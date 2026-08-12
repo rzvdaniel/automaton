@@ -45,10 +45,12 @@ public sealed class RoleBasedWorkExecutor(
         var cancelled = false;
         var disposedForCi = false;
         var publicationStarted = false;
+        var currentRole = (string?)null;
         try
         {
             await client.InitializeAsync(cancellationToken);
 
+            currentRole = AgentRoles.Manager;
             Record("role.started", attempt.WorkItem.Id, "engineering", AgentRoles.Manager, "Manager role started.");
             var manager = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Manager, async () =>
             {
@@ -57,12 +59,14 @@ public sealed class RoleBasedWorkExecutor(
             }, cancellationToken);
             if (manager.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(manager.Summary);
 
+            currentRole = AgentRoles.Developer;
             Record("role.started", attempt.WorkItem.Id, "engineering", AgentRoles.Developer, "Developer role started.");
             var developerThread = await client.StartThreadAsync(cancellationToken);
             var developer = await RunDeveloperAsync(client, developerThread, prompts.Developer(attempt, workspace, manager), cancellationToken);
             if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
 
             var reviewerThread = await client.StartThreadAsync(cancellationToken);
+            currentRole = AgentRoles.Reviewer;
             Record("role.started", attempt.WorkItem.Id, "engineering-review", AgentRoles.Reviewer, "Independent Reviewer role started.");
             var reviewerPrompt = prompts.Reviewer(attempt, workspace, manager, developer);
             ReviewerHandoff? approvedReview = null;
@@ -133,7 +137,20 @@ public sealed class RoleBasedWorkExecutor(
             cancelled = true;
             outcome = RunOutcome.PermanentFailure("Execution was cancelled.");
         }
-        catch (CodexIdleTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
+        catch (CodexIdleTimeoutException exception)
+        {
+            var idleMilliseconds = Math.Max(0, (DateTimeOffset.UtcNow - client.LastActivityUtc).TotalMilliseconds);
+            telemetry?.Record("codex.turn.idle_timeout", OperatorEventSeverities.Warning, attempt.WorkItem.Id, "engineering", currentRole,
+                "Codex turn reached the configured protocol-idle timeout.", new Dictionary<string, string>
+                {
+                    ["lastActivityUtc"] = client.LastActivityUtc.ToUniversalTime().ToString("O"),
+                    ["lastEventType"] = client.LastEventType ?? "unknown",
+                    ["idleMilliseconds"] = ((long)idleMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["timeoutMilliseconds"] = ((long)client.IdleTimeout.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["processAlive"] = client.IsProcessAlive?.ToString().ToLowerInvariant() ?? "unknown"
+                });
+            outcome = RunOutcome.RetryableFailure(Bounded(exception.Message));
+        }
         catch (CodexProcessExitedException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (CodexLaunchException exception)
         {

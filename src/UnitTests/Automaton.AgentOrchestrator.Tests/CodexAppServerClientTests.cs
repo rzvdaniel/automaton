@@ -44,6 +44,31 @@ public sealed class CodexAppServerClientTests
     }
 
     [Test]
+    public async Task LastActivityClassificationIsBoundedToRecognizedProtocolValues()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message => RespondNormally(transport, message);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        var before = client.LastActivityUtc;
+        await client.StartThreadAsync(CancellationToken.None);
+        Assert.That(client.LastEventType, Is.EqualTo("response"));
+
+        transport.Emit("{\"method\":\"item/completed\",\"params\":{\"threadId\":\"thread-1\"}}");
+        await EventuallyAsync(() => client.LastEventType == "item/completed");
+        var recognizedAt = client.LastActivityUtc;
+        transport.Emit("{\"method\":\"evil.secret.payload\",\"params\":{}}");
+        await EventuallyAsync(() => client.LastEventType == "unknown-notification");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(recognizedAt, Is.GreaterThanOrEqualTo(before));
+            Assert.That(client.LastEventType, Is.EqualTo("unknown-notification"));
+            Assert.That(client.LastEventType, Does.Not.Contain("evil.secret.payload"));
+        });
+    }
+
+    [Test]
     public async Task Requests_AreCorrelatedWhenResponsesArriveOutOfOrder()
     {
         var transport = new ScriptedTransport();

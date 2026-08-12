@@ -25,6 +25,7 @@ public interface ICodexJsonRpcTransport : IAsyncDisposable
     string LaunchNonce { get; }
     CodexProcessIdentity? Identity { get; }
     DurableExecutionIdentity? DurableIdentity { get; }
+    bool? IsProcessAlive => null;
     Task StartAsync(CancellationToken cancellationToken);
     Task SendAsync(string message, CancellationToken cancellationToken);
     IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
@@ -75,6 +76,9 @@ public sealed class CodexAppServerClient(
     public Workspace? CurrentWorkspace => ownership.CurrentWorkspace;
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
+    public string? LastEventType { get; private set; }
+    public TimeSpan IdleTimeout => idleTimeout;
+    public bool? IsProcessAlive => transport.IsProcessAlive;
     public IReadOnlyList<CodexSessionEvent> Events { get { lock (events) return events.ToArray(); } }
     internal int PendingRequestCount => pending.Count;
     internal int BufferedEarlyTurnResultCount { get { lock (turnGate) return earlyTurnResults.Count; } }
@@ -218,6 +222,7 @@ public sealed class CodexAppServerClient(
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
         lastActivityUtc = clock.UtcNow;
+        LastEventType = ClassifyEvent(root);
         if (root.TryGetProperty("id", out var id) && id.TryGetInt64(out var requestId))
         {
             if (!pending.TryGetValue(requestId, out var completion)) return;
@@ -241,6 +246,20 @@ public sealed class CodexAppServerClient(
             case CodexAppServerMethods.TurnCompleted: CompleteTurn(parameters, threadId, turnId); break;
             default: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
         }
+    }
+
+    private static string ClassifyEvent(JsonElement root)
+    {
+        if (!root.TryGetProperty("method", out var methodProperty)) return "response";
+        return methodProperty.GetString() switch
+        {
+            CodexAppServerMethods.TurnStarted => CodexAppServerMethods.TurnStarted,
+            CodexAppServerMethods.ItemStarted => CodexAppServerMethods.ItemStarted,
+            CodexAppServerMethods.ItemCompleted => CodexAppServerMethods.ItemCompleted,
+            CodexAppServerMethods.TokenUsageUpdated => CodexAppServerMethods.TokenUsageUpdated,
+            CodexAppServerMethods.TurnCompleted => CodexAppServerMethods.TurnCompleted,
+            _ => "unknown-notification"
+        };
     }
 
     private void CompleteTurn(JsonElement parameters, string? threadId, string? turnId)

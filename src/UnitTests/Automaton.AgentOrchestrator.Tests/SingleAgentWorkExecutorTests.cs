@@ -36,6 +36,31 @@ public sealed class SingleAgentWorkExecutorTests
     }
 
     [Test]
+    public async Task IdleTimeoutIsObservableOnceWithoutChangingRetryClassification()
+    {
+        var fixture = Create(ManagerReady());
+        fixture.Client.WaitFailure = new CodexIdleTimeoutException();
+        fixture.Client.LastEventTypeValue = "item/completed";
+        fixture.Client.LastActivityValue = DateTimeOffset.UtcNow.AddMinutes(-15);
+        fixture.Client.IdleTimeoutValue = TimeSpan.FromMinutes(15);
+        fixture.Client.ProcessAliveValue = true;
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        var events = fixture.Telemetry.Events.Where(value => value.EventType == "codex.turn.idle_timeout").ToList();
+        var diagnostic = events.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(events, Has.Count.EqualTo(1));
+            Assert.That(outcome.IsRetryable, Is.True);
+            Assert.That(diagnostic.Metadata!["lastEventType"], Is.EqualTo("item/completed"));
+            Assert.That(diagnostic.Metadata["processAlive"], Is.EqualTo("true"));
+            Assert.That(diagnostic.Message, Does.Not.Contain("item/completed"));
+            Assert.That(diagnostic.Metadata.Values, Has.None.Contain("secret"));
+        });
+    }
+
+    [Test]
     public async Task RolesRunInOrderOnDistinctThreadsUnderOneClientLease()
     {
         var fixture = Create(ManagerReady(), DeveloperCompleted(), ReviewerApproved());
@@ -558,7 +583,6 @@ public sealed class SingleAgentWorkExecutorTests
         private Workspace current = workspace;
         public Workspace? CurrentWorkspace => current;
         public CodexProcessIdentity? ProcessIdentity => null;
-        public DateTimeOffset LastActivityUtc => DateTimeOffset.UtcNow;
         public IReadOnlyList<CodexSessionEvent> Events => [];
         public List<string> StartedThreadIds { get; } = [];
         public List<string> TurnThreadIds { get; } = [];
@@ -567,6 +591,14 @@ public sealed class SingleAgentWorkExecutorTests
         public bool Quarantined { get; set; }
         public Exception? InitializeFailure { get; set; }
         public Exception? WaitFailure { get; set; }
+        public DateTimeOffset LastActivityValue { get; set; } = DateTimeOffset.UtcNow;
+        public string? LastEventTypeValue { get; set; }
+        public TimeSpan IdleTimeoutValue { get; set; } = TimeSpan.FromMinutes(15);
+        public bool? ProcessAliveValue { get; set; }
+        public DateTimeOffset LastActivityUtc => LastActivityValue;
+        public string? LastEventType => LastEventTypeValue;
+        public TimeSpan IdleTimeout => IdleTimeoutValue;
+        public bool? IsProcessAlive => ProcessAliveValue;
         public int? WaitFailureAtCall { get; set; }
         private int waitCallCount;
         public Task InitializeAsync(CancellationToken cancellationToken) { current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active, LaunchNonce = "run" }; if (InitializeFailure is not null) throw InitializeFailure; return Task.CompletedTask; }
