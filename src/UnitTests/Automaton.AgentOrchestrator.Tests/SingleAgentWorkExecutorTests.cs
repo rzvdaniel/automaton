@@ -14,6 +14,28 @@ public sealed class SingleAgentWorkExecutorTests
     private const string WorkspacePath = "C:\\isolated-workspaces\\work-123";
 
     [Test]
+    public async Task LaunchFailureIsObservableWhileQuarantineRemainsFailClosed()
+    {
+        var fixture = Create();
+        fixture.Client.Quarantined = true;
+        fixture.Client.InitializeFailure = new CodexLaunchException("process-start", "The Codex process could not be started.");
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        var launchEvent = fixture.Telemetry.Events.Single(value => value.EventType == "codex.launch.failed");
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Is.EqualTo("Codex launch failed; execution ownership was quarantined."));
+            Assert.That(fixture.Client.CurrentWorkspace!.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
+            Assert.That(fixture.Telemetry.Events.Count(value => value.EventType == "codex.launch.failed"), Is.EqualTo(1));
+            Assert.That(launchEvent.Message, Does.Not.Contain("process-start"));
+            Assert.That(launchEvent.Metadata!["category"], Is.EqualTo("process-start"));
+            Assert.That(launchEvent.Metadata["reason"], Is.EqualTo("process start failed"));
+        });
+    }
+
+    [Test]
     public async Task RolesRunInOrderOnDistinctThreadsUnderOneClientLease()
     {
         var fixture = Create(ManagerReady(), DeveloperCompleted(), ReviewerApproved());
@@ -466,7 +488,8 @@ public sealed class SingleAgentWorkExecutorTests
             Agent = new AgentExecutionOptions { MaxConcurrentAgents = 1, MaxTurns = 2, ManagerMaxTurns = 2, DeveloperMaxTurns = 2, ReviewerMaxTurns = 2, MaxReviewRounds = maxReviewRounds }
         });
         var publisher = new FakePublisher();
-        return new(new RoleBasedWorkExecutor(manager, guard, factory, publisher, workflow), manager, factory, client, publisher);
+        var telemetry = new FakeTelemetry();
+        return new(new RoleBasedWorkExecutor(manager, guard, factory, publisher, workflow, telemetry: telemetry), manager, factory, client, publisher, telemetry);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("issue-42", "ACME-42", "Correct the widget", "Full issue body", "open", ["agent:ready", "bug"]), 1, DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
@@ -482,7 +505,16 @@ public sealed class SingleAgentWorkExecutorTests
     private static CodexTurnResult FailedTurn() => TurnFailure("failed");
     private static CodexTurnResult TurnFailure(string status) => new("unused", Guid.NewGuid().ToString("N"), status, "temporary model failure");
 
-    private sealed record Fixture(RoleBasedWorkExecutor Executor, FakeWorkspaceManager Workspaces, FakeCodexFactory Factory, FakeCodexClient Client, FakePublisher Publisher);
+    private sealed record Fixture(RoleBasedWorkExecutor Executor, FakeWorkspaceManager Workspaces, FakeCodexFactory Factory, FakeCodexClient Client, FakePublisher Publisher, FakeTelemetry Telemetry);
+    private sealed class FakeTelemetry : IOperatorTelemetry
+    {
+        public List<OperatorEvent> Events { get; } = [];
+        public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null)
+            => Events.Add(new(Events.Count + 1, DateTimeOffset.UtcNow, eventType, severity, workItemId, stage, role, message, metadata));
+        public OperatorEvent? LatestFor(string workItemId) => Events.LastOrDefault(value => value.WorkItemId == workItemId);
+        public void SetDaemonState(string state, string? error = null) { }
+        public (string State, string? LastError) DaemonState() => (OperatorDaemonStates.Running, null);
+    }
     private sealed class FakePublisher : IWorkPublisher
     {
         public List<PublicationRequest> Requests { get; } = [];
