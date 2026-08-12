@@ -104,6 +104,9 @@ public interface ICodexAppServerClient : IAsyncDisposable
     Workspace? CurrentWorkspace { get; }
     CodexProcessIdentity? ProcessIdentity { get; }
     DateTimeOffset LastActivityUtc { get; }
+    string? LastEventType => null;
+    TimeSpan IdleTimeout => Timeout.InfiniteTimeSpan;
+    bool? IsProcessAlive => null;
     IReadOnlyList<CodexSessionEvent> Events { get; }
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken);
