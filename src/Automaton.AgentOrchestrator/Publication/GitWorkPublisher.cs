@@ -429,11 +429,11 @@ Refs {Sanitize(issueReference)}
     private static string RequireSha(string value) => value.Length == 40 && value.All(Uri.IsHexDigit) ? value.ToLowerInvariant() : throw new PublicationException("Git returned an invalid commit SHA.");
     private static bool PathsEqual(string left, string right) => string.Equals(Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
-    private static bool ContainsWorktree(string porcelain, string path, string branch)
+    internal static bool ContainsWorktree(string porcelain, string path, string branch)
         => porcelain.Replace("\r\n", "\n", StringComparison.Ordinal).Split("\n\n", StringSplitOptions.RemoveEmptyEntries)
-            .Any(block => block.Split('\n').Contains($"worktree {Path.GetFullPath(path)}", StringComparerForPaths)
+            .Any(block => block.Split('\n').FirstOrDefault(line => line.StartsWith("worktree ", StringComparison.Ordinal)) is { } worktreeLine
+                          && PathsEqual(worktreeLine[9..].Trim(), path)
                           && block.Split('\n').Contains($"branch refs/heads/{branch}", StringComparer.Ordinal));
-    private static StringComparer StringComparerForPaths => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     internal static bool TryParseGitHubRepository(string remote, out string host, out string identity)
     {
