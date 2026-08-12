@@ -56,4 +56,6 @@ public sealed record OperatorStatusSnapshot(
     bool Healthy,
     string RepositoryIdentity,
     IReadOnlyList<OperatorRunStatus> Runs,
-    string? LastError = null);
+    string? LastError = null,
+    string ApplicationVersion = "unknown",
+    string BuildRevision = "unknown");

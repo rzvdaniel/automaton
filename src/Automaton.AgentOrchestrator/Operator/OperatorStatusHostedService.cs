@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Hosting;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Hosting;
@@ -12,7 +13,8 @@ public sealed class OperatorStatusHostedService(
     IOperatorTelemetry telemetry,
     IClock clock,
     OrchestratorOptions options,
-    ILogger<OperatorStatusHostedService> logger) : BackgroundService
+    ILogger<OperatorStatusHostedService> logger,
+    IBuildIdentity? buildIdentity = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -54,12 +56,13 @@ public sealed class OperatorStatusHostedService(
             return new OperatorRunStatus(run.WorkItemId, run.State, run.Attempt, run.UpdatedAtUtc, latest?.Stage, latest?.Role,
                 record?.Workspace.Key, record?.Workspace.Path, record?.Workspace.Branch, record?.Publication?.PullRequestUrl,
                 record?.Publication?.CommitSha, record?.Ci?.Status, record?.ReviewFeedback?.Status, record?.Workspace.ExecutionOwnershipStatus,
-                run.RetryAtUtc, Bound(run.FailureReason ?? record?.Recovery.Reason), record?.Ci?.LastObservedAtUtc, record?.ReviewFeedback?.LastObservedAtUtc);
+                run.RetryAtUtc, FileOperatorTelemetry.SanitizeDiagnostic(run.FailureReason ?? record?.Recovery.Reason), record?.Ci?.LastObservedAtUtc, record?.ReviewFeedback?.LastObservedAtUtc);
         }).OrderBy(run => run.WorkItemId, StringComparer.Ordinal).ToArray();
         var daemon = telemetry.DaemonState();
         try
         {
-            files.WriteSnapshot(new(1, clock.UtcNow, daemon.State, orchestrator.IsStartupReconciled, healthy && daemon.State != OperatorDaemonStates.Degraded, options.Repository.Identity, runs, error ?? daemon.LastError));
+            var build = buildIdentity?.Current ?? new BuildIdentity("unknown", "unknown");
+            files.WriteSnapshot(new(1, clock.UtcNow, daemon.State, orchestrator.IsStartupReconciled, healthy && daemon.State != OperatorDaemonStates.Degraded, options.Repository.Identity, runs, error ?? daemon.LastError, build.Version, build.Revision));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -75,5 +78,4 @@ public sealed class OperatorStatusHostedService(
         await base.StopAsync(cancellationToken);
     }
 
-    private static string? Bound(string? value) => value is null ? null : value.Length <= 512 ? value : value[..512];
 }

@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAgentOrchestrator(this IServiceCollection services)
     {
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IBuildIdentity, AssemblyBuildIdentity>();
         services.AddSingleton<IOperatorTelemetry>(services => services.GetRequiredService<OrchestratorOptions>().Observability.Enabled
             ? new FileOperatorTelemetry(services.GetRequiredService<OrchestratorOptions>(), services.GetRequiredService<IClock>())
             : new NoopOperatorTelemetry());
