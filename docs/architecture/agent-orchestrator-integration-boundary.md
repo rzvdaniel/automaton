@@ -24,7 +24,7 @@ Stage 14 introduces the provider-neutral `IOrchestratorStatusQuery` contract and
 
 ## Versioned read contract
 
-`OrchestratorStatusQueryResult.schemaVersion` versions the external integration envelope independently from the internal sidecar and operator-file schemas. Consumers must reject unsupported versions. Availability is explicit: missing, malformed, oversized, unreadable, or unsupported local status produces a bounded `unavailable` result rather than invented healthy state.
+`OrchestratorStatusQueryResult.schemaVersion` versions the external integration envelope independently from the internal sidecar and operator-file schemas. Consumers must reject unsupported versions. Availability is explicit: missing, syntactically or semantically malformed, oversized, unreadable, or unsupported local status produces a bounded `unavailable` result rather than invented healthy state. Schema version alone is insufficient: the local adapter validates required daemon/repository/build identity, run identity/state/attempt/timestamps, unique ordinal work-item IDs, and optional exact-SHA structure before mapping.
 
 The snapshot exposes only normalized orchestration concepts:
 
