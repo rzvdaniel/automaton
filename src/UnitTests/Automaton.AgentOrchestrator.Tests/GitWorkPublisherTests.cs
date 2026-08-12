@@ -10,6 +10,19 @@ namespace Automaton.AgentOrchestrator.Tests;
 [TestFixture]
 public sealed class GitWorkPublisherTests
 {
+    [Test]
+    public void ContainsWorktreeUsesSemanticPathAndExactBranch()
+    {
+        var path = OperatingSystem.IsWindows() ? @"C:\Work\example" : "/tmp/example";
+        var gitPath = OperatingSystem.IsWindows() ? "C:/Work/example" : "/tmp/example";
+        var porcelain = $"worktree {gitPath}\nHEAD abc\nbranch refs/heads/automaton/work/7\n\nworktree /unrelated\nHEAD def\nbranch refs/heads/other";
+        Assert.Multiple(() =>
+        {
+            Assert.That(GitWorkPublisher.ContainsWorktree(porcelain, path, "automaton/work/7"), Is.True);
+            Assert.That(GitWorkPublisher.ContainsWorktree(porcelain, path, "automaton/work/wrong"), Is.False);
+            Assert.That(GitWorkPublisher.ContainsWorktree(porcelain, path + "-wrong", "automaton/work/7"), Is.False);
+        });
+    }
     private string root = null!;
     private string workspacePath = null!;
     private static readonly string BaseSha = new('a', 40);
