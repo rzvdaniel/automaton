@@ -133,7 +133,7 @@ reviewed_head_sha: {request.Target.HeadSha}
 human_feedback:
 {Feedback(request.Feedback)}
 Inspect the actual workspace and current diff. Address only relevant, actionable feedback within the original issue scope, validate, and self-review. Do not commit, push, create/modify a PR, post comments, access provider credentials, or mutate provider state.
-Return AUTOMATON_DEVELOPER_RESULT JSON using the existing structured contract.
+{RolePromptBuilder.DeveloperTerminalContract}
 """;
     private static string DeveloperCorrectionPrompt(ReviewFeedbackRemediationRequest request, DeveloperHandoff developer, ReviewerHandoff reviewer)
         => DeveloperPrompt(request) + $"\nPrior Developer summary: {Escape(developer.Summary)}\nIndependent Reviewer findings: {Escape(string.Join("; ", reviewer.Findings.Select(x => x.Description)))}\nCorrect the findings in the current workspace.";
