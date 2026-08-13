@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Ci;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
@@ -70,7 +71,15 @@ public sealed class ReviewFeedbackShepherd(
                 return ReviewFeedbackResult.Blocked("Feedback remediation returned an invalid publication identity.", current.HeadSha, round);
             round++;
             var next = current with { HeadSha = publication.CommitSha, RemediationRound = round, PublicationRevision = current.PublicationRevision + 1 };
-            var ciResult = await ci.ShepherdAsync(new(next.RepositoryIdentity, next.PullRequestNumber, next.HeadBranch, next.HeadSha), workspace, workItem, cancellationToken);
+            CiShepherdResult ciResult;
+            try
+            {
+                ciResult = await ci.ShepherdAsync(new(next.RepositoryIdentity, next.PullRequestNumber, next.HeadBranch, next.HeadSha), workspace, workItem, cancellationToken);
+            }
+            catch (CiProviderException exception)
+            {
+                return ReviewFeedbackResult.Blocked("human feedback CI failed", next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, exception.IsRetryable);
+            }
             if (!ciResult.Succeeded)
                 return ReviewFeedbackResult.Blocked("human feedback CI failed", ciResult.HeadSha ?? next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, ciResult.IsRetryable);
             current = next with { HeadSha = ciResult.HeadSha ?? next.HeadSha, PublicationRevision = next.PublicationRevision + ciResult.RemediationRound };

@@ -31,11 +31,16 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
 
         var pull = await GetJsonAsync<PullResponse>(new(options.ApiBaseUri, $"repos/{Encode(options.Owner)}/{Encode(options.Repository)}/pulls/{target.PullRequestNumber}"), cancellationToken)
             ?? throw new CiProviderException("GitHub returned an empty pull-request identity response.");
-        if (!string.Equals(pull.State, "open", StringComparison.OrdinalIgnoreCase) || pull.Draft != true
-            || !string.Equals(pull.Head?.Ref, target.HeadBranch, StringComparison.Ordinal)
-            || !string.Equals(pull.Head?.Sha, target.HeadSha, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(pull.Base?.Repository?.FullName, target.RepositoryIdentity, StringComparison.OrdinalIgnoreCase))
-            throw new CiProviderException("GitHub pull-request head does not match the exact CI target.");
+        if (!string.Equals(pull.Base?.Repository?.FullName, target.RepositoryIdentity, StringComparison.OrdinalIgnoreCase))
+            throw new CiProviderException("GitHub pull-request repository does not match the exact CI target.");
+        if (!string.Equals(pull.State, "open", StringComparison.OrdinalIgnoreCase))
+            throw new CiProviderException("GitHub pull request is not open.");
+        if (pull.Draft != true)
+            throw new CiProviderException("GitHub pull request is not a draft.");
+        if (!string.Equals(pull.Head?.Ref, target.HeadBranch, StringComparison.Ordinal))
+            throw new CiProviderException("GitHub pull-request branch does not match the exact CI target.");
+        if (!string.Equals(pull.Head?.Sha, target.HeadSha, StringComparison.OrdinalIgnoreCase))
+            throw new CiProviderException("GitHub pull-request head does not match the exact CI target.", true);
 
         var checkRuns = await GetCheckRunsAsync(target.HeadSha, cancellationToken);
         var commitStatuses = await GetCommitStatusesAsync(target.HeadSha, cancellationToken);
