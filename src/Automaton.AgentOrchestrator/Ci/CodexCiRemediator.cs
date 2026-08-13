@@ -97,7 +97,7 @@ failing_head_sha: {request.Target.HeadSha}
 ci_failure_context:
 {Checks(request.Failure)}
 Inspect the actual workspace, reproduce failures locally when practical, make only scoped fixes, validate and self-review. Do not commit, push, create/modify a PR, access provider credentials, or mutate provider state.
-Return AUTOMATON_DEVELOPER_RESULT JSON using the existing structured contract.
+{RolePromptBuilder.DeveloperTerminalContract}
 """;
     private static string DeveloperCorrectionPrompt(CiRemediationRequest request, DeveloperHandoff developer, ReviewerHandoff reviewer) => DeveloperPrompt(request) + $"\nPrior Developer summary: {Escape(developer.Summary)}\nIndependent Reviewer findings: {Escape(string.Join("; ", reviewer.Findings.Select(x => x.Description)))}\nCorrect the findings in the current workspace.";
     internal static string ReviewerPrompt(CiRemediationRequest request, DeveloperHandoff developer, ReviewerHandoff? prior) => $"""
