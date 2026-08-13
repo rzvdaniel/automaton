@@ -153,6 +153,7 @@ public static class RoleResultContracts
 public sealed class RolePromptBuilder(WorkflowDefinition workflow)
 {
     public const string DeveloperTerminalContract = "End with exactly one terminal line:\nAUTOMATON_DEVELOPER_RESULT: {\"status\":\"CONTINUE|COMPLETED|BLOCKED\",\"summary\":\"bounded text\",\"validation\":\"bounded text\",\"remainingConcerns\":\"bounded text\"}";
+    public const string ReviewerTerminalContract = "End with exactly one terminal line:\nAUTOMATON_REVIEW_RESULT: {\"verdict\":\"CONTINUE|APPROVED|CHANGES_REQUIRED|BLOCKED\",\"summary\":\"bounded text\",\"findings\":[{\"severity\":\"blocking|important|minor\",\"description\":\"bounded text\",\"filePath\":\"optional\",\"line\":1}]}";
     public string Manager(RunAttempt attempt, Workspace workspace)
         => Common(attempt, workspace) + """
 
@@ -230,7 +231,7 @@ AUTOMATON_REVIEW_RESULT: {"verdict":"CONTINUE|APPROVED|CHANGES_REQUIRED|BLOCKED"
 """;
 
     public static string Continue(string role, string boundedSummary)
-        => $"Continue the same {role} role in its existing thread. Prior structured status summary: {Bound(boundedSummary)}. Complete the role contract; do not change roles.{(role == AgentRoles.Developer ? "\n" + DeveloperTerminalContract : string.Empty)}";
+        => $"Continue the same {role} role in its existing thread. Prior structured status summary: {Bound(boundedSummary)}. Complete the role contract; do not change roles.{role switch { AgentRoles.Developer => "\n" + DeveloperTerminalContract, AgentRoles.Reviewer => "\n" + ReviewerTerminalContract, _ => string.Empty }}";
 
     private string Common(RunAttempt attempt, Workspace workspace)
     {

@@ -25,6 +25,24 @@ public sealed class ReviewFeedbackPromptTests
         Assert.That(prompt, Does.Contain(RolePromptBuilder.DeveloperTerminalContract));
     }
 
+    [Test]
+    public void FeedbackReviewerPromptAndContinuationUseExactTerminalContract()
+    {
+        var request = new ReviewFeedbackRemediationRequest(new("acme/widgets", 42, "branch", new string('a', 40)), new("key", "C:/assigned", "branch", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce", "acme/widgets"), new("id", "#1", "title", null, "open", []), new(new string('a', 40), ReviewFeedbackStatuses.Actionable, []), 1);
+        var prompt = CodexReviewFeedbackRemediator.ReviewerPrompt(request, new(RoleResultStatuses.Completed, "fixed", "tests", "none"), null);
+        Assert.Multiple(() => { Assert.That(prompt, Does.Contain(RolePromptBuilder.ReviewerTerminalContract)); Assert.That(RolePromptBuilder.Continue(AgentRoles.Reviewer, "more"), Does.Contain(RolePromptBuilder.ReviewerTerminalContract)); });
+    }
+
+    [TestCase("malformed-reviewer-contract")]
+    [TestCase("reviewer-turn-limit")]
+    [TestCase("reviewer-blocked")]
+    [TestCase("read-only-boundary-violated")]
+    public void ReviewerFailuresRemainBounded(string subcategory)
+    {
+        var failure = CodexReviewFeedbackRemediator.ReviewerFailure(subcategory, false);
+        Assert.Multiple(() => { Assert.That(failure.Category, Is.EqualTo(ReviewFeedbackFailureCategories.Reviewer)); Assert.That(failure.Subcategory, Is.EqualTo(subcategory)); Assert.That(failure.SafeReason, Is.EqualTo("human feedback Reviewer remediation failed")); });
+    }
+
     [TestCase(ReviewFeedbackFailureCategories.Developer)]
     [TestCase(ReviewFeedbackFailureCategories.Reviewer)]
     [TestCase(ReviewFeedbackFailureCategories.Publication)]

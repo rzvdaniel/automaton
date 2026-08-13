@@ -112,7 +112,7 @@ ci_failure_context:
 Developer summary: {Escape(developer.Summary)}
 Prior review: {Escape(prior?.Summary ?? "none")}
 Inspect the real current diff and validate the CI fix, regression risk, scope, and preservation of the original intent.
-Return AUTOMATON_REVIEW_RESULT JSON using APPROVED, CHANGES_REQUIRED, or BLOCKED.
+{RolePromptBuilder.ReviewerTerminalContract}
 """;
     private static string Checks(CiSnapshot snapshot)
     {
