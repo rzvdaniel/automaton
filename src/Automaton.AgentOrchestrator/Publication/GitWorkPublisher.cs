@@ -212,6 +212,30 @@ public sealed class GitWorkPublisher(
             existing.Number, existing.Url, existing.Draft);
     }
 
+    public async Task<PublicationResult> RecoverAuthorizedWithoutCommitAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken)
+    {
+        var publication = record.Publication;
+        if (publication is not { State: PublicationStates.Authorized, CommitSha: null, AuthorizedParentSha: not null,
+            Revision: > 1, RemoteBranch: not null, PullRequestNumber: > 0, PullRequestUrl: not null }
+            || record.Workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None)
+            throw new PublicationException("Durable authorized publication is not a safe no-op recovery candidate.");
+        var parent = RequireSha(publication.AuthorizedParentSha);
+        ValidateWorkspaceForPublication(record.Workspace, requireActiveOwnership: false);
+        await ValidateGitStateAsync(record.Workspace, cancellationToken);
+        var localHead = RequireSha((await GitAsync(record.Workspace.Path, ["rev-parse", "HEAD"], "verify authorized publication parent", cancellationToken)).StandardOutput.Trim());
+        if (!string.Equals(localHead, parent, StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Authorized publication workspace HEAD does not match its parent.");
+        await VerifyRemoteBranchAsync(record.Workspace, parent, cancellationToken);
+        var request = new PullRequestPublicationRequest(options.Repository.Identity, record.Workspace.Branch, parent, options.Repository.BaseBranch, string.Empty, string.Empty);
+        var existing = await pullRequests.FindExactAsync(request, publication.PullRequestNumber.Value, cancellationToken)
+            ?? throw new PublicationException("The authorized publication pull request no longer matches its parent.");
+        ValidatePullRequest(existing, record.Workspace, parent, options.Repository.BaseBranch);
+        var authoritative = new PublicationRecoveryState(PublicationStates.PullRequestCreated, parent, record.Workspace.Branch,
+            existing.Number, existing.Url, publication.Revision - 1, publication.AuthorizedParentSha);
+        await workspaces.ReconcileAuthorizedWithoutCommitAsync(record.Workspace, authoritative, CancellationToken.None);
+        return new(options.Repository.Identity, record.Workspace.Branch, parent, existing.Number, existing.Url, existing.Draft);
+    }
+
     private void ValidateWorkspaceForPublication(Workspace workspace, bool requireActiveOwnership)
     {
         var expectedOwnership = requireActiveOwnership ? WorkspaceExecutionOwnershipStates.Active : WorkspaceExecutionOwnershipStates.None;

@@ -47,7 +47,7 @@ public sealed class ReviewFeedbackShepherd(
                 consumed.RepositoryIdentity.Equals(current.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
                 && consumed.PullRequestNumber == current.PullRequestNumber
                 && consumed.FeedbackId == item.Id
-                && consumed.Version == (item.CommitSha ?? current.HeadSha))).ToArray();
+                && consumed.Version == FeedbackVersion(item))).ToArray();
             if (snapshot.Status == ReviewFeedbackStatuses.Actionable && actionable.Length == 0)
             {
                 telemetry?.Record("human-feedback.replay-suppressed", OperatorEventSeverities.Information, workItem.Id, "human-feedback", metadata: new Dictionary<string, string> { ["count"] = snapshot.Items.Count.ToString() });
@@ -95,11 +95,13 @@ public sealed class ReviewFeedbackShepherd(
             if (!ciResult.Succeeded)
                 return ReviewFeedbackResult.Blocked("human feedback CI failed", ciResult.HeadSha ?? next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, ciResult.IsRetryable);
             current = next with { HeadSha = ciResult.HeadSha ?? next.HeadSha, PublicationRevision = next.PublicationRevision + ciResult.RemediationRound };
-            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, item.CommitSha ?? next.HeadSha, current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
+            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
             var state = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
             await workspaces.UpdateReviewFeedbackStateAsync(workspace, new(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(state?.Consumed ?? []), ..consumed]), CancellationToken.None);
         }
     }
+
+    private static string FeedbackVersion(ReviewFeedbackItem item) => item.Version ?? "unversioned";
 
     private static bool MatchesRevision(PublicationResult publication, ReviewFeedbackTarget current)
         => string.Equals(publication.Repository, current.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
