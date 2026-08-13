@@ -657,8 +657,14 @@ Sidecar schema v6 adds minimal exact-head feedback status, observation time, and
 remediation round. A new publication revision clears stale CI and feedback state.
 Restart recovery preserves execution fencing, publication provenance, CI, the
 feedback round budget, and exact PR/head binding before resuming the human-review
-wait. Review-feedback credentials are host-side and independent from tracker,
-publication, and CI provider selection.
+wait. For a durable `Working` run whose exact draft is already published, has
+passed CI, and is `awaiting-human` with no execution ownership, recovery performs
+one bounded provider validation of the open PR and exact head, then registers the
+normal long-lived feedback monitor after startup reconciliation completes. It
+does not rerun roles, validation, commit/push, PR creation, or CI. Any missing or
+mismatched durable/provider identity fails closed. Review-feedback credentials
+are host-side and independent from tracker, publication, and CI provider
+selection.
 
 ### Stage 12 observability and operator surface
 

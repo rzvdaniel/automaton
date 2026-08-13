@@ -17,7 +17,8 @@ public sealed class StartupReconciler(
     OrchestratorOptions options,
     ILogger<StartupReconciler> logger,
     ICiShepherd? ciShepherd = null,
-    IReviewFeedbackShepherd? reviewFeedbackShepherd = null)
+    IReviewFeedbackShepherd? reviewFeedbackShepherd = null,
+    IReviewFeedbackProvider? reviewFeedbackProvider = null)
 {
     public async Task ReconcileAsync(CancellationToken cancellationToken)
     {
@@ -47,6 +48,51 @@ public sealed class StartupReconciler(
                 {
                     decisions.Add(() => orchestrator.RestoreIneligible(record.WorkItemId, record.Recovery.NextAttempt,
                         "work item is absent or no longer eligible during publication recovery"));
+                    continue;
+                }
+
+                if (IsAwaitingHumanFeedbackRecovery(record))
+                {
+                    var targetIsValid = TryCreateAwaitingHumanFeedbackTarget(record, out var target, out var reason);
+                    if (!options.ReviewFeedback.Enabled
+                        || !targetIsValid
+                        || reviewFeedbackProvider is null || reviewFeedbackShepherd is null)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), reason ?? "human feedback recovery is not configured"));
+                        continue;
+                    }
+
+                    try
+                    {
+                        var snapshot = await reviewFeedbackProvider.GetAsync(target!, cancellationToken);
+                        if (!string.Equals(snapshot.HeadSha, target!.HeadSha, StringComparison.OrdinalIgnoreCase)
+                            || snapshot.Status is not (ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable or ReviewFeedbackStatuses.Approved))
+                        {
+                            decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                                Math.Max(record.Recovery.LastCompletedAttempt, 1), "review feedback provider returned an unexpected head SHA during recovery"));
+                            continue;
+                        }
+                    }
+                    catch (ReviewFeedbackProviderException exception) when (exception.IsRetryable)
+                    {
+                        throw;
+                    }
+                    catch (ReviewFeedbackProviderException exception)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
+                        continue;
+                    }
+
+                    var recoveredItem = item!;
+                    var recoveredTarget = target!;
+                    var attempt = Math.Max(record.Recovery.LastCompletedAttempt, 1);
+                    decisions.Add(() => orchestrator.RestoreAwaitingHumanFeedback(recoveredItem, attempt, async token =>
+                    {
+                        var feedback = await reviewFeedbackShepherd.ShepherdAsync(recoveredTarget, record.Workspace, recoveredItem, token);
+                        return feedback.Succeeded ? RunOutcome.Success() : RunOutcome.PermanentFailure(feedback.FailureReason ?? "human feedback remediation failed");
+                    }));
                     continue;
                 }
 
@@ -180,4 +226,43 @@ public sealed class StartupReconciler(
     private bool IsEligible(WorkItem item)
         => options.Tracker.ActiveProviderLifecycleStates.Contains(item.ProviderLifecycleState, StringComparer.OrdinalIgnoreCase)
            && options.Tracker.RequiredLabels.All(required => item.Labels.Contains(required, StringComparer.OrdinalIgnoreCase));
+
+    private static bool IsAwaitingHumanFeedbackRecovery(OwnedWorkspaceRecord record)
+        => record.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.None
+           && record.Publication?.State == PublicationStates.PullRequestCreated
+           && record.Ci?.Status == CiStatuses.Passed
+           && record.ReviewFeedback?.Status == ReviewFeedbackStatuses.AwaitingHuman;
+
+    private static bool TryCreateAwaitingHumanFeedbackTarget(OwnedWorkspaceRecord record, out ReviewFeedbackTarget? target, out string? reason)
+    {
+        target = null;
+        reason = null;
+        var publication = record.Publication;
+        var ci = record.Ci;
+        var feedback = record.ReviewFeedback;
+        if (publication is null || ci is null || feedback is null
+            || publication.PullRequestNumber is not > 0
+            || string.IsNullOrWhiteSpace(publication.PullRequestUrl)
+            || !Uri.TryCreate(publication.PullRequestUrl, UriKind.Absolute, out _)
+            || !IsSha(publication.CommitSha)
+            || !IsSha(ci.HeadSha)
+            || !IsSha(feedback.HeadSha)
+            || !string.Equals(ci.HeadSha, publication.CommitSha, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(feedback.HeadSha, publication.CommitSha, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(publication.RemoteBranch, record.Workspace.Branch, StringComparison.Ordinal)
+            || publication.Revision < 1
+            || ci.RemediationRound < 0
+            || feedback.RemediationRound < 0)
+        {
+            reason = "durable published draft state is inconsistent for human feedback recovery";
+            return false;
+        }
+
+        target = new ReviewFeedbackTarget(record.Workspace.RepositoryIdentity, publication.PullRequestNumber.Value,
+            record.Workspace.Branch, publication.CommitSha!, feedback.RemediationRound, publication.Revision);
+        return true;
+    }
+
+    private static bool IsSha(string? value)
+        => value is { Length: 40 } && value.All(Uri.IsHexDigit);
 }
