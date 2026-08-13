@@ -51,7 +51,9 @@ public interface IWorkPublisher
 {
     Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
     Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-    Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
+        => ValidateRevisionBaseAsync(workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
+    Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, bool allowWorkingTreeChanges, CancellationToken cancellationToken) => Task.CompletedTask;
     Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken);
 }
 

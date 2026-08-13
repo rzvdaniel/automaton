@@ -16,7 +16,7 @@ public sealed class CodexCiRemediator(
     public async Task<PublicationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken)
     {
         var currentPublication = new PublicationResult(request.Target.RepositoryIdentity, request.Target.HeadBranch, request.Target.HeadSha, request.Target.PullRequestNumber, string.Empty, true);
-        await publisher.ValidateRevisionBaseAsync(request.Workspace, currentPublication, cancellationToken);
+        await publisher.ValidateRevisionBaseAsync(request.Workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
         await using var client = clients.Create(request.Workspace, new Dictionary<string, string>());
         await client.InitializeAsync(cancellationToken);
         var developerThread = await client.StartThreadAsync(cancellationToken);

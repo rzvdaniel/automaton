@@ -358,12 +358,102 @@ public sealed class GitWorkPublisherTests
         });
     }
 
+    [Test]
+    public async Task ValidateRevisionBaseAsync_AllowsDirtyWorktreeOnlyWhenExplicitlyAuthorizedForFeedbackRemediation()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true };
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        await Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(git.Commands, Has.None.EqualTo("status --porcelain=v1 --untracked-files=all"));
+            Assert.That(git.Commands, Does.Contain("rev-parse HEAD"));
+            Assert.That(git.Commands, Does.Contain("ls-remote --heads origin refs/heads/automaton/work/7"));
+        });
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_DefaultAndCiPolicyRejectDirtyWorktree()
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        var defaultError = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true }, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), CancellationToken.None));
+        var ciError = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true }, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: false, CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(defaultError!.Message, Is.EqualTo("Workspace contains unrelated changes before CI remediation."));
+            Assert.That(ciError!.Message, Is.EqualTo("Workspace contains unrelated changes before CI remediation."));
+        });
+    }
+
+    [Test]
+    public async Task ValidateRevisionBaseAsync_CiPolicyAcceptsCleanExactBase()
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+        await Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = false }, new FakeWorkspaces(), new FakePullRequests())
+            .ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: false, CancellationToken.None);
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_RejectsDifferentLocalHeadEvenWhenWorktreeIsDirty()
+    {
+        var git = new FakeGit(workspacePath) { HasChanges = true, RemoteSha = CommitSha };
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None));
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_RejectsDifferentBranchOrPublicationHead()
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+        var publisher = Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha }, new FakeWorkspaces(), new FakePullRequests());
+
+        Assert.Multiple(() =>
+        {
+            Assert.ThrowsAsync<PublicationException>(() => publisher.ValidateRevisionBaseAsync(workspace, CurrentPublication() with { Branch = "automaton/work/other" }, CancellationToken.None));
+            Assert.ThrowsAsync<PublicationException>(() => publisher.ValidateRevisionBaseAsync(workspace, CurrentPublication() with { CommitSha = new string('c', 40) }, CancellationToken.None));
+        });
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_RejectsWorkspaceBranchThatDoesNotMatchTheRegisteredBranch()
+    {
+        var workspace = Request().Workspace with { Branch = "automaton/work/other", ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+        var publication = CurrentPublication() with { Branch = workspace.Branch };
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, publication, CancellationToken.None));
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_FeedbackPolicyStillRejectsChangedRemoteHead()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = new string('c', 40), HasChanges = true };
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None));
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_RejectsUnregisteredWorkspace()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, Registered = false };
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), CancellationToken.None));
+    }
+
     private GitWorkPublisher Create(FakeGit git, FakeWorkspaces workspaces, FakePullRequests prs, IReadOnlyList<string>? validation = null, IOperatorTelemetry? telemetry = null, int validationTimeoutMilliseconds = 600_000) => new(git, workspaces, prs, new OrchestratorOptions
     {
         Repository = new RepositoryOptions { Root = root, Identity = "acme/widgets", BaseBranch = "main" },
         Publication = new PublicationOptions { ValidationCommands = validation ?? [], ValidationTimeoutMilliseconds = validationTimeoutMilliseconds, GitName = "Automaton Agent", GitEmail = "agent@example.test", RemoteName = "origin", GitHubHost = "github.com" }
     }, telemetry);
     private PublicationRequest Request() => new(new Workspace("key", workspacePath, "automaton/work/7", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.Active, "nonce", "acme/widgets", BaseSha), new WorkItem("id", "acme/widgets#7", "Fix widget", "body", "open", []), new("READY", "plan", "steps", "tests", "risk"), new("COMPLETED", "done", "tests pass", "none"), new("APPROVED", "good", []));
+    private static PublicationResult CurrentPublication() => new("acme/widgets", "automaton/work/7", CommitSha, 42, "https://github.com/acme/widgets/pull/42", true);
     private OwnedWorkspaceRecord RecoveryRecord(string state)
     {
         var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
@@ -379,6 +469,7 @@ public sealed class GitWorkPublisherTests
         public bool Committed { get; set; }
         public bool PushFailure { get; set; }
         public bool RevisionCommitted { get; set; }
+        public bool Registered { get; set; } = true;
         public string? RemoteSha { get; set; }
         public string RemoteUrl { get; set; } = "git@github.com:acme/widgets.git";
         public string Provenance { get; set; } = "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget";
@@ -388,7 +479,7 @@ public sealed class GitWorkPublisherTests
             var command = string.Join(' ', args); Commands.Add(command);
             if (command == "rev-parse --show-toplevel") return Ok(path);
             if (command == "symbolic-ref --quiet --short HEAD") return Ok("automaton/work/7");
-            if (command == "worktree list --porcelain") return Ok($"worktree {Path.GetFullPath(path)}\nHEAD {BaseSha}\nbranch refs/heads/automaton/work/7");
+            if (command == "worktree list --porcelain") return Ok($"worktree {Path.GetFullPath(Registered ? path : path + "-other")}\nHEAD {BaseSha}\nbranch refs/heads/automaton/work/7");
             if (command == "rev-parse refs/heads/main") return Ok(BaseSha);
             if (command == "diff --name-only --diff-filter=U") return Ok(Unmerged ? "conflicted.txt" : "");
             if (command.StartsWith("rev-parse --git-path ")) return Ok(Path.Combine(path, ".git", "absent-" + args[^1]));

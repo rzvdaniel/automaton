@@ -95,7 +95,10 @@ public sealed class GitWorkPublisher(
         return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
     }
 
-    public async Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
+    public Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
+        => ValidateRevisionBaseAsync(workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
+
+    public async Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, bool allowWorkingTreeChanges, CancellationToken cancellationToken)
     {
         ValidateWorkspaceForPublication(workspace, requireActiveOwnership: false);
         if (!string.Equals(currentPublication.Repository, workspace.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
@@ -107,8 +110,11 @@ public sealed class GitWorkPublisher(
         var head = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "verify CI remediation local head", cancellationToken)).StandardOutput.Trim());
         if (!string.Equals(head, currentPublication.CommitSha, StringComparison.OrdinalIgnoreCase))
             throw new PublicationException("Local workspace HEAD does not match the published CI target.");
-        var status = await GitAsync(workspace.Path, ["status", "--porcelain=v1", "--untracked-files=all"], "verify clean CI remediation base", cancellationToken);
-        if (!string.IsNullOrWhiteSpace(status.StandardOutput)) throw new PublicationException("Workspace contains unrelated changes before CI remediation.");
+        if (!allowWorkingTreeChanges)
+        {
+            var status = await GitAsync(workspace.Path, ["status", "--porcelain=v1", "--untracked-files=all"], "verify clean CI remediation base", cancellationToken);
+            if (!string.IsNullOrWhiteSpace(status.StandardOutput)) throw new PublicationException("Workspace contains unrelated changes before CI remediation.");
+        }
         await VerifyRemoteBranchAsync(workspace, currentPublication.CommitSha, cancellationToken);
         var lookup = new PullRequestPublicationRequest(options.Repository.Identity, workspace.Branch, currentPublication.CommitSha, options.Repository.BaseBranch, string.Empty, string.Empty);
         _ = await pullRequests.FindExactAsync(lookup, currentPublication.PullRequestNumber, cancellationToken)
