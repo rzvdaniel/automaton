@@ -35,7 +35,7 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
             || !string.Equals(pull.Head?.Ref, target.HeadBranch, StringComparison.Ordinal)
             || !string.Equals(pull.Head?.Sha, target.HeadSha, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(pull.Base?.Repository?.FullName, target.RepositoryIdentity, StringComparison.OrdinalIgnoreCase))
-            throw new CiProviderException("GitHub pull-request head does not match the exact CI target.");
+            throw new CiProviderException("GitHub pull-request head does not match the exact CI target.", true);
 
         var checkRuns = await GetCheckRunsAsync(target.HeadSha, cancellationToken);
         var commitStatuses = await GetCommitStatusesAsync(target.HeadSha, cancellationToken);

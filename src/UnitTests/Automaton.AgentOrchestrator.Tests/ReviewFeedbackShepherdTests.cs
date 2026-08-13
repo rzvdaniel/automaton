@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Ci;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Workflows;
@@ -46,6 +47,15 @@ public sealed class ReviewFeedbackShepherdTests
     }
 
     [Test]
+    public async Task CiProviderFailureAtPostPublicationBoundaryBecomesCiCategory()
+    {
+        var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.Actionable)], [Publication(Sha2)]);
+        fixture.Ci.Failure = new CiProviderException("provider payload must not leak", true);
+        var result = await fixture.Shepherd.ShepherdAsync(Target, Workspace(), Work(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.FailureCategory, Is.EqualTo(ReviewFeedbackFailureCategories.Ci)); Assert.That(result.IsRetryable, Is.True); Assert.That(result.FailureReason, Is.EqualTo("human feedback CI failed")); });
+    }
+
+    [Test]
     public async Task RemediationFailurePreservesBoundedDeveloperCategory()
     {
         var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.Actionable)]);
@@ -67,7 +77,7 @@ public sealed class ReviewFeedbackShepherdTests
     private sealed record Fixture(ReviewFeedbackShepherd Shepherd, FakeProvider Provider, FakeRemediator Remediator, FakeCi Ci, FakeDelay Delay);
     private sealed class FakeProvider(IEnumerable<ReviewFeedbackSnapshot> values) : IReviewFeedbackProvider { private readonly Queue<ReviewFeedbackSnapshot> values = new(values); public List<ReviewFeedbackTarget> Targets { get; } = []; public Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken token) { Targets.Add(target); return Task.FromResult(values.Dequeue()); } }
     private sealed class FakeRemediator(IEnumerable<PublicationResult> values) : IReviewFeedbackRemediator { private readonly Queue<PublicationResult> values = new(values); public List<ReviewFeedbackRemediationRequest> Requests { get; } = []; public ReviewFeedbackRemediationException? Failure { get; set; } public Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken token) { Requests.Add(request); if (Failure is not null) throw Failure; return Task.FromResult(values.Dequeue()); } }
-    private sealed class FakeCi(bool success) : ICiShepherd { public List<CiTarget> Targets { get; } = []; public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(success ? CiShepherdResult.Success(target.HeadSha, 0) : CiShepherdResult.Blocked("failed", target.HeadSha, 0)); } }
+    private sealed class FakeCi(bool success) : ICiShepherd { public List<CiTarget> Targets { get; } = []; public CiProviderException? Failure { get; set; } public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); if (Failure is not null) throw Failure; return Task.FromResult(success ? CiShepherdResult.Success(target.HeadSha, 0) : CiShepherdResult.Blocked("failed", target.HeadSha, 0)); } }
     private sealed class FakeDelay : IReviewFeedbackPollDelay { public int Count { get; private set; } public Task DelayAsync(TimeSpan delay, CancellationToken token) { Count++; return Task.CompletedTask; } }
     private sealed class FakeClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-01T00:00:00Z"); }
     private sealed class FakeWorkspaces : IWorkspaceManager
