@@ -110,10 +110,11 @@ public sealed class CodexReviewFeedbackRemediator(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) { failure = exception; }
         if (client.CurrentWorkspace?.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) throw ReviewerFailure("workspace-quarantined", false);
+        if (failure is ReviewFeedbackRemediationException remediation) throw remediation;
         if (failure is CodexProtocolException) throw ReviewerFailure("codex-protocol-failed", false);
         var after = await mutationGuard.CaptureAsync(client.CurrentWorkspace ?? workspace, CancellationToken.None);
         if (!string.Equals(before, after, StringComparison.Ordinal)) throw ReviewerFailure("read-only-boundary-violated", false);
-        if (failure is not null) throw ReviewerFailure(ClassifyReviewerException(failure), failure is PublicationException publication && publication.IsRetryable);
+        if (failure is not null) throw ReviewerFailure(ClassifyReviewerException(failure), failure is NonCompletedReviewerTurnException turn && turn.IsRetryable || failure is PublicationException publication && publication.IsRetryable);
         return handoff!;
     }
 
@@ -123,8 +124,7 @@ public sealed class CodexReviewFeedbackRemediator(
         CodexIdleTimeoutException => "codex-turn-timeout",
         CodexProcessExitedException => "codex-process-failed",
         CodexProtocolException => "codex-protocol-failed",
-        PublicationException publication when publication.Message.Contains("malformed", StringComparison.OrdinalIgnoreCase) => "malformed-reviewer-contract",
-        PublicationException publication when publication.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase) => "reviewer-turn-limit",
+        NonCompletedReviewerTurnException => "codex-turn-failed",
         _ => "unexpected"
     };
 
@@ -135,7 +135,7 @@ public sealed class CodexReviewFeedbackRemediator(
     {
         var turn = await client.StartTurnAsync(thread.Id, prompt, cancellationToken);
         var result = await client.WaitForTurnCompletionAsync(turn, cancellationToken);
-        if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase)) throw new PublicationException(Bound(result.FailureReason ?? "Feedback role turn failed."), true);
+        if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase)) throw new NonCompletedReviewerTurnException(true);
         return result;
     }
 
@@ -174,4 +174,9 @@ Independently inspect the real current workspace and complete diff. Verify relev
     }
     private static string Escape(string value) => new(value.Select(character => char.IsControl(character) ? ' ' : character).Take(2000).ToArray());
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
+}
+
+internal sealed class NonCompletedReviewerTurnException(bool isRetryable) : Exception
+{
+    public bool IsRetryable { get; } = isRetryable;
 }

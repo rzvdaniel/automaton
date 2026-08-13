@@ -1,5 +1,6 @@
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Codex;
+using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Orchestration;
 using NUnit.Framework;
@@ -41,6 +42,17 @@ public sealed class ReviewFeedbackPromptTests
     {
         var failure = CodexReviewFeedbackRemediator.ReviewerFailure(subcategory, false);
         Assert.Multiple(() => { Assert.That(failure.Category, Is.EqualTo(ReviewFeedbackFailureCategories.Reviewer)); Assert.That(failure.Subcategory, Is.EqualTo(subcategory)); Assert.That(failure.SafeReason, Is.EqualTo("human feedback Reviewer remediation failed")); });
+    }
+
+    [Test]
+    public void NonCompletedReviewerTurnUsesTypedCodexTurnFailureClassification()
+    {
+        var failure = new NonCompletedReviewerTurnException(true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(CodexReviewFeedbackRemediator.ClassifyReviewerException(failure), Is.EqualTo("codex-turn-failed"));
+            Assert.That(CodexReviewFeedbackRemediator.ClassifyReviewerException(new PublicationException("malformed reviewer exceeded token secret")), Is.EqualTo("unexpected"));
+        });
     }
 
     [TestCase(ReviewFeedbackFailureCategories.Developer)]
