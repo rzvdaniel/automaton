@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Publication;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -51,6 +52,7 @@ public interface IWorkPublisher
 {
     Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
     Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+    Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken);
     Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
         => ValidateRevisionBaseAsync(workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
     Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, bool allowWorkingTreeChanges, CancellationToken cancellationToken) => Task.CompletedTask;

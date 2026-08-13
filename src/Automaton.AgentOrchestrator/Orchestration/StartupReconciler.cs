@@ -112,7 +112,9 @@ public sealed class StartupReconciler(
                     }
                     try
                     {
-                        var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
+                        var recovered = record.Publication?.State == PublicationStates.PullRequestCreated
+                            ? new PublicationRecoveryResult(true, await publisher.VerifyRecoveredPublicationAsync(record, cancellationToken))
+                            : await publisher.RecoverAsync(record, item!, cancellationToken);
                     if (recovered.Recognized)
                     {
                         var ci = recovered.Publication is not null && ciShepherd is not null

@@ -191,6 +191,27 @@ public sealed class GitWorkPublisher(
         return new(true, new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft));
     }
 
+    public async Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken)
+    {
+        var publication = record.Publication;
+        if (publication is not { State: PublicationStates.PullRequestCreated, CommitSha: not null, RemoteBranch: not null,
+            PullRequestNumber: > 0, PullRequestUrl: not null })
+            throw new PublicationException("Durable publication identity is invalid.");
+        ValidateWorkspaceForPublication(record.Workspace, requireActiveOwnership: false);
+        await ValidateGitStateAsync(record.Workspace, cancellationToken);
+        var localHead = RequireSha((await GitAsync(record.Workspace.Path, ["rev-parse", "HEAD"], "verify recovered publication local head", cancellationToken)).StandardOutput.Trim());
+        if (!string.Equals(localHead, publication.CommitSha, StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Local workspace HEAD does not match the durable published commit.");
+        await VerifyRemoteBranchAsync(record.Workspace, publication.CommitSha, cancellationToken);
+        var request = new PullRequestPublicationRequest(options.Repository.Identity, record.Workspace.Branch,
+            publication.CommitSha, options.Repository.BaseBranch, string.Empty, string.Empty);
+        var existing = await pullRequests.FindExactAsync(request, publication.PullRequestNumber.Value, cancellationToken)
+            ?? throw new PublicationException("The durably recorded draft pull request no longer exists or matches publication identity.");
+        ValidatePullRequest(existing, record.Workspace, publication.CommitSha, options.Repository.BaseBranch);
+        return new(options.Repository.Identity, record.Workspace.Branch, publication.CommitSha,
+            existing.Number, existing.Url, existing.Draft);
+    }
+
     private void ValidateWorkspaceForPublication(Workspace workspace, bool requireActiveOwnership)
     {
         var expectedOwnership = requireActiveOwnership ? WorkspaceExecutionOwnershipStates.Active : WorkspaceExecutionOwnershipStates.None;

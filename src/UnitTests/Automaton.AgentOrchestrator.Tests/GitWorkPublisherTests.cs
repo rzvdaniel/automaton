@@ -52,6 +52,22 @@ public sealed class GitWorkPublisherTests
     }
 
     [Test]
+    public async Task VerifyRecoveredPublication_RequiresLocalHeadToMatchDurableSha()
+    {
+        var git = new FakeGit(workspacePath) { RemoteSha = CommitSha, Committed = true };
+        var publisher = Create(git, new FakeWorkspaces(), new FakePullRequests());
+        var record = RecoveryRecord(PublicationStates.PullRequestCreated);
+        var result = await publisher.VerifyRecoveredPublicationAsync(record, CancellationToken.None);
+        Assert.That(result.CommitSha, Is.EqualTo(CommitSha));
+        Assert.That(git.Commands, Has.None.Contains("push"));
+
+        git.LocalHead = new string('c', 40);
+        var error = Assert.ThrowsAsync<PublicationException>(() => publisher.VerifyRecoveredPublicationAsync(record, CancellationToken.None));
+        Assert.That(error!.Message, Is.EqualTo("Local workspace HEAD does not match the durable published commit."));
+        Assert.That(git.Commands, Has.None.Contains("push"));
+    }
+
+    [Test]
     public void PublishAsync_RejectsNoChangesBeforePushOrPullRequest()
     {
         var git = new FakeGit(workspacePath) { HasChanges = false };
@@ -471,6 +487,7 @@ public sealed class GitWorkPublisherTests
         public bool RevisionCommitted { get; set; }
         public bool Registered { get; set; } = true;
         public string? RemoteSha { get; set; }
+        public string? LocalHead { get; set; }
         public string RemoteUrl { get; set; } = "git@github.com:acme/widgets.git";
         public string Provenance { get; set; } = "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget";
         public List<string> Commands { get; } = [];
@@ -483,7 +500,7 @@ public sealed class GitWorkPublisherTests
             if (command == "rev-parse refs/heads/main") return Ok(BaseSha);
             if (command == "diff --name-only --diff-filter=U") return Ok(Unmerged ? "conflicted.txt" : "");
             if (command.StartsWith("rev-parse --git-path ")) return Ok(Path.Combine(path, ".git", "absent-" + args[^1]));
-            if (command == "rev-parse HEAD") return Ok(RevisionCommitted ? RevisionSha : Committed ? CommitSha : BaseSha);
+            if (command == "rev-parse HEAD") return Ok(LocalHead ?? (RevisionCommitted ? RevisionSha : Committed ? CommitSha : BaseSha));
             if (command == "rev-parse HEAD^") return Ok(CommitSha);
             if (command.StartsWith("rev-list --count ")) return Ok("1");
             if (command == "log -1 --format=%an%x00%ae%x00%s") return Ok(RevisionCommitted ? "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget (CI fix 1)" : Provenance);

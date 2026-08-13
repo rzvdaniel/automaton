@@ -542,6 +542,8 @@ public sealed class SingleAgentWorkExecutorTests
     }
     private sealed class FakePublisher : IWorkPublisher
     {
+        public Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
         public List<PublicationRequest> Requests { get; } = [];
         public PublicationException? Failure { get; set; }
         public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
