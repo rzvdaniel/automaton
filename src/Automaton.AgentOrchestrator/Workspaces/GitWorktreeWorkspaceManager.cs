@@ -258,9 +258,16 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !string.Equals(sidecar.CiStatus, CiStatuses.Passed, StringComparison.Ordinal)
             || !string.Equals(sidecar.CiHeadSha, feedbackState.HeadSha, StringComparison.OrdinalIgnoreCase))
             throw new WorkspaceRecoveryException("Review feedback state must bind to an exact durable publication head that passed CI.");
-        var updated = sidecar with { ReviewFeedbackStatus = feedbackState.Status, ReviewFeedbackHeadSha = feedbackState.HeadSha, ReviewFeedbackRemediationRound = feedbackState.RemediationRound, ReviewFeedbackObservedAtUtc = feedbackState.LastObservedAtUtc, UpdatedAtUtc = clock.UtcNow };
+        var updated = sidecar with { ReviewFeedbackStatus = feedbackState.Status, ReviewFeedbackHeadSha = feedbackState.HeadSha, ReviewFeedbackRemediationRound = feedbackState.RemediationRound, ReviewFeedbackObservedAtUtc = feedbackState.LastObservedAtUtc, ConsumedFeedback = feedbackState.Consumed?.TakeLast(64).ToArray() ?? sidecar.ConsumedFeedback, UpdatedAtUtc = clock.UtcNow };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
         return ToWorkspace(updated);
+    }
+
+    public async Task<ReviewFeedbackRecoveryState?> GetReviewFeedbackStateAsync(Workspace workspace, CancellationToken cancellationToken)
+    {
+        var sidecar = await ReadSidecarAsync(GetSidecarPath(workspace.Key), cancellationToken);
+        return sidecar?.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null
+            : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc, sidecar.ConsumedFeedback);
     }
 
     public async Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken)
@@ -556,7 +563,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             sidecar.SchemaVersion,
             new PublicationRecoveryState(sidecar.PublicationState, sidecar.PublicationCommitSha, sidecar.PublicationRemoteBranch, sidecar.PullRequestNumber, sidecar.PullRequestUrl, sidecar.PublicationRevision, sidecar.AuthorizedParentSha),
             sidecar.CiStatus is null || sidecar.CiHeadSha is null ? null : new CiRecoveryState(sidecar.CiStatus, sidecar.CiHeadSha, sidecar.CiRemediationRound, sidecar.CiObservedAtUtc, sidecar.CiFailureReason),
-            sidecar.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc));
+            sidecar.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc, sidecar.ConsumedFeedback));
 
     private async Task<string> ResolveBaseShaAsync(string repositoryRoot, string baseBranch, CancellationToken cancellationToken)
     {
@@ -666,7 +673,8 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         string? ReviewFeedbackStatus = null,
         string? ReviewFeedbackHeadSha = null,
         int ReviewFeedbackRemediationRound = 0,
-        DateTimeOffset? ReviewFeedbackObservedAtUtc = null);
+        DateTimeOffset? ReviewFeedbackObservedAtUtc = null,
+        IReadOnlyList<ConsumedReviewFeedback>? ConsumedFeedback = null);
 }
 
 public class WorkspaceException(string message) : Exception(message);
