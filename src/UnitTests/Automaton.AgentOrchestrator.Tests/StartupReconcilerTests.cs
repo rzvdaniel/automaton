@@ -172,6 +172,35 @@ public sealed class StartupReconcilerTests
         await fixture.Orchestrator.StopAsync();
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task RestoredActionableFeedbackPreservesDeveloperFailureSubcategoryAndRetryability(bool retryable)
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.Actionable, sha, 0)
+        };
+        var feedback = new FakeReviewFeedbackShepherd { Result = ReviewFeedbackResult.Blocked("human feedback Developer remediation failed", sha, 0, ReviewFeedbackFailureCategories.Developer, retryable) with { FailureSubcategory = "malformed-developer-contract" } };
+        var fixture = Create(record, feedbackShepherd: feedback);
+        fixture.FeedbackProvider.Result = new ReviewFeedbackSnapshot(sha, ReviewFeedbackStatuses.Actionable, [new("comment", ReviewFeedbackKinds.ReviewComment, "human", "fix")]);
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => fixture.Telemetry.Events.Any(x => x.EventType == "human-feedback.monitor.failed"));
+
+        var failed = fixture.Telemetry.Events.Single(x => x.EventType == "human-feedback.monitor.failed");
+        Assert.Multiple(() =>
+        {
+            Assert.That(failed.Metadata!["category"], Is.EqualTo(ReviewFeedbackFailureCategories.Developer));
+            Assert.That(failed.Metadata["subcategory"], Is.EqualTo("malformed-developer-contract"));
+            Assert.That(failed.Metadata["retryable"], Is.EqualTo(retryable.ToString().ToLowerInvariant()));
+            Assert.That(failed.Metadata["role"], Is.EqualTo(AgentRoles.Developer));
+        });
+        await fixture.Orchestrator.StopAsync();
+    }
+
     [TestCase("ci")]
     [TestCase("feedback")]
     [TestCase("pull-request")]
@@ -420,13 +449,14 @@ public sealed class StartupReconcilerTests
             Agent = new AgentExecutionOptions { MaxConcurrentAgents = 1 },
             Retry = new RetryOptions { MaxAttempts = 3 }
         };
-        var orchestrator = new InMemoryOrchestrator(tracker, executor, options, new FixedClock(), NullLogger<InMemoryOrchestrator>.Instance);
+        var telemetry = new FakeTelemetry();
+        var orchestrator = new InMemoryOrchestrator(tracker, executor, options, new FixedClock(), NullLogger<InMemoryOrchestrator>.Instance, telemetry);
         var workspaces = new FakeWorkspaceManager(record);
         var fence = new FakeFence(fenceClassification);
         var publisher = new FakePublisher();
         feedbackProvider ??= new FakeReviewFeedbackProvider();
         var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd, feedbackShepherd, feedbackProvider);
-        return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher, feedbackProvider);
+        return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher, feedbackProvider, telemetry);
     }
 
     private static WorkItem Work(IReadOnlyList<string>? labels = null, string providerState = "open") => new("issue-1", "#1", "Work", null, providerState, labels ?? ["agent:ready"]);
@@ -449,8 +479,16 @@ public sealed class StartupReconcilerTests
     }
 
     private sealed record Fixture(InMemoryOrchestrator Orchestrator, StartupReconciler Reconciler, FakeTracker Tracker,
-        RecordingExecutor Executor, FakeWorkspaceManager Workspaces, FakeFence Fence, FakePublisher Publisher, FakeReviewFeedbackProvider FeedbackProvider);
+        RecordingExecutor Executor, FakeWorkspaceManager Workspaces, FakeFence Fence, FakePublisher Publisher, FakeReviewFeedbackProvider FeedbackProvider, FakeTelemetry Telemetry);
     private sealed class FixedClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-02T00:00:00Z"); }
+    private sealed class FakeTelemetry : IOperatorTelemetry
+    {
+        public List<(string EventType, IReadOnlyDictionary<string, string>? Metadata)> Events { get; } = [];
+        public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null) => Events.Add((eventType, metadata));
+        public OperatorEvent? LatestFor(string workItemId) => null;
+        public void SetDaemonState(string state, string? error = null) { }
+        public (string State, string? LastError) DaemonState() => ("running", null);
+    }
     private sealed class FakeTracker(WorkItem item) : IWorkTracker
     {
         public Exception? Failure { get; set; }

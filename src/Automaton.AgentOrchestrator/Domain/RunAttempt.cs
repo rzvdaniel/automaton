@@ -6,5 +6,5 @@ public sealed record RunOutcome(bool Succeeded, bool IsRetryable, string? Failur
 {
     public static RunOutcome Success() => new(true, false);
     public static RunOutcome RetryableFailure(string reason) => new(false, true, reason);
-    public static RunOutcome PermanentFailure(string reason, string? category = null) => new(false, false, reason, category);
+    public static RunOutcome PermanentFailure(string reason, string? category = null, string? subcategory = null) => new(false, false, reason, category, subcategory);
 }
