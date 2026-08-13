@@ -34,6 +34,21 @@ public sealed class GitHubCiProviderTests
     }
 
     [Test]
+    public void GetAsync_StaleHeadIsRetryableButOtherIdentityMismatchesAreNot()
+    {
+        var stale = new StubHandler(Json(Pull(new string('b', 40))));
+        var wrongBranch = new StubHandler(Json(Pull(Sha).Replace("automaton/work/7", "other", StringComparison.Ordinal)));
+        var wrongRepo = new StubHandler(Json(Pull(Sha).Replace("acme/widgets", "other/repo", StringComparison.Ordinal)));
+        var closed = new StubHandler(Json(Pull(Sha).Replace("\"state\":\"open\"", "\"state\":\"closed\"", StringComparison.Ordinal)));
+
+        var staleError = Assert.ThrowsAsync<CiProviderException>(() => Create(stale, []).GetAsync(Target, CancellationToken.None));
+        var branchError = Assert.ThrowsAsync<CiProviderException>(() => Create(wrongBranch, []).GetAsync(Target, CancellationToken.None));
+        var repoError = Assert.ThrowsAsync<CiProviderException>(() => Create(wrongRepo, []).GetAsync(Target, CancellationToken.None));
+        var closedError = Assert.ThrowsAsync<CiProviderException>(() => Create(closed, []).GetAsync(Target, CancellationToken.None));
+        Assert.Multiple(() => { Assert.That(staleError!.IsRetryable, Is.True); Assert.That(branchError!.IsRetryable, Is.False); Assert.That(repoError!.IsRetryable, Is.False); Assert.That(closedError!.IsRetryable, Is.False); });
+    }
+
+    [Test]
     public async Task GetAsync_FollowsSameOriginPaginationAndAggregatesMixedChecks()
     {
         var first = Json(Checks(Check("build", "completed", "success", Sha)), "<https://api.github.test/repos/acme/widgets/commits/x/check-runs?page=2>; rel=\"next\"");
