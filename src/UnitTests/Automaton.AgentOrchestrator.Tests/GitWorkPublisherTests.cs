@@ -359,12 +359,12 @@ public sealed class GitWorkPublisherTests
     }
 
     [Test]
-    public async Task ValidateRevisionBaseAsync_AllowsDirtyWorktreeWhenExactPublishedBaseIsProven()
+    public async Task ValidateRevisionBaseAsync_AllowsDirtyWorktreeOnlyWhenExplicitlyAuthorizedForFeedbackRemediation()
     {
         var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true };
         var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
 
-        await Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), CancellationToken.None);
+        await Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None);
 
         Assert.Multiple(() =>
         {
@@ -375,12 +375,35 @@ public sealed class GitWorkPublisherTests
     }
 
     [Test]
+    public void ValidateRevisionBaseAsync_DefaultAndCiPolicyRejectDirtyWorktree()
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        var defaultError = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true }, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), CancellationToken.None));
+        var ciError = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = true }, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: false, CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(defaultError!.Message, Is.EqualTo("Workspace contains unrelated changes before CI remediation."));
+            Assert.That(ciError!.Message, Is.EqualTo("Workspace contains unrelated changes before CI remediation."));
+        });
+    }
+
+    [Test]
+    public async Task ValidateRevisionBaseAsync_CiPolicyAcceptsCleanExactBase()
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+        await Create(new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha, HasChanges = false }, new FakeWorkspaces(), new FakePullRequests())
+            .ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: false, CancellationToken.None);
+    }
+
+    [Test]
     public void ValidateRevisionBaseAsync_RejectsDifferentLocalHeadEvenWhenWorktreeIsDirty()
     {
         var git = new FakeGit(workspacePath) { HasChanges = true, RemoteSha = CommitSha };
         var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
 
-        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), CancellationToken.None));
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None));
     }
 
     [Test]
@@ -404,6 +427,15 @@ public sealed class GitWorkPublisherTests
         var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
 
         Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, publication, CancellationToken.None));
+    }
+
+    [Test]
+    public void ValidateRevisionBaseAsync_FeedbackPolicyStillRejectsChangedRemoteHead()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = new string('c', 40), HasChanges = true };
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).ValidateRevisionBaseAsync(workspace, CurrentPublication(), allowWorkingTreeChanges: true, CancellationToken.None));
     }
 
     [Test]
