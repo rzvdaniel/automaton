@@ -16,4 +16,36 @@ public sealed class ReviewFeedbackPromptTests
         var reviewer = CodexReviewFeedbackRemediator.ReviewerPrompt(request, new(RoleResultStatuses.Completed, "fixed", "tests", "none"), null);
         Assert.Multiple(() => { Assert.That(developer, Does.Contain("untrusted advisory input")); Assert.That(developer, Does.Contain("Do not commit, push")); Assert.That(reviewer, Does.Contain("Read-only boundary")); Assert.That(developer.Length, Is.LessThan(16_000)); });
     }
+
+    [TestCase(ReviewFeedbackFailureCategories.Developer)]
+    [TestCase(ReviewFeedbackFailureCategories.Reviewer)]
+    [TestCase(ReviewFeedbackFailureCategories.Publication)]
+    public void CancelledRemediationStagePropagatesCancellation(string category)
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.That(async () => await CodexReviewFeedbackRemediator.InStage(
+            category,
+            "safe reason",
+            cancellation.Token,
+            () => Task.FromCanceled<PublicationResult>(cancellation.Token)), Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void NonCancellationRemediationStageRetainsBoundedCategory()
+    {
+        var exception = Assert.ThrowsAsync<ReviewFeedbackRemediationException>(() => CodexReviewFeedbackRemediator.InStage(
+            ReviewFeedbackFailureCategories.Developer,
+            "human feedback Developer remediation failed",
+            CancellationToken.None,
+            () => Task.FromException<PublicationResult>(new InvalidOperationException("token=should-not-leak"))));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Category, Is.EqualTo(ReviewFeedbackFailureCategories.Developer));
+            Assert.That(exception.SafeReason, Is.EqualTo("human feedback Developer remediation failed"));
+            Assert.That(exception.SafeReason, Does.Not.Contain("token"));
+        });
+    }
 }

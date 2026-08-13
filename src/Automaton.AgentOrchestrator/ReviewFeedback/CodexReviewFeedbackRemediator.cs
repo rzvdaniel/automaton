@@ -15,39 +15,41 @@ public sealed class CodexReviewFeedbackRemediator(
     public async Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken)
     {
         var current = new PublicationResult(request.Target.RepositoryIdentity, request.Target.HeadBranch, request.Target.HeadSha, request.Target.PullRequestNumber, string.Empty, true);
-        await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", () => publisher.ValidateRevisionBaseAsync(request.Workspace, current, cancellationToken));
+        await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken, () => publisher.ValidateRevisionBaseAsync(request.Workspace, current, cancellationToken));
         await using var client = clients.Create(request.Workspace, new Dictionary<string, string>());
         await client.InitializeAsync(cancellationToken);
         var developerThread = await client.StartThreadAsync(cancellationToken);
         var reviewerThread = await client.StartThreadAsync(cancellationToken);
-        var developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", () => RunDeveloperAsync(client, developerThread, DeveloperPrompt(request), cancellationToken));
+        var developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperPrompt(request), cancellationToken));
         if (developer.Status == RoleResultStatuses.Blocked) throw new PublicationException(developer.Summary);
         ReviewerHandoff? approved = null;
         var reviewerPrompt = ReviewerPrompt(request, developer, null);
         for (var reviewRound = 1; reviewRound <= workflow.Options.Agent.MaxReviewRounds; reviewRound++)
         {
-            var reviewer = await InStage(ReviewFeedbackFailureCategories.Reviewer, "human feedback Reviewer remediation failed", () => RunReadOnlyReviewerAsync(client, reviewerThread, reviewerPrompt, cancellationToken));
+            var reviewer = await InStage(ReviewFeedbackFailureCategories.Reviewer, "human feedback Reviewer remediation failed", cancellationToken, () => RunReadOnlyReviewerAsync(client, reviewerThread, reviewerPrompt, cancellationToken));
             if (reviewer.Verdict == RoleResultStatuses.Approved) { approved = reviewer; break; }
             if (reviewer.Verdict == RoleResultStatuses.Blocked || reviewRound == workflow.Options.Agent.MaxReviewRounds)
                 throw new PublicationException(reviewer.Summary.Length > 0 ? reviewer.Summary : "Feedback remediation Reviewer did not approve.");
-            developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", () => RunDeveloperAsync(client, developerThread, DeveloperCorrectionPrompt(request, developer, reviewer), cancellationToken));
+            developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperCorrectionPrompt(request, developer, reviewer), cancellationToken));
             if (developer.Status == RoleResultStatuses.Blocked) throw new PublicationException(developer.Summary);
             reviewerPrompt = ReviewerPrompt(request, developer, reviewer);
         }
         if (approved is null) throw new PublicationException("Feedback remediation did not receive independent Reviewer approval.");
-        return await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
+        return await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", cancellationToken, () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
     }
 
-    private static async Task<T> InStage<T>(string category, string safeReason, Func<Task<T>> action)
+    internal static async Task<T> InStage<T>(string category, string safeReason, CancellationToken cancellationToken, Func<Task<T>> action)
     {
         try { return await action(); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (ReviewFeedbackRemediationException) { throw; }
         catch (PublicationException exception) { throw new ReviewFeedbackRemediationException(category, safeReason, exception.IsRetryable); }
         catch (Exception) { throw new ReviewFeedbackRemediationException(category, safeReason); }
     }
-    private static async Task InStage(string category, string safeReason, Func<Task> action)
+    internal static async Task InStage(string category, string safeReason, CancellationToken cancellationToken, Func<Task> action)
     {
         try { await action(); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (ReviewFeedbackRemediationException) { throw; }
         catch (PublicationException exception) { throw new ReviewFeedbackRemediationException(category, safeReason, exception.IsRetryable); }
         catch (Exception) { throw new ReviewFeedbackRemediationException(category, safeReason); }
