@@ -113,7 +113,8 @@ public sealed class RoleBasedWorkExecutor(
                 var feedback = await reviewFeedbackShepherd.ShepherdAsync(
                     new(publication.Repository, publication.PullRequestNumber, publication.Branch, reviewedHead, PublicationRevision: 1 + ci.RemediationRound),
                     client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
-                if (!feedback.Succeeded) outcome = RunOutcome.PermanentFailure(Bounded(feedback.FailureReason ?? "Human review feedback remediation failed."));
+                if (!feedback.Succeeded)
+                    outcome = new RunOutcome(false, feedback.IsRetryable, Bounded(feedback.FailureReason ?? "Human review feedback remediation failed."), feedback.FailureCategory, feedback.FailureSubcategory);
             }
         }
         catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }

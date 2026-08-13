@@ -21,7 +21,7 @@ public sealed class CodexReviewFeedbackRemediator(
         var developerThread = await client.StartThreadAsync(cancellationToken);
         var reviewerThread = await client.StartThreadAsync(cancellationToken);
         var developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperPrompt(request), cancellationToken));
-        if (developer.Status == RoleResultStatuses.Blocked) throw new PublicationException(developer.Summary);
+        if (developer.Status == RoleResultStatuses.Blocked) throw DeveloperFailure("blocked", false);
         ReviewerHandoff? approved = null;
         var reviewerPrompt = ReviewerPrompt(request, developer, null);
         for (var reviewRound = 1; reviewRound <= workflow.Options.Agent.MaxReviewRounds; reviewRound++)
@@ -31,7 +31,7 @@ public sealed class CodexReviewFeedbackRemediator(
             if (reviewer.Verdict == RoleResultStatuses.Blocked || reviewRound == workflow.Options.Agent.MaxReviewRounds)
                 throw new PublicationException(reviewer.Summary.Length > 0 ? reviewer.Summary : "Feedback remediation Reviewer did not approve.");
             developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperCorrectionPrompt(request, developer, reviewer), cancellationToken));
-            if (developer.Status == RoleResultStatuses.Blocked) throw new PublicationException(developer.Summary);
+            if (developer.Status == RoleResultStatuses.Blocked) throw DeveloperFailure("blocked", false);
             reviewerPrompt = ReviewerPrompt(request, developer, reviewer);
         }
         if (approved is null) throw new PublicationException("Feedback remediation did not receive independent Reviewer approval.");
@@ -57,15 +57,38 @@ public sealed class CodexReviewFeedbackRemediator(
 
     private async Task<DeveloperHandoff> RunDeveloperAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
     {
-        for (var turn = 0; turn < workflow.Options.Agent.DeveloperMaxTurns; turn++)
+        try
         {
-            var result = await RunTurnAsync(client, thread, prompt, cancellationToken);
-            if (!RoleResultContracts.TryParseDeveloper(result.FinalResponse, out var handoff)) throw new PublicationException("Feedback Developer returned a malformed contract.");
-            if (handoff.Status != RoleResultStatuses.Continue) return handoff;
-            prompt = RolePromptBuilder.Continue(AgentRoles.Developer, handoff.Summary);
+            for (var turn = 0; turn < workflow.Options.Agent.DeveloperMaxTurns; turn++)
+            {
+                var result = await RunTurnAsync(client, thread, prompt, cancellationToken);
+                if (!RoleResultContracts.TryParseDeveloper(result.FinalResponse, out var handoff)) throw DeveloperFailure("malformed-developer-contract", false);
+                if (handoff.Status != RoleResultStatuses.Continue) return handoff;
+                prompt = RolePromptBuilder.Continue(AgentRoles.Developer, handoff.Summary);
+            }
+            throw DeveloperFailure("developer-turn-limit", false);
         }
-        throw new PublicationException("Feedback Developer exceeded its turn limit.");
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (ReviewFeedbackRemediationException) { throw; }
+        catch (CodexLaunchException exception) { throw DeveloperFailure(ClassifyDeveloperException(exception), false); }
+        catch (CodexIdleTimeoutException exception) { throw DeveloperFailure(ClassifyDeveloperException(exception), false); }
+        catch (CodexProcessExitedException exception) { throw DeveloperFailure(ClassifyDeveloperException(exception), false); }
+        catch (CodexProtocolException exception) { throw DeveloperFailure(ClassifyDeveloperException(exception), false); }
+        catch (PublicationException exception) { throw DeveloperFailure("codex-turn-failed", exception.IsRetryable); }
+        catch (Exception) { throw DeveloperFailure("unexpected", false); }
     }
+
+    internal static string ClassifyDeveloperException(Exception exception) => exception switch
+    {
+        CodexLaunchException => "codex-launch-failed",
+        CodexIdleTimeoutException => "codex-turn-timeout",
+        CodexProcessExitedException => "codex-process-failed",
+        CodexProtocolException => "codex-protocol-failed",
+        _ => "unexpected"
+    };
+
+    internal static ReviewFeedbackRemediationException DeveloperFailure(string subcategory, bool retryable)
+        => new(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", retryable, subcategory);
 
     private async Task<ReviewerHandoff> RunReadOnlyReviewerAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
     {

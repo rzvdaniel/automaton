@@ -191,7 +191,7 @@ public sealed class InMemoryOrchestrator(
         try
         {
             var outcome = await monitor(run.Cancellation.Token);
-            if (!outcome.Succeeded) RecordHumanFeedbackFailure(run, outcome.FailureCategory, outcome.FailureReason, outcome.IsRetryable);
+            if (!outcome.Succeeded) RecordHumanFeedbackFailure(run, outcome.FailureCategory, outcome.FailureReason, outcome.IsRetryable, outcome.FailureSubcategory);
             Complete(run.WorkItem.Id, outcome.Succeeded ? RunStates.Completed : RunStates.Blocked, run.Attempt, outcome.FailureReason);
         }
         catch (OperationCanceledException) when (run.Cancellation.IsCancellationRequested)
@@ -207,14 +207,16 @@ public sealed class InMemoryOrchestrator(
         }
     }
 
-    private void RecordHumanFeedbackFailure(ActiveRun run, string? category, string? reason, bool retryable)
+    private void RecordHumanFeedbackFailure(ActiveRun run, string? category, string? reason, bool retryable, string? subcategory = null)
     {
         telemetry?.Record("human-feedback.monitor.failed", OperatorEventSeverities.Warning, run.WorkItem.Id, "human-feedback",
             message: reason, metadata: new Dictionary<string, string>
             {
                 ["category"] = category ?? ReviewFeedbackFailureCategories.MonitorUnexpected,
                 ["workspaceKey"] = "unavailable",
-                ["retryable"] = retryable.ToString().ToLowerInvariant()
+                ["retryable"] = retryable.ToString().ToLowerInvariant(),
+                ["subcategory"] = subcategory ?? "unexpected",
+                ["role"] = category == ReviewFeedbackFailureCategories.Developer ? AgentRoles.Developer : "unknown"
             });
     }
 
