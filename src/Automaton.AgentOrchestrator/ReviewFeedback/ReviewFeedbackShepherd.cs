@@ -80,11 +80,11 @@ public sealed class ReviewFeedbackShepherd(
             {
                 return ReviewFeedbackResult.Blocked("human feedback publication failed", current.HeadSha, round, ReviewFeedbackFailureCategories.Publication, exception.IsRetryable);
             }
-            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
             if (publication.IsReviewedNoOp)
             {
+                var noOpConsumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
                 var noOpState = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
-                await workspaces.UpdateReviewFeedbackStateAsync(workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(noOpState?.Consumed ?? []), ..consumed], []), CancellationToken.None);
+                await workspaces.UpdateReviewFeedbackStateAsync(workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(noOpState?.Consumed ?? []), ..noOpConsumed], []), CancellationToken.None);
                 return ReviewFeedbackResult.Success(current.HeadSha, round);
             }
             telemetry?.Record("feedback.remediation.published", OperatorEventSeverities.Information, workItem.Id, "feedback-remediation", AgentRoles.Developer,
@@ -105,6 +105,7 @@ public sealed class ReviewFeedbackShepherd(
             if (!ciResult.Succeeded)
                 return ReviewFeedbackResult.Blocked("human feedback CI failed", ciResult.HeadSha ?? next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, ciResult.IsRetryable);
             current = next with { HeadSha = ciResult.HeadSha ?? next.HeadSha, PublicationRevision = next.PublicationRevision + ciResult.RemediationRound };
+            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
             var state = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
             await workspaces.UpdateReviewFeedbackStateAsync(workspace, new(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(state?.Consumed ?? []), ..consumed], []), CancellationToken.None);
         }

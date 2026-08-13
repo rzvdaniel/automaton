@@ -38,7 +38,11 @@ public sealed class CodexReviewFeedbackRemediator(
         if (approved is null) throw new PublicationException("Feedback remediation did not receive independent Reviewer approval.");
         var finalFingerprint = await mutationGuard.CaptureAsync(client.CurrentWorkspace ?? request.Workspace, CancellationToken.None);
         if (string.Equals(initialFingerprint, finalFingerprint, StringComparison.Ordinal))
+        {
+            await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken,
+                () => publisher.ValidateRevisionBaseAsync(client.CurrentWorkspace ?? request.Workspace, current, allowWorkingTreeChanges: false, cancellationToken));
             return current with { IsReviewedNoOp = true };
+        }
         return await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", cancellationToken, () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
     }
 
