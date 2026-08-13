@@ -67,6 +67,9 @@ public sealed class ReviewFeedbackShepherd(
             if (round >= options.ReviewFeedback.MaxRemediationRounds)
                 return ReviewFeedbackResult.Blocked("Human review feedback remediation rounds were exhausted.", current.HeadSha, round);
 
+            var pending = actionable.Select(item => new PendingReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, item.Kind, FeedbackVersion(item), current.HeadSha, current.PublicationRevision)).ToArray();
+            var existingState = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
+            await workspaces.UpdateReviewFeedbackStateAsync(workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.Actionable, current.HeadSha, round, clock.UtcNow, existingState?.Consumed, pending), CancellationToken.None);
             PublicationResult publication;
             try { publication = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot with { Items = actionable }, round + 1), cancellationToken); }
             catch (ReviewFeedbackRemediationException exception)
@@ -76,6 +79,13 @@ public sealed class ReviewFeedbackShepherd(
             catch (PublicationException exception)
             {
                 return ReviewFeedbackResult.Blocked("human feedback publication failed", current.HeadSha, round, ReviewFeedbackFailureCategories.Publication, exception.IsRetryable);
+            }
+            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
+            if (publication.IsReviewedNoOp)
+            {
+                var noOpState = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
+                await workspaces.UpdateReviewFeedbackStateAsync(workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(noOpState?.Consumed ?? []), ..consumed], []), CancellationToken.None);
+                return ReviewFeedbackResult.Success(current.HeadSha, round);
             }
             telemetry?.Record("feedback.remediation.published", OperatorEventSeverities.Information, workItem.Id, "feedback-remediation", AgentRoles.Developer,
                 "Human feedback remediation was independently approved and published.", new Dictionary<string, string> { ["headSha"] = publication.CommitSha });
@@ -95,9 +105,8 @@ public sealed class ReviewFeedbackShepherd(
             if (!ciResult.Succeeded)
                 return ReviewFeedbackResult.Blocked("human feedback CI failed", ciResult.HeadSha ?? next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, ciResult.IsRetryable);
             current = next with { HeadSha = ciResult.HeadSha ?? next.HeadSha, PublicationRevision = next.PublicationRevision + ciResult.RemediationRound };
-            var consumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
             var state = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
-            await workspaces.UpdateReviewFeedbackStateAsync(workspace, new(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(state?.Consumed ?? []), ..consumed]), CancellationToken.None);
+            await workspaces.UpdateReviewFeedbackStateAsync(workspace, new(ReviewFeedbackStatuses.AwaitingHuman, current.HeadSha, round, clock.UtcNow, [..(state?.Consumed ?? []), ..consumed], []), CancellationToken.None);
         }
     }
 
