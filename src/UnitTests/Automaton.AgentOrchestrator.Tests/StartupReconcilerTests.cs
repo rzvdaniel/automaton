@@ -2,6 +2,7 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Publication;
+using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
@@ -122,7 +123,150 @@ public sealed class StartupReconcilerTests
         var fixture = Create(record, ciShepherd: ci, feedbackShepherd: feedback);
         fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", sha, 42, "https://github.com/acme/widgets/pull/42", true));
         await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
-        Assert.Multiple(() => { Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(sha)); Assert.That(feedback.Targets.Single().RemediationRound, Is.EqualTo(2)); Assert.That(feedback.Targets.Single().PublicationRevision, Is.EqualTo(3)); Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed)); });
+        await EventuallyAsync(() => feedback.Targets.Count == 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.FeedbackProvider.Targets.Single().HeadSha, Is.EqualTo(sha));
+            Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(sha));
+            Assert.That(feedback.Targets.Single().RemediationRound, Is.EqualTo(2));
+            Assert.That(feedback.Targets.Single().PublicationRevision, Is.EqualTo(3));
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(ci.Targets, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed));
+        });
+    }
+
+    [Test]
+    public async Task PublishedPassedDraftAwaitingHumanRestoresBoundedFeedbackMonitoringWithoutRerunningEngineering()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+        };
+        var feedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
+        var fixture = Create(record, feedbackShepherd: feedback);
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => feedback.Targets.Count == 1);
+        await fixture.Orchestrator.PollAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(fixture.FeedbackProvider.Targets, Has.Count.EqualTo(1));
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.Executor.Attempts, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Working && x.WorkItemId == "issue-1"));
+        });
+
+        await fixture.Orchestrator.StopAsync();
+    }
+
+    [TestCase("ci")]
+    [TestCase("feedback")]
+    [TestCase("pull-request")]
+    public async Task InconsistentPublishedAwaitingHumanStateFailsClosed(string mismatch)
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+        };
+        record = mismatch switch
+        {
+            "ci" => record with { Ci = record.Ci! with { HeadSha = new string('b', 40) } },
+            "feedback" => record with { ReviewFeedback = record.ReviewFeedback! with { HeadSha = new string('b', 40) } },
+            "pull-request" => record with { Publication = record.Publication! with { PullRequestNumber = null } },
+            _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
+        };
+        var fixture = Create(record);
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(fixture.FeedbackProvider.Targets, Is.Empty);
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
+        });
+    }
+
+    [Test]
+    public async Task GracefulShutdownThenRestartRestoresAwaitingHumanFeedbackAgain()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+        };
+        var firstFeedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
+        var first = Create(record, feedbackShepherd: firstFeedback);
+        await first.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => firstFeedback.Targets.Count == 1);
+        await first.Orchestrator.StopAsync();
+
+        var secondFeedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
+        var second = Create(record, feedbackShepherd: secondFeedback);
+        await second.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => secondFeedback.Targets.Count == 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(second.Executor.Attempts, Is.Empty);
+            Assert.That(second.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(second.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Working));
+        });
+
+        await second.Orchestrator.StopAsync();
+    }
+
+    [Test]
+    public async Task QuarantinedPublishedAwaitingHumanWorkspaceNeverRestoresFeedbackMonitoring()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Workspace = Record(WorkspaceRecoveryStates.Working).Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Quarantined },
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+        };
+        var fixture = Create(record);
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.FeedbackProvider.Targets, Is.Empty);
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
+        });
+    }
+
+    [Test]
+    public void TransientAwaitingHumanProviderValidationKeepsStartupGateClosed()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+        };
+        var provider = new FakeReviewFeedbackProvider { Failure = new ReviewFeedbackProviderException("provider unavailable", true) };
+        var fixture = Create(record, feedbackShepherd: new FakeReviewFeedbackShepherd(), feedbackProvider: provider);
+
+        Assert.ThrowsAsync<ReviewFeedbackProviderException>(() => fixture.Reconciler.ReconcileAsync(CancellationToken.None));
+        Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.False);
     }
 
     [Test]
@@ -258,7 +402,7 @@ public sealed class StartupReconcilerTests
         Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.False);
     }
 
-    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead, FakeCiShepherd? ciShepherd = null, FakeReviewFeedbackShepherd? feedbackShepherd = null)
+    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead, FakeCiShepherd? ciShepherd = null, FakeReviewFeedbackShepherd? feedbackShepherd = null, FakeReviewFeedbackProvider? feedbackProvider = null)
     {
         var tracker = new FakeTracker(item ?? Work());
         var executor = new RecordingExecutor();
@@ -273,8 +417,9 @@ public sealed class StartupReconcilerTests
         var workspaces = new FakeWorkspaceManager(record);
         var fence = new FakeFence(fenceClassification);
         var publisher = new FakePublisher();
-        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd, feedbackShepherd);
-        return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher);
+        feedbackProvider ??= new FakeReviewFeedbackProvider();
+        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd, feedbackShepherd, feedbackProvider);
+        return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher, feedbackProvider);
     }
 
     private static WorkItem Work(IReadOnlyList<string>? labels = null, string providerState = "open") => new("issue-1", "#1", "Work", null, providerState, labels ?? ["agent:ready"]);
@@ -297,7 +442,7 @@ public sealed class StartupReconcilerTests
     }
 
     private sealed record Fixture(InMemoryOrchestrator Orchestrator, StartupReconciler Reconciler, FakeTracker Tracker,
-        RecordingExecutor Executor, FakeWorkspaceManager Workspaces, FakeFence Fence, FakePublisher Publisher);
+        RecordingExecutor Executor, FakeWorkspaceManager Workspaces, FakeFence Fence, FakePublisher Publisher, FakeReviewFeedbackProvider FeedbackProvider);
     private sealed class FixedClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-02T00:00:00Z"); }
     private sealed class FakeTracker(WorkItem item) : IWorkTracker
     {
@@ -335,7 +480,25 @@ public sealed class StartupReconcilerTests
     {
         public List<ReviewFeedbackTarget> Targets { get; } = [];
         public ReviewFeedbackResult Result { get; set; } = ReviewFeedbackResult.Blocked("not configured", new string('0', 40), 0);
-        public Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(Result); }
+        public bool BlockUntilCancelled { get; set; }
+        public async Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem item, CancellationToken token)
+        {
+            Targets.Add(target);
+            if (BlockUntilCancelled) await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return Result;
+        }
+    }
+    private sealed class FakeReviewFeedbackProvider : IReviewFeedbackProvider
+    {
+        public List<ReviewFeedbackTarget> Targets { get; } = [];
+        public ReviewFeedbackSnapshot? Result { get; set; }
+        public ReviewFeedbackProviderException? Failure { get; set; }
+        public Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken cancellationToken)
+        {
+            Targets.Add(target);
+            if (Failure is not null) throw Failure;
+            return Task.FromResult(Result ?? new ReviewFeedbackSnapshot(target.HeadSha, ReviewFeedbackStatuses.AwaitingHuman, []));
+        }
     }
     private sealed class FakeFence(string classification) : IExecutionFence
     {
