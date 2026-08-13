@@ -4,6 +4,7 @@ using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 using NUnit.Framework;
+using System.Diagnostics;
 
 namespace Automaton.AgentOrchestrator.Tests;
 
@@ -93,6 +94,97 @@ public sealed class GitWorkPublisherTests
         var prs = new FakePullRequests();
         var error = Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), prs, ["dotnet --definitely-invalid-stage9-option"]).PublishAsync(Request(), CancellationToken.None));
         Assert.Multiple(() => { Assert.That(error!.IsRetryable, Is.False); Assert.That(git.Commands, Has.None.Contains("commit")); Assert.That(prs.Requests, Is.Empty); });
+    }
+
+    [Test]
+    public async Task ValidationFailureEmitsBoundedRedactedDiagnostic()
+    {
+        var telemetry = new FakeTelemetry();
+        var error = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath), new FakeWorkspaces(), new FakePullRequests(), ["dotnet --definitely-invalid-stage9-option"], telemetry).PublishAsync(Request(), CancellationToken.None));
+        var diagnostic = telemetry.Events.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(error!.IsRetryable, Is.False);
+            Assert.That(diagnostic.EventType, Is.EqualTo("publication.validation.failed"));
+            Assert.That(diagnostic.Metadata!["executable"], Is.EqualTo("dotnet"));
+            Assert.That(diagnostic.Metadata["exitCode"], Is.Not.EqualTo("0"));
+            Assert.That(diagnostic.Metadata["stderrSummary"].Length, Is.LessThanOrEqualTo(1024));
+        });
+    }
+
+    [Test]
+    public void ValidationEnvironmentIsMinimalAndExcludesCredentials()
+    {
+        var inherited = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PATH"] = "safe-path", ["DOTNET_ROOT"] = "dotnet-root", ["MSBuildSDKsPath"] = "sdk-path", ["APPDATA"] = "app-data", ["LOCALAPPDATA"] = "local-app-data", ["ProgramFiles"] = "program-files",
+            ["AUTOMATON_ACCEPTANCE_TRACKER_TOKEN"] = "must-not-inherit", ["HTTP_PROXY"] = "https://secret@example.test"
+        };
+        var start = GitWorkPublisher.CreateValidationStartInfo("dotnet", ["--version"], workspacePath, inherited);
+        Assert.Multiple(() =>
+        {
+            Assert.That(start.Environment["PATH"], Is.EqualTo("safe-path"));
+            Assert.That(start.Environment["DOTNET_ROOT"], Is.EqualTo("dotnet-root"));
+            Assert.That(start.Environment["MSBuildSDKsPath"], Is.EqualTo("sdk-path"));
+            Assert.That(start.Environment["APPDATA"], Is.EqualTo("app-data"));
+            Assert.That(start.Environment["LOCALAPPDATA"], Is.EqualTo("local-app-data"));
+            Assert.That(start.Environment["ProgramFiles"], Is.EqualTo("program-files"));
+            Assert.That(start.Environment.ContainsKey("AUTOMATON_ACCEPTANCE_TRACKER_TOKEN"), Is.False);
+            Assert.That(start.Environment.ContainsKey("HTTP_PROXY"), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task DotnetTestRunsUnderProductionValidationEnvironment()
+    {
+        var probe = Path.Combine(Path.GetTempPath(), "automaton-validation-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(probe);
+        await File.WriteAllTextAsync(Path.Combine(probe, "Probe.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>");
+        await File.WriteAllTextAsync(Path.Combine(probe, "Program.cs"), "Console.WriteLine(\"probe\");");
+        var inherited = GitWorkPublisher.ValidationEnvironmentNames
+            .ToDictionary(name => name, Environment.GetEnvironmentVariable, StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var process = Process.Start(GitWorkPublisher.CreateValidationStartInfo("dotnet", ["test", "Probe.csproj", "--configuration", "Release"], probe, inherited))!;
+            await process.WaitForExitAsync();
+            Assert.That(process.ExitCode, Is.Zero);
+        }
+        finally { if (Directory.Exists(probe)) Directory.Delete(probe, true); }
+    }
+
+    [Test]
+    public void ValidationSummaryRedactsAndBoundsSecretLikeContent()
+    {
+        var summary = GitWorkPublisher.SanitizeValidationSummary("Authorization: Bearer gho_abcdefghijklmnopqrstuvwxyz0123456789\nTOKEN=value\nhttps://user:password@example.test/path?token=secret\n" + new string('x', 2000));
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Length, Is.LessThanOrEqualTo(1025));
+            Assert.That(summary, Does.Not.Contain("abcdefghijklmnopqrstuvwxyz0123456789"));
+            Assert.That(summary, Does.Not.Contain("TOKEN=value"));
+            Assert.That(summary, Does.Not.Contain("user:password"));
+        });
+    }
+
+    [Test]
+    public async Task SuccessfulValidationDoesNotEmitFailureDiagnostic()
+    {
+        var telemetry = new FakeTelemetry();
+        await Create(new FakeGit(workspacePath), new FakeWorkspaces(), new FakePullRequests(), ["dotnet --version"], telemetry).PublishAsync(Request(), CancellationToken.None);
+        Assert.That(telemetry.Events, Is.Empty);
+    }
+
+    [Test]
+    public void ValidationTimeoutEmitsDistinctDiagnosticAndStopsPublication()
+    {
+        if (!OperatingSystem.IsWindows()) Assert.Ignore("The deterministic command is Windows-specific.");
+        var telemetry = new FakeTelemetry();
+        var error = Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath), new FakeWorkspaces(), new FakePullRequests(), ["cmd.exe /c \"ping -n 3 127.0.0.1 > nul\""], telemetry, 1).PublishAsync(Request(), CancellationToken.None));
+        Assert.Multiple(() =>
+        {
+            Assert.That(error!.Message, Is.EqualTo("Publication validation command timed out."));
+            Assert.That(telemetry.Events.Single().Metadata!["category"], Is.EqualTo("validation-timeout"));
+            Assert.That(telemetry.Events.Single().Metadata!["exitCode"], Is.EqualTo("none"));
+        });
     }
 
     [Test]
@@ -266,11 +358,11 @@ public sealed class GitWorkPublisherTests
         });
     }
 
-    private GitWorkPublisher Create(FakeGit git, FakeWorkspaces workspaces, FakePullRequests prs, IReadOnlyList<string>? validation = null) => new(git, workspaces, prs, new OrchestratorOptions
+    private GitWorkPublisher Create(FakeGit git, FakeWorkspaces workspaces, FakePullRequests prs, IReadOnlyList<string>? validation = null, IOperatorTelemetry? telemetry = null, int validationTimeoutMilliseconds = 600_000) => new(git, workspaces, prs, new OrchestratorOptions
     {
         Repository = new RepositoryOptions { Root = root, Identity = "acme/widgets", BaseBranch = "main" },
-        Publication = new PublicationOptions { ValidationCommands = validation ?? [], GitName = "Automaton Agent", GitEmail = "agent@example.test", RemoteName = "origin", GitHubHost = "github.com" }
-    });
+        Publication = new PublicationOptions { ValidationCommands = validation ?? [], ValidationTimeoutMilliseconds = validationTimeoutMilliseconds, GitName = "Automaton Agent", GitEmail = "agent@example.test", RemoteName = "origin", GitHubHost = "github.com" }
+    }, telemetry);
     private PublicationRequest Request() => new(new Workspace("key", workspacePath, "automaton/work/7", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.Active, "nonce", "acme/widgets", BaseSha), new WorkItem("id", "acme/widgets#7", "Fix widget", "body", "open", []), new("READY", "plan", "steps", "tests", "risk"), new("COMPLETED", "done", "tests pass", "none"), new("APPROVED", "good", []));
     private OwnedWorkspaceRecord RecoveryRecord(string state)
     {
@@ -339,5 +431,13 @@ public sealed class GitWorkPublisherTests
         public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState state, CancellationToken token) => throw new NotSupportedException();
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken token) => throw new NotSupportedException();
         public Task CleanupTerminalAsync(Workspace workspace, CancellationToken token) => throw new NotSupportedException();
+    }
+    private sealed class FakeTelemetry : IOperatorTelemetry
+    {
+        public List<(string EventType, IReadOnlyDictionary<string, string>? Metadata)> Events { get; } = [];
+        public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null) => Events.Add((eventType, metadata));
+        public OperatorEvent? LatestFor(string workItemId) => null;
+        public void SetDaemonState(string state, string? error = null) { }
+        public (string State, string? LastError) DaemonState() => ("running", null);
     }
 }

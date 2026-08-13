@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
@@ -17,7 +18,8 @@ public sealed class GitWorkPublisher(
     IGitCommandRunner git,
     IWorkspaceManager workspaces,
     IPullRequestPublisher pullRequests,
-    OrchestratorOptions options) : IWorkPublisher
+    OrchestratorOptions options,
+    IOperatorTelemetry? telemetry = null) : IWorkPublisher
 {
     private const int MaximumSubjectLength = 120;
     private const int MaximumBodyLength = 12_000;
@@ -32,7 +34,7 @@ public sealed class GitWorkPublisher(
             new PublicationRecoveryState(PublicationStates.Authorized, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
 
         await ValidateGitStateAsync(workspace, cancellationToken);
-        await RunValidationCommandsAsync(workspace, cancellationToken);
+        await RunValidationCommandsAsync(workspace, request.WorkItem.Id, cancellationToken);
         var subject = BuildSubject(request.WorkItem);
         await ValidateRemoteAsync(workspace, cancellationToken);
         var commitSha = await PrepareCommitAsync(workspace, subject, cancellationToken);
@@ -73,7 +75,7 @@ public sealed class GitWorkPublisher(
                 PullRequestNumber: request.CurrentPublication.PullRequestNumber, PullRequestUrl: request.CurrentPublication.PullRequestUrl,
                 Revision: request.Revision, AuthorizedParentSha: request.CurrentPublication.CommitSha), CancellationToken.None);
         await ValidateGitStateAsync(workspace, cancellationToken);
-        await RunValidationCommandsAsync(workspace, cancellationToken);
+        await RunValidationCommandsAsync(workspace, request.WorkItem.Id, cancellationToken);
         await ValidateRemoteAsync(workspace, cancellationToken);
         var subject = BuildRevisionSubject(request.WorkItem, request.Revision);
         var commitSha = await PrepareRevisionCommitAsync(workspace, request.CurrentPublication.CommitSha, subject, cancellationToken);
@@ -125,7 +127,7 @@ public sealed class GitWorkPublisher(
         var subject = BuildSubject(workItem);
         var revision = record.Publication?.Revision ?? 1;
         var authorizedParent = record.Publication?.AuthorizedParentSha ?? workspace.BaseCommitSha;
-        await RunValidationCommandsAsync(workspace, cancellationToken);
+        await RunValidationCommandsAsync(workspace, workItem.Id, cancellationToken);
         await ValidateRemoteAsync(workspace, cancellationToken);
         string commitSha;
         if (recoveryState == PublicationStates.Authorized)
@@ -338,17 +340,14 @@ public sealed class GitWorkPublisher(
         return RequireSha(lines[0].Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries)[0]);
     }
 
-    private async Task RunValidationCommandsAsync(Workspace workspace, CancellationToken cancellationToken)
+    private async Task RunValidationCommandsAsync(Workspace workspace, string workItemId, CancellationToken cancellationToken)
     {
-        foreach (var command in options.Publication.ValidationCommands)
+        for (var index = 0; index < options.Publication.ValidationCommands.Count; index++)
         {
+            var command = options.Publication.ValidationCommands[index];
             var (fileName, arguments) = ProcessCodexJsonRpcTransport.ParseCommand(command);
-            var start = new ProcessStartInfo(fileName) { WorkingDirectory = workspace.Path, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-            var inherited = start.Environment.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-            start.Environment.Clear();
-            foreach (var name in new[] { "PATH", "PATHEXT", "SYSTEMROOT", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE" })
-                if (inherited.TryGetValue(name, out var value) && value is not null) start.Environment[name] = value;
-            foreach (var argument in arguments) start.ArgumentList.Add(argument);
+            var start = CreateValidationStartInfo(fileName, arguments, workspace.Path,
+                ValidationEnvironmentNames.ToDictionary(name => name, Environment.GetEnvironmentVariable, StringComparer.OrdinalIgnoreCase));
             using var process = Process.Start(start) ?? throw new PublicationException("Publication validation command could not start.", true);
             var stdout = DrainAsync(process.StandardOutput);
             var stderr = DrainAsync(process.StandardError);
@@ -358,7 +357,8 @@ public sealed class GitWorkPublisher(
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
-                await Task.WhenAll(stdout, stderr);
+                var output = await Task.WhenAll(stdout, stderr);
+                RecordValidationFailure(workItemId, workspace, index, fileName, null, "validation-timeout", output[1]);
                 throw new PublicationException("Publication validation command timed out.");
             }
             catch (OperationCanceledException)
@@ -367,15 +367,59 @@ public sealed class GitWorkPublisher(
                 await Task.WhenAll(stdout, stderr);
                 throw;
             }
-            await Task.WhenAll(stdout, stderr);
-            if (process.ExitCode != 0) throw new PublicationException("Repository publication validation failed.");
+            var streams = await Task.WhenAll(stdout, stderr);
+            if (process.ExitCode != 0)
+            {
+                RecordValidationFailure(workItemId, workspace, index, fileName, process.ExitCode, "validation-process-exit", streams[1]);
+                throw new PublicationException("Repository publication validation failed.");
+            }
         }
     }
 
-    private static async Task DrainAsync(StreamReader reader)
+    internal static ProcessStartInfo CreateValidationStartInfo(string fileName, IReadOnlyList<string> arguments, string workspacePath, IReadOnlyDictionary<string, string?> inherited)
+    {
+        var start = new ProcessStartInfo(fileName) { WorkingDirectory = workspacePath, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+        start.Environment.Clear();
+        foreach (var name in ValidationEnvironmentNames)
+            if (inherited.TryGetValue(name, out var value) && value is not null) start.Environment[name] = value;
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        return start;
+    }
+
+    private void RecordValidationFailure(string workItemId, Workspace workspace, int index, string fileName, int? exitCode, string category, string stderr)
+        => telemetry?.Record("publication.validation.failed", OperatorEventSeverities.Warning, workItemId, "publication", message: "Publication validation command failed.", metadata: new Dictionary<string, string>
+        {
+            ["commandIndex"] = index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["executable"] = Path.GetFileName(fileName),
+            ["exitCode"] = exitCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none",
+            ["category"] = category,
+            ["stderrSummary"] = SanitizeValidationSummary(stderr),
+            ["workspaceKey"] = workspace.Key
+        });
+
+    internal static readonly string[] ValidationEnvironmentNames =
+    ["PATH", "PATHEXT", "SYSTEMROOT", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "ProgramFiles",
+     "DOTNET_ROOT", "DOTNET_ROOT_X64", "DOTNET_HOST_PATH", "DOTNET_CLI_HOME", "NUGET_PACKAGES", "NUGET_HTTP_CACHE_PATH", "MSBuildSDKsPath", "MSBUILD_EXE_PATH"];
+
+    internal static string SanitizeValidationSummary(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "no stderr output";
+        var result = new string(value.Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t').ToArray());
+        result = Regex.Replace(result, "(?i)\\b(bearer|basic)\\s+[^\\s]+", "$1 [REDACTED]");
+        result = Regex.Replace(result, "(?i)https?://[^\\s/@]+:[^\\s/@]+@[^\\s]+|https?://[^\\s?]+\\?[^\\s]+", "[REDACTED-URL]");
+        result = Regex.Replace(result, "(?m)\\b[A-Za-z_][A-Za-z0-9_]{1,127}=[^\\s\\r\\n]+", "[REDACTED-ENV]");
+        result = Regex.Replace(result, "(?<![A-Za-z0-9])[A-Za-z0-9+/_-]{24,}={0,2}(?![A-Za-z0-9])", "[REDACTED]");
+        return result.Length <= 1024 ? result.Trim() : result[..1024].TrimEnd() + "…";
+    }
+
+    private static async Task<string> DrainAsync(StreamReader reader)
     {
         var buffer = new char[4096];
-        while (await reader.ReadAsync(buffer) > 0) { }
+        var bounded = new StringBuilder(2048);
+        int read;
+        while ((read = await reader.ReadAsync(buffer)) > 0)
+            if (bounded.Length < 2048) bounded.Append(buffer, 0, Math.Min(read, 2048 - bounded.Length));
+        return bounded.ToString();
     }
 
     private async Task<GitCommandResult> GitAsync(string cwd, IReadOnlyList<string> arguments, string operation, CancellationToken cancellationToken)
