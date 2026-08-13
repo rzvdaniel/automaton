@@ -134,7 +134,7 @@ public sealed class StartupReconcilerTests
             Assert.That(feedback.WasStartupReconciledWhenStarted, Is.True);
             Assert.That(ci.Targets.Single().HeadSha, Is.EqualTo(currentSha));
             Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(currentSha));
-            Assert.That(fixture.Publisher.RecoveryRequests, Has.Count.EqualTo(1));
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
             Assert.That(fixture.Executor.Attempts, Is.Empty);
         });
 
@@ -645,6 +645,12 @@ public sealed class StartupReconcilerTests
         public List<OwnedWorkspaceRecord> RecoveryRequests { get; } = [];
         public PublicationRecoveryResult Result { get; set; } = new(false);
         public PublicationException? Failure { get; set; }
+        public Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken)
+        {
+            if (Failure is not null) throw Failure;
+            var publication = record.Publication!;
+            return Task.FromResult(new PublicationResult(record.Repository.Identity, publication.RemoteBranch!, publication.CommitSha!, publication.PullRequestNumber!.Value, publication.PullRequestUrl!, true));
+        }
         public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
         {
