@@ -28,8 +28,8 @@ public sealed class CodexReviewFeedbackRemediator(
         {
             var reviewer = await InStage(ReviewFeedbackFailureCategories.Reviewer, "human feedback Reviewer remediation failed", cancellationToken, () => RunReadOnlyReviewerAsync(client, reviewerThread, reviewerPrompt, cancellationToken));
             if (reviewer.Verdict == RoleResultStatuses.Approved) { approved = reviewer; break; }
-            if (reviewer.Verdict == RoleResultStatuses.Blocked || reviewRound == workflow.Options.Agent.MaxReviewRounds)
-                throw new PublicationException(reviewer.Summary.Length > 0 ? reviewer.Summary : "Feedback remediation Reviewer did not approve.");
+            if (reviewer.Verdict == RoleResultStatuses.Blocked) throw ReviewerFailure("reviewer-blocked", false);
+            if (reviewRound == workflow.Options.Agent.MaxReviewRounds) throw ReviewerFailure("reviewer-turn-limit", false);
             developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperCorrectionPrompt(request, developer, reviewer), cancellationToken));
             if (developer.Status == RoleResultStatuses.Blocked) throw DeveloperFailure("blocked", false);
             reviewerPrompt = ReviewerPrompt(request, developer, reviewer);
@@ -92,7 +92,7 @@ public sealed class CodexReviewFeedbackRemediator(
 
     private async Task<ReviewerHandoff> RunReadOnlyReviewerAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
     {
-        var workspace = client.CurrentWorkspace ?? throw new PublicationException("Feedback Reviewer workspace is unavailable.");
+        var workspace = client.CurrentWorkspace ?? throw ReviewerFailure("workspace-unavailable", false);
         var before = await mutationGuard.CaptureAsync(workspace, cancellationToken);
         ReviewerHandoff? handoff = null;
         Exception? failure = null;
@@ -101,25 +101,41 @@ public sealed class CodexReviewFeedbackRemediator(
             for (var turn = 0; turn < workflow.Options.Agent.ReviewerMaxTurns; turn++)
             {
                 var result = await RunTurnAsync(client, thread, prompt, cancellationToken);
-                if (!RoleResultContracts.TryParseReviewer(result.FinalResponse, out handoff)) throw new PublicationException("Feedback Reviewer returned a malformed contract.");
+                if (!RoleResultContracts.TryParseReviewer(result.FinalResponse, out handoff)) throw ReviewerFailure("malformed-reviewer-contract", false);
                 if (handoff.Verdict != RoleResultStatuses.Continue) break;
                 prompt = RolePromptBuilder.Continue(AgentRoles.Reviewer, handoff.Summary);
             }
-            if (handoff is null || handoff.Verdict == RoleResultStatuses.Continue) throw new PublicationException("Feedback Reviewer exceeded its turn limit.");
+            if (handoff is null || handoff.Verdict == RoleResultStatuses.Continue) throw ReviewerFailure("reviewer-turn-limit", false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) { failure = exception; }
-        if (client.CurrentWorkspace?.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined || failure is CodexProtocolException) throw failure!;
+        if (client.CurrentWorkspace?.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) throw ReviewerFailure("workspace-quarantined", false);
+        if (failure is ReviewFeedbackRemediationException remediation) throw remediation;
+        if (failure is CodexProtocolException) throw ReviewerFailure("codex-protocol-failed", false);
         var after = await mutationGuard.CaptureAsync(client.CurrentWorkspace ?? workspace, CancellationToken.None);
-        if (!string.Equals(before, after, StringComparison.Ordinal)) throw new PublicationException("Feedback Reviewer violated its read-only workspace boundary.");
-        if (failure is not null) throw failure;
+        if (!string.Equals(before, after, StringComparison.Ordinal)) throw ReviewerFailure("read-only-boundary-violated", false);
+        if (failure is not null) throw ReviewerFailure(ClassifyReviewerException(failure), failure is NonCompletedReviewerTurnException turn && turn.IsRetryable || failure is PublicationException publication && publication.IsRetryable);
         return handoff!;
     }
+
+    internal static string ClassifyReviewerException(Exception exception) => exception switch
+    {
+        CodexLaunchException => "codex-launch-failed",
+        CodexIdleTimeoutException => "codex-turn-timeout",
+        CodexProcessExitedException => "codex-process-failed",
+        CodexProtocolException => "codex-protocol-failed",
+        NonCompletedReviewerTurnException => "codex-turn-failed",
+        _ => "unexpected"
+    };
+
+    internal static ReviewFeedbackRemediationException ReviewerFailure(string subcategory, bool retryable)
+        => new(ReviewFeedbackFailureCategories.Reviewer, "human feedback Reviewer remediation failed", retryable, subcategory);
 
     private static async Task<CodexTurnResult> RunTurnAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
     {
         var turn = await client.StartTurnAsync(thread.Id, prompt, cancellationToken);
         var result = await client.WaitForTurnCompletionAsync(turn, cancellationToken);
-        if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase)) throw new PublicationException(Bound(result.FailureReason ?? "Feedback role turn failed."), true);
+        if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase)) throw new NonCompletedReviewerTurnException(true);
         return result;
     }
 
@@ -148,7 +164,8 @@ human_feedback:
 {Feedback(request.Feedback)}
 Developer summary: {Escape(developer.Summary)}
 Prior review: {Escape(prior?.Summary ?? "none")}
-Independently inspect the real current workspace and complete diff. Verify relevant human feedback was correctly addressed without regressions or scope expansion. Return AUTOMATON_REVIEW_RESULT JSON using APPROVED, CHANGES_REQUIRED, or BLOCKED.
+Independently inspect the real current workspace and complete diff. Verify relevant human feedback was correctly addressed without regressions or scope expansion.
+{RolePromptBuilder.ReviewerTerminalContract}
 """;
     private static string Feedback(ReviewFeedbackSnapshot snapshot)
     {
@@ -157,4 +174,9 @@ Independently inspect the real current workspace and complete diff. Verify relev
     }
     private static string Escape(string value) => new(value.Select(character => char.IsControl(character) ? ' ' : character).Take(2000).ToArray());
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
+}
+
+internal sealed class NonCompletedReviewerTurnException(bool isRetryable) : Exception
+{
+    public bool IsRetryable { get; } = isRetryable;
 }

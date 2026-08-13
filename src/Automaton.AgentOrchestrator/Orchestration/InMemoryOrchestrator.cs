@@ -216,7 +216,7 @@ public sealed class InMemoryOrchestrator(
                 ["workspaceKey"] = "unavailable",
                 ["retryable"] = retryable.ToString().ToLowerInvariant(),
                 ["subcategory"] = subcategory ?? "unexpected",
-                ["role"] = category == ReviewFeedbackFailureCategories.Developer ? AgentRoles.Developer : "unknown"
+                ["role"] = category == ReviewFeedbackFailureCategories.Developer ? AgentRoles.Developer : category == ReviewFeedbackFailureCategories.Reviewer ? AgentRoles.Reviewer : "unknown"
             });
     }
 
