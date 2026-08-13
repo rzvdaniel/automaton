@@ -18,6 +18,7 @@ public sealed class CodexReviewFeedbackRemediator(
         await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken, () => publisher.ValidateRevisionBaseAsync(request.Workspace, current, allowWorkingTreeChanges: true, cancellationToken));
         await using var client = clients.Create(request.Workspace, new Dictionary<string, string>());
         await client.InitializeAsync(cancellationToken);
+        var initialFingerprint = await mutationGuard.CaptureAsync(request.Workspace, cancellationToken);
         var developerThread = await client.StartThreadAsync(cancellationToken);
         var reviewerThread = await client.StartThreadAsync(cancellationToken);
         var developer = await InStage(ReviewFeedbackFailureCategories.Developer, "human feedback Developer remediation failed", cancellationToken, () => RunDeveloperAsync(client, developerThread, DeveloperPrompt(request), cancellationToken));
@@ -35,6 +36,13 @@ public sealed class CodexReviewFeedbackRemediator(
             reviewerPrompt = ReviewerPrompt(request, developer, reviewer);
         }
         if (approved is null) throw new PublicationException("Feedback remediation did not receive independent Reviewer approval.");
+        var finalFingerprint = await mutationGuard.CaptureAsync(client.CurrentWorkspace ?? request.Workspace, CancellationToken.None);
+        if (string.Equals(initialFingerprint, finalFingerprint, StringComparison.Ordinal))
+        {
+            await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken,
+                () => publisher.ValidateRevisionBaseAsync(client.CurrentWorkspace ?? request.Workspace, current, allowWorkingTreeChanges: false, cancellationToken));
+            return current with { IsReviewedNoOp = true };
+        }
         return await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", cancellationToken, () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
     }
 

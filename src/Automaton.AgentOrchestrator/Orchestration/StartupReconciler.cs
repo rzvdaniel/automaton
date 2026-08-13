@@ -98,6 +98,34 @@ public sealed class StartupReconciler(
                     continue;
                 }
 
+                if (record.Publication is { State: PublicationStates.Authorized, CommitSha: null, AuthorizedParentSha: not null, Revision: > 1 })
+                {
+                    try
+                    {
+                        var recovered = await publisher.RecoverAuthorizedWithoutCommitAsync(record, cancellationToken);
+                        if (ciShepherd is null || reviewFeedbackShepherd is null || reviewFeedbackProvider is null)
+                            throw new PublicationException("Human feedback recovery is not configured.");
+                        var ci = await ciShepherd.ShepherdAsync(new(recovered.Repository, recovered.PullRequestNumber, recovered.Branch, recovered.CommitSha), record.Workspace, item!, cancellationToken);
+                        if (!ci.Succeeded) throw new PublicationException("Recovered publication CI did not pass.");
+                        var sha = ci.HeadSha ?? recovered.CommitSha;
+                        await workspaces.UpdateCiStateAsync(record.Workspace, new CiRecoveryState(CiStatuses.Passed, sha, ci.RemediationRound), cancellationToken);
+                        await workspaces.UpdateReviewFeedbackStateAsync(record.Workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, sha, record.ReviewFeedback?.RemediationRound ?? 0), cancellationToken);
+                        var target = new ReviewFeedbackTarget(recovered.Repository, recovered.PullRequestNumber, recovered.Branch, sha, record.ReviewFeedback?.RemediationRound ?? 0, record.Publication.Revision - 1);
+                        var recoveredItem = item!;
+                        decisions.Add(() => orchestrator.RestoreAwaitingHumanFeedback(recoveredItem, Math.Max(record.Recovery.LastCompletedAttempt, 1), async token =>
+                        {
+                            var feedback = await reviewFeedbackShepherd.ShepherdAsync(target, record.Workspace, recoveredItem, token);
+                            return feedback.Succeeded ? RunOutcome.Success() : new RunOutcome(false, feedback.IsRetryable, feedback.FailureReason ?? "human feedback remediation failed", feedback.FailureCategory, feedback.FailureSubcategory);
+                        }));
+                        continue;
+                    }
+                    catch (PublicationException exception)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked, Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
+                        continue;
+                    }
+                }
+
                 if (record.Publication?.State is not (null or PublicationStates.None))
                 {
                     if (record.Publication.State == PublicationStates.PullRequestCreated

@@ -42,9 +42,9 @@ public sealed class GitHubReviewFeedbackProvider(HttpClient client, GitHubReview
 
         var items = new List<ReviewFeedbackItem>();
         foreach (var review in currentReviews.Values.Where(review => string.Equals(review.State, "CHANGES_REQUESTED", StringComparison.OrdinalIgnoreCase)))
-            items.Add(new($"review:{review.Id}", ReviewFeedbackKinds.ChangesRequested, Bound(review.User?.Login, 100) ?? "unknown", Bound(review.Body, 2000) ?? "Changes requested.", CommitSha: target.HeadSha, Url: Bound(review.HtmlUrl, 2048)));
+            items.Add(new($"review:{review.Id}", ReviewFeedbackKinds.ChangesRequested, Bound(review.User?.Login, 100) ?? "unknown", Bound(review.Body, 2000) ?? "Changes requested.", CommitSha: target.HeadSha, Url: Bound(review.HtmlUrl, 2048), Version: review.UpdatedAt?.ToUniversalTime().ToString("O")));
         foreach (var comment in comments.Where(comment => IsHuman(comment.User) && string.Equals(comment.CommitId, target.HeadSha, StringComparison.OrdinalIgnoreCase)))
-            items.Add(new($"comment:{comment.Id}", ReviewFeedbackKinds.ReviewComment, Bound(comment.User?.Login, 100) ?? "unknown", Bound(comment.Body, 2000) ?? "Review comment.", Bound(comment.Path, 500), comment.Line ?? comment.OriginalLine, target.HeadSha, Bound(comment.HtmlUrl, 2048)));
+            items.Add(new($"comment:{comment.Id}", ReviewFeedbackKinds.ReviewComment, Bound(comment.User?.Login, 100) ?? "unknown", Bound(comment.Body, 2000) ?? "Review comment.", Bound(comment.Path, 500), comment.Line ?? comment.OriginalLine, target.HeadSha, Bound(comment.HtmlUrl, 2048), comment.UpdatedAt?.ToUniversalTime().ToString("O")));
         if (items.Count > MaximumItems) throw new ReviewFeedbackProviderException("GitHub returned too many actionable review feedback items.");
 
         var status = items.Count > 0 ? ReviewFeedbackStatuses.Actionable
@@ -141,6 +141,6 @@ public sealed class GitHubReviewFeedbackProvider(HttpClient client, GitHubReview
     private sealed class GitRef { public string? Ref { get; init; } public string? Sha { get; init; } [JsonPropertyName("repo")] public Repository? Repository { get; init; } }
     private sealed class Repository { [JsonPropertyName("full_name")] public string? FullName { get; init; } }
     private sealed class UserResponse { public string? Login { get; init; } public string? Type { get; init; } }
-    private sealed class ReviewResponse { public long Id { get; init; } public string? State { get; init; } public string? Body { get; init; } [JsonPropertyName("commit_id")] public string? CommitId { get; init; } [JsonPropertyName("html_url")] public string? HtmlUrl { get; init; } public UserResponse? User { get; init; } }
-    private sealed class ReviewCommentResponse { public long Id { get; init; } public string? Body { get; init; } public string? Path { get; init; } public int? Line { get; init; } [JsonPropertyName("original_line")] public int? OriginalLine { get; init; } [JsonPropertyName("commit_id")] public string? CommitId { get; init; } [JsonPropertyName("html_url")] public string? HtmlUrl { get; init; } public UserResponse? User { get; init; } }
+    private sealed class ReviewResponse { public long Id { get; init; } public string? State { get; init; } public string? Body { get; init; } [JsonPropertyName("commit_id")] public string? CommitId { get; init; } [JsonPropertyName("html_url")] public string? HtmlUrl { get; init; } [JsonPropertyName("updated_at")] public DateTimeOffset? UpdatedAt { get; init; } public UserResponse? User { get; init; } }
+    private sealed class ReviewCommentResponse { public long Id { get; init; } public string? Body { get; init; } public string? Path { get; init; } public int? Line { get; init; } [JsonPropertyName("original_line")] public int? OriginalLine { get; init; } [JsonPropertyName("commit_id")] public string? CommitId { get; init; } [JsonPropertyName("html_url")] public string? HtmlUrl { get; init; } [JsonPropertyName("updated_at")] public DateTimeOffset? UpdatedAt { get; init; } public UserResponse? User { get; init; } }
 }

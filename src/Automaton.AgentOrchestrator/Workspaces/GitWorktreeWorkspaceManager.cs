@@ -225,6 +225,27 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         return ToWorkspace(updated);
     }
 
+    public async Task<Workspace> ReconcileAuthorizedWithoutCommitAsync(Workspace workspace, PublicationRecoveryState authoritativeState, CancellationToken cancellationToken)
+    {
+        if (authoritativeState.State != PublicationStates.PullRequestCreated || authoritativeState.CommitSha is null
+            || authoritativeState.Revision < 1 || authoritativeState.PullRequestNumber is not > 0 || authoritativeState.PullRequestUrl is null)
+            throw new WorkspaceRecoveryException("Authorized publication reconciliation state is invalid.");
+        var path = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(path, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        if (sidecar.PublicationState != PublicationStates.Authorized || sidecar.PublicationCommitSha is not null
+            || sidecar.PublicationRevision != authoritativeState.Revision + 1
+            || !string.Equals(sidecar.AuthorizedParentSha, authoritativeState.CommitSha, StringComparison.OrdinalIgnoreCase)
+            || sidecar.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None)
+            throw new WorkspaceRecoveryException("Authorized publication reconciliation is not safe.");
+        var updated = sidecar with { PublicationState = authoritativeState.State, PublicationCommitSha = authoritativeState.CommitSha,
+            PublicationRemoteBranch = authoritativeState.RemoteBranch, PullRequestNumber = authoritativeState.PullRequestNumber,
+            PullRequestUrl = Bound(authoritativeState.PullRequestUrl), PublicationRevision = authoritativeState.Revision,
+            AuthorizedParentSha = authoritativeState.AuthorizedParentSha, UpdatedAtUtc = clock.UtcNow };
+        await WriteSidecarAsync(path, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
     public async Task<Workspace> UpdateCiStateAsync(Workspace workspace, CiRecoveryState ciState, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);
@@ -258,9 +279,20 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !string.Equals(sidecar.CiStatus, CiStatuses.Passed, StringComparison.Ordinal)
             || !string.Equals(sidecar.CiHeadSha, feedbackState.HeadSha, StringComparison.OrdinalIgnoreCase))
             throw new WorkspaceRecoveryException("Review feedback state must bind to an exact durable publication head that passed CI.");
-        var updated = sidecar with { ReviewFeedbackStatus = feedbackState.Status, ReviewFeedbackHeadSha = feedbackState.HeadSha, ReviewFeedbackRemediationRound = feedbackState.RemediationRound, ReviewFeedbackObservedAtUtc = feedbackState.LastObservedAtUtc, UpdatedAtUtc = clock.UtcNow };
+        var consumed = (feedbackState.Consumed ?? sidecar.ConsumedFeedback ?? [])
+            .GroupBy(x => $"{x.RepositoryIdentity}\u001f{x.PullRequestNumber}\u001f{x.FeedbackId}\u001f{x.Version}", StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.Last()).TakeLast(64).ToArray();
+        var pending = (feedbackState.Pending ?? sidecar.PendingFeedback ?? []).TakeLast(64).ToArray();
+        var updated = sidecar with { ReviewFeedbackStatus = feedbackState.Status, ReviewFeedbackHeadSha = feedbackState.HeadSha, ReviewFeedbackRemediationRound = feedbackState.RemediationRound, ReviewFeedbackObservedAtUtc = feedbackState.LastObservedAtUtc, ConsumedFeedback = consumed, PendingFeedback = pending, UpdatedAtUtc = clock.UtcNow };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
         return ToWorkspace(updated);
+    }
+
+    public async Task<ReviewFeedbackRecoveryState?> GetReviewFeedbackStateAsync(Workspace workspace, CancellationToken cancellationToken)
+    {
+        var sidecar = await ReadSidecarAsync(GetSidecarPath(workspace.Key), cancellationToken);
+        return sidecar?.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null
+            : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc, sidecar.ConsumedFeedback, sidecar.PendingFeedback);
     }
 
     public async Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken)
@@ -556,7 +588,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             sidecar.SchemaVersion,
             new PublicationRecoveryState(sidecar.PublicationState, sidecar.PublicationCommitSha, sidecar.PublicationRemoteBranch, sidecar.PullRequestNumber, sidecar.PullRequestUrl, sidecar.PublicationRevision, sidecar.AuthorizedParentSha),
             sidecar.CiStatus is null || sidecar.CiHeadSha is null ? null : new CiRecoveryState(sidecar.CiStatus, sidecar.CiHeadSha, sidecar.CiRemediationRound, sidecar.CiObservedAtUtc, sidecar.CiFailureReason),
-            sidecar.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc));
+            sidecar.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc, sidecar.ConsumedFeedback, sidecar.PendingFeedback));
 
     private async Task<string> ResolveBaseShaAsync(string repositoryRoot, string baseBranch, CancellationToken cancellationToken)
     {
@@ -666,7 +698,9 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         string? ReviewFeedbackStatus = null,
         string? ReviewFeedbackHeadSha = null,
         int ReviewFeedbackRemediationRound = 0,
-        DateTimeOffset? ReviewFeedbackObservedAtUtc = null);
+        DateTimeOffset? ReviewFeedbackObservedAtUtc = null,
+        IReadOnlyList<ConsumedReviewFeedback>? ConsumedFeedback = null,
+        IReadOnlyList<PendingReviewFeedback>? PendingFeedback = null);
 }
 
 public class WorkspaceException(string message) : Exception(message);

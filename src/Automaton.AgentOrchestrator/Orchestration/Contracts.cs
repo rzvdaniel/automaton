@@ -53,6 +53,7 @@ public interface IWorkPublisher
     Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
     Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken);
+    Task<PublicationResult> RecoverAuthorizedWithoutCommitAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
         => ValidateRevisionBaseAsync(workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
     Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, bool allowWorkingTreeChanges, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -98,8 +99,10 @@ public interface IWorkspaceManager
     Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
     Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken);
+    Task<Workspace> ReconcileAuthorizedWithoutCommitAsync(Workspace workspace, PublicationRecoveryState authoritativeState, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<Workspace> UpdateCiStateAsync(Workspace workspace, CiRecoveryState ciState, CancellationToken cancellationToken) => Task.FromResult(workspace);
     Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState feedbackState, CancellationToken cancellationToken) => Task.FromResult(workspace);
+    Task<ReviewFeedbackRecoveryState?> GetReviewFeedbackStateAsync(Workspace workspace, CancellationToken cancellationToken) => Task.FromResult<ReviewFeedbackRecoveryState?>(null);
     Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }

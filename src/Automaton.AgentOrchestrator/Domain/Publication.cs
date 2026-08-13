@@ -33,7 +33,8 @@ public sealed record PublicationResult(
     string CommitSha,
     int PullRequestNumber,
     string PullRequestUrl,
-    bool Draft);
+    bool Draft,
+    bool IsReviewedNoOp = false);
 
 public sealed record PublicationRecoveryResult(bool Recognized, PublicationResult? Publication = null);
 
