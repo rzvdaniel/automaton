@@ -100,6 +100,16 @@ public sealed class StartupReconciler(
 
                 if (record.Publication?.State is not (null or PublicationStates.None))
                 {
+                    if (record.Publication.State == PublicationStates.PullRequestCreated
+                        && (!IsValidDownstreamSha(record, record.Ci?.HeadSha, record.Publication.CommitSha)
+                            || !IsValidDownstreamSha(record, record.ReviewFeedback?.HeadSha, record.Publication.CommitSha)
+                            || (record.Ci is not null && record.ReviewFeedback is not null
+                                && !string.Equals(record.Ci.HeadSha, record.ReviewFeedback.HeadSha, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), "durable CI or feedback state conflicts with the published head"));
+                        continue;
+                    }
                     try
                     {
                         var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
@@ -108,11 +118,35 @@ public sealed class StartupReconciler(
                         var ci = recovered.Publication is not null && ciShepherd is not null
                             ? await ciShepherd.ShepherdAsync(new(recovered.Publication.Repository, recovered.Publication.PullRequestNumber, recovered.Publication.Branch, recovered.Publication.CommitSha), record.Workspace, item!, cancellationToken)
                             : CiShepherdResult.Success(recovered.Publication?.CommitSha ?? record.Publication?.CommitSha ?? string.Empty, record.Ci?.RemediationRound ?? 0);
-                        var feedback = ci.Succeeded && recovered.Publication is not null && reviewFeedbackShepherd is not null
-                            ? await reviewFeedbackShepherd.ShepherdAsync(new(recovered.Publication.Repository, recovered.Publication.PullRequestNumber, recovered.Publication.Branch, ci.HeadSha ?? recovered.Publication.CommitSha, record.ReviewFeedback?.RemediationRound ?? 0, record.Publication?.Revision ?? 1), record.Workspace, item!, cancellationToken)
-                            : ReviewFeedbackResult.Success(ci.HeadSha ?? recovered.Publication?.CommitSha ?? string.Empty, record.ReviewFeedback?.RemediationRound ?? 0);
-                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded && feedback.Succeeded ? RunStates.Completed : RunStates.Blocked,
-                            Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? feedback.FailureReason ?? "draft publication, CI, and human review were authoritatively recovered"));
+                        if (ci.Succeeded && recovered.Publication is not null && reviewFeedbackShepherd is not null && reviewFeedbackProvider is not null)
+                        {
+                            // Publication recovery can complete just before the daemon stops, leaving CI/feedback
+                            // sidecar state one revision behind.  CI is the bounded recovery step; defer the
+                            // long-lived feedback shepherd until startup reconciliation has opened the gate.
+                            var recoveredSha = ci.HeadSha ?? recovered.Publication.CommitSha;
+                            var feedbackTarget = new ReviewFeedbackTarget(recovered.Publication.Repository,
+                                recovered.Publication.PullRequestNumber, recovered.Publication.Branch, recoveredSha,
+                                record.ReviewFeedback?.RemediationRound ?? 0, record.Publication?.Revision ?? 1);
+                            await workspaces.UpdateCiStateAsync(record.Workspace,
+                                new CiRecoveryState(CiStatuses.Passed, recoveredSha, ci.RemediationRound), cancellationToken);
+                            await workspaces.UpdateReviewFeedbackStateAsync(record.Workspace,
+                                new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, recoveredSha,
+                                    record.ReviewFeedback?.RemediationRound ?? 0), cancellationToken);
+                            var recoveredItem = item!;
+                            var attempt = Math.Max(record.Recovery.LastCompletedAttempt, 1);
+                            decisions.Add(() => orchestrator.RestoreAwaitingHumanFeedback(recoveredItem, attempt, async token =>
+                            {
+                                var feedback = await reviewFeedbackShepherd.ShepherdAsync(feedbackTarget, record.Workspace, recoveredItem, token);
+                                return feedback.Succeeded
+                                    ? RunOutcome.Success()
+                                    : new RunOutcome(false, feedback.IsRetryable, feedback.FailureReason ?? "human feedback remediation failed", feedback.FailureCategory, feedback.FailureSubcategory);
+                            }));
+                        }
+                        else
+                        {
+                            decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded ? RunStates.Completed : RunStates.Blocked,
+                                Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? "draft publication and CI were authoritatively recovered"));
+                        }
                         continue;
                         }
                     }
@@ -233,7 +267,29 @@ public sealed class StartupReconciler(
         => record.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.None
            && record.Publication?.State == PublicationStates.PullRequestCreated
            && record.Ci?.Status == CiStatuses.Passed
-           && record.ReviewFeedback?.Status is ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable;
+           && record.ReviewFeedback?.Status is ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable
+           && string.Equals(record.Ci.HeadSha, record.Publication.CommitSha, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(record.ReviewFeedback.HeadSha, record.Publication.CommitSha, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasPostPublicationDownstreamLag(OwnedWorkspaceRecord record, string publicationSha)
+        => record.Ci is not null
+           && record.ReviewFeedback is not null
+           && IsSha(record.Ci.HeadSha)
+           && record.Publication is { Revision: > 1, AuthorizedParentSha: not null }
+           && IsSha(record.Publication.AuthorizedParentSha)
+           && string.Equals(record.Ci.HeadSha, record.ReviewFeedback.HeadSha, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(record.Ci.HeadSha, record.Publication.AuthorizedParentSha, StringComparison.OrdinalIgnoreCase)
+           && !string.Equals(record.Ci.HeadSha, publicationSha, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsValidDownstreamSha(OwnedWorkspaceRecord record, string? downstreamSha, string? publicationSha)
+    {
+        if (downstreamSha is null) return true;
+        if (!IsSha(downstreamSha) || !IsSha(publicationSha)) return false;
+        if (string.Equals(downstreamSha, publicationSha, StringComparison.OrdinalIgnoreCase)) return true;
+        return record.Publication is { Revision: > 1, AuthorizedParentSha: not null }
+            && IsSha(record.Publication.AuthorizedParentSha)
+            && string.Equals(downstreamSha, record.Publication.AuthorizedParentSha, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool TryCreateAwaitingHumanFeedbackTarget(OwnedWorkspaceRecord record, out ReviewFeedbackTarget? target, out string? reason)
     {

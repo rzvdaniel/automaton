@@ -109,6 +109,144 @@ public sealed class StartupReconcilerTests
     }
 
     [Test]
+    public async Task RestartAfterPublicationAdvancesBeforeCiStateQueuesFeedbackForCurrentHead()
+    {
+        var previousSha = new string('a', 40);
+        var currentSha = new string('b', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, currentSha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 2, previousSha),
+            Ci = new(CiStatuses.Passed, previousSha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.Actionable, previousSha, 0)
+        };
+        var ci = new FakeCiShepherd { Result = CiShepherdResult.Success(currentSha, 0) };
+        var feedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
+        var fixture = Create(record, ciShepherd: ci, feedbackShepherd: feedback);
+        fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", currentSha, 42, "https://github.com/acme/widgets/pull/42", true));
+        feedback.StartupReconciled = () => fixture.Orchestrator.IsStartupReconciled;
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => feedback.Targets.Count == 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(feedback.WasStartupReconciledWhenStarted, Is.True);
+            Assert.That(ci.Targets.Single().HeadSha, Is.EqualTo(currentSha));
+            Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(currentSha));
+            Assert.That(fixture.Publisher.RecoveryRequests, Has.Count.EqualTo(1));
+            Assert.That(fixture.Executor.Attempts, Is.Empty);
+        });
+
+        await fixture.Orchestrator.StopAsync();
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task RecoveredPublicationWithMissingDownstreamStateQueuesFeedbackForCurrentHead(bool ciStatePresent)
+    {
+        var sha = new string('b', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 2),
+            Ci = ciStatePresent ? new CiRecoveryState(CiStatuses.Passed, sha, 0) : null,
+            ReviewFeedback = null
+        };
+        var ci = new FakeCiShepherd { Result = CiShepherdResult.Success(sha, 0) };
+        var feedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
+        var fixture = Create(record, ciShepherd: ci, feedbackShepherd: feedback);
+        fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", sha, 42, "https://github.com/acme/widgets/pull/42", true));
+        feedback.StartupReconciled = () => fixture.Orchestrator.IsStartupReconciled;
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await EventuallyAsync(() => feedback.Targets.Count == 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(feedback.WasStartupReconciledWhenStarted, Is.True);
+            Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(sha));
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Working));
+            Assert.That(fixture.Executor.Attempts, Is.Empty);
+        });
+
+        await fixture.Orchestrator.StopAsync();
+    }
+
+    [Test]
+    public async Task UnrelatedMatchingDownstreamShaFailsClosedInsteadOfBeingTreatedAsRevisionLag()
+    {
+        var publicationSha = new string('b', 40);
+        var authorizedParent = new string('a', 40);
+        var unrelatedSha = new string('c', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, publicationSha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 2, authorizedParent),
+            Ci = new(CiStatuses.Passed, unrelatedSha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, unrelatedSha, 0)
+        };
+        var fixture = Create(record, ciShepherd: new FakeCiShepherd { Result = CiShepherdResult.Success(publicationSha, 0) }, feedbackShepherd: new FakeReviewFeedbackShepherd());
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.FeedbackProvider.Targets, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
+        });
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task UnrelatedSingleDownstreamShaFailsClosed(bool ciRecord)
+    {
+        var publicationSha = new string('b', 40);
+        var parentSha = new string('a', 40);
+        var unrelatedSha = new string('c', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, publicationSha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 2, parentSha),
+            Ci = ciRecord ? new CiRecoveryState(CiStatuses.Passed, unrelatedSha, 0) : null,
+            ReviewFeedback = ciRecord ? null : new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.AwaitingHuman, unrelatedSha, 0)
+        };
+        var fixture = Create(record, ciShepherd: new FakeCiShepherd { Result = CiShepherdResult.Success(publicationSha, 0) }, feedbackShepherd: new FakeReviewFeedbackShepherd());
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.FeedbackProvider.Targets, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
+        });
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task MixedCurrentAndPreviousDownstreamHeadsFailClosed(bool ciUsesParent)
+    {
+        var publicationSha = new string('b', 40);
+        var parentSha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, publicationSha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 2, parentSha),
+            Ci = new(CiStatuses.Passed, ciUsesParent ? parentSha : publicationSha, 0),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, ciUsesParent ? publicationSha : parentSha, 0)
+        };
+        var fixture = Create(record, ciShepherd: new FakeCiShepherd { Result = CiShepherdResult.Success(publicationSha, 0) }, feedbackShepherd: new FakeReviewFeedbackShepherd());
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
+            Assert.That(fixture.FeedbackProvider.Targets, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
+        });
+    }
+
+    [Test]
     public async Task RestartAfterCiPassResumesExactHeadHumanFeedbackRound()
     {
         var sha = new string('a', 40);
