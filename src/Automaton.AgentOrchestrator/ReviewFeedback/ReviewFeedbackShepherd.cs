@@ -1,5 +1,6 @@
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 
 namespace Automaton.AgentOrchestrator.ReviewFeedback;
@@ -33,6 +34,10 @@ public sealed class ReviewFeedbackShepherd(
                 await delay.DelayAsync(TimeSpan.FromMilliseconds(options.ReviewFeedback.PollIntervalMilliseconds), cancellationToken);
                 continue;
             }
+            catch (ReviewFeedbackProviderException exception)
+            {
+                return ReviewFeedbackResult.Blocked("human feedback provider failed", current.HeadSha, round, ReviewFeedbackFailureCategories.Provider, exception.IsRetryable);
+            }
             if (!string.Equals(snapshot.HeadSha, current.HeadSha, StringComparison.OrdinalIgnoreCase))
                 return ReviewFeedbackResult.Blocked("Review feedback provider returned an unexpected head SHA.", current.HeadSha, round);
             await workspaces.UpdateReviewFeedbackStateAsync(workspace, new(snapshot.Status, current.HeadSha, round, clock.UtcNow), CancellationToken.None);
@@ -49,7 +54,16 @@ public sealed class ReviewFeedbackShepherd(
             if (round >= options.ReviewFeedback.MaxRemediationRounds)
                 return ReviewFeedbackResult.Blocked("Human review feedback remediation rounds were exhausted.", current.HeadSha, round);
 
-            var publication = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot, round + 1), cancellationToken);
+            PublicationResult publication;
+            try { publication = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot, round + 1), cancellationToken); }
+            catch (ReviewFeedbackRemediationException exception)
+            {
+                return ReviewFeedbackResult.Blocked(exception.SafeReason, current.HeadSha, round, exception.Category, exception.IsRetryable);
+            }
+            catch (PublicationException exception)
+            {
+                return ReviewFeedbackResult.Blocked("human feedback publication failed", current.HeadSha, round, ReviewFeedbackFailureCategories.Publication, exception.IsRetryable);
+            }
             telemetry?.Record("feedback.remediation.published", OperatorEventSeverities.Information, workItem.Id, "feedback-remediation", AgentRoles.Developer,
                 "Human feedback remediation was independently approved and published.", new Dictionary<string, string> { ["headSha"] = publication.CommitSha });
             if (!MatchesRevision(publication, current))
@@ -58,7 +72,7 @@ public sealed class ReviewFeedbackShepherd(
             var next = current with { HeadSha = publication.CommitSha, RemediationRound = round, PublicationRevision = current.PublicationRevision + 1 };
             var ciResult = await ci.ShepherdAsync(new(next.RepositoryIdentity, next.PullRequestNumber, next.HeadBranch, next.HeadSha), workspace, workItem, cancellationToken);
             if (!ciResult.Succeeded)
-                return ReviewFeedbackResult.Blocked(ciResult.FailureReason ?? "Republished feedback remediation did not pass CI.", ciResult.HeadSha ?? next.HeadSha, round);
+                return ReviewFeedbackResult.Blocked("human feedback CI failed", ciResult.HeadSha ?? next.HeadSha, round, ReviewFeedbackFailureCategories.Ci, ciResult.IsRetryable);
             current = next with { HeadSha = ciResult.HeadSha ?? next.HeadSha, PublicationRevision = next.PublicationRevision + ciResult.RemediationRound };
         }
     }
@@ -69,4 +83,11 @@ public sealed class ReviewFeedbackShepherd(
            && string.Equals(publication.Branch, current.HeadBranch, StringComparison.Ordinal)
            && publication.CommitSha.Length == 40 && publication.CommitSha.All(Uri.IsHexDigit)
            && !string.Equals(publication.CommitSha, current.HeadSha, StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed class ReviewFeedbackRemediationException(string category, string safeReason, bool isRetryable = false) : Exception(safeReason)
+{
+    public string Category { get; } = category;
+    public string SafeReason { get; } = safeReason;
+    public bool IsRetryable { get; } = isRetryable;
 }

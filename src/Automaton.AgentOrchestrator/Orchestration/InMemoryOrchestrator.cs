@@ -191,6 +191,7 @@ public sealed class InMemoryOrchestrator(
         try
         {
             var outcome = await monitor(run.Cancellation.Token);
+            if (!outcome.Succeeded) RecordHumanFeedbackFailure(run, outcome.FailureCategory, outcome.FailureReason, outcome.IsRetryable);
             Complete(run.WorkItem.Id, outcome.Succeeded ? RunStates.Completed : RunStates.Blocked, run.Attempt, outcome.FailureReason);
         }
         catch (OperationCanceledException) when (run.Cancellation.IsCancellationRequested)
@@ -200,8 +201,21 @@ public sealed class InMemoryOrchestrator(
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Restored human-feedback monitoring failed for work item {WorkItemId}", run.WorkItem.Id);
-            Complete(run.WorkItem.Id, RunStates.Blocked, run.Attempt, "human feedback monitoring failed");
+            const string reason = "human feedback monitor encountered an unexpected failure";
+            RecordHumanFeedbackFailure(run, ReviewFeedbackFailureCategories.MonitorUnexpected, reason, false);
+            Complete(run.WorkItem.Id, RunStates.Blocked, run.Attempt, reason);
         }
+    }
+
+    private void RecordHumanFeedbackFailure(ActiveRun run, string? category, string? reason, bool retryable)
+    {
+        telemetry?.Record("human-feedback.monitor.failed", OperatorEventSeverities.Warning, run.WorkItem.Id, "human-feedback",
+            message: reason, metadata: new Dictionary<string, string>
+            {
+                ["category"] = category ?? ReviewFeedbackFailureCategories.MonitorUnexpected,
+                ["workspaceKey"] = "unavailable",
+                ["retryable"] = retryable.ToString().ToLowerInvariant()
+            });
     }
 
     private void StartRestoredHumanFeedbackMonitor(PendingHumanFeedbackMonitor monitor)
