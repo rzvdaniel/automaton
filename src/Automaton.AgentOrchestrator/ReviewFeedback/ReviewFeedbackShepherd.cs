@@ -58,7 +58,7 @@ public sealed class ReviewFeedbackShepherd(
             try { publication = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot, round + 1), cancellationToken); }
             catch (ReviewFeedbackRemediationException exception)
             {
-                return ReviewFeedbackResult.Blocked(exception.SafeReason, current.HeadSha, round, exception.Category, exception.IsRetryable);
+                return ReviewFeedbackResult.Blocked(exception.SafeReason, current.HeadSha, round, exception.Category, exception.IsRetryable) with { FailureSubcategory = exception.Subcategory };
             }
             catch (PublicationException exception)
             {
@@ -85,9 +85,10 @@ public sealed class ReviewFeedbackShepherd(
            && !string.Equals(publication.CommitSha, current.HeadSha, StringComparison.OrdinalIgnoreCase);
 }
 
-public sealed class ReviewFeedbackRemediationException(string category, string safeReason, bool isRetryable = false) : Exception(safeReason)
+public sealed class ReviewFeedbackRemediationException(string category, string safeReason, bool isRetryable = false, string? subcategory = null) : Exception(safeReason)
 {
     public string Category { get; } = category;
     public string SafeReason { get; } = safeReason;
     public bool IsRetryable { get; } = isRetryable;
+    public string Subcategory { get; } = subcategory ?? "unexpected";
 }

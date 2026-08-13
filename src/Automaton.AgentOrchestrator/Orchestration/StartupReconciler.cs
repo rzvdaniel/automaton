@@ -91,7 +91,9 @@ public sealed class StartupReconciler(
                     decisions.Add(() => orchestrator.RestoreAwaitingHumanFeedback(recoveredItem, attempt, async token =>
                     {
                         var feedback = await reviewFeedbackShepherd.ShepherdAsync(recoveredTarget, record.Workspace, recoveredItem, token);
-                        return feedback.Succeeded ? RunOutcome.Success() : RunOutcome.PermanentFailure(feedback.FailureReason ?? "human feedback remediation failed", feedback.FailureCategory);
+                        return feedback.Succeeded
+                            ? RunOutcome.Success()
+                            : new RunOutcome(false, feedback.IsRetryable, feedback.FailureReason ?? "human feedback remediation failed", feedback.FailureCategory, feedback.FailureSubcategory);
                     }));
                     continue;
                 }

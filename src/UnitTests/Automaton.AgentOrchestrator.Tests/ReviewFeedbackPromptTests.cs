@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Orchestration;
 using NUnit.Framework;
@@ -46,6 +47,52 @@ public sealed class ReviewFeedbackPromptTests
             Assert.That(exception!.Category, Is.EqualTo(ReviewFeedbackFailureCategories.Developer));
             Assert.That(exception.SafeReason, Is.EqualTo("human feedback Developer remediation failed"));
             Assert.That(exception.SafeReason, Does.Not.Contain("token"));
+        });
+    }
+
+    [TestCase("launch")]
+    [TestCase("timeout")]
+    [TestCase("process")]
+    [TestCase("protocol")]
+    public void DeveloperRuntimeExceptionsUseBoundedClassifications(string kind)
+    {
+        Exception exception = kind switch
+        {
+            "launch" => new CodexLaunchException("process-start", "safe"),
+            "timeout" => new CodexIdleTimeoutException(),
+            "process" => new CodexProcessExitedException(),
+            _ => new CodexProtocolException("raw protocol payload must not escape")
+        };
+
+        var subcategory = CodexReviewFeedbackRemediator.ClassifyDeveloperException(exception);
+
+        Assert.That(subcategory, Is.EqualTo(kind switch
+        {
+            "launch" => "codex-launch-failed",
+            "timeout" => "codex-turn-timeout",
+            "process" => "codex-process-failed",
+            _ => "codex-protocol-failed"
+        }));
+    }
+
+    [Test]
+    public void DeveloperClassificationNeverUsesExceptionText()
+    {
+        var exception = new CodexProtocolException("TOKEN=secret prompt payload");
+        Assert.That(CodexReviewFeedbackRemediator.ClassifyDeveloperException(exception), Is.EqualTo("codex-protocol-failed"));
+    }
+
+    [TestCase("malformed-developer-contract")]
+    [TestCase("developer-turn-limit")]
+    [TestCase("blocked")]
+    public void DeveloperContractFailuresRemainBounded(string subcategory)
+    {
+        var failure = CodexReviewFeedbackRemediator.DeveloperFailure(subcategory, false);
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure.Category, Is.EqualTo(ReviewFeedbackFailureCategories.Developer));
+            Assert.That(failure.Subcategory, Is.EqualTo(subcategory));
+            Assert.That(failure.SafeReason, Is.EqualTo("human feedback Developer remediation failed"));
         });
     }
 }
