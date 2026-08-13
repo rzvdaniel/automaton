@@ -137,17 +137,23 @@ public sealed class StartupReconcilerTests
     }
 
     [Test]
-    public async Task PublishedPassedDraftAwaitingHumanRestoresBoundedFeedbackMonitoringWithoutRerunningEngineering()
+    [TestCase(ReviewFeedbackStatuses.AwaitingHuman)]
+    [TestCase(ReviewFeedbackStatuses.Actionable)]
+    public async Task PublishedPassedDraftFeedbackStateRestoresBoundedFeedbackMonitoringWithoutRerunningEngineering(string feedbackStatus)
     {
         var sha = new string('a', 40);
         var record = Record(WorkspaceRecoveryStates.Working) with
         {
             Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
             Ci = new(CiStatuses.Passed, sha, 0),
-            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 0)
+            ReviewFeedback = new(feedbackStatus, sha, 0)
         };
         var feedback = new FakeReviewFeedbackShepherd { BlockUntilCancelled = true };
         var fixture = Create(record, feedbackShepherd: feedback);
+        fixture.FeedbackProvider.Result = new ReviewFeedbackSnapshot(sha, feedbackStatus, feedbackStatus == ReviewFeedbackStatuses.Actionable
+            ? [new ReviewFeedbackItem("comment-1", ReviewFeedbackKinds.ReviewComment, "human", "fix")]
+            : []);
+        feedback.StartupReconciled = () => fixture.Orchestrator.IsStartupReconciled;
 
         await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
         await EventuallyAsync(() => feedback.Targets.Count == 1);
@@ -156,6 +162,7 @@ public sealed class StartupReconcilerTests
         Assert.Multiple(() =>
         {
             Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(feedback.WasStartupReconciledWhenStarted, Is.True);
             Assert.That(fixture.FeedbackProvider.Targets, Has.Count.EqualTo(1));
             Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty);
             Assert.That(fixture.Executor.Attempts, Is.Empty);
@@ -481,9 +488,12 @@ public sealed class StartupReconcilerTests
         public List<ReviewFeedbackTarget> Targets { get; } = [];
         public ReviewFeedbackResult Result { get; set; } = ReviewFeedbackResult.Blocked("not configured", new string('0', 40), 0);
         public bool BlockUntilCancelled { get; set; }
+        public Func<bool>? StartupReconciled { get; set; }
+        public bool? WasStartupReconciledWhenStarted { get; private set; }
         public async Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem item, CancellationToken token)
         {
             Targets.Add(target);
+            WasStartupReconciledWhenStarted = StartupReconciled?.Invoke();
             if (BlockUntilCancelled) await Task.Delay(Timeout.InfiniteTimeSpan, token);
             return Result;
         }

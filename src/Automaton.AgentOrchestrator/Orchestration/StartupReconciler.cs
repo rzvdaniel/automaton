@@ -231,7 +231,7 @@ public sealed class StartupReconciler(
         => record.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.None
            && record.Publication?.State == PublicationStates.PullRequestCreated
            && record.Ci?.Status == CiStatuses.Passed
-           && record.ReviewFeedback?.Status == ReviewFeedbackStatuses.AwaitingHuman;
+           && record.ReviewFeedback?.Status is ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable;
 
     private static bool TryCreateAwaitingHumanFeedbackTarget(OwnedWorkspaceRecord record, out ReviewFeedbackTarget? target, out string? reason)
     {
