@@ -34,3 +34,4 @@ public sealed record ReviewFeedbackResult(bool Succeeded, string? FailureReason,
     public static ReviewFeedbackResult Success(string sha, int round) => new(true, null, sha, round);
     public static ReviewFeedbackResult Blocked(string reason, string sha, int round, string? category = null, bool isRetryable = false) => new(false, reason, sha, round, category, isRetryable);
 }
+public sealed record ReviewFeedbackRemediationResult(PublicationResult Publication, Workspace Workspace);
