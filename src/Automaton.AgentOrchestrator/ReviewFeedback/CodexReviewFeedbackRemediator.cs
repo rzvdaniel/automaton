@@ -12,11 +12,14 @@ public sealed class CodexReviewFeedbackRemediator(
     IWorkPublisher publisher,
     WorkflowDefinition workflow) : IReviewFeedbackRemediator
 {
-    public async Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken)
+    public async Task<ReviewFeedbackRemediationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken)
     {
         var current = new PublicationResult(request.Target.RepositoryIdentity, request.Target.HeadBranch, request.Target.HeadSha, request.Target.PullRequestNumber, string.Empty, true);
         await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken, () => publisher.ValidateRevisionBaseAsync(request.Workspace, current, allowWorkingTreeChanges: true, cancellationToken));
-        await using var client = clients.Create(request.Workspace, new Dictionary<string, string>());
+        var client = clients.Create(request.Workspace, new Dictionary<string, string>());
+        var disposed = false;
+        try
+        {
         await client.InitializeAsync(cancellationToken);
         var initialFingerprint = await mutationGuard.CaptureAsync(request.Workspace, cancellationToken);
         var developerThread = await client.StartThreadAsync(cancellationToken);
@@ -41,9 +44,17 @@ public sealed class CodexReviewFeedbackRemediator(
         {
             await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication validation failed", cancellationToken,
                 () => publisher.ValidateRevisionBaseAsync(client.CurrentWorkspace ?? request.Workspace, current, allowWorkingTreeChanges: false, cancellationToken));
-            return current with { IsReviewedNoOp = true };
+            await client.DisposeAsync(); disposed = true;
+            return new(current with { IsReviewedNoOp = true }, client.CurrentWorkspace ?? request.Workspace);
         }
-        return await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", cancellationToken, () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
+        var publication = await InStage(ReviewFeedbackFailureCategories.Publication, "human feedback publication revision failed", cancellationToken, () => publisher.PublishRevisionAsync(new(client.CurrentWorkspace ?? request.Workspace, request.WorkItem, current, developer, approved, request.Target.PublicationRevision + 1), cancellationToken));
+        await client.DisposeAsync(); disposed = true;
+        return new(publication, client.CurrentWorkspace ?? request.Workspace);
+        }
+        finally
+        {
+            if (!disposed) await client.DisposeAsync();
+        }
     }
 
     internal static async Task<T> InStage<T>(string category, string safeReason, CancellationToken cancellationToken, Func<Task<T>> action)

@@ -38,7 +38,7 @@ public interface IReviewFeedbackShepherd
 
 public interface IReviewFeedbackRemediator
 {
-    Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken);
+    Task<ReviewFeedbackRemediationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken);
 }
 
 public interface IReviewFeedbackPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }

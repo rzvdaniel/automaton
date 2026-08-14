@@ -70,8 +70,8 @@ public sealed class ReviewFeedbackShepherd(
             var pending = actionable.Select(item => new PendingReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, item.Kind, FeedbackVersion(item), current.HeadSha, current.PublicationRevision)).ToArray();
             var existingState = await workspaces.GetReviewFeedbackStateAsync(workspace, CancellationToken.None);
             await workspaces.UpdateReviewFeedbackStateAsync(workspace, new ReviewFeedbackRecoveryState(ReviewFeedbackStatuses.Actionable, current.HeadSha, round, clock.UtcNow, existingState?.Consumed, pending), CancellationToken.None);
-            PublicationResult publication;
-            try { publication = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot with { Items = actionable }, round + 1), cancellationToken); }
+            ReviewFeedbackRemediationResult remediation;
+            try { remediation = await remediator.RemediateAsync(new(current, workspace, workItem, snapshot with { Items = actionable }, round + 1), cancellationToken); }
             catch (ReviewFeedbackRemediationException exception)
             {
                 return ReviewFeedbackResult.Blocked(exception.SafeReason, current.HeadSha, round, exception.Category, exception.IsRetryable) with { FailureSubcategory = exception.Subcategory };
@@ -80,6 +80,8 @@ public sealed class ReviewFeedbackShepherd(
             {
                 return ReviewFeedbackResult.Blocked("human feedback publication failed", current.HeadSha, round, ReviewFeedbackFailureCategories.Publication, exception.IsRetryable);
             }
+            workspace = remediation.Workspace;
+            var publication = remediation.Publication;
             if (publication.IsReviewedNoOp)
             {
                 var noOpConsumed = actionable.Select(item => new ConsumedReviewFeedback(current.RepositoryIdentity, current.PullRequestNumber, item.Id, FeedbackVersion(item), current.HeadSha, current.PublicationRevision, clock.UtcNow)).ToArray();
