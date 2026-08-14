@@ -14,7 +14,7 @@ public sealed record CodexProcessOptions(
 
 public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IExecutionFence? executionFence = null) : ICodexJsonRpcTransport
 {
-    private static readonly string[] AllowedHostEnvironment = ["PATH", "Path", "PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "CODEX_HOME"];
+    private static readonly string[] AllowedHostEnvironment = ["PATH", "Path", "PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "ProgramFiles", "CODEX_HOME"];
     private readonly Channel<string> stdout = Channel.CreateUnbounded<string>(new() { SingleReader = true, SingleWriter = true });
     private readonly CancellationTokenSource lifetime = new();
     private Process? process;
