@@ -134,6 +134,7 @@ public sealed class RoleBasedWorkExecutor(
         catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
         catch (PublicationException exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             outcome = exception.IsRetryable
                 ? RunOutcome.RetryableFailure(Bounded(exception.Message))
                 : RunOutcome.PermanentFailure(Bounded(exception.Message));
@@ -179,6 +180,7 @@ public sealed class RoleBasedWorkExecutor(
         catch (CodexProtocolException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (Exception exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             ambiguous = string.Equals(client.CurrentWorkspace?.ExecutionOwnershipStatus, WorkspaceExecutionOwnershipStates.Quarantined, StringComparison.Ordinal);
             outcome = ambiguous
                 ? RunOutcome.PermanentFailure("Codex execution ownership is quarantined for manual recovery.")
@@ -220,6 +222,12 @@ public sealed class RoleBasedWorkExecutor(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         return outcome;
+    }
+
+    private static void AdoptRemediationWorkspace(Exception exception, ref Workspace workspace)
+    {
+        if (exception.Data["CiRemediationWorkspace"] is Workspace released)
+            workspace = released;
     }
 
     private void Record(string eventType, string workItemId, string stage, string? role, string? message, IReadOnlyDictionary<string, string>? metadata = null)

@@ -50,12 +50,17 @@ public sealed class CodexCiRemediator(
             ?? throw new PublicationException("CI remediation workspace ownership release state is unavailable.");
         return new(publication, releasedWorkspace);
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             if (!disposed)
             {
                 disposed = true;
                 await client.DisposeAsync();
+            }
+            if (client.CurrentWorkspace is { } releasedWorkspace)
+            {
+                exception.Data["CiRemediationWorkspace"] = releasedWorkspace;
+                throw;
             }
             throw;
         }

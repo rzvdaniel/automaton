@@ -1,5 +1,6 @@
 namespace Automaton.AgentOrchestrator.Domain;
 
+
 public static class CiStatuses
 {
     public const string Pending = "pending";
@@ -14,6 +15,7 @@ public sealed record CiSnapshot(string HeadSha, string Status, IReadOnlyList<CiC
 public sealed record CiRecoveryState(string Status, string HeadSha, int RemediationRound, DateTimeOffset? LastObservedAtUtc = null, string? FailureReason = null);
 public sealed record CiRemediationRequest(CiTarget Target, Workspace Workspace, WorkItem WorkItem, CiSnapshot Failure, int RemediationRound);
 public sealed record CiRemediationResult(PublicationResult Publication, Workspace Workspace);
+
 
 public sealed record CiShepherdResult(bool Succeeded, bool IsRetryable, string? FailureReason = null, string? HeadSha = null, int RemediationRound = 0, Workspace? Workspace = null)
 {
