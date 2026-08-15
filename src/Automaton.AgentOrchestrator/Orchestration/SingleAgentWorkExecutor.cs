@@ -108,6 +108,10 @@ public sealed class RoleBasedWorkExecutor(
             }
             await client.DisposeAsync();
             disposedForCi = true;
+            // DisposeAsync durably releases the lease and returns the newest fencing
+            // snapshot. CI must start from that released workspace, not the active
+            // publication snapshot.
+            workspace = client.CurrentWorkspace ?? workspace;
             var ci = ciShepherd is null
                 ? CiShepherdResult.Success(publication.CommitSha, 0)
                 : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), workspace, attempt.WorkItem, cancellationToken);
