@@ -35,6 +35,19 @@ public sealed class SingleAgentWorkExecutorTests
     }
 
     [Test]
+    public async Task PublicationWorkspaceIsAuthoritativeInputToCiAfterEngineeringClientRelease()
+    {
+        var published = Workspace("nonce-published");
+        var ci = new FakeCi(CiShepherdResult.Blocked("failed", new string('a', 40), 0, published));
+        var fixture = CreateCore(3, [], [ManagerReady(), DeveloperCompleted(), ReviewerApproved()], ci, null);
+        fixture.Publisher.PublishedWorkspace = published;
+
+        await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.That(ci.Workspaces.Single().LaunchNonce, Is.EqualTo("nonce-published"));
+    }
+
+    [Test]
     public async Task CodexCiRemediatorReleasesExactlyOnceBeforeReturning()
     {
         var workspace = Workspace("nonce-b");
@@ -594,11 +607,12 @@ public sealed class SingleAgentWorkExecutorTests
             => throw new NotSupportedException();
         public List<PublicationRequest> Requests { get; } = [];
         public PublicationException? Failure { get; set; }
+        public Workspace? PublishedWorkspace { get; set; }
         public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
         {
             Requests.Add(request);
             if (Failure is not null) throw Failure;
-            return Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://github.com/acme/widgets/pull/1", true));
+            return Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://github.com/acme/widgets/pull/1", true, Workspace: PublishedWorkspace));
         }
         public Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken)
             => Task.FromResult(new PublicationResult(request.CurrentPublication.Repository, request.CurrentPublication.Branch, new string('b', 40), request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, true, Workspace: request.Workspace with { LaunchNonce = "nonce-published" }));

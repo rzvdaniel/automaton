@@ -98,12 +98,20 @@ public sealed class RoleBasedWorkExecutor(
             Record("publication.started", attempt.WorkItem.Id, "publication", null, "Approved workspace publication started.");
             var publication = await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
             publicationStarted = true;
+            // Publication advances durable workspace identity (including fencing fields).
+            // Adopt that authoritative snapshot before releasing the engineering lease or
+            // handing the workspace to CI; the disposed client may still hold the older one.
+            if (publication.Workspace is { } publishedWorkspace)
+            {
+                workspace = publishedWorkspace;
+                client.AdoptWorkspace(publishedWorkspace);
+            }
             await client.DisposeAsync();
             disposedForCi = true;
             var ci = ciShepherd is null
                 ? CiShepherdResult.Success(publication.CommitSha, 0)
-                : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
-            workspace = ci.Workspace ?? client.CurrentWorkspace ?? workspace;
+                : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), workspace, attempt.WorkItem, cancellationToken);
+            workspace = ci.Workspace ?? workspace;
             Record("ci.observed", attempt.WorkItem.Id, "ci", null, ci.Succeeded ? "CI shepherding passed." : ci.FailureReason, new Dictionary<string, string> { ["pullRequestNumber"] = publication.PullRequestNumber.ToString(System.Globalization.CultureInfo.InvariantCulture), ["headSha"] = ci.HeadSha ?? publication.CommitSha });
             if (!ci.Succeeded)
                 outcome = ci.IsRetryable ? RunOutcome.RetryableFailure(Bounded(ci.FailureReason ?? "CI shepherding failed.")) : RunOutcome.PermanentFailure(Bounded(ci.FailureReason ?? "CI shepherding failed."));
