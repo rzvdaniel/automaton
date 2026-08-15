@@ -548,14 +548,22 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
     private void ValidateWorkspaceMatchesSidecar(Workspace workspace, WorkspaceSidecar sidecar)
     {
-        if (!string.Equals(workspace.Key, sidecar.WorkspaceKey, StringComparison.Ordinal)
-            || !PathsEqual(workspace.Path, sidecar.WorkspacePath)
-            || !string.Equals(workspace.Branch, sidecar.Branch, StringComparison.Ordinal)
-            || !string.Equals(workspace.ExecutionOwnershipStatus, sidecar.ExecutionOwnershipStatus, StringComparison.Ordinal)
-            || !string.Equals(workspace.RepositoryIdentity, sidecar.RepositoryIdentity, StringComparison.Ordinal)
-            || !string.Equals(workspace.BaseCommitSha, sidecar.BaseCommitSha, StringComparison.Ordinal)
-            || !string.Equals(workspace.LaunchNonce, sidecar.LaunchNonce, StringComparison.Ordinal))
-            throw new WorkspaceRecoveryException("Workspace does not match daemon-owned sidecar state.");
+        var mismatches = new (string Name, string? Supplied, string? Durable, bool Equal)[]
+        {
+            ("Key", workspace.Key, sidecar.WorkspaceKey, string.Equals(workspace.Key, sidecar.WorkspaceKey, StringComparison.Ordinal)),
+            ("Path", workspace.Path, sidecar.WorkspacePath, PathsEqual(workspace.Path, sidecar.WorkspacePath)),
+            ("Branch", workspace.Branch, sidecar.Branch, string.Equals(workspace.Branch, sidecar.Branch, StringComparison.Ordinal)),
+            ("ExecutionOwnershipStatus", workspace.ExecutionOwnershipStatus, sidecar.ExecutionOwnershipStatus, string.Equals(workspace.ExecutionOwnershipStatus, sidecar.ExecutionOwnershipStatus, StringComparison.Ordinal)),
+            ("RepositoryIdentity", workspace.RepositoryIdentity, sidecar.RepositoryIdentity, string.Equals(workspace.RepositoryIdentity, sidecar.RepositoryIdentity, StringComparison.Ordinal)),
+            ("BaseCommitSha", workspace.BaseCommitSha, sidecar.BaseCommitSha, string.Equals(workspace.BaseCommitSha, sidecar.BaseCommitSha, StringComparison.Ordinal)),
+            ("LaunchNonce", workspace.LaunchNonce, sidecar.LaunchNonce, string.Equals(workspace.LaunchNonce, sidecar.LaunchNonce, StringComparison.Ordinal))
+        };
+        var mismatchIndex = Array.FindIndex(mismatches, value => !value.Equal);
+        if (mismatchIndex >= 0)
+        {
+            var mismatch = mismatches[mismatchIndex];
+            throw new WorkspaceRecoveryException($"Workspace does not match daemon-owned sidecar state during workspace validation: field={mismatch.Name}; supplied={mismatch.Supplied}; durable={mismatch.Durable}.");
+        }
         EnsureContained(workspace.Path, workspaceRoot);
     }
 
