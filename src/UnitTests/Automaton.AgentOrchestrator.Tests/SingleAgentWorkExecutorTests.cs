@@ -45,7 +45,7 @@ public sealed class SingleAgentWorkExecutorTests
         var remediator = new Automaton.AgentOrchestrator.Ci.CodexCiRemediator(factory, new FakeMutationGuard([]), publisher, workflow);
         var request = new CiRemediationRequest(new("acme/widgets", 1, "automaton/work/work-123", new string('a', 40)), workspace, Attempt().WorkItem, new CiSnapshot(new string('a', 40), CiStatuses.Failed, []), 1);
         var result = await remediator.RemediateAsync(request, CancellationToken.None);
-        Assert.Multiple(() => { Assert.That(client.DisposeCount, Is.EqualTo(1)); Assert.That(result.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None)); });
+        Assert.Multiple(() => { Assert.That(client.DisposeCount, Is.EqualTo(1)); Assert.That(result.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None)); Assert.That(result.Workspace.LaunchNonce, Is.EqualTo("nonce-published")); });
     }
 
     [Test]
@@ -601,7 +601,7 @@ public sealed class SingleAgentWorkExecutorTests
             return Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://github.com/acme/widgets/pull/1", true));
         }
         public Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken)
-            => Task.FromResult(new PublicationResult(request.CurrentPublication.Repository, request.CurrentPublication.Branch, new string('b', 40), request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, true));
+            => Task.FromResult(new PublicationResult(request.CurrentPublication.Repository, request.CurrentPublication.Branch, new string('b', 40), request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, true, Workspace: request.Workspace with { LaunchNonce = "nonce-published" }));
         public Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
             => Task.FromResult(new PublicationRecoveryResult(false));
     }
@@ -664,6 +664,7 @@ public sealed class SingleAgentWorkExecutorTests
         public string? LastEventType => LastEventTypeValue;
         public TimeSpan IdleTimeout => IdleTimeoutValue;
         public bool? IsProcessAlive => ProcessAliveValue;
+        public void AdoptWorkspace(Workspace value) => current = value;
         public int? WaitFailureAtCall { get; set; }
         private int waitCallCount;
         public Task InitializeAsync(CancellationToken cancellationToken) { current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active, LaunchNonce = "run" }; if (InitializeFailure is not null) throw InitializeFailure; return Task.CompletedTask; }

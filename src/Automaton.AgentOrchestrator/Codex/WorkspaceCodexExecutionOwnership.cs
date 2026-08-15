@@ -8,6 +8,7 @@ public sealed class WorkspaceCodexExecutionOwnership(IWorkspaceManager workspace
 {
     private Workspace current = workspace;
     public Workspace? CurrentWorkspace => current;
+    public void AdoptWorkspace(Workspace workspace) => current = workspace;
 
     public async Task AcquireAsync(string launchNonce, CancellationToken cancellationToken)
     {

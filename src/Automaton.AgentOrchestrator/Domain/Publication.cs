@@ -34,7 +34,8 @@ public sealed record PublicationResult(
     int PullRequestNumber,
     string PullRequestUrl,
     bool Draft,
-    bool IsReviewedNoOp = false);
+    bool IsReviewedNoOp = false,
+    Workspace? Workspace = null);
 
 public sealed record PublicationRecoveryResult(bool Recognized, PublicationResult? Publication = null);
 

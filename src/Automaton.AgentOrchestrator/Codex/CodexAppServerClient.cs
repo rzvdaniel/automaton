@@ -34,6 +34,7 @@ public interface ICodexJsonRpcTransport : IAsyncDisposable
 
 public interface ICodexExecutionOwnership
 {
+    void AdoptWorkspace(Workspace workspace) { }
     Workspace? CurrentWorkspace { get; }
     Task AcquireAsync(string launchNonce, CancellationToken cancellationToken);
     Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken);
@@ -57,6 +58,7 @@ public sealed class CodexAppServerClient(
     TimeSpan idleTimeout,
     string workspacePath) : ICodexAppServerClient, IAsyncDisposable
 {
+    public void AdoptWorkspace(Workspace workspace) => ownership.AdoptWorkspace(workspace);
     private const int MaximumEarlyTurnResults = 64;
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> pending = [];
     private readonly object turnGate = new();
