@@ -37,6 +37,23 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.Multiple(() => { Assert.That(outcome.IsRetryable, Is.True); Assert.That(fixture.Client.DisposeCount, Is.EqualTo(1)); Assert.That(fixture.Workspaces.FinalWorkspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None)); });
     }
 
+    [Test]
+    public void CancellationReleasesOwnershipBeforeItPropagates()
+    {
+        var fixture = Create("COMPLETED");
+        using var cancellation = new CancellationTokenSource();
+        fixture.Client.CancelSource = cancellation;
+
+        Assert.ThrowsAsync<OperationCanceledException>(() => fixture.Executor.ExecuteAsync(Attempt(), cancellation.Token));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Client.DisposeCount, Is.EqualTo(1));
+            Assert.That(fixture.Client.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
+            Assert.That(fixture.Workspaces.LifecycleWrites, Is.EqualTo(0));
+        });
+    }
+
     private static Fixture Create(string status)
     {
         var workspace = new Workspace("work-1", "C:\\work\\work-1", "automaton/work/work-1", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce-a", "acme/repo", new string('a', 40));
@@ -57,21 +74,23 @@ public sealed class SupervisedCodexWorkExecutorTests
         public int DisposeCount { get; private set; }
         public string Prompt { get; private set; } = string.Empty;
         public Exception? Failure { get; set; }
+        public CancellationTokenSource? CancelSource { get; set; }
         public CodexProcessIdentity? ProcessIdentity => null; public DateTimeOffset LastActivityUtc => DateTimeOffset.UtcNow; public IReadOnlyList<CodexSessionEvent> Events => [];
         public Task InitializeAsync(CancellationToken token) { InitializeCount++; Workspace = Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active }; return Task.CompletedTask; }
         public Task<CodexThread> StartThreadAsync(CancellationToken token) => Task.FromResult(new CodexThread("thread-1"));
         public Task<CodexThread> ResumeThreadAsync(string id, CancellationToken token) => throw new NotSupportedException();
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken token) { Prompt = prompt; return Task.FromResult(new CodexTurn("turn-1", threadId)); }
-        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (Failure is not null) throw Failure; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}")); }
+        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (CancelSource is not null) { CancelSource.Cancel(); throw new OperationCanceledException(token); } if (Failure is not null) throw Failure; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}")); }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken token) => Task.CompletedTask;
         public ValueTask DisposeAsync() { DisposeCount++; Workspace = Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None }; return ValueTask.CompletedTask; }
     }
     private sealed class FakeWorkspaces(Workspace workspace) : IWorkspaceManager
     {
         public Workspace FinalWorkspace { get; private set; } = workspace;
+        public int LifecycleWrites { get; private set; }
         public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken token) => Task.FromResult(FinalWorkspace);
         public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState state, CancellationToken token) => Task.FromResult(FinalWorkspace = value);
-        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string state, CancellationToken token) => Task.FromResult(FinalWorkspace = value with { LifecycleStatus = state });
+        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string state, CancellationToken token) { LifecycleWrites++; return Task.FromResult(FinalWorkspace = value with { LifecycleStatus = state }); }
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string state, string nonce, CancellationToken token) => Task.FromResult(FinalWorkspace = value with { ExecutionOwnershipStatus = state, LaunchNonce = nonce });
         public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken token) => Task.FromResult(value);
         public Task<Workspace> UpdatePublicationStateAsync(Workspace value, PublicationRecoveryState state, CancellationToken token) => throw new NotSupportedException();

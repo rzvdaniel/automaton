@@ -81,7 +81,12 @@ public sealed class SupervisedCodexWorkExecutor(
             }
             return await FinishAsync(workspace, client, attempt, RunOutcome.PermanentFailure("Codex exceeded the configured task turn limit."), CancellationToken.None);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try { await client.DisposeAsync(); }
+            catch { /* Disposal preserves its own release-or-quarantine fencing outcome. */ }
+            throw;
+        }
         catch (CodexIdleTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
         catch (CodexLaunchException) { quarantined = true; outcome = RunOutcome.PermanentFailure("Codex launch failed; execution ownership was quarantined."); }
         catch (CodexProcessExitedException exception) { quarantined = true; outcome = RunOutcome.PermanentFailure(Bound(exception.Message)); }
