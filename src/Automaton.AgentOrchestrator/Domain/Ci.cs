@@ -1,5 +1,6 @@
 namespace Automaton.AgentOrchestrator.Domain;
 
+
 public static class CiStatuses
 {
     public const string Pending = "pending";
