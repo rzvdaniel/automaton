@@ -108,6 +108,7 @@ public interface IWorkspaceManager
 }
 public interface ICodexAppServerClient : IAsyncDisposable
 {
+    void AdoptWorkspace(Workspace workspace) { }
     Workspace? CurrentWorkspace { get; }
     CodexProcessIdentity? ProcessIdentity { get; }
     DateTimeOffset LastActivityUtc { get; }

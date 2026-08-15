@@ -43,6 +43,7 @@ public sealed class CodexCiRemediator(
         var publication = await publisher.PublishRevisionAsync(new(workspace, request.WorkItem,
             currentPublication,
             developer, approved, request.RemediationRound + 1), cancellationToken);
+        if (publication.Workspace is { } publishedWorkspace) client.AdoptWorkspace(publishedWorkspace);
         disposed = true;
         await client.DisposeAsync();
         var releasedWorkspace = client.CurrentWorkspace

@@ -53,9 +53,9 @@ public sealed class GitWorkPublisher(
             subject,
             BuildPullRequestBody(request)), cancellationToken);
         ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
-        await workspaces.UpdatePublicationStateAsync(workspace,
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
             new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url, 1, workspace.BaseCommitSha), CancellationToken.None);
-        return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
+        return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft, Workspace: workspace);
     }
 
     public async Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken)
@@ -90,9 +90,9 @@ public sealed class GitWorkPublisher(
         var publication = await pullRequests.FindExactAsync(lookup, request.CurrentPublication.PullRequestNumber, cancellationToken)
             ?? throw new PublicationException("The existing draft pull request did not advance to the CI remediation commit.");
         ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
-        await workspaces.UpdatePublicationStateAsync(workspace,
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
             new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url, request.Revision, request.CurrentPublication.CommitSha), CancellationToken.None);
-        return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
+        return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft, Workspace: workspace);
     }
 
     public Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
