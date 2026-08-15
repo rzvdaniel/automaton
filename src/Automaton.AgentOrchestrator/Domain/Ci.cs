@@ -16,7 +16,6 @@ public sealed record CiRecoveryState(string Status, string HeadSha, int Remediat
 public sealed record CiRemediationRequest(CiTarget Target, Workspace Workspace, WorkItem WorkItem, CiSnapshot Failure, int RemediationRound);
 public sealed record CiRemediationResult(PublicationResult Publication, Workspace Workspace);
 
-
 public sealed record CiShepherdResult(bool Succeeded, bool IsRetryable, string? FailureReason = null, string? HeadSha = null, int RemediationRound = 0, Workspace? Workspace = null)
 {
     public static CiShepherdResult Success(string sha, int round, Workspace? workspace = null) => new(true, false, HeadSha: sha, RemediationRound: round, Workspace: workspace);

@@ -130,8 +130,8 @@ public sealed class RoleBasedWorkExecutor(
                     outcome = new RunOutcome(false, feedback.IsRetryable, Bounded(feedback.FailureReason ?? "Human review feedback remediation failed."), feedback.FailureCategory, feedback.FailureSubcategory);
             }
         }
-        catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
-        catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
+        catch (RoleBlockedException exception) { AdoptRemediationWorkspace(exception, ref workspace); outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
+        catch (RoleInfrastructureException exception) { AdoptRemediationWorkspace(exception, ref workspace); outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
         catch (PublicationException exception)
         {
             AdoptRemediationWorkspace(exception, ref workspace);
@@ -141,10 +141,12 @@ public sealed class RoleBasedWorkExecutor(
         }
         catch (CiProviderException exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             outcome = exception.IsRetryable ? RunOutcome.RetryableFailure(Bounded(exception.Message)) : RunOutcome.PermanentFailure(Bounded(exception.Message));
         }
         catch (ReviewFeedbackProviderException exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             outcome = exception.IsRetryable ? RunOutcome.RetryableFailure(Bounded(exception.Message)) : RunOutcome.PermanentFailure(Bounded(exception.Message));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -154,6 +156,7 @@ public sealed class RoleBasedWorkExecutor(
         }
         catch (CodexIdleTimeoutException exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             var idleMilliseconds = Math.Max(0, (DateTimeOffset.UtcNow - client.LastActivityUtc).TotalMilliseconds);
             telemetry?.Record("codex.turn.idle_timeout", OperatorEventSeverities.Warning, attempt.WorkItem.Id, "engineering", currentRole,
                 "Codex turn reached the configured protocol-idle timeout.", new Dictionary<string, string>
@@ -166,9 +169,10 @@ public sealed class RoleBasedWorkExecutor(
                 });
             outcome = RunOutcome.RetryableFailure(Bounded(exception.Message));
         }
-        catch (CodexProcessExitedException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
+        catch (CodexProcessExitedException exception) { AdoptRemediationWorkspace(exception, ref workspace); ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (CodexLaunchException exception)
         {
+            AdoptRemediationWorkspace(exception, ref workspace);
             telemetry?.Record("codex.launch.failed", OperatorEventSeverities.Error, attempt.WorkItem.Id, "execution", message: "Codex launch failed before durable process identity was recorded.", metadata: new Dictionary<string, string>
             {
                 ["category"] = exception.Category,
@@ -177,7 +181,7 @@ public sealed class RoleBasedWorkExecutor(
             ambiguous = true;
             outcome = RunOutcome.PermanentFailure("Codex launch failed; execution ownership was quarantined.");
         }
-        catch (CodexProtocolException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
+        catch (CodexProtocolException exception) { AdoptRemediationWorkspace(exception, ref workspace); ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (Exception exception)
         {
             AdoptRemediationWorkspace(exception, ref workspace);
