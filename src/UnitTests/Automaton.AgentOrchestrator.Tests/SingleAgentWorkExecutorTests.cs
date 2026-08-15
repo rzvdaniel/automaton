@@ -14,6 +14,52 @@ public sealed class SingleAgentWorkExecutorTests
     private const string WorkspacePath = "C:\\isolated-workspaces\\work-123";
 
     [Test]
+    public async Task SuccessfulCiPersistsAuthoritativeWorkspaceThroughFeedbackAndLifecycle()
+    {
+        var c = Workspace("nonce-c");
+        var ci = new FakeCi(CiShepherdResult.Success(new string('a', 40), 0, c));
+        var feedback = new FakeFeedback();
+        var fixture = CreateCore(3, [], [ManagerReady(), DeveloperCompleted(), ReviewerApproved()], ci, feedback);
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(outcome.Succeeded, Is.True); Assert.That(feedback.Workspaces.Single().LaunchNonce, Is.EqualTo("nonce-c")); Assert.That(fixture.Workspaces.RecoveryInputs.Last().LaunchNonce, Is.EqualTo("nonce-c")); Assert.That(fixture.Workspaces.LifecycleInputs.Last().LaunchNonce, Is.EqualTo("nonce-c")); });
+    }
+
+    [Test]
+    public async Task BlockedCiPersistsAuthoritativeWorkspaceThroughRecoveryAndLifecycle()
+    {
+        var c = Workspace("nonce-c");
+        var ci = new FakeCi(CiShepherdResult.Blocked("failed", new string('a', 40), 0, c));
+        var fixture = CreateCore(3, [], [ManagerReady(), DeveloperCompleted(), ReviewerApproved()], ci, null);
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(outcome.Succeeded, Is.False); Assert.That(fixture.Workspaces.RecoveryInputs.Last().LaunchNonce, Is.EqualTo("nonce-c")); Assert.That(fixture.Workspaces.LifecycleInputs.Last().LaunchNonce, Is.EqualTo("nonce-c")); });
+    }
+
+    [Test]
+    public async Task CodexCiRemediatorReleasesExactlyOnceBeforeReturning()
+    {
+        var workspace = Workspace("nonce-b");
+        var client = new FakeCodexClient(workspace, [DeveloperCompleted(), ReviewerApproved()]);
+        var factory = new FakeCodexFactory(client);
+        var publisher = new FakePublisher();
+        var workflow = new WorkflowDefinition(Path.Combine(CanonicalRoot, "WORKFLOW.md"), new Dictionary<string, object?>(), "guidance", new OrchestratorOptions { Agent = new AgentExecutionOptions { DeveloperMaxTurns = 2, ReviewerMaxTurns = 2, MaxReviewRounds = 1 } });
+        var remediator = new Automaton.AgentOrchestrator.Ci.CodexCiRemediator(factory, new FakeMutationGuard([]), publisher, workflow);
+        var request = new CiRemediationRequest(new("acme/widgets", 1, "automaton/work/work-123", new string('a', 40)), workspace, Attempt().WorkItem, new CiSnapshot(new string('a', 40), CiStatuses.Failed, []), 1);
+        var result = await remediator.RemediateAsync(request, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(client.DisposeCount, Is.EqualTo(1)); Assert.That(result.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None)); });
+    }
+
+    [Test]
+    public async Task CodexCiRemediatorDisposesOnceWhenDeveloperFails()
+    {
+        var client = new FakeCodexClient(Workspace("nonce-b"), [DeveloperCompleted()]) { WaitFailure = new InvalidOperationException("turn failed") };
+        var workflow = new WorkflowDefinition(Path.Combine(CanonicalRoot, "WORKFLOW.md"), new Dictionary<string, object?>(), "guidance", new OrchestratorOptions { Agent = new AgentExecutionOptions { DeveloperMaxTurns = 1, ReviewerMaxTurns = 1 } });
+        var remediator = new Automaton.AgentOrchestrator.Ci.CodexCiRemediator(new FakeCodexFactory(client), new FakeMutationGuard([]), new FakePublisher(), workflow);
+        var request = new CiRemediationRequest(new("acme/widgets", 1, "automaton/work/work-123", new string('a', 40)), Workspace("nonce-b"), Attempt().WorkItem, new CiSnapshot(new string('a', 40), CiStatuses.Failed, []), 1);
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await remediator.RemediateAsync(request, CancellationToken.None));
+        Assert.That(client.DisposeCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task LaunchFailureIsObservableWhileQuarantineRemainsFailClosed()
     {
         var fixture = Create();
@@ -76,6 +122,7 @@ public sealed class SingleAgentWorkExecutorTests
             Assert.That(fixture.Client.Prompts[2], Does.Contain("ROLE: REVIEWER"));
             Assert.That(fixture.Factory.CreateCount, Is.EqualTo(1));
             Assert.That(fixture.Client.Disposed, Is.True);
+            Assert.That(fixture.Client.DisposeCount, Is.EqualTo(1));
             Assert.That(fixture.Publisher.Requests, Has.Count.EqualTo(1));
             Assert.That(fixture.Publisher.Requests[0].Reviewer.Verdict, Is.EqualTo(RoleResultStatuses.Approved));
         });
@@ -499,7 +546,7 @@ public sealed class SingleAgentWorkExecutorTests
     private static Fixture CreateWithFingerprints(IEnumerable<string> fingerprints, params CodexTurnResult[] results)
         => CreateCore(3, fingerprints, results);
 
-    private static Fixture CreateCore(int maxReviewRounds, IEnumerable<string> fingerprints, params CodexTurnResult[] results)
+    private static Fixture CreateCore(int maxReviewRounds, IEnumerable<string> fingerprints, CodexTurnResult[] results, ICiShepherd? ci = null, IReviewFeedbackShepherd? feedback = null)
     {
         var workspace = new Workspace("work-123", WorkspacePath, "automaton/work/work-123", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "reserved", "acme/widgets");
         var manager = new FakeWorkspaceManager(workspace);
@@ -514,10 +561,11 @@ public sealed class SingleAgentWorkExecutorTests
         });
         var publisher = new FakePublisher();
         var telemetry = new FakeTelemetry();
-        return new(new RoleBasedWorkExecutor(manager, guard, factory, publisher, workflow, telemetry: telemetry), manager, factory, client, publisher, telemetry);
+        return new(new RoleBasedWorkExecutor(manager, guard, factory, publisher, workflow, ci, feedback, telemetry), manager, factory, client, publisher, telemetry);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("issue-42", "ACME-42", "Correct the widget", "Full issue body", "open", ["agent:ready", "bug"]), 1, DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+    private static Workspace Workspace(string nonce) => new("work-123", WorkspacePath, "automaton/work/work-123", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, nonce, "acme/widgets");
     private static CodexTurnResult ManagerReady(string finalPrefix = "") => Manager("READY", "plan ready", finalPrefix);
     private static CodexTurnResult ManagerBlocked(string reason) => Manager("BLOCKED", reason);
     private static CodexTurnResult Manager(string status, string summary, string finalPrefix = "") => Completed($"{finalPrefix}AUTOMATON_MANAGER_RESULT: {{\"status\":\"{status}\",\"summary\":\"{summary}\",\"implementationPlan\":\"Implement widget safely\",\"validationPlan\":\"Run tests\",\"risks\":\"None\"}}");
@@ -552,6 +600,8 @@ public sealed class SingleAgentWorkExecutorTests
             if (Failure is not null) throw Failure;
             return Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://github.com/acme/widgets/pull/1", true));
         }
+        public Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken)
+            => Task.FromResult(new PublicationResult(request.CurrentPublication.Repository, request.CurrentPublication.Branch, new string('b', 40), request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, true));
         public Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
             => Task.FromResult(new PublicationRecoveryResult(false));
     }
@@ -560,14 +610,26 @@ public sealed class SingleAgentWorkExecutorTests
         private readonly Queue<string> values = new(fingerprints);
         public Task<string> CaptureAsync(Workspace workspace, CancellationToken cancellationToken) => Task.FromResult(values.Count > 0 ? values.Dequeue() : "stable");
     }
+    private sealed class FakeCi(CiShepherdResult result) : ICiShepherd
+    {
+        public List<Workspace> Workspaces { get; } = [];
+        public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Workspaces.Add(workspace); return Task.FromResult(result); }
+    }
+    private sealed class FakeFeedback : IReviewFeedbackShepherd
+    {
+        public List<Workspace> Workspaces { get; } = [];
+        public Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Workspaces.Add(workspace); return Task.FromResult(ReviewFeedbackResult.Success(target.HeadSha, target.PublicationRevision)); }
+    }
     private sealed class FakeWorkspaceManager(Workspace workspace) : IWorkspaceManager
     {
         public List<string> Lifecycles { get; } = [];
+        public List<Workspace> RecoveryInputs { get; } = [];
+        public List<Workspace> LifecycleInputs { get; } = [];
         public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken cancellationToken) => Task.FromResult(workspace);
-        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string lifecycleStatus, CancellationToken cancellationToken) { Lifecycles.Add(lifecycleStatus); return Task.FromResult(value with { LifecycleStatus = lifecycleStatus }); }
+        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string lifecycleStatus, CancellationToken cancellationToken) { LifecycleInputs.Add(value); Lifecycles.Add(lifecycleStatus); return Task.FromResult(value with { LifecycleStatus = lifecycleStatus }); }
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.FromResult(value);
-        public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) => Task.FromResult(value);
+        public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) { RecoveryInputs.Add(value); return Task.FromResult(value); }
         public Task<Workspace> UpdatePublicationStateAsync(Workspace value, PublicationRecoveryState publicationState, CancellationToken cancellationToken) => Task.FromResult(value);
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace value, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -590,6 +652,7 @@ public sealed class SingleAgentWorkExecutorTests
         public List<string> TurnThreadIds { get; } = [];
         public List<string> Prompts { get; } = [];
         public bool Disposed { get; private set; }
+        public int DisposeCount { get; private set; }
         public bool Quarantined { get; set; }
         public Exception? InitializeFailure { get; set; }
         public Exception? WaitFailure { get; set; }
@@ -619,6 +682,6 @@ public sealed class SingleAgentWorkExecutorTests
             return Task.FromResult(results.Dequeue() with { ThreadId = turn.ThreadId, TurnId = turn.Id });
         }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public ValueTask DisposeAsync() { Disposed = true; current = current with { ExecutionOwnershipStatus = Quarantined ? WorkspaceExecutionOwnershipStates.Quarantined : WorkspaceExecutionOwnershipStates.None }; return ValueTask.CompletedTask; }
+        public ValueTask DisposeAsync() { DisposeCount++; Disposed = true; current = current with { ExecutionOwnershipStatus = Quarantined ? WorkspaceExecutionOwnershipStates.Quarantined : WorkspaceExecutionOwnershipStates.None }; return ValueTask.CompletedTask; }
     }
 }

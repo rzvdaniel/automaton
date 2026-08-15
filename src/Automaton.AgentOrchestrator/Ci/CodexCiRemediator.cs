@@ -13,11 +13,14 @@ public sealed class CodexCiRemediator(
     IWorkPublisher publisher,
     WorkflowDefinition workflow) : ICiRemediator
 {
-    public async Task<PublicationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken)
+    public async Task<CiRemediationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken)
     {
         var currentPublication = new PublicationResult(request.Target.RepositoryIdentity, request.Target.HeadBranch, request.Target.HeadSha, request.Target.PullRequestNumber, string.Empty, true);
         await publisher.ValidateRevisionBaseAsync(request.Workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
-        await using var client = clients.Create(request.Workspace, new Dictionary<string, string>());
+        var client = clients.Create(request.Workspace, new Dictionary<string, string>());
+        var disposed = false;
+        try
+        {
         await client.InitializeAsync(cancellationToken);
         var developerThread = await client.StartThreadAsync(cancellationToken);
         var reviewerThread = await client.StartThreadAsync(cancellationToken);
@@ -37,9 +40,24 @@ public sealed class CodexCiRemediator(
         }
         if (approved is null) throw new PublicationException("CI remediation did not receive independent Reviewer approval.");
         var workspace = client.CurrentWorkspace ?? throw new PublicationException("CI remediation workspace ownership is unavailable.");
-        return await publisher.PublishRevisionAsync(new(workspace, request.WorkItem,
+        var publication = await publisher.PublishRevisionAsync(new(workspace, request.WorkItem,
             currentPublication,
             developer, approved, request.RemediationRound + 1), cancellationToken);
+        disposed = true;
+        await client.DisposeAsync();
+        var releasedWorkspace = client.CurrentWorkspace
+            ?? throw new PublicationException("CI remediation workspace ownership release state is unavailable.");
+        return new(publication, releasedWorkspace);
+        }
+        catch
+        {
+            if (!disposed)
+            {
+                disposed = true;
+                await client.DisposeAsync();
+            }
+            throw;
+        }
     }
 
     private async Task<DeveloperHandoff> RunDeveloperAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
