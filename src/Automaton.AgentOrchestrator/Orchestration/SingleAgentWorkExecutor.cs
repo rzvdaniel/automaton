@@ -103,6 +103,7 @@ public sealed class RoleBasedWorkExecutor(
             var ci = ciShepherd is null
                 ? CiShepherdResult.Success(publication.CommitSha, 0)
                 : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
+            workspace = ci.Workspace ?? client.CurrentWorkspace ?? workspace;
             Record("ci.observed", attempt.WorkItem.Id, "ci", null, ci.Succeeded ? "CI shepherding passed." : ci.FailureReason, new Dictionary<string, string> { ["pullRequestNumber"] = publication.PullRequestNumber.ToString(System.Globalization.CultureInfo.InvariantCulture), ["headSha"] = ci.HeadSha ?? publication.CommitSha });
             if (!ci.Succeeded)
                 outcome = ci.IsRetryable ? RunOutcome.RetryableFailure(Bounded(ci.FailureReason ?? "CI shepherding failed.")) : RunOutcome.PermanentFailure(Bounded(ci.FailureReason ?? "CI shepherding failed."));
@@ -112,7 +113,7 @@ public sealed class RoleBasedWorkExecutor(
                 Record("feedback.waiting", attempt.WorkItem.Id, "human-feedback", null, "Waiting for exact-head human review feedback.", new Dictionary<string, string> { ["headSha"] = reviewedHead, ["pullRequestNumber"] = publication.PullRequestNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) });
                 var feedback = await reviewFeedbackShepherd.ShepherdAsync(
                     new(publication.Repository, publication.PullRequestNumber, publication.Branch, reviewedHead, PublicationRevision: 1 + ci.RemediationRound),
-                    client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
+                    workspace, attempt.WorkItem, cancellationToken);
                 if (!feedback.Succeeded)
                     outcome = new RunOutcome(false, feedback.IsRetryable, Bounded(feedback.FailureReason ?? "Human review feedback remediation failed."), feedback.FailureCategory, feedback.FailureSubcategory);
             }
@@ -179,7 +180,10 @@ public sealed class RoleBasedWorkExecutor(
             outcome = RunOutcome.PermanentFailure(Bounded($"Codex shutdown could not verify ownership release: {exception.Message}"));
         }
 
-        var currentWorkspace = client.CurrentWorkspace ?? workspace;
+        // `workspace` is the authoritative snapshot. It may have advanced through
+        // CI observation/remediation; never replace it with the disposed engineering
+        // client's older snapshot here.
+        var currentWorkspace = workspace;
         if (ambiguous || currentWorkspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
 
         var recovery = cancelled && publicationStarted

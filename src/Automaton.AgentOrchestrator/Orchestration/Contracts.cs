@@ -21,7 +21,7 @@ public interface ICiShepherd
 
 public interface ICiRemediator
 {
-    Task<PublicationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken);
+    Task<CiRemediationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken);
 }
 
 public interface ICiPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }

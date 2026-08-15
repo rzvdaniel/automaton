@@ -22,31 +22,36 @@ public sealed class CiShepherd(
     {
         if (!options.Ci.Enabled) return CiShepherdResult.Success(target.HeadSha, 0);
         var current = target;
+        var currentWorkspace = workspace;
         for (var round = 0; round <= options.Ci.MaxRemediationRounds; round++)
         {
-            var observation = await ObserveAsync(current, workspace, round, cancellationToken);
+            var observed = await ObserveAsync(current, currentWorkspace, round, cancellationToken);
+            var observation = observed.Snapshot;
+            currentWorkspace = observed.Workspace;
             telemetry?.Record("ci.snapshot", observation.Status == CiStatuses.Failed ? OperatorEventSeverities.Warning : OperatorEventSeverities.Information,
                 workItem.Id, "ci", message: observation.Status, metadata: new Dictionary<string, string> { ["headSha"] = current.HeadSha, ["round"] = round.ToString(System.Globalization.CultureInfo.InvariantCulture) });
-            if (observation.Status == CiStatuses.Passed) return CiShepherdResult.Success(current.HeadSha, round);
+            if (observation.Status == CiStatuses.Passed) return CiShepherdResult.Success(current.HeadSha, round, currentWorkspace);
             if (observation.Status != CiStatuses.Failed)
-                return CiShepherdResult.Blocked(observation.Checks.FirstOrDefault()?.FailureSummary ?? "CI state is indeterminate.", current.HeadSha, round);
+                return CiShepherdResult.Blocked(observation.Checks.FirstOrDefault()?.FailureSummary ?? "CI state is indeterminate.", current.HeadSha, round, currentWorkspace);
             if (round == options.Ci.MaxRemediationRounds)
-                return CiShepherdResult.Blocked("CI still fails after the configured remediation rounds.", current.HeadSha, round);
+                return CiShepherdResult.Blocked("CI still fails after the configured remediation rounds.", current.HeadSha, round, currentWorkspace);
 
-            var publication = await remediator.RemediateAsync(new(current, workspace, workItem, observation, round + 1), cancellationToken);
+            var remediation = await remediator.RemediateAsync(new(current, currentWorkspace, workItem, observation, round + 1), cancellationToken);
+            var publication = remediation.Publication;
+            currentWorkspace = remediation.Workspace;
             telemetry?.Record("ci.remediation.published", OperatorEventSeverities.Information, workItem.Id, "ci-remediation", AgentRoles.Developer,
                 "CI remediation revision was independently approved and published.", new Dictionary<string, string> { ["headSha"] = publication.CommitSha });
             if (!string.Equals(publication.Repository, current.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
                 || publication.PullRequestNumber != current.PullRequestNumber
                 || !string.Equals(publication.Branch, current.HeadBranch, StringComparison.Ordinal)
                 || !IsSha(publication.CommitSha) || string.Equals(publication.CommitSha, current.HeadSha, StringComparison.OrdinalIgnoreCase))
-                return CiShepherdResult.Blocked("CI remediation returned an invalid publication identity.", current.HeadSha, round);
+                return CiShepherdResult.Blocked("CI remediation returned an invalid publication identity.", current.HeadSha, round, currentWorkspace);
             current = current with { HeadSha = publication.CommitSha };
         }
-        return CiShepherdResult.Blocked("CI remediation budget was exhausted.", current.HeadSha, options.Ci.MaxRemediationRounds);
+        return CiShepherdResult.Blocked("CI remediation budget was exhausted.", current.HeadSha, options.Ci.MaxRemediationRounds, currentWorkspace);
     }
 
-    private async Task<CiSnapshot> ObserveAsync(CiTarget target, Workspace workspace, int round, CancellationToken cancellationToken)
+    private async Task<(CiSnapshot Snapshot, Workspace Workspace)> ObserveAsync(CiTarget target, Workspace workspace, int round, CancellationToken cancellationToken)
     {
         var started = clock.UtcNow;
         while (true)
@@ -62,11 +67,11 @@ public sealed class CiShepherd(
             }
             if (!string.Equals(snapshot.HeadSha, target.HeadSha, StringComparison.OrdinalIgnoreCase))
                 throw new CiProviderException("CI provider returned a snapshot for an unexpected commit SHA.");
-            await workspaces.UpdateCiStateAsync(workspace, new(snapshot.Status, target.HeadSha, round, clock.UtcNow,
+            workspace = await workspaces.UpdateCiStateAsync(workspace, new(snapshot.Status, target.HeadSha, round, clock.UtcNow,
                 snapshot.Status == CiStatuses.Failed ? BuildFailureReason(snapshot) : null), CancellationToken.None);
-            if (snapshot.Status != CiStatuses.Pending) return snapshot;
+            if (snapshot.Status != CiStatuses.Pending) return (snapshot, workspace);
             if (clock.UtcNow - started >= TimeSpan.FromMilliseconds(options.Ci.TimeoutMilliseconds))
-                return new(target.HeadSha, CiStatuses.Indeterminate, [new("CI timeout", CiStatuses.Indeterminate, FailureSummary: "CI did not reach a terminal result within the configured timeout.")]);
+                return (new(target.HeadSha, CiStatuses.Indeterminate, [new("CI timeout", CiStatuses.Indeterminate, FailureSummary: "CI did not reach a terminal result within the configured timeout.")]), workspace);
             await delay.DelayAsync(TimeSpan.FromMilliseconds(options.Ci.PollIntervalMilliseconds), cancellationToken);
         }
     }
