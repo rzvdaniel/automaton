@@ -11,9 +11,7 @@ public static class LinuxProductionStartupValidator
         if (!string.Equals(options.Tracker.Kind, "github-issues", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Production tracker kind must be github-issues.");
         Require(options.Tracker.Provider.GetValueOrDefault("token"), "tracker credential");
-        Require(options.Publication.GitHubToken, "publication credential");
-        if (options.Ci.Enabled) Require(options.Ci.GitHubToken, "CI credential");
-        if (options.ReviewFeedback.Enabled) Require(options.ReviewFeedback.GitHubToken, "review-feedback credential");
+        if (options.Agent.GitHub.Enabled) Require(options.Agent.GitHub.Token, "agent GitHub credential");
         if (options.Agent.MaxConcurrentAgents is < 1 or > 2) throw new InvalidOperationException("Production concurrency must be between 1 and 2 for Stage 13.");
 
         var workspace = Path.GetFullPath(options.Workspace.Root);

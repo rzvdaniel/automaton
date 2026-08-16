@@ -1,5 +1,6 @@
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Hosting;
+using Automaton.AgentOrchestrator.Integration;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Hosting;
@@ -54,15 +55,14 @@ public sealed class OperatorStatusHostedService(
             durable.TryGetValue(run.WorkItemId, out var record);
             var latest = telemetry.LatestFor(run.WorkItemId);
             return new OperatorRunStatus(run.WorkItemId, run.State, run.Attempt, run.UpdatedAtUtc, latest?.Stage, latest?.Role,
-                record?.Workspace.Key, record?.Workspace.Path, record?.Workspace.Branch, record?.Publication?.PullRequestUrl,
-                record?.Publication?.CommitSha, record?.Ci?.Status, record?.ReviewFeedback?.Status, record?.Workspace.ExecutionOwnershipStatus,
-                run.RetryAtUtc, FileOperatorTelemetry.SanitizeDiagnostic(run.FailureReason ?? record?.Recovery.Reason), record?.Ci?.LastObservedAtUtc, record?.ReviewFeedback?.LastObservedAtUtc);
+                record?.Workspace.Key, record?.Workspace.Path, record?.Workspace.Branch, record?.Workspace.ExecutionOwnershipStatus,
+                run.RetryAtUtc, FileOperatorTelemetry.SanitizeDiagnostic(run.FailureReason ?? record?.Recovery.Reason));
         }).OrderBy(run => run.WorkItemId, StringComparer.Ordinal).ToArray();
         var daemon = telemetry.DaemonState();
         try
         {
             var build = buildIdentity?.Current ?? new BuildIdentity("unknown", "unknown");
-            files.WriteSnapshot(new(1, clock.UtcNow, daemon.State, orchestrator.IsStartupReconciled, healthy && daemon.State != OperatorDaemonStates.Degraded, options.Repository.Identity, runs, error ?? daemon.LastError, build.Version, build.Revision));
+            files.WriteSnapshot(new(OrchestratorIntegrationSchema.CurrentVersion, clock.UtcNow, daemon.State, orchestrator.IsStartupReconciled, healthy && daemon.State != OperatorDaemonStates.Degraded, options.Repository.Identity, runs, error ?? daemon.LastError, build.Version, build.Revision));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

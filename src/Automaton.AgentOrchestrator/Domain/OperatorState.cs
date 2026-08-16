@@ -38,15 +38,9 @@ public sealed record OperatorRunStatus(
     string? WorkspaceKey = null,
     string? WorkspacePath = null,
     string? Branch = null,
-    string? PullRequestUrl = null,
-    string? HeadSha = null,
-    string? CiStatus = null,
-    string? FeedbackStatus = null,
     string? OwnershipStatus = null,
     DateTimeOffset? RetryAtUtc = null,
-    string? Reason = null,
-    DateTimeOffset? CiObservedAtUtc = null,
-    DateTimeOffset? FeedbackObservedAtUtc = null);
+    string? Reason = null);
 
 public sealed record OperatorStatusSnapshot(
     int SchemaVersion,

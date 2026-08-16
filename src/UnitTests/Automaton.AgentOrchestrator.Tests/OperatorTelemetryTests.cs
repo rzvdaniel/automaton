@@ -49,15 +49,13 @@ public sealed class OperatorTelemetryTests
         orchestrator.RestoreTerminalState("issue-1", RunStates.Blocked, 2, "manual attention");
         orchestrator.CompleteStartupReconciliation();
         telemetry.Record("feedback.snapshot", OperatorEventSeverities.Warning, "issue-1", "human-feedback", message: "actionable");
-        var sha = new string('a', 40);
         var record = new OwnedWorkspaceRecord(new("work-key", Path.Combine(temp.Path, "work-key"), "automaton/work/work-key", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce", "acme/widgets"), "issue-1",
-            new(temp.Path, "acme/widgets"), new(WorkspaceRecoveryStates.Blocked, 2, 3, Reason: "manual attention"), null, 6,
-            new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.test/pull/42", 1), new(CiStatuses.Passed, sha, 0), new(ReviewFeedbackStatuses.Actionable, sha, 1));
+            new(temp.Path, "acme/widgets"), new(WorkspaceRecoveryStates.Blocked, 2, 3, Reason: "manual attention"), null, 7);
         var service = new OperatorStatusHostedService(orchestrator, new FakeWorkspaces(record), telemetry, new FixedClock(), options, NullLogger<OperatorStatusHostedService>.Instance);
         await service.WriteOnceAsync(CancellationToken.None);
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(telemetry.StatusPath));
         var run = document.RootElement.GetProperty("runs")[0];
-        Assert.Multiple(() => { Assert.That(document.RootElement.GetProperty("healthy").GetBoolean(), Is.True); Assert.That(run.GetProperty("stage").GetString(), Is.EqualTo("human-feedback")); Assert.That(run.GetProperty("pullRequestUrl").GetString(), Does.Contain("/42")); Assert.That(run.GetProperty("headSha").GetString(), Is.EqualTo(sha)); Assert.That(run.GetProperty("ciStatus").GetString(), Is.EqualTo(CiStatuses.Passed)); Assert.That(run.GetProperty("feedbackStatus").GetString(), Is.EqualTo(ReviewFeedbackStatuses.Actionable)); });
+        Assert.Multiple(() => { Assert.That(document.RootElement.GetProperty("healthy").GetBoolean(), Is.True); Assert.That(run.GetProperty("stage").GetString(), Is.EqualTo("human-feedback")); Assert.That(run.GetProperty("ownershipStatus").GetString(), Is.EqualTo(WorkspaceExecutionOwnershipStates.None)); Assert.That(run.TryGetProperty("ciStatus", out _), Is.False); });
         await orchestrator.DisposeAsync();
     }
 
@@ -69,7 +67,7 @@ public sealed class OperatorTelemetryTests
     private sealed class FakeWorkspaces(OwnedWorkspaceRecord record) : IWorkspaceManager
     {
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken token) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([record]);
-        public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string state, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string state, string nonce, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState state, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState state, CancellationToken token) => throw new NotSupportedException(); public Task CleanupTerminalAsync(Workspace workspace, CancellationToken token) => throw new NotSupportedException();
+        public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string state, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string state, string nonce, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState state, CancellationToken token) => throw new NotSupportedException(); public Task CleanupTerminalAsync(Workspace workspace, CancellationToken token) => throw new NotSupportedException();
     }
     private sealed class TempDirectory : IDisposable { public TempDirectory() { Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "automaton-operator-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(Path); } public string Path { get; } public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); } }
 }
