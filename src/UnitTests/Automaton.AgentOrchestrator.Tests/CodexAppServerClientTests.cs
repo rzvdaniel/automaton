@@ -232,6 +232,55 @@ public sealed class CodexAppServerClientTests
     }
 
     [Test]
+    public async Task ContinuousProtocolActivityDoesNotExtendTotalTurnTimeout()
+    {
+        var transport = new ScriptedTransport();
+        var clock = new DeterministicClock(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(10));
+        transport.OnSend = message => RespondNormally(transport, message);
+        clock.OnDelay = () => transport.Emit("{\"method\":\"item/completed\",\"params\":{\"threadId\":\"thread-1\"}}");
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), clock, TimeSpan.FromSeconds(60), TimeSpan.FromMinutes(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
+        var turn = await client.StartTurnAsync(thread.Id, "wait", CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexTurnTimeoutException>(async () => await client.WaitForTurnCompletionAsync(turn, CancellationToken.None));
+        Assert.That(clock.UtcNow, Is.EqualTo(clock.Start + TimeSpan.FromSeconds(60)));
+    }
+
+    [Test]
+    public async Task ProtocolActivityExtendsStallTimeoutButNotForever()
+    {
+        var transport = new ScriptedTransport();
+        var clock = new DeterministicClock(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(10));
+        transport.OnSend = message => RespondNormally(transport, message);
+        var activityCount = 0;
+        clock.OnDelay = () => { if (activityCount++ < 2) transport.Emit("{\"method\":\"item/completed\",\"params\":{\"threadId\":\"thread-1\"}}"); };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), clock, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(30), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
+        var turn = await client.StartTurnAsync(thread.Id, "wait", CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexIdleTimeoutException>(async () => await client.WaitForTurnCompletionAsync(turn, CancellationToken.None));
+        Assert.That(activityCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(clock.UtcNow - clock.Start, Is.LessThan(TimeSpan.FromMinutes(2)));
+    }
+
+    [Test]
+    public async Task NoProtocolActivityUsesStallTimeoutBeforeTotalTimeout()
+    {
+        var transport = new ScriptedTransport();
+        var clock = new DeterministicClock(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(20));
+        transport.OnSend = message => RespondNormally(transport, message);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), clock, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(20), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
+        var turn = await client.StartTurnAsync(thread.Id, "wait", CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexIdleTimeoutException>(async () => await client.WaitForTurnCompletionAsync(turn, CancellationToken.None));
+        Assert.That(clock.UtcNow, Is.EqualTo(clock.Start + TimeSpan.FromSeconds(20)));
+    }
+
+    [Test]
     public async Task FailedTurn_PreservesTerminalStatusAndIds()
     {
         var transport = new ScriptedTransport();
@@ -421,6 +470,20 @@ public sealed class CodexAppServerClientTests
         public Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken) { DurableIdentity = identity; return Task.CompletedTask; }
         public Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken) { ReleasedNonce = launchNonce; return Task.CompletedTask; }
         public Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken) { QuarantinedNonce = launchNonce; return Task.CompletedTask; }
+    }
+
+    private sealed class DeterministicClock(DateTimeOffset start, TimeSpan step) : IClock
+    {
+        public DateTimeOffset Start { get; } = start;
+        public DateTimeOffset UtcNow { get; private set; } = start;
+        public Action? OnDelay { get; set; }
+        public Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            UtcNow += step <= delay ? step : delay;
+            OnDelay?.Invoke();
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingWorkspaceManager : IWorkspaceManager

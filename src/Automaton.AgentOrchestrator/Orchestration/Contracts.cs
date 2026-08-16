@@ -13,7 +13,11 @@ public interface IWorkExecutor
     Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken);
 }
 
-public interface IClock { DateTimeOffset UtcNow { get; } }
+public interface IClock
+{
+    DateTimeOffset UtcNow { get; }
+    Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken) => Task.Delay(delay, cancellationToken);
+}
 
 public interface IOperatorTelemetry
 {

@@ -311,12 +311,12 @@ protocol cwd override. Both operations validate the required top-level `cwd` in
 their 0.147.0 response and reject a missing, relative, or mismatched path.
 Callers cannot provide a different thread working directory.
 
-The configured `codex.turn_timeout_ms` is interpreted at this boundary as a
-meaningful-activity idle timeout. Responses, notifications, item activity, and
-usage updates refresh it, so healthy long-running turns are not killed merely
-for exceeding a total wall-clock duration. Cancellation and idle timeout first
-request `turn/interrupt`; session disposal closes stdin, waits briefly for clean
-exit, and then kills the full process tree if required.
+The configured `codex.turn_timeout_ms` is the maximum total wall-clock duration
+of a turn. `codex.stall_timeout_ms` separately bounds protocol inactivity;
+responses, notifications, item activity, and usage updates refresh the stall
+clock but never extend the total turn budget. Cancellation and either timeout
+first request `turn/interrupt`; session disposal closes stdin, waits briefly for
+clean exit, and then kills the full process tree if required.
 
 The process starts with `UseShellExecute=false`, an argument list, the workspace
 as its current directory, and a minimal allowlisted environment. Tracker tokens

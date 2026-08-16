@@ -22,6 +22,7 @@ public sealed class CodexAppServerClientFactory(
             new WorkspaceCodexExecutionOwnership(context),
             clock,
             TimeSpan.FromMilliseconds(options.Codex.TurnTimeoutMilliseconds),
+            TimeSpan.FromMilliseconds(options.Codex.StallTimeoutMilliseconds),
             workspace.Path);
     }
 }

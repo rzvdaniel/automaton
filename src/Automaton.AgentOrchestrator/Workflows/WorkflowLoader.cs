@@ -108,7 +108,8 @@ public sealed class WorkflowLoader : IWorkflowLoader
             Codex = new CodexOptions
             {
                 Command = StringValue(Section(root, "codex").GetValueOrDefault("command"), "codex.command", required: false) ?? "codex app-server",
-                TurnTimeoutMilliseconds = PositiveInt(Section(root, "codex").GetValueOrDefault("turn_timeout_ms"), "codex.turn_timeout_ms", 3_600_000)
+                TurnTimeoutMilliseconds = PositiveInt(Section(root, "codex").GetValueOrDefault("turn_timeout_ms"), "codex.turn_timeout_ms", 3_600_000),
+                StallTimeoutMilliseconds = PositiveInt(Section(root, "codex").GetValueOrDefault("stall_timeout_ms"), "codex.stall_timeout_ms", 300_000)
             },
             Retry = new RetryOptions
             {

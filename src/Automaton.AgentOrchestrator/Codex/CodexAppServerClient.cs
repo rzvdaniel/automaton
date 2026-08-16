@@ -52,13 +52,17 @@ public sealed class CodexAppServerClient(
     ICodexJsonRpcTransport transport,
     ICodexExecutionOwnership ownership,
     IClock clock,
-    TimeSpan idleTimeout,
+    TimeSpan turnTimeout,
+    TimeSpan stallTimeout,
     string workspacePath) : ICodexAppServerClient, IAsyncDisposable
 {
+    public CodexAppServerClient(ICodexJsonRpcTransport transport, ICodexExecutionOwnership ownership, IClock clock, TimeSpan timeout, string workspacePath)
+        : this(transport, ownership, clock, timeout, timeout, workspacePath) { }
     private const int MaximumEarlyTurnResults = 64;
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> pending = [];
     private readonly object turnGate = new();
     private readonly Dictionary<string, TaskCompletionSource<CodexTurnResult>> turns = [];
+    private readonly Dictionary<string, DateTimeOffset> turnStartedUtc = [];
     private readonly Dictionary<string, (CodexTurnResult Result, LinkedListNode<string> Node)> earlyTurnResults = [];
     private readonly LinkedList<string> earlyTurnOrder = [];
     private readonly List<CodexSessionEvent> events = [];
@@ -74,7 +78,7 @@ public sealed class CodexAppServerClient(
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
     public string? LastEventType { get; private set; }
-    public TimeSpan IdleTimeout => idleTimeout;
+    public TimeSpan IdleTimeout => stallTimeout;
     public bool? IsProcessAlive => transport.IsProcessAlive;
     public IReadOnlyList<CodexSessionEvent> Events { get { lock (events) return events.ToArray(); } }
     internal int PendingRequestCount => pending.Count;
@@ -131,6 +135,7 @@ public sealed class CodexAppServerClient(
         {
             var completion = new TaskCompletionSource<CodexTurnResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!turns.TryAdd(id, completion)) throw new CodexProtocolException("Duplicate turn ID.");
+            turnStartedUtc[id] = clock.UtcNow;
             if (earlyTurnResults.Remove(id, out var earlyResult))
             {
                 earlyTurnOrder.Remove(earlyResult.Node);
@@ -150,12 +155,21 @@ public sealed class CodexAppServerClient(
         {
             while (true)
             {
-                var remaining = idleTimeout - (clock.UtcNow - lastActivityUtc);
-                if (remaining <= TimeSpan.Zero) throw new CodexIdleTimeoutException();
-                var delay = Task.Delay(remaining, cancellationToken);
+                DateTimeOffset started;
+                lock (turnGate) started = turnStartedUtc[turn.Id];
+                var now = clock.UtcNow;
+                var totalRemaining = turnTimeout - (now - started);
+                var stallRemaining = stallTimeout - (now - lastActivityUtc);
+                if (stallRemaining <= TimeSpan.Zero) throw new CodexIdleTimeoutException();
+                if (totalRemaining <= TimeSpan.Zero) throw new CodexTurnTimeoutException();
+                var remaining = totalRemaining <= stallRemaining ? totalRemaining : stallRemaining;
+                var delay = clock.DelayAsync(remaining, cancellationToken);
                 if (await Task.WhenAny(completion.Task, delay) == completion.Task) return await completion.Task;
+                await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
-                if (clock.UtcNow - lastActivityUtc >= idleTimeout) throw new CodexIdleTimeoutException();
+                now = clock.UtcNow;
+                if (now - lastActivityUtc >= stallTimeout) throw new CodexIdleTimeoutException();
+                if (now - started >= turnTimeout) throw new CodexTurnTimeoutException();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -168,7 +182,7 @@ public sealed class CodexAppServerClient(
             await InterruptTurnAsync(turn.ThreadId, turn.Id, CancellationToken.None);
             throw;
         }
-        finally { lock (turnGate) turns.Remove(turn.Id); }
+        finally { lock (turnGate) { turns.Remove(turn.Id); turnStartedUtc.Remove(turn.Id); } }
     }
 
     public async Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken)
@@ -349,4 +363,5 @@ public sealed class CodexAppServerClient(
 
 public class CodexProtocolException(string message, Exception? inner = null) : Exception(message, inner);
 public sealed class CodexProcessExitedException() : CodexProtocolException("Codex App Server exited unexpectedly.");
-public sealed class CodexIdleTimeoutException() : TimeoutException("Codex App Server produced no meaningful activity before the idle timeout.");
+public sealed class CodexIdleTimeoutException() : TimeoutException("Codex App Server produced no protocol activity before the stall timeout.");
+public sealed class CodexTurnTimeoutException() : TimeoutException("Codex App Server turn exceeded the configured total timeout.");

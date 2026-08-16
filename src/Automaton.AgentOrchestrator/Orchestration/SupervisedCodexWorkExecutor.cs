@@ -89,6 +89,7 @@ public sealed class SupervisedCodexWorkExecutor(
             throw;
         }
         catch (CodexIdleTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
+        catch (CodexTurnTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
         catch (CodexLaunchException) { quarantined = true; outcome = RunOutcome.PermanentFailure("Codex launch failed; execution ownership was quarantined."); }
         catch (CodexProcessExitedException exception) { quarantined = true; outcome = RunOutcome.PermanentFailure(Bound(exception.Message)); }
         catch (CodexProtocolException exception) { quarantined = true; outcome = RunOutcome.PermanentFailure(Bound(exception.Message)); }
