@@ -58,14 +58,67 @@ public sealed class CodexAppServerClientTests
         await EventuallyAsync(() => client.LastEventType == "item/completed");
         var recognizedAt = client.LastActivityUtc;
         transport.Emit("{\"method\":\"evil.secret.payload\",\"params\":{}}");
-        await EventuallyAsync(() => client.LastEventType == "unknown-notification");
+        await EventuallyAsync(() => client.LastEventType == "evil.secret.payload");
 
         Assert.Multiple(() =>
         {
             Assert.That(recognizedAt, Is.GreaterThanOrEqualTo(before));
-            Assert.That(client.LastEventType, Is.EqualTo("unknown-notification"));
-            Assert.That(client.LastEventType, Does.Not.Contain("evil.secret.payload"));
+            Assert.That(client.LastEventType, Is.EqualTo("evil.secret.payload"));
         });
+    }
+
+    [Test]
+    public async Task ServerRequestsReceiveScopedApprovalsAndExplicitResponses()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            using var document = JsonDocument.Parse(message);
+            if (document.RootElement.TryGetProperty("method", out _)) RespondNormally(transport, message);
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        transport.Emit($"{{\"id\":901,\"method\":\"item/commandExecution/requestApproval\",\"params\":{{\"cwd\":{JsonSerializer.Serialize(WorkspacePath)}}}}}");
+        transport.Emit($"{{\"id\":902,\"method\":\"item/fileChange/requestApproval\",\"params\":{{\"grantRoot\":{JsonSerializer.Serialize(Path.Combine(WorkspacePath, "..", "outside"))}}}}}");
+        transport.Emit("{\"id\":903,\"method\":\"item/tool/requestUserInput\",\"params\":{}}");
+        transport.Emit("{\"id\":904,\"method\":\"server/unknown\",\"params\":{}}");
+        await EventuallyAsync(() => transport.Messages.Any(x => x.Contains("901")) && transport.Messages.Any(x => x.Contains("904")));
+
+        var responses = transport.Messages.Skip(2).Select(message => JsonDocument.Parse(message)).Select(x => x.RootElement.Clone()).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(responses.Single(x => x.GetProperty("id").GetInt32() == 901).GetProperty("result").GetProperty("decision").GetString(), Is.EqualTo("accept"));
+            Assert.That(responses.Single(x => x.GetProperty("id").GetInt32() == 902).GetProperty("result").GetProperty("decision").GetString(), Is.EqualTo("decline"));
+            Assert.That(responses.Single(x => x.GetProperty("id").GetInt32() == 903).GetProperty("result").GetProperty("answers").ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(responses.Single(x => x.GetProperty("id").GetInt32() == 904).GetProperty("error").GetProperty("code").GetInt32(), Is.EqualTo(-32601));
+            Assert.That(client.LastEventType, Is.EqualTo("server/unknown"));
+        });
+    }
+
+    [Test]
+    public async Task ServerRequestIdCollisionDoesNotConsumePendingClientRequest()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            using var document = JsonDocument.Parse(message);
+            if (document.RootElement.TryGetProperty("method", out var method) && method.GetString() == "initialize")
+                transport.Respond(document.RootElement.GetProperty("id").GetInt64(), new { });
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        var pendingThread = client.StartThreadAsync(CancellationToken.None);
+        await EventuallyAsync(() => transport.Messages.Count >= 3);
+        var pendingId = JsonDocument.Parse(transport.Messages[^1]).RootElement.GetProperty("id").GetInt64();
+        transport.Emit($"{{\"id\":{pendingId},\"method\":\"item/commandExecution/requestApproval\",\"params\":{{\"cwd\":{JsonSerializer.Serialize(WorkspacePath)}}}}}");
+        await EventuallyAsync(() => transport.Messages.Any(x => x.Contains($"\"id\":{pendingId}") && x.Contains("\"decision\":\"accept\"")));
+
+        Assert.That(pendingThread.IsCompleted, Is.False);
+        transport.Respond(pendingId, new { thread = new { id = "thread-1" }, cwd = WorkspacePath });
+        var thread = await pendingThread;
+        Assert.That(thread.Id, Is.EqualTo("thread-1"));
     }
 
     [Test]
@@ -218,7 +271,7 @@ public sealed class CodexAppServerClientTests
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => RespondNormally(transport, message);
-        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromMilliseconds(40), WorkspacePath);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(40), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
         var thread = await client.StartThreadAsync(CancellationToken.None);
         var first = await client.StartTurnAsync(thread.Id, "wait", CancellationToken.None);
@@ -521,8 +574,9 @@ public sealed class CodexAppServerClientTests
         }
         public Task SendAsync(string message, CancellationToken cancellationToken)
         {
-            Methods.Add(Request(message).Method);
             Messages.Add(message);
+            using var document = JsonDocument.Parse(message);
+            if (document.RootElement.TryGetProperty("method", out var method)) Methods.Add(method.GetString()!);
             if (SendFailure is { } failure) { SendFailure = null; return Task.FromException(failure); }
             OnSend?.Invoke(message);
             return Task.CompletedTask;
