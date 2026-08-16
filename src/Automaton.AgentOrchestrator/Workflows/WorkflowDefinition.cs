@@ -42,7 +42,12 @@ public sealed class AgentGitHubOptions
     public bool Enabled { get; init; }
     public string Token { get; init; } = string.Empty;
 }
-public sealed class CodexOptions { public string Command { get; init; } = "codex app-server"; public int TurnTimeoutMilliseconds { get; init; } = 3_600_000; }
+public sealed class CodexOptions
+{
+    public string Command { get; init; } = "codex app-server";
+    public int TurnTimeoutMilliseconds { get; init; } = 3_600_000;
+    public int StallTimeoutMilliseconds { get; init; } = 300_000;
+}
 public sealed class RetryOptions { public int MaxAttempts { get; init; } = 3; public int InitialBackoffMilliseconds { get; init; } = 1_000; public int MaxBackoffMilliseconds { get; init; } = 300_000; }
 public sealed class ReconciliationOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
 public sealed class ObservabilityOptions

@@ -87,18 +87,72 @@ public sealed class SupervisedCodexWorkExecutorTests
         });
     }
 
-    private static Fixture Create(string status, AgentGitHubOptions? github = null)
+    [Test]
+    public async Task TurnTimeoutRecordsBoundedTelemetryAndRemainsRetryable()
+    {
+        var telemetry = new RecordingTelemetry();
+        var fixture = Create("COMPLETED", telemetry: telemetry);
+        fixture.Client.Failure = new CodexTurnTimeoutException(new("turn", TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(5), DateTimeOffset.UtcNow, "turn/started", true));
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        var eventRecord = telemetry.Events.Single(x => x.EventType == "agent.codex.timeout");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.True);
+            Assert.That(eventRecord.Metadata!["timeoutKind"], Is.EqualTo("turn"));
+            Assert.That(eventRecord.Metadata["configuredTimeoutMs"], Is.EqualTo("60000"));
+            Assert.That(eventRecord.Metadata["totalElapsedMs"], Is.EqualTo("60000"));
+            Assert.That(eventRecord.Metadata["lastEventType"], Is.EqualTo("turn/started"));
+            Assert.That(eventRecord.Metadata["processAlive"], Is.EqualTo("True"));
+            Assert.That(eventRecord.Metadata.Values, Has.None.Contains("secret"));
+            Assert.That(fixture.Workspaces.FinalWorkspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
+        });
+    }
+
+    [Test]
+    public async Task StallTimeoutRecordsInactivityTelemetryAndRemainsRetryable()
+    {
+        var telemetry = new RecordingTelemetry();
+        var fixture = Create("COMPLETED", telemetry: telemetry);
+        fixture.Client.Failure = new CodexIdleTimeoutException(new("stall", TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(42), TimeSpan.FromSeconds(30), DateTimeOffset.UtcNow, "item/completed", false));
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        var eventRecord = telemetry.Events.Single(x => x.EventType == "agent.codex.timeout");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.True);
+            Assert.That(eventRecord.Metadata!["timeoutKind"], Is.EqualTo("stall"));
+            Assert.That(eventRecord.Metadata["configuredTimeoutMs"], Is.EqualTo("30000"));
+            Assert.That(eventRecord.Metadata["inactivityMs"], Is.EqualTo("30000"));
+            Assert.That(eventRecord.Metadata["totalElapsedMs"], Is.EqualTo("42000"));
+            Assert.That(eventRecord.Metadata["lastEventType"], Is.EqualTo("item/completed"));
+            Assert.That(eventRecord.Metadata["processAlive"], Is.EqualTo("False"));
+        });
+    }
+
+    private static Fixture Create(string status, AgentGitHubOptions? github = null, RecordingTelemetry? telemetry = null)
     {
         var workspace = new Workspace("work-1", "C:\\work\\work-1", "automaton/work/work-1", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce-a", "acme/repo", new string('a', 40));
         var manager = new FakeWorkspaces(workspace);
         var client = new FakeClient(status);
         var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new() } });
         var factory = new FakeFactory(client);
-        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow), manager, client, workspace, factory);
+        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow, telemetry), manager, client, workspace, factory);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("id-1", "#1", "Acceptance task", "Implement the task", "open", ["ready"]), 1, DateTimeOffset.UtcNow);
     private sealed record Fixture(SupervisedCodexWorkExecutor Executor, FakeWorkspaces Workspaces, FakeClient Client, Workspace Workspace, FakeFactory Factory);
+    private sealed class RecordingTelemetry : IOperatorTelemetry
+    {
+        public List<OperatorEvent> Events { get; } = [];
+        public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null)
+            => Events.Add(new(Events.Count + 1, DateTimeOffset.UtcNow, eventType, severity, workItemId, stage, role, message, metadata));
+        public OperatorEvent? LatestFor(string workItemId) => Events.LastOrDefault(x => x.WorkItemId == workItemId);
+        public void SetDaemonState(string state, string? error = null) { }
+        public (string State, string? LastError) DaemonState() => (OperatorDaemonStates.Running, null);
+    }
     private sealed class FakeFactory(FakeClient client) : ICodexAppServerClientFactory
     {
         public IReadOnlyDictionary<string, string> Environment { get; private set; } = new Dictionary<string, string>();

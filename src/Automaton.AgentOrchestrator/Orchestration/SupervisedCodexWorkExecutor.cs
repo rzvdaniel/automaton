@@ -88,7 +88,8 @@ public sealed class SupervisedCodexWorkExecutor(
             catch { /* Disposal preserves its own release-or-quarantine fencing outcome. */ }
             throw;
         }
-        catch (CodexIdleTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
+        catch (CodexIdleTimeoutException exception) { RecordTimeout(telemetry, attempt, exception.Diagnostic); outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
+        catch (CodexTurnTimeoutException exception) { RecordTimeout(telemetry, attempt, exception.Diagnostic); outcome = RunOutcome.RetryableFailure(Bound(exception.Message)); }
         catch (CodexLaunchException) { quarantined = true; outcome = RunOutcome.PermanentFailure("Codex launch failed; execution ownership was quarantined."); }
         catch (CodexProcessExitedException exception) { quarantined = true; outcome = RunOutcome.PermanentFailure(Bound(exception.Message)); }
         catch (CodexProtocolException exception) { quarantined = true; outcome = RunOutcome.PermanentFailure(Bound(exception.Message)); }
@@ -136,4 +137,19 @@ Operate only in the assigned workspace. Inspect, implement, test, self-review, a
 """;
 
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
+
+    private static void RecordTimeout(IOperatorTelemetry? telemetry, RunAttempt attempt, CodexTimeoutDiagnostic? diagnostic)
+    {
+        if (telemetry is null || diagnostic is null) return;
+        telemetry.Record("agent.codex.timeout", OperatorEventSeverities.Warning, attempt.WorkItem.Id, "execution", metadata: new Dictionary<string, string>
+        {
+            ["timeoutKind"] = diagnostic.Kind,
+            ["configuredTimeoutMs"] = ((long)diagnostic.ConfiguredTimeout.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["totalElapsedMs"] = ((long)diagnostic.TotalElapsed.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["inactivityMs"] = ((long)diagnostic.InactivityDuration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["lastActivityUtc"] = diagnostic.LastActivityUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            ["lastEventType"] = Bound(diagnostic.LastEventType ?? "unknown"),
+            ["processAlive"] = diagnostic.ProcessAlive?.ToString() ?? "unknown"
+        });
+    }
 }

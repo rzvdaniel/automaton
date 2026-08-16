@@ -39,6 +39,7 @@ public sealed class WorkflowLoaderTests
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
+                  stall_timeout_ms: 37
                 retry:
                   max_attempts: 4
                   initial_backoff_ms: 3
@@ -74,6 +75,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
                 Assert.That(definition.Options.Observability.MaximumEventFileBytes, Is.EqualTo(4096));
+                Assert.That(definition.Options.Codex.TurnTimeoutMilliseconds, Is.EqualTo(99));
+                Assert.That(definition.Options.Codex.StallTimeoutMilliseconds, Is.EqualTo(37));
             });
         }
         finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", null); }
@@ -158,6 +161,24 @@ public sealed class WorkflowLoaderTests
             await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
 
         Assert.That(exception!.Message, Is.EqualTo("retry.initial_backoff_ms must not exceed retry.max_backoff_ms."));
+    }
+
+    [Test]
+    public async Task LoadAsync_RejectsInvalidStallTimeout()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            codex:
+              stall_timeout_ms: 0
+            ---
+            Prompt
+            """);
+
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+
+        Assert.That(exception!.Message, Is.EqualTo("codex.stall_timeout_ms must be a positive integer."));
     }
 
     [Test]
