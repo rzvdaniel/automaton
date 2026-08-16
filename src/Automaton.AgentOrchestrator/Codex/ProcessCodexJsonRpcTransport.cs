@@ -15,6 +15,7 @@ public sealed record CodexProcessOptions(
 public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IExecutionFence? executionFence = null) : ICodexJsonRpcTransport
 {
     private static readonly string[] AllowedHostEnvironment = ["PATH", "Path", "PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "ProgramFiles", "CODEX_HOME"];
+    private static readonly string[] AllowedExplicitCredentialEnvironment = ["GH_TOKEN"];
     private readonly Channel<string> stdout = Channel.CreateUnbounded<string>(new() { SingleReader = true, SingleWriter = true });
     private readonly CancellationTokenSource lifetime = new();
     private Process? process;
@@ -158,7 +159,7 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
             if (hostEnvironment.TryGetValue(name, out var value) && !string.IsNullOrEmpty(value)) result[name] = value;
         foreach (var pair in explicitEnvironment ?? new Dictionary<string, string>())
         {
-            if (IsForbiddenChildEnvironmentName(pair.Key))
+            if (IsForbiddenChildEnvironmentName(pair.Key) && !AllowedExplicitCredentialEnvironment.Contains(pair.Key, StringComparer.OrdinalIgnoreCase))
                 throw new CodexProtocolException($"Child environment variable '{pair.Key}' is not allowed.");
             result[pair.Key] = pair.Value;
         }

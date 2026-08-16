@@ -14,6 +14,7 @@ public sealed class WorkflowLoaderTests
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", "publication-value");
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", "ci-value");
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", "feedback-value");
+        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", "agent-value");
         try
         {
             await using var workflow = await TemporaryWorkflow.CreateAsync("""
@@ -67,6 +68,9 @@ public sealed class WorkflowLoaderTests
                   developer_max_turns: 6
                   reviewer_max_turns: 3
                   max_review_rounds: 4
+                  github:
+                    enabled: true
+                    token: $AUTOMATON_ORCHESTRATOR_AGENT_TOKEN
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -119,13 +123,15 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.DeveloperMaxTurns, Is.EqualTo(6));
                 Assert.That(definition.Options.Agent.ReviewerMaxTurns, Is.EqualTo(3));
                 Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(4));
+                Assert.That(definition.Options.Agent.GitHub.Enabled, Is.True);
+                Assert.That(definition.Options.Agent.GitHub.Token, Is.EqualTo("agent-value"));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
                 Assert.That(definition.Options.Observability.MaximumEventFileBytes, Is.EqualTo(4096));
             });
         }
-        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", null); }
+        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", null); }
     }
 
     [Test]
@@ -178,6 +184,26 @@ public sealed class WorkflowLoaderTests
 
         Assert.That(exception!.Message, Does.Contain("environment variable that is not set"));
         Assert.That(exception.Message, Does.Not.Contain("$AUTOMATON_ORCHESTRATOR_MISSING_SECRET"));
+    }
+
+    [Test]
+    public async Task LoadAsync_RequiresAnExplicitCredentialForEnabledAgentGitHubCapability()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            workspace:
+              root: workspaces
+            agent:
+              github:
+                enabled: true
+            ---
+            Prompt
+            """);
+
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+        Assert.That(exception!.Message, Is.EqualTo("agent.github.token is required when agent.github.enabled is true."));
     }
 
     [Test]
