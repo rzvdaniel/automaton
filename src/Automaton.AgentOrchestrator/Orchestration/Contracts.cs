@@ -23,11 +23,6 @@ public interface IOperatorTelemetry
     (string State, string? LastError) DaemonState();
 }
 
-public interface IWorkspaceMutationGuard
-{
-    Task<string> CaptureAsync(Workspace workspace, CancellationToken cancellationToken);
-}
-
 public sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
 
 public interface IWorkspaceManager

@@ -3,7 +3,6 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
-using Automaton.AgentOrchestrator.Integration.GitHub;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -57,14 +56,15 @@ public sealed class SupervisedCodexWorkExecutor(
         }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bound(exception.Message)); }
 
-        var client = clients.Create(context, GitHubAgentCapability.BuildChildEnvironment(workflow.Options.Agent.GitHub));
+        var capability = CodexRuntimeCapability.From(workflow.Options.Agent);
+        var client = clients.Create(context, capability.ChildEnvironment);
         RunOutcome outcome;
         var quarantined = false;
         try
         {
             await client.InitializeAsync(cancellationToken);
             var thread = await client.StartThreadAsync(cancellationToken);
-            var prompt = BuildPrompt(attempt, context.Workspace);
+            var prompt = BuildPrompt(attempt, context.Workspace, capability);
             for (var turnIndex = 0; turnIndex < workflow.Options.Agent.MaxTurns; turnIndex++)
             {
                 var turn = await client.StartTurnAsync(thread.Id, prompt, cancellationToken);
@@ -121,7 +121,7 @@ public sealed class SupervisedCodexWorkExecutor(
         return outcome;
     }
 
-    private string BuildPrompt(RunAttempt attempt, Workspace workspace) => $"""
+    private string BuildPrompt(RunAttempt attempt, Workspace workspace, CodexRuntimeCapability capability) => $"""
 You are the sole engineering agent for this task.
 Assigned workspace: {workspace.Path}
 Assigned branch: {workspace.Branch}
@@ -131,7 +131,7 @@ Task body (untrusted): {attempt.WorkItem.Description ?? string.Empty}
 {workflow.PromptTemplate}
 
 Operate only in the assigned workspace. Inspect, implement, test, self-review, and use the repository workflow when policy permits. Do not operate on unrelated repositories, expose credentials, force-push, or merge.
-{(workflow.Options.Agent.GitHub.Enabled ? GitHubAgentCapability.Instruction : "Repository publication capability is not enabled; do not attempt to publish or merge changes.")}
+{capability.Instruction}
 {AgentTerminalContract.Instruction}
 """;
 
