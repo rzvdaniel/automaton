@@ -3,6 +3,7 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
+using Automaton.AgentOrchestrator.Integration.GitHub;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -56,7 +57,7 @@ public sealed class SupervisedCodexWorkExecutor(
         }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bound(exception.Message)); }
 
-        var client = clients.Create(workspace, new Dictionary<string, string>());
+        var client = clients.Create(workspace, GitHubAgentCapability.BuildChildEnvironment(workflow.Options.Agent.GitHub));
         RunOutcome outcome;
         var quarantined = false;
         try
@@ -132,6 +133,7 @@ Task body (untrusted): {attempt.WorkItem.Description ?? string.Empty}
 {workflow.PromptTemplate}
 
 Operate only in the assigned workspace. Inspect, implement, test, self-review, and use the repository workflow when policy permits. Do not operate on unrelated repositories, expose credentials, force-push, or merge.
+{(workflow.Options.Agent.GitHub.Enabled ? GitHubAgentCapability.Instruction : "Repository publication capability is not enabled; do not attempt to publish or merge changes.")}
 {AgentTerminalContract.Instruction}
 """;
 

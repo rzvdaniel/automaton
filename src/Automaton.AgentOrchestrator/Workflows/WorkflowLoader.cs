@@ -133,7 +133,12 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 DeveloperMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("developer_max_turns"), "agent.developer_max_turns",
                     PositiveInt(Section(root, "agent").GetValueOrDefault("max_turns"), "agent.max_turns", 1)),
                 ReviewerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("reviewer_max_turns"), "agent.reviewer_max_turns", 2),
-                MaxReviewRounds = BoundedPositiveInt(Section(root, "agent").GetValueOrDefault("max_review_rounds"), "agent.max_review_rounds", 3, 10)
+                MaxReviewRounds = BoundedPositiveInt(Section(root, "agent").GetValueOrDefault("max_review_rounds"), "agent.max_review_rounds", 3, 10),
+                GitHub = new AgentGitHubOptions
+                {
+                    Enabled = BooleanValue(Section(Section(root, "agent"), "github").GetValueOrDefault("enabled"), "agent.github.enabled", false),
+                    Token = ResolveOptionalSecret(Section(Section(root, "agent"), "github").GetValueOrDefault("token"), "agent.github.token")
+                }
             },
             Codex = new CodexOptions
             {
@@ -261,6 +266,10 @@ public sealed class WorkflowLoader : IWorkflowLoader
         if (!IsSafeRefPart(options.Publication.RemoteName)) throw new WorkflowValidationException("publication.remote_name is invalid.");
         if (options.Publication.GitName.Any(char.IsControl) || options.Publication.GitEmail.Any(char.IsControl))
             throw new WorkflowValidationException("publication Git identity contains control characters.");
+        if (options.Agent.GitHub.Enabled && string.IsNullOrWhiteSpace(options.Agent.GitHub.Token))
+            throw new WorkflowValidationException("agent.github.token is required when agent.github.enabled is true.");
+        if (!options.Agent.GitHub.Enabled && !string.IsNullOrWhiteSpace(options.Agent.GitHub.Token))
+            throw new WorkflowValidationException("agent.github.token requires agent.github.enabled to be true.");
         if (options.Ci.RequiredChecks.Any(name => string.IsNullOrWhiteSpace(name) || name.Length > 200 || name.Any(char.IsControl)))
             throw new WorkflowValidationException("ci.required_checks contains an invalid check name.");
         if (!Uri.TryCreate(options.Ci.GitHubApiBaseUrl, UriKind.Absolute, out var ciApi) || ciApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(ciApi.UserInfo))

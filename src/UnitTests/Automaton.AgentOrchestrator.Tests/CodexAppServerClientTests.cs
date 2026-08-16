@@ -340,7 +340,7 @@ public sealed class CodexAppServerClientTests
         var parsed = ProcessCodexJsonRpcTransport.ParseCommand("\"C:\\Program Files\\Codex\\codex.exe\" app-server");
         var environment = ProcessCodexJsonRpcTransport.BuildEnvironment(
             new Dictionary<string, string> { ["PATH"] = "tools", ["ProgramFiles"] = "program-files", ["GITHUB_TOKEN"] = "secret", ["AUTOMATON_DB"] = "secret" },
-            new Dictionary<string, string> { ["CODEX_STAGE4"] = "enabled" });
+            new Dictionary<string, string> { ["CODEX_STAGE4"] = "enabled", ["GH_TOKEN"] = "explicit-agent-token" });
 
         Assert.Multiple(() =>
         {
@@ -349,6 +349,7 @@ public sealed class CodexAppServerClientTests
             Assert.That(environment["PATH"], Is.EqualTo("tools"));
             Assert.That(environment["ProgramFiles"], Is.EqualTo("program-files"));
             Assert.That(environment["CODEX_STAGE4"], Is.EqualTo("enabled"));
+            Assert.That(environment["GH_TOKEN"], Is.EqualTo("explicit-agent-token"));
             Assert.That(environment.ContainsKey("GITHUB_TOKEN"), Is.False);
             Assert.That(environment.ContainsKey("AUTOMATON_DB"), Is.False);
             Assert.That(() => ProcessCodexJsonRpcTransport.BuildEnvironment(new Dictionary<string, string>(), new Dictionary<string, string> { ["GITHUB_TOKEN"] = "secret" }), Throws.TypeOf<CodexProtocolException>());

@@ -54,18 +54,60 @@ public sealed class SupervisedCodexWorkExecutorTests
         });
     }
 
-    private static Fixture Create(string status)
+    [Test]
+    public async Task EnabledGitHubCapability_InjectsOnlyTheExplicitCredentialAndWorkflowInstructions()
+    {
+        var fixture = Create("COMPLETED", new AgentGitHubOptions { Enabled = true, Token = "test-agent-token" });
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(fixture.Factory.Environment, Is.EqualTo(new Dictionary<string, string> { ["GH_TOKEN"] = "test-agent-token" }));
+            Assert.That(fixture.Client.Prompt, Does.Contain("commit the completed change"));
+            Assert.That(fixture.Client.Prompt, Does.Contain("create or update one draft pull request"));
+            Assert.That(fixture.Client.Prompt, Does.Contain("Never merge or approve"));
+            Assert.That(fixture.Client.Prompt, Does.Not.Contain("test-agent-token"));
+        });
+    }
+
+    [Test]
+    public async Task DisabledGitHubCapability_DoesNotInjectCredentialsOrPermitPublication()
+    {
+        var fixture = Create("COMPLETED");
+
+        await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Factory.Environment, Is.Empty);
+            Assert.That(fixture.Client.Prompt, Does.Contain("publication capability is not enabled"));
+        });
+    }
+
+    private static Fixture Create(string status, AgentGitHubOptions? github = null)
     {
         var workspace = new Workspace("work-1", "C:\\work\\work-1", "automaton/work/work-1", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce-a", "acme/repo", new string('a', 40));
         var manager = new FakeWorkspaces(workspace);
         var client = new FakeClient(workspace, status);
-        var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2 } });
-        return new(new SupervisedCodexWorkExecutor(manager, new FakeFactory(client), workflow), manager, client, workspace);
+        var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new() } });
+        var factory = new FakeFactory(client);
+        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow), manager, client, workspace, factory);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("id-1", "#1", "Acceptance task", "Implement the task", "open", ["ready"]), 1, DateTimeOffset.UtcNow);
-    private sealed record Fixture(SupervisedCodexWorkExecutor Executor, FakeWorkspaces Workspaces, FakeClient Client, Workspace Workspace);
-    private sealed class FakeFactory(FakeClient client) : ICodexAppServerClientFactory { public ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? environment = null) { client.Workspace = workspace; return client; } }
+    private sealed record Fixture(SupervisedCodexWorkExecutor Executor, FakeWorkspaces Workspaces, FakeClient Client, Workspace Workspace, FakeFactory Factory);
+    private sealed class FakeFactory(FakeClient client) : ICodexAppServerClientFactory
+    {
+        public IReadOnlyDictionary<string, string> Environment { get; private set; } = new Dictionary<string, string>();
+        public ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Environment = new Dictionary<string, string>(environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
+            client.Workspace = workspace;
+            return client;
+        }
+    }
     private sealed class FakeClient(Workspace workspace, string status) : ICodexAppServerClient
     {
         public Workspace Workspace { get; set; } = workspace;

@@ -11,23 +11,13 @@ repository:
   root: /var/lib/automaton-agent-orchestrator/repository
   identity: example-owner/example-repository
   base_branch: main
-publication:
-  validation_commands:
-    - dotnet test
-  github_token: $AUTOMATON_PUBLICATION_TOKEN
-ci:
-  enabled: true
-  kind: github
-  github_token: $AUTOMATON_CI_TOKEN
-review_feedback:
-  enabled: true
-  kind: github
-  github_token: $AUTOMATON_REVIEW_FEEDBACK_TOKEN
-  automation_login: automaton-agent
 workspace:
   root: /var/lib/automaton-agent-orchestrator/workspaces
 agent:
   max_concurrent_agents: 1
+  github:
+    enabled: true
+    token: $AUTOMATON_AGENT_GITHUB_TOKEN
 codex:
   command: /usr/local/bin/codex app-server
 observability:
@@ -35,4 +25,4 @@ observability:
 ---
 # Trusted production task prompt
 
-Implement the eligible work item in the assigned isolated workspace. Do not reveal credentials or operate outside that workspace.
+Implement the eligible work item in the assigned isolated workspace. When the explicit GitHub capability is enabled, commit and push only the assigned branch, create or update one draft pull request, and inspect CI/review feedback. Never merge, approve, force-push, reveal credentials, or operate outside that workspace.
