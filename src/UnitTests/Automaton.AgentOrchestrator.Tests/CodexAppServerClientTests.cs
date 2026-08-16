@@ -97,6 +97,31 @@ public sealed class CodexAppServerClientTests
     }
 
     [Test]
+    public async Task ServerRequestIdCollisionDoesNotConsumePendingClientRequest()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            using var document = JsonDocument.Parse(message);
+            if (document.RootElement.TryGetProperty("method", out var method) && method.GetString() == "initialize")
+                transport.Respond(document.RootElement.GetProperty("id").GetInt64(), new { });
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        var pendingThread = client.StartThreadAsync(CancellationToken.None);
+        await EventuallyAsync(() => transport.Messages.Count >= 3);
+        var pendingId = JsonDocument.Parse(transport.Messages[^1]).RootElement.GetProperty("id").GetInt64();
+        transport.Emit($"{{\"id\":{pendingId},\"method\":\"item/commandExecution/requestApproval\",\"params\":{{\"cwd\":{JsonSerializer.Serialize(WorkspacePath)}}}}}");
+        await EventuallyAsync(() => transport.Messages.Any(x => x.Contains($"\"id\":{pendingId}") && x.Contains("\"decision\":\"accept\"")));
+
+        Assert.That(pendingThread.IsCompleted, Is.False);
+        transport.Respond(pendingId, new { thread = new { id = "thread-1" }, cwd = WorkspacePath });
+        var thread = await pendingThread;
+        Assert.That(thread.Id, Is.EqualTo("thread-1"));
+    }
+
+    [Test]
     public async Task Requests_AreCorrelatedWhenResponsesArriveOutOfOrder()
     {
         var transport = new ScriptedTransport();

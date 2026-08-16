@@ -246,34 +246,34 @@ public sealed class CodexAppServerClient(
         var root = document.RootElement;
         lastActivityUtc = clock.UtcNow;
         LastEventType = ClassifyEvent(root);
-        if (root.TryGetProperty("id", out var id) && id.TryGetInt64(out var requestId))
+        if (root.TryGetProperty("method", out var methodProperty))
         {
-            if (pending.TryGetValue(requestId, out var completion))
+            var method = methodProperty.GetString();
+            LastEventType = method;
+            var parameters = root.TryGetProperty("params", out var value) ? value : default;
+            var threadId = StringProperty(parameters, "threadId");
+            var turnId = StringProperty(parameters, "turnId") ?? NestedStringProperty(parameters, "turn", "id");
+            switch (method)
             {
-                if (root.TryGetProperty("error", out var error)) completion.TrySetException(new CodexProtocolException(Bounded(error.GetRawText())));
-                else if (root.TryGetProperty("result", out var result)) completion.TrySetResult(result.Clone());
-                else completion.TrySetException(new CodexProtocolException("JSON-RPC response has no result."));
-                return;
+                case CodexAppServerMethods.TurnStarted: Touch(CodexSessionEventKinds.TurnStarted, threadId, turnId); break;
+                case CodexAppServerMethods.ItemStarted:
+                case CodexAppServerMethods.ItemCompleted: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
+                case CodexAppServerMethods.TokenUsageUpdated:
+                    Touch(CodexSessionEventKinds.UsageUpdated, threadId, turnId, inputTokens: FindLong(parameters, "inputTokens"), outputTokens: FindLong(parameters, "outputTokens")); break;
+                case CodexAppServerMethods.TurnCompleted: CompleteTurn(parameters, threadId, turnId); break;
+                default: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
             }
+            if (root.TryGetProperty("id", out var serverRequestId))
+                await HandleServerRequestAsync(serverRequestId, method, parameters);
+            return;
         }
-        if (!root.TryGetProperty("method", out var methodProperty)) throw new CodexProtocolException("JSON-RPC message has neither ID nor method.");
-        var method = methodProperty.GetString();
-        LastEventType = method;
-        var parameters = root.TryGetProperty("params", out var value) ? value : default;
-        var threadId = StringProperty(parameters, "threadId");
-        var turnId = StringProperty(parameters, "turnId") ?? NestedStringProperty(parameters, "turn", "id");
-        switch (method)
-        {
-            case CodexAppServerMethods.TurnStarted: Touch(CodexSessionEventKinds.TurnStarted, threadId, turnId); break;
-            case CodexAppServerMethods.ItemStarted:
-            case CodexAppServerMethods.ItemCompleted: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
-            case CodexAppServerMethods.TokenUsageUpdated:
-                Touch(CodexSessionEventKinds.UsageUpdated, threadId, turnId, inputTokens: FindLong(parameters, "inputTokens"), outputTokens: FindLong(parameters, "outputTokens")); break;
-            case CodexAppServerMethods.TurnCompleted: CompleteTurn(parameters, threadId, turnId); break;
-            default: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
-        }
-        if (root.TryGetProperty("id", out var serverRequestId))
-            await HandleServerRequestAsync(serverRequestId, method, parameters);
+        if (!root.TryGetProperty("id", out var id) || !id.TryGetInt64(out var requestId)
+            || (!root.TryGetProperty("result", out var result) && !root.TryGetProperty("error", out var error)))
+            throw new CodexProtocolException("Malformed JSON-RPC message shape.");
+        if (!pending.TryGetValue(requestId, out var completion))
+            throw new CodexProtocolException("JSON-RPC response did not match a pending request.");
+        if (root.TryGetProperty("error", out error)) completion.TrySetException(new CodexProtocolException(Bounded(error.GetRawText())));
+        else completion.TrySetResult(result.Clone());
     }
 
     private async Task HandleServerRequestAsync(JsonElement requestId, string? method, JsonElement parameters)
