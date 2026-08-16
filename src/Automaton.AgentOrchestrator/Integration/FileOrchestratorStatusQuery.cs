@@ -19,7 +19,7 @@ public sealed class FileOrchestratorStatusQuery(string statusPath) : IOrchestrat
             if (info.Length is <= 0 or > MaximumStatusBytes) return Unavailable("operator status size is invalid");
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 16_384, FileOptions.Asynchronous | FileOptions.SequentialScan);
             var source = await JsonSerializer.DeserializeAsync<OperatorStatusSnapshot>(stream, Json, cancellationToken);
-            if (source is null || source.SchemaVersion != 1) return Unavailable("operator status schema is unsupported");
+            if (source is null || source.SchemaVersion != OrchestratorIntegrationSchema.CurrentVersion) return Unavailable("operator status schema is unsupported");
             if (!IsValid(source)) return Unavailable("operator status is malformed");
             return new(OrchestratorIntegrationSchema.CurrentVersion, OrchestratorAvailabilityStates.Available, Map(source));
         }
@@ -55,15 +55,11 @@ public sealed class FileOrchestratorStatusQuery(string statusPath) : IOrchestrat
                 || string.IsNullOrWhiteSpace(run.RunState)
                 || run.Attempt < 0
                 || run.UpdatedAtUtc == default
-                || !workItemIds.Add(run.WorkItemId)
-                || !IsValidSha(run.HeadSha))
+                || !workItemIds.Add(run.WorkItemId))
                 return false;
         }
         return true;
     }
-
-    private static bool IsValidSha(string? value) => value is null
-        || value.Length == 40 && value.All(Uri.IsHexDigit);
 
     private static OrchestratorStatusContract Map(OperatorStatusSnapshot value) => new(
         value.GeneratedAtUtc, value.DaemonState, value.StartupReconciled, value.Healthy, value.RepositoryIdentity,
@@ -71,8 +67,7 @@ public sealed class FileOrchestratorStatusQuery(string statusPath) : IOrchestrat
 
     private static OrchestratorRunContract Map(OperatorRunStatus value) => new(
         value.WorkItemId, value.RunState, value.Attempt, value.UpdatedAtUtc, value.Stage, value.Role, value.WorkspaceKey,
-        value.WorkspacePath, value.Branch, value.PullRequestUrl, value.HeadSha, value.CiStatus, value.FeedbackStatus,
-        value.OwnershipStatus, value.RetryAtUtc, value.Reason, value.CiObservedAtUtc, value.FeedbackObservedAtUtc);
+        value.WorkspacePath, value.Branch, value.OwnershipStatus, value.RetryAtUtc, value.Reason);
 
     private static OrchestratorStatusQueryResult Unavailable(string reason) =>
         new(OrchestratorIntegrationSchema.CurrentVersion, OrchestratorAvailabilityStates.Unavailable, Reason: reason);

@@ -13,8 +13,8 @@ public sealed class OrchestratorIntegrationBoundaryTests
     {
         using var file = new TemporaryStatus();
         var now = DateTimeOffset.Parse("2026-08-12T12:00:00Z");
-        var run = new OperatorRunStatus("jira:TEAM-42", RunStates.Blocked, 2, now, "human-feedback", "reviewer", "key", "/work/key", "automaton/work/key", "https://provider.test/pr/7", new string('a', 40), CiStatuses.Passed, ReviewFeedbackStatuses.Actionable, WorkspaceExecutionOwnershipStates.Quarantined, Reason: "manual attention");
-        await file.WriteAsync(new(1, now, OperatorDaemonStates.Running, true, true, "acme/widgets", [run], ApplicationVersion: "2.0.0", BuildRevision: "abcdef0"));
+        var run = new OperatorRunStatus("jira:TEAM-42", RunStates.Blocked, 2, now, "execution", "codex", "key", "/work/key", "automaton/work/key", WorkspaceExecutionOwnershipStates.Quarantined, Reason: "manual attention");
+        await file.WriteAsync(new(OrchestratorIntegrationSchema.CurrentVersion, now, OperatorDaemonStates.Running, true, true, "acme/widgets", [run], ApplicationVersion: "2.0.0", BuildRevision: "abcdef0"));
 
         var result = await new FileOrchestratorStatusQuery(file.Path).GetAsync(CancellationToken.None);
 
@@ -26,7 +26,6 @@ public sealed class OrchestratorIntegrationBoundaryTests
             Assert.That(result.Status.BuildRevision, Is.EqualTo("abcdef0"));
             Assert.That(result.Status.Runs.Single().WorkItemId, Is.EqualTo("jira:TEAM-42"));
             Assert.That(result.Status.Runs.Single().OwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
-            Assert.That(result.Status.Runs.Single().HeadSha, Has.Length.EqualTo(40));
         });
     }
 
@@ -48,7 +47,7 @@ public sealed class OrchestratorIntegrationBoundaryTests
     {
         using var file = new TemporaryStatus();
         var now = DateTimeOffset.UtcNow;
-        await file.WriteAsync(new(1, now, OperatorDaemonStates.Running, true, true, "acme/widgets", [
+        await file.WriteAsync(new(OrchestratorIntegrationSchema.CurrentVersion, now, OperatorDaemonStates.Running, true, true, "acme/widgets", [
             new("github:1", RunStates.Completed, 1, now),
             new("linear:ENG-2", RunStates.Working, 1, now),
             new("jira:TEAM-42", RunStates.RetryQueued, 2, now)]));
@@ -91,17 +90,6 @@ public sealed class OrchestratorIntegrationBoundaryTests
         Assert.Multiple(() => { Assert.That(result.Availability, Is.EqualTo(OrchestratorAvailabilityStates.Unavailable)); Assert.That(selected, Is.Null); });
     }
 
-    [TestCase("abc")]
-    [TestCase("gggggggggggggggggggggggggggggggggggggggg")]
-    [TestCase("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
-    public async Task InvalidExactShaIsUnavailable(string sha)
-    {
-        using var file = new TemporaryStatus();
-        var run = $"{{\"workItemId\":\"github:1\",\"runState\":\"working\",\"attempt\":0,\"updatedAtUtc\":\"2026-08-12T00:00:00Z\",\"headSha\":\"{sha}\"}}";
-        await file.WriteRawAsync(SnapshotJson(run));
-        Assert.That((await new FileOrchestratorStatusQuery(file.Path).GetAsync(CancellationToken.None)).Availability, Is.EqualTo(OrchestratorAvailabilityStates.Unavailable));
-    }
-
     [Test]
     public async Task ValidEmptyRunCollectionIsAvailable()
     {
@@ -139,7 +127,7 @@ public sealed class OrchestratorIntegrationBoundaryTests
     }
 
     private static string SnapshotJson(string runs) => $$"""
-        {"schemaVersion":1,"generatedAtUtc":"2026-08-12T00:00:00Z","daemonState":"running","startupReconciled":true,"healthy":true,"repositoryIdentity":"acme/widgets","runs":[{{runs}}],"applicationVersion":"1.0.0","buildRevision":"abcdef0"}
+        {"schemaVersion":2,"generatedAtUtc":"2026-08-12T00:00:00Z","daemonState":"running","startupReconciled":true,"healthy":true,"repositoryIdentity":"acme/widgets","runs":[{{runs}}],"applicationVersion":"1.0.0","buildRevision":"abcdef0"}
         """;
 
     private sealed class TemporaryStatus : IDisposable

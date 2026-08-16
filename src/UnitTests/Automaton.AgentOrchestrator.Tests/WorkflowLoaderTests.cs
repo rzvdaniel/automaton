@@ -11,9 +11,6 @@ public sealed class WorkflowLoaderTests
     {
         var variableName = "AUTOMATON_ORCHESTRATOR_TEST_TOKEN";
         Environment.SetEnvironmentVariable(variableName, "test-value");
-        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", "publication-value");
-        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", "ci-value");
-        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", "feedback-value");
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", "agent-value");
         try
         {
@@ -31,43 +28,11 @@ public sealed class WorkflowLoaderTests
                   root: .
                   identity: acme/widgets
                   base_branch: trunk
-                publication:
-                  validation_commands:
-                    - dotnet test
-                  git_name: Automaton Bot
-                  git_email: bot@example.test
-                  remote_name: upstream
-                  github_host: github.example.test
-                  github_token: $AUTOMATON_ORCHESTRATOR_PR_TOKEN
-                  validation_timeout_ms: 1234
-                ci:
-                  enabled: true
-                  kind: github
-                  github_token: $AUTOMATON_ORCHESTRATOR_CI_TOKEN
-                  github_api_base_url: https://api.github.example.test/
-                  required_checks:
-                    - build
-                    - test
-                  poll_interval_ms: 25
-                  timeout_ms: 5000
-                  max_remediation_rounds: 2
-                review_feedback:
-                  enabled: true
-                  kind: github
-                  github_token: $AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN
-                  github_api_base_url: https://api.github.example.test/
-                  automation_login: automaton-bot
-                  poll_interval_ms: 75
-                  max_remediation_rounds: 4
                 workspace:
                   root: workspaces
                 agent:
                   max_concurrent_agents: 2
                   max_turns: 5
-                  manager_max_turns: 2
-                  developer_max_turns: 6
-                  reviewer_max_turns: 3
-                  max_review_rounds: 4
                   github:
                     enabled: true
                     token: $AUTOMATON_ORCHESTRATOR_AGENT_TOKEN
@@ -101,28 +66,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Repository.Root, Is.EqualTo(workflow.Directory));
                 Assert.That(definition.Options.Repository.Identity, Is.EqualTo("acme/widgets"));
                 Assert.That(definition.Options.Repository.BaseBranch, Is.EqualTo("trunk"));
-                Assert.That(definition.Options.Publication.ValidationCommands, Is.EqualTo(new[] { "dotnet test" }));
-                Assert.That(definition.Options.Publication.GitName, Is.EqualTo("Automaton Bot"));
-                Assert.That(definition.Options.Publication.GitEmail, Is.EqualTo("bot@example.test"));
-                Assert.That(definition.Options.Publication.RemoteName, Is.EqualTo("upstream"));
-                Assert.That(definition.Options.Publication.GitHubHost, Is.EqualTo("github.example.test"));
-                Assert.That(definition.Options.Publication.GitHubToken, Is.EqualTo("publication-value"));
-                Assert.That(definition.Options.Publication.ValidationTimeoutMilliseconds, Is.EqualTo(1234));
-                Assert.That(definition.Options.Ci.GitHubToken, Is.EqualTo("ci-value"));
-                Assert.That(definition.Options.Ci.RequiredChecks, Is.EqualTo(new[] { "build", "test" }));
-                Assert.That(definition.Options.Ci.PollIntervalMilliseconds, Is.EqualTo(25));
-                Assert.That(definition.Options.Ci.TimeoutMilliseconds, Is.EqualTo(5000));
-                Assert.That(definition.Options.Ci.MaxRemediationRounds, Is.EqualTo(2));
-                Assert.That(definition.Options.ReviewFeedback.GitHubToken, Is.EqualTo("feedback-value"));
-                Assert.That(definition.Options.ReviewFeedback.AutomationLogin, Is.EqualTo("automaton-bot"));
-                Assert.That(definition.Options.ReviewFeedback.PollIntervalMilliseconds, Is.EqualTo(75));
-                Assert.That(definition.Options.ReviewFeedback.MaxRemediationRounds, Is.EqualTo(4));
                 Assert.That(definition.Options.Workspace.Root, Is.EqualTo(Path.Combine(workflow.Directory, "workspaces")));
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
-                Assert.That(definition.Options.Agent.ManagerMaxTurns, Is.EqualTo(2));
-                Assert.That(definition.Options.Agent.DeveloperMaxTurns, Is.EqualTo(6));
-                Assert.That(definition.Options.Agent.ReviewerMaxTurns, Is.EqualTo(3));
-                Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(4));
                 Assert.That(definition.Options.Agent.GitHub.Enabled, Is.True);
                 Assert.That(definition.Options.Agent.GitHub.Token, Is.EqualTo("agent-value"));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
@@ -131,7 +76,7 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Observability.MaximumEventFileBytes, Is.EqualTo(4096));
             });
         }
-        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", null); }
+        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_AGENT_TOKEN", null); }
     }
 
     [Test]
@@ -204,6 +149,25 @@ public sealed class WorkflowLoaderTests
 
         var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
         Assert.That(exception!.Message, Is.EqualTo("agent.github.token is required when agent.github.enabled is true."));
+    }
+
+    [Test]
+    public async Task LoadAsync_RejectsRemovedPublicationCiAndFeedbackConfiguration()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            workspace:
+              root: workspaces
+            ci:
+              enabled: true
+            ---
+            Prompt
+            """);
+
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+        Assert.That(exception!.Message, Does.StartWith("ci is no longer orchestrator configuration"));
     }
 
     [Test]

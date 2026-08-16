@@ -1,5 +1,4 @@
 using Automaton.AgentOrchestrator.Domain;
-using Automaton.AgentOrchestrator.Publication;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -9,70 +8,10 @@ public interface IWorkTracker
     Task<WorkItem?> GetByIdAsync(string workItemId, CancellationToken cancellationToken);
 }
 
-public interface ICiProvider
-{
-    Task<CiSnapshot> GetAsync(CiTarget target, CancellationToken cancellationToken);
-}
-
-public interface ICiShepherd
-{
-    Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem workItem, CancellationToken cancellationToken);
-}
-
-public interface ICiRemediator
-{
-    Task<CiRemediationResult> RemediateAsync(CiRemediationRequest request, CancellationToken cancellationToken);
-}
-
-public interface ICiPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }
-
-public interface IReviewFeedbackProvider
-{
-    Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken cancellationToken);
-}
-
-public interface IReviewFeedbackShepherd
-{
-    Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem workItem, CancellationToken cancellationToken);
-}
-
-public interface IReviewFeedbackRemediator
-{
-    Task<ReviewFeedbackRemediationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken);
-}
-
-public interface IReviewFeedbackPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }
-
 public interface IWorkExecutor
 {
     Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken);
 }
-
-public interface IWorkPublisher
-{
-    Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
-    Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-    Task<PublicationResult> VerifyRecoveredPublicationAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken);
-    Task<PublicationResult> RecoverAuthorizedWithoutCommitAsync(OwnedWorkspaceRecord record, CancellationToken cancellationToken) => throw new NotSupportedException();
-    Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
-        => ValidateRevisionBaseAsync(workspace, currentPublication, allowWorkingTreeChanges: false, cancellationToken);
-    Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, bool allowWorkingTreeChanges, CancellationToken cancellationToken) => Task.CompletedTask;
-    Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken);
-}
-
-public interface IPullRequestPublisher
-{
-    Task<PullRequestPublication> FindOrCreateAsync(PullRequestPublicationRequest request, CancellationToken cancellationToken);
-    Task<PullRequestPublication?> FindExactAsync(PullRequestPublicationRequest request, int? expectedNumber, CancellationToken cancellationToken);
-}
-
-public sealed record PullRequestPublicationRequest(
-    string Repository,
-    string HeadBranch,
-    string HeadSha,
-    string BaseBranch,
-    string Title,
-    string Body);
 
 public interface IClock { DateTimeOffset UtcNow { get; } }
 
@@ -98,11 +37,6 @@ public interface IWorkspaceManager
     Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
     Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
-    Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken);
-    Task<Workspace> ReconcileAuthorizedWithoutCommitAsync(Workspace workspace, PublicationRecoveryState authoritativeState, CancellationToken cancellationToken) => throw new NotSupportedException();
-    Task<Workspace> UpdateCiStateAsync(Workspace workspace, CiRecoveryState ciState, CancellationToken cancellationToken) => Task.FromResult(workspace);
-    Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState feedbackState, CancellationToken cancellationToken) => Task.FromResult(workspace);
-    Task<ReviewFeedbackRecoveryState?> GetReviewFeedbackStateAsync(Workspace workspace, CancellationToken cancellationToken) => Task.FromResult<ReviewFeedbackRecoveryState?>(null);
     Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }

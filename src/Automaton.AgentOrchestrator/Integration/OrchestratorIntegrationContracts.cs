@@ -2,7 +2,7 @@ namespace Automaton.AgentOrchestrator.Integration;
 
 public static class OrchestratorIntegrationSchema
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 }
 
 public static class OrchestratorAvailabilityStates
@@ -38,15 +38,9 @@ public sealed record OrchestratorRunContract(
     string? WorkspaceKey = null,
     string? WorkspacePath = null,
     string? Branch = null,
-    string? PullRequestUrl = null,
-    string? HeadSha = null,
-    string? CiStatus = null,
-    string? FeedbackStatus = null,
     string? OwnershipStatus = null,
     DateTimeOffset? RetryAtUtc = null,
-    string? Reason = null,
-    DateTimeOffset? CiObservedAtUtc = null,
-    DateTimeOffset? FeedbackObservedAtUtc = null);
+    string? Reason = null);
 
 public interface IOrchestratorStatusQuery
 {

@@ -17,7 +17,6 @@ public sealed class InMemoryOrchestrator(
     private readonly Dictionary<string, RetryRun> retryRuns = new(StringComparer.Ordinal);
     private readonly HashSet<string> terminalDispatchSuppression = new(StringComparer.Ordinal);
     private readonly List<RunState> history = [];
-    private readonly List<PendingHumanFeedbackMonitor> pendingHumanFeedbackMonitors = [];
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private bool startupReconciled;
     private bool stopping;
@@ -63,42 +62,12 @@ public sealed class InMemoryOrchestrator(
         }
     }
 
-    public void RestoreAwaitingHumanFeedback(WorkItem item, int attempt, Func<CancellationToken, Task<RunOutcome>> monitor)
-    {
-        ArgumentNullException.ThrowIfNull(item);
-        ArgumentNullException.ThrowIfNull(monitor);
-        if (attempt < 1) throw new ArgumentOutOfRangeException(nameof(attempt));
-
-        ActiveRun run;
-        lock (gate)
-        {
-            if (stopping || terminalDispatchSuppression.Contains(item.Id) || activeRuns.ContainsKey(item.Id)) return;
-            history.RemoveAll(x => x.WorkItemId == item.Id);
-            retryRuns.Remove(item.Id);
-            run = new ActiveRun(item, attempt, new CancellationTokenSource(), Task.CompletedTask,
-                new RunState(item.Id, RunStates.Working, attempt, clock.UtcNow));
-            activeRuns[item.Id] = run;
-            pendingHumanFeedbackMonitors.Add(new PendingHumanFeedbackMonitor(run, monitor));
-        }
-        telemetry?.Record("run.restored", OperatorEventSeverities.Information, item.Id, "human-feedback",
-            message: "Restored published draft awaiting human feedback.",
-            metadata: new Dictionary<string, string>
-            {
-                ["state"] = RunStates.Working,
-                ["attempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            });
-    }
-
     public void CompleteStartupReconciliation()
     {
-        PendingHumanFeedbackMonitor[] monitors;
         lock (gate)
         {
             startupReconciled = true;
-            monitors = [.. pendingHumanFeedbackMonitors];
-            pendingHumanFeedbackMonitors.Clear();
         }
-        foreach (var monitor in monitors) StartRestoredHumanFeedbackMonitor(monitor);
     }
 
     public IReadOnlyList<RunState> Snapshot()
@@ -183,50 +152,6 @@ public sealed class InMemoryOrchestrator(
             logger.LogWarning(exception, "Work item {WorkItemId} execution failed", run.WorkItem.Id);
             if (run.Attempt < options.Retry.MaxAttempts && !IsStopping()) QueueRetry(run, "execution failed");
             else Complete(run.WorkItem.Id, RunStates.Blocked, run.Attempt, "execution failed");
-        }
-    }
-
-    private async Task MonitorRestoredHumanFeedbackAsync(ActiveRun run, Func<CancellationToken, Task<RunOutcome>> monitor)
-    {
-        try
-        {
-            var outcome = await monitor(run.Cancellation.Token);
-            if (!outcome.Succeeded) RecordHumanFeedbackFailure(run, outcome.FailureCategory, outcome.FailureReason, outcome.IsRetryable, outcome.FailureSubcategory);
-            Complete(run.WorkItem.Id, outcome.Succeeded ? RunStates.Completed : RunStates.Blocked, run.Attempt, outcome.FailureReason);
-        }
-        catch (OperationCanceledException) when (run.Cancellation.IsCancellationRequested)
-        {
-            Complete(run.WorkItem.Id, RunStates.Cancelled, run.Attempt, null);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Restored human-feedback monitoring failed for work item {WorkItemId}", run.WorkItem.Id);
-            const string reason = "human feedback monitor encountered an unexpected failure";
-            RecordHumanFeedbackFailure(run, ReviewFeedbackFailureCategories.MonitorUnexpected, reason, false);
-            Complete(run.WorkItem.Id, RunStates.Blocked, run.Attempt, reason);
-        }
-    }
-
-    private void RecordHumanFeedbackFailure(ActiveRun run, string? category, string? reason, bool retryable, string? subcategory = null)
-    {
-        telemetry?.Record("human-feedback.monitor.failed", OperatorEventSeverities.Warning, run.WorkItem.Id, "human-feedback",
-            message: reason, metadata: new Dictionary<string, string>
-            {
-                ["category"] = category ?? ReviewFeedbackFailureCategories.MonitorUnexpected,
-                ["workspaceKey"] = "unavailable",
-                ["retryable"] = retryable.ToString().ToLowerInvariant(),
-                ["subcategory"] = subcategory ?? "unexpected",
-                ["role"] = category == ReviewFeedbackFailureCategories.Developer ? AgentRoles.Developer : category == ReviewFeedbackFailureCategories.Reviewer ? AgentRoles.Reviewer : "unknown"
-            });
-    }
-
-    private void StartRestoredHumanFeedbackMonitor(PendingHumanFeedbackMonitor monitor)
-    {
-        lock (gate)
-        {
-            if (stopping || !activeRuns.TryGetValue(monitor.Run.WorkItem.Id, out var active) || active.Cancellation.IsCancellationRequested) return;
-            var task = Task.Run(() => MonitorRestoredHumanFeedbackAsync(active, monitor.Monitor));
-            activeRuns[active.WorkItem.Id] = active with { Task = task };
         }
     }
 
@@ -367,5 +292,4 @@ public sealed class InMemoryOrchestrator(
 
     private sealed record ActiveRun(WorkItem WorkItem, int Attempt, CancellationTokenSource Cancellation, Task Task, RunState State);
     private sealed record RetryRun(WorkItem WorkItem, int NextAttempt, RunState State, bool IsDispatching = false);
-    private sealed record PendingHumanFeedbackMonitor(ActiveRun Run, Func<CancellationToken, Task<RunOutcome>> Monitor);
 }

@@ -68,6 +68,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
 
     private static OrchestratorOptions BuildOptions(IReadOnlyDictionary<string, object?> root, string workflowDirectory)
     {
+        RejectRemovedSections(root);
         var tracker = Section(root, "tracker");
         var provider = Section(tracker, "provider")
             .ToDictionary(x => x.Key, x => ResolveProviderValue(x.Key, StringValue(x.Value, $"tracker.provider.{x.Key}")!), StringComparer.OrdinalIgnoreCase);
@@ -92,37 +93,6 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 Root = repositoryRoot,
                 Identity = repositoryIdentity,
                 BaseBranch = StringValue(repository.GetValueOrDefault("base_branch"), "repository.base_branch", required: false) ?? "main"
-            },
-            Publication = new PublicationOptions
-            {
-                ValidationCommands = StringList(Section(root, "publication").GetValueOrDefault("validation_commands"), "publication.validation_commands"),
-                GitName = StringValue(Section(root, "publication").GetValueOrDefault("git_name"), "publication.git_name", required: false) ?? "Automaton Agent",
-                GitEmail = StringValue(Section(root, "publication").GetValueOrDefault("git_email"), "publication.git_email", required: false) ?? "automaton-agent@users.noreply.github.com",
-                RemoteName = StringValue(Section(root, "publication").GetValueOrDefault("remote_name"), "publication.remote_name", required: false) ?? "origin",
-                GitHubHost = StringValue(Section(root, "publication").GetValueOrDefault("github_host"), "publication.github_host", required: false) ?? "github.com",
-                GitHubToken = ResolveOptionalSecret(Section(root, "publication").GetValueOrDefault("github_token"), "publication.github_token"),
-                ValidationTimeoutMilliseconds = PositiveInt(Section(root, "publication").GetValueOrDefault("validation_timeout_ms"), "publication.validation_timeout_ms", 600_000)
-            },
-            Ci = new CiOptions
-            {
-                Enabled = BooleanValue(Section(root, "ci").GetValueOrDefault("enabled"), "ci.enabled", true),
-                Kind = StringValue(Section(root, "ci").GetValueOrDefault("kind"), "ci.kind", required: false) ?? "github",
-                GitHubToken = ResolveOptionalSecret(Section(root, "ci").GetValueOrDefault("github_token"), "ci.github_token"),
-                GitHubApiBaseUrl = StringValue(Section(root, "ci").GetValueOrDefault("github_api_base_url"), "ci.github_api_base_url", required: false) ?? "https://api.github.com/",
-                RequiredChecks = StringList(Section(root, "ci").GetValueOrDefault("required_checks"), "ci.required_checks"),
-                PollIntervalMilliseconds = PositiveInt(Section(root, "ci").GetValueOrDefault("poll_interval_ms"), "ci.poll_interval_ms", 30_000),
-                TimeoutMilliseconds = PositiveInt(Section(root, "ci").GetValueOrDefault("timeout_ms"), "ci.timeout_ms", 3_600_000),
-                MaxRemediationRounds = NonNegativeInt(Section(root, "ci").GetValueOrDefault("max_remediation_rounds"), "ci.max_remediation_rounds", 2, 10)
-            },
-            ReviewFeedback = new ReviewFeedbackOptions
-            {
-                Enabled = BooleanValue(Section(root, "review_feedback").GetValueOrDefault("enabled"), "review_feedback.enabled", true),
-                Kind = StringValue(Section(root, "review_feedback").GetValueOrDefault("kind"), "review_feedback.kind", required: false) ?? "github",
-                GitHubToken = ResolveOptionalSecret(Section(root, "review_feedback").GetValueOrDefault("github_token"), "review_feedback.github_token"),
-                GitHubApiBaseUrl = StringValue(Section(root, "review_feedback").GetValueOrDefault("github_api_base_url"), "review_feedback.github_api_base_url", required: false) ?? "https://api.github.com/",
-                AutomationLogin = StringValue(Section(root, "review_feedback").GetValueOrDefault("automation_login"), "review_feedback.automation_login", required: false) ?? string.Empty,
-                PollIntervalMilliseconds = PositiveInt(Section(root, "review_feedback").GetValueOrDefault("poll_interval_ms"), "review_feedback.poll_interval_ms", 60_000),
-                MaxRemediationRounds = NonNegativeInt(Section(root, "review_feedback").GetValueOrDefault("max_remediation_rounds"), "review_feedback.max_remediation_rounds", 3, 10)
             },
             Workspace = new WorkspaceOptions { Root = workspaceRoot },
             Agent = new AgentExecutionOptions
@@ -168,6 +138,13 @@ public sealed class WorkflowLoader : IWorkflowLoader
             IReadOnlyDictionary<string, object?> section => section,
             _ => throw new WorkflowValidationException($"{key} must be a mapping.")
         };
+
+    private static void RejectRemovedSections(IReadOnlyDictionary<string, object?> root)
+    {
+        foreach (var section in new[] { "publication", "ci", "review_feedback" })
+            if (root.ContainsKey(section))
+                throw new WorkflowValidationException($"{section} is no longer orchestrator configuration; grant repository workflow capability under agent.github instead.");
+    }
 
     private static string? StringValue(object? value, string field, bool required = true)
     {
@@ -263,19 +240,10 @@ public sealed class WorkflowLoader : IWorkflowLoader
         if (!Directory.Exists(options.Repository.Root))
             throw new WorkflowValidationException("repository.root must reference an existing directory.");
         if (!IsSafeRefPart(options.Repository.BaseBranch)) throw new WorkflowValidationException("repository.base_branch is invalid.");
-        if (!IsSafeRefPart(options.Publication.RemoteName)) throw new WorkflowValidationException("publication.remote_name is invalid.");
-        if (options.Publication.GitName.Any(char.IsControl) || options.Publication.GitEmail.Any(char.IsControl))
-            throw new WorkflowValidationException("publication Git identity contains control characters.");
         if (options.Agent.GitHub.Enabled && string.IsNullOrWhiteSpace(options.Agent.GitHub.Token))
             throw new WorkflowValidationException("agent.github.token is required when agent.github.enabled is true.");
         if (!options.Agent.GitHub.Enabled && !string.IsNullOrWhiteSpace(options.Agent.GitHub.Token))
             throw new WorkflowValidationException("agent.github.token requires agent.github.enabled to be true.");
-        if (options.Ci.RequiredChecks.Any(name => string.IsNullOrWhiteSpace(name) || name.Length > 200 || name.Any(char.IsControl)))
-            throw new WorkflowValidationException("ci.required_checks contains an invalid check name.");
-        if (!Uri.TryCreate(options.Ci.GitHubApiBaseUrl, UriKind.Absolute, out var ciApi) || ciApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(ciApi.UserInfo))
-            throw new WorkflowValidationException("ci.github_api_base_url must be an HTTPS origin without credentials.");
-        if (!Uri.TryCreate(options.ReviewFeedback.GitHubApiBaseUrl, UriKind.Absolute, out var feedbackApi) || feedbackApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(feedbackApi.UserInfo))
-            throw new WorkflowValidationException("review_feedback.github_api_base_url must be an HTTPS origin without credentials.");
     }
 
     private static bool IsSafeRefPart(string value)

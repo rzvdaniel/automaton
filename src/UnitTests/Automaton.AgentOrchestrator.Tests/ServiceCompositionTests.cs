@@ -1,7 +1,6 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Hosting;
 using Automaton.AgentOrchestrator.Orchestration;
-using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,7 @@ namespace Automaton.AgentOrchestrator.Tests;
 public sealed class ServiceCompositionTests
 {
     [Test]
-    public async Task ProductionServiceGraphResolvesGitDependenciesAndHostedServices()
+    public async Task ProductionServiceGraphResolvesOnlyTheSimplifiedRuntimeAndHostedServices()
     {
         using var temp = new TempDirectory();
         var options = new OrchestratorOptions
@@ -27,9 +26,7 @@ public sealed class ServiceCompositionTests
             },
             Repository = new RepositoryOptions { Root = temp.Path, Identity = "acme/acceptance", BaseBranch = "main" },
             Workspace = new WorkspaceOptions { Root = Path.Combine(temp.Path, "workspaces") },
-            Publication = new PublicationOptions { GitHubToken = "redacted" },
-            Ci = new CiOptions { Enabled = false },
-            ReviewFeedback = new ReviewFeedbackOptions { Enabled = false }
+            Agent = new AgentExecutionOptions { GitHub = new AgentGitHubOptions { Enabled = true, Token = "redacted" } }
         };
         Directory.CreateDirectory(options.Workspace.Root);
 
@@ -43,8 +40,10 @@ public sealed class ServiceCompositionTests
         {
             Assert.That(provider.GetRequiredService<IGitCommandRunner>(), Is.TypeOf<ProcessGitCommandRunner>());
             Assert.That(provider.GetRequiredService<IWorkspaceManager>(), Is.TypeOf<GitWorktreeWorkspaceManager>());
-            Assert.That(provider.GetRequiredService<IWorkspaceMutationGuard>(), Is.TypeOf<GitWorkspaceMutationGuard>());
-            Assert.That(provider.GetRequiredService<IWorkPublisher>(), Is.TypeOf<GitWorkPublisher>());
+            Assert.That(provider.GetRequiredService<IWorkExecutor>(), Is.TypeOf<SupervisedCodexWorkExecutor>());
+            Assert.That(services.Any(service => service.ServiceType.Name.Contains("Publisher", StringComparison.Ordinal)
+                || service.ServiceType.Name.Contains("Ci", StringComparison.Ordinal)
+                || service.ServiceType.Name.Contains("ReviewFeedback", StringComparison.Ordinal)), Is.False);
             Assert.That(provider.GetServices<IHostedService>(), Is.Not.Empty);
         });
     }

@@ -135,7 +135,6 @@ public sealed class SupervisedCodexWorkExecutorTests
         public Task<Workspace> UpdateLifecycleAsync(Workspace value, string state, CancellationToken token) { LifecycleWrites++; return Task.FromResult(FinalWorkspace = value with { LifecycleStatus = state }); }
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string state, string nonce, CancellationToken token) => Task.FromResult(FinalWorkspace = value with { ExecutionOwnershipStatus = state, LaunchNonce = nonce });
         public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken token) => Task.FromResult(value);
-        public Task<Workspace> UpdatePublicationStateAsync(Workspace value, PublicationRecoveryState state, CancellationToken token) => throw new NotSupportedException();
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken token) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace value, CancellationToken token) => Task.CompletedTask;
     }
