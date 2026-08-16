@@ -80,36 +80,6 @@ public sealed class WorkflowLoaderTests
     }
 
     [Test]
-    public async Task LoadAsync_DefaultsAndBoundsReviewRounds()
-    {
-        await using var defaults = await TemporaryWorkflow.CreateAsync("""
-            ---
-            tracker:
-              kind: fake
-            workspace:
-              root: workspaces
-            ---
-            Prompt
-            """);
-        var definition = await new WorkflowLoader().LoadAsync(defaults.Path, CancellationToken.None);
-        Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(3));
-
-        await using var excessive = await TemporaryWorkflow.CreateAsync("""
-            ---
-            tracker:
-              kind: fake
-            workspace:
-              root: workspaces
-            agent:
-              max_review_rounds: 11
-            ---
-            Prompt
-            """);
-        var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(excessive.Path, CancellationToken.None));
-        Assert.That(exception!.Message, Is.EqualTo("agent.max_review_rounds must not exceed 10."));
-    }
-
-    [Test]
     public async Task LoadAsync_RejectsMissingEnvironmentReferenceWithoutLeakingValue()
     {
         const string variableName = "AUTOMATON_ORCHESTRATOR_MISSING_SECRET";

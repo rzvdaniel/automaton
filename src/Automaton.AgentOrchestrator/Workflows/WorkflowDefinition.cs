@@ -35,10 +35,6 @@ public sealed class AgentExecutionOptions
 {
     public int MaxConcurrentAgents { get; init; } = 1;
     public int MaxTurns { get; init; } = 1;
-    public int ManagerMaxTurns { get; init; } = 2;
-    public int DeveloperMaxTurns { get; init; } = 1;
-    public int ReviewerMaxTurns { get; init; } = 2;
-    public int MaxReviewRounds { get; init; } = 3;
     public AgentGitHubOptions GitHub { get; init; } = new();
 }
 public sealed class AgentGitHubOptions
