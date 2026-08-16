@@ -18,6 +18,10 @@ public static class CodexAppServerMethods
     public const string ItemStarted = "item/started";
     public const string ItemCompleted = "item/completed";
     public const string TokenUsageUpdated = "thread/tokenUsage/updated";
+    public const string CommandApproval = "item/commandExecution/requestApproval";
+    public const string FileApproval = "item/fileChange/requestApproval";
+    public const string UserInput = "item/tool/requestUserInput";
+    public const string PermissionsApproval = "item/permissions/requestApproval";
 }
 
 public interface ICodexJsonRpcTransport : IAsyncDisposable
@@ -217,7 +221,7 @@ public sealed class CodexAppServerClient(
     {
         try
         {
-            await foreach (var line in transport.ReadAllAsync(cancellationToken)) ProcessMessage(line);
+            await foreach (var line in transport.ReadAllAsync(cancellationToken)) await ProcessMessageAsync(line);
             if (!stopping)
             {
                 var exception = new CodexProcessExitedException();
@@ -236,7 +240,7 @@ public sealed class CodexAppServerClient(
         }
     }
 
-    private void ProcessMessage(string line)
+    private async Task ProcessMessageAsync(string line)
     {
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
@@ -244,14 +248,17 @@ public sealed class CodexAppServerClient(
         LastEventType = ClassifyEvent(root);
         if (root.TryGetProperty("id", out var id) && id.TryGetInt64(out var requestId))
         {
-            if (!pending.TryGetValue(requestId, out var completion)) return;
-            if (root.TryGetProperty("error", out var error)) completion.TrySetException(new CodexProtocolException(Bounded(error.GetRawText())));
-            else if (root.TryGetProperty("result", out var result)) completion.TrySetResult(result.Clone());
-            else completion.TrySetException(new CodexProtocolException("JSON-RPC response has no result."));
-            return;
+            if (pending.TryGetValue(requestId, out var completion))
+            {
+                if (root.TryGetProperty("error", out var error)) completion.TrySetException(new CodexProtocolException(Bounded(error.GetRawText())));
+                else if (root.TryGetProperty("result", out var result)) completion.TrySetResult(result.Clone());
+                else completion.TrySetException(new CodexProtocolException("JSON-RPC response has no result."));
+                return;
+            }
         }
         if (!root.TryGetProperty("method", out var methodProperty)) throw new CodexProtocolException("JSON-RPC message has neither ID nor method.");
         var method = methodProperty.GetString();
+        LastEventType = method;
         var parameters = root.TryGetProperty("params", out var value) ? value : default;
         var threadId = StringProperty(parameters, "threadId");
         var turnId = StringProperty(parameters, "turnId") ?? NestedStringProperty(parameters, "turn", "id");
@@ -265,7 +272,48 @@ public sealed class CodexAppServerClient(
             case CodexAppServerMethods.TurnCompleted: CompleteTurn(parameters, threadId, turnId); break;
             default: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
         }
+        if (root.TryGetProperty("id", out var serverRequestId))
+            await HandleServerRequestAsync(serverRequestId, method, parameters);
     }
+
+    private async Task HandleServerRequestAsync(JsonElement requestId, string? method, JsonElement parameters)
+    {
+        object response;
+        switch (method)
+        {
+            case CodexAppServerMethods.CommandApproval:
+                response = new { decision = IsAssignedWorkspace(parameters) ? "accept" : "decline" };
+                break;
+            case CodexAppServerMethods.FileApproval:
+                response = new { decision = IsFileApprovalSafe(parameters) ? "accept" : "decline" };
+                break;
+            case CodexAppServerMethods.UserInput:
+                response = new { answers = new Dictionary<string, object>() };
+                break;
+            case CodexAppServerMethods.PermissionsApproval:
+                response = new { permissions = new { fileSystem = (object?)null, network = (object?)null } };
+                break;
+            default:
+                await SendRawAsync(new { jsonrpc = "2.0", id = requestId.Clone(), error = new { code = -32601, message = "Unsupported server request." } }, CancellationToken.None);
+                return;
+        }
+        await SendRawAsync(new { jsonrpc = "2.0", id = requestId.Clone(), result = response }, CancellationToken.None);
+    }
+
+    private bool IsAssignedWorkspace(JsonElement parameters)
+    {
+        var cwd = StringProperty(parameters, "cwd") ?? StringProperty(parameters, "grantRoot");
+        return cwd is not null && PathsEqual(cwd, workspacePath);
+    }
+
+    private bool IsFileApprovalSafe(JsonElement parameters)
+    {
+        var grantRoot = StringProperty(parameters, "grantRoot");
+        return grantRoot is null || PathsEqual(grantRoot, workspacePath);
+    }
+
+    private Task SendRawAsync(object message, CancellationToken cancellationToken)
+        => transport.SendAsync(JsonSerializer.Serialize(message), cancellationToken);
 
     private static string ClassifyEvent(JsonElement root)
     {
