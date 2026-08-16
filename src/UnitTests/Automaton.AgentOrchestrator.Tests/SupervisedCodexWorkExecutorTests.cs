@@ -83,7 +83,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.Multiple(() =>
         {
             Assert.That(fixture.Factory.Environment, Is.Empty);
-            Assert.That(fixture.Client.Prompt, Does.Contain("publication capability is not enabled"));
+            Assert.That(fixture.Client.Prompt, Does.Contain("Repository workflow capability is not enabled"));
         });
     }
 
