@@ -90,7 +90,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IReviewFeedbackPollDelay, SystemReviewFeedbackPollDelay>();
         services.AddSingleton<IReviewFeedbackRemediator, CodexReviewFeedbackRemediator>();
         services.AddSingleton<IReviewFeedbackShepherd, ReviewFeedbackShepherd>();
-        services.AddSingleton<IWorkExecutor, RoleBasedWorkExecutor>();
+        services.AddSingleton<IWorkExecutor, SupervisedCodexWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();
         services.AddHostedService<OrchestratorHostedService>();
