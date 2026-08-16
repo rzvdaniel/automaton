@@ -47,24 +47,24 @@ public sealed class SupervisedCodexWorkExecutor(
 {
     public async Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
     {
-        Workspace workspace;
+        WorkspaceExecutionContext context;
         try
         {
-            workspace = await workspaceManager.CreateOrRecoverAsync(new(attempt.WorkItem,
+            var workspace = await workspaceManager.CreateOrRecoverAsync(new(attempt.WorkItem,
                 new WorkspaceRepository(workflow.Options.Repository.Root, workflow.Options.Repository.Identity, workflow.Options.Repository.BaseBranch)), cancellationToken);
-            workspace = await workspaceManager.UpdateRecoveryStateAsync(workspace,
-                new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt), cancellationToken);
+            context = new WorkspaceExecutionContext(workspaceManager, workspace);
+            await context.SetRecoveryAsync(new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt), cancellationToken);
         }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bound(exception.Message)); }
 
-        var client = clients.Create(workspace, GitHubAgentCapability.BuildChildEnvironment(workflow.Options.Agent.GitHub));
+        var client = clients.Create(context, GitHubAgentCapability.BuildChildEnvironment(workflow.Options.Agent.GitHub));
         RunOutcome outcome;
         var quarantined = false;
         try
         {
             await client.InitializeAsync(cancellationToken);
             var thread = await client.StartThreadAsync(cancellationToken);
-            var prompt = BuildPrompt(attempt, workspace);
+            var prompt = BuildPrompt(attempt, context.Workspace);
             for (var turnIndex = 0; turnIndex < workflow.Options.Agent.MaxTurns; turnIndex++)
             {
                 var turn = await client.StartTurnAsync(thread.Id, prompt, cancellationToken);
@@ -72,15 +72,15 @@ public sealed class SupervisedCodexWorkExecutor(
                 if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException(Bound(result.FailureReason ?? "Codex task turn did not complete."));
                 if (!AgentTerminalContract.TryParse(result.FinalResponse, out var terminal))
-                    return await FinishAsync(workspace, client, attempt, RunOutcome.PermanentFailure("Codex returned a malformed task terminal contract."), CancellationToken.None);
-                if (terminal.Status == "COMPLETED") return await FinishAsync(workspace, client, attempt, RunOutcome.Success(), CancellationToken.None);
-                if (terminal.Status == "BLOCKED") return await FinishAsync(workspace, client, attempt, RunOutcome.PermanentFailure(Bound(terminal.Summary)), CancellationToken.None);
-                if (terminal.Status == "RETRYABLE") return await FinishAsync(workspace, client, attempt, RunOutcome.RetryableFailure(Bound(terminal.Summary)), CancellationToken.None);
+                    return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Codex returned a malformed task terminal contract."), CancellationToken.None);
+                if (terminal.Status == "COMPLETED") return await FinishAsync(context, client, attempt, RunOutcome.Success(), CancellationToken.None);
+                if (terminal.Status == "BLOCKED") return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure(Bound(terminal.Summary)), CancellationToken.None);
+                if (terminal.Status == "RETRYABLE") return await FinishAsync(context, client, attempt, RunOutcome.RetryableFailure(Bound(terminal.Summary)), CancellationToken.None);
                 if (turnIndex + 1 == workflow.Options.Agent.MaxTurns)
-                    return await FinishAsync(workspace, client, attempt, RunOutcome.PermanentFailure("Codex exceeded the configured task turn limit."), CancellationToken.None);
+                    return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Codex exceeded the configured task turn limit."), CancellationToken.None);
                 prompt = "Continue the assigned task in the same workspace. " + AgentTerminalContract.Instruction;
             }
-            return await FinishAsync(workspace, client, attempt, RunOutcome.PermanentFailure("Codex exceeded the configured task turn limit."), CancellationToken.None);
+            return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Codex exceeded the configured task turn limit."), CancellationToken.None);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -96,28 +96,26 @@ public sealed class SupervisedCodexWorkExecutor(
 
         try { await client.DisposeAsync(); }
         catch (Exception exception) { return RunOutcome.PermanentFailure(Bound("Codex shutdown could not verify ownership release: " + exception.Message)); }
-        workspace = client.CurrentWorkspace ?? workspace;
-        if (quarantined || workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
-        return await PersistAsync(workspace, attempt, outcome, CancellationToken.None);
+        if (quarantined || context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
+        return await PersistAsync(context, attempt, outcome, CancellationToken.None);
     }
 
-    private async Task<RunOutcome> FinishAsync(Workspace workspace, ICodexAppServerClient client, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
+    private async Task<RunOutcome> FinishAsync(WorkspaceExecutionContext context, ICodexAppServerClient client, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
     {
         await client.DisposeAsync();
-        workspace = client.CurrentWorkspace ?? workspace;
-        if (workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
-        return await PersistAsync(workspace, attempt, outcome, cancellationToken);
+        if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
+        return await PersistAsync(context, attempt, outcome, cancellationToken);
     }
 
-    private async Task<RunOutcome> PersistAsync(Workspace workspace, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
+    private async Task<RunOutcome> PersistAsync(WorkspaceExecutionContext context, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
     {
         var recovery = outcome.Succeeded
             ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Completed, attempt.Attempt, attempt.Attempt + 1)
             : outcome.IsRetryable
                 ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.RetryableFailure, attempt.Attempt, attempt.Attempt + 1, Reason: outcome.FailureReason)
                 : new WorkspaceRecoveryState(WorkspaceRecoveryStates.Blocked, attempt.Attempt, attempt.Attempt + 1, Reason: outcome.FailureReason);
-        workspace = await workspaceManager.UpdateRecoveryStateAsync(workspace, recovery, cancellationToken);
-        await workspaceManager.UpdateLifecycleAsync(workspace, outcome.Succeeded ? WorkspaceLifecycleStates.Ready : outcome.IsRetryable ? WorkspaceLifecycleStates.RetryableFailure : WorkspaceLifecycleStates.Failed, cancellationToken);
+        await context.SetRecoveryAsync(recovery, cancellationToken);
+        await context.SetLifecycleAsync(outcome.Succeeded ? WorkspaceLifecycleStates.Ready : outcome.IsRetryable ? WorkspaceLifecycleStates.RetryableFailure : WorkspaceLifecycleStates.Failed, cancellationToken);
         telemetry?.Record("agent.task.completed", outcome.Succeeded ? OperatorEventSeverities.Information : OperatorEventSeverities.Warning,
             attempt.WorkItem.Id, "execution", message: outcome.Succeeded ? "Codex task completed." : outcome.FailureReason);
         return outcome;

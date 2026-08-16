@@ -34,8 +34,6 @@ public interface ICodexJsonRpcTransport : IAsyncDisposable
 
 public interface ICodexExecutionOwnership
 {
-    void AdoptWorkspace(Workspace workspace) { }
-    Workspace? CurrentWorkspace { get; }
     Task AcquireAsync(string launchNonce, CancellationToken cancellationToken);
     Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken);
@@ -44,7 +42,6 @@ public interface ICodexExecutionOwnership
 
 public sealed class NoopCodexExecutionOwnership : ICodexExecutionOwnership
 {
-    public Workspace? CurrentWorkspace => null;
     public Task AcquireAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -58,7 +55,6 @@ public sealed class CodexAppServerClient(
     TimeSpan idleTimeout,
     string workspacePath) : ICodexAppServerClient, IAsyncDisposable
 {
-    public void AdoptWorkspace(Workspace workspace) => ownership.AdoptWorkspace(workspace);
     private const int MaximumEarlyTurnResults = 64;
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> pending = [];
     private readonly object turnGate = new();
@@ -75,7 +71,6 @@ public sealed class CodexAppServerClient(
     private DateTimeOffset lastActivityUtc;
     private bool stopping;
 
-    public Workspace? CurrentWorkspace => ownership.CurrentWorkspace;
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
     public string? LastEventType { get; private set; }

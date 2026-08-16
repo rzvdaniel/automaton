@@ -42,8 +42,6 @@ public interface IWorkspaceManager
 }
 public interface ICodexAppServerClient : IAsyncDisposable
 {
-    void AdoptWorkspace(Workspace workspace) { }
-    Workspace? CurrentWorkspace { get; }
     CodexProcessIdentity? ProcessIdentity { get; }
     DateTimeOffset LastActivityUtc { get; }
     string? LastEventType => null;
@@ -60,6 +58,6 @@ public interface ICodexAppServerClient : IAsyncDisposable
 
 public interface ICodexAppServerClientFactory
 {
-    ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? childEnvironment = null);
+    ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? childEnvironment = null);
 }
 public interface IRunStateStore { }

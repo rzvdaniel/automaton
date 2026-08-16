@@ -5,13 +5,13 @@ using Automaton.AgentOrchestrator.Workflows;
 namespace Automaton.AgentOrchestrator.Codex;
 
 public sealed class CodexAppServerClientFactory(
-    IWorkspaceManager workspaceManager,
     OrchestratorOptions options,
     IClock clock,
     IExecutionFence executionFence) : ICodexAppServerClientFactory
 {
-    public ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? childEnvironment = null)
+    public ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? childEnvironment = null)
     {
+        var workspace = context.Workspace;
         var transport = new ProcessCodexJsonRpcTransport(new(
             options.Codex.Command,
             workspace.Path,
@@ -19,7 +19,7 @@ public sealed class CodexAppServerClientFactory(
             TimeSpan.FromSeconds(5)), executionFence);
         return new CodexAppServerClient(
             transport,
-            new WorkspaceCodexExecutionOwnership(workspaceManager, workspace),
+            new WorkspaceCodexExecutionOwnership(context),
             clock,
             TimeSpan.FromMilliseconds(options.Codex.TurnTimeoutMilliseconds),
             workspace.Path);
