@@ -66,9 +66,20 @@ public sealed class StartupReconciler(
                     decisions.Add(() => orchestrator.RestoreRetry(item!, record.Recovery.NextAttempt,
                         record.Recovery.RetryNotBeforeUtc, record.Recovery.Reason));
                     break;
-                case WorkspaceRecoveryStates.Working:
+                case WorkspaceRecoveryStates.Working when record.Workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None:
+                    // A validated live owner remains responsible for the active execution.
+                    break;
+                case WorkspaceRecoveryStates.Working when !eligible:
+                    decisions.Add(() => orchestrator.RestoreIneligible(record.WorkItemId, record.Recovery.NextAttempt,
+                        "work item is absent or no longer eligible"));
+                    break;
+                case WorkspaceRecoveryStates.Working when record.Recovery.NextAttempt > options.Retry.MaxAttempts:
                     decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
-                        Math.Max(record.Recovery.LastCompletedAttempt, 1), "prior execution ended without a durable outcome"));
+                        record.Recovery.LastCompletedAttempt, "retry attempts exhausted"));
+                    break;
+                case WorkspaceRecoveryStates.Working:
+                    decisions.Add(() => orchestrator.RestoreRetry(item!, record.Recovery.NextAttempt,
+                        record.Recovery.RetryNotBeforeUtc, record.Recovery.Reason ?? "prior execution ended without a durable outcome"));
                     break;
                 case WorkspaceRecoveryStates.Ineligible:
                     decisions.Add(() => orchestrator.RestoreIneligible(record.WorkItemId, record.Recovery.NextAttempt, record.Recovery.Reason));

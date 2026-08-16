@@ -11,7 +11,7 @@ namespace Automaton.AgentOrchestrator.Tests;
 public sealed class StartupReconcilerTests
 {
     [Test]
-    public async Task DeadOwnedExecutionIsReleasedAndAnIncompleteRunIsBlocked()
+    public async Task DeadOwnedExecutionIsReleasedAndAnIncompleteRunIsRetryable()
     {
         var record = Record(WorkspaceExecutionOwnershipStates.Active, WorkspaceRecoveryStates.Working,
             new DurableExecutionIdentity(42, DateTimeOffset.UtcNow, "nonce-a", ExecutionFencingKinds.WindowsJob));
@@ -23,7 +23,23 @@ public sealed class StartupReconcilerTests
         {
             Assert.That(fixture.Workspaces.OwnershipUpdates, Is.EqualTo(new[] { WorkspaceExecutionOwnershipStates.None }));
             Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
-            Assert.That(fixture.Orchestrator.Snapshot().Single().State, Is.EqualTo(RunStates.Blocked));
+            Assert.That(fixture.Orchestrator.Snapshot().First(x => x.State == RunStates.RetryQueued).State, Is.EqualTo(RunStates.RetryQueued));
+        });
+    }
+
+    [Test]
+    public async Task ReleasedIncompleteEligibleExecutionIsRetriedRegardlessOfWorkingRecoveryState()
+    {
+        var record = Record(WorkspaceExecutionOwnershipStates.None, WorkspaceRecoveryStates.Working, null);
+        var fixture = Create(record, ExecutionIdentityClassifications.Dead);
+
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.True);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Property(nameof(RunState.State)).EqualTo(RunStates.RetryQueued));
+            Assert.That(fixture.Orchestrator.Snapshot().First(x => x.State == RunStates.RetryQueued).FailureReason, Does.Contain("prior execution"));
         });
     }
 
