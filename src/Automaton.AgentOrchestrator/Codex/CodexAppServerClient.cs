@@ -160,16 +160,16 @@ public sealed class CodexAppServerClient(
                 var now = clock.UtcNow;
                 var totalRemaining = turnTimeout - (now - started);
                 var stallRemaining = stallTimeout - (now - lastActivityUtc);
-                if (stallRemaining <= TimeSpan.Zero) throw new CodexIdleTimeoutException();
-                if (totalRemaining <= TimeSpan.Zero) throw new CodexTurnTimeoutException();
+                if (stallRemaining <= TimeSpan.Zero) throw new CodexIdleTimeoutException(CreateTimeoutDiagnostic("stall", stallTimeout, started, now));
+                if (totalRemaining <= TimeSpan.Zero) throw new CodexTurnTimeoutException(CreateTimeoutDiagnostic("turn", turnTimeout, started, now));
                 var remaining = totalRemaining <= stallRemaining ? totalRemaining : stallRemaining;
                 var delay = clock.DelayAsync(remaining, cancellationToken);
                 if (await Task.WhenAny(completion.Task, delay) == completion.Task) return await completion.Task;
                 await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
                 now = clock.UtcNow;
-                if (now - lastActivityUtc >= stallTimeout) throw new CodexIdleTimeoutException();
-                if (now - started >= turnTimeout) throw new CodexTurnTimeoutException();
+                if (now - lastActivityUtc >= stallTimeout) throw new CodexIdleTimeoutException(CreateTimeoutDiagnostic("stall", stallTimeout, started, now));
+                if (now - started >= turnTimeout) throw new CodexTurnTimeoutException(CreateTimeoutDiagnostic("turn", turnTimeout, started, now));
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -182,8 +182,16 @@ public sealed class CodexAppServerClient(
             await InterruptTurnAsync(turn.ThreadId, turn.Id, CancellationToken.None);
             throw;
         }
+        catch (CodexTurnTimeoutException)
+        {
+            await InterruptTurnAsync(turn.ThreadId, turn.Id, CancellationToken.None);
+            throw;
+        }
         finally { lock (turnGate) { turns.Remove(turn.Id); turnStartedUtc.Remove(turn.Id); } }
     }
+
+    private CodexTimeoutDiagnostic CreateTimeoutDiagnostic(string kind, TimeSpan configuredTimeout, DateTimeOffset started, DateTimeOffset now)
+        => new(kind, configuredTimeout, now - started, now - lastActivityUtc, lastActivityUtc, LastEventType, transport.IsProcessAlive);
 
     public async Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken)
         => _ = await RequestAsync(CodexAppServerMethods.TurnInterrupt, new { threadId, turnId }, cancellationToken);
@@ -363,5 +371,19 @@ public sealed class CodexAppServerClient(
 
 public class CodexProtocolException(string message, Exception? inner = null) : Exception(message, inner);
 public sealed class CodexProcessExitedException() : CodexProtocolException("Codex App Server exited unexpectedly.");
-public sealed class CodexIdleTimeoutException() : TimeoutException("Codex App Server produced no protocol activity before the stall timeout.");
-public sealed class CodexTurnTimeoutException() : TimeoutException("Codex App Server turn exceeded the configured total timeout.");
+public sealed record CodexTimeoutDiagnostic(
+    string Kind,
+    TimeSpan ConfiguredTimeout,
+    TimeSpan TotalElapsed,
+    TimeSpan InactivityDuration,
+    DateTimeOffset LastActivityUtc,
+    string? LastEventType,
+    bool? ProcessAlive);
+public sealed class CodexIdleTimeoutException(CodexTimeoutDiagnostic? diagnostic = null) : TimeoutException("Codex App Server produced no protocol activity before the stall timeout.")
+{
+    public CodexTimeoutDiagnostic? Diagnostic { get; } = diagnostic;
+}
+public sealed class CodexTurnTimeoutException(CodexTimeoutDiagnostic? diagnostic = null) : TimeoutException("Codex App Server turn exceeded the configured total timeout.")
+{
+    public CodexTimeoutDiagnostic? Diagnostic { get; } = diagnostic;
+}
