@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Workflows;
 using NUnit.Framework;
 
@@ -21,7 +22,7 @@ public sealed class SupervisedCodexWorkExecutorTests
             Assert.That(outcome.Succeeded, Is.EqualTo(succeeded));
             Assert.That(outcome.IsRetryable, Is.EqualTo(retryable));
             Assert.That(fixture.Client.InitializeCount, Is.EqualTo(1));
-            Assert.That(fixture.Client.Workspace.Path, Is.EqualTo(fixture.Workspace.Path));
+            Assert.That(fixture.Factory.Context!.Workspace.Path, Is.EqualTo(fixture.Workspace.Path));
             Assert.That(fixture.Client.Prompt, Does.Contain("Acceptance task"));
             Assert.That(fixture.Client.Prompt, Does.Contain("WORKFLOW policy"));
             Assert.That(fixture.Workspaces.FinalWorkspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
@@ -49,7 +50,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.Multiple(() =>
         {
             Assert.That(fixture.Client.DisposeCount, Is.EqualTo(1));
-            Assert.That(fixture.Client.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
+            Assert.That(fixture.Factory.Context!.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
             Assert.That(fixture.Workspaces.LifecycleWrites, Is.EqualTo(0));
         });
     }
@@ -90,7 +91,7 @@ public sealed class SupervisedCodexWorkExecutorTests
     {
         var workspace = new Workspace("work-1", "C:\\work\\work-1", "automaton/work/work-1", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce-a", "acme/repo", new string('a', 40));
         var manager = new FakeWorkspaces(workspace);
-        var client = new FakeClient(workspace, status);
+        var client = new FakeClient(status);
         var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new() } });
         var factory = new FakeFactory(client);
         return new(new SupervisedCodexWorkExecutor(manager, factory, workflow), manager, client, workspace, factory);
@@ -101,41 +102,57 @@ public sealed class SupervisedCodexWorkExecutorTests
     private sealed class FakeFactory(FakeClient client) : ICodexAppServerClientFactory
     {
         public IReadOnlyDictionary<string, string> Environment { get; private set; } = new Dictionary<string, string>();
-        public ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? environment = null)
+        public WorkspaceExecutionContext? Context { get; private set; }
+        public ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? environment = null)
         {
             Environment = new Dictionary<string, string>(environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
-            client.Workspace = workspace;
+            Context = context;
+            client.Context = context;
             return client;
         }
     }
-    private sealed class FakeClient(Workspace workspace, string status) : ICodexAppServerClient
+    private sealed class FakeClient(string status) : ICodexAppServerClient
     {
-        public Workspace Workspace { get; set; } = workspace;
-        public Workspace? CurrentWorkspace => Workspace;
+        public WorkspaceExecutionContext? Context { get; set; }
         public int InitializeCount { get; private set; }
         public int DisposeCount { get; private set; }
         public string Prompt { get; private set; } = string.Empty;
         public Exception? Failure { get; set; }
         public CancellationTokenSource? CancelSource { get; set; }
         public CodexProcessIdentity? ProcessIdentity => null; public DateTimeOffset LastActivityUtc => DateTimeOffset.UtcNow; public IReadOnlyList<CodexSessionEvent> Events => [];
-        public Task InitializeAsync(CancellationToken token) { InitializeCount++; Workspace = Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active }; return Task.CompletedTask; }
+        public async Task InitializeAsync(CancellationToken token)
+        {
+            InitializeCount++;
+            await Context!.SetOwnershipAsync(WorkspaceExecutionOwnershipStates.Active, "nonce-active", token);
+        }
         public Task<CodexThread> StartThreadAsync(CancellationToken token) => Task.FromResult(new CodexThread("thread-1"));
         public Task<CodexThread> ResumeThreadAsync(string id, CancellationToken token) => throw new NotSupportedException();
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken token) { Prompt = prompt; return Task.FromResult(new CodexTurn("turn-1", threadId)); }
         public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (CancelSource is not null) { CancelSource.Cancel(); throw new OperationCanceledException(token); } if (Failure is not null) throw Failure; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}")); }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken token) => Task.CompletedTask;
-        public ValueTask DisposeAsync() { DisposeCount++; Workspace = Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None }; return ValueTask.CompletedTask; }
+        public async ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            await Context!.SetOwnershipAsync(WorkspaceExecutionOwnershipStates.None, Context.Workspace.LaunchNonce, CancellationToken.None);
+        }
     }
     private sealed class FakeWorkspaces(Workspace workspace) : IWorkspaceManager
     {
         public Workspace FinalWorkspace { get; private set; } = workspace;
         public int LifecycleWrites { get; private set; }
         public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken token) => Task.FromResult(FinalWorkspace);
-        public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState state, CancellationToken token) => Task.FromResult(FinalWorkspace = value);
-        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string state, CancellationToken token) { LifecycleWrites++; return Task.FromResult(FinalWorkspace = value with { LifecycleStatus = state }); }
-        public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string state, string nonce, CancellationToken token) => Task.FromResult(FinalWorkspace = value with { ExecutionOwnershipStatus = state, LaunchNonce = nonce });
-        public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken token) => Task.FromResult(value);
+        public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState state, CancellationToken token) => Task.FromResult(FinalWorkspace = RequireCurrent(value));
+        public Task<Workspace> UpdateLifecycleAsync(Workspace value, string state, CancellationToken token) { LifecycleWrites++; return Task.FromResult(FinalWorkspace = RequireCurrent(value) with { LifecycleStatus = state }); }
+        public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string state, string nonce, CancellationToken token) => Task.FromResult(FinalWorkspace = RequireCurrent(value) with { ExecutionOwnershipStatus = state, LaunchNonce = nonce });
+        public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken token) => Task.FromResult(RequireCurrent(value));
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken token) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace value, CancellationToken token) => Task.CompletedTask;
+
+        private Workspace RequireCurrent(Workspace value)
+        {
+            if (!string.Equals(value.LaunchNonce, FinalWorkspace.LaunchNonce, StringComparison.Ordinal))
+                throw new WorkspaceRecoveryException("Workspace does not match daemon-owned sidecar state.");
+            return value;
+        }
     }
 }

@@ -361,7 +361,8 @@ public sealed class CodexAppServerClientTests
     {
         var workspace = new Workspace("key", Path.GetTempPath(), "branch", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "reserved", "repo");
         var manager = new RecordingWorkspaceManager();
-        var lease = new WorkspaceCodexExecutionOwnership(manager, workspace);
+        var context = new WorkspaceExecutionContext(manager, workspace);
+        var lease = new WorkspaceCodexExecutionOwnership(context);
 
         await lease.AcquireAsync("run-nonce", CancellationToken.None);
         await lease.ReleaseAsync("run-nonce", CancellationToken.None);
@@ -371,6 +372,7 @@ public sealed class CodexAppServerClientTests
             (WorkspaceExecutionOwnershipStates.Active, "run-nonce"),
             (WorkspaceExecutionOwnershipStates.None, "run-nonce")
         }));
+        Assert.That(context.Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
     }
 
     private static void RespondNormally(ScriptedTransport transport, string message)
@@ -411,7 +413,6 @@ public sealed class CodexAppServerClientTests
 
     private sealed class RecordingOwnership : ICodexExecutionOwnership
     {
-        public Workspace? CurrentWorkspace => null;
         public string? AcquiredNonce { get; private set; }
         public string? ReleasedNonce { get; private set; }
         public string? QuarantinedNonce { get; private set; }
