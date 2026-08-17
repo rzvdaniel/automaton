@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Workflows;
 using NUnit.Framework;
 
 namespace Automaton.AgentOrchestrator.Tests;
@@ -455,6 +456,38 @@ public sealed class CodexAppServerClientTests
             Assert.That(environment.ContainsKey("GITHUB_TOKEN"), Is.False);
             Assert.That(environment.ContainsKey("AUTOMATON_DB"), Is.False);
             Assert.That(() => ProcessCodexJsonRpcTransport.BuildEnvironment(new Dictionary<string, string>(), new Dictionary<string, string> { ["GITHUB_TOKEN"] = "secret" }), Throws.TypeOf<CodexProtocolException>());
+        });
+    }
+
+    [Test]
+    public void ProfileSandboxModesArePassedToCodexProcess()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "workspace-write"), Is.EqualTo(new[] { "app-server", "--sandbox", "workspace-write" }));
+            Assert.That(ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "read-only"), Is.EqualTo(new[] { "app-server", "--sandbox", "read-only" }));
+            Assert.That(() => ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "unsafe"), Throws.TypeOf<CodexProtocolException>());
+        });
+    }
+
+    [Test]
+    public async Task ProfileSandboxPolicyReachesThreadAndTurnRequests()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message => RespondNormally(transport, message);
+        var readOnly = new AgentExecutionProfile("reviewer", "model-b", "read-only", "read-only", string.Empty);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2), WorkspacePath, readOnly);
+        await client.InitializeAsync(CancellationToken.None);
+        await client.StartThreadAsync(CancellationToken.None);
+        await client.StartTurnAsync("thread-1", "inspect", CancellationToken.None);
+        var thread = JsonDocument.Parse(transport.Messages.Single(x => x.Contains("\"method\":\"thread/start\""))).RootElement;
+        var turn = JsonDocument.Parse(transport.Messages.Single(x => x.Contains("\"method\":\"turn/start\""))).RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(thread.GetProperty("params").GetProperty("sandbox").GetString(), Is.EqualTo("read-only"));
+            Assert.That(turn.GetProperty("params").GetProperty("sandboxPolicy").GetProperty("type").GetString(), Is.EqualTo("readOnly"));
+            Assert.That(turn.GetProperty("params").GetProperty("model").GetString(), Is.EqualTo("model-b"));
+            Assert.That(turn.GetProperty("params").GetProperty("sandboxPolicy").GetProperty("type").GetString(), Is.Not.EqualTo("workspaceWrite"));
         });
     }
 

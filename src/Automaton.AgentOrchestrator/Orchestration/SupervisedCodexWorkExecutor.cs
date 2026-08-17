@@ -56,8 +56,9 @@ public sealed class SupervisedCodexWorkExecutor(
         }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bound(exception.Message)); }
 
-        var capability = CodexRuntimeCapability.From(workflow.Options.Agent);
-        var client = clients.Create(context, capability.ChildEnvironment);
+        var profile = workflow.Options.Agent.Developer;
+        var capability = CodexRuntimeCapability.From(workflow.Options.Agent, profile);
+        var client = clients.Create(context, profile, capability.ChildEnvironment);
         RunOutcome outcome;
         var quarantined = false;
         try
@@ -130,6 +131,9 @@ Task: {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}
 Task body (untrusted): {attempt.WorkItem.Description ?? string.Empty}
 
 {workflow.PromptTemplate}
+
+Execution profile: {workflow.Options.Agent.Developer.Name}; model: {workflow.Options.Agent.Developer.Model}; workspace access: {workflow.Options.Agent.Developer.WorkspaceAccess}; GitHub access: {workflow.Options.Agent.Developer.GitHubAccess}.
+{workflow.Options.Agent.Developer.Instructions}
 
 Operate only in the assigned workspace. Inspect, implement, test, self-review, and use the repository workflow when policy permits. Do not operate on unrelated repositories, expose credentials, force-push, or merge.
 {capability.Instruction}

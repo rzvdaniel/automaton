@@ -88,6 +88,27 @@ public sealed class SupervisedCodexWorkExecutorTests
     }
 
     [Test]
+    public async Task DeveloperProfileModelAndPermissionsReachGenericRuntime()
+    {
+        var fixture = Create("COMPLETED");
+        var profile = new AgentExecutionProfile("developer", "model-a", "read-write", "write", "developer instructions");
+        var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions
+        {
+            Repository = new() { Root = "C:\\repo", Identity = "acme/repo" },
+            Agent = new() { MaxTurns = 2, Developer = profile }
+        });
+        var executor = new SupervisedCodexWorkExecutor(fixture.Workspaces, fixture.Factory, workflow);
+        var outcome = await executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(fixture.Factory.Profile, Is.EqualTo(profile));
+            Assert.That(fixture.Client.Prompt, Does.Contain("model: model-a"));
+            Assert.That(fixture.Client.Prompt, Does.Contain("developer instructions"));
+        });
+    }
+
+    [Test]
     public async Task TurnTimeoutRecordsBoundedTelemetryAndRemainsRetryable()
     {
         var telemetry = new RecordingTelemetry();
@@ -157,12 +178,18 @@ public sealed class SupervisedCodexWorkExecutorTests
     {
         public IReadOnlyDictionary<string, string> Environment { get; private set; } = new Dictionary<string, string>();
         public WorkspaceExecutionContext? Context { get; private set; }
+        public AgentExecutionProfile? Profile { get; private set; }
         public ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? environment = null)
         {
             Environment = new Dictionary<string, string>(environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
             Context = context;
             client.Context = context;
             return client;
+        }
+        public ICodexAppServerClient Create(WorkspaceExecutionContext context, AgentExecutionProfile profile, IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Profile = profile;
+            return Create(context, environment);
         }
     }
     private sealed class FakeClient(string status) : ICodexAppServerClient
@@ -173,6 +200,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         public string Prompt { get; private set; } = string.Empty;
         public Exception? Failure { get; set; }
         public CancellationTokenSource? CancelSource { get; set; }
+        public AgentExecutionProfile? Profile { get; private set; }
         public CodexProcessIdentity? ProcessIdentity => null; public DateTimeOffset LastActivityUtc => DateTimeOffset.UtcNow; public IReadOnlyList<CodexSessionEvent> Events => [];
         public async Task InitializeAsync(CancellationToken token)
         {
@@ -182,6 +210,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         public Task<CodexThread> StartThreadAsync(CancellationToken token) => Task.FromResult(new CodexThread("thread-1"));
         public Task<CodexThread> ResumeThreadAsync(string id, CancellationToken token) => throw new NotSupportedException();
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken token) { Prompt = prompt; return Task.FromResult(new CodexTurn("turn-1", threadId)); }
+        public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, AgentExecutionProfile profile, CancellationToken token) { Profile = profile; return StartTurnAsync(threadId, prompt, token); }
         public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (CancelSource is not null) { CancelSource.Cancel(); throw new OperationCanceledException(token); } if (Failure is not null) throw Failure; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}")); }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken token) => Task.CompletedTask;
         public async ValueTask DisposeAsync()
