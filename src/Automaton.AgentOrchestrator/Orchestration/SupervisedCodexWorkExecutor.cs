@@ -150,6 +150,8 @@ public sealed class SupervisedCodexWorkExecutor(
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a malformed review result."), cancellationToken);
                 if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
                 await reviewer.DisposeAsync();
+                if (review.Verdict == "BLOCKED")
+                    return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);
                 if (round == workflow.Options.Agent.Review.MaxRounds)
                     return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);
                 var remediation = await RemediateAsync(context, attempt, review.Summary, cancellationToken);
@@ -176,7 +178,11 @@ public sealed class SupervisedCodexWorkExecutor(
             if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !AgentTerminalContract.TryParse(result.FinalResponse, out var terminal))
                 return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Developer remediation returned a malformed task result."), cancellationToken);
             var outcome = terminal.Status == "COMPLETED" ? RunOutcome.Success() : terminal.Status == "RETRYABLE" ? RunOutcome.RetryableFailure(Bound(terminal.Summary)) : RunOutcome.PermanentFailure(Bound(terminal.Summary));
-            return await FinishAsync(context, client, attempt, outcome, cancellationToken);
+            await client.DisposeAsync();
+            if (outcome.Succeeded && context.Workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.Quarantined)
+                return outcome;
+            if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
+            return await PersistAsync(context, attempt, outcome, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         { return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
