@@ -77,6 +77,7 @@ public sealed class SupervisedCodexWorkExecutorTests
             Assert.That(fixture.Factory.Environment, Is.EqualTo(new Dictionary<string, string> { ["GH_TOKEN"] = "test-agent-token" }));
             Assert.That(fixture.Client.Prompt, Does.Contain("commit the completed change"));
             Assert.That(fixture.Client.Prompt, Does.Contain("create or update one draft pull request"));
+            Assert.That(fixture.Client.Prompt, Does.Contain("authenticated `gh` CLI"));
             Assert.That(fixture.Client.Prompt, Does.Contain("Never merge or approve"));
             Assert.That(fixture.Client.Prompt, Does.Not.Contain("test-agent-token"));
         });

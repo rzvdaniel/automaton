@@ -14,6 +14,7 @@ public sealed record CodexRuntimeCapability(
 {
     private const string RepositoryWorkflowInstruction = """
 Repository workflow capability is enabled for this task. Use the assigned branch only: commit the completed change, push that branch, and create or update one draft pull request targeting the configured base branch. Inspect checks and actionable review feedback for that draft pull request, and address it when the assigned task requires it. Never merge or approve a pull request, force-push, change the remote or base branch, or reveal credentials.
+Use the authenticated `gh` CLI with the provided GH_TOKEN for issue and pull-request operations; draft pull-request creation and updates are authorized, while merge and approval are not.
 """;
 
     private const string NoRepositoryWorkflowInstruction = "Repository workflow capability is not enabled; do not attempt to publish or merge changes.";
