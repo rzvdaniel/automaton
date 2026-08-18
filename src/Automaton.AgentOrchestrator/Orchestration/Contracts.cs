@@ -1,4 +1,5 @@
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Workflows;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -58,5 +59,7 @@ public interface ICodexAppServerClient : IAsyncDisposable
 public interface ICodexAppServerClientFactory
 {
     ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? childEnvironment = null);
+    ICodexAppServerClient Create(WorkspaceExecutionContext context, AgentExecutionProfile profile, IReadOnlyDictionary<string, string>? childEnvironment = null)
+        => Create(context, childEnvironment);
 }
 public interface IRunStateStore { }
