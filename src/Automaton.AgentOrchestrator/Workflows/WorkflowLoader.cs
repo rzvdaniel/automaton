@@ -103,7 +103,10 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 {
                     Enabled = BooleanValue(Section(Section(root, "agent"), "github").GetValueOrDefault("enabled"), "agent.github.enabled", false),
                     Token = ResolveOptionalSecret(Section(Section(root, "agent"), "github").GetValueOrDefault("token"), "agent.github.token")
-                }
+                },
+                Developer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("developer"), "developer")
+                ,Reviewer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("reviewer"), "reviewer")
+                ,Review = new AgentReviewOptions { Enabled = BooleanValue(Section(root, "review").GetValueOrDefault("enabled"), "review.enabled", false) }
             },
             Codex = new CodexOptions
             {
@@ -125,6 +128,21 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 MaximumEventFileBytes = PositiveInt(Section(root, "observability").GetValueOrDefault("maximum_event_file_bytes"), "observability.maximum_event_file_bytes", 5 * 1024 * 1024)
             }
         };
+    }
+
+    private static AgentExecutionProfile Profile(object? value, string name)
+    {
+        if (value is null) return AgentExecutionProfile.DefaultDeveloper;
+        if (value is not IReadOnlyDictionary<string, object?> section) throw new WorkflowValidationException($"agent.profiles.{name} must be a mapping.");
+        var profile = new AgentExecutionProfile(
+            StringValue(section.GetValueOrDefault("name"), $"agent.profiles.{name}.name", required: false) ?? name,
+            StringValue(section.GetValueOrDefault("model"), $"agent.profiles.{name}.model", required: false) ?? string.Empty,
+            StringValue(section.GetValueOrDefault("workspace_access"), $"agent.profiles.{name}.workspace_access", required: false) ?? "read-write",
+            StringValue(section.GetValueOrDefault("github"), $"agent.profiles.{name}.github", required: false) ?? "write",
+            StringValue(section.GetValueOrDefault("instructions"), $"agent.profiles.{name}.instructions", required: false) ?? string.Empty);
+        if (profile.WorkspaceAccess is not ("read-write" or "read-only")) throw new WorkflowValidationException($"agent.profiles.{name}.workspace_access must be read-write or read-only.");
+        if (profile.GitHubAccess is not ("write" or "read-only" or "none")) throw new WorkflowValidationException($"agent.profiles.{name}.github must be write, read-only, or none.");
+        return profile;
     }
 
     private static IReadOnlyDictionary<string, object?> Section(IReadOnlyDictionary<string, object?> root, string key)

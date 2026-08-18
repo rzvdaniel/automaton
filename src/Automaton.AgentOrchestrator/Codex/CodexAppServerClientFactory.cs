@@ -10,19 +10,24 @@ public sealed class CodexAppServerClientFactory(
     IExecutionFence executionFence) : ICodexAppServerClientFactory
 {
     public ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? childEnvironment = null)
+        => Create(context, AgentExecutionProfile.DefaultDeveloper, childEnvironment);
+
+    public ICodexAppServerClient Create(WorkspaceExecutionContext context, AgentExecutionProfile profile, IReadOnlyDictionary<string, string>? childEnvironment = null)
     {
         var workspace = context.Workspace;
         var transport = new ProcessCodexJsonRpcTransport(new(
             options.Codex.Command,
             workspace.Path,
             childEnvironment,
-            TimeSpan.FromSeconds(5)), executionFence);
+            TimeSpan.FromSeconds(5),
+            SandboxMode: string.Equals(profile.WorkspaceAccess, "read-only", StringComparison.OrdinalIgnoreCase) ? "read-only" : "workspace-write"), executionFence);
         return new CodexAppServerClient(
             transport,
             new WorkspaceCodexExecutionOwnership(context),
             clock,
             TimeSpan.FromMilliseconds(options.Codex.TurnTimeoutMilliseconds),
             TimeSpan.FromMilliseconds(options.Codex.StallTimeoutMilliseconds),
-            workspace.Path);
+            workspace.Path,
+            profile);
     }
 }

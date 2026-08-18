@@ -10,7 +10,8 @@ public sealed record CodexProcessOptions(
     string WorkingDirectory,
     IReadOnlyDictionary<string, string>? Environment = null,
     TimeSpan? ShutdownTimeout = null,
-    string? LaunchNonce = null);
+    string? LaunchNonce = null,
+    string SandboxMode = "workspace-write");
 
 public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IExecutionFence? executionFence = null) : ICodexJsonRpcTransport
 {
@@ -38,12 +39,14 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
         }
     }
     internal IReadOnlyDictionary<string, string>? StartedEnvironment { get; private set; }
+    internal IReadOnlyList<string>? StartedArguments { get; private set; }
     internal string StderrTail => stderrTail;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (process is not null) throw new InvalidOperationException("Codex App Server process is already started.");
-        var (fileName, arguments) = ParseCommand(options.Command);
+        var (fileName, _) = ParseCommand(options.Command);
+        var launchArguments = BuildArguments(options.Command, options.SandboxMode);
         var startInfo = new ProcessStartInfo(fileName)
         {
             WorkingDirectory = Path.GetFullPath(options.WorkingDirectory),
@@ -53,7 +56,8 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
             RedirectStandardError = true,
             CreateNoWindow = true
         };
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var argument in launchArguments) startInfo.ArgumentList.Add(argument);
+        StartedArguments = launchArguments;
         startInfo.Environment.Clear();
         var hostEnvironment = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
             .ToDictionary(entry => (string)entry.Key, entry => Convert.ToString(entry.Value) ?? string.Empty, StringComparer.OrdinalIgnoreCase);
@@ -148,6 +152,12 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
         if (current.Length > 0) tokens.Add(current.ToString());
         if (tokens.Count == 0) throw new CodexProtocolException("codex.command must not be empty.");
         return (tokens[0], tokens.Skip(1).ToArray());
+    }
+
+    internal static IReadOnlyList<string> BuildArguments(string command, string sandboxMode)
+    {
+        if (sandboxMode is not ("workspace-write" or "read-only")) throw new CodexProtocolException("Unsupported Codex sandbox mode.");
+        return ParseCommand(command).Arguments.Concat(new[] { "--sandbox", sandboxMode }).ToArray();
     }
 
     internal static IReadOnlyDictionary<string, string> BuildEnvironment(

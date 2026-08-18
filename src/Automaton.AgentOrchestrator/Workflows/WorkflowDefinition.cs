@@ -36,6 +36,17 @@ public sealed class AgentExecutionOptions
     public int MaxConcurrentAgents { get; init; } = 1;
     public int MaxTurns { get; init; } = 1;
     public AgentGitHubOptions GitHub { get; init; } = new();
+    public AgentExecutionProfile Developer { get; init; } = AgentExecutionProfile.DefaultDeveloper;
+    public AgentExecutionProfile Reviewer { get; init; } = new("reviewer", string.Empty, "read-only", "read-only", string.Empty);
+    public AgentReviewOptions Review { get; init; } = new();
+}
+public sealed class AgentReviewOptions
+{
+    public bool Enabled { get; init; }
+}
+public sealed record AgentExecutionProfile(string Name, string Model, string WorkspaceAccess, string GitHubAccess, string Instructions)
+{
+    public static AgentExecutionProfile DefaultDeveloper { get; } = new("developer", string.Empty, "read-write", "write", string.Empty);
 }
 public sealed class AgentGitHubOptions
 {

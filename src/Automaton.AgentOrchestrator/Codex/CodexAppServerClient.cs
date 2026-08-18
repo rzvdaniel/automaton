@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Workflows;
 
 namespace Automaton.AgentOrchestrator.Codex;
 
@@ -58,7 +59,8 @@ public sealed class CodexAppServerClient(
     IClock clock,
     TimeSpan turnTimeout,
     TimeSpan stallTimeout,
-    string workspacePath) : ICodexAppServerClient, IAsyncDisposable
+    string workspacePath,
+    AgentExecutionProfile? profile = null) : ICodexAppServerClient, IAsyncDisposable
 {
     public CodexAppServerClient(ICodexJsonRpcTransport transport, ICodexExecutionOwnership ownership, IClock clock, TimeSpan timeout, string workspacePath)
         : this(transport, ownership, clock, timeout, timeout, workspacePath) { }
@@ -114,7 +116,7 @@ public sealed class CodexAppServerClient(
 
     public async Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken)
     {
-        var result = await RequestAsync(CodexAppServerMethods.ThreadStart, new { cwd = workspacePath }, cancellationToken);
+        var result = await RequestAsync(CodexAppServerMethods.ThreadStart, new { cwd = workspacePath, sandbox = SandboxMode(profile ?? AgentExecutionProfile.DefaultDeveloper) }, cancellationToken);
         var id = RequiredNestedId(result, "thread");
         ValidateResponseWorkspace(result, "thread/start");
         Touch(CodexSessionEventKinds.ThreadStarted, id);
@@ -133,7 +135,8 @@ public sealed class CodexAppServerClient(
     public async Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken cancellationToken)
     {
         var input = new[] { new { type = "text", text = prompt, text_elements = Array.Empty<object>() } };
-        var result = await RequestAsync(CodexAppServerMethods.TurnStart, new { threadId, input }, cancellationToken);
+        var selectedProfile = profile ?? AgentExecutionProfile.DefaultDeveloper;
+        var result = await RequestAsync(CodexAppServerMethods.TurnStart, new { threadId, input, model = string.IsNullOrWhiteSpace(selectedProfile.Model) ? null : selectedProfile.Model, sandboxPolicy = SandboxPolicy(selectedProfile) }, cancellationToken);
         var id = RequiredNestedId(result, "turn");
         lock (turnGate)
         {
@@ -149,6 +152,14 @@ public sealed class CodexAppServerClient(
         Touch(CodexSessionEventKinds.TurnStarted, threadId, id);
         return new(id, threadId);
     }
+
+    private static string SandboxMode(AgentExecutionProfile profile)
+        => profile.WorkspaceAccess == "read-only" ? "read-only" : "workspace-write";
+
+    private static object SandboxPolicy(AgentExecutionProfile profile)
+        => profile.WorkspaceAccess == "read-only"
+            ? new { type = "readOnly", networkAccess = false }
+            : new { type = "workspaceWrite", networkAccess = false, writableRoots = Array.Empty<string>() };
 
     public async Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken)
     {

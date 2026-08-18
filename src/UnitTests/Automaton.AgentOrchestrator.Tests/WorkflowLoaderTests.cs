@@ -36,6 +36,21 @@ public sealed class WorkflowLoaderTests
                   github:
                     enabled: true
                     token: $AUTOMATON_ORCHESTRATOR_AGENT_TOKEN
+                  profiles:
+                    developer:
+                      name: developer
+                      model: model-a
+                      workspace_access: read-write
+                      github: write
+                      instructions: Use the developer profile.
+                    reviewer:
+                      name: reviewer
+                      model: model-b
+                      workspace_access: read-only
+                      github: read-only
+                      instructions: Review without modifying.
+                review:
+                  enabled: true
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -71,6 +86,9 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
                 Assert.That(definition.Options.Agent.GitHub.Enabled, Is.True);
                 Assert.That(definition.Options.Agent.GitHub.Token, Is.EqualTo("agent-value"));
+                Assert.That(definition.Options.Agent.Developer, Is.EqualTo(new AgentExecutionProfile("developer", "model-a", "read-write", "write", "Use the developer profile.")));
+                Assert.That(definition.Options.Agent.Reviewer, Is.EqualTo(new AgentExecutionProfile("reviewer", "model-b", "read-only", "read-only", "Review without modifying.")));
+                Assert.That(definition.Options.Agent.Review.Enabled, Is.True);
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
@@ -241,6 +259,28 @@ public sealed class WorkflowLoaderTests
             await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
 
         Assert.That(exception!.Message, Is.EqualTo("repository.root must reference an existing directory."));
+    }
+
+    [TestCase("banana", "read-write", "agent.profiles.developer.workspace_access must be read-write or read-only.")]
+    [TestCase("read-only", "arbitrary", "agent.profiles.developer.github must be write, read-only, or none.")]
+    public async Task LoadAsync_RejectsInvalidProfileValues(string workspaceAccess, string github, string message)
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync($"""
+            ---
+            tracker:
+              kind: fake
+            repository:
+              root: .
+            agent:
+              profiles:
+                developer:
+                  workspace_access: {workspaceAccess}
+                  github: {github}
+            ---
+            Prompt
+            """);
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(async () => await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+        Assert.That(exception!.Message, Is.EqualTo(message));
     }
 
     private sealed class TemporaryWorkflow : IAsyncDisposable
