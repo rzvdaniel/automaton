@@ -460,13 +460,11 @@ public sealed class CodexAppServerClientTests
     }
 
     [Test]
-    public void ProfileSandboxModesArePassedToCodexProcess()
+    public void AppServerProcessDoesNotReceiveUnsupportedProcessSandboxArgument()
     {
         Assert.Multiple(() =>
         {
-            Assert.That(ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "workspace-write"), Is.EqualTo(new[] { "app-server", "--sandbox", "workspace-write" }));
-            Assert.That(ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "read-only"), Is.EqualTo(new[] { "app-server", "--sandbox", "read-only" }));
-            Assert.That(() => ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server", "unsafe"), Throws.TypeOf<CodexProtocolException>());
+            Assert.That(ProcessCodexJsonRpcTransport.BuildArguments("codex.cmd app-server"), Is.EqualTo(new[] { "app-server" }));
         });
     }
 

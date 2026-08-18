@@ -19,8 +19,7 @@ public sealed class CodexAppServerClientFactory(
             options.Codex.Command,
             workspace.Path,
             childEnvironment,
-            TimeSpan.FromSeconds(5),
-            SandboxMode: string.Equals(profile.WorkspaceAccess, "read-only", StringComparison.OrdinalIgnoreCase) ? "read-only" : "workspace-write"), executionFence);
+            TimeSpan.FromSeconds(5)), executionFence);
         return new CodexAppServerClient(
             transport,
             new WorkspaceCodexExecutionOwnership(context),
