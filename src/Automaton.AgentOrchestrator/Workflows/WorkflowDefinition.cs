@@ -43,6 +43,7 @@ public sealed class AgentExecutionOptions
 public sealed class AgentReviewOptions
 {
     public bool Enabled { get; init; }
+    public int MaxRounds { get; init; } = 2;
 }
 public sealed record AgentExecutionProfile(string Name, string Model, string WorkspaceAccess, string GitHubAccess, string Instructions)
 {

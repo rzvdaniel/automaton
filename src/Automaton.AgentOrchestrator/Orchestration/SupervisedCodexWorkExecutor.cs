@@ -136,23 +136,50 @@ public sealed class SupervisedCodexWorkExecutor(
 
     private async Task<RunOutcome> ReviewAsync(WorkspaceExecutionContext context, RunAttempt attempt, RunOutcome developerOutcome, CancellationToken cancellationToken)
     {
-        var profile = workflow.Options.Agent.Reviewer;
+        for (var round = 1; round <= workflow.Options.Agent.Review.MaxRounds; round++)
+        {
+            var reviewer = clients.Create(context, workflow.Options.Agent.Reviewer, CodexRuntimeCapability.From(workflow.Options.Agent, workflow.Options.Agent.Reviewer).ChildEnvironment);
+            try
+            {
+                await reviewer.InitializeAsync(cancellationToken);
+                var thread = await reviewer.StartThreadAsync(cancellationToken);
+                var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{CodexRuntimeCapability.From(workflow.Options.Agent, workflow.Options.Agent.Reviewer).Instruction}\n{ReviewTerminalContract.Instruction}""";
+                var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
+                var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
+                if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review))
+                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a malformed review result."), cancellationToken);
+                if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
+                await reviewer.DisposeAsync();
+                if (round == workflow.Options.Agent.Review.MaxRounds)
+                    return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);
+                var remediation = await RemediateAsync(context, attempt, review.Summary, cancellationToken);
+                if (!remediation.Succeeded) return remediation;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { try { await reviewer.DisposeAsync(); } catch { } throw; }
+            catch (Exception exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
+        }
+        return developerOutcome;
+    }
+
+    private async Task<RunOutcome> RemediateAsync(WorkspaceExecutionContext context, RunAttempt attempt, string findings, CancellationToken cancellationToken)
+    {
+        var profile = workflow.Options.Agent.Developer;
         var capability = CodexRuntimeCapability.From(workflow.Options.Agent, profile);
-        var reviewer = clients.Create(context, profile, capability.ChildEnvironment);
+        var client = clients.Create(context, profile, capability.ChildEnvironment);
         try
         {
-            await reviewer.InitializeAsync(cancellationToken);
-            var thread = await reviewer.StartThreadAsync(cancellationToken);
-            var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{capability.Instruction}\n{ReviewTerminalContract.Instruction}""";
-            var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
-            var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
-            if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review))
-                return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a malformed review result."), cancellationToken);
-            var outcome = review.Verdict == "APPROVED" ? developerOutcome : RunOutcome.PermanentFailure(Bound(review.Summary));
-            return await FinishReviewAsync(context, reviewer, attempt, outcome, cancellationToken);
+            await client.InitializeAsync(cancellationToken);
+            var thread = await client.StartThreadAsync(cancellationToken);
+            var prompt = $"Continue the assigned task in the same workspace. Address these independent reviewer findings, run focused tests, and update the existing branch/PR without merging: {Bound(findings)}\n{profile.Instructions}\n{AgentTerminalContract.Instruction}";
+            var turn = await client.StartTurnAsync(thread.Id, prompt, cancellationToken);
+            var result = await client.WaitForTurnCompletionAsync(turn, cancellationToken);
+            if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !AgentTerminalContract.TryParse(result.FinalResponse, out var terminal))
+                return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Developer remediation returned a malformed task result."), cancellationToken);
+            var outcome = terminal.Status == "COMPLETED" ? RunOutcome.Success() : terminal.Status == "RETRYABLE" ? RunOutcome.RetryableFailure(Bound(terminal.Summary)) : RunOutcome.PermanentFailure(Bound(terminal.Summary));
+            return await FinishAsync(context, client, attempt, outcome, cancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { try { await reviewer.DisposeAsync(); } catch { } throw; }
-        catch (Exception exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
     }
 
     private async Task<RunOutcome> FinishReviewAsync(WorkspaceExecutionContext context, ICodexAppServerClient reviewer, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)

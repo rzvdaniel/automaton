@@ -106,7 +106,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 },
                 Developer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("developer"), "developer")
                 ,Reviewer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("reviewer"), "reviewer")
-                ,Review = new AgentReviewOptions { Enabled = BooleanValue(Section(root, "review").GetValueOrDefault("enabled"), "review.enabled", false) }
+                ,Review = new AgentReviewOptions { Enabled = BooleanValue(Section(root, "review").GetValueOrDefault("enabled"), "review.enabled", false), MaxRounds = PositiveInt(Section(root, "review").GetValueOrDefault("max_rounds"), "review.max_rounds", 2) }
             },
             Codex = new CodexOptions
             {
