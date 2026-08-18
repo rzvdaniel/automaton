@@ -105,6 +105,8 @@ public sealed class WorkflowLoader : IWorkflowLoader
                     Token = ResolveOptionalSecret(Section(Section(root, "agent"), "github").GetValueOrDefault("token"), "agent.github.token")
                 },
                 Developer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("developer"), "developer")
+                ,Reviewer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("reviewer"), "reviewer")
+                ,Review = new AgentReviewOptions { Enabled = BooleanValue(Section(root, "review").GetValueOrDefault("enabled"), "review.enabled", false) }
             },
             Codex = new CodexOptions
             {
@@ -130,7 +132,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
 
     private static AgentExecutionProfile Profile(object? value, string name)
     {
-        if (value is null) return AgentExecutionProfile.DefaultDeveloper;
+        if (value is null) return name.Equals("reviewer", StringComparison.OrdinalIgnoreCase) ? AgentExecutionProfile.DefaultReviewer : AgentExecutionProfile.DefaultDeveloper;
         if (value is not IReadOnlyDictionary<string, object?> section) throw new WorkflowValidationException($"agent.profiles.{name} must be a mapping.");
         var profile = new AgentExecutionProfile(
             StringValue(section.GetValueOrDefault("name"), $"agent.profiles.{name}.name", required: false) ?? name,

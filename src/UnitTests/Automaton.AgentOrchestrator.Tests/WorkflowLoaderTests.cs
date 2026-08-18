@@ -43,6 +43,14 @@ public sealed class WorkflowLoaderTests
                       workspace_access: read-write
                       github: write
                       instructions: Use the developer profile.
+                    reviewer:
+                      name: reviewer
+                      model: model-b
+                      workspace_access: read-only
+                      github: read-only
+                      instructions: Review without modifying.
+                review:
+                  enabled: true
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -79,6 +87,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.GitHub.Enabled, Is.True);
                 Assert.That(definition.Options.Agent.GitHub.Token, Is.EqualTo("agent-value"));
                 Assert.That(definition.Options.Agent.Developer, Is.EqualTo(new AgentExecutionProfile("developer", "model-a", "read-write", "write", "Use the developer profile.")));
+                Assert.That(definition.Options.Agent.Reviewer, Is.EqualTo(new AgentExecutionProfile("reviewer", "model-b", "read-only", "read-only", "Review without modifying.")));
+                Assert.That(definition.Options.Agent.Review.Enabled, Is.True);
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
@@ -271,6 +281,33 @@ public sealed class WorkflowLoaderTests
             """);
         var exception = Assert.ThrowsAsync<WorkflowValidationException>(async () => await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
         Assert.That(exception!.Message, Is.EqualTo(message));
+    }
+
+    [Test]
+    public async Task LoadAsync_UsesSafeRoleSpecificDefaultsWhenProfilesAreOmitted()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            repository:
+              root: .
+            workspace:
+              root: workspaces
+            review:
+              enabled: true
+            ---
+            Prompt
+            """);
+        var options = (await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None)).Options;
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.Agent.Developer, Is.EqualTo(AgentExecutionProfile.DefaultDeveloper));
+            Assert.That(options.Agent.Reviewer, Is.EqualTo(AgentExecutionProfile.DefaultReviewer));
+            Assert.That(options.Agent.Review.Enabled, Is.True);
+            Assert.That(options.Agent.Reviewer.WorkspaceAccess, Is.EqualTo("read-only"));
+            Assert.That(options.Agent.Reviewer.GitHubAccess, Is.EqualTo("read-only"));
+        });
     }
 
     private sealed class TemporaryWorkflow : IAsyncDisposable

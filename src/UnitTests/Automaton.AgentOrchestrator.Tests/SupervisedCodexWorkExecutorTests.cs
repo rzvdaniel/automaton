@@ -10,6 +10,15 @@ namespace Automaton.AgentOrchestrator.Tests;
 [TestFixture]
 public sealed class SupervisedCodexWorkExecutorTests
 {
+    [TestCase("APPROVED")]
+    [TestCase("CHANGES_REQUIRED")]
+    [TestCase("BLOCKED")]
+    public void ReviewContractIsStrictAndBounded(string verdict)
+    {
+        var response = $"REVIEW_RESULT: {{\"verdict\":\"{verdict}\",\"summary\":\"summary\"}}";
+        Assert.That(ReviewTerminalContract.TryParse(response, out _), Is.True);
+        Assert.That(ReviewTerminalContract.TryParse("REVIEW_RESULT: APPROVED", out _), Is.False);
+    }
     [TestCase("COMPLETED", true, false)]
     [TestCase("BLOCKED", false, false)]
     [TestCase("RETRYABLE", false, true)]
