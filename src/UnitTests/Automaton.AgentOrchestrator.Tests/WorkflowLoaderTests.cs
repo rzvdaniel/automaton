@@ -43,6 +43,14 @@ public sealed class WorkflowLoaderTests
                       workspace_access: read-write
                       github: write
                       instructions: Use the developer profile.
+                    reviewer:
+                      name: reviewer
+                      model: model-b
+                      workspace_access: read-only
+                      github: read-only
+                      instructions: Review without modifying.
+                review:
+                  enabled: true
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -79,6 +87,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.GitHub.Enabled, Is.True);
                 Assert.That(definition.Options.Agent.GitHub.Token, Is.EqualTo("agent-value"));
                 Assert.That(definition.Options.Agent.Developer, Is.EqualTo(new AgentExecutionProfile("developer", "model-a", "read-write", "write", "Use the developer profile.")));
+                Assert.That(definition.Options.Agent.Reviewer, Is.EqualTo(new AgentExecutionProfile("reviewer", "model-b", "read-only", "read-only", "Review without modifying.")));
+                Assert.That(definition.Options.Agent.Review.Enabled, Is.True);
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));

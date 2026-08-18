@@ -105,6 +105,8 @@ public sealed class WorkflowLoader : IWorkflowLoader
                     Token = ResolveOptionalSecret(Section(Section(root, "agent"), "github").GetValueOrDefault("token"), "agent.github.token")
                 },
                 Developer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("developer"), "developer")
+                ,Reviewer = Profile(Section(Section(root, "agent"), "profiles").GetValueOrDefault("reviewer"), "reviewer")
+                ,Review = new AgentReviewOptions { Enabled = BooleanValue(Section(root, "review").GetValueOrDefault("enabled"), "review.enabled", false) }
             },
             Codex = new CodexOptions
             {

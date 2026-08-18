@@ -38,6 +38,32 @@ public static class AgentTerminalContract
     }
 }
 
+public sealed record ReviewTerminalResult(string Verdict, string Summary);
+public static class ReviewTerminalContract
+{
+    public const string Instruction = "End with exactly one terminal line: REVIEW_RESULT: {\"verdict\":\"APPROVED|CHANGES_REQUIRED|BLOCKED\",\"summary\":\"bounded text\"}";
+    public static bool TryParse(string? response, out ReviewTerminalResult result)
+    {
+        result = new(string.Empty, string.Empty);
+        if (string.IsNullOrWhiteSpace(response) || response.Length > 16_384) return false;
+        var line = response.TrimEnd().Split('\n').Last().TrimEnd('\r');
+        const string prefix = "REVIEW_RESULT: ";
+        if (!line.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(line[prefix.Length..]);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("verdict", out var verdict) || !root.TryGetProperty("summary", out var summary)
+                || verdict.ValueKind != JsonValueKind.String || summary.ValueKind != JsonValueKind.String) return false;
+            var value = verdict.GetString() ?? string.Empty;
+            var text = summary.GetString() ?? string.Empty;
+            if (text.Length > 512 || value is not ("APPROVED" or "CHANGES_REQUIRED" or "BLOCKED")) return false;
+            result = new(value, text); return true;
+        }
+        catch (JsonException) { return false; }
+    }
+}
+
 public sealed class SupervisedCodexWorkExecutor(
     IWorkspaceManager workspaceManager,
     ICodexAppServerClientFactory clients,
@@ -74,7 +100,13 @@ public sealed class SupervisedCodexWorkExecutor(
                     throw new InvalidOperationException(Bound(result.FailureReason ?? "Codex task turn did not complete."));
                 if (!AgentTerminalContract.TryParse(result.FinalResponse, out var terminal))
                     return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Codex returned a malformed task terminal contract."), CancellationToken.None);
-                if (terminal.Status == "COMPLETED") return await FinishAsync(context, client, attempt, RunOutcome.Success(), CancellationToken.None);
+                if (terminal.Status == "COMPLETED")
+                {
+                    await client.DisposeAsync();
+                    if (workflow.Options.Agent.Review.Enabled)
+                        return await ReviewAsync(context, attempt, RunOutcome.Success(), CancellationToken.None);
+                    return await PersistAsync(context, attempt, RunOutcome.Success(), CancellationToken.None);
+                }
                 if (terminal.Status == "BLOCKED") return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure(Bound(terminal.Summary)), CancellationToken.None);
                 if (terminal.Status == "RETRYABLE") return await FinishAsync(context, client, attempt, RunOutcome.RetryableFailure(Bound(terminal.Summary)), CancellationToken.None);
                 if (turnIndex + 1 == workflow.Options.Agent.MaxTurns)
@@ -100,6 +132,34 @@ public sealed class SupervisedCodexWorkExecutor(
         catch (Exception exception) { return RunOutcome.PermanentFailure(Bound("Codex shutdown could not verify ownership release: " + exception.Message)); }
         if (quarantined || context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
         return await PersistAsync(context, attempt, outcome, CancellationToken.None);
+    }
+
+    private async Task<RunOutcome> ReviewAsync(WorkspaceExecutionContext context, RunAttempt attempt, RunOutcome developerOutcome, CancellationToken cancellationToken)
+    {
+        var profile = workflow.Options.Agent.Reviewer;
+        var capability = CodexRuntimeCapability.From(workflow.Options.Agent, profile);
+        var reviewer = clients.Create(context, profile, capability.ChildEnvironment);
+        try
+        {
+            await reviewer.InitializeAsync(cancellationToken);
+            var thread = await reviewer.StartThreadAsync(cancellationToken);
+            var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{capability.Instruction}\n{ReviewTerminalContract.Instruction}""";
+            var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
+            var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
+            if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review))
+                return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a malformed review result."), cancellationToken);
+            var outcome = review.Verdict == "APPROVED" ? developerOutcome : RunOutcome.PermanentFailure(Bound(review.Summary));
+            return await FinishReviewAsync(context, reviewer, attempt, outcome, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { try { await reviewer.DisposeAsync(); } catch { } throw; }
+        catch (Exception exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
+    }
+
+    private async Task<RunOutcome> FinishReviewAsync(WorkspaceExecutionContext context, ICodexAppServerClient reviewer, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
+    {
+        await reviewer.DisposeAsync();
+        if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
+        return await PersistAsync(context, attempt, outcome, cancellationToken);
     }
 
     private async Task<RunOutcome> FinishAsync(WorkspaceExecutionContext context, ICodexAppServerClient client, RunAttempt attempt, RunOutcome outcome, CancellationToken cancellationToken)
