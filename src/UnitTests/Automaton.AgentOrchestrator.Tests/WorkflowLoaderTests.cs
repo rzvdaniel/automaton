@@ -51,6 +51,7 @@ public sealed class WorkflowLoaderTests
                       instructions: Review without modifying.
                 review:
                   enabled: true
+                  max_rounds: 3
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -89,6 +90,7 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.Developer, Is.EqualTo(new AgentExecutionProfile("developer", "model-a", "read-write", "write", "Use the developer profile.")));
                 Assert.That(definition.Options.Agent.Reviewer, Is.EqualTo(new AgentExecutionProfile("reviewer", "model-b", "read-only", "read-only", "Review without modifying.")));
                 Assert.That(definition.Options.Agent.Review.Enabled, Is.True);
+                Assert.That(definition.Options.Agent.Review.MaxRounds, Is.EqualTo(3));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
                 Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
