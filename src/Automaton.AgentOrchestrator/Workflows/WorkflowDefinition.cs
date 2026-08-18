@@ -47,6 +47,7 @@ public sealed class AgentReviewOptions
 public sealed record AgentExecutionProfile(string Name, string Model, string WorkspaceAccess, string GitHubAccess, string Instructions)
 {
     public static AgentExecutionProfile DefaultDeveloper { get; } = new("developer", string.Empty, "read-write", "write", string.Empty);
+    public static AgentExecutionProfile DefaultReviewer { get; } = new("reviewer", string.Empty, "read-only", "read-only", string.Empty);
 }
 public sealed class AgentGitHubOptions
 {

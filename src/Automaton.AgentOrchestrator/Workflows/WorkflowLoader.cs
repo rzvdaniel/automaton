@@ -132,7 +132,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
 
     private static AgentExecutionProfile Profile(object? value, string name)
     {
-        if (value is null) return AgentExecutionProfile.DefaultDeveloper;
+        if (value is null) return name.Equals("reviewer", StringComparison.OrdinalIgnoreCase) ? AgentExecutionProfile.DefaultReviewer : AgentExecutionProfile.DefaultDeveloper;
         if (value is not IReadOnlyDictionary<string, object?> section) throw new WorkflowValidationException($"agent.profiles.{name} must be a mapping.");
         var profile = new AgentExecutionProfile(
             StringValue(section.GetValueOrDefault("name"), $"agent.profiles.{name}.name", required: false) ?? name,
