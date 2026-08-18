@@ -10,8 +10,7 @@ public sealed record CodexProcessOptions(
     string WorkingDirectory,
     IReadOnlyDictionary<string, string>? Environment = null,
     TimeSpan? ShutdownTimeout = null,
-    string? LaunchNonce = null,
-    string SandboxMode = "workspace-write");
+    string? LaunchNonce = null);
 
 public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IExecutionFence? executionFence = null) : ICodexJsonRpcTransport
 {
@@ -46,7 +45,7 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
     {
         if (process is not null) throw new InvalidOperationException("Codex App Server process is already started.");
         var (fileName, _) = ParseCommand(options.Command);
-        var launchArguments = BuildArguments(options.Command, options.SandboxMode);
+        var launchArguments = BuildArguments(options.Command);
         var startInfo = new ProcessStartInfo(fileName)
         {
             WorkingDirectory = Path.GetFullPath(options.WorkingDirectory),
@@ -154,11 +153,8 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
         return (tokens[0], tokens.Skip(1).ToArray());
     }
 
-    internal static IReadOnlyList<string> BuildArguments(string command, string sandboxMode)
-    {
-        if (sandboxMode is not ("workspace-write" or "read-only")) throw new CodexProtocolException("Unsupported Codex sandbox mode.");
-        return ParseCommand(command).Arguments.Concat(new[] { "--sandbox", sandboxMode }).ToArray();
-    }
+    internal static IReadOnlyList<string> BuildArguments(string command)
+        => ParseCommand(command).Arguments;
 
     internal static IReadOnlyDictionary<string, string> BuildEnvironment(
         IReadOnlyDictionary<string, string> hostEnvironment,
