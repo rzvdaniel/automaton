@@ -19,6 +19,37 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.That(ReviewTerminalContract.TryParse(response, out _), Is.True);
         Assert.That(ReviewTerminalContract.TryParse("REVIEW_RESULT: APPROVED", out _), Is.False);
     }
+
+    [TestCase(null, ReviewTerminalParseFailure.EmptyResponse)]
+    [TestCase("plain prose", ReviewTerminalParseFailure.MissingTerminalLine)]
+    [TestCase("REVIEW_RESULT: {", ReviewTerminalParseFailure.InvalidJson)]
+    [TestCase("REVIEW_RESULT: {\"summary\":\"x\"}", ReviewTerminalParseFailure.MissingVerdict)]
+    [TestCase("REVIEW_RESULT: {\"verdict\":\"NOPE\",\"summary\":\"x\"}", ReviewTerminalParseFailure.UnsupportedVerdict)]
+    [TestCase("REVIEW_RESULT: {\"verdict\":\"APPROVED\"}", ReviewTerminalParseFailure.MissingSummary)]
+    public void ReviewContractReportsBoundedParseFailure(string? response, ReviewTerminalParseFailure expected)
+    {
+        Assert.That(ReviewTerminalContract.TryParse(response, out _, out var failure), Is.False);
+        Assert.That(failure, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ReviewContractReportsOverlongSummaryWithoutLeakingContents()
+    {
+        var secret = new string('x', 513);
+        var response = $"REVIEW_RESULT: {{\"verdict\":\"APPROVED\",\"summary\":\"{secret}\"}}";
+        Assert.That(ReviewTerminalContract.TryParse(response, out _, out var failure), Is.False);
+        Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.SummaryTooLong));
+        Assert.That(failure.ToString(), Does.Not.Contain(secret));
+    }
+
+    [Test]
+    public void ReviewContractRejectsMultipleTerminalLinesWithoutLeakingContents()
+    {
+        var response = "REVIEW_RESULT: {\"verdict\":\"CHANGES_REQUIRED\",\"summary\":\"first\"}\nREVIEW_RESULT: {\"verdict\":\"APPROVED\",\"summary\":\"second\"}";
+        Assert.That(ReviewTerminalContract.TryParse(response, out _, out var failure), Is.False);
+        Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.MultipleTerminalLines));
+        Assert.That(failure.ToString(), Does.Not.Contain("first").And.Not.Contain("second"));
+    }
     [TestCase("COMPLETED", true, false)]
     [TestCase("BLOCKED", false, false)]
     [TestCase("RETRYABLE", false, true)]
