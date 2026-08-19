@@ -50,6 +50,26 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.MultipleTerminalLines));
         Assert.That(failure.ToString(), Does.Not.Contain("first").And.Not.Contain("second"));
     }
+
+    [Test]
+    public void NonCompletedTurnOutcomeFormattingIncludesBoundedMetadataOnly()
+    {
+        var raw = "provider-secret-response";
+        var diagnostic = new CodexTurnDiagnostic("failed", false, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(2), "turn/completed", true, true, "provider_failed");
+        var reason = SupervisedCodexWorkExecutor.FormatNonCompletedReviewerTurn(new CodexTurnResult("thread", "turn", "failed", raw, raw, diagnostic));
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason, Does.Contain("status=failed"));
+            Assert.That(reason, Does.Contain("final_response_present=false"));
+            Assert.That(reason, Does.Contain("last_event=turn/completed"));
+            Assert.That(reason, Does.Contain("process_alive=true"));
+            Assert.That(reason, Does.Contain("termination=provider_failed"));
+            Assert.That(reason, Does.Contain("total_elapsed_ms=3000"));
+            Assert.That(reason, Does.Contain("inactivity_ms=2000"));
+            Assert.That(reason, Does.Contain("turn_completed_observed=true"));
+            Assert.That(reason, Does.Not.Contain(raw));
+        });
+    }
     [TestCase("COMPLETED", true, false)]
     [TestCase("BLOCKED", false, false)]
     [TestCase("RETRYABLE", false, true)]
