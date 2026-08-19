@@ -39,28 +39,48 @@ public static class AgentTerminalContract
 }
 
 public sealed record ReviewTerminalResult(string Verdict, string Summary);
+public enum ReviewTerminalParseFailure
+{
+    None,
+    EmptyResponse,
+    MissingTerminalLine,
+    InvalidJson,
+    MissingVerdict,
+    UnsupportedVerdict,
+    MissingSummary,
+    SummaryTooLong,
+    ResponseTooLong
+}
 public static class ReviewTerminalContract
 {
     public const string Instruction = "End with exactly one terminal line: REVIEW_RESULT: {\"verdict\":\"APPROVED|CHANGES_REQUIRED|BLOCKED\",\"summary\":\"bounded text\"}";
     public static bool TryParse(string? response, out ReviewTerminalResult result)
+        => TryParse(response, out result, out _);
+
+    public static bool TryParse(string? response, out ReviewTerminalResult result, out ReviewTerminalParseFailure failure)
     {
         result = new(string.Empty, string.Empty);
-        if (string.IsNullOrWhiteSpace(response) || response.Length > 16_384) return false;
+        failure = ReviewTerminalParseFailure.None;
+        if (string.IsNullOrWhiteSpace(response)) { failure = ReviewTerminalParseFailure.EmptyResponse; return false; }
+        if (response.Length > 16_384) { failure = ReviewTerminalParseFailure.ResponseTooLong; return false; }
         var line = response.TrimEnd().Split('\n').Last().TrimEnd('\r');
         const string prefix = "REVIEW_RESULT: ";
-        if (!line.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        if (!line.StartsWith(prefix, StringComparison.Ordinal)) { failure = ReviewTerminalParseFailure.MissingTerminalLine; return false; }
         try
         {
             using var document = JsonDocument.Parse(line[prefix.Length..]);
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("verdict", out var verdict) || !root.TryGetProperty("summary", out var summary)
-                || verdict.ValueKind != JsonValueKind.String || summary.ValueKind != JsonValueKind.String) return false;
+            if (root.ValueKind != JsonValueKind.Object) { failure = ReviewTerminalParseFailure.InvalidJson; return false; }
+            if (!root.TryGetProperty("verdict", out var verdict)) { failure = ReviewTerminalParseFailure.MissingVerdict; return false; }
+            if (verdict.ValueKind != JsonValueKind.String) { failure = ReviewTerminalParseFailure.UnsupportedVerdict; return false; }
             var value = verdict.GetString() ?? string.Empty;
+            if (value is not ("APPROVED" or "CHANGES_REQUIRED" or "BLOCKED")) { failure = ReviewTerminalParseFailure.UnsupportedVerdict; return false; }
+            if (!root.TryGetProperty("summary", out var summary) || summary.ValueKind != JsonValueKind.String) { failure = ReviewTerminalParseFailure.MissingSummary; return false; }
             var text = summary.GetString() ?? string.Empty;
-            if (text.Length > 512 || value is not ("APPROVED" or "CHANGES_REQUIRED" or "BLOCKED")) return false;
+            if (text.Length > 512) { failure = ReviewTerminalParseFailure.SummaryTooLong; return false; }
             result = new(value, text); return true;
         }
-        catch (JsonException) { return false; }
+        catch (JsonException) { failure = ReviewTerminalParseFailure.InvalidJson; return false; }
     }
 }
 
@@ -146,8 +166,9 @@ public sealed class SupervisedCodexWorkExecutor(
                 var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{CodexRuntimeCapability.From(workflow.Options.Agent, workflow.Options.Agent.Reviewer).Instruction}\n{ReviewTerminalContract.Instruction}""";
                 var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
                 var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
-                if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review))
-                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a malformed review result."), cancellationToken);
+                var parseFailure = ReviewTerminalParseFailure.None;
+                if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
+                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
                 if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
                 await reviewer.DisposeAsync();
                 if (review.Verdict == "BLOCKED")
