@@ -49,7 +49,9 @@ public enum ReviewTerminalParseFailure
     UnsupportedVerdict,
     MissingSummary,
     SummaryTooLong,
-    ResponseTooLong
+    ResponseTooLong,
+    MultipleTerminalLines,
+    TurnNotCompleted
 }
 public static class ReviewTerminalContract
 {
@@ -63,8 +65,11 @@ public static class ReviewTerminalContract
         failure = ReviewTerminalParseFailure.None;
         if (string.IsNullOrWhiteSpace(response)) { failure = ReviewTerminalParseFailure.EmptyResponse; return false; }
         if (response.Length > 16_384) { failure = ReviewTerminalParseFailure.ResponseTooLong; return false; }
-        var line = response.TrimEnd().Split('\n').Last().TrimEnd('\r');
         const string prefix = "REVIEW_RESULT: ";
+        var terminalLineCount = response.Split('\n').Count(line => line.TrimEnd('\r').StartsWith(prefix, StringComparison.Ordinal));
+        if (terminalLineCount == 0) { failure = ReviewTerminalParseFailure.MissingTerminalLine; return false; }
+        if (terminalLineCount > 1) { failure = ReviewTerminalParseFailure.MultipleTerminalLines; return false; }
+        var line = response.TrimEnd().Split('\n').Last().TrimEnd('\r');
         if (!line.StartsWith(prefix, StringComparison.Ordinal)) { failure = ReviewTerminalParseFailure.MissingTerminalLine; return false; }
         try
         {
@@ -167,7 +172,12 @@ public sealed class SupervisedCodexWorkExecutor(
                 var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
                 var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
                 var parseFailure = ReviewTerminalParseFailure.None;
-                if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase) || !ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
+                if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase))
+                {
+                    parseFailure = ReviewTerminalParseFailure.TurnNotCompleted;
+                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a non-completed turn (turn-not-completed)."), cancellationToken);
+                }
+                if (!ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
                 if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
                 await reviewer.DisposeAsync();

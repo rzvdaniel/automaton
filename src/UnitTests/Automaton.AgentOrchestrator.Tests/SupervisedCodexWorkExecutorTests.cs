@@ -41,6 +41,15 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.SummaryTooLong));
         Assert.That(failure.ToString(), Does.Not.Contain(secret));
     }
+
+    [Test]
+    public void ReviewContractRejectsMultipleTerminalLinesWithoutLeakingContents()
+    {
+        var response = "REVIEW_RESULT: {\"verdict\":\"CHANGES_REQUIRED\",\"summary\":\"first\"}\nREVIEW_RESULT: {\"verdict\":\"APPROVED\",\"summary\":\"second\"}";
+        Assert.That(ReviewTerminalContract.TryParse(response, out _, out var failure), Is.False);
+        Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.MultipleTerminalLines));
+        Assert.That(failure.ToString(), Does.Not.Contain("first").And.Not.Contain("second"));
+    }
     [TestCase("COMPLETED", true, false)]
     [TestCase("BLOCKED", false, false)]
     [TestCase("RETRYABLE", false, true)]
