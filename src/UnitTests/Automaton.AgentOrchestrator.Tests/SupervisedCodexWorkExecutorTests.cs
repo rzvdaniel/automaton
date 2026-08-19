@@ -52,16 +52,22 @@ public sealed class SupervisedCodexWorkExecutorTests
     }
 
     [Test]
-    public void NonCompletedTurnDiagnosticIsBoundedAndStructural()
+    public void NonCompletedTurnOutcomeFormattingIncludesBoundedMetadataOnly()
     {
+        var raw = "provider-secret-response";
         var diagnostic = new CodexTurnDiagnostic("failed", false, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(2), "turn/completed", true, true, "provider_failed");
+        var reason = SupervisedCodexWorkExecutor.FormatNonCompletedReviewerTurn(new CodexTurnResult("thread", "turn", "failed", raw, raw, diagnostic));
         Assert.Multiple(() =>
         {
-            Assert.That(diagnostic.Status, Is.EqualTo("failed"));
-            Assert.That(diagnostic.FinalResponsePresent, Is.False);
-            Assert.That(diagnostic.TurnCompletedObserved, Is.True);
-            Assert.That(diagnostic.Termination, Is.EqualTo("provider_failed"));
-            Assert.That(diagnostic.ToString(), Does.Not.Contain("prompt").And.Not.Contain("secret"));
+            Assert.That(reason, Does.Contain("status=failed"));
+            Assert.That(reason, Does.Contain("final_response_present=false"));
+            Assert.That(reason, Does.Contain("last_event=turn/completed"));
+            Assert.That(reason, Does.Contain("process_alive=true"));
+            Assert.That(reason, Does.Contain("termination=provider_failed"));
+            Assert.That(reason, Does.Contain("total_elapsed_ms=3000"));
+            Assert.That(reason, Does.Contain("inactivity_ms=2000"));
+            Assert.That(reason, Does.Contain("turn_completed_observed=true"));
+            Assert.That(reason, Does.Not.Contain(raw));
         });
     }
     [TestCase("COMPLETED", true, false)]
