@@ -80,6 +80,9 @@ public sealed class CodexAppServerClient(
     private int ownershipQuarantined;
     private DateTimeOffset lastActivityUtc;
     private bool stopping;
+    private int serverRequestCount;
+    private int serverRequestDeclinedCount;
+    private string? lastServerRequestType;
 
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
@@ -140,6 +143,9 @@ public sealed class CodexAppServerClient(
         var id = RequiredNestedId(result, "turn");
         lock (turnGate)
         {
+            serverRequestCount = 0;
+            serverRequestDeclinedCount = 0;
+            lastServerRequestType = null;
             var completion = new TaskCompletionSource<CodexTurnResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!turns.TryAdd(id, completion)) throw new CodexProtocolException("Duplicate turn ID.");
             turnStartedUtc[id] = clock.UtcNow;
@@ -289,14 +295,20 @@ public sealed class CodexAppServerClient(
 
     private async Task HandleServerRequestAsync(JsonElement requestId, string? method, JsonElement parameters)
     {
+        serverRequestCount++;
+        lastServerRequestType = ServerRequestType(method);
         object response;
         switch (method)
         {
             case CodexAppServerMethods.CommandApproval:
-                response = new { decision = IsAssignedWorkspace(parameters) ? "accept" : "decline" };
+                var commandAllowed = IsAssignedWorkspace(parameters);
+                if (!commandAllowed) serverRequestDeclinedCount++;
+                response = new { decision = commandAllowed ? "accept" : "decline" };
                 break;
             case CodexAppServerMethods.FileApproval:
-                response = new { decision = IsFileApprovalSafe(parameters) ? "accept" : "decline" };
+                var fileAllowed = IsFileApprovalSafe(parameters);
+                if (!fileAllowed) serverRequestDeclinedCount++;
+                response = new { decision = fileAllowed ? "accept" : "decline" };
                 break;
             case CodexAppServerMethods.UserInput:
                 response = new { answers = new Dictionary<string, object>() };
@@ -305,11 +317,21 @@ public sealed class CodexAppServerClient(
                 response = new { permissions = new { fileSystem = (object?)null, network = (object?)null } };
                 break;
             default:
+                serverRequestDeclinedCount++;
                 await SendRawAsync(new { jsonrpc = "2.0", id = requestId.Clone(), error = new { code = -32601, message = "Unsupported server request." } }, CancellationToken.None);
                 return;
         }
         await SendRawAsync(new { jsonrpc = "2.0", id = requestId.Clone(), result = response }, CancellationToken.None);
     }
+
+    private static string ServerRequestType(string? method) => method switch
+    {
+        CodexAppServerMethods.CommandApproval => "command_approval",
+        CodexAppServerMethods.FileApproval => "file_approval",
+        CodexAppServerMethods.UserInput => "user_input",
+        CodexAppServerMethods.PermissionsApproval => "permissions",
+        _ => "unknown"
+    };
 
     private bool IsAssignedWorkspace(JsonElement parameters)
     {
@@ -353,13 +375,28 @@ public sealed class CodexAppServerClient(
         var diagnostic = status.Equals("completed", StringComparison.OrdinalIgnoreCase) ? null :
             new CodexTurnDiagnostic(status, FinalResponsePresent: !string.IsNullOrWhiteSpace(finalResponse), clock.UtcNow - started,
                 clock.UtcNow - lastActivityUtc, LastEventType, transport.IsProcessAlive, TurnCompletedObserved: true, Termination: status switch
-                { "failed" => "provider_failed", "interrupted" => "interrupted", _ => "unknown" });
+                { "failed" => "provider_failed", "interrupted" => "interrupted", _ => "unknown" },
+                ProviderFailureCategory: status.Equals("failed", StringComparison.OrdinalIgnoreCase) ? ClassifyProviderFailure(parameters) : "unknown_provider_failure",
+                ServerRequestCount: serverRequestCount, ServerRequestDeclinedCount: serverRequestDeclinedCount, LastServerRequestType: lastServerRequestType);
         var result = new CodexTurnResult(threadId, turnId, status, failure, finalResponse, diagnostic);
         lock (turnGate)
         {
             if (turns.TryGetValue(turnId, out var completion)) completion.TrySetResult(result);
             else BufferEarlyTurnResult(result);
         }
+    }
+
+    private static string ClassifyProviderFailure(JsonElement parameters)
+    {
+        var type = NestedStringProperty(parameters, "turn", "error", "type");
+        return type switch
+        {
+            "invalid_request_error" => "invalid_request",
+            "authentication_error" => "authentication",
+            "permission_error" => "permission_denied",
+            "rate_limit_error" => "rate_limited",
+            _ => "provider_failure"
+        };
     }
 
     private async Task QuarantineAsync()
@@ -453,7 +490,11 @@ public sealed record CodexTurnDiagnostic(
     string? LastEventType,
     bool? ProcessAlive,
     bool TurnCompletedObserved,
-    string Termination);
+    string Termination,
+    string ProviderFailureCategory = "unknown_provider_failure",
+    int ServerRequestCount = 0,
+    int ServerRequestDeclinedCount = 0,
+    string? LastServerRequestType = null);
 public sealed class CodexIdleTimeoutException(CodexTimeoutDiagnostic? diagnostic = null) : TimeoutException("Codex App Server produced no protocol activity before the stall timeout.")
 {
     public CodexTimeoutDiagnostic? Diagnostic { get; } = diagnostic;

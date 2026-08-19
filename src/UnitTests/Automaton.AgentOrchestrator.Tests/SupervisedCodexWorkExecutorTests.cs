@@ -55,7 +55,7 @@ public sealed class SupervisedCodexWorkExecutorTests
     public void NonCompletedTurnOutcomeFormattingIncludesBoundedMetadataOnly()
     {
         var raw = "provider-secret-response";
-        var diagnostic = new CodexTurnDiagnostic("failed", false, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(2), "turn/completed", true, true, "provider_failed");
+        var diagnostic = new CodexTurnDiagnostic("failed", false, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(2), "turn/completed", true, true, "provider_failed", "provider_failure", 2, 1, "command_approval");
         var reason = SupervisedCodexWorkExecutor.FormatNonCompletedReviewerTurn(new CodexTurnResult("thread", "turn", "failed", raw, raw, diagnostic));
         Assert.Multiple(() =>
         {
@@ -64,6 +64,10 @@ public sealed class SupervisedCodexWorkExecutorTests
             Assert.That(reason, Does.Contain("last_event=turn/completed"));
             Assert.That(reason, Does.Contain("process_alive=true"));
             Assert.That(reason, Does.Contain("termination=provider_failed"));
+            Assert.That(reason, Does.Contain("provider_failure=provider_failure"));
+            Assert.That(reason, Does.Contain("server_request_count=2"));
+            Assert.That(reason, Does.Contain("server_request_declined_count=1"));
+            Assert.That(reason, Does.Contain("last_server_request_type=command_approval"));
             Assert.That(reason, Does.Contain("total_elapsed_ms=3000"));
             Assert.That(reason, Does.Contain("inactivity_ms=2000"));
             Assert.That(reason, Does.Contain("turn_completed_observed=true"));

@@ -271,15 +271,15 @@ Operate only in the assigned workspace. Inspect, implement, test, self-review, a
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
     private static string BoundEnum(string? value) => value?.ToLowerInvariant() switch
     {
-        "failed" or "interrupted" or "completed" or "provider_failed" or "turn/completed" or "turn/started" or "item/started" or "item/completed" or "unknown" => value!.ToLowerInvariant(),
+        "failed" or "interrupted" or "completed" or "provider_failed" or "provider_failure" or "unknown_provider_failure" or "turn/completed" or "turn/started" or "item/started" or "item/completed" or "unknown" or "command_approval" or "file_approval" or "user_input" or "permissions" => value!.ToLowerInvariant(),
         _ => "unknown"
     };
     internal static string FormatNonCompletedReviewerTurn(CodexTurnResult result)
     {
         var diagnostic = result.Diagnostic;
         return diagnostic is null
-            ? "Reviewer returned a non-completed turn (turn-not-completed; status=unknown, final_response_present=unknown, last_event=unknown, process_alive=unknown, termination=unknown, total_elapsed_ms=unknown, inactivity_ms=unknown, turn_completed_observed=unknown)."
-            : $"Reviewer returned a non-completed turn (status={BoundEnum(diagnostic.Status)}, final_response_present={diagnostic.FinalResponsePresent.ToString().ToLowerInvariant()}, last_event={BoundEnum(diagnostic.LastEventType)}, process_alive={diagnostic.ProcessAlive?.ToString().ToLowerInvariant() ?? "unknown"}, termination={BoundEnum(diagnostic.Termination)}, total_elapsed_ms={(long)diagnostic.TotalElapsed.TotalMilliseconds}, inactivity_ms={(long)diagnostic.InactivityDuration.TotalMilliseconds}, turn_completed_observed={diagnostic.TurnCompletedObserved.ToString().ToLowerInvariant()}).";
+            ? "Reviewer returned a non-completed turn (turn-not-completed; status=unknown, final_response_present=unknown, last_event=unknown, process_alive=unknown, termination=unknown, provider_failure=unknown_provider_failure, server_request_count=0, server_request_declined_count=0, last_server_request_type=unknown, total_elapsed_ms=unknown, inactivity_ms=unknown, turn_completed_observed=unknown)."
+            : $"Reviewer returned a non-completed turn (status={BoundEnum(diagnostic.Status)}, final_response_present={diagnostic.FinalResponsePresent.ToString().ToLowerInvariant()}, last_event={BoundEnum(diagnostic.LastEventType)}, process_alive={diagnostic.ProcessAlive?.ToString().ToLowerInvariant() ?? "unknown"}, termination={BoundEnum(diagnostic.Termination)}, provider_failure={BoundEnum(diagnostic.ProviderFailureCategory)}, server_request_count={diagnostic.ServerRequestCount}, server_request_declined_count={diagnostic.ServerRequestDeclinedCount}, last_server_request_type={BoundEnum(diagnostic.LastServerRequestType)}, total_elapsed_ms={(long)diagnostic.TotalElapsed.TotalMilliseconds}, inactivity_ms={(long)diagnostic.InactivityDuration.TotalMilliseconds}, turn_completed_observed={diagnostic.TurnCompletedObserved.ToString().ToLowerInvariant()}).";
     }
     private static string ReviewFailureReason(string termination, CodexTimeoutDiagnostic? diagnostic)
         => diagnostic is null
