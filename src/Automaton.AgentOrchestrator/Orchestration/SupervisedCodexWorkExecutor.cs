@@ -271,7 +271,7 @@ Operate only in the assigned workspace. Inspect, implement, test, self-review, a
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
     private static string BoundEnum(string? value) => value?.ToLowerInvariant() switch
     {
-        "failed" or "interrupted" or "completed" or "provider_failed" or "provider_failure" or "unknown_provider_failure" or "turn/completed" or "turn/started" or "item/started" or "item/completed" or "unknown" or "command_approval" or "file_approval" or "user_input" or "permissions" => value!.ToLowerInvariant(),
+        "failed" or "interrupted" or "completed" or "provider_failed" or "invalid_request" or "authentication_failed" or "permission_denied" or "rate_limited" or "unknown_provider_failure" or "turn/completed" or "turn/started" or "item/started" or "item/completed" or "unknown" or "command_approval" or "file_approval" or "user_input" or "permissions" => value!.ToLowerInvariant(),
         _ => "unknown"
     };
     internal static string FormatNonCompletedReviewerTurn(CodexTurnResult result)

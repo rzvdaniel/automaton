@@ -392,10 +392,10 @@ public sealed class CodexAppServerClient(
         return type switch
         {
             "invalid_request_error" => "invalid_request",
-            "authentication_error" => "authentication",
+            "authentication_error" => "authentication_failed",
             "permission_error" => "permission_denied",
             "rate_limit_error" => "rate_limited",
-            _ => "provider_failure"
+            _ => "unknown_provider_failure"
         };
     }
 
