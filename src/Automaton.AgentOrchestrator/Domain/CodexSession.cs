@@ -1,3 +1,5 @@
+using Automaton.AgentOrchestrator.Codex;
+
 namespace Automaton.AgentOrchestrator.Domain;
 
 public static class CodexSessionEventKinds
@@ -27,5 +29,5 @@ public sealed record CodexSessionEvent(
 
 public sealed record CodexThread(string Id);
 public sealed record CodexTurn(string Id, string ThreadId);
-public sealed record CodexTurnResult(string ThreadId, string TurnId, string Status, string? FailureReason = null, string? FinalResponse = null);
+public sealed record CodexTurnResult(string ThreadId, string TurnId, string Status, string? FailureReason = null, string? FinalResponse = null, CodexTurnDiagnostic? Diagnostic = null);
 public sealed record CodexProcessIdentity(int ProcessId, DateTimeOffset StartedAtUtc, string LaunchNonce);

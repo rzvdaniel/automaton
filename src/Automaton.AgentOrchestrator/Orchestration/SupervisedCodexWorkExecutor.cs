@@ -175,7 +175,11 @@ public sealed class SupervisedCodexWorkExecutor(
                 if (!string.Equals(result.Status, "completed", StringComparison.OrdinalIgnoreCase))
                 {
                     parseFailure = ReviewTerminalParseFailure.TurnNotCompleted;
-                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer returned a non-completed turn (turn-not-completed)."), cancellationToken);
+                    var diagnostic = result.Diagnostic;
+                    var reason = diagnostic is null
+                        ? "Reviewer returned a non-completed turn (turn-not-completed; status=unknown, final_response_present=unknown, last_event=unknown, process_alive=unknown, termination=unknown)."
+                        : $"Reviewer returned a non-completed turn (status={BoundEnum(diagnostic.Status)}, final_response_present={diagnostic.FinalResponsePresent.ToString().ToLowerInvariant()}, last_event={BoundEnum(diagnostic.LastEventType)}, process_alive={diagnostic.ProcessAlive?.ToString().ToLowerInvariant() ?? "unknown"}, termination={BoundEnum(diagnostic.Termination)}).";
+                    return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(reason), cancellationToken);
                 }
                 if (!ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
@@ -265,6 +269,7 @@ Operate only in the assigned workspace. Inspect, implement, test, self-review, a
 """;
 
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
+    private static string BoundEnum(string? value) => value is null ? "unknown" : value.Length <= 64 && value.All(char.IsLetterOrDigit) ? value.ToLowerInvariant() : "unknown";
 
     private static void RecordTimeout(IOperatorTelemetry? telemetry, RunAttempt attempt, CodexTimeoutDiagnostic? diagnostic)
     {

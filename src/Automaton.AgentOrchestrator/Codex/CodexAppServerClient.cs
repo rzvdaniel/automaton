@@ -347,7 +347,14 @@ public sealed class CodexAppServerClient(
         var failure = NestedStringProperty(parameters, "turn", "error", "message");
         var kind = status switch { "completed" => CodexSessionEventKinds.TurnCompleted, "interrupted" => CodexSessionEventKinds.TurnInterrupted, _ => CodexSessionEventKinds.TurnFailed };
         Touch(kind, threadId, turnId, failure);
-        var result = new CodexTurnResult(threadId, turnId, status, failure, ExtractFinalResponse(parameters));
+        DateTimeOffset started;
+        lock (turnGate) started = turnStartedUtc.TryGetValue(turnId, out var value) ? value : clock.UtcNow;
+        var finalResponse = ExtractFinalResponse(parameters);
+        var diagnostic = status.Equals("completed", StringComparison.OrdinalIgnoreCase) ? null :
+            new CodexTurnDiagnostic(status, FinalResponsePresent: !string.IsNullOrWhiteSpace(finalResponse), clock.UtcNow - started,
+                clock.UtcNow - lastActivityUtc, LastEventType, transport.IsProcessAlive, TurnCompletedObserved: true, Termination: status switch
+                { "failed" => "provider_failed", "interrupted" => "interrupted", _ => "unknown" });
+        var result = new CodexTurnResult(threadId, turnId, status, failure, finalResponse, diagnostic);
         lock (turnGate)
         {
             if (turns.TryGetValue(turnId, out var completion)) completion.TrySetResult(result);
@@ -438,6 +445,15 @@ public sealed record CodexTimeoutDiagnostic(
     DateTimeOffset LastActivityUtc,
     string? LastEventType,
     bool? ProcessAlive);
+public sealed record CodexTurnDiagnostic(
+    string Status,
+    bool FinalResponsePresent,
+    TimeSpan TotalElapsed,
+    TimeSpan InactivityDuration,
+    string? LastEventType,
+    bool? ProcessAlive,
+    bool TurnCompletedObserved,
+    string Termination);
 public sealed class CodexIdleTimeoutException(CodexTimeoutDiagnostic? diagnostic = null) : TimeoutException("Codex App Server produced no protocol activity before the stall timeout.")
 {
     public CodexTimeoutDiagnostic? Diagnostic { get; } = diagnostic;
