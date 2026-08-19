@@ -50,6 +50,20 @@ public sealed class SupervisedCodexWorkExecutorTests
         Assert.That(failure, Is.EqualTo(ReviewTerminalParseFailure.MultipleTerminalLines));
         Assert.That(failure.ToString(), Does.Not.Contain("first").And.Not.Contain("second"));
     }
+
+    [Test]
+    public void NonCompletedTurnDiagnosticIsBoundedAndStructural()
+    {
+        var diagnostic = new CodexTurnDiagnostic("failed", false, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(2), "turn/completed", true, true, "provider_failed");
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.Status, Is.EqualTo("failed"));
+            Assert.That(diagnostic.FinalResponsePresent, Is.False);
+            Assert.That(diagnostic.TurnCompletedObserved, Is.True);
+            Assert.That(diagnostic.Termination, Is.EqualTo("provider_failed"));
+            Assert.That(diagnostic.ToString(), Does.Not.Contain("prompt").And.Not.Contain("secret"));
+        });
+    }
     [TestCase("COMPLETED", true, false)]
     [TestCase("BLOCKED", false, false)]
     [TestCase("RETRYABLE", false, true)]

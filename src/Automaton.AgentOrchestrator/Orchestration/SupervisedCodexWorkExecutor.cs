@@ -193,7 +193,11 @@ public sealed class SupervisedCodexWorkExecutor(
                 if (!remediation.Succeeded) return remediation;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { try { await reviewer.DisposeAsync(); } catch { } throw; }
-            catch (Exception exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(Bound(exception.Message)), CancellationToken.None); }
+            catch (CodexIdleTimeoutException exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(ReviewFailureReason("stall_timeout", exception.Diagnostic)), CancellationToken.None); }
+            catch (CodexTurnTimeoutException exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure(ReviewFailureReason("turn_timeout", exception.Diagnostic)), CancellationToken.None); }
+            catch (CodexProcessExitedException) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer turn failed (termination=process_exited)."), CancellationToken.None); }
+            catch (CodexProtocolException) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer turn failed (termination=protocol_failure)."), CancellationToken.None); }
+            catch (Exception) { return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure("Reviewer turn failed (termination=unknown)."), CancellationToken.None); }
         }
         return developerOutcome;
     }
@@ -270,6 +274,10 @@ Operate only in the assigned workspace. Inspect, implement, test, self-review, a
 
     private static string Bound(string value) => value.Length <= 512 ? value : value[..512];
     private static string BoundEnum(string? value) => value is null ? "unknown" : value.Length <= 64 && value.All(char.IsLetterOrDigit) ? value.ToLowerInvariant() : "unknown";
+    private static string ReviewFailureReason(string termination, CodexTimeoutDiagnostic? diagnostic)
+        => diagnostic is null
+            ? $"Reviewer turn failed (termination={termination}, status=unknown, final_response_present=unknown, last_event=unknown, process_alive=unknown, total_elapsed_ms=unknown, inactivity_ms=unknown, turn_completed_observed=unknown)."
+            : $"Reviewer turn failed (termination={termination}, status=unknown, final_response_present=unknown, last_event={BoundEnum(diagnostic.LastEventType)}, process_alive={diagnostic.ProcessAlive?.ToString().ToLowerInvariant() ?? "unknown"}, total_elapsed_ms={(long)diagnostic.TotalElapsed.TotalMilliseconds}, inactivity_ms={(long)diagnostic.InactivityDuration.TotalMilliseconds}, turn_completed_observed=false).";
 
     private static void RecordTimeout(IOperatorTelemetry? telemetry, RunAttempt attempt, CodexTimeoutDiagnostic? diagnostic)
     {
