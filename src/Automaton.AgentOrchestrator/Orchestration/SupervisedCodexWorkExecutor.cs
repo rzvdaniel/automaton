@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 
@@ -93,8 +94,10 @@ public sealed class SupervisedCodexWorkExecutor(
     IWorkspaceManager workspaceManager,
     ICodexAppServerClientFactory clients,
     WorkflowDefinition workflow,
-    IOperatorTelemetry? telemetry = null) : IWorkExecutor
+    IOperatorTelemetry? telemetry = null,
+    IHumanApprovalHandoff? humanApprovalHandoff = null) : IWorkExecutor
 {
+    private readonly IHumanApprovalHandoff humanApprovalHandoff = humanApprovalHandoff ?? new NoopHumanApprovalHandoff();
     public async Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
     {
         WorkspaceExecutionContext context;
@@ -179,7 +182,14 @@ public sealed class SupervisedCodexWorkExecutor(
                 }
                 if (!ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
-                if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
+                if (review.Verdict == "APPROVED")
+                {
+                    var reviewedHead = await humanApprovalHandoff.CaptureReviewedHeadAsync(context.Workspace, cancellationToken);
+                    await reviewer.DisposeAsync();
+                    var handoff = await humanApprovalHandoff.CompleteAsync(context.Workspace, reviewedHead, workflow.Options.Agent, cancellationToken);
+                    if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return handoff;
+                    return await PersistAsync(context, attempt, handoff, cancellationToken);
+                }
                 await reviewer.DisposeAsync();
                 if (review.Verdict == "BLOCKED")
                     return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);

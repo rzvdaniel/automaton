@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Workflows;
 using NUnit.Framework;
@@ -239,14 +240,60 @@ public sealed class SupervisedCodexWorkExecutorTests
         });
     }
 
-    private static Fixture Create(string status, AgentGitHubOptions? github = null, RecordingTelemetry? telemetry = null)
+    [Test]
+    public async Task ReviewerApprovalHandsOffTheCapturedHeadBeforeTerminalPersistence()
+    {
+        var handoff = new RecordingHandoff(new string('b', 40));
+        var fixture = Create("COMPLETED", github: new AgentGitHubOptions { Enabled = true, Token = "test-token" }, reviewEnabled: true, handoff: handoff);
+        fixture.Client.Responses = new Queue<string>([
+            "AUTOMATON_RESULT: {\"status\":\"COMPLETED\",\"summary\":\"done\"}",
+            "REVIEW_RESULT: {\"verdict\":\"APPROVED\",\"summary\":\"reviewed\"}"
+        ]);
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(handoff.CapturedHead, Is.EqualTo(new string('b', 40)));
+            Assert.That(handoff.CompletedHead, Is.EqualTo(new string('b', 40)));
+            Assert.That(handoff.CompletedWithReleasedOwnership, Is.True);
+            Assert.That(fixture.Workspaces.LifecycleWrites, Is.EqualTo(1));
+            Assert.That(fixture.Factory.Profiles.Select(x => x.Name), Is.EqualTo(new[] { "developer", "reviewer" }));
+        });
+    }
+
+    [Test]
+    public async Task RemediationHandsOffOnlyTheFinalReviewerApprovedHead()
+    {
+        var handoff = new RecordingHandoff(new string('c', 40));
+        var fixture = Create("COMPLETED", github: new AgentGitHubOptions { Enabled = true, Token = "test-token" }, reviewEnabled: true, handoff: handoff);
+        fixture.Client.Responses = new Queue<string>([
+            "AUTOMATON_RESULT: {\"status\":\"COMPLETED\",\"summary\":\"initial\"}",
+            "REVIEW_RESULT: {\"verdict\":\"CHANGES_REQUIRED\",\"summary\":\"add validation\"}",
+            "AUTOMATON_RESULT: {\"status\":\"COMPLETED\",\"summary\":\"remediated\"}",
+            "REVIEW_RESULT: {\"verdict\":\"APPROVED\",\"summary\":\"final\"}"
+        ]);
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(handoff.CompletedHead, Is.EqualTo(new string('c', 40)));
+            Assert.That(fixture.Factory.Profiles.Select(x => x.Name), Is.EqualTo(new[] { "developer", "reviewer", "developer", "reviewer" }));
+            Assert.That(fixture.Workspaces.LifecycleWrites, Is.EqualTo(1));
+        });
+    }
+
+    private static Fixture Create(string status, AgentGitHubOptions? github = null, RecordingTelemetry? telemetry = null, bool reviewEnabled = false, IHumanApprovalHandoff? handoff = null)
     {
         var workspace = new Workspace("work-1", "C:\\work\\work-1", "automaton/work/work-1", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce-a", "acme/repo", new string('a', 40));
         var manager = new FakeWorkspaces(workspace);
         var client = new FakeClient(status);
-        var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new() } });
+        var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new(), Review = new() { Enabled = reviewEnabled } } });
         var factory = new FakeFactory(client);
-        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow, telemetry), manager, client, workspace, factory);
+        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow, telemetry, handoff), manager, client, workspace, factory);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("id-1", "#1", "Acceptance task", "Implement the task", "open", ["ready"]), 1, DateTimeOffset.UtcNow);
@@ -265,6 +312,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         public IReadOnlyDictionary<string, string> Environment { get; private set; } = new Dictionary<string, string>();
         public WorkspaceExecutionContext? Context { get; private set; }
         public AgentExecutionProfile? Profile { get; private set; }
+        public List<AgentExecutionProfile> Profiles { get; } = [];
         public ICodexAppServerClient Create(WorkspaceExecutionContext context, IReadOnlyDictionary<string, string>? environment = null)
         {
             Environment = new Dictionary<string, string>(environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
@@ -275,6 +323,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         public ICodexAppServerClient Create(WorkspaceExecutionContext context, AgentExecutionProfile profile, IReadOnlyDictionary<string, string>? environment = null)
         {
             Profile = profile;
+            Profiles.Add(profile);
             return Create(context, environment);
         }
     }
@@ -285,6 +334,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         public int DisposeCount { get; private set; }
         public string Prompt { get; private set; } = string.Empty;
         public Exception? Failure { get; set; }
+        public Queue<string>? Responses { get; set; }
         public CancellationTokenSource? CancelSource { get; set; }
         public AgentExecutionProfile? Profile { get; private set; }
         public CodexProcessIdentity? ProcessIdentity => null; public DateTimeOffset LastActivityUtc => DateTimeOffset.UtcNow; public IReadOnlyList<CodexSessionEvent> Events => [];
@@ -297,12 +347,25 @@ public sealed class SupervisedCodexWorkExecutorTests
         public Task<CodexThread> ResumeThreadAsync(string id, CancellationToken token) => throw new NotSupportedException();
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken token) { Prompt = prompt; return Task.FromResult(new CodexTurn("turn-1", threadId)); }
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, AgentExecutionProfile profile, CancellationToken token) { Profile = profile; return StartTurnAsync(threadId, prompt, token); }
-        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (CancelSource is not null) { CancelSource.Cancel(); throw new OperationCanceledException(token); } if (Failure is not null) throw Failure; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}")); }
+        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken token) { if (CancelSource is not null) { CancelSource.Cancel(); throw new OperationCanceledException(token); } if (Failure is not null) throw Failure; var response = Responses?.Dequeue() ?? $"AUTOMATON_RESULT: {{\"status\":\"{status}\",\"summary\":\"done\"}}"; return Task.FromResult(new CodexTurnResult(turn.ThreadId, turn.Id, "completed", FinalResponse: response)); }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken token) => Task.CompletedTask;
         public async ValueTask DisposeAsync()
         {
             DisposeCount++;
             await Context!.SetOwnershipAsync(WorkspaceExecutionOwnershipStates.None, Context.Workspace.LaunchNonce, CancellationToken.None);
+        }
+    }
+    private sealed class RecordingHandoff(string head) : IHumanApprovalHandoff
+    {
+        public string? CapturedHead { get; private set; }
+        public string? CompletedHead { get; private set; }
+        public bool CompletedWithReleasedOwnership { get; private set; }
+        public Task<string> CaptureReviewedHeadAsync(Workspace workspace, CancellationToken token) { CapturedHead = head; return Task.FromResult(head); }
+        public Task<RunOutcome> CompleteAsync(Workspace workspace, string reviewedHeadSha, AgentExecutionOptions agent, CancellationToken token)
+        {
+            CompletedHead = reviewedHeadSha;
+            CompletedWithReleasedOwnership = workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.None;
+            return Task.FromResult(RunOutcome.Success());
         }
     }
     private sealed class FakeWorkspaces(Workspace workspace) : IWorkspaceManager

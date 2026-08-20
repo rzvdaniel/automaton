@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Hosting;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,7 @@ public sealed class ServiceCompositionTests
         Assert.Multiple(() =>
         {
             Assert.That(provider.GetRequiredService<IGitCommandRunner>(), Is.TypeOf<ProcessGitCommandRunner>());
+            Assert.That(provider.GetRequiredService<IHumanApprovalHandoff>(), Is.TypeOf<GitHubHumanApprovalHandoff>());
             Assert.That(provider.GetRequiredService<IWorkspaceManager>(), Is.TypeOf<GitWorktreeWorkspaceManager>());
             Assert.That(provider.GetRequiredService<IWorkExecutor>(), Is.TypeOf<SupervisedCodexWorkExecutor>());
             Assert.That(services.Any(service => service.ServiceType.Name.Contains("Publisher", StringComparison.Ordinal)
