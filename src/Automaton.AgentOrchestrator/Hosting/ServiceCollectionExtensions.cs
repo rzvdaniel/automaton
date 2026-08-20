@@ -41,6 +41,8 @@ public static class ServiceCollectionExtensions
             services.GetRequiredService<OrchestratorOptions>().Workspace.Root,
             services.GetRequiredService<IGitCommandRunner>(),
             services.GetRequiredService<IClock>()));
+        services.AddSingleton<IGitHubCliRunner, ProcessGitHubCliRunner>();
+        services.AddSingleton<IHumanApprovalHandoff, GitHubHumanApprovalHandoff>();
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
         services.AddSingleton<IExecutionFence, PlatformExecutionFence>();
         services.AddSingleton<IWorkExecutor, SupervisedCodexWorkExecutor>();

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 
@@ -93,6 +94,7 @@ public sealed class SupervisedCodexWorkExecutor(
     IWorkspaceManager workspaceManager,
     ICodexAppServerClientFactory clients,
     WorkflowDefinition workflow,
+    IHumanApprovalHandoff humanApprovalHandoff,
     IOperatorTelemetry? telemetry = null) : IWorkExecutor
 {
     public async Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
@@ -169,6 +171,7 @@ public sealed class SupervisedCodexWorkExecutor(
                 await reviewer.InitializeAsync(cancellationToken);
                 var thread = await reviewer.StartThreadAsync(cancellationToken);
                 var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{CodexRuntimeCapability.From(workflow.Options.Agent, workflow.Options.Agent.Reviewer).Instruction}\n{ReviewTerminalContract.Instruction}""";
+                var reviewedHead = await humanApprovalHandoff.CaptureReviewedHeadAsync(context.Workspace, cancellationToken);
                 var turn = await reviewer.StartTurnAsync(thread.Id, prompt, cancellationToken);
                 var result = await reviewer.WaitForTurnCompletionAsync(turn, cancellationToken);
                 var parseFailure = ReviewTerminalParseFailure.None;
@@ -179,7 +182,13 @@ public sealed class SupervisedCodexWorkExecutor(
                 }
                 if (!ReviewTerminalContract.TryParse(result.FinalResponse, out var review, out parseFailure))
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
-                if (review.Verdict == "APPROVED") return await FinishReviewAsync(context, reviewer, attempt, developerOutcome, cancellationToken);
+                if (review.Verdict == "APPROVED")
+                {
+                    await reviewer.DisposeAsync();
+                    var handoff = await humanApprovalHandoff.CompleteAsync(context.Workspace, reviewedHead, workflow.Options.Agent, cancellationToken);
+                    if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return handoff;
+                    return await PersistAsync(context, attempt, handoff, cancellationToken);
+                }
                 await reviewer.DisposeAsync();
                 if (review.Verdict == "BLOCKED")
                     return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);
