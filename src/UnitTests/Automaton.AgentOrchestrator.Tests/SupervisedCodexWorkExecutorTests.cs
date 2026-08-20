@@ -184,7 +184,7 @@ public sealed class SupervisedCodexWorkExecutorTests
             Repository = new() { Root = "C:\\repo", Identity = "acme/repo" },
             Agent = new() { MaxTurns = 2, Developer = profile }
         });
-        var executor = new SupervisedCodexWorkExecutor(fixture.Workspaces, fixture.Factory, workflow);
+        var executor = new SupervisedCodexWorkExecutor(fixture.Workspaces, fixture.Factory, workflow, new RecordingHandoff([new string('a', 40)]));
         var outcome = await executor.ExecuteAsync(Attempt(), CancellationToken.None);
         Assert.Multiple(() =>
         {
@@ -268,6 +268,15 @@ public sealed class SupervisedCodexWorkExecutorTests
     }
 
     [Test]
+    public void HumanApprovalHandoffIsARequiredExecutorDependency()
+    {
+        var constructor = typeof(SupervisedCodexWorkExecutor).GetConstructors().Single();
+        var handoff = constructor.GetParameters().Single(parameter => parameter.ParameterType == typeof(IHumanApprovalHandoff));
+
+        Assert.That(handoff.HasDefaultValue, Is.False);
+    }
+
+    [Test]
     public async Task MidReviewHeadChangeIsHandedOffAsTheOriginalReviewedHeadAndRefused()
     {
         var headA = new string('a', 40);
@@ -322,7 +331,7 @@ public sealed class SupervisedCodexWorkExecutorTests
         var client = new FakeClient(status, trace);
         var workflow = new WorkflowDefinition("WORKFLOW.md", new Dictionary<string, object?>(), "WORKFLOW policy", new OrchestratorOptions { Repository = new() { Root = "C:\\repo", Identity = "acme/repo" }, Agent = new() { MaxTurns = 2, GitHub = github ?? new(), Review = new() { Enabled = reviewEnabled } } });
         var factory = new FakeFactory(client);
-        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow, telemetry, handoff), manager, client, workspace, factory);
+        return new(new SupervisedCodexWorkExecutor(manager, factory, workflow, handoff ?? new RecordingHandoff([workspace.BaseCommitSha!]), telemetry), manager, client, workspace, factory);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("id-1", "#1", "Acceptance task", "Implement the task", "open", ["ready"]), 1, DateTimeOffset.UtcNow);

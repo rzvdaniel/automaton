@@ -94,11 +94,3 @@ public sealed class GitHubHumanApprovalHandoff(IGitCommandRunner git, IGitHubCli
     private static bool IsSha(string? value) => value is { Length: 40 } && value.All(Uri.IsHexDigit);
     private sealed record PullRequestSnapshot(int Number, bool IsDraft, string HeadSha);
 }
-
-public sealed class NoopHumanApprovalHandoff : IHumanApprovalHandoff
-{
-    public Task<string> CaptureReviewedHeadAsync(Workspace workspace, CancellationToken cancellationToken)
-        => Task.FromResult(workspace.BaseCommitSha ?? new string('0', 40));
-    public Task<RunOutcome> CompleteAsync(Workspace workspace, string reviewedHeadSha, AgentExecutionOptions agent, CancellationToken cancellationToken)
-        => Task.FromResult(RunOutcome.Success());
-}

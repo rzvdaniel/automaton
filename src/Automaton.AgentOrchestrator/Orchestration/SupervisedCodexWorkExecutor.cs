@@ -94,10 +94,9 @@ public sealed class SupervisedCodexWorkExecutor(
     IWorkspaceManager workspaceManager,
     ICodexAppServerClientFactory clients,
     WorkflowDefinition workflow,
-    IOperatorTelemetry? telemetry = null,
-    IHumanApprovalHandoff? humanApprovalHandoff = null) : IWorkExecutor
+    IHumanApprovalHandoff humanApprovalHandoff,
+    IOperatorTelemetry? telemetry = null) : IWorkExecutor
 {
-    private readonly IHumanApprovalHandoff humanApprovalHandoff = humanApprovalHandoff ?? new NoopHumanApprovalHandoff();
     public async Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
     {
         WorkspaceExecutionContext context;
