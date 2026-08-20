@@ -1,7 +1,28 @@
-# Agent Orchestrator operations
+# Agent Orchestrator operator guide
 
-The Agent Orchestrator writes a local, read-only operator surface under the
-configured workspace root:
+The orchestrator discovers eligible GitHub issues, assigns one isolated worktree,
+and supervises Codex. The Developer edits, tests, commits, pushes, and creates a
+draft PR. An optional independent Reviewer is read-only. After approval, the
+orchestrator verifies the reviewed local and PR heads match, marks the same PR
+ready for review, and stops. Humans approve and merge.
+
+## Trusted workflow configuration
+
+`WORKFLOW.md` is trusted host configuration, not issue content. Keep it outside
+the repository checkout and workspace root. An issue is eligible only when it is
+open and has every configured `tracker.required_labels` label.
+
+Production defaults are Developer `gpt-5.6-terra`, Reviewer `gpt-5.5`, one
+concurrent agent, two review rounds, a five-minute stall timeout, and a
+60-minute emergency turn ceiling. The Developer is read-write/GitHub-write; the
+Reviewer is read-only/GitHub-read-only. Unsafe role profiles fail startup.
+
+Credentials are supplied through explicit environment references in the
+workflow. Never commit tokens, prompts, or Codex authentication state.
+
+## State, recovery, and investigation
+
+Operator files are daemon-owned under:
 
 ```text
 <workspace-root>/.automaton-agent-orchestrator/operator/
@@ -10,55 +31,26 @@ configured workspace root:
   events.jsonl.1
 ```
 
-These files are daemon-owned and outside agent-visible Git worktrees. They are
-diagnostic state, not product audit history, and must not be edited to control
-the daemon.
+`status.json` identifies the running issue, workspace, branch, ownership,
+attempt, terminal state, build revision, and reconciliation health.
+`events.jsonl` contains bounded lifecycle events including workspace claim,
+Developer/Reviewer model and round, remediation, handoff, completion, and
+shutdown. It never contains tokens, prompts, transcripts, command output, or
+raw provider payloads.
 
-## Health and status
+On restart, ownership is resolved first. A proven-dead execution is released and
+may retry within its budget; ambiguous ownership is quarantined for operator
+attention. Do not edit sidecars or operator files to force progress.
 
-`status.json` is replaced atomically on the configured interval. Schema version
-1 includes:
+## Service lifecycle
 
-- daemon state: `starting`, `reconciling`, `running`, `stopping`, or `degraded`;
-- whether startup reconciliation completed and polling is enabled;
-- repository identity and generation timestamp;
-- current scheduler run state and attempt;
-- current stage and role from the latest structured lifecycle event;
-- workspace key/path, branch, PR URL, and exact published SHA;
-- execution-ownership, CI, and human-feedback state and observation timestamps;
-- retry time and bounded blocked/recovery reason.
+Run one daemon per workspace root under a host service manager. Linux production
+uses systemd; stop with SIGTERM and let the daemon release or quarantine active
+ownership before the service manager's bounded final kill. Logs and workspace
+sidecars survive restart. Verify the reported build revision before dispatch.
 
-`healthy: false` means the operator projection is degraded or durable workspace
-state could not be verified. It does not override the authoritative workspace
-sidecars or process-fencing state. During startup, `startupReconciled: false`
-means work polling remains closed.
+## Non-goals
 
-## Events
-
-`events.jsonl` contains one bounded JSON object per lifecycle transition. Event
-types cover reconciliation, run start/terminal state, retries, roles,
-publication, CI, feedback, and shutdown. The file rotates to `events.jsonl.1`
-at `observability.maximum_event_file_bytes`; only one prior segment is retained.
-
-Messages and metadata are bounded. Secret-like metadata names are persisted as
-`[REDACTED]`. Tokens, authorization headers, environment values, prompts,
-transcripts, raw provider payloads, and CI logs must never be emitted.
-
-Useful checks:
-
-```powershell
-Get-Content <workspace-root>/.automaton-agent-orchestrator/operator/status.json
-Get-Content <workspace-root>/.automaton-agent-orchestrator/operator/events.jsonl -Tail 50
-```
-
-## Configuration
-
-```yaml
-observability:
-  enabled: true
-  snapshot_interval_ms: 10000
-  maximum_event_file_bytes: 5242880
-```
-
-Disabling observability suppresses the operator files but does not change
-scheduling, recovery, fencing, publication, CI, or feedback behavior.
+The orchestrator has no Manager role, CI state machine, PR-feedback state
+machine, auto-approval, auto-merge, or merge automation. GitHub remains the
+source of truth for PR state; human review and merge stay external.

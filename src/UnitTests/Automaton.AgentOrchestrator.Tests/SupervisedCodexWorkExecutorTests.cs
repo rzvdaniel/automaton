@@ -245,8 +245,9 @@ public sealed class SupervisedCodexWorkExecutorTests
     {
         var trace = new List<string>();
         var head = new string('a', 40);
+        var telemetry = new RecordingTelemetry();
         var handoff = new RecordingHandoff([head], trace: trace);
-        var fixture = Create("COMPLETED", github: new AgentGitHubOptions { Enabled = true, Token = "test-token" }, reviewEnabled: true, handoff: handoff, trace: trace);
+        var fixture = Create("COMPLETED", github: new AgentGitHubOptions { Enabled = true, Token = "test-token" }, telemetry: telemetry, reviewEnabled: true, handoff: handoff, trace: trace);
         fixture.Client.Responses = new Queue<string>([
             "AUTOMATON_RESULT: {\"status\":\"COMPLETED\",\"summary\":\"done\"}",
             "REVIEW_RESULT: {\"verdict\":\"APPROVED\",\"summary\":\"reviewed\"}"
@@ -262,6 +263,8 @@ public sealed class SupervisedCodexWorkExecutorTests
             Assert.That(handoff.CompletedWithReleasedOwnership, Is.True);
             Assert.That(trace.IndexOf($"capture:{head}"), Is.LessThan(trace.IndexOf("start:reviewer")));
             Assert.That(trace.IndexOf($"capture:{head}"), Is.LessThan(trace.IndexOf("wait:reviewer")));
+            Assert.That(telemetry.Events.Select(x => x.EventType), Does.Contain("workspace.claimed").And.Contain("agent.started").And.Contain("reviewer.started").And.Contain("reviewer.approved").And.Contain("handoff.ready_for_review").And.Contain("workspace.released"));
+            Assert.That(telemetry.Events.Single(x => x.EventType == "reviewer.approved").Metadata!["reviewedHead"], Is.EqualTo(head));
             Assert.That(fixture.Workspaces.LifecycleWrites, Is.EqualTo(1));
             Assert.That(fixture.Factory.Profiles.Select(x => x.Name), Is.EqualTo(new[] { "developer", "reviewer" }));
         });
