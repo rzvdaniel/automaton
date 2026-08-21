@@ -537,9 +537,8 @@ const handleRetry = async () => {
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
             <p class="text-color-secondary mb-4">
-              Create an app from scratch, import an existing project, or start from a template.
+              Create and build your first web app with the Create App button above, or import an existing project.
             </p>
-            <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
           </div>
         </template>
       </Card>
