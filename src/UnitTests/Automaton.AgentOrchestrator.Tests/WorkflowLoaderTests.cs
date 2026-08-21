@@ -309,7 +309,34 @@ public sealed class WorkflowLoaderTests
             Assert.That(options.Agent.Review.Enabled, Is.True);
             Assert.That(options.Agent.Reviewer.WorkspaceAccess, Is.EqualTo("read-only"));
             Assert.That(options.Agent.Reviewer.GitHubAccess, Is.EqualTo("read-only"));
+            Assert.That(options.Agent.Developer.Model, Is.EqualTo("gpt-5.6-terra"));
+            Assert.That(options.Agent.Reviewer.Model, Is.EqualTo("gpt-5.5"));
         });
+    }
+
+    [TestCase("developer", "read-only", "write", "agent.profiles.developer.workspace_access must be read-write.")]
+    [TestCase("reviewer", "read-write", "read-only", "agent.profiles.reviewer.workspace_access must be read-only.")]
+    [TestCase("reviewer", "read-only", "write", "agent.profiles.reviewer.github must be read-only.")]
+    public async Task LoadAsync_RejectsUnsafeRoleProfiles(string role, string workspaceAccess, string github, string message)
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync($"""
+            ---
+            tracker:
+              kind: fake
+            repository:
+              root: .
+            workspace:
+              root: workspaces
+            agent:
+              profiles:
+                {role}:
+                  workspace_access: {workspaceAccess}
+                  github: {github}
+            ---
+            Prompt
+            """);
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(async () => await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+        Assert.That(exception!.Message, Is.EqualTo(message));
     }
 
     private sealed class TemporaryWorkflow : IAsyncDisposable

@@ -106,6 +106,7 @@ public sealed class SupervisedCodexWorkExecutor(
                 new WorkspaceRepository(workflow.Options.Repository.Root, workflow.Options.Repository.Identity, workflow.Options.Repository.BaseBranch)), cancellationToken);
             context = new WorkspaceExecutionContext(workspaceManager, workspace);
             await context.SetRecoveryAsync(new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt), cancellationToken);
+            telemetry?.Record("workspace.claimed", OperatorEventSeverities.Information, attempt.WorkItem.Id, "execution", metadata: ExecutionMetadata(context.Workspace, attempt));
         }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bound(exception.Message)); }
 
@@ -117,6 +118,7 @@ public sealed class SupervisedCodexWorkExecutor(
         try
         {
             await client.InitializeAsync(cancellationToken);
+            telemetry?.Record("agent.started", OperatorEventSeverities.Information, attempt.WorkItem.Id, "execution", profile.Name, metadata: ExecutionMetadata(context.Workspace, attempt, profile));
             var thread = await client.StartThreadAsync(cancellationToken);
             var prompt = BuildPrompt(attempt, context.Workspace, capability);
             for (var turnIndex = 0; turnIndex < workflow.Options.Agent.MaxTurns; turnIndex++)
@@ -129,6 +131,7 @@ public sealed class SupervisedCodexWorkExecutor(
                     return await FinishAsync(context, client, attempt, RunOutcome.PermanentFailure("Codex returned a malformed task terminal contract."), CancellationToken.None);
                 if (terminal.Status == "COMPLETED")
                 {
+                    telemetry?.Record("agent.completed", OperatorEventSeverities.Information, attempt.WorkItem.Id, "execution", profile.Name, metadata: ExecutionMetadata(context.Workspace, attempt, profile));
                     await client.DisposeAsync();
                     if (workflow.Options.Agent.Review.Enabled)
                         return await ReviewAsync(context, attempt, RunOutcome.Success(), CancellationToken.None);
@@ -169,6 +172,7 @@ public sealed class SupervisedCodexWorkExecutor(
             try
             {
                 await reviewer.InitializeAsync(cancellationToken);
+                telemetry?.Record("reviewer.started", OperatorEventSeverities.Information, attempt.WorkItem.Id, "review", "reviewer", metadata: ExecutionMetadata(context.Workspace, attempt, workflow.Options.Agent.Reviewer, round));
                 var thread = await reviewer.StartThreadAsync(cancellationToken);
                 var prompt = $"""You are an independent read-only reviewer. Inspect the current assigned workspace and diff for task {attempt.WorkItem.Identifier} — {attempt.WorkItem.Title}. Review correctness, requirements, tests, regressions, and unrelated changes. Do not modify files, commit, push, or change GitHub state.\n\n{workflow.PromptTemplate}\n\n{CodexRuntimeCapability.From(workflow.Options.Agent, workflow.Options.Agent.Reviewer).Instruction}\n{ReviewTerminalContract.Instruction}""";
                 var reviewedHead = await humanApprovalHandoff.CaptureReviewedHeadAsync(context.Workspace, cancellationToken);
@@ -184,12 +188,15 @@ public sealed class SupervisedCodexWorkExecutor(
                     return await FinishReviewAsync(context, reviewer, attempt, RunOutcome.PermanentFailure($"Reviewer returned an invalid review result ({parseFailure.ToString().ToLowerInvariant()})."), cancellationToken);
                 if (review.Verdict == "APPROVED")
                 {
+                    telemetry?.Record("reviewer.approved", OperatorEventSeverities.Information, attempt.WorkItem.Id, "review", "reviewer", metadata: ExecutionMetadata(context.Workspace, attempt, workflow.Options.Agent.Reviewer, round, reviewedHead));
                     await reviewer.DisposeAsync();
                     var handoff = await humanApprovalHandoff.CompleteAsync(context.Workspace, reviewedHead, workflow.Options.Agent, cancellationToken);
+                    if (handoff.Succeeded) telemetry?.Record("handoff.ready_for_review", OperatorEventSeverities.Information, attempt.WorkItem.Id, "handoff", metadata: ExecutionMetadata(context.Workspace, attempt, reviewedHead: reviewedHead));
                     if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return handoff;
                     return await PersistAsync(context, attempt, handoff, cancellationToken);
                 }
                 await reviewer.DisposeAsync();
+                if (review.Verdict == "CHANGES_REQUIRED") telemetry?.Record("reviewer.changes_required", OperatorEventSeverities.Information, attempt.WorkItem.Id, "review", "reviewer", metadata: ExecutionMetadata(context.Workspace, attempt, workflow.Options.Agent.Reviewer, round));
                 if (review.Verdict == "BLOCKED")
                     return await PersistAsync(context, attempt, RunOutcome.PermanentFailure(Bound(review.Summary)), cancellationToken);
                 if (round == workflow.Options.Agent.Review.MaxRounds)
@@ -214,6 +221,7 @@ public sealed class SupervisedCodexWorkExecutor(
         var client = clients.Create(context, profile, capability.ChildEnvironment);
         try
         {
+            telemetry?.Record("remediation.started", OperatorEventSeverities.Information, attempt.WorkItem.Id, "remediation", profile.Name, metadata: ExecutionMetadata(context.Workspace, attempt, profile));
             await client.InitializeAsync(cancellationToken);
             var thread = await client.StartThreadAsync(cancellationToken);
             var prompt = $"Continue the assigned task in the same workspace. Address these independent reviewer findings, run focused tests, and update the existing branch/PR without merging: {Bound(findings)}\n{profile.Instructions}\n{AgentTerminalContract.Instruction}";
@@ -255,9 +263,20 @@ public sealed class SupervisedCodexWorkExecutor(
                 : new WorkspaceRecoveryState(WorkspaceRecoveryStates.Blocked, attempt.Attempt, attempt.Attempt + 1, Reason: outcome.FailureReason);
         await context.SetRecoveryAsync(recovery, cancellationToken);
         await context.SetLifecycleAsync(outcome.Succeeded ? WorkspaceLifecycleStates.Ready : outcome.IsRetryable ? WorkspaceLifecycleStates.RetryableFailure : WorkspaceLifecycleStates.Failed, cancellationToken);
+        if (context.Workspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.None)
+            telemetry?.Record("workspace.released", OperatorEventSeverities.Information, attempt.WorkItem.Id, "execution", metadata: ExecutionMetadata(context.Workspace, attempt));
         telemetry?.Record("agent.task.completed", outcome.Succeeded ? OperatorEventSeverities.Information : OperatorEventSeverities.Warning,
             attempt.WorkItem.Id, "execution", message: outcome.Succeeded ? "Codex task completed." : outcome.FailureReason);
         return outcome;
+    }
+
+    private static IReadOnlyDictionary<string, string> ExecutionMetadata(Workspace workspace, RunAttempt attempt, AgentExecutionProfile? profile = null, int? reviewRound = null, string? reviewedHead = null)
+    {
+        var metadata = new Dictionary<string, string> { ["attempt"] = attempt.Attempt.ToString(System.Globalization.CultureInfo.InvariantCulture), ["workspaceKey"] = workspace.Key, ["branch"] = workspace.Branch };
+        if (profile is not null) metadata["model"] = profile.Model;
+        if (reviewRound is not null) metadata["reviewRound"] = reviewRound.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (reviewedHead is not null) metadata["reviewedHead"] = reviewedHead;
+        return metadata;
     }
 
     private string BuildPrompt(RunAttempt attempt, Workspace workspace, CodexRuntimeCapability capability) => $"""

@@ -251,6 +251,14 @@ public sealed class WorkflowLoader : IWorkflowLoader
             throw new WorkflowValidationException("agent.github.token is required when agent.github.enabled is true.");
         if (!options.Agent.GitHub.Enabled && !string.IsNullOrWhiteSpace(options.Agent.GitHub.Token))
             throw new WorkflowValidationException("agent.github.token requires agent.github.enabled to be true.");
+        if (options.Agent.Developer.WorkspaceAccess != "read-write")
+            throw new WorkflowValidationException("agent.profiles.developer.workspace_access must be read-write.");
+        if (options.Agent.GitHub.Enabled && options.Agent.Developer.GitHubAccess != "write")
+            throw new WorkflowValidationException("agent.profiles.developer.github must be write when agent.github.enabled is true.");
+        if (options.Agent.Reviewer.WorkspaceAccess != "read-only")
+            throw new WorkflowValidationException("agent.profiles.reviewer.workspace_access must be read-only.");
+        if (options.Agent.Reviewer.GitHubAccess != "read-only")
+            throw new WorkflowValidationException("agent.profiles.reviewer.github must be read-only.");
     }
 
     private static bool IsSafeRefPart(string value)
