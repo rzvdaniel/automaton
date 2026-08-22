@@ -534,7 +534,7 @@ const handleRetry = async () => {
       <Card v-else-if="!appsStore.hasApps">
         <template #content>
           <div class="text-center py-5">
-            <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
+            <i class="pi pi-globe text-6xl text-color-secondary mb-4" aria-hidden="true"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
             <p class="text-color-secondary mb-4">
               Create an app from scratch, import an existing project, or start from a template.
