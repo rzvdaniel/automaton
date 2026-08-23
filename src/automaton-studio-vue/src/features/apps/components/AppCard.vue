@@ -83,7 +83,7 @@ const liveStatusLabel = computed(() => {
   if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (environment.isStaticHosting) return 'Available'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.frontendDeployed && !environment.backendDeployed) return 'Unassigned'
+  if (!environment.runtimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 })
 const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveStatusLabel.value)

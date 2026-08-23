@@ -18,14 +18,14 @@ public sealed class DeployService
     private readonly ConfigService config;
     private readonly Action<string>? progress;
     private readonly Action<DeployCheckResult>? checkReported;
-    private readonly Func<string, string, CancellationToken, Task<int>> runBuildAsync;
+    private readonly Func<ApplicationCommandSpec, string, CancellationToken, Task<int>> runBuildAsync;
     private readonly Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync;
     private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> createSnapshotAsync;
     private readonly Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync;
 
     public DeployService(
         ConfigService config,
-        Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
+        Func<ApplicationCommandSpec, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
         : this(config, null, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
@@ -35,7 +35,7 @@ public sealed class DeployService
     public DeployService(
         ConfigService config,
         Action<string>? progress,
-        Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
+        Func<ApplicationCommandSpec, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
         : this(config, progress, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
@@ -46,7 +46,7 @@ public sealed class DeployService
         ConfigService config,
         Action<string>? progress = null,
         Action<DeployCheckResult>? checkReported = null,
-        Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
+        Func<ApplicationCommandSpec, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null,
         Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync = null)
@@ -313,11 +313,8 @@ public sealed class DeployService
             return new DeployCheckResult(DeployCheckNames.Build, false, "build.command is configured in automaton.json but has no executable");
         }
 
-        var commandLine = string.Join(
-            " ",
-            new[] { buildCommand.Executable }.Concat(buildCommand.Arguments).Select(QuoteCommandArgument));
         var workingDirectory = ZipService.ResolveDeployDirectory(directory, buildCommand.WorkingDirectory);
-        var exitCode = await runBuildAsync(commandLine, workingDirectory, cancellationToken);
+        var exitCode = await runBuildAsync(buildCommand, workingDirectory, cancellationToken);
         if (exitCode != 0)
         {
             nextSteps.Add("Fix the build errors and rerun automaton deploy");
@@ -412,27 +409,66 @@ public sealed class DeployService
         };
     }
 
-    private static string QuoteCommandArgument(string value) =>
-        value.Any(char.IsWhiteSpace) || value.Contains('"')
-            ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
-            : value;
-
-    private static async Task<int> RunBuildAsync(string command, string workingDir, CancellationToken cancellationToken)
+    private static async Task<int> RunBuildAsync(ApplicationCommandSpec command, string workingDir, CancellationToken cancellationToken)
     {
-        var (shell, args) = OperatingSystem.IsWindows()
-            ? ("cmd.exe", $"/c {command}")
-            : ("/bin/sh", $"-c \"{command}\"");
-
-        var psi = new System.Diagnostics.ProcessStartInfo(shell, args)
-        {
-            WorkingDirectory = workingDir,
-            UseShellExecute = false
-        };
+        var psi = CreateBuildProcessStartInfo(command, workingDir);
 
         using var process = System.Diagnostics.Process.Start(psi)!;
         await process.WaitForExitAsync(cancellationToken);
         return process.ExitCode;
     }
+
+    internal static System.Diagnostics.ProcessStartInfo CreateBuildProcessStartInfo(
+        ApplicationCommandSpec command,
+        string workingDir)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            WorkingDirectory = workingDir,
+            UseShellExecute = false
+        };
+
+        if (command.UseShell)
+        {
+            var commandLine = string.Join(
+                " ",
+                new[] { command.Executable }.Concat(command.Arguments).Select(QuoteShellArgument));
+            if (OperatingSystem.IsWindows())
+            {
+                psi.FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
+                psi.ArgumentList.Add("/d");
+                psi.ArgumentList.Add("/s");
+                psi.ArgumentList.Add("/c");
+                psi.ArgumentList.Add(commandLine);
+            }
+            else
+            {
+                psi.FileName = "/bin/sh";
+                psi.ArgumentList.Add("-c");
+                psi.ArgumentList.Add(commandLine);
+            }
+        }
+        else
+        {
+            psi.FileName = command.Executable;
+            foreach (var argument in command.Arguments)
+            {
+                psi.ArgumentList.Add(argument);
+            }
+        }
+
+        foreach (var pair in command.Environment)
+        {
+            psi.Environment[pair.Key] = pair.Value;
+        }
+
+        return psi;
+    }
+
+    private static string QuoteShellArgument(string value) =>
+        value.Any(char.IsWhiteSpace) || value.Contains('"')
+            ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+            : value;
 
     private static async Task<(DeployUploadResult Upload, DeployBackendResult Deploy)> DeployPackageAsync(
         string server,

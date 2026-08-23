@@ -114,8 +114,7 @@ export interface AppListItem {
     isHostedRunner: boolean
     applicationProfile?: string | null
     runnerOnline: boolean
-    frontendDeployed: boolean
-    backendDeployed: boolean
+    runtimeDeployed: boolean
     isStaticHosting?: boolean
     routePath: string
   } | null
@@ -140,8 +139,7 @@ export interface AppDeploymentTarget {
   slug: string
   isDefault: boolean
   status: DeploymentTargetStatus
-  frontendDeployed: boolean
-  backendDeployed: boolean
+  runtimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
   cleanupPending: boolean

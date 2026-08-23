@@ -326,6 +326,8 @@ public class AppsControllerExecutionService
             throw new InvalidOperationException("A deployment package file is required.");
         }
 
+        var packageApplication = await DeployPackageContractService.ReadAsync(file, appId, cancellationToken);
+
         if (string.IsNullOrWhiteSpace(targetSlug))
         {
             var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
@@ -379,6 +381,8 @@ public class AppsControllerExecutionService
 
             if (result.Success)
             {
+                await DeployPackageContractService.PersistAsync(
+                    dataContext, appId, packageApplication, cancellationToken);
                 // Keep API source as the compatibility copy used by Studio, pull,
                 // remix, and fork flows. Runner-deployed Action content remains the
                 // runtime authority and is never reconstructed from this copy.

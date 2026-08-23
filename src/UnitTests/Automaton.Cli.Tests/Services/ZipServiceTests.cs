@@ -1,6 +1,8 @@
 using System.IO.Compression;
+using System.Text.Json;
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
+using Automaton.Core.Models;
 using NUnit.Framework;
 
 namespace Automaton.Cli.Tests.Services;
@@ -22,6 +24,49 @@ public class ZipServiceTests
         }
 
         _tempDirectories.Clear();
+    }
+
+    [Test]
+    public void CreateDeployPackageZip_EmbedsCanonicalApplicationContract()
+    {
+        var projectRoot = CreateTempDirectory();
+        var artifactDirectory = Path.Combine(projectRoot, "artifacts");
+        Directory.CreateDirectory(artifactDirectory);
+        File.WriteAllText(Path.Combine(artifactDirectory, "app.bin"), "runtime");
+
+        var application = new ApplicationContract
+        {
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "arbitrary-server",
+                    Arguments = ["--port", "5000"],
+                    WorkingDirectory = "app"
+                },
+                Port = 5000
+            },
+            Health = new ApplicationHealthSpec { Path = null }
+        };
+
+        using var zipStream = ZipService.CreateDeployPackageZip(
+            projectRoot,
+            Guid.NewGuid().ToString(),
+            application,
+            sourceScopeConfig: null,
+            resolvedArtifactDirectory: artifactDirectory);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        using var manifestReader = new StreamReader(archive.GetEntry("manifest.json")!.Open());
+        using var manifest = JsonDocument.Parse(manifestReader.ReadToEnd());
+        var loaded = ApplicationContractSerialization.Deserialize(
+            manifest.RootElement.GetProperty("Application").GetRawText());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(loaded.Runtime.Command!.Executable, Is.EqualTo("arbitrary-server"));
+            Assert.That(loaded.Runtime.Command.Arguments, Is.EqualTo(new[] { "--port", "5000" }));
+            Assert.That(loaded.Health.Path, Is.Null);
+        });
     }
 
     [Test]

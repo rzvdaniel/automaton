@@ -532,8 +532,11 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
         entity.Definition = "{}";
-        ApplicationContractValidator.EnsureValid(app.Application);
-        entity.ApplicationContractJson = ApplicationContractSerialization.Serialize(app.Application);
+        if (app.Application is not null)
+        {
+            ApplicationContractValidator.EnsureValid(app.Application);
+            entity.ApplicationContractJson = ApplicationContractSerialization.Serialize(app.Application);
+        }
 
         // Public profile display fields
         entity.ThumbnailUrl = app.ThumbnailUrl;

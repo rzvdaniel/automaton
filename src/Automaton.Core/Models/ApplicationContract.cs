@@ -30,7 +30,7 @@ public sealed class ApplicationRuntimeSpec
 
 public sealed class ApplicationHealthSpec
 {
-    public string Path { get; set; } = "/health";
+    public string? Path { get; set; }
     public int? Port { get; set; }
     public int StartupTimeoutSeconds { get; set; } = 60;
 }
@@ -140,10 +140,11 @@ public static class ApplicationContractValidator
             errors.Add("health is required");
         else
         {
-            if (string.IsNullOrWhiteSpace(contract.Health.Path)
-                || !contract.Health.Path.StartsWith("/", StringComparison.Ordinal)
-                || contract.Health.Path.Contains("..", StringComparison.Ordinal)
-                || contract.Health.Path.Contains('\0'))
+            if (contract.Health.Path is not null
+                && (string.IsNullOrWhiteSpace(contract.Health.Path)
+                    || !contract.Health.Path.StartsWith("/", StringComparison.Ordinal)
+                    || contract.Health.Path.Contains("..", StringComparison.Ordinal)
+                    || contract.Health.Path.Contains('\0')))
             {
                 errors.Add("health.path must be an absolute application URL path without traversal");
             }

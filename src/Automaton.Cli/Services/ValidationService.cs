@@ -25,9 +25,7 @@ public sealed class ValidationService
       },
       "port": 8080
     },
-    "health": {
-      "path": "/health"
-    },
+    "health": {},
     "storage": {
       "dataDirectory": "data"
     }

@@ -158,7 +158,7 @@ async function saveTarget() {
   try {
     if (editingTarget.value) {
       const runnerChanged = runnerId.value !== (editingTarget.value.runner?.id ?? null)
-      const hasRuntime = editingTarget.value.frontendDeployed || editingTarget.value.backendDeployed
+      const hasRuntime = editingTarget.value.runtimeDeployed
       if (runnerChanged && hasRuntime) {
         confirm.require({
           header: 'Move deployed environment?',
@@ -330,24 +330,21 @@ function runtimeTransport(target: AppDeploymentTarget): string {
 function canOpenPreview(target: AppDeploymentTarget): boolean {
   return (
     !!target.runner &&
-    target.frontendDeployed &&
+    target.runtimeDeployed &&
     target.runner.isOnline &&
     target.status !== DeploymentTargetStatus.RunnerOffline
   )
 }
 
 function deploymentState(target: AppDeploymentTarget): string {
-  if (!target.frontendDeployed && !target.backendDeployed) return ''
-  if (target.frontendDeployed && target.backendDeployed) return 'Frontend + backend'
-  return target.frontendDeployed ? 'Frontend' : 'Backend'
+  return target.runtimeDeployed ? 'Runtime deployed' : ''
 }
 
 function canPromote(target: AppDeploymentTarget): boolean {
   return (
     !!target.runner &&
     target.runner.isOnline &&
-    target.frontendDeployed &&
-    target.backendDeployed &&
+    target.runtimeDeployed &&
     target.status !== DeploymentTargetStatus.Deploying
   )
 }

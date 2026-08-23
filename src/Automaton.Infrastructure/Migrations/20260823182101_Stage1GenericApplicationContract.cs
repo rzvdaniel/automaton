@@ -30,7 +30,7 @@ namespace Automaton.Infrastructure.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.Sql(
-                "UPDATE `WebApps` SET `ApplicationContractJson` = '{\"build\":{\"command\":null,\"outputDirectory\":null,\"timeoutSeconds\":900},\"runtime\":{\"command\":null,\"port\":8080},\"health\":{\"path\":\"/health\",\"port\":null,\"startupTimeoutSeconds\":60},\"storage\":{\"dataDirectory\":\"data\",\"mounts\":[]}}' WHERE `ApplicationContractJson` IS NULL");
+                "UPDATE `WebApps` SET `ApplicationContractJson` = '{\"build\":{\"command\":null,\"outputDirectory\":null,\"timeoutSeconds\":900},\"runtime\":{\"command\":null,\"port\":8080},\"health\":{\"path\":null,\"port\":null,\"startupTimeoutSeconds\":60},\"storage\":{\"dataDirectory\":\"data\",\"mounts\":[]}}' WHERE `ApplicationContractJson` IS NULL");
 
             migrationBuilder.AlterColumn<string>(
                 name: "ApplicationContractJson",

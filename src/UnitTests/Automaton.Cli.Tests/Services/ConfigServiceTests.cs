@@ -133,6 +133,15 @@ public class ConfigServiceTests
     }
 
     [Test]
+    public void ApplicationContract_AllowsPortReadinessWithoutHealthPath()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Health.Path = null;
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+    }
+
+    [Test]
     public void CanonicalApplicationContractHasNoFrontendOrBackendRequirement()
     {
         Assert.Multiple(() =>

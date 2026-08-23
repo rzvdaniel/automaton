@@ -61,7 +61,10 @@ public class AppModel
     public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
-    public ApplicationContract Application { get; set; } = ApplicationContractDefaults.Create();
+    // The full app representation includes the canonical contract, but update
+    // payloads may omit it when changing unrelated metadata. The service then
+    // preserves the persisted contract instead of replacing it with defaults.
+    public ApplicationContract? Application { get; set; }
 }
 
 public class AppComponentOwnershipModel

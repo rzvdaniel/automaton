@@ -195,7 +195,7 @@ function getTargetDestinationLabel(target?: AppDeploymentTarget | null): string 
 
 function getTargetStatusLabel(target: AppDeploymentTarget): string {
   if (!target.runner) return 'Unassigned'
-  if (!target.frontendDeployed) return 'Not deployed'
+  if (!target.runtimeDeployed) return 'Not deployed'
   if (!target.runner.isOnline || target.status === DeploymentTargetStatus.RunnerOffline) return 'Offline'
   return target.status === DeploymentTargetStatus.Running ? 'Running' : target.status
 }
