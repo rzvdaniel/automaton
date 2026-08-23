@@ -12,19 +12,19 @@ public class RunnerDeploymentService
     private const int MaximumArchiveEntries = 20_000;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly RunnerBackendEnvironmentService backendEnvironmentService;
-    private readonly IAppBackendProcessManager backendProcessManager;
+    private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly AppActionDeploymentService actionDeploymentService;
     private readonly ILogger logger;
 
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerBackendEnvironmentService backendEnvironmentService,
-        IAppBackendProcessManager backendProcessManager,
+        IAppRuntimeProcessManager runtimeProcessManager,
         AppActionDeploymentService actionDeploymentService)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.backendEnvironmentService = backendEnvironmentService;
-        this.backendProcessManager = backendProcessManager;
+        this.runtimeProcessManager = runtimeProcessManager;
         this.actionDeploymentService = actionDeploymentService;
         logger = Log.ForContext<RunnerDeploymentService>();
     }
@@ -49,7 +49,7 @@ public class RunnerDeploymentService
             Directory.CreateDirectory(tempExtractRoot);
             ExtractPackageSafely(request.PackagePath, tempExtractRoot);
 
-            var manifest = LoadManifest(tempExtractRoot);
+            var manifest = LoadManifest(tempExtractRoot, appId);
             ValidateIncomingActions(tempExtractRoot, request.SystemInfrastructure);
             snapshotPath = CreateSnapshotIfNeeded(appId, deploymentTargetId);
 
@@ -106,11 +106,10 @@ public class RunnerDeploymentService
                 }
             }
 
-            await PersistDeploymentMetadataAsync(appId, deploymentTargetId, manifest);
-            if (manifest.HasBackend)
-                await backendProcessManager.EnsureRunningAsync(appId, deploymentTargetId);
-            else
-                await backendProcessManager.StopAsync(appId, deploymentTargetId);
+            await runtimeProcessManager.ApplyAsync(
+                appId,
+                deploymentTargetId,
+                manifest.Application);
 
             return new DeployAppPackageResult
             {
@@ -168,7 +167,7 @@ public class RunnerDeploymentService
         Guid appId,
         Guid deploymentTargetId)
     {
-        await backendProcessManager.StopAsync(appId, deploymentTargetId);
+        await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
         var targetRoot = runnerWorkspaceService.GetDeploymentTargetRoot(
             appId,
             deploymentTargetId);
@@ -178,27 +177,7 @@ public class RunnerDeploymentService
         }
     }
 
-    private async Task PersistDeploymentMetadataAsync(
-        Guid appId,
-        Guid deploymentTargetId,
-        AppDeploymentPackageManifest manifest)
-    {
-        var metadataPath = Path.Combine(
-            runnerWorkspaceService.GetDeploymentTargetRoot(appId, deploymentTargetId),
-            "deployment.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
-        var metadata = JsonSerializer.Serialize(new
-        {
-            appId = appId.ToString(),
-            deploymentTargetId = deploymentTargetId.ToString(),
-            hasBackend = manifest.HasBackend,
-            backendModule = manifest.BackendModule,
-            deployedAtUtc = DateTime.UtcNow
-        });
-        await File.WriteAllTextAsync(metadataPath, metadata);
-    }
-
-    private AppDeploymentPackageManifest LoadManifest(string extractRoot)
+    private AppDeploymentPackageManifest LoadManifest(string extractRoot, Guid requestAppId)
     {
         var manifestPath = Path.Combine(extractRoot, "manifest.json");
         if (!File.Exists(manifestPath))
@@ -211,6 +190,14 @@ public class RunnerDeploymentService
         {
             throw new InvalidOperationException("Deployment package manifest is invalid.");
         }
+
+        if (!Guid.TryParse(manifest.AppId, out var manifestAppId)
+            || manifestAppId != requestAppId)
+        {
+            throw new InvalidOperationException("Deployment package manifest app ID does not match the deployment request.");
+        }
+
+        ApplicationContractValidator.EnsureValid(manifest.Application);
 
         return manifest;
     }
@@ -250,8 +237,7 @@ public class RunnerDeploymentService
     private void CleanDeploymentRoots(Guid appId, Guid deploymentTargetId)
     {
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeFrontendDirectory(appId, deploymentTargetId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppBackendDirectory(appId, deploymentTargetId));
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId));
     }
 

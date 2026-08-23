@@ -12,19 +12,19 @@ namespace Automaton.Runner.Console.Services;
 public sealed class RunnerRuntimeGatewayService : IHostedService
 {
     private readonly RunnerWorkspaceService workspace;
-    private readonly RunnerBackendRegistry backendRegistry;
+    private readonly RunnerRuntimeRegistry runtimeRegistry;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly ILogger<RunnerRuntimeGatewayService> logger;
     private WebApplication? application;
 
     public RunnerRuntimeGatewayService(
         RunnerWorkspaceService workspace,
-        RunnerBackendRegistry backendRegistry,
+        RunnerRuntimeRegistry runtimeRegistry,
         IHttpClientFactory httpClientFactory,
         ILogger<RunnerRuntimeGatewayService> logger)
     {
         this.workspace = workspace;
-        this.backendRegistry = backendRegistry;
+        this.runtimeRegistry = runtimeRegistry;
         this.httpClientFactory = httpClientFactory;
         this.logger = logger;
     }
@@ -63,16 +63,16 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         Guid deploymentTargetId,
         string? path)
     {
-        if (!backendRegistry.TryGet(appId, deploymentTargetId, out var backend))
+        if (!runtimeRegistry.TryGet(appId, deploymentTargetId, out var runtime))
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Backend runtime is unavailable." });
+            await context.Response.WriteAsJsonAsync(new { error = "Application runtime is unavailable." });
             return;
         }
 
-        var target = new UriBuilder("http", "127.0.0.1", backend.Port)
+        var target = new UriBuilder("http", "127.0.0.1", runtime.Port)
         {
-            // The gateway route removes only /apps/{appId}; preserve /api for the app backend.
+            // The gateway route removes only /apps/{appId}; preserve /api for the application runtime.
             Path = "/api/" + (path ?? string.Empty),
             Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
         }.Uri;
@@ -102,7 +102,7 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
             if (!context.Response.HasStarted)
             {
                 context.Response.StatusCode = StatusCodes.Status502BadGateway;
-                await context.Response.WriteAsJsonAsync(new { error = "Backend runtime could not be reached." }, context.RequestAborted);
+                await context.Response.WriteAsJsonAsync(new { error = "Application runtime could not be reached." }, context.RequestAborted);
             }
         }
     }

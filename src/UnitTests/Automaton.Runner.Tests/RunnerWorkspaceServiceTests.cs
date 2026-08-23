@@ -143,9 +143,9 @@ public class RunnerWorkspaceServiceTests
     }
 
     [Test]
-    public void BackendRegistry_AllowsTwoTargetsOfOneApp()
+    public void RuntimeRegistry_AllowsTwoTargetsOfOneApp()
     {
-        var registry = new RunnerBackendRegistry();
+        var registry = new RunnerRuntimeRegistry();
         var appId = Guid.NewGuid();
         var firstTargetId = Guid.NewGuid();
         var secondTargetId = Guid.NewGuid();
