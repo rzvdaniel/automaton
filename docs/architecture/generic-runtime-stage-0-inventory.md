@@ -113,6 +113,67 @@ execution paths should not remain as fallbacks.
    concepts, while the runtime gateway/tunnel path forwards requests to the
    assigned runner endpoint.
 
+### 4a. Python-specific Automaton Action/controller execution contract (current)
+
+The repository currently contains two related but different execution
+contracts. Both are part of the Stage 0 inventory and must not be conflated
+with the target generic runtime:
+
+- Manifest-driven Automaton Actions are deployed below the runner's
+  `runtime/actions` tree. `AppActionDeploymentService` prepares versioned
+  Action directories and, for Python Actions, creates an Action-local `.venv`
+  and installs `requirements.txt`. `AppActionExecutionService` starts the
+  declared entrypoint with the Action-local interpreter, sends JSON on stdin,
+  requires JSON on stdout, enforces input/result/log/timeout limits, persists
+  execution state and artifacts, and redacts configured secrets. These are
+  durable Action/version/execution semantics, but their current runtime
+  selection and process launch are stack-specific.
+- Legacy Studio/app controller Actions are a separate Python controller
+  contract. `AppsControllerExecutionService.ExecuteActionAsync` resolves the
+  app's assigned online runner, optionally serves a mock from
+  `source/backend/mocks/{controller}.{action}.json`, or sends a tunnel `POST`
+  to `/api/controller/{controller}` with `app_id`, `deployment_target_id`,
+  `action`, and `inputs`. A `404` triggers one auto-deploy-and-retry attempt.
+  Results are aggregated across the selected runner set; controller output is
+  added to execution logs and published as backend runtime output.
+
+The controller deployment and launch assumptions are concrete:
+
+1. `AppsControllerExecutionService` syncs `source/backend` into the API-side
+   runtime backend, enumerates backend files, and sends them to the runner via
+   `UploadControllerScript`. Text files such as `requirements.txt` and
+   `system-requirements.txt` are deployed as dependency inputs; the fast
+   auto-deploy path skips text files and pushes the remaining Python scripts.
+   The same service marks the operation as a backend deployment and refreshes
+   backend route configuration.
+2. `fastapi_server/main.py` resolves the target workspace as
+   `RUNNER_SCRIPTS_DIR/{appId}/targets/{deploymentTargetId}`. It requires both
+   `runtime/backend` and a target-local `venv` (`venv/Scripts/python.exe` on
+   Windows or `venv/bin/python` elsewhere), creates the app data directory,
+   and launches the venv interpreter with
+   `controller_runner.py <scripts_dir> <app_id> <deployment_target_id>
+   <controller_name>`. It injects `AUTOMATON_APP_ID`,
+   `AUTOMATON_DEPLOYMENT_TARGET_ID`, `AUTOMATON_APP_HOME`,
+   `AUTOMATON_APP_BACKEND_DIR`, and `AUTOMATON_APP_DATA_DIR` into the child
+   process.
+3. `controller_runner.py` imports
+   `{scripts_dir}/{app_id}/targets/{deployment_target_id}/runtime/backend/{controller}.py`,
+   requires a `handle(action_name, inputs)` function, captures the function's
+   stdout/stderr, requires a dictionary result, and emits the JSON envelope
+   `{ success, data, error, output }`. Controller exceptions and malformed
+   results become a failed JSON response. The contract therefore assumes
+   Python source files, Python imports from the backend directory, a callable
+   `handle` function, and a JSON-compatible result; it is not an opaque HTTP
+   runtime contract.
+
+The generic runtime migration must decide which parts remain product-level
+Action semantics (input/result schema, idempotency, execution history, logs,
+and redaction) and which parts become runtime-provider details (Python module
+loading, `handle`, backend directory, venv, requirements files, FastAPI
+sidecar, and the controller tunnel path). The runner may retain a control
+plane service, but application execution must be driven by the explicit generic
+build/runtime/health contract rather than by these Python assumptions.
+
 ### 5. Readiness, routing, and publishing
 
 - Application readiness is currently a TCP port probe in
@@ -154,6 +215,10 @@ execution paths should not remain as fallbacks.
 | API file storage | `source/frontend`, `source/backend`, `live/frontend`, `live/backend`, frontend/backend metadata | Persistence/schema coupling | Migrate durable source and data; remove enforced role split |
 | API Studio deploy | separate frontend sync and backend runner deployment | Control-plane coupling | Converge on the generic deployment path |
 | API capability checks | build-marker and source-layout detection | Control-plane coupling | Remove from infrastructure decisions; templates may provide explicit config |
+| Action/controller execution | `controller_runner.py`, Python `handle(action, inputs)`, target `runtime/backend`, app venv, `requirements.txt`, and the controller tunnel/auto-deploy path in `AppsControllerExecutionService` | Runner/control-plane coupling | Preserve Action-level result/history semantics where required; replace Python module loading, backend/venv assumptions, and controller-specific transport with the generic execution contract |
+| Managed runner assignment | `ManagedRunnerAppAssignmentService` assigns only apps whose storage metadata reports a backend source/runtime | Control-plane coupling | Assign from generic runtime/deployment requirements or explicit capability data; do not infer runner eligibility from the existence of a backend |
+| Deployment target state | `AppDeploymentTargetStateService` accepts `deployFrontend`/`deployBackend` and stores split completion markers | Persistence/control-plane coupling | Replace role booleans and split completion calls with generic deployment revision, runtime, and readiness state after all callers are mapped |
+| CLI pull | `PullCommand` infers `FrontendConfig`/`BackendConfig` from `frontend/` and `backend/` paths when reconstructing `automaton.json` | CLI coupling | Pull the declared generic contract and complete source tree; do not invent stack roles from directory names |
 | Runner package deploy | requirements files, system requirements, `HasBackend`, `BackendModule` | Runner coupling | Replace with generic build/runtime commands |
 | Runner process start | `main.py`, Python, venv, uvicorn, fixed backend port range | Runner coupling | Replace with opaque executable/process supervision |
 | Runner workspace | FastAPI scripts root, backend/venv helpers, legacy scripts layout | Runner coupling | Keep containment/storage ownership; remove technology names and role assumptions |
@@ -176,6 +241,23 @@ inventory:
 - `src/Automaton.Api/Services/AppDeployCapabilityService.cs`, the split Studio
   deploy methods in `AppsControllerExecutionService.cs`, and the split
   frontend/backend deployment DTOs and UI calls.
+- `src/Automaton.Api/Services/AppsControllerExecutionService.cs` controller
+  deployment/execution portions, `src/Automaton.Runner/fastapi_server/main.py`,
+  and `src/Automaton.Runner/fastapi_server/controller_runner.py`. These encode
+  the current Python controller import, venv, `runtime/backend`, tunnel,
+  auto-deploy, and JSON `handle` response contract.
+- `src/Automaton.Api/Services/ManagedRunnerAppAssignmentService.cs`. Its
+  eligibility gate is `Backend.SourceAvailable || Backend.RuntimeAvailable`,
+  so an app without the current backend classification cannot receive a
+  managed execution runner even if a future generic runtime requires one.
+- `src/Automaton.Api/Services/AppDeploymentTargetStateService.cs`. Its public
+  completion API and persisted flags model deployment as independent frontend
+  and backend operations; a generic runtime needs one contract-driven
+  deployment/readiness state rather than role-specific markers.
+- `src/Automaton.Cli/Commands/PullCommand.cs`. When no local config exists, it
+  reconstructs `automaton.json` by scanning for `frontend/` and `backend/` and
+  creates role-specific config. A generic pull must preserve the remote
+  contract and arbitrary source layout without stack inference.
 - `src/Automaton.Infrastructure/Entities/AppDeploymentTarget.cs` deployment
   booleans and related summaries/projections.
 - `src/Automaton.Api/Services/AppFileStorageService.cs` fixed frontend/backend
@@ -237,6 +319,16 @@ until each later stage replaces the behavior deliberately:
   metadata, process stop behavior, and target cleanup isolation. It also records
   the current `HasBackend`/`BackendModule` marker used to restart Python
   backends.
+- `Automaton.Runner.Tests/AppActionDeploymentServiceTests.cs` covers Action
+  version preparation, unchanged deployments, restore, and deletion rules.
+- `Automaton.Runner.Tests/AppActionExecutionServiceTests.cs` covers persisted
+  execution/idempotency, interruption classification, bounded stdout/stderr,
+  and secret redaction for the manifest-driven Action runtime.
+- `Automaton.Runner.Tests/ControllerRunnerContractTests.cs` is the focused
+  baseline for the currently uncovered controller invariant: a deployed
+  Python controller is imported from the target `runtime/backend` directory,
+  receives the action and inputs through `handle`, and returns the JSON result
+  envelope with captured output.
 - `Automaton.Api.Tests/AppFileStorageServiceTests.cs` covers source/runtime
   separation, version restore, fork-safe copying, and current frontend build
   marker detection.
