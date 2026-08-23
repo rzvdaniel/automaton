@@ -432,7 +432,7 @@ public class ZipServiceTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => ZipService.ResolveDeployDirectory(projectRoot, null));
 
-        Assert.That(ex!.Message, Does.Contain("frontend.deployDir is required"));
+        Assert.That(ex!.Message, Does.Contain("application artifact directory is required"));
     }
 
     [Test]

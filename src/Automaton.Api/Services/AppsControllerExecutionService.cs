@@ -140,7 +140,7 @@ public class AppsControllerExecutionService
                 if (runnersWithoutScripts.Count == 0)
                 {
                     if (manageTargetState)
-                        await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, deployFrontend: false, deployBackend: true, cancellationToken);
+                        await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
                     return new DeployBackendResponse
                     {
                         DeploymentTargetId = target.Id,
@@ -153,7 +153,7 @@ public class AppsControllerExecutionService
 
                 await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, runnersWithoutScripts, cancellationToken);
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, deployFrontend: false, deployBackend: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -171,7 +171,7 @@ public class AppsControllerExecutionService
             if (!runners.Any())
             {
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, deployFrontend: false, deployBackend: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, runtimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -187,7 +187,7 @@ public class AppsControllerExecutionService
             if (storageBlock != null)
             {
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, deployFrontend: false, deployBackend: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, runtimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -264,14 +264,14 @@ public class AppsControllerExecutionService
             };
             if (manageTargetState)
                 await deploymentTargetStateService.MarkCompletedAsync(
-                    appId, target.Id, response.Success, deployFrontend: false, deployBackend: true, cancellationToken);
+                    appId, target.Id, response.Success, runtimeDeployed: true, cancellationToken);
             return response;
         }
         catch
         {
             if (manageTargetState)
                 await deploymentTargetStateService.MarkCompletedAsync(
-                    appId, target.Id, success: false, deployFrontend: false, deployBackend: true, CancellationToken.None);
+                    appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -374,8 +374,7 @@ public class AppsControllerExecutionService
                 appId,
                 target.Id,
                 result.Success,
-                deployFrontend: true,
-                deployBackend: true,
+                runtimeDeployed: true,
                 cancellationToken);
 
             if (result.Success)
@@ -423,7 +422,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, deployFrontend: true, deployBackend: true, CancellationToken.None);
+                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -478,7 +477,7 @@ public class AppsControllerExecutionService
             await backendRouteConfigService.RefreshAsync(cancellationToken);
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, backendDeploy.Success, deployFrontend: true, deployBackend: true, cancellationToken);
+                appId, target.Id, backendDeploy.Success, runtimeDeployed: true, cancellationToken);
             return new DeployAppResponse
             {
                 DeploymentTargetId = target.Id,
@@ -500,7 +499,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, deployFrontend: true, deployBackend: true, CancellationToken.None);
+                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -603,7 +602,7 @@ public class AppsControllerExecutionService
             });
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: true, deployFrontend: true, deployBackend: false, cancellationToken);
+                appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
             await backendRouteConfigService.RefreshAsync(cancellationToken);
             return new DeployAppResponse
             {
@@ -621,7 +620,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, deployFrontend: true, deployBackend: false, CancellationToken.None);
+                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -661,7 +660,7 @@ public class AppsControllerExecutionService
             await backendRouteConfigService.RefreshAsync(cancellationToken);
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, backendDeploy.Success, deployFrontend: false, deployBackend: true, cancellationToken);
+                appId, target.Id, backendDeploy.Success, runtimeDeployed: true, cancellationToken);
             return new DeployAppResponse
             {
                 DeploymentTargetId = target.Id,
@@ -681,7 +680,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, deployFrontend: false, deployBackend: true, CancellationToken.None);
+                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
             throw;
         }
     }

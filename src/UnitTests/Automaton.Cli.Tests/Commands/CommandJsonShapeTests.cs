@@ -179,10 +179,7 @@ public class CommandJsonShapeTests
         config.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Recovered App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
         config.SaveProjectLocalConfig(projectRoot, new GlobalConfig
         {

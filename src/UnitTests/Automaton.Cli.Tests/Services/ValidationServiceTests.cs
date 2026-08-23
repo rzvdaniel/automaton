@@ -53,7 +53,7 @@ public class ValidationServiceTests
         AssertCheck(result, ValidationCheckNames.AppLink, false, "automaton.json not found");
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, false, "skipped because app linkage failed");
         Assert.That(result.NextSteps, Has.Some.Contains("automaton new"));
-        Assert.That(result.NextSteps.Any(step => step.Contains("\"frontend\"")), Is.True);
+        Assert.That(result.NextSteps.Any(step => step.Contains("\"application\"")), Is.True);
     }
 
     [Test]
@@ -66,14 +66,7 @@ public class ValidationServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Unlinked App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
 
         var service = new ValidationService(configService, (_, _, _, _) =>
@@ -87,7 +80,7 @@ public class ValidationServiceTests
     }
 
     [Test]
-    public async Task ValidateAsync_WhenDeployDirectoryHasNoIndexHtml_FailsFrontendDeployShape()
+    public async Task ValidateAsync_WhenDeployDirectoryHasNoIndexHtml_DoesNotRequireAFrontendShape()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
@@ -95,10 +88,7 @@ public class ValidationServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Test App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist"));
@@ -108,27 +98,20 @@ public class ValidationServiceTests
 
         var result = await service.ValidateAsync(projectRoot);
 
-        Assert.That(result.Success, Is.False);
-        AssertCheck(result, ValidationCheckNames.FrontendDeployShape, false, "no index.html found");
+        Assert.That(result.Success, Is.True);
+        AssertCheck(result, ValidationCheckNames.ApplicationContract, true, "valid");
     }
 
     [Test]
-    public async Task ValidateAsync_WhenBackendControllersExistWithoutRunner_FailsBackendRunnerCheck()
+    public async Task ValidateAsync_WhenBackendControllersExistWithoutRunner_DoesNotInferRuntimePolicyFromSourceFiles()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            Name = "Backend App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
-            }
+            Name = "Runtime App",
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -140,10 +123,9 @@ public class ValidationServiceTests
 
         var result = await service.ValidateAsync(projectRoot);
 
-        Assert.That(result.Success, Is.False);
+        Assert.That(result.Success, Is.True);
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, true, "remote app found");
-        AssertCheck(result, ValidationCheckNames.BackendRunner, false, "no runner is assigned");
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton deploy to prepare the default managed Runner"));
+        AssertCheck(result, ValidationCheckNames.ApplicationContract, true, "valid");
     }
 
     [Test]
@@ -155,10 +137,7 @@ public class ValidationServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Remote App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -174,18 +153,15 @@ public class ValidationServiceTests
     }
 
     [Test]
-    public async Task ValidateAsync_WhenFrontendOnlyAppIsLinkedAndReachable_Passes()
+    public async Task ValidateAsync_WhenGenericAppIsLinkedAndReachable_Passes()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            Name = "Frontend App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Name = "Remote App",
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -208,11 +184,8 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            Name = "Frontend App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Name = "Generic App",
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));
@@ -237,11 +210,8 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            Name = "Frontend App",
-            Frontend = new FrontendConfig
-            {
-                DeployDir = "frontend/dist"
-            }
+            Name = "Generic App",
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));

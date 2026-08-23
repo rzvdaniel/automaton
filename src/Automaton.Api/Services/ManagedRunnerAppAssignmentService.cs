@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -6,18 +7,15 @@ namespace Automaton.Api.Services;
 public sealed class ManagedRunnerAppAssignmentService
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly AppFileStorageService fileStorageService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly ILogger<ManagedRunnerAppAssignmentService> logger;
 
     public ManagedRunnerAppAssignmentService(
         ApplicationDbContext dbContext,
-        AppFileStorageService fileStorageService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         ILogger<ManagedRunnerAppAssignmentService> logger)
     {
         this.dbContext = dbContext;
-        this.fileStorageService = fileStorageService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.logger = logger;
     }
@@ -38,9 +36,8 @@ public sealed class ManagedRunnerAppAssignmentService
         var assignedCount = 0;
         foreach (var app in apps)
         {
-            var metadata = await fileStorageService.GetAppStorageMetadataAsync(userId, app.Id);
-            var hasBackend = metadata?.Backend.SourceAvailable == true || metadata?.Backend.RuntimeAvailable == true;
-            if (!hasBackend)
+            var application = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
+            if (application.Runtime.Command is null)
             {
                 continue;
             }

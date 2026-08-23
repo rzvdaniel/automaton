@@ -95,7 +95,7 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
-        var buildCheck = await RunBuildIfNeededAsync(projectConfig.Frontend?.Build, directory, nextSteps, cancellationToken);
+        var buildCheck = await RunBuildIfNeededAsync(projectConfig.Application.Build.Command, directory, nextSteps, cancellationToken);
         AddCheck(checks, buildCheck);
         if (!buildCheck.Success)
         {
@@ -109,18 +109,16 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
-        var frontendCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, actionCount > 0, nextSteps, out var deployDirectory);
-        AddCheck(checks, frontendCheck);
-        if (!frontendCheck.Success)
+        var applicationCheck = ValidateApplicationPackage(
+            directory,
+            directoryOverride ?? projectConfig.Application.Build.OutputDirectory,
+            actionCount > 0,
+            nextSteps,
+            out var deployDirectory);
+        AddCheck(checks, applicationCheck);
+        if (!applicationCheck.Success)
         {
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
-        }
-
-        var backendCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
-        AddCheck(checks, backendCheck);
-        if (!skipBackend && !backendCheck.Success)
-        {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         try
@@ -142,11 +140,9 @@ public sealed class DeployService
             using var zip = ZipService.CreateDeployPackageZip(
                 directory,
                 appId!,
-                deployDirectory,
-                null,
+                projectConfig.Application,
                 projectConfig.Source,
-                projectConfig.Frontend,
-                null);
+                deployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
             var result = await deployPackageAsync(
                 server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
@@ -157,15 +153,8 @@ public sealed class DeployService
             return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
-        if (backendControllers == 0 || backendDirectory == null)
-        {
-            nextSteps.Add("Add backend.deployDir to automaton.json when the app gains a backend.");
-            backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
-        }
-
-        // Every deployed app uses a managed hosted runner. Do not infer runtime
-        // eligibility from the presence of backend controllers: frontend-only apps
-        // need the same hosted runtime and may be the user's first deployment.
+        // Every deployed app uses the configured generic runtime contract. The
+        // runner assignment is not inferred from source files or technology.
         if (ensureManagedRuntimeReadyAsync != null && target?.IsDefault != false)
         {
             var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
@@ -194,11 +183,9 @@ public sealed class DeployService
             using var zip = ZipService.CreateDeployPackageZip(
                 directory,
                 appId!,
-                deployDirectory,
-                backendControllers > 0 ? backendDirectory : null,
+                projectConfig.Application,
                 projectConfig.Source,
-                projectConfig.Frontend,
-                projectConfig.Backend);
+                deployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
             var result = await deployPackageAsync(
                 server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
@@ -313,20 +300,24 @@ public sealed class DeployService
         return new DeployCheckResult(DeployCheckNames.Credentials, true, $"credentials resolved for {server}");
     }
 
-    private async Task<DeployCheckResult> RunBuildIfNeededAsync(string? buildCommand, string directory, ISet<string> nextSteps, CancellationToken cancellationToken)
+    private async Task<DeployCheckResult> RunBuildIfNeededAsync(ApplicationCommandSpec? buildCommand, string directory, ISet<string> nextSteps, CancellationToken cancellationToken)
     {
         if (buildCommand is null)
         {
             return new DeployCheckResult(DeployCheckNames.Build, true, "no build configured");
         }
 
-        if (string.IsNullOrWhiteSpace(buildCommand))
+        if (string.IsNullOrWhiteSpace(buildCommand.Executable))
         {
-            nextSteps.Add("Set a valid build command in automaton.json or remove the build field");
-            return new DeployCheckResult(DeployCheckNames.Build, false, "build is configured in automaton.json but is empty");
+            nextSteps.Add("Set a valid build executable in automaton.json or remove the build command");
+            return new DeployCheckResult(DeployCheckNames.Build, false, "build.command is configured in automaton.json but has no executable");
         }
 
-        var exitCode = await runBuildAsync(buildCommand, directory, cancellationToken);
+        var commandLine = string.Join(
+            " ",
+            new[] { buildCommand.Executable }.Concat(buildCommand.Arguments).Select(QuoteCommandArgument));
+        var workingDirectory = ZipService.ResolveDeployDirectory(directory, buildCommand.WorkingDirectory);
+        var exitCode = await runBuildAsync(commandLine, workingDirectory, cancellationToken);
         if (exitCode != 0)
         {
             nextSteps.Add("Fix the build errors and rerun automaton deploy");
@@ -336,32 +327,25 @@ public sealed class DeployService
         return new DeployCheckResult(DeployCheckNames.Build, true, "build completed successfully");
     }
 
-    private static DeployCheckResult ValidateFrontendPackage(string directory, string? deployDir, bool hasActions, ISet<string> nextSteps, out string? resolvedDeployDirectory)
+    private static DeployCheckResult ValidateApplicationPackage(string directory, string? deployDir, bool hasActions, ISet<string> nextSteps, out string? resolvedDeployDirectory)
     {
         if (string.IsNullOrWhiteSpace(deployDir) && hasActions)
         {
             resolvedDeployDirectory = null;
-            return new DeployCheckResult(DeployCheckNames.FrontendPackage, true, "no frontend configured; deploying an Actions-only App");
+            return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, "no runtime artifact configured; deploying an Actions-only App");
         }
         try
         {
-            resolvedDeployDirectory = ZipService.ResolveDeployDirectory(directory, deployDir);
+            resolvedDeployDirectory = ZipService.ResolveDeployDirectory(directory, string.IsNullOrWhiteSpace(deployDir) ? "." : deployDir);
         }
         catch (Exception ex)
         {
-            nextSteps.Add("Fix frontend.deployDir in automaton.json or pass --dir with a valid directory");
+            nextSteps.Add("Fix application.build.outputDirectory in automaton.json or pass --dir with a valid directory");
             resolvedDeployDirectory = null;
-            return new DeployCheckResult(DeployCheckNames.FrontendPackage, false, ex.Message);
+            return new DeployCheckResult(DeployCheckNames.ApplicationPackage, false, ex.Message);
         }
 
-        var indexPath = Path.Combine(resolvedDeployDirectory, "index.html");
-        if (!File.Exists(indexPath))
-        {
-            nextSteps.Add("Ensure the deploy directory contains index.html before deploying");
-            return new DeployCheckResult(DeployCheckNames.FrontendPackage, false, $"no index.html found in deploy directory: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
-        }
-
-        return new DeployCheckResult(DeployCheckNames.FrontendPackage, true, $"deploy directory ready: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
+        return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, $"runtime artifact directory ready: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
     }
 
     private static DeployCheckResult ValidateActions(string directory, ISet<string> nextSteps, out int actionCount)
@@ -386,48 +370,6 @@ public sealed class DeployService
             nextSteps.Add("Fix Action manifests under actions/{action-key}/action.yaml and rerun automaton deploy");
             return new DeployCheckResult("actions", false, ex.Message);
         }
-    }
-
-    private static DeployCheckResult ValidateBackendPackage(
-        string directory,
-        string? deployDir,
-        ISet<string> nextSteps,
-        out string? resolvedBackendDirectory,
-        out int backendControllers)
-    {
-        resolvedBackendDirectory = null;
-        backendControllers = 0;
-
-        var conventionalBackendDirectory = Path.Combine(directory, "backend");
-        if (string.IsNullOrWhiteSpace(deployDir))
-        {
-            if (Directory.Exists(conventionalBackendDirectory)
-                && Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length > 0)
-            {
-                nextSteps.Add("Add backend.deployDir to automaton.json, usually 'backend'");
-                return new DeployCheckResult(DeployCheckNames.BackendPackage, false, "backend controllers were found, but backend.deployDir is missing from automaton.json");
-            }
-
-            return new DeployCheckResult(DeployCheckNames.BackendPackage, true, "no backend deploy configured");
-        }
-
-        try
-        {
-            resolvedBackendDirectory = ZipService.ResolveDeployDirectory(directory, deployDir);
-        }
-        catch (Exception ex)
-        {
-            nextSteps.Add("Fix backend.deployDir in automaton.json");
-            return new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message);
-        }
-
-        backendControllers = Directory.GetFiles(resolvedBackendDirectory, "*.py", SearchOption.AllDirectories).Length;
-        return new DeployCheckResult(
-            DeployCheckNames.BackendPackage,
-            true,
-            backendControllers == 0
-                ? $"backend directory ready but no Python controllers were found: {Path.GetRelativePath(directory, resolvedBackendDirectory)}"
-                : $"backend directory ready: {Path.GetRelativePath(directory, resolvedBackendDirectory)}");
     }
 
     private static DeployResult CreateResult(
@@ -469,6 +411,11 @@ public sealed class DeployService
             BackendRunning = backendResult?.Success == true && backendResult.RunnerCount > 0
         };
     }
+
+    private static string QuoteCommandArgument(string value) =>
+        value.Any(char.IsWhiteSpace) || value.Contains('"')
+            ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+            : value;
 
     private static async Task<int> RunBuildAsync(string command, string workingDir, CancellationToken cancellationToken)
     {

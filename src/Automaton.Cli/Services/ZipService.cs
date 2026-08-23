@@ -70,8 +70,8 @@ public static class ZipService
         if (string.IsNullOrWhiteSpace(deployDir))
         {
             throw new InvalidOperationException(
-                "frontend.deployDir is required in automaton.json. " +
-                "Use 'frontend/dist' for build-based apps or '.' for an explicit no-build static app.");
+                "an application artifact directory is required for deployment. " +
+                "Set application.build.outputDirectory or pass --dir with an explicit project-relative directory.");
         }
 
         var explicitPath = Path.GetFullPath(Path.Combine(projectRoot, deployDir));
@@ -79,12 +79,12 @@ public static class ZipService
         if (!explicitPath.StartsWith(fullProjectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(explicitPath, fullProjectRoot, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"deployDir '{deployDir}' points outside the project root");
+            throw new InvalidOperationException($"artifact directory '{deployDir}' points outside the project root");
         }
 
         if (Directory.Exists(explicitPath)) return explicitPath;
         throw new DirectoryNotFoundException(
-            $"deployDir '{deployDir}' configured in automaton.json does not exist: {explicitPath}");
+            $"artifact directory '{deployDir}' configured in automaton.json does not exist: {explicitPath}");
     }
 
     /// <summary>
@@ -104,12 +104,16 @@ public static class ZipService
     public static Stream CreateDeployPackageZip(
         string projectRoot,
         string appId,
-        string? frontendDeployDir,
-        string? backendDeployDir,
+        ApplicationContract application,
         DeployScopeConfig? sourceScopeConfig,
-        FrontendConfig? frontendConfig,
-        BackendConfig? backendConfig)
+        string? resolvedArtifactDirectory = null)
     {
+        ApplicationContractValidator.EnsureValid(application);
+        var artifactDirectory = resolvedArtifactDirectory
+            ?? application.Build.OutputDirectory
+            ?? application.Runtime.Command?.WorkingDirectory
+            ?? ".";
+
         var ms = new MemoryStream();
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -119,7 +123,7 @@ public static class ZipService
                 writer.Write(System.Text.Json.JsonSerializer.Serialize(new AppDeploymentPackageManifest
                 {
                     AppId = appId,
-                    HasBackend = !string.IsNullOrWhiteSpace(backendDeployDir)
+                    Application = application
                 }));
             }
 
@@ -131,39 +135,13 @@ public static class ZipService
                 includeAutomatonConfig: true,
                 scopeConfig: sourceScopeConfig);
 
-            if (!string.IsNullOrWhiteSpace(frontendDeployDir))
-            {
-                AddDirectoryWithPrefix(
-                    archive,
-                    frontendDeployDir,
-                    frontendDeployDir,
-                    "runtime/frontend",
-                    includeAutomatonConfig: false,
-                    scopeConfig: frontendConfig == null
-                        ? null
-                        : new DeployScopeConfig
-                        {
-                            Include = frontendConfig.Include,
-                            Exclude = frontendConfig.Exclude
-                        });
-            }
-
-            if (!string.IsNullOrWhiteSpace(backendDeployDir))
-            {
-                AddDirectoryWithPrefix(
-                    archive,
-                    backendDeployDir,
-                    backendDeployDir,
-                    "runtime/backend",
-                    includeAutomatonConfig: false,
-                    scopeConfig: backendConfig == null
-                        ? null
-                        : new DeployScopeConfig
-                        {
-                            Include = backendConfig.Include,
-                            Exclude = backendConfig.Exclude
-                        });
-            }
+            AddDirectoryWithPrefix(
+                archive,
+                artifactDirectory,
+                artifactDirectory,
+                "runtime/frontend",
+                includeAutomatonConfig: false,
+                scopeConfig: sourceScopeConfig);
         }
 
         ms.Position = 0;

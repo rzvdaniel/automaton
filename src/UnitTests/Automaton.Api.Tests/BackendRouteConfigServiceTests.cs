@@ -35,7 +35,7 @@ public class BackendRouteConfigServiceTests
         });
 
         var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        defaultTarget.FrontendDeployed = true;
+        defaultTarget.RuntimeDeployed = true;
         dbContext.WebApps.Add(new WebApp
         {
             Id = appId,
@@ -103,7 +103,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        defaultTarget.FrontendDeployed = true;
+        defaultTarget.RuntimeDeployed = true;
         var namedTarget = new AppDeploymentTarget
         {
             Id = Guid.NewGuid(),
@@ -111,7 +111,7 @@ public class BackendRouteConfigServiceTests
             Name = "Server EU",
             Slug = "server-eu",
             ExecutionRunnerId = runnerId,
-            FrontendDeployed = true,
+            RuntimeDeployed = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -175,7 +175,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.FrontendDeployed = true;
+        target.RuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
             Id = runnerId,
@@ -220,7 +220,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.FrontendDeployed = true;
+        target.RuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
             {
                 Id = runnerId,
@@ -264,7 +264,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.FrontendDeployed = true;
+        target.RuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
             Id = runnerId,
@@ -298,7 +298,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.FrontendDeployed = true;
+        target.RuntimeDeployed = true;
         dbContext.HostedRunners.Add(new HostedRunner
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "Hosted Runner",

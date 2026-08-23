@@ -1,5 +1,6 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
+using Automaton.Core.Models;
 using Spectre.Console;
 using System.CommandLine;
 using System.Text;
@@ -17,7 +18,6 @@ namespace Automaton.Cli.Commands;
 /// </summary>
 public static class PullCommand
 {
-    private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
     private const int OverwritePreviewCount = 10;
     internal sealed record SourceDownload(string RemotePath, string LocalPath);
 
@@ -113,6 +113,7 @@ public static class PullCommand
         var app = await ResolveAppAsync(client, appIdentifier);
         var appId = GetRequiredString(app, "id");
         var appName = GetRequiredString(app, "name");
+        var application = ReadApplicationContract(app);
         var slug = TryReadString(app, "publicUrl");
         var folderName = SanitizeDirectoryName(slug ?? appName);
         var targetDir = dir ?? Path.Combine(cwd, folderName);
@@ -137,32 +138,18 @@ public static class PullCommand
         var pulledConfig = config.TryLoadProjectConfig(targetDir);
         if (pulledConfig == null)
         {
-            var hasFrontend = sourceFiles.Any(path => path.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase));
-            var hasBackend = sourceFiles.Any(path => path.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
-            var isBuildBasedFrontend = hasFrontend && File.Exists(Path.Combine(targetDir, "frontend", "package.json"));
             pulledConfig = new AutomatonConfig
             {
                 Name = appName,
                 Slug = slug,
-                Frontend = hasFrontend
-                    ? new FrontendConfig
-                    {
-                        Build = isBuildBasedFrontend ? FrontendBuildCommand : null,
-                        DeployDir = isBuildBasedFrontend ? "frontend/dist" : "frontend"
-                    }
-                    : null,
-                Backend = hasBackend
-                    ? new BackendConfig
-                    {
-                        DeployDir = "backend"
-                    }
-                    : null
+                Application = application
             };
         }
         else
         {
             pulledConfig.Name = appName;
             pulledConfig.Slug = slug;
+            pulledConfig.Application = application;
         }
 
         config.SaveProjectConfig(targetDir, pulledConfig);
@@ -209,6 +196,18 @@ public static class PullCommand
                 AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
             }
         }
+    }
+
+    private static ApplicationContract ReadApplicationContract(JsonElement app)
+    {
+        if (!app.TryGetProperty("application", out var application)
+            || application.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException(
+                "The remote app does not declare the required generic application contract.");
+        }
+
+        return ApplicationContractSerialization.Deserialize(application.GetRawText());
     }
 
     private static async Task<List<string>> ListSourceFilesAsync(AutomatonApiClient client, string appId)

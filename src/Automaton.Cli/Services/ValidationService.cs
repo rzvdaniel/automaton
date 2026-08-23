@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using Automaton.Core.Models;
 
 namespace Automaton.Cli.Services;
 
@@ -8,12 +9,28 @@ public sealed class ValidationService
     private const string MinimalConfigExample = """
 {
   "name": "My App",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
-  },
-  "backend": {
-    "deployDir": "backend"
+  "application": {
+    "build": {
+      "command": {
+        "executable": "build-tool",
+        "arguments": [],
+        "workingDirectory": "."
+      }
+    },
+    "runtime": {
+      "command": {
+        "executable": "app-server",
+        "arguments": [],
+        "workingDirectory": "."
+      },
+      "port": 8080
+    },
+    "health": {
+      "path": "/health"
+    },
+    "storage": {
+      "dataDirectory": "data"
+    }
   }
 }
 """;
@@ -45,11 +62,7 @@ public sealed class ValidationService
         var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, resolvedAppId, resolvedServer, nextSteps);
         checks.Add(appLinkCheck);
 
-        var frontendCheck = ValidateFrontendDeployShape(directory, projectConfig);
-        checks.Add(frontendCheck);
-
-        var backendCheck = ValidateBackendDeployShape(directory, projectConfig, out var backendControllers);
-        checks.Add(backendCheck);
+        checks.Add(ValidateApplicationContract(projectConfig));
 
         checks.AddRange(CollectWarnings(directory, projectConfig, strict, nextSteps));
 
@@ -62,7 +75,6 @@ public sealed class ValidationService
             nextSteps,
             cancellationToken);
 
-        checks.Add(ValidateBackendRunner(backendControllers, remoteAppCheck, nextSteps));
         checks.Add(remoteAppCheck.Check);
 
         var success = checks.All(check => check.Success);
@@ -150,137 +162,29 @@ public sealed class ValidationService
             $"linked app {resolvedAppId} on {resolvedServer}");
     }
 
-    private static ValidationCheckResult ValidateFrontendDeployShape(string directory, Models.AutomatonConfig? projectConfig)
+    private static ValidationCheckResult ValidateApplicationContract(Models.AutomatonConfig? projectConfig)
     {
-        if (projectConfig?.Frontend == null)
+        if (projectConfig is null)
         {
             return new ValidationCheckResult(
-                ValidationCheckNames.FrontendDeployShape,
+                ValidationCheckNames.ApplicationContract,
                 false,
-                "frontend configuration is missing from automaton.json");
+                "application contract is unavailable because automaton.json could not be loaded");
         }
 
-        if (projectConfig.Frontend.Build is not null && string.IsNullOrWhiteSpace(projectConfig.Frontend.Build))
+        var errors = ApplicationContractValidator.Validate(projectConfig.Application);
+        if (errors.Count > 0)
         {
             return new ValidationCheckResult(
-                ValidationCheckNames.FrontendDeployShape,
+                ValidationCheckNames.ApplicationContract,
                 false,
-                "frontend.build is configured in automaton.json but is empty");
-        }
-
-        string deployDirectory;
-        try
-        {
-            deployDirectory = ZipService.ResolveDeployDirectory(directory, projectConfig.Frontend.DeployDir);
-        }
-        catch (Exception ex)
-        {
-            return new ValidationCheckResult(ValidationCheckNames.FrontendDeployShape, false, ex.Message);
-        }
-
-        if (!Directory.Exists(deployDirectory))
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.FrontendDeployShape,
-                false,
-                $"deploy directory does not exist: {deployDirectory}");
-        }
-
-        var indexPath = Path.Combine(deployDirectory, "index.html");
-        if (!File.Exists(indexPath))
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.FrontendDeployShape,
-                false,
-                $"no index.html found in deploy directory: {Path.GetRelativePath(directory, deployDirectory)}");
+                string.Join("; ", errors));
         }
 
         return new ValidationCheckResult(
-            ValidationCheckNames.FrontendDeployShape,
+            ValidationCheckNames.ApplicationContract,
             true,
-            $"deploy directory ready: {Path.GetRelativePath(directory, deployDirectory)}");
-    }
-
-    private static ValidationCheckResult ValidateBackendDeployShape(
-        string directory,
-        Models.AutomatonConfig? projectConfig,
-        out int backendControllers)
-    {
-        backendControllers = 0;
-        var conventionalBackendDirectory = Path.Combine(directory, "backend");
-        var conventionalBackendControllers = Directory.Exists(conventionalBackendDirectory)
-            ? Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length
-            : 0;
-
-        var backendDeployDir = projectConfig?.Backend?.DeployDir;
-        if (string.IsNullOrWhiteSpace(backendDeployDir))
-        {
-            if (conventionalBackendControllers > 0)
-            {
-                return new ValidationCheckResult(
-                    ValidationCheckNames.BackendDeployShape,
-                    false,
-                    "backend controllers were found, but backend.deployDir is missing from automaton.json");
-            }
-
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendDeployShape,
-                true,
-                "no backend deploy configured");
-        }
-
-        string backendDirectory;
-        try
-        {
-            backendDirectory = ZipService.ResolveDeployDirectory(directory, backendDeployDir);
-        }
-        catch (Exception ex)
-        {
-            return new ValidationCheckResult(ValidationCheckNames.BackendDeployShape, false, ex.Message);
-        }
-
-        backendControllers = Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length;
-        return new ValidationCheckResult(
-            ValidationCheckNames.BackendDeployShape,
-            true,
-            $"backend directory ready: {Path.GetRelativePath(directory, backendDirectory)}");
-    }
-
-    private static ValidationCheckResult ValidateBackendRunner(
-        int backendControllers,
-        RemoteAppCheckResult remoteAppCheck,
-        ISet<string> nextSteps)
-    {
-        if (backendControllers == 0)
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendRunner,
-                true,
-                "runner not required because no backend controllers were found");
-        }
-
-        if (!remoteAppCheck.Check.Success)
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendRunner,
-                false,
-                "cannot verify runner assignment because remote app access failed");
-        }
-
-        if (string.IsNullOrWhiteSpace(remoteAppCheck.RemoteApp?.DefaultTargetRunnerId))
-        {
-            nextSteps.Add("Run automaton deploy to prepare the default managed Runner");
-            nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendRunner,
-                false,
-                $"{backendControllers} backend controller(s) found but no runner is assigned");
-        }
-
-        return new ValidationCheckResult(
-            ValidationCheckNames.BackendRunner,
-            true,
-            $"default target runner assigned: {remoteAppCheck.RemoteApp.DefaultTargetRunnerId}");
+            "application contract is valid");
     }
 
     private async Task<RemoteAppCheckResult> ValidateRemoteAppAccessAsync(

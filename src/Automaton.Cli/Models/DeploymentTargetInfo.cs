@@ -13,7 +13,6 @@ public sealed record DeploymentTargetInfo(
     string Slug,
     bool IsDefault,
     string Status,
-    bool FrontendDeployed,
-    bool BackendDeployed,
+    bool RuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DeploymentTargetRunnerInfo? Runner);

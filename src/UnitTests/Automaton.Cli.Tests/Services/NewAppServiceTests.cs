@@ -49,9 +49,9 @@ public class NewAppServiceTests
         var configService = new ConfigService();
         var config = configService.LoadProjectConfig(projectRoot);
         Assert.That(config.Name, Is.EqualTo("My App"));
-        Assert.That(config.Frontend?.Build, Is.EqualTo("cd frontend && npm install && npm run build"));
-        Assert.That(config.Frontend?.DeployDir, Is.EqualTo("frontend/dist"));
-        Assert.That(config.Backend?.DeployDir, Is.EqualTo("backend"));
+        Assert.That(config.Application, Is.Not.Null);
+        Assert.That(config.Application.Storage.DataDirectory, Is.EqualTo("data"));
+        Assert.That(config.Application.Build.Command, Is.Null);
         var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-123"));
         Assert.That(env.Server, Is.EqualTo("https://automaton.monster"));
@@ -85,22 +85,14 @@ public class NewAppServiceTests
     }
 
     [Test]
-    public async Task CreateAsync_WhenRecoveringExistingUnlinkedScaffold_PreservesExistingDeploySettings()
+    public async Task CreateAsync_WhenRecoveringExistingUnlinkedScaffold_PreservesExistingApplicationContract()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Recovered App",
-            Frontend = new FrontendConfig
-            {
-                Build = "npm run custom-build",
-                DeployDir = "custom-dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "api"
-            }
+            Application = ApplicationContractTestFactory.Create("custom-dist")
         });
 
         var service = new NewAppService(
@@ -112,9 +104,9 @@ public class NewAppServiceTests
 
         Assert.That(result.Success, Is.True);
         var config = configService.LoadProjectConfig(projectRoot);
-        Assert.That(config.Frontend?.Build, Is.EqualTo("npm run custom-build"));
-        Assert.That(config.Frontend?.DeployDir, Is.EqualTo("custom-dist"));
-        Assert.That(config.Backend?.DeployDir, Is.EqualTo("api"));
+        Assert.That(config.Application.Build.OutputDirectory, Is.EqualTo("custom-dist"));
+        Assert.That(config.Application.Build.Command?.Executable, Is.EqualTo("npm"));
+        Assert.That(config.Application.Build.Command?.Arguments, Is.EqualTo(new[] { "run", "build" }));
         var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-123"));
     }

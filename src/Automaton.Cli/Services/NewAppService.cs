@@ -1,14 +1,11 @@
 using Automaton.Cli.Models;
 using Automaton.AiGuidance;
+using Automaton.Core.Models;
 
 namespace Automaton.Cli.Services;
 
 public sealed class NewAppService
 {
-    private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
-    private const string FrontendDeployDirectory = "frontend/dist";
-    private const string BackendDeployDirectory = "backend";
-
     private readonly ConfigService _config;
     private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, string, CancellationToken, Task<(string appId, string name)>> _createAppAsync;
@@ -156,15 +153,7 @@ public sealed class NewAppService
         return new AutomatonConfig
         {
             Name = name,
-            Frontend = existingConfig?.Frontend ?? new FrontendConfig
-            {
-                Build = FrontendBuildCommand,
-                DeployDir = FrontendDeployDirectory
-            },
-            Backend = existingConfig?.Backend ?? new BackendConfig
-            {
-                DeployDir = BackendDeployDirectory
-            },
+            Application = existingConfig?.Application ?? ApplicationContractDefaults.Create(),
             Source = existingConfig?.Source
         };
     }

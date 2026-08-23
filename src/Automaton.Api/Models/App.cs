@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 
 namespace Automaton.Api.Models;
 
@@ -60,6 +61,7 @@ public class AppModel
     public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
+    public ApplicationContract Application { get; set; } = ApplicationContractDefaults.Create();
 }
 
 public class AppComponentOwnershipModel

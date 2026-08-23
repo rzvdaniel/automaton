@@ -14,7 +14,6 @@ public class DeploymentTargetServiceTests
         true,
         "Running",
         true,
-        true,
         DateTimeOffset.UtcNow,
         new DeploymentTargetRunnerInfo("runner-1", "Hosted Runner", true));
 
@@ -24,7 +23,6 @@ public class DeploymentTargetServiceTests
         "server-eu",
         false,
         "Running",
-        true,
         true,
         DateTimeOffset.UtcNow,
         new DeploymentTargetRunnerInfo("runner-2", "Runner EU", true));

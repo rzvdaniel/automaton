@@ -163,7 +163,7 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
-    public async Task ListAsync_MapsFrontendAndBackendDeploymentMetadataSeparately()
+    public async Task ListAsync_MapsGenericRuntimeDeploymentMetadata()
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -189,8 +189,7 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
-            Assert.That(app.Runtime.FrontendDeployedAtUtc, Is.EqualTo(frontendAtUtc));
-            Assert.That(app.Runtime.BackendDeployedAtUtc, Is.EqualTo(backendAtUtc));
+            Assert.That(app.Runtime.RuntimeDeployedAtUtc, Is.EqualTo(frontendAtUtc));
             Assert.That(app.Runtime.FrontendAvailable, Is.True);
             Assert.That(app.Runtime.BackendAvailable, Is.True);
         });

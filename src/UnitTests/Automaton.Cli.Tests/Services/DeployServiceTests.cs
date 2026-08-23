@@ -43,7 +43,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", string.Empty, Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -72,11 +72,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig
-            {
-                Build = "cd frontend && npm run build",
-                DeployDir = "frontend/dist"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -99,8 +95,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -138,8 +133,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -167,8 +161,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -202,8 +195,8 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            Name = "Frontend App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+            Name = "Generic App",
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -237,8 +230,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -273,8 +265,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -309,7 +300,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -333,7 +324,7 @@ public class DeployServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "App",
-            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+            Application = ApplicationContractTestFactory.Create()
         });
         SaveEnvironment(
             configService,
@@ -350,7 +341,6 @@ public class DeployServiceTests
             false,
             "Running",
             true,
-            false,
             null,
             new DeploymentTargetRunnerInfo("runner-eu", "Runner EU", true));
         var service = new DeployService(

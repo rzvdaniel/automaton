@@ -168,6 +168,19 @@ public class AppMediaStorageServiceTests
                 .Include(target => target.ExecutionRunner)
                 .SingleAsync(
                     target => target.WebAppId == appId && target.IsDefault,
+                cancellationToken);
+        }
+
+        public async Task<AppDeploymentTarget> ResolveByIdAsync(
+            Guid appId,
+            Guid targetId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            return await dbContext.AppDeploymentTargets
+                .Include(target => target.ExecutionRunner)
+                .SingleAsync(
+                    target => target.WebAppId == appId && target.Id == targetId,
                     cancellationToken);
         }
     }

@@ -24,8 +24,7 @@ public sealed class AppDeploymentTarget
     /// </summary>
     public byte? DefaultConstraintKey { get; private set; }
 
-    public bool FrontendDeployed { get; set; }
-    public bool BackendDeployed { get; set; }
+    public bool RuntimeDeployed { get; set; }
 
     public DateTimeOffset? LastDeploymentAt { get; set; }
     public DateTimeOffset? LastSuccessfulDeploymentAt { get; set; }

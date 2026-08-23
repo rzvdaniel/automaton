@@ -5,11 +5,10 @@ public static class DeployCheckNames
     public const string AppLink = "appLink";
     public const string Credentials = "credentials";
     public const string RemoteAppAccess = "remoteAppAccess";
-    public const string FrontendPackage = "frontendPackage";
+    public const string ApplicationPackage = "applicationPackage";
     public const string Build = "build";
     public const string RunnerLookup = "runnerLookup";
     public const string RunnerAssignment = "runnerAssignment";
-    public const string BackendPackage = "backendPackage";
     public const string PackageUpload = "packageUpload";
     public const string PackageDeploy = "packageDeploy";
 }

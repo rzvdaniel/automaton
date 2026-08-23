@@ -780,9 +780,6 @@ namespace Automaton.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<bool>("BackendDeployed")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<bool>("CleanupPending")
                         .HasColumnType("tinyint(1)");
 
@@ -794,9 +791,6 @@ namespace Automaton.Api.Migrations
 
                     b.Property<Guid?>("ExecutionRunnerId")
                         .HasColumnType("char(36)");
-
-                    b.Property<bool>("FrontendDeployed")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("tinyint(1)");
@@ -818,6 +812,9 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
+
+                    b.Property<bool>("RuntimeDeployed")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -3811,6 +3808,10 @@ namespace Automaton.Api.Migrations
                         .HasDefaultValue("active");
 
                     b.Property<string>("AllowedRoles")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ApplicationContractJson")
+                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("CatalogVisibility")
