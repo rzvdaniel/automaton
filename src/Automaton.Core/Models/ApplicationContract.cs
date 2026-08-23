@@ -159,8 +159,18 @@ public static class ApplicationContractValidator
         else
         {
             ValidateRelativePath(contract.Storage.DataDirectory, "storage.dataDirectory", errors, allowEmpty: false);
-            foreach (var mount in contract.Storage.Mounts ?? [])
+            if (contract.Storage.Mounts is null)
             {
+                errors.Add("storage.mounts must be an array");
+            }
+            else foreach (var mount in contract.Storage.Mounts)
+            {
+                if (mount is null)
+                {
+                    errors.Add("storage.mounts entries must be objects");
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(mount.Name) || mount.Name.Contains('\0'))
                     errors.Add("storage.mounts.name is required and must not contain NUL");
                 ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
@@ -184,14 +194,22 @@ public static class ApplicationContractValidator
 
         if (string.IsNullOrWhiteSpace(command.Executable) || command.Executable.Contains('\0'))
             errors.Add($"{name}.executable is required and must not contain NUL");
-        else if (Path.IsPathRooted(command.Executable) || LooksLikeWindowsRootedPath(command.Executable))
+        else if (Path.IsPathRooted(command.Executable)
+            || LooksLikeWindowsRootedPath(command.Executable)
+            || ContainsTraversalSegment(command.Executable))
             errors.Add($"{name}.executable must not point outside the runner-managed workspace");
 
-        if (command.Arguments.Any(argument => argument is null || argument.Contains('\0')))
+        if (command.Arguments is null)
+            errors.Add($"{name}.arguments must be an array");
+        else if (command.Arguments.Any(argument => argument is null || argument.Contains('\0')))
             errors.Add($"{name}.arguments must not contain NUL");
 
         ValidateRelativePath(command.WorkingDirectory, $"{name}.workingDirectory", errors, allowEmpty: false);
-        foreach (var pair in command.Environment ?? new Dictionary<string, string>())
+        if (command.Environment is null)
+        {
+            errors.Add($"{name}.environment must be an object");
+        }
+        else foreach (var pair in command.Environment)
         {
             if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Contains('=') || pair.Key.Contains('\0'))
                 errors.Add($"{name}.environment contains an invalid variable name");
@@ -233,4 +251,8 @@ public static class ApplicationContractValidator
 
     private static bool LooksLikeWindowsRootedPath(string value) =>
         value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':';
+
+    private static bool ContainsTraversalSegment(string value) =>
+        value.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment == "..");
 }

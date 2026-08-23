@@ -132,6 +132,50 @@ public class ConfigServiceTests
         Assert.That(ApplicationContractValidator.Validate(contract), Has.Some.Contains("workingDirectory"));
     }
 
+    [TestCase("dotnet", true)]
+    [TestCase("tools/my-server", true)]
+    [TestCase("./bin/server", true)]
+    [TestCase("../server", false)]
+    [TestCase("bin/../../server", false)]
+    [TestCase("/usr/bin/server", false)]
+    [TestCase("C:\\server.exe", false)]
+    public void ApplicationContractValidator_ValidatesExecutablePathBoundaries(string executable, bool expectedValid)
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Command = new ApplicationCommandSpec { Executable = executable };
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.That(errors.Any(error => error.Contains("runtime.command.executable")), Is.EqualTo(!expectedValid));
+    }
+
+    [Test]
+    public void ApplicationContractValidator_ReportsNullCommandCollectionsInsteadOfThrowing()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Command = new ApplicationCommandSpec
+        {
+            Executable = "dotnet",
+            Arguments = null!,
+            Environment = null!
+        };
+        contract.Storage.Mounts = null!;
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(errors, Has.Some.EqualTo("runtime.command.arguments must be an array"));
+            Assert.That(errors, Has.Some.EqualTo("runtime.command.environment must be an object"));
+            Assert.That(errors, Has.Some.EqualTo("storage.mounts must be an array"));
+        });
+
+        var json = JsonSerializer.Serialize(contract, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ApplicationContractSerialization.Deserialize(json));
+        Assert.That(exception!.Message, Does.Contain("runtime.command.arguments must be an array"));
+    }
+
     [Test]
     public void ApplicationContract_AllowsPortReadinessWithoutHealthPath()
     {

@@ -118,7 +118,7 @@ export interface AppListItem {
     isStaticHosting?: boolean
     routePath: string
   } | null
-  runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
+  runtime: { frontendAvailable: boolean; backendAvailable: boolean; runtimeDeployedAtUtc?: string | null }
 }
 
 export const DeploymentTargetStatus = {
