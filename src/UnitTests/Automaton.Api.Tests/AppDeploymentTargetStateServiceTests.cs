@@ -24,18 +24,16 @@ public class AppDeploymentTargetStateServiceTests
 
         await service.MarkStartedAsync(app.Id, first.Id);
         await service.MarkCompletedAsync(
-            app.Id, first.Id, success: true, deployFrontend: true, deployBackend: false);
+            app.Id, first.Id, success: true, runtimeDeployed: true);
 
         Assert.Multiple(() =>
         {
             Assert.That(first.Status, Is.EqualTo(DeploymentTargetStatus.Running));
-            Assert.That(first.FrontendDeployed, Is.True);
-            Assert.That(first.BackendDeployed, Is.False);
+            Assert.That(first.RuntimeDeployed, Is.True);
             Assert.That(first.LastDeploymentAt, Is.Not.Null);
             Assert.That(first.LastSuccessfulDeploymentAt, Is.Not.Null);
             Assert.That(second.Status, Is.EqualTo(DeploymentTargetStatus.NotDeployed));
-            Assert.That(second.FrontendDeployed, Is.False);
-            Assert.That(second.BackendDeployed, Is.False);
+            Assert.That(second.RuntimeDeployed, Is.False);
             Assert.That(second.LastDeploymentAt, Is.Null);
             Assert.That(second.LastSuccessfulDeploymentAt, Is.Null);
         });
@@ -145,12 +143,8 @@ public class AppDeploymentTargetStateServiceTests
         }
     }
 
-    [TestCase(true, false)]
-    [TestCase(false, true)]
-    [TestCase(true, true)]
-    public async Task SuccessfulDeployment_PersistsRequestedComponents(
-        bool deployFrontend,
-        bool deployBackend)
+    [Test]
+    public async Task SuccessfulDeployment_PersistsRuntimeDeployment()
     {
         await using var db = CreateDbContext();
         var app = AddAppWithTwoTargets(db);
@@ -160,12 +154,11 @@ public class AppDeploymentTargetStateServiceTests
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
-            app.Id, target.Id, success: true, deployFrontend, deployBackend);
+            app.Id, target.Id, success: true, runtimeDeployed: true);
 
         Assert.Multiple(() =>
         {
-            Assert.That(target.FrontendDeployed, Is.EqualTo(deployFrontend));
-            Assert.That(target.BackendDeployed, Is.EqualTo(deployBackend));
+            Assert.That(target.RuntimeDeployed, Is.True);
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
         });
     }
@@ -181,13 +174,12 @@ public class AppDeploymentTargetStateServiceTests
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
-            app.Id, target.Id, success: false, deployFrontend: true, deployBackend: true);
+            app.Id, target.Id, success: false, runtimeDeployed: true);
 
         Assert.Multiple(() =>
         {
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
-            Assert.That(target.FrontendDeployed, Is.False);
-            Assert.That(target.BackendDeployed, Is.False);
+            Assert.That(target.RuntimeDeployed, Is.False);
             Assert.That(target.LastDeploymentAt, Is.Not.Null);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Null);
         });
@@ -208,8 +200,7 @@ public class AppDeploymentTargetStateServiceTests
                 firstApp.Id,
                 secondTarget.Id,
                 success: true,
-                deployFrontend: true,
-                deployBackend: true));
+                runtimeDeployed: true));
     }
 
     [Test]

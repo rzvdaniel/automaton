@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using Automaton.Core.Models;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -47,7 +48,14 @@ public class ConfigService
         try
         {
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AutomatonConfig>(json, SerializerOptions);
+            using var document = JsonDocument.Parse(json);
+            ApplicationContractSerialization.RejectLegacyFields(document.RootElement);
+            var config = JsonSerializer.Deserialize<AutomatonConfig>(json, SerializerOptions);
+            if (config is null)
+                return null;
+
+            ApplicationContractValidator.EnsureValid(config.Application);
+            return config;
         }
         catch
         {

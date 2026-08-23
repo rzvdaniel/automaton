@@ -3,9 +3,7 @@ namespace Automaton.Cli.Models;
 public static class ValidationCheckNames
 {
     public const string AppLink = "appLink";
-    public const string FrontendDeployShape = "frontendDeployShape";
-    public const string BackendDeployShape = "backendDeployShape";
-    public const string BackendRunner = "backendRunner";
+    public const string ApplicationContract = "applicationContract";
     public const string RemoteAppAccess = "remoteAppAccess";
 }
 

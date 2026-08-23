@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Automaton.Core.Models;
 using System.Text.RegularExpressions;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
@@ -88,8 +89,7 @@ public class AppsService
                     {
                         target.Name,
                         target.Status,
-                        target.FrontendDeployed,
-                        target.BackendDeployed,
+                        target.RuntimeDeployed,
                         target.Id,
                         IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
                         Runner = target.ExecutionRunner == null ? null : new
@@ -140,17 +140,15 @@ public class AppsService
                         row.LiveTarget.Runner.ConnectionId,
                         row.LiveTarget.Runner.LastHeartbeatAtUtc,
                         now) == RunnerStatus.Online,
-                    FrontendDeployed = row.LiveTarget.FrontendDeployed,
-                    BackendDeployed = row.LiveTarget.BackendDeployed,
-                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.FrontendDeployed,
+                    RuntimeDeployed = row.LiveTarget.RuntimeDeployed,
+                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.RuntimeDeployed,
                     RoutePath = $"/private/{row.Id:D}",
                 },
                 Runtime = new AppListRuntimeDto
                 {
                     FrontendAvailable = metadata.Frontend.RuntimeAvailable,
                     BackendAvailable = metadata.Backend.RuntimeAvailable,
-                    FrontendDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc,
-                    BackendDeployedAtUtc = metadata.Backend.RuntimeDeployedAtUtc
+                    RuntimeDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc ?? metadata.Backend.RuntimeDeployedAtUtc
                 }
             };
         }));
@@ -406,6 +404,7 @@ public class AppsService
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             Definition = "{}", // Empty - content is now in file system
+            ApplicationContractJson = ApplicationContractSerialization.Serialize(ApplicationContractDefaults.Create()),
             Tags = AppTagNormalizer.Serialize(app.Tags)
         };
 
@@ -445,8 +444,17 @@ public class AppsService
 
         // Write automaton.json so external AI tools (Copilot, Cursor, Claude) can discover the app ID.
         var automatonConfig = JsonSerializer.Serialize(
-            new { appId = entity.Id, name = entity.Name },
-            new JsonSerializerOptions { WriteIndented = true });
+            new
+            {
+                appId = entity.Id,
+                name = entity.Name,
+                application = ApplicationContractDefaults.Create()
+            },
+            new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
         await fileStorageService.WriteSourceFileAsync(UserId, entity.Id, "automaton.json", automatonConfig);
 
         // Log activity
@@ -524,6 +532,11 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
         entity.Definition = "{}";
+        if (app.Application is not null)
+        {
+            ApplicationContractValidator.EnsureValid(app.Application);
+            entity.ApplicationContractJson = ApplicationContractSerialization.Serialize(app.Application);
+        }
 
         // Public profile display fields
         entity.ThumbnailUrl = app.ThumbnailUrl;
@@ -1015,6 +1028,7 @@ public class AppsService
             Scope = entity.Scope,
             ProjectId = entity.ProjectId,
             Definition = definition ?? JsonSerializer.Deserialize<AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
+            Application = ApplicationContractSerialization.Deserialize(entity.ApplicationContractJson),
             // Analytics
             ViewCount = entity.ViewCount,
             StarCount = entity.StarCount,
@@ -1092,6 +1106,7 @@ public class AppsService
             Summary = source.Summary,
             Description = source.Description,
             Definition = "{}",
+            ApplicationContractJson = source.ApplicationContractJson,
             IsPublished = false,
             PublicUrl = null,
             PublishedAt = null,
@@ -1234,6 +1249,7 @@ public class AppsService
             Summary = source.Summary,
             Description = source.Description,
             Definition = "{}",
+            ApplicationContractJson = source.ApplicationContractJson,
             IsPublished = request.PublishImmediately,
             IsForkable = false,
             PublicUrl = publicUrl,

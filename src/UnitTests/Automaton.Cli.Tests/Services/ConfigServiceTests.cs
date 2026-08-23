@@ -1,5 +1,6 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
+using Automaton.Core.Models;
 using NUnit.Framework;
 using System.Text.Json;
 
@@ -37,6 +38,163 @@ public class ConfigServiceTests
         }
 
         _tempDirectories.Clear();
+    }
+
+    [Test]
+    public void SaveProjectConfig_PersistsAndLoadsTheStackNeutralApplicationContract()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        var contract = new ApplicationContract
+        {
+            Build = new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "build-tool",
+                    Arguments = ["--target", "release", "name with spaces"],
+                    WorkingDirectory = "tools/build",
+                    Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" }
+                },
+                OutputDirectory = "artifacts/site"
+            },
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "custom-server",
+                    Arguments = ["--port", "4312"],
+                    WorkingDirectory = "services/web",
+                    Environment = new Dictionary<string, string> { ["APP_MODE"] = "production" }
+                },
+                Port = 4312
+            },
+            Health = new ApplicationHealthSpec { Path = "/ready", Port = 4312 },
+            Storage = new ApplicationStorageSpec
+            {
+                DataDirectory = "var/data",
+                Mounts = [new ApplicationStorageMount { Name = "uploads", RelativePath = "var/uploads" }]
+            }
+        };
+
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Generic App",
+            Application = contract
+        });
+
+        var loaded = configService.LoadProjectConfig(projectRoot);
+
+        Assert.That(loaded.Application.Build.Command?.Executable, Is.EqualTo("build-tool"));
+        Assert.That(loaded.Application.Build.Command?.Arguments, Is.EqualTo(new[] { "--target", "release", "name with spaces" }));
+        Assert.That(loaded.Application.Build.Command?.WorkingDirectory, Is.EqualTo("tools/build"));
+        Assert.That(loaded.Application.Runtime.Command?.Executable, Is.EqualTo("custom-server"));
+        Assert.That(loaded.Application.Runtime.Port, Is.EqualTo(4312));
+        Assert.That(loaded.Application.Storage.Mounts.Single().RelativePath, Is.EqualTo("var/uploads"));
+    }
+
+    [Test]
+    public void TryLoadProjectConfig_RejectsTheRemovedFrontendBackendContract()
+    {
+        var projectRoot = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), """
+        {
+          "name": "Legacy app",
+          "frontend": { "build": "npm run build", "deployDir": "dist" },
+          "backend": { "deployDir": "backend" }
+        }
+        """);
+
+        var loaded = new ConfigService().TryLoadProjectConfig(projectRoot);
+
+        Assert.That(loaded, Is.Null);
+    }
+
+    [Test]
+    public void ApplicationContractValidator_RejectsWorkspaceEscapesButAllowsArbitraryExecutables()
+    {
+        var contract = new ApplicationContract
+        {
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "binary-with-any-name",
+                    WorkingDirectory = "services/runtime",
+                    Arguments = ["--flag", "value"]
+                }
+            }
+        };
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+
+        contract.Runtime.Command!.WorkingDirectory = "../outside";
+        Assert.That(ApplicationContractValidator.Validate(contract), Has.Some.Contains("workingDirectory"));
+    }
+
+    [TestCase("dotnet", true)]
+    [TestCase("tools/my-server", true)]
+    [TestCase("./bin/server", true)]
+    [TestCase("../server", false)]
+    [TestCase("bin/../../server", false)]
+    [TestCase("/usr/bin/server", false)]
+    [TestCase("C:\\server.exe", false)]
+    public void ApplicationContractValidator_ValidatesExecutablePathBoundaries(string executable, bool expectedValid)
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Command = new ApplicationCommandSpec { Executable = executable };
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.That(errors.Any(error => error.Contains("runtime.command.executable")), Is.EqualTo(!expectedValid));
+    }
+
+    [Test]
+    public void ApplicationContractValidator_ReportsNullCommandCollectionsInsteadOfThrowing()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Command = new ApplicationCommandSpec
+        {
+            Executable = "dotnet",
+            Arguments = null!,
+            Environment = null!
+        };
+        contract.Storage.Mounts = null!;
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(errors, Has.Some.EqualTo("runtime.command.arguments must be an array"));
+            Assert.That(errors, Has.Some.EqualTo("runtime.command.environment must be an object"));
+            Assert.That(errors, Has.Some.EqualTo("storage.mounts must be an array"));
+        });
+
+        var json = JsonSerializer.Serialize(contract, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ApplicationContractSerialization.Deserialize(json));
+        Assert.That(exception!.Message, Does.Contain("runtime.command.arguments must be an array"));
+    }
+
+    [Test]
+    public void ApplicationContract_AllowsPortReadinessWithoutHealthPath()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Health.Path = null;
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+    }
+
+    [Test]
+    public void CanonicalApplicationContractHasNoFrontendOrBackendRequirement()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(typeof(ApplicationContract).GetProperty("Frontend"), Is.Null);
+            Assert.That(typeof(ApplicationContract).GetProperty("Backend"), Is.Null);
+            Assert.That(typeof(AutomatonConfig).GetProperty("Frontend"), Is.Null);
+            Assert.That(typeof(AutomatonConfig).GetProperty("Backend"), Is.Null);
+        });
     }
 
     [Test]
@@ -126,15 +284,7 @@ public class ConfigServiceTests
             AppId = Guid.NewGuid().ToString(),
             Name = "Test App",
             Server = "https://project.example.com",
-            Frontend = new FrontendConfig
-            {
-                Build = "cd frontend && npm install && npm run build",
-                DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
-            }
+            Application = ApplicationContractTestFactory.Create()
         };
 
         // Act
@@ -242,11 +392,7 @@ public class ConfigServiceTests
             AppId = "app-123",
             Name = "Nested App",
             Server = "https://project.example.com",
-            Frontend = new FrontendConfig
-            {
-                Build = "cd frontend && npm install && npm run build",
-                DeployDir = "frontend/dist"
-            }
+            Application = ApplicationContractTestFactory.Create()
         });
 
         var loaded = configService.LoadProjectConfig(nestedDirectory);

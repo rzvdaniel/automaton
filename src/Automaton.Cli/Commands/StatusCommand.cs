@@ -57,10 +57,9 @@ public static class StatusCommand
                 var targets = await client.ListDeploymentTargetsAsync(appId!);
                 var defaultTarget = targets.SingleOrDefault(target => target.IsDefault);
 
-                var deployDirectory = !string.IsNullOrWhiteSpace(appConfig.Frontend?.DeployDir)
-                    ? ZipService.ResolveDeployDirectory(cwd, appConfig.Frontend.DeployDir)
+                var artifactDirectory = !string.IsNullOrWhiteSpace(appConfig.Application.Build.OutputDirectory)
+                    ? ZipService.ResolveDeployDirectory(cwd, appConfig.Application.Build.OutputDirectory)
                     : null;
-                var backendScripts = ResolveBackendScriptCount(cwd, appConfig.Backend?.DeployDir);
 
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
@@ -85,11 +84,8 @@ public static class StatusCommand
                             name = appConfig.Name,
                             environment = resolved.EnvironmentName,
                             server,
-                            build = appConfig.Frontend?.Build,
-                            deployDir = appConfig.Frontend?.DeployDir,
-                            resolvedDeployDir = deployDirectory,
-                            backendDeployDir = appConfig.Backend?.DeployDir,
-                            backendScripts
+                            application = appConfig.Application,
+                            resolvedArtifactDirectory = artifactDirectory
                         },
                         remote = new
                         {
@@ -111,10 +107,9 @@ public static class StatusCommand
                 table.AddRow("app", $"{appConfig.Name} ({appId})");
                 table.AddRow("environment", string.IsNullOrWhiteSpace(resolved.EnvironmentName) ? "-" : resolved.EnvironmentName);
                 table.AddRow("server", server);
-                table.AddRow("build", string.IsNullOrWhiteSpace(appConfig.Frontend?.Build) ? "-" : appConfig.Frontend.Build);
-                table.AddRow("frontend deploy dir", deployDirectory == null ? "-" : Path.GetRelativePath(cwd, deployDirectory));
-                table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
-                table.AddRow("backend scripts", backendScripts.ToString());
+                table.AddRow("build executable", string.IsNullOrWhiteSpace(appConfig.Application.Build.Command?.Executable) ? "-" : appConfig.Application.Build.Command.Executable);
+                table.AddRow("runtime executable", string.IsNullOrWhiteSpace(appConfig.Application.Runtime.Command?.Executable) ? "-" : appConfig.Application.Runtime.Command.Executable);
+                table.AddRow("artifact directory", artifactDirectory == null ? "-" : Path.GetRelativePath(cwd, artifactDirectory));
                 table.AddRow(
                     "Live target",
                     defaultTarget == null
@@ -144,17 +139,6 @@ public static class StatusCommand
         }, jsonOption, environmentOption);
 
         return cmd;
-    }
-
-    private static int ResolveBackendScriptCount(string cwd, string? backendDeployDir)
-    {
-        if (string.IsNullOrWhiteSpace(backendDeployDir))
-            return 0;
-
-        var backendDirectory = Path.Combine(cwd, backendDeployDir);
-        return Directory.Exists(backendDirectory)
-            ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
-            : 0;
     }
 
 }

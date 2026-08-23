@@ -4,6 +4,10 @@ public sealed class AppDeploymentPackageManifest
 {
     public int Version { get; set; } = 1;
     public string AppId { get; set; } = string.Empty;
+    public ApplicationContract Application { get; set; } = ApplicationContractDefaults.Create();
+
+    // These fields remain internal to the pre-Stage-2 runner package path.
+    // They are not part of the canonical application contract.
     public bool HasBackend { get; set; }
     public string FrontendRuntimePath { get; set; } = "runtime/frontend";
     public string BackendRuntimePath { get; set; } = "runtime/backend";

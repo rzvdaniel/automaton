@@ -163,7 +163,7 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
-    public async Task ListAsync_MapsFrontendAndBackendDeploymentMetadataSeparately()
+    public async Task ListAsync_MapsGenericRuntimeDeploymentMetadata()
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -189,8 +189,7 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
-            Assert.That(app.Runtime.FrontendDeployedAtUtc, Is.EqualTo(frontendAtUtc));
-            Assert.That(app.Runtime.BackendDeployedAtUtc, Is.EqualTo(backendAtUtc));
+            Assert.That(app.Runtime.RuntimeDeployedAtUtc, Is.EqualTo(frontendAtUtc));
             Assert.That(app.Runtime.FrontendAvailable, Is.True);
             Assert.That(app.Runtime.BackendAvailable, Is.True);
         });
@@ -273,6 +272,44 @@ public class AppAuthorizationRegressionTests
         Assert.That(
             (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.Null);
+    }
+
+    [Test]
+    public async Task Update_WhenApplicationContractIsOmitted_PreservesPersistedContract()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var contract = new Automaton.Core.Models.ApplicationContract
+        {
+            Runtime = new Automaton.Core.Models.ApplicationRuntimeSpec
+            {
+                Command = new Automaton.Core.Models.ApplicationCommandSpec
+                {
+                    Executable = "custom-server",
+                    Arguments = ["--port", "5000"]
+                },
+                Port = 5000
+            }
+        };
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var entity = await dbContext.WebApps.SingleAsync(app => app.Id == appId);
+        entity.ApplicationContractJson = Automaton.Core.Models.ApplicationContractSerialization.Serialize(contract);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+        var model = service.Get(appId)!;
+        model.Name = "Renamed app";
+        model.Application = null;
+
+        await service.Update(appId, model);
+
+        var persisted = Automaton.Core.Models.ApplicationContractSerialization.Deserialize(
+            (await dbContext.WebApps.SingleAsync(app => app.Id == appId)).ApplicationContractJson);
+        Assert.That(persisted.Runtime.Command!.Executable, Is.EqualTo("custom-server"));
+        Assert.That(persisted.Runtime.Port, Is.EqualTo(5000));
     }
 
     [Test]
@@ -729,7 +766,7 @@ public class AppAuthorizationRegressionTests
         return new AppsService(
             dbContext,
             userContextService,
-            null!,
+            new RecentActivityService(dbContext, userContextService),
             authorizationService,
             fileStorageService,
             environment,

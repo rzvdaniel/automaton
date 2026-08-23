@@ -131,8 +131,7 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         Guid appId,
         Guid deploymentTargetId,
         bool success,
-        bool deployFrontend,
-        bool deployBackend,
+        bool runtimeDeployed,
         CancellationToken cancellationToken = default)
     {
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
@@ -146,8 +145,7 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         target.UpdatedAt = now;
         if (success)
         {
-            target.FrontendDeployed |= deployFrontend;
-            target.BackendDeployed |= deployBackend;
+            target.RuntimeDeployed |= runtimeDeployed;
             target.LastSuccessfulDeploymentAt = now;
         }
         await dataContext.SaveChangesAsync(cancellationToken);

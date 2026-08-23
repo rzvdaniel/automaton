@@ -54,7 +54,7 @@ const getLiveStatusLabel = (app: AppListItem) => {
   const environment = app.liveEnvironment
   if (!environment) return app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.frontendDeployed && !environment.backendDeployed) return 'Unassigned'
+  if (!environment.runtimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 }
 

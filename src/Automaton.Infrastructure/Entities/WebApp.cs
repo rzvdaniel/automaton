@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 
 namespace Automaton.Api.Entities;
 
@@ -9,6 +10,12 @@ public class WebApp
     public string Summary { get; set; }
     public string Description { get; set; }
     public string Definition { get; set; }
+
+    /// <summary>
+    /// Serialized stack-neutral build, runtime, health, and storage contract.
+    /// </summary>
+    public string ApplicationContractJson { get; set; } =
+        ApplicationContractSerialization.Serialize(ApplicationContractDefaults.Create());
     
     // Publishing fields
     public bool IsPublished { get; set; }

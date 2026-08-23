@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 
 namespace Automaton.Api.Models;
 
@@ -60,6 +61,10 @@ public class AppModel
     public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
+    // The full app representation includes the canonical contract, but update
+    // payloads may omit it when changing unrelated metadata. The service then
+    // preserves the persisted contract instead of replacing it with defaults.
+    public ApplicationContract? Application { get; set; }
 }
 
 public class AppComponentOwnershipModel

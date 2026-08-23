@@ -114,12 +114,11 @@ export interface AppListItem {
     isHostedRunner: boolean
     applicationProfile?: string | null
     runnerOnline: boolean
-    frontendDeployed: boolean
-    backendDeployed: boolean
+    runtimeDeployed: boolean
     isStaticHosting?: boolean
     routePath: string
   } | null
-  runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
+  runtime: { frontendAvailable: boolean; backendAvailable: boolean; runtimeDeployedAtUtc?: string | null }
 }
 
 export const DeploymentTargetStatus = {
@@ -140,8 +139,7 @@ export interface AppDeploymentTarget {
   slug: string
   isDefault: boolean
   status: DeploymentTargetStatus
-  frontendDeployed: boolean
-  backendDeployed: boolean
+  runtimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
   cleanupPending: boolean

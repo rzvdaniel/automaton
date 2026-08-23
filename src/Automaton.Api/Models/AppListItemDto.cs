@@ -27,8 +27,7 @@ public sealed class AppListEnvironmentDto
     public bool IsHostedRunner { get; init; }
     public string? ApplicationProfile { get; init; }
     public bool RunnerOnline { get; init; }
-    public bool FrontendDeployed { get; init; }
-    public bool BackendDeployed { get; init; }
+    public bool RuntimeDeployed { get; init; }
     public bool IsStaticHosting { get; init; }
     public string RoutePath { get; init; } = string.Empty;
 }
@@ -45,6 +44,5 @@ public sealed class AppListRuntimeDto
 {
     public bool FrontendAvailable { get; init; }
     public bool BackendAvailable { get; init; }
-    public DateTime? FrontendDeployedAtUtc { get; init; }
-    public DateTime? BackendDeployedAtUtc { get; init; }
+    public DateTime? RuntimeDeployedAtUtc { get; init; }
 }

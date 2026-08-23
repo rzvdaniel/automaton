@@ -5,7 +5,7 @@ import { getViewingTargetPreviewState, resolveViewingTarget } from './viewing-ta
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'live', isDefault: true,
-    status: DeploymentTargetStatus.Running, frontendDeployed: true, backendDeployed: true,
+    status: DeploymentTargetStatus.Running, runtimeDeployed: true,
     cleanupPending: false, routePath: '/private/app-id',
     runner: { id: 'runner-id', name: 'Hosted', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
@@ -23,7 +23,7 @@ describe('viewing targets', () => {
 
   it.each([
     [target({ runner: null, status: DeploymentTargetStatus.Unassigned }), 'No runtime assigned'],
-    [target({ frontendDeployed: false, status: DeploymentTargetStatus.NotDeployed }), 'Not deployed'],
+    [target({ runtimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }), 'Not deployed'],
     [target({ runner: { id: 'runner-id', name: 'Offline', purpose: 'Application', isHostedRunner: false, isOnline: false }, status: DeploymentTargetStatus.RunnerOffline }), 'Runtime is offline'],
   ])('does not create a preview for unavailable targets', (unavailableTarget, message) => {
     expect(getViewingTargetPreviewState(unavailableTarget)).toEqual({ available: false, message })
