@@ -123,7 +123,42 @@ public class RunnerDeploymentTargetIsolationTests
         });
     }
 
-    private string CreatePackage(Guid appId, string frontendContent)
+    [Test]
+    public async Task DeployingBackendPackage_UsesCurrentBackendMarkerAndRequestsProcessStart()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace,
+            new RunnerBackendEnvironmentService(workspace),
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var package = CreatePackage(appId, "backend target", hasBackend: true);
+
+        var result = await service.DeployPackage(new DeployAppPackageRequest
+        {
+            AppId = appId,
+            DeploymentTargetId = targetId,
+            PackagePath = package,
+            Clean = true
+        });
+
+        var metadata = await File.ReadAllTextAsync(Path.Combine(
+            workspace.GetDeploymentTargetRoot(appId, targetId),
+            "deployment.json"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.True);
+            Assert.That(processManager.StartedTargets, Does.Contain(targetId));
+            Assert.That(metadata, Does.Contain("\"hasBackend\":true"));
+            Assert.That(metadata, Does.Contain("\"backendModule\":\"main:app\""));
+        });
+    }
+
+    private string CreatePackage(Guid appId, string frontendContent, bool hasBackend = false)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
@@ -134,9 +169,11 @@ public class RunnerDeploymentTargetIsolationTests
             JsonSerializer.Serialize(new AppDeploymentPackageManifest
             {
                 AppId = appId.ToString(),
-                HasBackend = false
+                HasBackend = hasBackend
             }));
         WriteEntry(archive, "runtime/frontend/index.html", frontendContent);
+        if (hasBackend)
+            WriteEntry(archive, "runtime/backend/main.py", "app = object()\n");
         return packagePath;
     }
 
@@ -149,13 +186,17 @@ public class RunnerDeploymentTargetIsolationTests
 
     private sealed class StubBackendProcessManager : IAppBackendProcessManager
     {
+        public List<Guid> StartedTargets { get; } = [];
         public List<Guid> StoppedTargets { get; } = [];
 
         public Task EnsureRunningAsync(
             Guid appId,
             Guid deploymentTargetId,
             CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        {
+            StartedTargets.Add(deploymentTargetId);
+            return Task.CompletedTask;
+        }
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId)
         {
