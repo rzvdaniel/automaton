@@ -783,7 +783,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var metadata = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             await File.ReadAllTextAsync(path, cancellationToken),
             JsonOptions);
-        if (metadata?.Runtime is null)
+        if (metadata is null
+            || (metadata.Runtime is null && metadata.Candidate?.Runtime is null))
             throw new InvalidOperationException("Runtime deployment metadata is invalid.");
         return metadata;
     }

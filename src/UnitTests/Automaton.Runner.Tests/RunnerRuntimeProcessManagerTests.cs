@@ -472,6 +472,66 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public async Task RecoveryWithFirstDeploymentCandidate_ReusesCandidateWithoutCurrentRuntime()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var candidateRoot = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, Guid.NewGuid());
+        Directory.CreateDirectory(candidateRoot);
+        var candidateContract = CreateContract(["--tcp", "first-deployment"]);
+        var candidatePort = 30_000 + Random.Shared.Next(500);
+        candidateContract.Runtime.Port = candidatePort;
+        using var candidateProcess = StartFixtureProcess(candidateRoot, candidatePort, "first-deployment");
+        await Task.Delay(250);
+
+        var candidateRecord = new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = candidateContract.Runtime,
+            Health = candidateContract.Health,
+            EffectivePort = candidatePort,
+            ProcessId = candidateProcess.Id,
+            ProcessStartTimeUtc = candidateProcess.StartTime.ToUniversalTime(),
+            ArtifactRoot = candidateRoot,
+            ArtifactId = "candidate",
+            State = RuntimeReadinessState.Starting
+        };
+        var metadata = new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = null,
+            Health = null,
+            State = RuntimeReadinessState.Stopped,
+            Candidate = candidateRecord
+        };
+        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata));
+
+        using var recoveryManager = CreateManager(workspace, registry);
+        await recoveryManager.StartAsync(CancellationToken.None);
+
+        var recovered = ReadMetadata(metadataPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(IsProcessAlive(candidateProcess.Id), Is.False);
+            Assert.That(recovered.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(recovered.Candidate, Is.Null);
+            Assert.That(recovered.ArtifactRoot, Is.EqualTo(candidateRoot));
+            Assert.That(recovered.ProcessId, Is.Not.EqualTo(candidateProcess.Id));
+            Assert.That(IsProcessAlive(recovered.ProcessId!.Value), Is.True);
+            Assert.That(Directory.Exists(candidateRoot), Is.True);
+            Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
+        });
+
+        await recoveryManager.StopAsync(appId, targetId);
+    }
+
+    [Test]
     public void RunnerBoundary_RejectsAbsoluteAndTraversalPaths()
     {
         var registry = new RunnerRuntimeRegistry();
