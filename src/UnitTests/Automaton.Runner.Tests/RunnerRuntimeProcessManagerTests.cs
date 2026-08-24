@@ -43,10 +43,10 @@ public sealed class RunnerRuntimeProcessManagerTests
         await Task.Delay(150);
 
         var targetRoot = workspace.GetDeploymentTargetRoot(appId, targetId);
-        var runtimeRoot = workspace.GetAppRuntimeApplicationDirectory(appId, targetId);
         var metadata = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             await File.ReadAllTextAsync(Path.Combine(targetRoot, "deployment.json")),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var runtimeRoot = metadata.ArtifactRoot!;
         var stdout = await ReadSharedTextAsync(Path.Combine(runtimeRoot, "logs", "runtime.stdout.log"));
         var stderr = await ReadSharedTextAsync(Path.Combine(runtimeRoot, "logs", "runtime.stderr.log"));
 
@@ -216,8 +216,10 @@ public sealed class RunnerRuntimeProcessManagerTests
                 Clean = true
             });
 
+            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var deployedMetadata = ReadMetadata(metadataPath);
             var logPath = Path.Combine(
-                workspace.GetAppRuntimeApplicationDirectory(appId, targetId),
+                deployedMetadata.ArtifactRoot!,
                 "logs",
                 "runtime.stdout.log");
             var output = await WaitForLogLineAsync(logPath, "deployed");
@@ -238,6 +240,70 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public async Task FailedDeployment_LeavesCurrentArtifactFilesAndMetadataIntact()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var processManager = CreateManager(workspace, registry);
+        var deployment = new RunnerDeploymentService(
+            workspace,
+            new RunnerBackendEnvironmentService(workspace),
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var originalPackage = CreateRuntimePackage(appId, ["RunnerRuntimeFixture.dll", "--tcp", "original"], "current");
+        var failedPackage = CreateRuntimePackage(appId, ["missing-runtime-fixture.dll"], "candidate");
+
+        try
+        {
+            var originalResult = await deployment.DeployPackage(new DeployAppPackageRequest
+            {
+                AppId = appId,
+                DeploymentTargetId = targetId,
+                PackagePath = originalPackage,
+                Clean = true
+            });
+            Assert.That(originalResult.Success, Is.True, originalResult.Message);
+
+            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var original = ReadMetadata(metadataPath);
+            var originalMarker = Path.Combine(original.ArtifactRoot!, "marker.txt");
+            var originalContent = await File.ReadAllTextAsync(originalMarker);
+            Assert.That(originalContent, Is.EqualTo("current"));
+            Assert.That(registry.TryGet(appId, targetId, out var originalRoute), Is.True);
+
+            var failedResult = await deployment.DeployPackage(new DeployAppPackageRequest
+            {
+                AppId = appId,
+                DeploymentTargetId = targetId,
+                PackagePath = failedPackage,
+                Clean = true
+            });
+
+            var restored = ReadMetadata(metadataPath);
+            Assert.Multiple(() =>
+            {
+                Assert.That(failedResult.Success, Is.False);
+                Assert.That(IsProcessAlive(original.ProcessId!.Value), Is.True);
+                Assert.That(registry.TryGet(appId, targetId, out var route), Is.True);
+                Assert.That(route.Port, Is.EqualTo(originalRoute.Port));
+                Assert.That(restored.State, Is.EqualTo(RuntimeReadinessState.Ready));
+                Assert.That(restored.ProcessId, Is.EqualTo(original.ProcessId));
+                Assert.That(restored.ArtifactRoot, Is.EqualTo(original.ArtifactRoot));
+            });
+            Assert.That(await File.ReadAllTextAsync(originalMarker), Is.EqualTo(originalContent));
+        }
+        finally
+        {
+            await processManager.StopAsync(appId, targetId);
+            processManager.Dispose();
+            if (File.Exists(originalPackage)) File.Delete(originalPackage);
+            if (File.Exists(failedPackage)) File.Delete(failedPackage);
+        }
+    }
+
+    [Test]
     public async Task StopWithCancelledShutdownToken_KillsTheEntireProcessTree()
     {
         var workspace = new RunnerWorkspaceService();
@@ -250,7 +316,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
         var metadata = ReadMetadata(metadataPath);
         var outputPath = Path.Combine(
-            workspace.GetAppRuntimeApplicationDirectory(appId, targetId),
+            metadata.ArtifactRoot!,
             "logs",
             "runtime.stdout.log");
         var output = await WaitForLogLineAsync(outputPath, "child:");
@@ -266,6 +332,87 @@ public sealed class RunnerRuntimeProcessManagerTests
             Assert.That(IsProcessAlive(metadata.ProcessId!.Value), Is.False);
             Assert.That(IsProcessAlive(childPid), Is.False);
         });
+    }
+
+    [Test]
+    public async Task RecoveryWithPersistedCandidate_FencesBothProcessesAndRebuildsDesiredRuntime()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var currentRoot = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, Guid.NewGuid());
+        var candidateRoot = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, Guid.NewGuid());
+        Directory.CreateDirectory(currentRoot);
+        Directory.CreateDirectory(candidateRoot);
+        var currentContract = CreateContract(["--tcp", "current"]);
+        var candidateContract = CreateContract(["--tcp", "candidate"]);
+        var currentPort = 30_000 + Random.Shared.Next(500);
+        var candidatePort = currentPort + 1;
+        using var currentProcess = StartFixtureProcess(currentRoot, currentPort, "current");
+        using var candidateProcess = StartFixtureProcess(candidateRoot, candidatePort, "candidate");
+        await Task.Delay(250);
+
+        var currentRecord = new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = currentContract.Runtime,
+            Health = currentContract.Health,
+            EffectivePort = currentPort,
+            ProcessId = currentProcess.Id,
+            ProcessStartTimeUtc = currentProcess.StartTime.ToUniversalTime(),
+            ArtifactRoot = currentRoot,
+            ArtifactId = "current",
+            State = RuntimeReadinessState.Ready
+        };
+        var metadata = new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = currentRecord.Runtime,
+            Health = currentRecord.Health,
+            EffectivePort = currentRecord.EffectivePort,
+            ProcessId = currentRecord.ProcessId,
+            ProcessStartTimeUtc = currentRecord.ProcessStartTimeUtc,
+            ArtifactRoot = currentRecord.ArtifactRoot,
+            ArtifactId = currentRecord.ArtifactId,
+            State = RuntimeReadinessState.Ready,
+            Candidate = new RunnerRuntimeDeploymentMetadata
+            {
+                AppId = appId.ToString(),
+                DeploymentTargetId = targetId.ToString(),
+                Runtime = candidateContract.Runtime,
+                Health = candidateContract.Health,
+                EffectivePort = candidatePort,
+                ProcessId = candidateProcess.Id,
+                ProcessStartTimeUtc = candidateProcess.StartTime.ToUniversalTime(),
+                ArtifactRoot = candidateRoot,
+                ArtifactId = "candidate",
+                State = RuntimeReadinessState.Starting
+            }
+        };
+        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata));
+
+        using var recoveryManager = CreateManager(workspace, registry);
+        await recoveryManager.StartAsync(CancellationToken.None);
+
+        var recovered = ReadMetadata(metadataPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(IsProcessAlive(currentProcess.Id), Is.False);
+            Assert.That(IsProcessAlive(candidateProcess.Id), Is.False);
+            Assert.That(recovered.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(recovered.Candidate, Is.Null);
+            Assert.That(recovered.ArtifactRoot, Is.EqualTo(candidateRoot));
+            Assert.That(recovered.ProcessId, Is.Not.EqualTo(currentProcess.Id));
+            Assert.That(recovered.ProcessId, Is.Not.EqualTo(candidateProcess.Id));
+            Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
+        });
+
+        await recoveryManager.StopAsync(appId, targetId);
     }
 
     [Test]
@@ -333,7 +480,10 @@ public sealed class RunnerRuntimeProcessManagerTests
         RunnerRuntimeRegistry registry)
         => new(workspace, registry, NullLogger<RunnerRuntimeProcessManager>.Instance);
 
-    private string CreateRuntimePackage(Guid appId)
+    private string CreateRuntimePackage(
+        Guid appId,
+        IReadOnlyList<string>? arguments = null,
+        string marker = "deployed")
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
@@ -345,7 +495,7 @@ public sealed class RunnerRuntimeProcessManagerTests
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "dotnet",
-                    Arguments = ["RunnerRuntimeFixture.dll", "--tcp", "deployed"],
+                    Arguments = arguments?.ToList() ?? ["RunnerRuntimeFixture.dll", "--tcp", "deployed"],
                     WorkingDirectory = "."
                 },
                 Port = 20_000 + Random.Shared.Next(1000)
@@ -361,6 +511,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         var fixtureDirectory = Path.GetDirectoryName(FixturePath())!;
         foreach (var file in Directory.GetFiles(fixtureDirectory, "RunnerRuntimeFixture.*"))
             archive.CreateEntryFromFile(file, $"runtime/application/{Path.GetFileName(file)}");
+        WriteEntry(archive, "runtime/application/marker.txt", marker);
         return packagePath;
     }
 
@@ -375,6 +526,24 @@ public sealed class RunnerRuntimeProcessManagerTests
         => JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             File.ReadAllText(path),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+
+    private static Process StartFixtureProcess(string workingDirectory, int port, string value)
+    {
+        var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            Environment = { ["AUTOMATON_PORT"] = port.ToString(), ["TEST_RUNTIME_VALUE"] = value },
+            ArgumentList = { FixturePath(), "--tcp", value }
+        }) ?? throw new InvalidOperationException("Could not start runtime fixture.");
+        _ = process.StandardOutput.ReadToEndAsync();
+        _ = process.StandardError.ReadToEndAsync();
+        return process;
+    }
 
     private static bool IsProcessAlive(int processId)
     {

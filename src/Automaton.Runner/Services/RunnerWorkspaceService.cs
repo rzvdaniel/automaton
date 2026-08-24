@@ -72,6 +72,14 @@ public class RunnerWorkspaceService
     public string GetAppRuntimeApplicationDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "application");
 
+    public string GetAppRuntimeCandidateDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
+        => GetFullPath(
+            GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "candidates"),
+            candidateId.ToString());
+
+    public string GetAppRuntimeCandidateApplicationDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
+        => GetFullPath(GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), "application");
+
     public string GetAppSourceFrontendDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "frontend");
 

@@ -15,7 +15,8 @@ public interface IAppRuntimeProcessManager
         Guid appId,
         Guid deploymentTargetId,
         ApplicationContract contract,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? artifactRoot = null);
 
     Task StopAsync(Guid appId, Guid deploymentTargetId);
 }
@@ -61,7 +62,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             try
             {
                 var metadata = await ReadMetadataAsync(metadataPath, cancellationToken);
-                if (metadata is null || metadata.Runtime?.Command is null)
+                if (metadata is null || (metadata.Runtime?.Command is null && metadata.Candidate?.Runtime?.Command is null))
                     continue;
 
                 if (!Guid.TryParse(metadata.AppId, out var appId)
@@ -71,19 +72,30 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 }
 
                 await StopRecordedProcessAsync(metadata);
-                var candidate = await StartRuntimeAsync(
+                if (metadata.Candidate is not null)
+                    await StopRecordedProcessAsync(metadata.Candidate);
+
+                var candidate = metadata.Candidate ?? CreateRecoveryCandidate(metadata);
+                var deleteCandidateArtifactOnFailure = metadata.Candidate is not null;
+                metadata.Candidate = candidate;
+                candidate.ProcessId = null;
+                candidate.ProcessStartTimeUtc = null;
+                candidate.EffectivePort = null;
+                candidate.State = RuntimeReadinessState.Starting;
+                await WriteMetadataAsync(metadata, cancellationToken);
+
+                var activeCandidate = await StartRuntimeAsync(
                     appId,
                     targetId,
-                    metadata.Runtime,
-                    metadata.Health ?? new ApplicationHealthSpec(),
+                    candidate,
                     metadata,
-                    cancellationToken);
+                    cancellationToken,
+                    deleteCandidateArtifactOnFailure);
                 await PromoteRuntimeAsync(
                     appId,
                     targetId,
-                    metadata.Runtime,
-                    metadata.Health ?? new ApplicationHealthSpec(),
-                    candidate,
+                    metadata,
+                    activeCandidate,
                     cancellationToken);
             }
             catch (Exception ex)
@@ -97,13 +109,21 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         Guid appId,
         Guid deploymentTargetId,
         ApplicationContract contract,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? artifactRoot = null)
     {
         ApplicationContractValidator.EnsureValid(contract);
         var metadataPath = GetMetadataPath(appId, deploymentTargetId);
         var previousMetadata = File.Exists(metadataPath)
             ? await ReadMetadataAsync(metadataPath, cancellationToken)
             : null;
+
+        if (previousMetadata?.Candidate is not null)
+        {
+            await StopRecordedProcessAsync(previousMetadata.Candidate);
+            DeleteArtifactDirectory(previousMetadata.Candidate.ArtifactRoot, previousMetadata.ArtifactRoot);
+            previousMetadata.Candidate = null;
+        }
 
         if (contract.Runtime.Command is null)
         {
@@ -121,39 +141,52 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             return;
         }
 
-        var pending = new RunnerRuntimeDeploymentMetadata
+        var candidate = new RunnerRuntimeDeploymentMetadata
         {
             AppId = appId.ToString(),
             DeploymentTargetId = deploymentTargetId.ToString(),
             Runtime = contract.Runtime,
             Health = contract.Health,
-            State = RuntimeReadinessState.Starting
-        };
-        await WriteMetadataAsync(pending, cancellationToken);
-
-        try
-        {
-            var candidate = await StartRuntimeAsync(
+            ArtifactRoot = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(
                 appId,
                 deploymentTargetId,
-                contract.Runtime,
-                contract.Health,
-                previousMetadata,
-                cancellationToken);
+                Guid.NewGuid()),
+            ArtifactId = null,
+            State = RuntimeReadinessState.Starting
+        };
+        candidate.ArtifactId = GetArtifactId(candidate.ArtifactRoot);
+        Directory.CreateDirectory(candidate.ArtifactRoot);
+        var pending = CreatePendingMetadata(appId, deploymentTargetId, previousMetadata, candidate);
+        await WriteMetadataAsync(pending, cancellationToken);
+
+        ActiveRuntime? activeCandidate = null;
+        try
+        {
+            activeCandidate = await StartRuntimeAsync(
+                appId,
+                deploymentTargetId,
+                candidate,
+                pending,
+                cancellationToken,
+                deleteArtifactOnFailure: true);
             await PromoteRuntimeAsync(
                 appId,
                 deploymentTargetId,
-                contract.Runtime,
-                contract.Health,
-                candidate,
+                pending,
+                activeCandidate,
                 cancellationToken);
         }
         catch
         {
-            if (previousMetadata is not null)
-                await WriteMetadataAsync(previousMetadata, CancellationToken.None);
-            else if (File.Exists(metadataPath))
-                File.Delete(metadataPath);
+            if (activeCandidate is null || !IsCurrentRuntime(
+                    new DeploymentRuntimeKey(appId, deploymentTargetId),
+                    activeCandidate))
+            {
+                if (previousMetadata is not null)
+                    await WriteMetadataAsync(previousMetadata, CancellationToken.None);
+                else if (File.Exists(metadataPath))
+                    File.Delete(metadataPath);
+            }
             throw;
         }
     }
@@ -161,17 +194,18 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private async Task<ActiveRuntime> StartRuntimeAsync(
         Guid appId,
         Guid deploymentTargetId,
-        ApplicationRuntimeSpec runtime,
-        ApplicationHealthSpec health,
-        RunnerRuntimeDeploymentMetadata? previousMetadata,
-        CancellationToken cancellationToken)
+        RunnerRuntimeDeploymentMetadata candidate,
+        RunnerRuntimeDeploymentMetadata metadata,
+        CancellationToken cancellationToken,
+        bool deleteArtifactOnFailure)
     {
-        var command = runtime.Command
+        var command = candidate.Runtime?.Command
             ?? throw new InvalidOperationException("A runtime command is required to start a runtime process.");
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
-        var requestedPort = previousMetadata?.EffectivePort ?? runtime.Port;
+        var requestedPort = candidate.EffectivePort ?? candidate.Runtime.Port;
         var effectivePort = AllocatePort(requestedPort);
-        var targetRoot = workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId);
+        var targetRoot = candidate.ArtifactRoot
+            ?? workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId);
         Directory.CreateDirectory(targetRoot);
         var workingDirectory = ResolveWorkspacePath(targetRoot, command.WorkingDirectory, "working directory");
         var executable = ResolveExecutable(targetRoot, command.Executable);
@@ -200,12 +234,29 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            var runtimeProcess = new ActiveRuntime(process, effectivePort, stdout, stderr);
+            var runtimeProcess = new ActiveRuntime(
+                process,
+                effectivePort,
+                stdout,
+                stderr,
+                targetRoot);
             active = runtimeProcess;
             process.Exited += (_, _) => OnProcessExited(key, runtimeProcess);
             lock (gate) candidates[key] = runtimeProcess;
 
-            await WaitForReadinessAsync(process, effectivePort, health, cancellationToken);
+            candidate.EffectivePort = effectivePort;
+            candidate.ProcessId = process.Id;
+            candidate.ProcessStartTimeUtc = GetProcessStartTime(process);
+            candidate.StartedAtUtc = DateTimeOffset.UtcNow;
+            candidate.State = RuntimeReadinessState.Starting;
+            metadata.Candidate = candidate;
+            await WriteMetadataAsync(metadata, cancellationToken);
+
+            await WaitForReadinessAsync(
+                process,
+                effectivePort,
+                candidate.Health ?? new ApplicationHealthSpec(),
+                cancellationToken);
             if (process.HasExited)
                 throw new InvalidOperationException("Runtime process exited immediately after becoming ready.");
             return runtimeProcess;
@@ -222,6 +273,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 stdout.Dispose();
                 stderr.Dispose();
             }
+            if (deleteArtifactOnFailure)
+                DeleteArtifactDirectory(candidate.ArtifactRoot);
             throw;
         }
     }
@@ -229,28 +282,20 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private async Task PromoteRuntimeAsync(
         Guid appId,
         Guid deploymentTargetId,
-        ApplicationRuntimeSpec runtime,
-        ApplicationHealthSpec health,
+        RunnerRuntimeDeploymentMetadata metadata,
         ActiveRuntime candidate,
         CancellationToken cancellationToken)
     {
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
         try
         {
-            await WriteMetadataAsync(
-                new RunnerRuntimeDeploymentMetadata
-                {
-                    AppId = appId.ToString(),
-                    DeploymentTargetId = deploymentTargetId.ToString(),
-                    Runtime = runtime,
-                    Health = health,
-                    EffectivePort = candidate.Port,
-                    ProcessId = candidate.Process.Id,
-                    ProcessStartTimeUtc = GetProcessStartTime(candidate.Process),
-                    StartedAtUtc = DateTimeOffset.UtcNow,
-                    State = RuntimeReadinessState.Ready
-                },
-                cancellationToken);
+            var candidateMetadata = metadata.Candidate
+                ?? throw new InvalidOperationException("Runtime candidate metadata is missing.");
+            candidateMetadata.EffectivePort = candidate.Port;
+            candidateMetadata.ProcessId = candidate.Process.Id;
+            candidateMetadata.ProcessStartTimeUtc = GetProcessStartTime(candidate.Process);
+            candidateMetadata.State = RuntimeReadinessState.Ready;
+            await WriteMetadataAsync(metadata, cancellationToken);
 
             ActiveRuntime? old;
             lock (gate)
@@ -263,6 +308,22 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
             if (old is not null && !old.Process.HasExited)
                 await StopProcessAsync(old.Process);
+
+            if (old is not null)
+                DeleteArtifactDirectory(old.ArtifactRoot, candidate.ArtifactRoot);
+
+            metadata.Runtime = candidateMetadata.Runtime;
+            metadata.Health = candidateMetadata.Health;
+            metadata.EffectivePort = candidateMetadata.EffectivePort;
+            metadata.ProcessId = candidateMetadata.ProcessId;
+            metadata.ProcessStartTimeUtc = candidateMetadata.ProcessStartTimeUtc;
+            metadata.StartedAtUtc = candidateMetadata.StartedAtUtc;
+            metadata.ArtifactRoot = candidateMetadata.ArtifactRoot;
+            metadata.ArtifactId = candidateMetadata.ArtifactId;
+            metadata.State = RuntimeReadinessState.Ready;
+            metadata.LastError = null;
+            metadata.Candidate = null;
+            await WriteMetadataAsync(metadata, cancellationToken);
         }
         catch
         {
@@ -396,6 +457,87 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         catch (System.ComponentModel.Win32Exception)
         {
         }
+    }
+
+    private static RunnerRuntimeDeploymentMetadata CreatePendingMetadata(
+        Guid appId,
+        Guid deploymentTargetId,
+        RunnerRuntimeDeploymentMetadata? previous,
+        RunnerRuntimeDeploymentMetadata candidate)
+        => new()
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = deploymentTargetId.ToString(),
+            Runtime = previous?.Runtime,
+            Health = previous?.Health,
+            EffectivePort = previous?.EffectivePort,
+            ProcessId = previous?.ProcessId,
+            ProcessStartTimeUtc = previous?.ProcessStartTimeUtc,
+            StartedAtUtc = previous?.StartedAtUtc,
+            ArtifactRoot = previous?.ArtifactRoot,
+            ArtifactId = previous?.ArtifactId,
+            State = previous?.State ?? RuntimeReadinessState.Stopped,
+            LastError = null,
+            Candidate = candidate
+        };
+
+    private static RunnerRuntimeDeploymentMetadata CreateRecoveryCandidate(
+        RunnerRuntimeDeploymentMetadata current)
+        => new()
+        {
+            AppId = current.AppId,
+            DeploymentTargetId = current.DeploymentTargetId,
+            Runtime = current.Runtime,
+            Health = current.Health,
+            ArtifactRoot = current.ArtifactRoot,
+            ArtifactId = current.ArtifactId,
+            State = RuntimeReadinessState.Starting
+        };
+
+    private static string? GetArtifactId(string? artifactRoot)
+    {
+        if (string.IsNullOrWhiteSpace(artifactRoot))
+            return null;
+
+        var applicationDirectory = Directory.GetParent(artifactRoot);
+        return applicationDirectory is not null
+            && string.Equals(applicationDirectory.Name, "application", StringComparison.OrdinalIgnoreCase)
+            ? applicationDirectory.Parent?.Name
+            : applicationDirectory?.Name;
+    }
+
+    private void DeleteArtifactDirectory(string? artifactRoot, string? preserveRoot = null)
+    {
+        if (string.IsNullOrWhiteSpace(artifactRoot)
+            || string.Equals(artifactRoot, preserveRoot, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var fullArtifactRoot = Path.GetFullPath(artifactRoot);
+        var appsRoot = Path.GetFullPath(workspace.AppsRoot).TrimEnd(Path.DirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!fullArtifactRoot.StartsWith(appsRoot, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Runtime artifact root is outside the runner workspace.");
+        if (!string.Equals(Path.GetFileName(fullArtifactRoot), "application", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Runtime artifact root is not a managed application directory.");
+
+        var candidateContainer = Directory.GetParent(fullArtifactRoot)?.FullName;
+        var containerParent = candidateContainer is null
+            ? null
+            : Directory.GetParent(candidateContainer)?.FullName;
+        if (containerParent is not null
+            && string.Equals(Path.GetFileName(containerParent), "candidates", StringComparison.OrdinalIgnoreCase))
+            DeleteDirectoryIfExists(candidateContainer!);
+        else if (containerParent is not null
+            && string.Equals(Path.GetFileName(containerParent), "runtime", StringComparison.OrdinalIgnoreCase))
+            DeleteDirectoryIfExists(fullArtifactRoot);
+        else
+            throw new InvalidOperationException("Runtime artifact root is not a managed application directory.");
+    }
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
     }
 
     private bool IsCurrentRuntime(DeploymentRuntimeKey key, ActiveRuntime runtime)
@@ -731,11 +873,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         Process process,
         int port,
         StreamWriter stdout,
-        StreamWriter stderr) : IDisposable
+        StreamWriter stderr,
+        string artifactRoot) : IDisposable
     {
         private int disposed;
         public Process Process { get; } = process;
         public int Port { get; } = port;
+        public string ArtifactRoot { get; } = artifactRoot;
 
         public void Dispose()
         {
@@ -766,6 +910,9 @@ public sealed class RunnerRuntimeDeploymentMetadata
     public int? ProcessId { get; set; }
     public DateTimeOffset? ProcessStartTimeUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
+    public string? ArtifactRoot { get; set; }
+    public string? ArtifactId { get; set; }
     public string State { get; set; } = RuntimeReadinessState.Stopped;
     public string? LastError { get; set; }
+    public RunnerRuntimeDeploymentMetadata? Candidate { get; set; }
 }

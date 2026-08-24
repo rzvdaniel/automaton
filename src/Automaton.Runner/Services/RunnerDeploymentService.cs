@@ -36,6 +36,9 @@ public class RunnerDeploymentService
         var deploymentTargetId = request.DeploymentTargetId;
         var tempExtractRoot = Path.Combine(Path.GetTempPath(), "automaton-deploy", Guid.NewGuid().ToString("N"));
         string? snapshotPath = null;
+        string? candidateRuntimeRoot = null;
+        var candidatePromoted = false;
+        var preserveCurrentRuntime = false;
 
         try
         {
@@ -50,12 +53,21 @@ public class RunnerDeploymentService
             ExtractPackageSafely(request.PackagePath, tempExtractRoot);
 
             var manifest = LoadManifest(tempExtractRoot, appId);
+            preserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
             ValidateIncomingActions(tempExtractRoot, request.SystemInfrastructure);
             snapshotPath = CreateSnapshotIfNeeded(appId, deploymentTargetId);
 
             if (request.Clean)
             {
-                CleanDeploymentRoots(appId, deploymentTargetId);
+                if (manifest.Application.Runtime.Command is null)
+                {
+                    await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
+                    CleanDeploymentRoots(appId, deploymentTargetId);
+                }
+                else
+                {
+                    CleanDeploymentRoots(appId, deploymentTargetId, includeRuntime: false);
+                }
             }
 
             SynchronizeActionRoots(appId, deploymentTargetId, tempExtractRoot);
@@ -63,9 +75,30 @@ public class RunnerDeploymentService
             var sourceCount = CopyTreeIfExists(
                 Path.Combine(tempExtractRoot, "source"),
                 runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
-            var runtimeCount = CopyTreeIfExists(
-                Path.Combine(tempExtractRoot, "runtime"),
-                runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+            int runtimeCount;
+            string? candidateArtifactRoot = null;
+            if (manifest.Application.Runtime.Command is not null)
+            {
+                var candidateId = Guid.NewGuid();
+                candidateRuntimeRoot = runnerWorkspaceService.GetAppRuntimeCandidateDirectory(
+                    appId,
+                    deploymentTargetId,
+                    candidateId);
+                candidateArtifactRoot = runnerWorkspaceService.GetAppRuntimeCandidateApplicationDirectory(
+                    appId,
+                    deploymentTargetId,
+                    candidateId);
+                runtimeCount = CopyTreeIfExists(
+                    Path.Combine(tempExtractRoot, "runtime"),
+                    candidateRuntimeRoot);
+                Directory.CreateDirectory(candidateArtifactRoot);
+            }
+            else
+            {
+                runtimeCount = CopyTreeIfExists(
+                    Path.Combine(tempExtractRoot, "runtime"),
+                    runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+            }
 
             logs.Add($"Deployed {sourceCount} source file(s) and {runtimeCount} runtime file(s).");
 
@@ -109,7 +142,9 @@ public class RunnerDeploymentService
             await runtimeProcessManager.ApplyAsync(
                 appId,
                 deploymentTargetId,
-                manifest.Application);
+                manifest.Application,
+                artifactRoot: candidateArtifactRoot);
+            candidatePromoted = candidateArtifactRoot is not null;
 
             return new DeployAppPackageResult
             {
@@ -129,7 +164,11 @@ public class RunnerDeploymentService
             {
                 try
                 {
-                    RestoreSnapshot(appId, deploymentTargetId, snapshotPath);
+                    RestoreSnapshot(
+                        appId,
+                        deploymentTargetId,
+                        snapshotPath,
+                        restoreRuntime: !preserveCurrentRuntime);
                     logs.Add("Deployment failed; the previous App snapshot was restored.");
                 }
                 catch (Exception restoreException)
@@ -150,6 +189,17 @@ public class RunnerDeploymentService
         }
         finally
         {
+            try
+            {
+                if (!candidatePromoted
+                    && candidateRuntimeRoot is not null
+                    && Directory.Exists(candidateRuntimeRoot))
+                    Directory.Delete(candidateRuntimeRoot, recursive: true);
+            }
+            catch
+            {
+            }
+
             try
             {
                 if (Directory.Exists(tempExtractRoot))
@@ -234,26 +284,32 @@ public class RunnerDeploymentService
         return snapshotRoot;
     }
 
-    private void CleanDeploymentRoots(Guid appId, Guid deploymentTargetId)
+    private void CleanDeploymentRoots(Guid appId, Guid deploymentTargetId, bool includeRuntime = true)
     {
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+        if (includeRuntime)
+            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId));
     }
 
-    private void RestoreSnapshot(Guid appId, Guid deploymentTargetId, string snapshotPath)
+    private void RestoreSnapshot(
+        Guid appId,
+        Guid deploymentTargetId,
+        string snapshotPath,
+        bool restoreRuntime = true)
     {
         if (!Directory.Exists(snapshotPath))
             throw new DirectoryNotFoundException("The previous App snapshot is unavailable.");
 
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+        if (restoreRuntime)
+            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
 
         var snapshotSource = Path.Combine(snapshotPath, "source");
         var snapshotRuntime = Path.Combine(snapshotPath, "runtime");
         if (Directory.Exists(snapshotSource))
             CopyDirectory(snapshotSource, runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
-        if (Directory.Exists(snapshotRuntime))
+        if (restoreRuntime && Directory.Exists(snapshotRuntime))
             CopyDirectory(snapshotRuntime, runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
     }
 

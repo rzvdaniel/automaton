@@ -189,7 +189,8 @@ public class RunnerDeploymentTargetIsolationTests
             Guid appId,
             Guid deploymentTargetId,
             ApplicationContract contract,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            string? artifactRoot = null)
         {
             StartedTargets.Add(deploymentTargetId);
             AppliedTargets.Add(deploymentTargetId);
