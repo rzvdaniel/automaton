@@ -365,10 +365,10 @@ public class Program
                 services.AddSingleton<AppActionExecutionCoordinator>();
                 services.AddHostedService<AppActionArtifactCleanupService>();
                 services.AddSingleton<RunnerDeploymentService>();
-                services.AddSingleton<RunnerBackendRegistry>();
-                services.AddSingleton<RunnerBackendProcessManager>();
-                services.AddSingleton<IAppBackendProcessManager>(sp => sp.GetRequiredService<RunnerBackendProcessManager>());
-                services.AddHostedService(sp => sp.GetRequiredService<RunnerBackendProcessManager>());
+                services.AddSingleton<RunnerRuntimeRegistry>();
+                services.AddSingleton<RunnerRuntimeProcessManager>();
+                services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
+                services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
                 services.AddSingleton<RunnerRuntimeGatewayService>();
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();

@@ -68,23 +68,16 @@ public class RunnerDeploymentTargetIsolationTests
         var secondContent = await File.ReadAllTextAsync(Path.Combine(
             workspace.GetAppRuntimeFrontendDirectory(appId, secondTargetId),
             "index.html"));
-        var firstMetadata = await File.ReadAllTextAsync(Path.Combine(
-            workspace.GetDeploymentTargetRoot(appId, firstTargetId),
-            "deployment.json"));
-        var secondMetadata = await File.ReadAllTextAsync(Path.Combine(
-            workspace.GetDeploymentTargetRoot(appId, secondTargetId),
-            "deployment.json"));
-
         Assert.Multiple(() =>
         {
-            Assert.That(first.Success, Is.True);
-            Assert.That(second.Success, Is.True);
+            Assert.That(first.Success, Is.True, first.Message);
+            Assert.That(second.Success, Is.True, second.Message);
             Assert.That(first.DeploymentTargetId, Is.EqualTo(firstTargetId));
             Assert.That(second.DeploymentTargetId, Is.EqualTo(secondTargetId));
             Assert.That(firstContent, Is.EqualTo("first target"));
             Assert.That(secondContent, Is.EqualTo("second target"));
-            Assert.That(firstMetadata, Does.Contain(firstTargetId.ToString()));
-            Assert.That(secondMetadata, Does.Contain(secondTargetId.ToString()));
+            Assert.That(processManager.AppliedTargets, Does.Contain(firstTargetId));
+            Assert.That(processManager.AppliedTargets, Does.Contain(secondTargetId));
             Assert.That(processManager.StoppedTargets, Does.Contain(firstTargetId));
             Assert.That(processManager.StoppedTargets, Does.Contain(secondTargetId));
         });
@@ -124,7 +117,7 @@ public class RunnerDeploymentTargetIsolationTests
     }
 
     [Test]
-    public async Task DeployingBackendPackage_UsesCurrentBackendMarkerAndRequestsProcessStart()
+    public async Task DeployingPackage_UsesGenericRuntimeContractAndRequestsProcessStart()
     {
         var workspace = new RunnerWorkspaceService();
         var processManager = new StubBackendProcessManager();
@@ -135,7 +128,7 @@ public class RunnerDeploymentTargetIsolationTests
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
-        var package = CreatePackage(appId, "backend target", hasBackend: true);
+        var package = CreatePackage(appId, "runtime target", hasRuntime: true);
 
         var result = await service.DeployPackage(new DeployAppPackageRequest
         {
@@ -145,20 +138,15 @@ public class RunnerDeploymentTargetIsolationTests
             Clean = true
         });
 
-        var metadata = await File.ReadAllTextAsync(Path.Combine(
-            workspace.GetDeploymentTargetRoot(appId, targetId),
-            "deployment.json"));
-
         Assert.Multiple(() =>
         {
             Assert.That(result.Success, Is.True);
             Assert.That(processManager.StartedTargets, Does.Contain(targetId));
-            Assert.That(metadata, Does.Contain("\"hasBackend\":true"));
-            Assert.That(metadata, Does.Contain("\"backendModule\":\"main:app\""));
+            Assert.That(processManager.StartedContracts[targetId].Runtime.Command!.Executable, Is.EqualTo("dotnet"));
         });
     }
 
-    private string CreatePackage(Guid appId, string frontendContent, bool hasBackend = false)
+    private string CreatePackage(Guid appId, string frontendContent, bool hasRuntime = false)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
@@ -169,11 +157,17 @@ public class RunnerDeploymentTargetIsolationTests
             JsonSerializer.Serialize(new AppDeploymentPackageManifest
             {
                 AppId = appId.ToString(),
-                HasBackend = hasBackend
+                Application = hasRuntime
+                    ? new ApplicationContract
+                    {
+                        Runtime = new ApplicationRuntimeSpec
+                        {
+                            Command = new ApplicationCommandSpec { Executable = "dotnet" }
+                        }
+                    }
+                    : ApplicationContractDefaults.Create()
             }));
         WriteEntry(archive, "runtime/frontend/index.html", frontendContent);
-        if (hasBackend)
-            WriteEntry(archive, "runtime/backend/main.py", "app = object()\n");
         return packagePath;
     }
 
@@ -184,18 +178,29 @@ public class RunnerDeploymentTargetIsolationTests
         writer.Write(content);
     }
 
-    private sealed class StubBackendProcessManager : IAppBackendProcessManager
+    private sealed class StubBackendProcessManager : IAppRuntimeProcessManager
     {
         public List<Guid> StartedTargets { get; } = [];
         public List<Guid> StoppedTargets { get; } = [];
+        public List<Guid> AppliedTargets { get; } = [];
+        public Dictionary<Guid, ApplicationContract> StartedContracts { get; } = [];
 
-        public Task EnsureRunningAsync(
+        public Task<RuntimeApplyResult> ApplyAsync(
             Guid appId,
             Guid deploymentTargetId,
-            CancellationToken cancellationToken = default)
+            ApplicationContract contract,
+            CancellationToken cancellationToken = default,
+            string? artifactRoot = null)
         {
             StartedTargets.Add(deploymentTargetId);
-            return Task.CompletedTask;
+            AppliedTargets.Add(deploymentTargetId);
+            StartedContracts[deploymentTargetId] = contract;
+            if (contract.Runtime.Command is null)
+                StoppedTargets.Add(deploymentTargetId);
+            return Task.FromResult(new RuntimeApplyResult
+            {
+                PromotionIrreversible = contract.Runtime.Command is not null
+            });
         }
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId)

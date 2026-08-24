@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Runner\Automaton.Runner.csproj" />
+    <ProjectReference Include="..\RunnerRuntimeFixture\RunnerRuntimeFixture.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

@@ -135,11 +135,14 @@ public static class ZipService
                 includeAutomatonConfig: true,
                 scopeConfig: sourceScopeConfig);
 
+            var runtimePrefix = application.Runtime.Command is null
+                ? "runtime/frontend"
+                : GetGenericRuntimeArtifactPrefix(projectRoot, artifactDirectory);
             AddDirectoryWithPrefix(
                 archive,
                 artifactDirectory,
                 artifactDirectory,
-                "runtime/frontend",
+                runtimePrefix,
                 includeAutomatonConfig: false,
                 scopeConfig: sourceScopeConfig);
         }
@@ -223,6 +226,21 @@ public static class ZipService
 
             archive.CreateEntryFromFile(file, $"{entryPrefix}/{entryName}", CompressionLevel.Optimal);
         }
+    }
+
+    private static string GetGenericRuntimeArtifactPrefix(string projectRoot, string artifactDirectory)
+    {
+        var relativeArtifactDirectory = Path.GetRelativePath(projectRoot, artifactDirectory)
+            .Replace('\\', '/');
+        if (relativeArtifactDirectory is "." or "")
+            return "runtime/application";
+        if (relativeArtifactDirectory == ".."
+            || relativeArtifactDirectory.StartsWith("../", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The runtime artifact directory must remain inside the project workspace.");
+        }
+
+        return $"runtime/application/{relativeArtifactDirectory}";
     }
 
     private static (Matcher Mandatory, IReadOnlyList<IgnoreRule> Project) CreateIgnoreMatchers(

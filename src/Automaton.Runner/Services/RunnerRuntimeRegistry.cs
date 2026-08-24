@@ -2,16 +2,16 @@ namespace Automaton.Runner.Console.Services;
 
 public readonly record struct DeploymentRuntimeKey(Guid AppId, Guid DeploymentTargetId);
 
-public sealed record RunnerBackendRegistration(
+public sealed record RunnerRuntimeRegistration(
     Guid AppId,
     Guid DeploymentTargetId,
     int Port);
 
-/// <summary>Runtime-owned mapping from deployed apps to loopback backend ports.</summary>
-public sealed class RunnerBackendRegistry
+/// <summary>Runtime-owned mapping from deployed applications to loopback ports.</summary>
+public sealed class RunnerRuntimeRegistry
 {
     private readonly object gate = new();
-    private readonly Dictionary<DeploymentRuntimeKey, RunnerBackendRegistration> registrations = [];
+    private readonly Dictionary<DeploymentRuntimeKey, RunnerRuntimeRegistration> registrations = [];
 
     public void Register(Guid appId, Guid deploymentTargetId, int port)
     {
@@ -19,13 +19,13 @@ public sealed class RunnerBackendRegistry
             throw new ArgumentOutOfRangeException(nameof(port));
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
         lock (gate)
-            registrations[key] = new RunnerBackendRegistration(appId, deploymentTargetId, port);
+            registrations[key] = new RunnerRuntimeRegistration(appId, deploymentTargetId, port);
     }
 
     public bool TryGet(
         Guid appId,
         Guid deploymentTargetId,
-        out RunnerBackendRegistration registration)
+        out RunnerRuntimeRegistration registration)
     {
         lock (gate)
             return registrations.TryGetValue(

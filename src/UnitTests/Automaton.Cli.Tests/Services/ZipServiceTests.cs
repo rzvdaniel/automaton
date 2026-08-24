@@ -66,6 +66,7 @@ public class ZipServiceTests
             Assert.That(loaded.Runtime.Command!.Executable, Is.EqualTo("arbitrary-server"));
             Assert.That(loaded.Runtime.Command.Arguments, Is.EqualTo(new[] { "--port", "5000" }));
             Assert.That(loaded.Health.Path, Is.Null);
+            Assert.That(archive.GetEntry("runtime/application/artifacts/app.bin"), Is.Not.Null);
         });
     }
 

@@ -64,6 +64,22 @@ public class RunnerWorkspaceService
     public string GetAppRuntimeRoot(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "runtime");
 
+    /// <summary>
+    /// Generic application runtime artifact root. Runtime commands resolve their
+    /// working directory and relative executables from here; the application
+    /// contract does not know this workspace layout.
+    /// </summary>
+    public string GetAppRuntimeApplicationDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "application");
+
+    public string GetAppRuntimeCandidateDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
+        => GetFullPath(
+            GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "candidates"),
+            candidateId.ToString());
+
+    public string GetAppRuntimeCandidateApplicationDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
+        => GetFullPath(GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), "application");
+
     public string GetAppSourceFrontendDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "frontend");
 
