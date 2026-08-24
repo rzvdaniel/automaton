@@ -34,6 +34,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private readonly ILogger<RunnerRuntimeProcessManager> logger;
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> runtimes = [];
+    private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> candidates = [];
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -70,12 +71,19 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 }
 
                 await StopRecordedProcessAsync(metadata);
-                await StartRuntimeAsync(
+                var candidate = await StartRuntimeAsync(
                     appId,
                     targetId,
                     metadata.Runtime,
                     metadata.Health ?? new ApplicationHealthSpec(),
                     metadata,
+                    cancellationToken);
+                await PromoteRuntimeAsync(
+                    appId,
+                    targetId,
+                    metadata.Runtime,
+                    metadata.Health ?? new ApplicationHealthSpec(),
+                    candidate,
                     cancellationToken);
             }
             catch (Exception ex)
@@ -125,12 +133,19 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
         try
         {
-            await StartRuntimeAsync(
+            var candidate = await StartRuntimeAsync(
                 appId,
                 deploymentTargetId,
                 contract.Runtime,
                 contract.Health,
                 previousMetadata,
+                cancellationToken);
+            await PromoteRuntimeAsync(
+                appId,
+                deploymentTargetId,
+                contract.Runtime,
+                contract.Health,
+                candidate,
                 cancellationToken);
         }
         catch
@@ -143,7 +158,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
     }
 
-    private async Task StartRuntimeAsync(
+    private async Task<ActiveRuntime> StartRuntimeAsync(
         Guid appId,
         Guid deploymentTargetId,
         ApplicationRuntimeSpec runtime,
@@ -154,10 +169,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var command = runtime.Command
             ?? throw new InvalidOperationException("A runtime command is required to start a runtime process.");
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
-        var old = GetActiveRuntime(key);
         var requestedPort = previousMetadata?.EffectivePort ?? runtime.Port;
-        var effectivePort = AllocatePort(requestedPort, old?.Port);
-        var targetRoot = workspace.GetDeploymentTargetRoot(appId, deploymentTargetId);
+        var effectivePort = AllocatePort(requestedPort);
+        var targetRoot = workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId);
+        Directory.CreateDirectory(targetRoot);
         var workingDirectory = ResolveWorkspacePath(targetRoot, command.WorkingDirectory, "working directory");
         var executable = ResolveExecutable(targetRoot, command.Executable);
         var logDirectory = Path.Combine(targetRoot, "logs");
@@ -165,6 +180,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var stdout = CreateLogWriter(Path.Combine(logDirectory, "runtime.stdout.log"));
         var stderr = CreateLogWriter(Path.Combine(logDirectory, "runtime.stderr.log"));
         Process? process = null;
+        ActiveRuntime? active = null;
 
         try
         {
@@ -184,13 +200,43 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            var active = new ActiveRuntime(process, effectivePort, stdout, stderr);
-            process.Exited += (_, _) => OnProcessExited(key, active);
-            lock (gate) runtimes[key] = active;
+            var runtimeProcess = new ActiveRuntime(process, effectivePort, stdout, stderr);
+            active = runtimeProcess;
+            process.Exited += (_, _) => OnProcessExited(key, runtimeProcess);
+            lock (gate) candidates[key] = runtimeProcess;
 
             await WaitForReadinessAsync(process, effectivePort, health, cancellationToken);
-            registry.Register(appId, deploymentTargetId, effectivePort);
+            if (process.HasExited)
+                throw new InvalidOperationException("Runtime process exited immediately after becoming ready.");
+            return runtimeProcess;
+        }
+        catch
+        {
+            if (process is not null)
+            {
+                await StopProcessAsync(process);
+                RemoveActiveRuntime(key, process);
+            }
+            if (active is null)
+            {
+                stdout.Dispose();
+                stderr.Dispose();
+            }
+            throw;
+        }
+    }
 
+    private async Task PromoteRuntimeAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        ApplicationRuntimeSpec runtime,
+        ApplicationHealthSpec health,
+        ActiveRuntime candidate,
+        CancellationToken cancellationToken)
+    {
+        var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
+        try
+        {
             await WriteMetadataAsync(
                 new RunnerRuntimeDeploymentMetadata
                 {
@@ -198,27 +244,33 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     DeploymentTargetId = deploymentTargetId.ToString(),
                     Runtime = runtime,
                     Health = health,
-                    EffectivePort = effectivePort,
-                    ProcessId = process.Id,
-                    ProcessStartTimeUtc = GetProcessStartTime(process),
+                    EffectivePort = candidate.Port,
+                    ProcessId = candidate.Process.Id,
+                    ProcessStartTimeUtc = GetProcessStartTime(candidate.Process),
                     StartedAtUtc = DateTimeOffset.UtcNow,
                     State = RuntimeReadinessState.Ready
                 },
                 cancellationToken);
+
+            ActiveRuntime? old;
+            lock (gate)
+            {
+                old = runtimes.GetValueOrDefault(key);
+                runtimes[key] = candidate;
+                candidates.Remove(key);
+                registry.Register(appId, deploymentTargetId, candidate.Port);
+            }
 
             if (old is not null && !old.Process.HasExited)
                 await StopProcessAsync(old.Process);
         }
         catch
         {
-            registry.Remove(appId, deploymentTargetId);
-            if (process is not null)
+            if (!IsCurrentRuntime(key, candidate))
             {
-                await StopProcessAsync(process);
-                RemoveActiveRuntime(key, process);
+                await StopProcessAsync(candidate.Process);
+                RemoveActiveRuntime(key, candidate.Process);
             }
-            stdout.Dispose();
-            stderr.Dispose();
             throw;
         }
     }
@@ -231,7 +283,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             active = runtimes.Values.ToArray();
             keys = runtimes.Keys.ToArray();
+            active = active.Concat(candidates.Values).ToArray();
             runtimes.Clear();
+            candidates.Clear();
         }
 
         foreach (var key in keys)
@@ -247,16 +301,25 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     {
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
         registry.Remove(appId, deploymentTargetId);
-        ActiveRuntime? active;
+        ActiveRuntime[] active;
         lock (gate)
         {
-            runtimes.Remove(key, out active);
+            var selected = new List<ActiveRuntime>();
+            if (runtimes.Remove(key, out var current))
+                selected.Add(current);
+            if (candidates.Remove(key, out var candidate)
+                && !selected.Contains(candidate))
+            {
+                selected.Add(candidate);
+            }
+
+            active = selected.ToArray();
         }
 
-        if (active is not null)
+        foreach (var runtime in active)
         {
-            await StopProcessAsync(active.Process);
-            active.Dispose();
+            await StopProcessAsync(runtime.Process);
+            runtime.Dispose();
         }
     }
 
@@ -267,6 +330,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             isCurrent = runtimes.TryGetValue(key, out var current) && ReferenceEquals(current, active);
             if (isCurrent) runtimes.Remove(key);
+            candidates.Remove(key, out var candidate);
+            if (!isCurrent && candidate is not null && !ReferenceEquals(candidate, active))
+                candidate.Dispose();
         }
 
         if (isCurrent)
@@ -332,10 +398,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
     }
 
-    private ActiveRuntime? GetActiveRuntime(DeploymentRuntimeKey key)
+    private bool IsCurrentRuntime(DeploymentRuntimeKey key, ActiveRuntime runtime)
     {
         lock (gate)
-            return runtimes.TryGetValue(key, out var active) ? active : null;
+            return runtimes.TryGetValue(key, out var current) && ReferenceEquals(current, runtime);
     }
 
     private void RemoveActiveRuntime(DeploymentRuntimeKey key, Process process)
@@ -344,15 +410,17 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (runtimes.TryGetValue(key, out var current) && ReferenceEquals(current.Process, process))
                 runtimes.Remove(key);
+            if (candidates.TryGetValue(key, out var candidate) && ReferenceEquals(candidate.Process, process))
+                candidates.Remove(key);
         }
     }
 
-    private int AllocatePort(int requestedPort, int? oldPort)
+    private int AllocatePort(int requestedPort)
     {
         lock (gate)
         {
-            var used = runtimes.Values
-                .Where(runtime => !runtime.Process.HasExited && runtime.Port != oldPort)
+            var used = runtimes.Values.Concat(candidates.Values)
+                .Where(runtime => !runtime.Process.HasExited)
                 .Select(runtime => runtime.Port)
                 .ToHashSet();
 
@@ -442,6 +510,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 {
                     using var tcp = new TcpClient();
                     await tcp.ConnectAsync(IPAddress.Loopback, healthPort, timeout.Token);
+                    return;
                 }
                 else
                 {
@@ -454,8 +523,6 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     if ((int)response.StatusCode is >= 200 and < 300)
                         return;
                 }
-
-                return;
             }
             catch (SocketException) when (!timeout.IsCancellationRequested)
             {
@@ -578,24 +645,58 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             if (process.HasExited)
                 return;
 
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await ForceKillProcessTreeAsync(process);
+                await process.WaitForExitAsync(CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+                return;
+            }
+
             process.CloseMainWindow();
-            await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
         }
-        catch (TimeoutException)
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
             try
             {
-                if (!process.HasExited)
-                    process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(cancellationToken);
+                await ForceKillProcessTreeAsync(process);
+                await process.WaitForExitAsync(CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
             }
-            catch (InvalidOperationException)
+            catch (Exception cleanupException) when (cleanupException is InvalidOperationException or TimeoutException)
             {
             }
         }
         catch (InvalidOperationException)
         {
         }
+    }
+
+    private static async Task ForceKillProcessTreeAsync(Process process)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            if (process.HasExited)
+                return;
+
+            using var taskKill = Process.Start(new ProcessStartInfo
+            {
+                FileName = "taskkill.exe",
+                ArgumentList = { "/PID", process.Id.ToString(), "/T", "/F" },
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            });
+            if (taskKill is not null)
+                await taskKill.WaitForExitAsync(CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            return;
+        }
+
+        if (!process.HasExited)
+            process.Kill(entireProcessTree: true);
     }
 
     private static DateTimeOffset? GetProcessStartTime(Process process)
