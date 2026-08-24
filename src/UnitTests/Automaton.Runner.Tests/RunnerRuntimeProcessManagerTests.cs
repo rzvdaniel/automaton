@@ -199,7 +199,6 @@ public sealed class RunnerRuntimeProcessManagerTests
         var processManager = CreateManager(workspace, registry);
         var deployment = new RunnerDeploymentService(
             workspace,
-            new RunnerBackendEnvironmentService(workspace),
             processManager,
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();
@@ -247,7 +246,6 @@ public sealed class RunnerRuntimeProcessManagerTests
         var processManager = CreateManager(workspace, registry);
         var deployment = new RunnerDeploymentService(
             workspace,
-            new RunnerBackendEnvironmentService(workspace),
             processManager,
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();
@@ -285,6 +283,84 @@ public sealed class RunnerRuntimeProcessManagerTests
             Assert.Multiple(() =>
             {
                 Assert.That(failedResult.Success, Is.False);
+                Assert.That(IsProcessAlive(original.ProcessId!.Value), Is.True);
+                Assert.That(registry.TryGet(appId, targetId, out var route), Is.True);
+                Assert.That(route.Port, Is.EqualTo(originalRoute.Port));
+                Assert.That(restored.State, Is.EqualTo(RuntimeReadinessState.Ready));
+                Assert.That(restored.ProcessId, Is.EqualTo(original.ProcessId));
+                Assert.That(restored.ArtifactRoot, Is.EqualTo(original.ArtifactRoot));
+            });
+            Assert.That(await File.ReadAllTextAsync(originalMarker), Is.EqualTo(originalContent));
+        }
+        finally
+        {
+            await processManager.StopAsync(appId, targetId);
+            processManager.Dispose();
+            if (File.Exists(originalPackage)) File.Delete(originalPackage);
+            if (File.Exists(failedPackage)) File.Delete(failedPackage);
+        }
+    }
+
+    [Test]
+    public async Task FailedBuild_LeavesCurrentRuntimeAndArtifactsIntact()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var processManager = CreateManager(workspace, registry);
+        var deployment = new RunnerDeploymentService(
+            workspace,
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var originalPackage = CreateRuntimePackage(
+            appId,
+            ["RunnerRuntimeFixture.dll", "--tcp", "original"],
+            "current");
+        var failedPackage = CreateRuntimePackage(
+            appId,
+            ["RunnerRuntimeFixture.dll", "--tcp", "candidate"],
+            "candidate",
+            new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = ["--not-a-real-build-option"],
+                    WorkingDirectory = "."
+                }
+            });
+
+        try
+        {
+            var originalResult = await deployment.DeployPackage(new DeployAppPackageRequest
+            {
+                AppId = appId,
+                DeploymentTargetId = targetId,
+                PackagePath = originalPackage,
+                Clean = true
+            });
+            Assert.That(originalResult.Success, Is.True, originalResult.Message);
+
+            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var original = ReadMetadata(metadataPath);
+            var originalMarker = Path.Combine(original.ArtifactRoot!, "marker.txt");
+            var originalContent = await File.ReadAllTextAsync(originalMarker);
+            Assert.That(registry.TryGet(appId, targetId, out var originalRoute), Is.True);
+
+            var failedResult = await deployment.DeployPackage(new DeployAppPackageRequest
+            {
+                AppId = appId,
+                DeploymentTargetId = targetId,
+                PackagePath = failedPackage,
+                Clean = true
+            });
+
+            var restored = ReadMetadata(metadataPath);
+            Assert.Multiple(() =>
+            {
+                Assert.That(failedResult.Success, Is.False);
+                Assert.That(failedResult.Message, Does.Contain("Application build failed"));
                 Assert.That(IsProcessAlive(original.ProcessId!.Value), Is.True);
                 Assert.That(registry.TryGet(appId, targetId, out var route), Is.True);
                 Assert.That(route.Port, Is.EqualTo(originalRoute.Port));
@@ -624,13 +700,15 @@ public sealed class RunnerRuntimeProcessManagerTests
     private string CreateRuntimePackage(
         Guid appId,
         IReadOnlyList<string>? arguments = null,
-        string marker = "deployed")
+        string marker = "deployed",
+        ApplicationBuildSpec? build = null)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
         using var archive = ZipFile.Open(packagePath, ZipArchiveMode.Create);
         var contract = new ApplicationContract
         {
+            Build = build ?? new ApplicationBuildSpec(),
             Runtime = new ApplicationRuntimeSpec
             {
                 Command = new ApplicationCommandSpec
@@ -653,6 +731,8 @@ public sealed class RunnerRuntimeProcessManagerTests
         foreach (var file in Directory.GetFiles(fixtureDirectory, "RunnerRuntimeFixture.*"))
             archive.CreateEntryFromFile(file, $"runtime/application/{Path.GetFileName(file)}");
         WriteEntry(archive, "runtime/application/marker.txt", marker);
+        if (build?.Command is not null)
+            WriteEntry(archive, "source/build-input.txt", "generic build input");
         return packagePath;
     }
 
