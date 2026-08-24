@@ -139,12 +139,15 @@ public class RunnerDeploymentService
                 }
             }
 
-            await runtimeProcessManager.ApplyAsync(
+            var runtimeApplyResult = await runtimeProcessManager.ApplyAsync(
                 appId,
                 deploymentTargetId,
                 manifest.Application,
                 artifactRoot: candidateArtifactRoot);
-            candidatePromoted = candidateArtifactRoot is not null;
+            candidatePromoted = candidateArtifactRoot is not null
+                && runtimeApplyResult.PromotionIrreversible;
+            if (runtimeApplyResult.Warning is not null)
+                logs.Add(runtimeApplyResult.Warning);
 
             return new DeployAppPackageResult
             {

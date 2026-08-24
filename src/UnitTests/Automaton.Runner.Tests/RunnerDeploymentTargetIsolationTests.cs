@@ -185,7 +185,7 @@ public class RunnerDeploymentTargetIsolationTests
         public List<Guid> AppliedTargets { get; } = [];
         public Dictionary<Guid, ApplicationContract> StartedContracts { get; } = [];
 
-        public Task ApplyAsync(
+        public Task<RuntimeApplyResult> ApplyAsync(
             Guid appId,
             Guid deploymentTargetId,
             ApplicationContract contract,
@@ -197,7 +197,10 @@ public class RunnerDeploymentTargetIsolationTests
             StartedContracts[deploymentTargetId] = contract;
             if (contract.Runtime.Command is null)
                 StoppedTargets.Add(deploymentTargetId);
-            return Task.CompletedTask;
+            return Task.FromResult(new RuntimeApplyResult
+            {
+                PromotionIrreversible = contract.Runtime.Command is not null
+            });
         }
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId)

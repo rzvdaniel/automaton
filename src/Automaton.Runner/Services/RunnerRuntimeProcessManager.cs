@@ -11,7 +11,7 @@ namespace Automaton.Runner.Console.Services;
 
 public interface IAppRuntimeProcessManager
 {
-    Task ApplyAsync(
+    Task<RuntimeApplyResult> ApplyAsync(
         Guid appId,
         Guid deploymentTargetId,
         ApplicationContract contract,
@@ -19,6 +19,12 @@ public interface IAppRuntimeProcessManager
         string? artifactRoot = null);
 
     Task StopAsync(Guid appId, Guid deploymentTargetId);
+}
+
+public sealed class RuntimeApplyResult
+{
+    public bool PromotionIrreversible { get; init; }
+    public string? Warning { get; init; }
 }
 
 /// <summary>
@@ -33,6 +39,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private readonly RunnerWorkspaceService workspace;
     private readonly RunnerRuntimeRegistry registry;
     private readonly ILogger<RunnerRuntimeProcessManager> logger;
+    private readonly Func<RunnerRuntimeDeploymentMetadata, Exception?>? metadataWriteFailureFactory;
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> runtimes = [];
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> candidates = [];
@@ -46,11 +53,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     public RunnerRuntimeProcessManager(
         RunnerWorkspaceService workspace,
         RunnerRuntimeRegistry registry,
-        ILogger<RunnerRuntimeProcessManager> logger)
+        ILogger<RunnerRuntimeProcessManager> logger,
+        Func<RunnerRuntimeDeploymentMetadata, Exception?>? metadataWriteFailureFactory = null)
     {
         this.workspace = workspace;
         this.registry = registry;
         this.logger = logger;
+        this.metadataWriteFailureFactory = metadataWriteFailureFactory;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -105,7 +114,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
     }
 
-    public async Task ApplyAsync(
+    public async Task<RuntimeApplyResult> ApplyAsync(
         Guid appId,
         Guid deploymentTargetId,
         ApplicationContract contract,
@@ -138,7 +147,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     State = RuntimeReadinessState.Stopped
                 },
                 cancellationToken);
-            return;
+            return new RuntimeApplyResult();
         }
 
         var candidate = new RunnerRuntimeDeploymentMetadata
@@ -154,6 +163,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             ArtifactId = null,
             State = RuntimeReadinessState.Starting
         };
+        candidate.ArtifactRoot = ValidateArtifactRoot(
+            appId,
+            deploymentTargetId,
+            candidate.ArtifactRoot);
         candidate.ArtifactId = GetArtifactId(candidate.ArtifactRoot);
         Directory.CreateDirectory(candidate.ArtifactRoot);
         var pending = CreatePendingMetadata(appId, deploymentTargetId, previousMetadata, candidate);
@@ -169,7 +182,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 pending,
                 cancellationToken,
                 deleteArtifactOnFailure: true);
-            await PromoteRuntimeAsync(
+            return await PromoteRuntimeAsync(
                 appId,
                 deploymentTargetId,
                 pending,
@@ -204,8 +217,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
         var requestedPort = candidate.EffectivePort ?? candidate.Runtime.Port;
         var effectivePort = AllocatePort(requestedPort);
-        var targetRoot = candidate.ArtifactRoot
-            ?? workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId);
+        var targetRoot = ValidateArtifactRoot(appId, deploymentTargetId, candidate.ArtifactRoot);
+        candidate.ArtifactRoot = targetRoot;
         Directory.CreateDirectory(targetRoot);
         var workingDirectory = ResolveWorkspacePath(targetRoot, command.WorkingDirectory, "working directory");
         var executable = ResolveExecutable(targetRoot, command.Executable);
@@ -279,7 +292,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
     }
 
-    private async Task PromoteRuntimeAsync(
+    private async Task<RuntimeApplyResult> PromoteRuntimeAsync(
         Guid appId,
         Guid deploymentTargetId,
         RunnerRuntimeDeploymentMetadata metadata,
@@ -287,6 +300,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         CancellationToken cancellationToken)
     {
         var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
+        var promotionIrreversible = false;
         try
         {
             var candidateMetadata = metadata.Candidate
@@ -305,6 +319,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 candidates.Remove(key);
                 registry.Register(appId, deploymentTargetId, candidate.Port);
             }
+            promotionIrreversible = true;
 
             if (old is not null && !old.Process.HasExited)
                 await StopProcessAsync(old.Process);
@@ -323,7 +338,38 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             metadata.State = RuntimeReadinessState.Ready;
             metadata.LastError = null;
             metadata.Candidate = null;
-            await WriteMetadataAsync(metadata, cancellationToken);
+            try
+            {
+                await WriteMetadataAsync(metadata, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Runtime promotion completed but metadata compaction failed for app {AppId}, target {DeploymentTargetId}",
+                    appId,
+                    deploymentTargetId);
+                return new RuntimeApplyResult
+                {
+                    PromotionIrreversible = true,
+                    Warning = "Runtime started successfully, but final deployment metadata compaction will be reconciled on runner restart."
+                };
+            }
+
+            return new RuntimeApplyResult { PromotionIrreversible = true };
+        }
+        catch (Exception ex) when (promotionIrreversible)
+        {
+            logger.LogWarning(
+                ex,
+                "Runtime promotion crossed its irreversible boundary for app {AppId}, target {DeploymentTargetId}; recovery will reconcile the durable candidate state",
+                appId,
+                deploymentTargetId);
+            return new RuntimeApplyResult
+            {
+                PromotionIrreversible = true,
+                Warning = "Runtime promotion crossed its irreversible boundary and will be reconciled from durable metadata."
+            };
         }
         catch
         {
@@ -504,6 +550,37 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             && string.Equals(applicationDirectory.Name, "application", StringComparison.OrdinalIgnoreCase)
             ? applicationDirectory.Parent?.Name
             : applicationDirectory?.Name;
+    }
+
+    private string ValidateArtifactRoot(Guid appId, Guid deploymentTargetId, string? artifactRoot)
+    {
+        var fullArtifactRoot = Path.GetFullPath(
+            artifactRoot ?? workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId));
+        var canonicalRoot = Path.GetFullPath(
+            workspace.GetAppRuntimeApplicationDirectory(appId, deploymentTargetId));
+        if (string.Equals(fullArtifactRoot, canonicalRoot, StringComparison.OrdinalIgnoreCase))
+            return fullArtifactRoot;
+
+        var runtimeRoot = Path.GetFullPath(workspace.GetAppRuntimeRoot(appId, deploymentTargetId));
+        var candidateDirectory = Directory.GetParent(fullArtifactRoot);
+        var candidatesDirectory = candidateDirectory is null
+            ? null
+            : Directory.GetParent(candidateDirectory.FullName);
+        var candidateContainerParent = candidatesDirectory is null
+            ? null
+            : Directory.GetParent(candidatesDirectory.FullName);
+        if (string.Equals(Path.GetFileName(fullArtifactRoot), "application", StringComparison.OrdinalIgnoreCase)
+            && candidateDirectory is not null
+            && candidatesDirectory is not null
+            && candidateContainerParent is not null
+            && string.Equals(Path.GetFileName(candidatesDirectory.FullName), "candidates", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(candidateContainerParent.FullName, runtimeRoot, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(Path.GetFileName(candidateDirectory.FullName))
+            && Path.GetFileName(candidateDirectory.FullName) is not "." and not "..")
+            return fullArtifactRoot;
+
+        throw new InvalidOperationException(
+            "Runtime artifact root must be the managed application runtime directory or a managed candidate artifact directory.");
     }
 
     private void DeleteArtifactDirectory(string? artifactRoot, string? preserveRoot = null)
@@ -715,14 +792,44 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         RunnerRuntimeDeploymentMetadata metadata,
         CancellationToken cancellationToken)
     {
+        var injectedFailure = metadataWriteFailureFactory?.Invoke(metadata);
+        if (injectedFailure is not null)
+            throw injectedFailure;
+
         var path = GetMetadataPath(
             Guid.Parse(metadata.AppId),
             Guid.Parse(metadata.DeploymentTargetId));
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(
-            path,
-            JsonSerializer.Serialize(metadata, JsonOptions),
-            cancellationToken);
+        var directory = Path.GetDirectoryName(path)!;
+        Directory.CreateDirectory(directory);
+        var temporaryPath = Path.Combine(
+            directory,
+            $".{MetadataFileName}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var stream = new FileStream(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 4096,
+                options: FileOptions.Asynchronous | FileOptions.WriteThrough))
+            await using (var writer = new StreamWriter(stream))
+            {
+                await writer.WriteAsync(
+                    JsonSerializer.Serialize(metadata, JsonOptions).AsMemory(),
+                    cancellationToken);
+                await writer.FlushAsync(cancellationToken);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 
     private static string ResolveExecutable(string root, string executable)

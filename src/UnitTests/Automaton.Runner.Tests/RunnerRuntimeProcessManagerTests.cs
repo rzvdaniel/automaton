@@ -304,6 +304,62 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public async Task FinalMetadataCompactionFailure_RetainsPromotedRuntimeForRestartReconciliation()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var failFinalMetadataWrite = false;
+        var manager = CreateManager(
+            workspace,
+            registry,
+            metadata => failFinalMetadataWrite
+                && metadata.Candidate is null
+                && metadata.State == RuntimeReadinessState.Ready
+                    ? new IOException("simulated final metadata failure")
+                    : null);
+
+        await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "original"]));
+        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var original = ReadMetadata(metadataPath);
+        var originalArtifactRoot = original.ArtifactRoot!;
+
+        failFinalMetadataWrite = true;
+        var result = await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "replacement"]));
+        var pending = ReadMetadata(metadataPath);
+        var candidateArtifactRoot = pending.Candidate!.ArtifactRoot!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.PromotionIrreversible, Is.True);
+            Assert.That(result.Warning, Is.Not.Null);
+            Assert.That(IsProcessAlive(pending.Candidate.ProcessId!.Value), Is.True);
+            Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
+            Assert.That(Directory.Exists(candidateArtifactRoot), Is.True);
+            Assert.That(Directory.Exists(originalArtifactRoot), Is.False);
+        });
+
+        manager.Dispose();
+        failFinalMetadataWrite = false;
+        using var recoveryManager = CreateManager(workspace, registry);
+        await recoveryManager.StartAsync(CancellationToken.None);
+
+        var recovered = ReadMetadata(metadataPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(recovered.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(recovered.Candidate, Is.Null);
+            Assert.That(recovered.ArtifactRoot, Is.EqualTo(candidateArtifactRoot));
+            Assert.That(IsProcessAlive(recovered.ProcessId!.Value), Is.True);
+            Assert.That(Directory.Exists(candidateArtifactRoot), Is.True);
+            Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
+        });
+
+        await recoveryManager.StopAsync(appId, targetId);
+    }
+
+    [Test]
     public async Task StopWithCancelledShutdownToken_KillsTheEntireProcessTree()
     {
         var workspace = new RunnerWorkspaceService();
@@ -434,6 +490,26 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public void ArtifactRootOutsideManagedTarget_IsRejectedBeforeExecution()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        using var manager = CreateManager(workspace, registry);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var outsideRoot = Path.Combine(root, "outside-artifacts");
+
+        Assert.That(
+            async () => await manager.ApplyAsync(
+                appId,
+                targetId,
+                CreateContract(["--tcp"]),
+                artifactRoot: outsideRoot),
+            Throws.TypeOf<InvalidOperationException>());
+        Assert.That(Directory.Exists(outsideRoot), Is.False);
+    }
+
+    [Test]
     public void StartupFailureIsDeterministic()
     {
         var registry = new RunnerRuntimeRegistry();
@@ -477,8 +553,13 @@ public sealed class RunnerRuntimeProcessManagerTests
 
     private static RunnerRuntimeProcessManager CreateManager(
         RunnerWorkspaceService workspace,
-        RunnerRuntimeRegistry registry)
-        => new(workspace, registry, NullLogger<RunnerRuntimeProcessManager>.Instance);
+        RunnerRuntimeRegistry registry,
+        Func<RunnerRuntimeDeploymentMetadata, Exception?>? metadataWriteFailureFactory = null)
+        => new(
+            workspace,
+            registry,
+            NullLogger<RunnerRuntimeProcessManager>.Instance,
+            metadataWriteFailureFactory);
 
     private string CreateRuntimePackage(
         Guid appId,
