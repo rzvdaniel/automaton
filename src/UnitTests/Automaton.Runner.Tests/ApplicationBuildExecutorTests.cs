@@ -214,6 +214,51 @@ public sealed class ApplicationBuildExecutorTests
     }
 
     [Test]
+    public async Task ExecuteAsync_ReturnsWhenDescendantKeepsOutputPipeOpen()
+    {
+        var childPidPath = Path.Combine(root, "orphan-child.pid");
+        var stopwatch = Stopwatch.StartNew();
+        var result = await ApplicationBuildExecutor.ExecuteAsync(
+            new ApplicationBuildSpec
+            {
+                TimeoutSeconds = 1,
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = [FixturePath(), "--orphan-child", childPidPath],
+                    WorkingDirectory = "."
+                }
+            },
+            root);
+
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(8)));
+                Assert.That(result.Succeeded, Is.False);
+                Assert.That(result.Error, Is.EqualTo("Build output collection timed out."));
+            });
+        }
+        finally
+        {
+            if (File.Exists(childPidPath)
+                && int.TryParse(File.ReadAllText(childPidPath), out var childPid))
+            {
+                try
+                {
+                    using var child = Process.GetProcessById(childPid);
+                    if (!child.HasExited)
+                        child.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+                {
+                }
+            }
+        }
+    }
+
+    [Test]
     public void ExecuteAsync_RejectsWorkingDirectoryOutsideWorkspace()
     {
         Assert.That(

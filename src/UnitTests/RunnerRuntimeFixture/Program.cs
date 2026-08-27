@@ -8,6 +8,26 @@ var alwaysUnavailable = args.Contains("--http-503", StringComparer.Ordinal);
 var unavailableOnce = args.Contains("--http-503-once", StringComparer.Ordinal);
 var http = args.Contains("--http", StringComparer.Ordinal) || alwaysUnavailable || unavailableOnce;
 var childMode = args.Contains("--child-process", StringComparer.Ordinal);
+var orphanChildIndex = Array.IndexOf(args, "--orphan-child");
+if (orphanChildIndex >= 0 && orphanChildIndex + 1 < args.Length)
+{
+    var orphan = Process.Start(new ProcessStartInfo
+    {
+        FileName = Environment.ProcessPath!,
+        UseShellExecute = false,
+        Environment = { ["AUTOMATON_PORT"] = "1" },
+        ArgumentList =
+        {
+            Assembly.GetExecutingAssembly().Location,
+            "--child-process"
+        }
+    }) ?? throw new InvalidOperationException("Could not start orphan child.");
+    File.WriteAllText(args[orphanChildIndex + 1], orphan.Id.ToString());
+    Console.WriteLine($"orphan-child:{orphan.Id}");
+    Console.Out.Flush();
+    return;
+}
+
 var writeFileIndex = Array.IndexOf(args, "--write-file");
 if (writeFileIndex >= 0 && writeFileIndex + 2 < args.Length)
 {

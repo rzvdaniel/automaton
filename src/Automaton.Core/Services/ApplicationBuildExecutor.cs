@@ -30,6 +30,8 @@ public sealed class ApplicationBuildExecutionResult
 /// </summary>
 public static class ApplicationBuildExecutor
 {
+    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(5);
+
     public static async Task<ApplicationBuildExecutionResult> ExecuteAsync(
         ApplicationBuildSpec build,
         string workspaceRoot,
@@ -84,8 +86,9 @@ public static class ApplicationBuildExecutor
         var command = build.Command!;
         var processId = process.Id;
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
+        using var outputCancellation = new CancellationTokenSource();
+        var stdoutTask = ReadOutputAsync(process.StandardOutput, outputCancellation.Token);
+        var stderrTask = ReadOutputAsync(process.StandardError, outputCancellation.Token);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(build.TimeoutSeconds));
 
@@ -102,20 +105,73 @@ public static class ApplicationBuildExecutor
             await TerminateProcessTreeAsync(process);
         }
 
-        var standardOutput = SplitLines(await stdoutTask);
-        var standardError = SplitLines(await stderrTask);
+        var output = await CollectOutputAsync(stdoutTask, stderrTask, outputCancellation);
         var exitCode = TryGetExitCode(process);
         return new ApplicationBuildExecutionResult
         {
-            Succeeded = !timedOut && !canceled && exitCode == 0,
+            Succeeded = !timedOut && !canceled && exitCode == 0 && !output.TimedOut,
             ProcessId = processId,
             ExitCode = exitCode,
             TimedOut = timedOut,
             Canceled = canceled,
-            StandardOutput = standardOutput,
-            StandardError = standardError
+            Error = output.TimedOut ? "Build output collection timed out." : null,
+            StandardOutput = SplitLines(output.StandardOutput),
+            StandardError = SplitLines(output.StandardError)
         };
     }
+
+    private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return string.Empty;
+        }
+        catch (IOException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static async Task<OutputCollectionResult> CollectOutputAsync(
+        Task<string> stdoutTask,
+        Task<string> stderrTask,
+        CancellationTokenSource outputCancellation)
+    {
+        var outputTask = Task.WhenAll(stdoutTask, stderrTask);
+        try
+        {
+            var output = await outputTask.WaitAsync(OutputDrainTimeout);
+            return new OutputCollectionResult(output[0], output[1], TimedOut: false);
+        }
+        catch (TimeoutException)
+        {
+            outputCancellation.Cancel();
+            try
+            {
+                var output = await outputTask.WaitAsync(TimeSpan.FromMilliseconds(250));
+                return new OutputCollectionResult(output[0], output[1], TimedOut: true);
+            }
+            catch (TimeoutException)
+            {
+                return new OutputCollectionResult(
+                    GetCompletedOutput(stdoutTask),
+                    GetCompletedOutput(stderrTask),
+                    TimedOut: true);
+            }
+        }
+    }
+
+    private static string GetCompletedOutput(Task<string> outputTask) =>
+        outputTask.Status == TaskStatus.RanToCompletion ? outputTask.Result : string.Empty;
+
+    private sealed record OutputCollectionResult(
+        string StandardOutput,
+        string StandardError,
+        bool TimedOut);
 
     public static ProcessStartInfo CreateStartInfo(
         ApplicationCommandSpec command,
