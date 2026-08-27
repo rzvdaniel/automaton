@@ -171,8 +171,8 @@ public static class ApplicationContractValidator
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(mount.Name) || mount.Name.Contains('\0'))
-                    errors.Add("storage.mounts.name is required and must not contain NUL");
+                if (!IsValidMountName(mount.Name))
+                    errors.Add("storage.mounts.name must be a valid environment-safe identifier");
                 ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
             }
         }
@@ -227,11 +227,7 @@ public static class ApplicationContractValidator
             return;
         }
 
-        var normalized = value.Replace('\\', '/');
-        if (normalized.Contains('\0')
-            || normalized.StartsWith("/", StringComparison.Ordinal)
-            || LooksLikeWindowsRootedPath(normalized)
-            || normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == ".."))
+        if (!ManagedPathBoundary.IsSafeRelative(value, allowEmpty))
         {
             errors.Add($"{name} must remain inside the application workspace");
         }
@@ -251,6 +247,11 @@ public static class ApplicationContractValidator
 
     private static bool LooksLikeWindowsRootedPath(string value) =>
         value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':';
+
+    private static bool IsValidMountName(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && (char.IsLetter(value[0]) || value[0] == '_')
+        && value.Skip(1).All(character => char.IsLetterOrDigit(character) || character == '_');
 
     private static bool ContainsTraversalSegment(string value) =>
         value.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)

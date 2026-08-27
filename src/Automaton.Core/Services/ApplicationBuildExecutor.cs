@@ -221,23 +221,7 @@ public static class ApplicationBuildExecutor
     }
 
     public static string ResolveWorkspacePath(string root, string relativePath, string description)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath)
-            || Path.IsPathRooted(relativePath)
-            || (relativePath.Length >= 2 && char.IsLetter(relativePath[0]) && relativePath[1] == ':'))
-            throw new InvalidOperationException($"{description} must remain inside the build workspace.");
-
-        var normalized = relativePath.Replace('\\', '/');
-        if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is ".."))
-            throw new InvalidOperationException($"{description} must remain inside the build workspace.");
-
-        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullPath = Path.GetFullPath(Path.Combine(fullRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
-        if (!fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"{description} must remain inside the build workspace.");
-        return fullPath;
-    }
+        => ManagedPathBoundary.ResolveInside(root, relativePath, description);
 
     private static string[] SplitLines(string output)
         => output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);

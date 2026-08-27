@@ -146,7 +146,7 @@ public class AppFlowExecutionService
 
     private string GetFlowArtifactsDirectory(Guid appId, Guid deploymentTargetId)
         => Path.Combine(
-            runnerWorkspaceService.GetAppBackendDirectory(appId, deploymentTargetId),
+            runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId),
             FlowArtifactsDirectoryName,
             FlowArtifactsFolderName);
 

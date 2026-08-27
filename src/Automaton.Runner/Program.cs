@@ -359,6 +359,7 @@ public class Program
                 services.AddSingleton<FileStorageService>();
                 services.AddSingleton<ApiKeyAuthenticationService>();
                 services.AddSingleton<RunnerWorkspaceService>();
+                services.AddHostedService<RunnerStorageMigrationService>();
                 services.AddSingleton<RunnerBackendEnvironmentService>();
                 services.AddSingleton<AppActionDeploymentService>();
                 services.AddSingleton<AppActionExecutionService>();

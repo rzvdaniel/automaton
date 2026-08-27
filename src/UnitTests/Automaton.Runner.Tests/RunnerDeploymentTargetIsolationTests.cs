@@ -62,10 +62,10 @@ public class RunnerDeploymentTargetIsolationTests
         });
 
         var firstContent = await File.ReadAllTextAsync(Path.Combine(
-            workspace.GetAppRuntimeFrontendDirectory(appId, firstTargetId),
+            workspace.GetAppRuntimeApplicationDirectory(appId, firstTargetId),
             "index.html"));
         var secondContent = await File.ReadAllTextAsync(Path.Combine(
-            workspace.GetAppRuntimeFrontendDirectory(appId, secondTargetId),
+            workspace.GetAppRuntimeApplicationDirectory(appId, secondTargetId),
             "index.html"));
         Assert.Multiple(() =>
         {
@@ -164,7 +164,7 @@ public class RunnerDeploymentTargetIsolationTests
                     }
                     : ApplicationContractDefaults.Create()
             }));
-        WriteEntry(archive, "runtime/frontend/index.html", frontendContent);
+        WriteEntry(archive, "runtime/application/index.html", frontendContent);
         return packagePath;
     }
 
