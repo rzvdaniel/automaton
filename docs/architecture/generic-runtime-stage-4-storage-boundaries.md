@@ -18,13 +18,13 @@ workspace/
       current/              promoted runtime artifact
       candidates/{id}/      isolated candidate artifact
     data/                   durable application data for this target's app
-    cache/                  disposable build/cache state
-      legacy-python/venv/   deferred controller bridge cache only
+    cache/                  disposable generic build/cache state
     logs/{runtime-id}/      runtime stdout/stderr, outside artifacts
     automaton/              runner metadata and snapshots
       deployment.json
       snapshots/
-    runtime/                reserved legacy execution-state boundary
+    runtime/backend/        deferred controller bridge files only
+    venv/                    deferred controller bridge environment only
 ```
 
 The app-level `data/{appId}` root is durable application data and is separate
@@ -40,7 +40,9 @@ directories and exposes their resolved paths through generic environment
 variables (`AUTOMATON_APP_DATA_DIR` and
 `AUTOMATON_STORAGE_{NAME}`). Names are environment-safe identifiers and all
 paths are validated as relative, contained paths. Existing path components are
-also checked for reparse-point/link escapes.
+also checked for reparse-point/link escapes. Mounts are writable in this stage;
+contracts declaring `readOnly` mounts are rejected until the runner can enforce
+that promise.
 
 ## Ownership and lifecycle
 
@@ -64,17 +66,21 @@ previous target layout into the canonical roots once:
 - `runtime/application` becomes `artifacts/current/application`;
 - `runtime/candidates` becomes `artifacts/candidates`;
 - old runtime logs become `logs`;
-- `venv` becomes `cache/legacy-python/venv`;
+- `runtime/backend` and `venv` remain in place for the deferred
+  `controller_runner.py` bridge; they are not generic runtime or cache roots;
 - `versions` and `deployment.json` become `automaton/snapshots` and
   `automaton/deployment.json`;
 - legacy app-local data becomes the durable app-data root;
 - artifact paths in migrated deployment metadata are rewritten to the new
   roots.
 
-The migration preserves source, durable data, and usable deployment state. It
-does not make the old directory names a fallback for generic build or runtime
-execution. A failed migration prevents the runner from continuing with an
-ambiguous layout.
+The migration preserves source, durable data, usable deployment state, and the
+two explicitly retained controller-bridge paths. It does not make the old
+directory names a fallback for generic build or runtime execution. Migration is
+fail-closed: existing destination files are accepted only when byte-identical;
+conflicts and reparse/link paths leave the legacy tree untouched and stop the
+runner from continuing with an ambiguous layout. Re-running a completed or
+partially completed migration is safe.
 
 ## Scope boundary
 

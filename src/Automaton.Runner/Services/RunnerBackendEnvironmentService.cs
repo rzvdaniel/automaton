@@ -21,7 +21,7 @@ public class RunnerBackendEnvironmentService
         bool recreate)
     {
         var logs = new List<string>();
-        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId);
+        var venvDir = runnerWorkspaceService.GetLegacyControllerVenvDirectory(appId, deploymentTargetId);
         var appRootDir = runnerWorkspaceService.GetDeploymentTargetRoot(appId, deploymentTargetId);
 
         Directory.CreateDirectory(appRootDir);
@@ -66,7 +66,7 @@ public class RunnerBackendEnvironmentService
         var logs = new List<string>();
         logs.AddRange(EnsureAppVirtualEnvironment(appId, deploymentTargetId, recreate: true));
 
-        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId);
+        var venvDir = runnerWorkspaceService.GetLegacyControllerVenvDirectory(appId, deploymentTargetId);
         var pipPath = GetVenvPipPath(venvDir);
         var pythonPath = GetVenvPythonPath(venvDir);
 

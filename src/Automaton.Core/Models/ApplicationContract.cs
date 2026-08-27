@@ -163,17 +163,27 @@ public static class ApplicationContractValidator
             {
                 errors.Add("storage.mounts must be an array");
             }
-            else foreach (var mount in contract.Storage.Mounts)
+            else
             {
-                if (mount is null)
+                var environmentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var mount in contract.Storage.Mounts)
                 {
-                    errors.Add("storage.mounts entries must be objects");
-                    continue;
-                }
+                    if (mount is null)
+                    {
+                        errors.Add("storage.mounts entries must be objects");
+                        continue;
+                    }
 
-                if (!IsValidMountName(mount.Name))
-                    errors.Add("storage.mounts.name must be a valid environment-safe identifier");
-                ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
+                    var validName = IsValidMountName(mount.Name);
+                    if (!validName)
+                        errors.Add("storage.mounts.name must be a valid environment-safe identifier");
+                    else if (!environmentNames.Add(mount.Name.ToUpperInvariant()))
+                        errors.Add("storage.mounts.name must be unique after environment-variable normalization");
+
+                    if (mount.ReadOnly)
+                        errors.Add("storage.mounts.readOnly is not supported by this runner");
+                    ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
+                }
             }
         }
 

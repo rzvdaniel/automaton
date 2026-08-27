@@ -177,6 +177,34 @@ public class ConfigServiceTests
     }
 
     [Test]
+    public void ApplicationContractValidator_RejectsEnvironmentNameCollisionsAfterNormalization()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Storage.Mounts =
+        [
+            new ApplicationStorageMount { Name = "uploads", RelativePath = "uploads" },
+            new ApplicationStorageMount { Name = "UPLOADS", RelativePath = "other" }
+        ];
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.That(errors, Has.Some.EqualTo(
+            "storage.mounts.name must be unique after environment-variable normalization"));
+    }
+
+    [Test]
+    public void ApplicationContractValidator_RejectsUnsupportedReadOnlyMounts()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Storage.Mounts =
+        [new ApplicationStorageMount { Name = "uploads", RelativePath = "uploads", ReadOnly = true }];
+
+        var errors = ApplicationContractValidator.Validate(contract);
+
+        Assert.That(errors, Has.Some.EqualTo("storage.mounts.readOnly is not supported by this runner"));
+    }
+
+    [Test]
     public void ApplicationContract_AllowsPortReadinessWithoutHealthPath()
     {
         var contract = ApplicationContractDefaults.Create();

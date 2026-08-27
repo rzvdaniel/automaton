@@ -56,7 +56,19 @@ public static class ManagedPathBoundary
             || fullCandidate.StartsWith(fullRoot + Path.DirectorySeparatorChar, PathComparison);
     }
 
-    private static void EnsureNoReparsePointEscape(string root, string path, string description)
+    public static void EnsureNoReparsePointEscape(string root, string path, string description)
+    {
+        var fullRoot = Path.GetFullPath(root)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullPath = Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!IsWithin(fullRoot, fullPath))
+            throw new InvalidOperationException($"{description} must remain inside the managed root.");
+
+        EnsureNoReparsePointEscapeCore(fullRoot, fullPath, description);
+    }
+
+    private static void EnsureNoReparsePointEscapeCore(string root, string path, string description)
     {
         var current = path;
         while (!string.Equals(current, root, PathComparison))
@@ -72,6 +84,27 @@ public static class ManagedPathBoundary
                 ?? throw new InvalidOperationException($"{description} must remain inside the managed root.");
             if (!IsWithin(root, current))
                 throw new InvalidOperationException($"{description} must remain inside the managed root.");
+        }
+    }
+
+    public static void EnsureNoReparsePoints(string root, string description)
+    {
+        if (!Directory.Exists(root) && !File.Exists(root))
+            return;
+
+        var pending = new Stack<string>([root]);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            var attributes = File.GetAttributes(current);
+            if (attributes.HasFlag(FileAttributes.ReparsePoint))
+                throw new InvalidOperationException($"{description} cannot migrate a link or reparse point.");
+
+            if (!attributes.HasFlag(FileAttributes.Directory))
+                continue;
+
+            foreach (var entry in Directory.EnumerateFileSystemEntries(current))
+                pending.Push(entry);
         }
     }
 

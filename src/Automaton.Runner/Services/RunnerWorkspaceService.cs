@@ -152,15 +152,19 @@ public class RunnerWorkspaceService
     public string GetAppActionExecutionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "executions");
 
-    public string GetAppBackendDirectory(Guid appId, Guid deploymentTargetId)
-    {
-        return GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "backend");
-    }
+    /// <summary>
+    /// Legacy controller bridge location. Generic applications must not use
+    /// this path; it remains aligned with controller_runner.py until that
+    /// bridge is removed in a later stage.
+    /// </summary>
+    public string GetLegacyControllerBackendDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "backend");
 
-    public string GetAppVenvDirectory(Guid appId, Guid deploymentTargetId)
-    {
-        return GetFullPath(GetAppCacheRoot(appId, deploymentTargetId), "legacy-python", "venv");
-    }
+    /// <summary>
+    /// Legacy controller bridge virtual environment location.
+    /// </summary>
+    public string GetLegacyControllerVenvDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "venv");
 
     public string GetAppVersionsDirectory(Guid appId, Guid deploymentTargetId)
     {
@@ -229,7 +233,7 @@ public class RunnerWorkspaceService
     public string ResolveBackendUploadPath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
         return ResolveRelativePath(
-            GetAppBackendDirectory(appId, deploymentTargetId),
+            GetLegacyControllerBackendDirectory(appId, deploymentTargetId),
             relativePath,
             "deployment target backend");
     }
@@ -238,7 +242,7 @@ public class RunnerWorkspaceService
     {
         var rootDirectory = area == AppRunnerFileAreas.Data
             ? GetAppDataDirectory(appId)
-            : GetAppBackendDirectory(appId, deploymentTargetId);
+            : GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
 
         return ResolveRelativePath(rootDirectory, relativePath, "requested app directory");
     }
@@ -251,7 +255,7 @@ public class RunnerWorkspaceService
     public string ResolveAppBackendFilePath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
         return ResolveRelativePath(
-            GetAppBackendDirectory(appId, deploymentTargetId),
+            GetLegacyControllerBackendDirectory(appId, deploymentTargetId),
             relativePath,
             "deployment target backend directory");
     }
@@ -296,6 +300,10 @@ public class RunnerWorkspaceService
         if (!Directory.Exists(AppsRoot))
             return;
 
+        ManagedPathBoundary.EnsureNoReparsePoints(
+            AppsRoot,
+            "legacy runner workspace");
+
         foreach (var appRoot in Directory.GetDirectories(AppsRoot))
         {
             if (!Guid.TryParse(Path.GetFileName(appRoot), out var appId))
@@ -319,6 +327,11 @@ public class RunnerWorkspaceService
 
     private void MigrateLegacyTarget(string oldTargetRoot, Guid appId, Guid deploymentTargetId)
     {
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            AppsRoot,
+            oldTargetRoot,
+            "legacy deployment target");
+
         var oldSource = Path.Combine(oldTargetRoot, "source");
         if (Directory.Exists(oldSource))
             MoveTree(oldSource, GetAppSourceRoot(appId, deploymentTargetId));
@@ -338,6 +351,7 @@ public class RunnerWorkspaceService
             foreach (var entry in Directory.GetFileSystemEntries(oldRuntime))
             {
                 if (string.Equals(Path.GetFileName(entry), "application", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.GetFileName(entry), "backend", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(Path.GetFileName(entry), "candidates", StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (string.Equals(Path.GetFileName(entry), "logs", StringComparison.OrdinalIgnoreCase))
@@ -362,39 +376,99 @@ public class RunnerWorkspaceService
             Path.Combine(GetAppAutomationRoot(appId, deploymentTargetId), "deployment.json"),
             oldRuntime,
             GetAppArtifactsRoot(appId, deploymentTargetId));
-        MoveTree(
-            Path.Combine(oldTargetRoot, "venv"),
-            GetAppVenvDirectory(appId, deploymentTargetId));
+        // Keep the legacy controller venv at target/venv until the controller
+        // bridge is removed. It is not a generic runtime cache.
         MoveTree(
             Path.Combine(oldTargetRoot, "versions"),
             GetAppVersionsDirectory(appId, deploymentTargetId));
     }
 
-    private static void MoveTree(string source, string destination)
+    private void MoveTree(string source, string destination)
     {
         if (!Directory.Exists(source) && !File.Exists(source))
             return;
+
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            WorkspaceRoot,
+            source,
+            "legacy migration source");
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            WorkspaceRoot,
+            destination,
+            "legacy migration destination");
+        ManagedPathBoundary.EnsureNoReparsePoints(source, "legacy migration source");
+        if (Directory.Exists(destination) || File.Exists(destination))
+            ManagedPathBoundary.EnsureNoReparsePoints(destination, "legacy migration destination");
+
+        ValidateMoveTree(source, destination);
+        MoveTreeContents(source, destination);
+    }
+
+    private static void ValidateMoveTree(string source, string destination)
+    {
+        if (File.Exists(source))
+        {
+            if (Directory.Exists(destination)
+                || (File.Exists(destination) && !FilesAreIdentical(source, destination)))
+            {
+                throw new InvalidOperationException(
+                    $"Legacy migration conflict: '{source}' and '{destination}' differ.");
+            }
+
+            return;
+        }
+
+        if (File.Exists(destination))
+            throw new InvalidOperationException(
+                $"Legacy migration conflict: '{source}' and '{destination}' have different types.");
+
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source))
+        {
+            ValidateMoveTree(entry, Path.Combine(destination, Path.GetFileName(entry)));
+        }
+    }
+
+    private static void MoveTreeContents(string source, string destination)
+    {
         if (File.Exists(source))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            if (!File.Exists(destination))
+            if (File.Exists(destination))
+                File.Delete(source);
+            else
                 File.Move(source, destination);
             return;
         }
 
-        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        Directory.CreateDirectory(destination);
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source).ToArray())
         {
-            var relative = Path.GetRelativePath(source, file);
-            var target = Path.Combine(destination, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            if (!File.Exists(target))
-                File.Move(file, target);
+            MoveTreeContents(entry, Path.Combine(destination, Path.GetFileName(entry)));
         }
 
-        foreach (var directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories)
-                     .OrderByDescending(path => path.Length))
-            DeleteEmptyDirectory(directory);
         DeleteEmptyDirectory(source);
+    }
+
+    private static bool FilesAreIdentical(string first, string second)
+    {
+        var firstInfo = new FileInfo(first);
+        var secondInfo = new FileInfo(second);
+        if (firstInfo.Length != secondInfo.Length)
+            return false;
+
+        using var firstStream = File.OpenRead(first);
+        using var secondStream = File.OpenRead(second);
+        var firstBuffer = new byte[81920];
+        var secondBuffer = new byte[81920];
+        int firstRead;
+        while ((firstRead = firstStream.Read(firstBuffer, 0, firstBuffer.Length)) > 0)
+        {
+            var secondRead = secondStream.Read(secondBuffer, 0, secondBuffer.Length);
+            if (firstRead != secondRead || !firstBuffer.AsSpan(0, firstRead).SequenceEqual(secondBuffer.AsSpan(0, secondRead)))
+                return false;
+        }
+
+        return secondStream.ReadByte() == -1;
     }
 
     private static void MigrateMetadataFile(
@@ -421,11 +495,26 @@ public class RunnerWorkspaceService
                 newArtifactsRoot);
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        File.WriteAllText(destination, JsonSerializer.Serialize(metadata, new JsonSerializerOptions
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            Path.GetDirectoryName(Path.GetDirectoryName(destination)!)!,
+            destination,
+            "legacy metadata destination");
+        var migratedContent = JsonSerializer.Serialize(metadata, new JsonSerializerOptions
         {
             WriteIndented = true
-        }));
+        });
+        if (File.Exists(destination) || Directory.Exists(destination))
+        {
+            if (!File.Exists(destination)
+                || !string.Equals(File.ReadAllText(destination), migratedContent, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"Legacy migration conflict: '{source}' and '{destination}' differ.");
+            File.Delete(source);
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.WriteAllText(destination, migratedContent);
         File.Delete(source);
     }
 

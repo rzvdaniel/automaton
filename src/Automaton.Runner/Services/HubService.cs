@@ -682,7 +682,7 @@ public class HubService
     {
         try
         {
-            var backendDir = runnerWorkspaceService.GetAppBackendDirectory(
+            var backendDir = runnerWorkspaceService.GetLegacyControllerBackendDirectory(
                 payload.AppId,
                 payload.DeploymentTargetId);
             var dataDir = runnerWorkspaceService.GetAppDataDirectory(payload.AppId);
@@ -970,7 +970,7 @@ public class HubService
     {
         return area == AppRunnerFileAreas.Data
             ? runnerWorkspaceService.GetAppDataDirectory(appId)
-            : runnerWorkspaceService.GetAppBackendDirectory(appId, deploymentTargetId);
+            : runnerWorkspaceService.GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
     }
 
     private static Guid ParseAppId(string appId)
