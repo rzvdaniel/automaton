@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using Automaton.Core.Models;
 
 namespace Automaton.Core.Services;
@@ -6,6 +8,7 @@ namespace Automaton.Core.Services;
 public sealed class ApplicationBuildExecutionResult
 {
     public bool Succeeded { get; init; }
+    public int? ProcessId { get; init; }
     public int? ExitCode { get; init; }
     public bool TimedOut { get; init; }
     public bool Canceled { get; init; }
@@ -79,6 +82,7 @@ public static class ApplicationBuildExecutor
         CancellationToken cancellationToken)
     {
         var command = build.Command!;
+        var processId = process.Id;
 
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = process.StandardError.ReadToEndAsync();
@@ -95,16 +99,17 @@ public static class ApplicationBuildExecutor
         {
             canceled = cancellationToken.IsCancellationRequested;
             timedOut = !canceled;
-            KillProcessTree(process);
-            await process.WaitForExitAsync(CancellationToken.None);
+            await TerminateProcessTreeAsync(process);
         }
 
         var standardOutput = SplitLines(await stdoutTask);
         var standardError = SplitLines(await stderrTask);
+        var exitCode = TryGetExitCode(process);
         return new ApplicationBuildExecutionResult
         {
-            Succeeded = !timedOut && !canceled && process.ExitCode == 0,
-            ExitCode = process.HasExited ? process.ExitCode : null,
+            Succeeded = !timedOut && !canceled && exitCode == 0,
+            ProcessId = processId,
+            ExitCode = exitCode,
             TimedOut = timedOut,
             Canceled = canceled,
             StandardOutput = standardOutput,
@@ -181,15 +186,76 @@ public static class ApplicationBuildExecutor
     private static string[] SplitLines(string output)
         => output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 
-    private static void KillProcessTree(Process process)
+    private static async Task TerminateProcessTreeAsync(Process process)
     {
         try
         {
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (IsTerminationException(ex))
         {
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            TryTaskKill(process.Id);
+        }
+        else
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill();
+            }
+            catch (Exception ex) when (IsTerminationException(ex))
+            {
+            }
+        }
+
+        using var waitCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await process.WaitForExitAsync(waitCancellation.Token);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException or COMException)
+        {
+        }
+    }
+
+    private static void TryTaskKill(int processId)
+    {
+        try
+        {
+            using var taskKill = Process.Start(new ProcessStartInfo
+            {
+                FileName = "taskkill.exe",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                ArgumentList = { "/PID", processId.ToString(), "/T", "/F" }
+            });
+            taskKill?.WaitForExit((int)TimeSpan.FromSeconds(5).TotalMilliseconds);
+        }
+        catch (Exception ex) when (IsTerminationException(ex))
+        {
+        }
+    }
+
+    private static bool IsTerminationException(Exception exception) =>
+        exception is InvalidOperationException
+            or Win32Exception
+            or NotSupportedException
+            or PlatformNotSupportedException;
+
+    private static int? TryGetExitCode(Process process)
+    {
+        try
+        {
+            return process.HasExited ? process.ExitCode : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or COMException)
+        {
+            return null;
         }
     }
 

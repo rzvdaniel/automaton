@@ -53,12 +53,16 @@ public class RunnerDeploymentService
             var manifest = LoadManifest(tempExtractRoot, appId);
             preserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
             ValidateIncomingActions(tempExtractRoot, request.SystemInfrastructure);
-            var buildLogs = await ExecuteBuildAsync(
-                manifest.Application.Build,
+            var buildResult = await ExecuteBuildAsync(
+                manifest.Application,
                 Path.Combine(tempExtractRoot, "source"),
                 tempExtractRoot,
                 cancellationToken: CancellationToken.None);
-            logs.AddRange(buildLogs);
+            logs.AddRange(buildResult.Logs);
+            if (!buildResult.Succeeded)
+            {
+                throw new InvalidOperationException(BuildFailureMessage(manifest.Application.Build, buildResult));
+            }
             snapshotPath = CreateSnapshotIfNeeded(appId, deploymentTargetId);
 
             if (request.Clean)
@@ -189,14 +193,15 @@ public class RunnerDeploymentService
         }
     }
 
-    private static async Task<IReadOnlyList<string>> ExecuteBuildAsync(
-        ApplicationBuildSpec build,
+    private static async Task<ApplicationBuildExecutionResult> ExecuteBuildAsync(
+        ApplicationContract application,
         string buildWorkspace,
         string extractRoot,
         CancellationToken cancellationToken)
     {
+        var build = application.Build;
         if (build.Command is null)
-            return [];
+            return new ApplicationBuildExecutionResult { Succeeded = true };
 
         if (!Directory.Exists(buildWorkspace))
             throw new InvalidOperationException("A build command requires a source workspace in the deployment package.");
@@ -205,31 +210,17 @@ public class RunnerDeploymentService
             build,
             buildWorkspace,
             cancellationToken);
-        var logs = result.Logs;
-        if (!result.Succeeded)
-        {
-            var reason = result.Canceled
-                ? "was canceled"
-                : result.TimedOut
-                    ? $"timed out after {build.TimeoutSeconds} seconds"
-                    : result.Error is not null
-                        ? result.Error
-                        : $"failed with exit code {result.ExitCode?.ToString() ?? "unknown"}";
-            throw new InvalidOperationException($"Application build {reason}." +
-                (result.StandardError.Count > 0
-                    ? $" {result.StandardError[^1]}"
-                    : string.Empty));
-        }
 
-        if (!string.IsNullOrWhiteSpace(build.OutputDirectory))
+        var artifactDirectory = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);
+        if (result.Succeeded && application.Runtime.Command is not null)
         {
             var outputDirectory = ApplicationBuildExecutor.ResolveWorkspacePath(
                 buildWorkspace,
-                build.OutputDirectory,
-                "build output directory");
+                artifactDirectory,
+                "runtime artifact directory");
             if (!Directory.Exists(outputDirectory))
                 throw new DirectoryNotFoundException(
-                    $"Build output directory does not exist: {outputDirectory}");
+                    $"Runtime artifact directory does not exist after the build: {outputDirectory}");
 
             var relativeOutput = Path.GetRelativePath(buildWorkspace, outputDirectory);
             var packagedOutput = Path.Combine(
@@ -241,7 +232,21 @@ public class RunnerDeploymentService
             CopyDirectory(outputDirectory, packagedOutput);
         }
 
-        return logs;
+        return result;
+    }
+
+    private static string BuildFailureMessage(
+        ApplicationBuildSpec build,
+        ApplicationBuildExecutionResult result)
+    {
+        var reason = result.Canceled
+            ? "was canceled"
+            : result.TimedOut
+                ? $"timed out after {build.TimeoutSeconds} seconds"
+                : result.Error is not null
+                    ? result.Error
+                    : $"failed with exit code {result.ExitCode?.ToString() ?? "unknown"}";
+        return $"Application build {reason}.";
     }
 
     public async Task CleanupTargetAsync(

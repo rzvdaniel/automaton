@@ -110,9 +110,7 @@ public static class ZipService
     {
         ApplicationContractValidator.EnsureValid(application);
         var artifactDirectory = resolvedArtifactDirectory
-            ?? application.Build.OutputDirectory
-            ?? application.Runtime.Command?.WorkingDirectory
-            ?? ".";
+            ?? Path.Combine(projectRoot, ApplicationBuildArtifactSelector.GetRelativeDirectory(application));
 
         var ms = new MemoryStream();
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
@@ -135,16 +133,17 @@ public static class ZipService
                 includeAutomatonConfig: true,
                 scopeConfig: sourceScopeConfig);
 
-            var runtimePrefix = application.Runtime.Command is null
-                ? "runtime/frontend"
-                : GetGenericRuntimeArtifactPrefix(projectRoot, artifactDirectory);
-            AddDirectoryWithPrefix(
-                archive,
-                artifactDirectory,
-                artifactDirectory,
-                runtimePrefix,
-                includeAutomatonConfig: false,
-                scopeConfig: sourceScopeConfig);
+            if (application.Runtime.Command is not null && application.Build.Command is null)
+            {
+                var runtimePrefix = GetGenericRuntimeArtifactPrefix(projectRoot, artifactDirectory);
+                AddDirectoryWithPrefix(
+                    archive,
+                    artifactDirectory,
+                    artifactDirectory,
+                    runtimePrefix,
+                    includeAutomatonConfig: false,
+                    scopeConfig: sourceScopeConfig);
+            }
         }
 
         ms.Position = 0;

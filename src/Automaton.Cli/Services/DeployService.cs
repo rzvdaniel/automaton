@@ -19,27 +19,24 @@ public sealed class DeployService
     private readonly ConfigService config;
     private readonly Action<string>? progress;
     private readonly Action<DeployCheckResult>? checkReported;
-    private readonly Func<ApplicationBuildSpec, string, CancellationToken, Task<ApplicationBuildExecutionResult>> runBuildAsync;
     private readonly Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync;
     private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> createSnapshotAsync;
     private readonly Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync;
 
     public DeployService(
         ConfigService config,
-        Func<ApplicationBuildSpec, string, CancellationToken, Task<ApplicationBuildExecutionResult>>? runBuildAsync = null,
-        Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
+        Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
-        : this(config, null, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
+        : this(config, null, null, deployPackageAsync, createSnapshotAsync)
     {
     }
 
     public DeployService(
         ConfigService config,
         Action<string>? progress,
-        Func<ApplicationBuildSpec, string, CancellationToken, Task<ApplicationBuildExecutionResult>>? runBuildAsync = null,
         Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
-        : this(config, progress, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
+        : this(config, progress, null, deployPackageAsync, createSnapshotAsync)
     {
     }
 
@@ -47,7 +44,6 @@ public sealed class DeployService
         ConfigService config,
         Action<string>? progress = null,
         Action<DeployCheckResult>? checkReported = null,
-        Func<ApplicationBuildSpec, string, CancellationToken, Task<ApplicationBuildExecutionResult>>? runBuildAsync = null,
         Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null,
         Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync = null)
@@ -56,7 +52,6 @@ public sealed class DeployService
         this.config = config;
         this.progress = progress;
         this.checkReported = checkReported;
-        this.runBuildAsync = runBuildAsync ?? RunBuildAsync;
         this.deployPackageAsync = deployPackageAsync ?? DeployPackageAsync;
         this.createSnapshotAsync = createSnapshotAsync ?? CreateSnapshotAsync;
         this.ensureManagedRuntimeReadyAsync = ensureManagedRuntimeReadyAsync
@@ -96,7 +91,8 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
-        var buildCheck = await RunBuildIfNeededAsync(projectConfig.Application.Build, directory, nextSteps, cancellationToken);
+        var deploymentApplication = ResolveDeploymentApplication(projectConfig.Application, directoryOverride);
+        var buildCheck = ValidateBuildForRunner(deploymentApplication.Build, directory, nextSteps);
         AddCheck(checks, buildCheck);
         if (!buildCheck.Success)
         {
@@ -112,8 +108,10 @@ public sealed class DeployService
 
         var applicationCheck = ValidateApplicationPackage(
             directory,
-            directoryOverride ?? projectConfig.Application.Build.OutputDirectory,
+            ApplicationBuildArtifactSelector.GetRelativeDirectory(deploymentApplication),
             actionCount > 0,
+            deploymentApplication.Runtime.Command is not null,
+            deploymentApplication.Build.Command is not null,
             nextSteps,
             out var deployDirectory);
         AddCheck(checks, applicationCheck);
@@ -141,14 +139,19 @@ public sealed class DeployService
             using var zip = ZipService.CreateDeployPackageZip(
                 directory,
                 appId!,
-                projectConfig.Application,
+                deploymentApplication,
                 projectConfig.Source,
                 deployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
             var result = await deployPackageAsync(
                 server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
-            backendResult = new DeployBackendResult(true, result.Deploy.RunnerCount, "backend deploy skipped by flag");
+            backendResult = new DeployBackendResult(
+                true,
+                result.Deploy.RunnerCount,
+                "backend deploy skipped by flag",
+                Logs: result.Deploy.Logs);
+            ReportDeploymentLogs(backendResult.Logs);
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, "backend deploy skipped by flag"));
             return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
@@ -184,7 +187,7 @@ public sealed class DeployService
             using var zip = ZipService.CreateDeployPackageZip(
                 directory,
                 appId!,
-                projectConfig.Application,
+                deploymentApplication,
                 projectConfig.Source,
                 deployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
@@ -192,6 +195,7 @@ public sealed class DeployService
                 server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
             backendResult = result.Deploy;
+            ReportDeploymentLogs(backendResult.Logs);
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
         }
         catch (Exception ex)
@@ -301,56 +305,79 @@ public sealed class DeployService
         return new DeployCheckResult(DeployCheckNames.Credentials, true, $"credentials resolved for {server}");
     }
 
-    private async Task<DeployCheckResult> RunBuildIfNeededAsync(ApplicationBuildSpec build, string directory, ISet<string> nextSteps, CancellationToken cancellationToken)
+    private static DeployCheckResult ValidateBuildForRunner(ApplicationBuildSpec build, string directory, ISet<string> nextSteps)
     {
         if (build.Command is null)
         {
             return new DeployCheckResult(DeployCheckNames.Build, true, "no build configured");
         }
 
-        if (string.IsNullOrWhiteSpace(build.Command.Executable))
+        try
         {
-            nextSteps.Add("Set a valid build executable in automaton.json or remove the build command");
-            return new DeployCheckResult(DeployCheckNames.Build, false, "build.command is configured in automaton.json but has no executable");
+            ApplicationContractValidator.EnsureValid(new ApplicationContract { Build = build });
+            var workingDirectory = ApplicationBuildExecutor.ResolveWorkspacePath(
+                directory,
+                build.Command.WorkingDirectory,
+                "build working directory");
+            if (!Directory.Exists(workingDirectory))
+                throw new DirectoryNotFoundException($"Build working directory does not exist: {workingDirectory}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or DirectoryNotFoundException)
+        {
+            nextSteps.Add("Fix the application build contract and rerun automaton deploy");
+            return new DeployCheckResult(DeployCheckNames.Build, false, ex.Message);
         }
 
-        ZipService.ResolveDeployDirectory(directory, build.Command.WorkingDirectory);
-        var result = await runBuildAsync(build, directory, cancellationToken);
-        if (!result.Succeeded)
-        {
-            nextSteps.Add("Fix the build errors and rerun automaton deploy");
-            var reason = result.Canceled
-                ? "build was canceled"
-                : result.TimedOut
-                    ? $"build timed out after {build.TimeoutSeconds} seconds"
-                    : result.Error is not null
-                        ? result.Error
-                        : $"build failed with exit code {result.ExitCode?.ToString() ?? "unknown"}";
-            return new DeployCheckResult(DeployCheckNames.Build, false, reason);
-        }
-
-        return new DeployCheckResult(DeployCheckNames.Build, true, "build completed successfully");
+        return new DeployCheckResult(DeployCheckNames.Build, true, "build deferred to the assigned Runner");
     }
 
-    private static DeployCheckResult ValidateApplicationPackage(string directory, string? deployDir, bool hasActions, ISet<string> nextSteps, out string? resolvedDeployDirectory)
+    private static DeployCheckResult ValidateApplicationPackage(
+        string directory,
+        string? deployDir,
+        bool hasActions,
+        bool hasRuntime,
+        bool buildOnRunner,
+        ISet<string> nextSteps,
+        out string? resolvedDeployDirectory)
     {
-        if (string.IsNullOrWhiteSpace(deployDir) && hasActions)
+        if (!hasRuntime)
         {
             resolvedDeployDirectory = null;
-            return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, "no runtime artifact configured; deploying an Actions-only App");
+            return new DeployCheckResult(
+                DeployCheckNames.ApplicationPackage,
+                hasActions,
+                hasActions ? "no runtime artifact configured; deploying an Actions-only App" : "runtime command is required");
         }
         try
         {
-            resolvedDeployDirectory = ZipService.ResolveDeployDirectory(directory, string.IsNullOrWhiteSpace(deployDir) ? "." : deployDir);
+            resolvedDeployDirectory = ApplicationBuildExecutor.ResolveWorkspacePath(
+                directory,
+                string.IsNullOrWhiteSpace(deployDir) ? "." : deployDir,
+                "runtime artifact directory");
+            if (!buildOnRunner && !Directory.Exists(resolvedDeployDirectory))
+                throw new DirectoryNotFoundException($"Runtime artifact directory does not exist: {resolvedDeployDirectory}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or DirectoryNotFoundException)
         {
             nextSteps.Add("Fix application.build.outputDirectory in automaton.json or pass --dir with a valid directory");
             resolvedDeployDirectory = null;
             return new DeployCheckResult(DeployCheckNames.ApplicationPackage, false, ex.Message);
         }
 
-        return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, $"runtime artifact directory ready: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
+        var status = buildOnRunner ? "runtime artifact directory will be produced by the assigned Runner" : "runtime artifact directory ready";
+        return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, $"{status}: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
+    }
+
+    private static ApplicationContract ResolveDeploymentApplication(ApplicationContract application, string? directoryOverride)
+    {
+        if (string.IsNullOrWhiteSpace(directoryOverride))
+            return application;
+
+        var copy = JsonSerializer.Deserialize<ApplicationContract>(JsonSerializer.Serialize(application))
+            ?? throw new InvalidOperationException("The application contract could not be copied for deployment.");
+        copy.Build.OutputDirectory = directoryOverride;
+        ApplicationContractValidator.EnsureValid(copy);
+        return copy;
     }
 
     private static DeployCheckResult ValidateActions(string directory, ISet<string> nextSteps, out int actionCount)
@@ -417,12 +444,6 @@ public sealed class DeployService
         };
     }
 
-    private static Task<ApplicationBuildExecutionResult> RunBuildAsync(
-        ApplicationBuildSpec build,
-        string workspaceRoot,
-        CancellationToken cancellationToken)
-        => ApplicationBuildExecutor.ExecuteAsync(build, workspaceRoot, cancellationToken);
-
     internal static System.Diagnostics.ProcessStartInfo CreateBuildProcessStartInfo(
         ApplicationCommandSpec command,
         string workingDir)
@@ -454,10 +475,17 @@ public sealed class DeployService
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
         var state = deployResult.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
         var requiresRetry = deployResult.TryGetProperty("requiresRetry", out var requiresRetryProperty) && requiresRetryProperty.GetBoolean();
+        var logs = deployResult.TryGetProperty("logs", out var logsProperty)
+            && logsProperty.ValueKind == JsonValueKind.Array
+            ? logsProperty.EnumerateArray()
+                .Where(log => log.ValueKind == JsonValueKind.String)
+                .Select(log => log.GetString()!)
+                .ToArray()
+            : null;
 
         return (
             new DeployUploadResult(sourceFiles + runtimeFiles, 0, sizeMb),
-            new DeployBackendResult(success, runnerCount, message, state, requiresRetry));
+            new DeployBackendResult(success, runnerCount, message, state, requiresRetry, logs));
     }
 
     private static async Task<JsonElement> EnsureManagedRuntimeReadyAsync(
@@ -512,6 +540,15 @@ public sealed class DeployService
     private void ReportProgress(string message)
     {
         progress?.Invoke(message);
+    }
+
+    private void ReportDeploymentLogs(IReadOnlyList<string>? logs)
+    {
+        if (logs is null)
+            return;
+
+        foreach (var log in logs)
+            ReportProgress(log);
     }
 
     private void AddCheck(ICollection<DeployCheckResult> checks, DeployCheckResult check)

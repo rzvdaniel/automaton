@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Automaton.Core.Models;
 using Automaton.Core.Services;
 using NUnit.Framework;
@@ -71,6 +72,30 @@ public sealed class ApplicationBuildExecutorTests
             Assert.That(result.ExitCode, Is.Not.EqualTo(0));
             Assert.That(result.StandardError, Is.Not.Empty);
             Assert.That(result.Logs, Has.Some.StartsWith("stderr: "));
+        });
+    }
+
+    [Test]
+    public async Task ExecuteAsync_PreservesUsefulStdoutDiagnosticsOnFailure()
+    {
+        var result = await ApplicationBuildExecutor.ExecuteAsync(
+            new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = [FixturePath(), "--fail-with-output"],
+                    WorkingDirectory = "."
+                }
+            },
+            root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.ExitCode, Is.EqualTo(3));
+            Assert.That(result.StandardOutput, Does.Contain("useful stdout diagnostic"));
+            Assert.That(result.Logs, Has.Some.EqualTo("stdout: useful stdout diagnostic"));
         });
     }
 
@@ -157,6 +182,38 @@ public sealed class ApplicationBuildExecutorTests
     }
 
     [Test]
+    public async Task ExecuteAsync_TerminatesBuildProcessTreeOnTimeout()
+    {
+        var fixturePath = FixturePath();
+        var result = await ApplicationBuildExecutor.ExecuteAsync(
+            new ApplicationBuildSpec
+            {
+                TimeoutSeconds = 1,
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = [fixturePath, "--spawn-child"],
+                    WorkingDirectory = ".",
+                    Environment = new Dictionary<string, string>
+                    {
+                        ["AUTOMATON_PORT"] = (32_000 + Random.Shared.Next(500)).ToString()
+                    }
+                }
+            },
+            root);
+
+        var childPid = ParseChildPid(result.StandardOutput);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.TimedOut, Is.True);
+            Assert.That(result.ProcessId, Is.Not.Null);
+            Assert.That(IsProcessAlive(result.ProcessId!.Value), Is.False);
+            Assert.That(IsProcessAlive(childPid), Is.False);
+        });
+    }
+
+    [Test]
     public void ExecuteAsync_RejectsWorkingDirectoryOutsideWorkspace()
     {
         Assert.That(
@@ -179,4 +236,23 @@ public sealed class ApplicationBuildExecutorTests
             TestContext.CurrentContext.TestDirectory,
             "..", "..", "..", "..",
             "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
+
+    private static int ParseChildPid(IEnumerable<string> output)
+    {
+        var line = output.Single(value => value.StartsWith("child:", StringComparison.Ordinal));
+        return int.Parse(line["child:".Length..]);
+    }
+
+    private static bool IsProcessAlive(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
 }

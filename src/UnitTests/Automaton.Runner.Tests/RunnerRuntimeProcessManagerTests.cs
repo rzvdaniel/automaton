@@ -326,7 +326,7 @@ public sealed class RunnerRuntimeProcessManagerTests
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "dotnet",
-                    Arguments = ["--not-a-real-build-option"],
+                    Arguments = [FixturePath(), "--fail-with-output"],
                     WorkingDirectory = "."
                 }
             });
@@ -361,6 +361,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             {
                 Assert.That(failedResult.Success, Is.False);
                 Assert.That(failedResult.Message, Does.Contain("Application build failed"));
+                Assert.That(failedResult.Logs, Has.Some.EqualTo("stdout: useful stdout diagnostic"));
                 Assert.That(IsProcessAlive(original.ProcessId!.Value), Is.True);
                 Assert.That(registry.TryGet(appId, targetId, out var route), Is.True);
                 Assert.That(route.Port, Is.EqualTo(originalRoute.Port));
@@ -376,6 +377,61 @@ public sealed class RunnerRuntimeProcessManagerTests
             processManager.Dispose();
             if (File.Exists(originalPackage)) File.Delete(originalPackage);
             if (File.Exists(failedPackage)) File.Delete(failedPackage);
+        }
+    }
+
+    [Test]
+    public async Task InPlaceBuildWithoutOutputDirectory_PromotesPostBuildWorkspaceAsRuntimeArtifact()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var processManager = CreateManager(workspace, registry);
+        var deployment = new RunnerDeploymentService(
+            workspace,
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var package = CreateRuntimePackage(
+            appId,
+            ["RunnerRuntimeFixture.dll", "--require-file", "built.txt", "--tcp", "in-place"],
+            "in-place",
+            new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = [FixturePath(), "--write-file", "built.txt", "created-by-build"],
+                    WorkingDirectory = "."
+                }
+            });
+
+        try
+        {
+            var result = await deployment.DeployPackage(new DeployAppPackageRequest
+            {
+                AppId = appId,
+                DeploymentTargetId = targetId,
+                PackagePath = package,
+                Clean = true
+            });
+
+            Assert.That(result.Success, Is.True, result.Message);
+            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var metadata = ReadMetadata(metadataPath);
+            var builtFile = Path.Combine(metadata.ArtifactRoot!, "built.txt");
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(builtFile), Is.EqualTo("created-by-build"));
+                Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
+                Assert.That(IsProcessAlive(metadata.ProcessId!.Value), Is.True);
+            });
+        }
+        finally
+        {
+            await processManager.StopAsync(appId, targetId);
+            processManager.Dispose();
+            if (File.Exists(package)) File.Delete(package);
         }
     }
 
@@ -732,7 +788,11 @@ public sealed class RunnerRuntimeProcessManagerTests
             archive.CreateEntryFromFile(file, $"runtime/application/{Path.GetFileName(file)}");
         WriteEntry(archive, "runtime/application/marker.txt", marker);
         if (build?.Command is not null)
+        {
             WriteEntry(archive, "source/build-input.txt", "generic build input");
+            foreach (var file in Directory.GetFiles(fixtureDirectory, "RunnerRuntimeFixture.*"))
+                archive.CreateEntryFromFile(file, $"source/{Path.GetFileName(file)}");
+        }
         return packagePath;
     }
 
@@ -773,7 +833,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             using var process = Process.GetProcessById(processId);
             return !process.HasExited;
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             return false;
         }

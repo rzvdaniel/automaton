@@ -1,7 +1,6 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Automaton.Core.Models;
-using Automaton.Core.Services;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -73,24 +72,16 @@ public class DeployServiceTests
         SaveEnvironment(configService, projectRoot, "https://api.example.com", string.Empty, Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
-        var buildInvoked = false;
-        var service = new DeployService(
-            configService,
-            (_, _, _) =>
-            {
-                buildInvoked = true;
-                return Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 });
-            });
+        var service = new DeployService(configService);
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.False);
-        Assert.That(buildInvoked, Is.False);
         AssertCheck(result, DeployCheckNames.Credentials, false, "API key could not be resolved");
     }
 
     [Test]
-    public async Task DeployAsync_WhenBuildFails_ReturnsStructuredBuildFailure()
+    public async Task DeployAsync_WhenBuildIsConfigured_DefersExecutionToRunner()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
@@ -104,12 +95,15 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = false, ExitCode = 2 }));
+            deployPackageAsync: (_, _, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployBackendResult(true, 1, "deployed"))),
+            createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
-        Assert.That(result.Success, Is.False);
-        AssertCheck(result, DeployCheckNames.Build, false, "build failed with exit code 2");
+        Assert.That(result.Success, Is.True);
+        AssertCheck(result, DeployCheckNames.Build, true, "deferred to the assigned Runner");
     }
 
     [Test]
@@ -130,13 +124,12 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             progress.Add,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, zip, _, _) =>
             {
                 Assert.That(zip.Length, Is.GreaterThan(0));
                 return Task.FromResult((
                     new DeployUploadResult(5, 0, 0.2),
-                    new DeployBackendResult(true, 1, "package deployed")));
+                    new DeployBackendResult(true, 1, "package deployed", Logs: ["stdout: runner build diagnostic"])));
             });
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
@@ -146,6 +139,7 @@ public class DeployServiceTests
         Assert.That(result.Uploaded?.Written, Is.EqualTo(5));
         Assert.That(progress, Has.Some.EqualTo("Creating deploy package..."));
         Assert.That(progress, Has.Some.EqualTo("Uploading deploy package to the assigned runner..."));
+        Assert.That(progress, Has.Some.EqualTo("stdout: runner build diagnostic"));
         AssertCheck(result, DeployCheckNames.PackageUpload, true, "uploaded 5 deploy package");
         AssertCheck(result, DeployCheckNames.PackageDeploy, true, "package deployed");
     }
@@ -166,7 +160,6 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(4, 0, 0.1),
                 new DeployBackendResult(true, 1, "ignored"))));
@@ -194,7 +187,6 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
@@ -229,7 +221,6 @@ public class DeployServiceTests
         var readinessCalled = false;
         var service = new DeployService(
             configService,
-            runBuildAsync: (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             deployPackageAsync: (_, _, _, _, _, _, _) => throw new InvalidOperationException("upload must wait for runtime readiness"),
             createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")),
             ensureManagedRuntimeReadyAsync: (_, _, _, _) =>
@@ -263,7 +254,6 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
@@ -298,7 +288,6 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
@@ -332,7 +321,6 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             (_, _, _, _, _, _, _) => throw new InvalidOperationException("package upload failed"));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
@@ -370,7 +358,6 @@ public class DeployServiceTests
             new DeploymentTargetRunnerInfo("runner-eu", "Runner EU", true));
         var service = new DeployService(
             configService,
-            runBuildAsync: (_, _, _) => Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true, ExitCode = 0 }),
             deployPackageAsync: (_, _, _, targetSlug, _, _, _) =>
             {
                 requestedTarget = targetSlug;

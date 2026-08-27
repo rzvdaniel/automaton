@@ -4,11 +4,34 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 
-var port = int.Parse(Environment.GetEnvironmentVariable("AUTOMATON_PORT")!);
 var alwaysUnavailable = args.Contains("--http-503", StringComparer.Ordinal);
 var unavailableOnce = args.Contains("--http-503-once", StringComparer.Ordinal);
 var http = args.Contains("--http", StringComparer.Ordinal) || alwaysUnavailable || unavailableOnce;
 var childMode = args.Contains("--child-process", StringComparer.Ordinal);
+var writeFileIndex = Array.IndexOf(args, "--write-file");
+if (writeFileIndex >= 0 && writeFileIndex + 2 < args.Length)
+{
+    File.WriteAllText(args[writeFileIndex + 1], args[writeFileIndex + 2]);
+    return;
+}
+
+var requiredFileIndex = Array.IndexOf(args, "--require-file");
+if (requiredFileIndex >= 0 && requiredFileIndex + 1 < args.Length
+    && !File.Exists(args[requiredFileIndex + 1]))
+{
+    Console.Error.WriteLine($"required file missing: {args[requiredFileIndex + 1]}");
+    Environment.ExitCode = 2;
+    return;
+}
+
+if (args.Contains("--fail-with-output", StringComparer.Ordinal))
+{
+    Console.WriteLine("useful stdout diagnostic");
+    Environment.ExitCode = 3;
+    return;
+}
+
+var port = int.Parse(Environment.GetEnvironmentVariable("AUTOMATON_PORT")!);
 Console.WriteLine($"stdout:{string.Join('|', args)}:{Environment.GetEnvironmentVariable("TEST_RUNTIME_VALUE")}");
 Console.Error.WriteLine("stderr:fixture");
 Console.Out.Flush();
