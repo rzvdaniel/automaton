@@ -38,7 +38,6 @@ public class RunnerDeploymentTargetIsolationTests
         var processManager = new StubBackendProcessManager();
         var service = new RunnerDeploymentService(
             workspace,
-            new RunnerBackendEnvironmentService(workspace),
             processManager,
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();
@@ -90,7 +89,6 @@ public class RunnerDeploymentTargetIsolationTests
         var processManager = new StubBackendProcessManager();
         var service = new RunnerDeploymentService(
             workspace,
-            new RunnerBackendEnvironmentService(workspace),
             processManager,
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();
@@ -123,7 +121,6 @@ public class RunnerDeploymentTargetIsolationTests
         var processManager = new StubBackendProcessManager();
         var service = new RunnerDeploymentService(
             workspace,
-            new RunnerBackendEnvironmentService(workspace),
             processManager,
             new AppActionDeploymentService(workspace));
         var appId = Guid.NewGuid();

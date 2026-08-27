@@ -11,11 +11,10 @@ namespace Automaton.Cli.Commands;
 /// automaton deploy [--clean] [--skip-backend] [--publish]
 ///
 /// Workflow:
-///   1. Read automaton.json for appId + frontend/backend deploy config
-///   2. Run frontend.build if configured
-///   3. Package the configured application artifact directory (or --dir override)
-///   4. Upload frontend runtime to the server
-///   5. Upload backend runtime and deploy backend scripts (unless --skip-backend)
+///   1. Read automaton.json for appId + application contract
+///   2. Validate the contract and package source plus the runtime artifact when applicable
+///   3. Upload the package; the assigned Runner executes the configured build once
+///   4. Deploy Actions and runtime (unless --skip-backend)
 /// </summary>
 public static class DeployCommand
 {

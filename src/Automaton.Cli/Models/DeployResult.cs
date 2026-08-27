@@ -28,7 +28,8 @@ public sealed record DeployBackendResult(
     int RunnerCount,
     string? Message,
     string? State = null,
-    bool RequiresRetry = false);
+    bool RequiresRetry = false,
+    IReadOnlyList<string>? Logs = null);
 
 public sealed class DeployResult
 {

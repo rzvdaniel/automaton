@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using Automaton.Core.Models;
+using Automaton.Core.Services;
 using Serilog;
 
 namespace Automaton.Runner.Console.Services;
@@ -11,19 +12,16 @@ public class RunnerDeploymentService
     private const long MaximumExtractedBytes = 250L * 1024 * 1024;
     private const int MaximumArchiveEntries = 20_000;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
-    private readonly RunnerBackendEnvironmentService backendEnvironmentService;
     private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly AppActionDeploymentService actionDeploymentService;
     private readonly ILogger logger;
 
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
-        RunnerBackendEnvironmentService backendEnvironmentService,
         IAppRuntimeProcessManager runtimeProcessManager,
         AppActionDeploymentService actionDeploymentService)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
-        this.backendEnvironmentService = backendEnvironmentService;
         this.runtimeProcessManager = runtimeProcessManager;
         this.actionDeploymentService = actionDeploymentService;
         logger = Log.ForContext<RunnerDeploymentService>();
@@ -55,6 +53,16 @@ public class RunnerDeploymentService
             var manifest = LoadManifest(tempExtractRoot, appId);
             preserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
             ValidateIncomingActions(tempExtractRoot, request.SystemInfrastructure);
+            var buildResult = await ExecuteBuildAsync(
+                manifest.Application,
+                Path.Combine(tempExtractRoot, "source"),
+                tempExtractRoot,
+                cancellationToken: CancellationToken.None);
+            logs.AddRange(buildResult.Logs);
+            if (!buildResult.Succeeded)
+            {
+                throw new InvalidOperationException(BuildFailureMessage(manifest.Application.Build, buildResult));
+            }
             snapshotPath = CreateSnapshotIfNeeded(appId, deploymentTargetId);
 
             if (request.Clean)
@@ -107,37 +115,6 @@ public class RunnerDeploymentService
                 deploymentTargetId,
                 request.SystemInfrastructure);
             logs.AddRange(actionResults.Select(result => $"Action {result.ActionKey}: {result.Status}."));
-
-            var runtimeBackendDir = runnerWorkspaceService.GetAppBackendDirectory(
-                appId,
-                deploymentTargetId);
-            if (Directory.Exists(runtimeBackendDir))
-            {
-                var systemRequirementsPath = Path.Combine(runtimeBackendDir, "system-requirements.txt");
-                if (File.Exists(systemRequirementsPath))
-                {
-                    logs.AddRange(backendEnvironmentService.InstallSystemPackages(
-                        appId,
-                        deploymentTargetId,
-                        File.ReadAllText(systemRequirementsPath)));
-                }
-
-                var requirementsPath = Path.Combine(runtimeBackendDir, "requirements.txt");
-                if (File.Exists(requirementsPath))
-                {
-                    logs.AddRange(backendEnvironmentService.InstallRequirements(
-                        appId,
-                        deploymentTargetId,
-                        requirementsPath));
-                }
-                else if (manifest.HasBackend)
-                {
-                    logs.AddRange(backendEnvironmentService.EnsureAppVirtualEnvironment(
-                        appId,
-                        deploymentTargetId,
-                        recreate: false));
-                }
-            }
 
             var runtimeApplyResult = await runtimeProcessManager.ApplyAsync(
                 appId,
@@ -214,6 +191,62 @@ public class RunnerDeploymentService
             {
             }
         }
+    }
+
+    private static async Task<ApplicationBuildExecutionResult> ExecuteBuildAsync(
+        ApplicationContract application,
+        string buildWorkspace,
+        string extractRoot,
+        CancellationToken cancellationToken)
+    {
+        var build = application.Build;
+        if (build.Command is null)
+            return new ApplicationBuildExecutionResult { Succeeded = true };
+
+        if (!Directory.Exists(buildWorkspace))
+            throw new InvalidOperationException("A build command requires a source workspace in the deployment package.");
+
+        var result = await ApplicationBuildExecutor.ExecuteAsync(
+            build,
+            buildWorkspace,
+            cancellationToken);
+
+        var artifactDirectory = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);
+        if (result.Succeeded && application.Runtime.Command is not null)
+        {
+            var outputDirectory = ApplicationBuildExecutor.ResolveWorkspacePath(
+                buildWorkspace,
+                artifactDirectory,
+                "runtime artifact directory");
+            if (!Directory.Exists(outputDirectory))
+                throw new DirectoryNotFoundException(
+                    $"Runtime artifact directory does not exist after the build: {outputDirectory}");
+
+            var relativeOutput = Path.GetRelativePath(buildWorkspace, outputDirectory);
+            var packagedOutput = Path.Combine(
+                extractRoot,
+                "runtime",
+                "application",
+                relativeOutput);
+            DeleteDirectoryIfExists(packagedOutput);
+            CopyDirectory(outputDirectory, packagedOutput);
+        }
+
+        return result;
+    }
+
+    private static string BuildFailureMessage(
+        ApplicationBuildSpec build,
+        ApplicationBuildExecutionResult result)
+    {
+        var reason = result.Canceled
+            ? "was canceled"
+            : result.TimedOut
+                ? $"timed out after {build.TimeoutSeconds} seconds"
+                : result.Error is not null
+                    ? result.Error
+                    : $"failed with exit code {result.ExitCode?.ToString() ?? "unknown"}";
+        return $"Application build {reason}.";
     }
 
     public async Task CleanupTargetAsync(

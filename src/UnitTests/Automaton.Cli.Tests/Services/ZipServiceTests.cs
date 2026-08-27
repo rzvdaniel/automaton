@@ -71,6 +71,48 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateDeployPackageZip_WithRunnerBuild_PackagesSourceWithoutPrebuiltRuntime()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "main.ts"), "source");
+
+        var application = new ApplicationContract
+        {
+            Build = new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "arbitrary-builder",
+                    WorkingDirectory = "frontend"
+                },
+                OutputDirectory = "frontend/dist"
+            },
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "arbitrary-server",
+                    WorkingDirectory = "."
+                }
+            }
+        };
+
+        using var zipStream = ZipService.CreateDeployPackageZip(
+            projectRoot,
+            Guid.NewGuid().ToString(),
+            application,
+            sourceScopeConfig: null);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(archive.GetEntry("source/frontend/main.ts"), Is.Not.Null);
+            Assert.That(archive.Entries.Any(entry => entry.FullName.StartsWith("runtime/", StringComparison.Ordinal)), Is.False);
+        });
+    }
+
+    [Test]
     public void SaveProjectConfig_WhenIgnoreFileMissing_CreatesAutomatonIgnoreWithDefaults()
     {
         // Arrange
