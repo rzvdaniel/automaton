@@ -30,6 +30,7 @@ public class AppDeploymentTargetStateServiceTests
         {
             Assert.That(first.Status, Is.EqualTo(DeploymentTargetStatus.Running));
             Assert.That(first.RuntimeDeployed, Is.True);
+            Assert.That(first.GenericRuntimeDeployed, Is.False);
             Assert.That(first.LastDeploymentAt, Is.Not.Null);
             Assert.That(first.LastSuccessfulDeploymentAt, Is.Not.Null);
             Assert.That(second.Status, Is.EqualTo(DeploymentTargetStatus.NotDeployed));
@@ -161,6 +162,51 @@ public class AppDeploymentTargetStateServiceTests
             Assert.That(target.RuntimeDeployed, Is.True);
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
         });
+    }
+
+    [Test]
+    public async Task SuccessfulGenericRuntimeDeployment_PersistsSeparatePromotionMarker()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.MarkStartedAsync(app.Id, target.Id);
+        await service.MarkCompletedAsync(
+            app.Id,
+            target.Id,
+            success: true,
+            runtimeDeployed: true,
+            genericRuntimeDeployed: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.RuntimeDeployed, Is.True);
+            Assert.That(target.GenericRuntimeDeployed, Is.True);
+            Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+        });
+    }
+
+    [Test]
+    public async Task LegacyControllerCompletion_DoesNotMarkGenericRuntime()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.MarkStartedAsync(app.Id, target.Id);
+        await service.MarkCompletedAsync(
+            app.Id,
+            target.Id,
+            success: true,
+            runtimeDeployed: true);
+
+        Assert.That(target.RuntimeDeployed, Is.True);
+        Assert.That(target.GenericRuntimeDeployed, Is.False);
     }
 
     [Test]

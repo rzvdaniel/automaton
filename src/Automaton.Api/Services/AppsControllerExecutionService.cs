@@ -378,7 +378,8 @@ public class AppsControllerExecutionService
                 target.Id,
                 result.Success,
                 runtimeDeployed,
-                cancellationToken);
+                cancellationToken,
+                genericRuntimeDeployed: runtimeDeployed);
 
             if (result.Success)
             {

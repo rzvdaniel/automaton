@@ -370,7 +370,6 @@ public class Program
                 services.AddSingleton<RunnerRuntimeProcessManager>();
                 services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
-                services.AddSingleton<RunnerRuntimeGatewayService>();
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();
                 services.AddHostedService<StorageTelemetryBackgroundService>();
@@ -438,6 +437,14 @@ public class Program
 
                 // Add default HTTP client
                 services.AddHttpClient();
+
+                // The runtime gateway is a transparent proxy. It must not follow
+                // application redirects on the runner's behalf.
+                services.AddHttpClient<RunnerRuntimeGatewayService>()
+                    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                    {
+                        AllowAutoRedirect = false
+                    });
 
                 // Register MediatR - scan current assembly and Core assembly
                 services.AddMediatR(cfg =>

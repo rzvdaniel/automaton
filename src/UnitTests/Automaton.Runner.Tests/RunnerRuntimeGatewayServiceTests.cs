@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text;
 using Automaton.Runner.Console.Services;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
@@ -12,17 +12,134 @@ namespace Automaton.Runner.Console.Tests;
 public sealed class RunnerRuntimeGatewayServiceTests
 {
     [Test]
-    public async Task Gateway_ForwardsArbitraryRuntimePathsWithoutTechnologySpecificRouting()
+    public async Task Gateway_ForwardsArbitraryMethodAndPreservesPathAndQuery()
     {
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler();
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler);
+
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(
+            new HttpMethod("PURGE"),
+            gateway.GetUri($"/orders/42?expand=items%2Fsummary"))
+        {
+            Content = new StringContent("payload")
+        };
+        using var response = await client.SendAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(handler.Request?.Method.Method, Is.EqualTo("PURGE"));
+            Assert.That(handler.Request?.RequestUri?.PathAndQuery,
+                Is.EqualTo("/orders/42?expand=items%2Fsummary"));
+        });
+    }
+
+    [Test]
+    public async Task Gateway_ForwardsBodyWhenRequestDoesNotDeclareContentLength()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler();
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler);
+
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            gateway.GetUri("/stream"))
+        {
+            Content = new UnknownLengthContent("streamed body")
+        };
+        using var response = await client.SendAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(handler.Body, Is.EqualTo("streamed body"));
+        });
+    }
+
+    [Test]
+    public async Task GatewayReturnsUpstreamRedirectWithoutFollowingIt()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler
+        {
+            ResponseFactory = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("/next?from=runtime", UriKind.Relative) },
+                Content = new StringContent("redirect body")
+            })
+        };
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler);
+
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+        using var response = await client.GetAsync(gateway.GetUri("/start"));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Redirect));
+            Assert.That(response.Headers.Location?.ToString(), Is.EqualTo("/next?from=runtime"));
+            Assert.That(body, Is.EqualTo("redirect body"));
+        });
+    }
+
+    [Test]
+    public async Task GatewayFiltersHopByHopHeadersAndPreservesEndToEndHeaders()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler
+        {
+            ResponseFactory = _ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("response")
+                };
+                response.Headers.TryAddWithoutValidation("Connection", "X-Upstream-Hop");
+                response.Headers.TryAddWithoutValidation("X-Upstream-Hop", "drop");
+                response.Headers.TryAddWithoutValidation("X-End-To-End", "preserve-response");
+                return Task.FromResult(response);
+            }
+        };
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler);
+
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, gateway.GetUri("/headers"));
+        request.Headers.TryAddWithoutValidation("Connection", "X-Request-Hop");
+        request.Headers.TryAddWithoutValidation("X-Request-Hop", "drop");
+        request.Headers.TryAddWithoutValidation("X-End-To-End", "preserve-request");
+        using var response = await client.SendAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.Request, Is.Not.Null);
+            Assert.That(handler.Request!.Headers.Contains("Connection"), Is.False);
+            Assert.That(handler.Request.Headers.Contains("X-Request-Hop"), Is.False);
+            Assert.That(handler.Request.Headers.GetValues("X-End-To-End").Single(),
+                Is.EqualTo("preserve-request"));
+            Assert.That(response.Headers.Contains("Connection"), Is.False);
+            Assert.That(response.Headers.Contains("X-Upstream-Hop"), Is.False);
+            Assert.That(response.Headers.GetValues("X-End-To-End").Single(),
+                Is.EqualTo("preserve-response"));
+        });
+    }
+
+    private static async Task<GatewayHarness> StartGatewayAsync(
+        Guid appId,
+        Guid targetId,
+        CapturingHandler handler)
+    {
         var registry = new RunnerRuntimeRegistry();
         registry.Register(appId, targetId, 18_321);
-
-        var factory = new CapturingHttpClientFactory();
         var gateway = new RunnerRuntimeGatewayService(
             registry,
-            factory,
+            new HttpClient(handler),
             NullLogger<RunnerRuntimeGatewayService>.Instance);
         var previousPort = Environment.GetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT");
         var port = GetFreePort();
@@ -31,23 +148,13 @@ public sealed class RunnerRuntimeGatewayServiceTests
         try
         {
             await gateway.StartAsync(CancellationToken.None);
-
-            using var client = new HttpClient();
-            using var response = await client.PostAsync(
-                $"http://127.0.0.1:{port}/apps/{appId:D}/targets/{targetId:D}/orders/42?expand=items",
-                new StringContent("payload"));
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-                Assert.That(factory.Request?.Method, Is.EqualTo(HttpMethod.Post));
-                Assert.That(factory.Request?.RequestUri?.PathAndQuery, Is.EqualTo("/orders/42?expand=items"));
-            });
+            return new GatewayHarness(gateway, previousPort, port, appId, targetId);
         }
-        finally
+        catch
         {
             await gateway.StopAsync(CancellationToken.None);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT", previousPort);
+            throw;
         }
     }
 
@@ -58,24 +165,59 @@ public sealed class RunnerRuntimeGatewayServiceTests
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    private sealed class CapturingHttpClientFactory : IHttpClientFactory
+    private sealed class GatewayHarness(
+        RunnerRuntimeGatewayService gateway,
+        string? previousPort,
+        int port,
+        Guid appId,
+        Guid targetId) : IAsyncDisposable
+    {
+        public Uri GetUri(string path) => new(
+            $"http://127.0.0.1:{port}/apps/{appId:D}/targets/{targetId:D}{path}");
+
+        public async ValueTask DisposeAsync()
+        {
+            await gateway.StopAsync(CancellationToken.None);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT", previousPort);
+        }
+    }
+
+    private sealed class CapturingHandler : HttpMessageHandler
     {
         public HttpRequestMessage? Request { get; private set; }
-
-        public HttpClient CreateClient(string name) => new(new CapturingHandler(this));
-
-        private sealed class CapturingHandler(CapturingHttpClientFactory owner) : HttpMessageHandler
-        {
-            protected override Task<HttpResponseMessage> SendAsync(
-                HttpRequestMessage request,
-                CancellationToken cancellationToken)
+        public string? Body { get; private set; }
+        public Func<HttpRequestMessage, Task<HttpResponseMessage>> ResponseFactory { get; init; }
+            = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                owner.Request = request;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("runtime response")
-                });
-            }
+                Content = new StringContent("runtime response")
+            });
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            Body = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            return await ResponseFactory(request);
+        }
+    }
+
+    private sealed class UnknownLengthContent(string value) : HttpContent
+    {
+        protected override async Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext? context)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            await stream.WriteAsync(bytes);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
         }
     }
 }

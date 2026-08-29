@@ -42,10 +42,11 @@ endpoint or the self-hosted runtime tunnel service and rewrites only the
 external host/path envelope to the trusted app/target gateway path. There are
 no frontend/API route branches in this generic path.
 
-Routes are generated only for deployment targets marked as having a successful
-runtime deployment. Replacement failure therefore leaves the existing route
-and healthy runtime untouched; cleanup refreshes the same route set after the
-target is stopped and removed.
+Routes are generated only when the target has both a successful generic runtime
+promotion marker and a canonical application contract with `Runtime.Command`.
+The legacy controller deployment flag is deliberately insufficient. Replacement
+failure therefore leaves the existing route and healthy runtime untouched;
+cleanup refreshes the same route set after the target is stopped and removed.
 
 The legacy API-side static publication projection and Studio/controller preview
 helpers remain outside this generic runtime path for later migration. They are

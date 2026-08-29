@@ -1,7 +1,9 @@
 using System.Text;
+using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Enums;
+using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -38,11 +40,14 @@ public class BackendRouteConfigService
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        var genericRuntimeTargetIds = await GetGenericRuntimeTargetIdsAsync(cancellationToken);
         var hostedRoutes = await dbContext.AppDeploymentTargets
             .AsNoTracking()
             .Where(target =>
                 target.ExecutionRunnerId != null &&
-                target.RuntimeDeployed)
+                target.RuntimeDeployed &&
+                target.GenericRuntimeDeployed &&
+                genericRuntimeTargetIds.Contains(target.Id))
             .Join(
                 dbContext.HostedRunners.AsNoTracking().Where(r =>
                     r.DeletedAt == null &&
@@ -79,6 +84,8 @@ public class BackendRouteConfigService
             .Where(target =>
                 target.ExecutionRunnerId != null &&
                 target.RuntimeDeployed &&
+                target.GenericRuntimeDeployed &&
+                genericRuntimeTargetIds.Contains(target.Id) &&
                 !dbContext.HostedRunners.Any(hostedRunner =>
                     hostedRunner.DeletedAt == null &&
                     hostedRunner.RunnerId == target.ExecutionRunnerId))
@@ -167,6 +174,44 @@ public class BackendRouteConfigService
             "Refreshed managed runtime routes for {RouteCount} target(s) at {TargetPath}",
             routes.Count,
             targetPath);
+    }
+
+    private async Task<HashSet<Guid>> GetGenericRuntimeTargetIdsAsync(
+        CancellationToken cancellationToken)
+    {
+        var candidates = await dbContext.AppDeploymentTargets
+            .AsNoTracking()
+            .Where(target => target.RuntimeDeployed && target.GenericRuntimeDeployed)
+            .Select(target => new
+            {
+                target.Id,
+                target.WebApp.ApplicationContractJson
+            })
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .Where(candidate => DeclaresGenericRuntime(candidate.ApplicationContractJson))
+            .Select(candidate => candidate.Id)
+            .ToHashSet();
+    }
+
+    private static bool DeclaresGenericRuntime(string? applicationContractJson)
+    {
+        if (string.IsNullOrWhiteSpace(applicationContractJson))
+            return false;
+
+        try
+        {
+            return ApplicationContractSerialization.Deserialize(applicationContractJson).Runtime.Command is not null;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private string BuildConfig(IReadOnlyCollection<RouteTarget> routes)

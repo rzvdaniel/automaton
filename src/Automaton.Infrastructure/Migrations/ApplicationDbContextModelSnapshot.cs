@@ -792,6 +792,9 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid?>("ExecutionRunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<bool>("GenericRuntimeDeployed")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("IsDefault")
                         .HasColumnType("tinyint(1)");
 
