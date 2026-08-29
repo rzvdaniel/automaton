@@ -685,7 +685,7 @@ public class HubService
             var backendDir = runnerWorkspaceService.GetLegacyControllerBackendDirectory(
                 payload.AppId,
                 payload.DeploymentTargetId);
-            var dataDir = runnerWorkspaceService.GetAppDataDirectory(payload.AppId);
+            var dataDir = runnerWorkspaceService.GetLegacyControllerDataDirectory(payload.AppId);
 
             Directory.CreateDirectory(backendDir);
             Directory.CreateDirectory(dataDir);
@@ -969,7 +969,7 @@ public class HubService
         string area)
     {
         return area == AppRunnerFileAreas.Data
-            ? runnerWorkspaceService.GetAppDataDirectory(appId)
+            ? runnerWorkspaceService.GetLegacyControllerDataDirectory(appId)
             : runnerWorkspaceService.GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
     }
 
@@ -1536,7 +1536,7 @@ public class HubService
 
     private string GetAppMediaDirectory(Guid appId)
     {
-        return Path.GetFullPath(Path.Combine(runnerWorkspaceService.GetAppDataDirectory(appId), "media"));
+        return Path.GetFullPath(Path.Combine(runnerWorkspaceService.GetLegacyControllerDataDirectory(appId), "media"));
     }
 
     private string ResolveAppMediaFilePath(Guid appId, string relativePath)

@@ -46,6 +46,22 @@ public class RunnerWorkspaceService
         return GetFullPath(AppsRoot, appId.ToString());
     }
 
+    private string GetLegacyControllerAppRoot(Guid appId)
+        => GetFullPath(GetFastApiScriptsRoot(), appId.ToString());
+
+    private string GetLegacyControllerTargetRoot(Guid appId, Guid deploymentTargetId)
+    {
+        if (appId == Guid.Empty)
+            throw new ArgumentException("App ID is required.", nameof(appId));
+        if (deploymentTargetId == Guid.Empty)
+            throw new ArgumentException(
+                "Deployment target ID is required.",
+                nameof(deploymentTargetId));
+        return GetFullPath(
+            GetFullPath(GetLegacyControllerAppRoot(appId), "targets"),
+            deploymentTargetId.ToString());
+    }
+
     public string GetDeploymentTargetRoot(Guid appId, Guid deploymentTargetId)
     {
         if (appId == Guid.Empty)
@@ -158,13 +174,23 @@ public class RunnerWorkspaceService
     /// bridge is removed in a later stage.
     /// </summary>
     public string GetLegacyControllerBackendDirectory(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "backend");
+        => GetFullPath(GetLegacyControllerTargetRoot(appId, deploymentTargetId), "runtime", "backend");
 
     /// <summary>
     /// Legacy controller bridge virtual environment location.
     /// </summary>
     public string GetLegacyControllerVenvDirectory(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "venv");
+        => GetFullPath(GetLegacyControllerTargetRoot(appId, deploymentTargetId), "venv");
+
+    /// <summary>
+    /// Legacy controller bridge data location. In legacy scripts-layout mode
+    /// this remains beside the configured scripts root because FastAPI uses it;
+    /// generic runtime storage continues to use GetAppDataDirectory.
+    /// </summary>
+    public string GetLegacyControllerDataDirectory(Guid appId)
+        => UsesLegacyScriptsLayout
+            ? GetFullPath(GetLegacyControllerAppRoot(appId), "data")
+            : GetAppDataDirectory(appId);
 
     public string GetAppVersionsDirectory(Guid appId, Guid deploymentTargetId)
     {
@@ -241,7 +267,7 @@ public class RunnerWorkspaceService
     public string ResolveRunnerFilePath(Guid appId, Guid deploymentTargetId, string relativePath, string area)
     {
         var rootDirectory = area == AppRunnerFileAreas.Data
-            ? GetAppDataDirectory(appId)
+            ? GetLegacyControllerDataDirectory(appId)
             : GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
 
         return ResolveRelativePath(rootDirectory, relativePath, "requested app directory");
@@ -249,7 +275,10 @@ public class RunnerWorkspaceService
 
     public string ResolveAppMediaFilePath(Guid appId, string relativePath)
     {
-        return ResolveRelativePath(GetFullPath(GetAppDataDirectory(appId), "media"), relativePath, "app media directory");
+        return ResolveRelativePath(
+            GetFullPath(GetLegacyControllerDataDirectory(appId), "media"),
+            relativePath,
+            "app media directory");
     }
 
     public string ResolveAppBackendFilePath(Guid appId, Guid deploymentTargetId, string relativePath)
@@ -297,38 +326,64 @@ public class RunnerWorkspaceService
     /// </summary>
     public void MigrateLegacyLayout()
     {
-        if (!Directory.Exists(AppsRoot))
-            return;
-
-        ManagedPathBoundary.EnsureNoReparsePoints(
-            AppsRoot,
-            "legacy runner workspace");
-
-        foreach (var appRoot in Directory.GetDirectories(AppsRoot))
+        var legacyAppsRoots = new List<string> { AppsRoot };
+        var controllerAppsRoot = GetFastApiScriptsRoot();
+        if (UsesLegacyScriptsLayout
+            && !string.Equals(AppsRoot, controllerAppsRoot, StringComparison.OrdinalIgnoreCase))
         {
-            if (!Guid.TryParse(Path.GetFileName(appRoot), out var appId))
+            legacyAppsRoots.Add(controllerAppsRoot);
+        }
+
+        foreach (var legacyAppsRoot in legacyAppsRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(legacyAppsRoot))
                 continue;
 
-            var oldData = Path.Combine(appRoot, "data");
-            if (Directory.Exists(oldData))
-                MoveTree(oldData, GetAppDataDirectory(appId));
+            ManagedPathBoundary.EnsureNoReparsePointEscape(
+                WorkspaceRoot,
+                legacyAppsRoot,
+                "legacy runner app root");
 
-            var targetsRoot = Path.Combine(appRoot, "targets");
-            if (!Directory.Exists(targetsRoot))
-                continue;
-
-            foreach (var targetRoot in Directory.GetDirectories(targetsRoot))
+            var preserveControllerData = UsesLegacyScriptsLayout
+                && string.Equals(legacyAppsRoot, controllerAppsRoot, StringComparison.OrdinalIgnoreCase);
+            foreach (var appRoot in Directory.GetDirectories(legacyAppsRoot))
             {
-                if (Guid.TryParse(Path.GetFileName(targetRoot), out var targetId))
-                    MigrateLegacyTarget(targetRoot, appId, targetId);
+                ManagedPathBoundary.EnsureNoReparsePointEscape(
+                    legacyAppsRoot,
+                    appRoot,
+                    "legacy app directory");
+                if (!Guid.TryParse(Path.GetFileName(appRoot), out var appId))
+                    continue;
+
+                var oldData = Path.Combine(appRoot, "data");
+                if (!preserveControllerData && (Directory.Exists(oldData) || File.Exists(oldData)))
+                    MoveTree(oldData, GetAppDataDirectory(appId));
+
+                var targetsRoot = Path.Combine(appRoot, "targets");
+                if (!Directory.Exists(targetsRoot))
+                    continue;
+
+                ManagedPathBoundary.EnsureNoReparsePointEscape(
+                    legacyAppsRoot,
+                    targetsRoot,
+                    "legacy deployment targets");
+                foreach (var targetRoot in Directory.GetDirectories(targetsRoot))
+                {
+                    if (Guid.TryParse(Path.GetFileName(targetRoot), out var targetId))
+                        MigrateLegacyTarget(legacyAppsRoot, targetRoot, appId, targetId);
+                }
             }
         }
     }
 
-    private void MigrateLegacyTarget(string oldTargetRoot, Guid appId, Guid deploymentTargetId)
+    private void MigrateLegacyTarget(
+        string legacyAppsRoot,
+        string oldTargetRoot,
+        Guid appId,
+        Guid deploymentTargetId)
     {
         ManagedPathBoundary.EnsureNoReparsePointEscape(
-            AppsRoot,
+            legacyAppsRoot,
             oldTargetRoot,
             "legacy deployment target");
 
@@ -339,6 +394,10 @@ public class RunnerWorkspaceService
         var oldRuntime = Path.Combine(oldTargetRoot, "runtime");
         if (Directory.Exists(oldRuntime))
         {
+            ManagedPathBoundary.EnsureNoReparsePointEscape(
+                legacyAppsRoot,
+                oldRuntime,
+                "legacy runtime tree");
             var current = GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current");
             var oldApplication = Path.Combine(oldRuntime, "application");
             if (Directory.Exists(oldApplication))

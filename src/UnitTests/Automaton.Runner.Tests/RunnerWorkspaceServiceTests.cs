@@ -57,8 +57,12 @@ public class RunnerWorkspaceServiceTests
         Assert.That(service.UsesLegacyScriptsLayout, Is.True);
         Assert.That(service.AppsRoot, Is.EqualTo(Path.GetFullPath(Path.Combine(scriptsRoot, "..", "apps"))));
         Assert.That(service.GetFastApiScriptsRoot(), Is.EqualTo(Path.GetFullPath(scriptsRoot)));
-        Assert.That(service.GetLegacyControllerBackendDirectory(appId, targetId), Does.Contain(Path.Combine("apps", appId.ToString(), "targets", targetId.ToString(), "runtime", "backend")));
-        Assert.That(service.GetLegacyControllerVenvDirectory(appId, targetId), Does.Contain(Path.Combine("apps", appId.ToString(), "targets", targetId.ToString(), "venv")));
+        Assert.That(service.GetLegacyControllerBackendDirectory(appId, targetId), Is.EqualTo(Path.Combine(
+            Path.GetFullPath(scriptsRoot), appId.ToString(), "targets", targetId.ToString(), "runtime", "backend")));
+        Assert.That(service.GetLegacyControllerVenvDirectory(appId, targetId), Is.EqualTo(Path.Combine(
+            Path.GetFullPath(scriptsRoot), appId.ToString(), "targets", targetId.ToString(), "venv")));
+        Assert.That(service.GetLegacyControllerDataDirectory(appId), Is.EqualTo(Path.Combine(
+            Path.GetFullPath(scriptsRoot), appId.ToString(), "data")));
         Assert.That(service.GetAppDataDirectory(appId), Is.EqualTo(Path.GetFullPath(Path.Combine(scriptsRoot, "..", "data", appId.ToString()))));
     }
 
@@ -155,6 +159,8 @@ public class RunnerWorkspaceServiceTests
             Assert.That(uploadedFile, Is.EqualTo(Path.Combine(backendRoot, "controllers", "todos.py")));
             Assert.That(service.GetLegacyControllerVenvDirectory(appId, targetId), Is.EqualTo(
                 Path.Combine(service.GetDeploymentTargetRoot(appId, targetId), "venv")));
+            Assert.That(service.GetLegacyControllerDataDirectory(appId), Is.EqualTo(
+                service.GetAppDataDirectory(appId)));
         });
     }
 
@@ -404,5 +410,84 @@ public class RunnerWorkspaceServiceTests
             Assert.That(Directory.Exists(oldData), Is.True);
             Assert.That(File.GetAttributes(link).HasFlag(FileAttributes.ReparsePoint), Is.True);
         });
+    }
+
+    [Test]
+    public void LegacyScriptsLayout_MigratesApplicationStateButRetainsControllerTreeAndData()
+    {
+        var scriptsRoot = Path.Combine(Path.GetTempPath(), "runner-custom-scripts", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", scriptsRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var oldTargetRoot = Path.Combine(scriptsRoot, appId.ToString(), "targets", targetId.ToString());
+        var oldSource = Path.Combine(oldTargetRoot, "source");
+        var oldApplication = Path.Combine(oldTargetRoot, "runtime", "application");
+        var oldBackend = service.GetLegacyControllerBackendDirectory(appId, targetId);
+        var oldVenv = service.GetLegacyControllerVenvDirectory(appId, targetId);
+        var oldData = service.GetLegacyControllerDataDirectory(appId);
+        Directory.CreateDirectory(oldSource);
+        Directory.CreateDirectory(oldApplication);
+        Directory.CreateDirectory(oldBackend);
+        Directory.CreateDirectory(oldVenv);
+        Directory.CreateDirectory(oldData);
+        File.WriteAllText(Path.Combine(oldSource, "source.txt"), "source");
+        File.WriteAllText(Path.Combine(oldApplication, "runtime.txt"), "artifact");
+        File.WriteAllText(Path.Combine(oldBackend, "todos.py"), "controller");
+        File.WriteAllText(Path.Combine(oldVenv, "marker.txt"), "venv");
+        File.WriteAllText(Path.Combine(oldData, "user.db"), "durable");
+        File.WriteAllText(
+            Path.Combine(oldTargetRoot, "deployment.json"),
+            JsonSerializer.Serialize(new RunnerRuntimeDeploymentMetadata
+            {
+                AppId = appId.ToString(),
+                DeploymentTargetId = targetId.ToString(),
+                Runtime = new ApplicationRuntimeSpec(),
+                ArtifactRoot = oldApplication,
+                State = RuntimeReadinessState.Ready
+            }));
+
+        service.MigrateLegacyLayout();
+        service.MigrateLegacyLayout();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(service.GetAppSourceRoot(appId, targetId), "source.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(service.GetAppRuntimeApplicationDirectory(appId, targetId), "runtime.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldBackend, "todos.py")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldVenv, "marker.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldData, "user.db")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldTargetRoot, "deployment.json")), Is.False);
+            Assert.That(Directory.Exists(service.GetAppDataDirectory(appId)), Is.False);
+        });
+    }
+
+    [Test]
+    public void MigrateLegacyLayout_IgnoresReparsePointsInRetainedCanonicalControllerTree()
+    {
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var backendRoot = service.GetLegacyControllerBackendDirectory(appId, targetId);
+        var outside = Path.Combine(Path.GetTempPath(), "runner-workspace-outside", Guid.NewGuid().ToString());
+        var link = Path.Combine(backendRoot, "linked");
+        Directory.CreateDirectory(backendRoot);
+        Directory.CreateDirectory(outside);
+
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("The test environment does not allow symbolic-link creation.");
+        }
+        catch (IOException)
+        {
+            Assert.Ignore("The test environment does not support symbolic-link creation.");
+        }
+
+        Assert.DoesNotThrow(() => service.MigrateLegacyLayout());
+        Assert.That(File.GetAttributes(link).HasFlag(FileAttributes.ReparsePoint), Is.True);
     }
 }

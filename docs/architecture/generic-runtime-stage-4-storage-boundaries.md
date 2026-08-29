@@ -12,6 +12,7 @@ boundary. Within it, the runner uses the following roots:
 
 ```text
 workspace/
+  data/{appId}/             generic durable application data
   apps/{appId}/targets/{targetId}/
     workspace/source/       agent/application-owned project source
     artifacts/              build and deployment artifacts
@@ -82,11 +83,21 @@ conflicts and reparse/link paths leave the legacy tree untouched and stop the
 runner from continuing with an ambiguous layout. Re-running a completed or
 partially completed migration is safe.
 
+When only `RUNNER_SCRIPTS_DIR` is configured, it is the explicit root of the
+legacy controller tree, even if its basename is not `apps`. The .NET bridge and
+FastAPI both resolve `{appId}/targets/{targetId}/runtime/backend`,
+`{appId}/targets/{targetId}/venv`, and `{appId}/data` from that root. Migration
+discovers apps there as well as under the canonical `workspace/apps` root. It
+moves generic source, artifacts, versions, and metadata into canonical roots,
+but deliberately retains the controller backend, virtual environment, and
+app-local data there so the deferred bridge does not lose its state. New
+generic runtime storage remains under `workspace/data/{appId}`.
+
 ## Scope boundary
 
 The generic build and runtime paths use only the canonical roots and structured
 application contract. The existing `controller_runner.py`, FastAPI tunnel,
-source/backend helpers, and legacy Python virtual-environment cache remain
+source/backend helpers, and legacy Python virtual-environment tree remain
 behind the explicitly deferred Action/controller bridge tracked in the Stage 0
 inventory. The fixed frontend gateway and controller transport are not used by
 the generic runtime contract and remain later-stage work.
