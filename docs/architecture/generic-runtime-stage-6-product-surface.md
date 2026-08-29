@@ -32,7 +32,9 @@ environment, and persistent-storage concepts that are serialized by the API.
 Deployment status and private-app launch eligibility are based on the selected
 deployment target's `GenericRuntimeDeployed` promotion marker. They do not use
 legacy frontend/backend storage metadata or the separate `RuntimeDeployed`
-controller-compatibility marker. Studio does not require a frontend directory,
+controller-compatibility marker. A target's `lastSuccessfulDeploymentAtUtc`
+value, where shown, is a general deployment-history timestamp and is not a
+generic runtime promotion timestamp. Studio does not require a frontend directory,
 backend directory, Python entrypoint, Vue project, or package-manager-specific
 file.
 
