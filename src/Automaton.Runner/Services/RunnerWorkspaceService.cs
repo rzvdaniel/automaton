@@ -234,9 +234,17 @@ public class RunnerWorkspaceService
     /// </summary>
     public void DeleteApplicationTarget(Guid appId, Guid deploymentTargetId)
     {
-        var targetRoot = GetDeploymentTargetRoot(appId, deploymentTargetId);
-        if (Directory.Exists(targetRoot))
-            Directory.Delete(targetRoot, recursive: true);
+        var targetRoots = new[]
+        {
+            GetDeploymentTargetRoot(appId, deploymentTargetId),
+            GetLegacyControllerTargetRoot(appId, deploymentTargetId)
+        };
+
+        foreach (var targetRoot in targetRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (Directory.Exists(targetRoot))
+                Directory.Delete(targetRoot, recursive: true);
+        }
     }
 
     public void DeletePersistentApplicationData(Guid appId)

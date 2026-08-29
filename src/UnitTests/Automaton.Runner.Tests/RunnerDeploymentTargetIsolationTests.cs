@@ -11,22 +11,26 @@ public class RunnerDeploymentTargetIsolationTests
 {
     private string root = null!;
     private string? originalRoot;
+    private string? originalScriptsDir;
 
     [SetUp]
     public void SetUp()
     {
         originalRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        originalScriptsDir = Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR");
         root = Path.Combine(
             Path.GetTempPath(),
             "automaton-target-deployment-tests",
             Guid.NewGuid().ToString("N"));
         Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", root);
+        Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", null);
     }
 
     [TearDown]
     public void TearDown()
     {
         Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", originalRoot);
+        Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", originalScriptsDir);
         if (Directory.Exists(root))
             Directory.Delete(root, recursive: true);
     }
@@ -111,6 +115,49 @@ public class RunnerDeploymentTargetIsolationTests
             Assert.That(
                 processManager.StoppedTargets.Count(target => target == deletedTargetId),
                 Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public async Task CleanupTargetAsync_WithCustomScriptsRoot_RemovesBothTargetTreesAndPreservesBothDataRoots()
+    {
+        var scriptsRoot = Path.Combine(root, "legacy-controller-files");
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", null);
+        Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", scriptsRoot);
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace,
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var canonicalTarget = workspace.GetDeploymentTargetRoot(appId, targetId);
+        var legacyBackend = workspace.GetLegacyControllerBackendDirectory(appId, targetId);
+        var legacyVenv = workspace.GetLegacyControllerVenvDirectory(appId, targetId);
+        var legacyData = workspace.GetLegacyControllerDataDirectory(appId);
+        var canonicalData = workspace.GetAppDataDirectory(appId);
+        Directory.CreateDirectory(canonicalTarget);
+        Directory.CreateDirectory(legacyBackend);
+        Directory.CreateDirectory(legacyVenv);
+        Directory.CreateDirectory(legacyData);
+        Directory.CreateDirectory(canonicalData);
+        File.WriteAllText(Path.Combine(canonicalTarget, "deployment.json"), "target");
+        File.WriteAllText(Path.Combine(legacyBackend, "todos.py"), "controller");
+        File.WriteAllText(Path.Combine(legacyVenv, "marker.txt"), "venv");
+        File.WriteAllText(Path.Combine(legacyData, "user.db"), "legacy durable");
+        File.WriteAllText(Path.Combine(canonicalData, "user.db"), "generic durable");
+
+        await service.CleanupTargetAsync(appId, targetId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Directory.Exists(canonicalTarget), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(scriptsRoot, appId.ToString(), "targets", targetId.ToString())), Is.False);
+            Assert.That(File.Exists(Path.Combine(legacyBackend, "todos.py")), Is.False);
+            Assert.That(File.Exists(Path.Combine(legacyVenv, "marker.txt")), Is.False);
+            Assert.That(File.ReadAllText(Path.Combine(legacyData, "user.db")), Is.EqualTo("legacy durable"));
+            Assert.That(File.ReadAllText(Path.Combine(canonicalData, "user.db")), Is.EqualTo("generic durable"));
         });
     }
 
