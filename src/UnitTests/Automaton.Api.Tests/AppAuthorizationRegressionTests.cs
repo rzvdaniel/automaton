@@ -42,8 +42,7 @@ public class AppAuthorizationRegressionTests
             Assert.That(app.Summary, Is.EqualTo("Card summary"));
             Assert.That(app.Runner, Is.Null);
             Assert.That(app.CanDelete, Is.True);
-            Assert.That(app.Runtime.FrontendAvailable, Is.False);
-            Assert.That(app.Runtime.BackendAvailable, Is.False);
+            Assert.That(app.Runtime.RuntimeAvailable, Is.False);
         });
     }
 
@@ -190,8 +189,7 @@ public class AppAuthorizationRegressionTests
         {
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
             Assert.That(app.Runtime.RuntimeDeployedAtUtc, Is.EqualTo(frontendAtUtc));
-            Assert.That(app.Runtime.FrontendAvailable, Is.True);
-            Assert.That(app.Runtime.BackendAvailable, Is.True);
+            Assert.That(app.Runtime.RuntimeAvailable, Is.True);
         });
     }
 
@@ -214,8 +212,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(apps, Has.Count.EqualTo(2));
         var corrupt = apps.Single(app => app.Id == corruptAppId);
-        Assert.That(corrupt.Runtime.FrontendAvailable, Is.False);
-        Assert.That(corrupt.Runtime.BackendAvailable, Is.False);
+        Assert.That(corrupt.Runtime.RuntimeAvailable, Is.False);
     }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()

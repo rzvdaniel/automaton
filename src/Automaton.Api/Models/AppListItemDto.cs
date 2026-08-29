@@ -42,7 +42,6 @@ public sealed class AppListRunnerDto
 
 public sealed class AppListRuntimeDto
 {
-    public bool FrontendAvailable { get; init; }
-    public bool BackendAvailable { get; init; }
+    public bool RuntimeAvailable { get; init; }
     public DateTime? RuntimeDeployedAtUtc { get; init; }
 }

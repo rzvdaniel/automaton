@@ -43,20 +43,22 @@ automaton pull --force
 automaton pull <app-id-or-slug>
 ```
 
-`automaton pull <app-id-or-slug>` creates a linked local folder with:
+`automaton pull <app-id-or-slug>` creates a linked local folder with the generic
+`automaton.json` application contract and portable source files. The source
+layout is not prescribed by the CLI:
 
 ```text
 my-app/
   automaton.json
-  frontend/
-  backend/   # only when source/backend exists
+  <application source chosen by the project>
 ```
 
-The CLI pulls portable source files only. It does not pull `live/backend`, and it does not use `live/frontend` fallback unless that behavior is added explicitly later.
+The CLI pulls portable source files only. It does not pull disposable runtime
+output or runner state.
 
 Refresh mode safety rules:
 
-- `automaton pull` checks whether matching local `frontend/` or `backend/` files already exist.
+- `automaton pull` checks whether matching local source files already exist.
 - In interactive mode, pull warns before overwriting those matching files and asks for confirmation.
 - In non-interactive mode, pull refuses to overwrite matching files unless you pass `--force`.
 - Local-only files are kept. Pull is not a clean mirror and does not delete extra local files.

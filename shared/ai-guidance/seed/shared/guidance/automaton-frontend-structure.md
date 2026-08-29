@@ -1,10 +1,13 @@
-# Automaton Frontend Structure
+# Optional frontend template: Automaton application contract
 
-Automaton supports multiple frontend styles.
+This reference is an optional frontend template, not a required Automaton
+project structure. The generic `application` contract is authoritative; use a
+different source layout or technology when it better fits the app.
 
 ## How to choose a stack
 
-Use the simplest stack that fits the project, but for AI-generated local apps the default must still be a build-based frontend that outputs to `frontend/dist/`.
+Use the simplest stack that fits the project. If this template is selected, it
+uses a build-based frontend and emits the generic build/runtime contract.
 
 ### Prefer Vite + vanilla TypeScript when
 
@@ -68,7 +71,7 @@ my-app/
 ```
 
 In that case:
-- set `"frontend": { "deployDir": "." }`
+    - set `application.build` to null and keep the public artifact directory as the configured deploy directory
 - do not include source-only, backend, secret, or dependency files at the root
 
 ## Vite + vanilla TypeScript or HTML/CSS/JS
@@ -90,12 +93,12 @@ my-app/
 Rules:
 - Keep the app framework-free unless the user asked for React or Vue.
 - Use Vite for modules, development workflow, and build output.
-- Build to `frontend/dist/` and set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- Build to `frontend/dist/` and set `application.build.command` plus `application.build.outputDirectory` in `automaton.json`.
 - Set `base: './'` in `frontend/vite.config.ts` so the published build uses relative asset URLs under `apps.automaton.monster/{slug}/`.
 - Do not hardcode root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them.
 - Do not add Automaton runtime script tags such as `automaton-config.js` or `automaton-api.js` to app source; the platform injects those during publish.
 - Keep service worker files and registrations inside the same relative app scope. Avoid root-relative worker URLs.
-- Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
+- The `frontend/` and `frontend/dist/` paths are conventions of this optional template, not platform requirements.
 - Treat the build pipeline as required for AI-generated local apps.
 - Do not put source files, `package.json`, or Vite config into runtime.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
@@ -116,9 +119,11 @@ export default defineConfig({
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
+  "application": {
+    "build": {
+      "command": { "executable": "npm", "arguments": ["run", "build"], "workingDirectory": "frontend" },
+      "outputDirectory": "frontend/dist"
+    }
   }
 }
 ```
@@ -262,8 +267,8 @@ Rules:
 - For frontend-only apps, build to `frontend/dist/` or another static output folder under `frontend/`.
 - Do not move framework build output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that the framework output under `frontend/` cannot work.
 - For apps with HTTP backends, keep backend source in `backend/`; frontend runtime deploy still points to the frontend build output.
-- Put `frontend.build` and `frontend.deployDir` in `automaton.json` when needed.
-- `automaton deploy` uploads frontend runtime and backend runtime separately.
+- Put `application.build.command` and `application.build.outputDirectory` in `automaton.json` when needed.
+- `automaton deploy` packages the generic application contract and artifact together.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
 Frontend-only example:
@@ -273,9 +278,11 @@ Frontend-only example:
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
+  "application": {
+    "build": {
+      "command": { "executable": "npm", "arguments": ["run", "build"], "workingDirectory": "frontend" },
+      "outputDirectory": "frontend/dist"
+    }
   }
 }
 ```
@@ -287,17 +294,21 @@ Frontend-plus-backend example:
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
-  },
-  "backend": {
-    "deployDir": "backend"
+  "application": {
+    "build": {
+      "command": { "executable": "npm", "arguments": ["run", "build"], "workingDirectory": "frontend" },
+      "outputDirectory": "frontend/dist"
+    },
+    "runtime": {
+      "command": { "executable": "app-server", "workingDirectory": "backend" },
+      "port": 8080
+    }
   }
 }
 ```
 
-If `automaton.json` already exists, add missing `frontend.build` and `frontend.deployDir` fields instead of assuming deploy from the project root.
+If `automaton.json` already exists, add the missing generic `application.build`
+and `application.runtime` fields instead of assuming a platform-specific layout.
 
 ## Frontend to backend calls
 

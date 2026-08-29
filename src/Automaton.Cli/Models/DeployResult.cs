@@ -23,7 +23,7 @@ public sealed record DeployUploadResult(
     double SizeMb,
     IReadOnlyList<DeploySkippedEntry>? SkippedEntries = null);
 
-public sealed record DeployBackendResult(
+public sealed record DeployRuntimeResult(
     bool Success,
     int RunnerCount,
     string? Message,
@@ -57,21 +57,17 @@ public sealed class DeployResult
 
     public bool Clean { get; init; }
 
-    public bool SkipBackend { get; init; }
-
     public IReadOnlyList<DeployCheckResult> Checks { get; init; } = [];
 
     public IReadOnlyList<string> NextSteps { get; init; } = [];
 
     public DeployUploadResult? SourceUploaded { get; init; }
 
-    public DeployUploadResult? Uploaded { get; init; }
+    public DeployUploadResult? RuntimeUploaded { get; init; }
 
-    public DeployUploadResult? BackendUploaded { get; init; }
-
-    public DeployBackendResult? Backend { get; init; }
+    public DeployRuntimeResult? Runtime { get; init; }
 
     public bool HasWarnings { get; init; }
 
-    public bool BackendRunning { get; init; }
+    public bool RuntimeRunning { get; init; }
 }

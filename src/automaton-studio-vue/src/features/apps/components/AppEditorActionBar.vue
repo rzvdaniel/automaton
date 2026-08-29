@@ -95,19 +95,6 @@ const actionMenuItems = computed<MenuItem[]>(() => {
     disabled: props.isDeployingApp || !props.canDeployFromStudio,
     command: () => emit('deployApp'),
   })
-  items.push({
-    label: 'Deploy Frontend',
-    icon: 'pi pi-desktop',
-    disabled: props.isDeployingApp || !props.canDeployFrontendFromStudio,
-    command: () => emit('deployFrontend'),
-  })
-  items.push({
-    label: 'Deploy Backend',
-    icon: 'pi pi-server',
-    disabled: props.isDeployingBackend,
-    command: () => emit('deployBackend'),
-  })
-
   if (props.isPublished) {
     items.push({ separator: true })
     items.push({

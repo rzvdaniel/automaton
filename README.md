@@ -2,7 +2,7 @@
 
 Automaton is an AI-first platform for building, deploying, publishing, and running web apps.
 
-Build apps locally with your preferred AI coding agent, deploy them with the Automaton CLI, publish them through Automaton Studio, and connect optional Python backends to runners you control.
+Build apps locally with your preferred AI coding agent, describe their build/runtime contract explicitly, deploy them with the Automaton CLI, and publish them through Automaton Studio. Applications may use any technology available in the selected Runner workspace.
 
 > AI can code. Automaton helps it ship.
 
@@ -10,9 +10,9 @@ Build apps locally with your preferred AI coding agent, deploy them with the Aut
 
 - **CLI-first app workflow** — create, pull, deploy, and publish Automaton apps from a local folder.
 - **Studio** — authenticated UI for apps, publishing, runners, API keys, AI keys, admin features, projects, and account management.
-- **Published app hosting** — serve frontend apps from public Automaton app URLs.
-- **Optional backend execution** — connect backend apps to a runner for Python/FastAPI-style workloads.
-- **Runner model** — run backend code on your own infrastructure or managed runner infrastructure.
+- **Published app hosting** — expose a healthy application runtime through public Automaton app URLs.
+- **Generic application contract** — declare structured build/runtime commands, port, health, environment, and persistent storage without selecting a framework.
+- **Runner model** — run the declared application process on your own infrastructure or managed runner infrastructure.
 - **AI-agent harness** — repository instructions, skills, and verification guidance for tools like Claude Code, Codex, Cursor, and Copilot.
 
 ## Core architecture
@@ -29,16 +29,17 @@ AI provider implementation currently lives under `src/Automaton.Mcp/`; check cur
 
 ## App model
 
-Automaton apps use a source/runtime split:
+Automaton apps use a source/runtime split. The source layout is application-defined; the persisted `application` contract describes how to build and run it:
 
-- `source/frontend/` — editable frontend source
-- `source/backend/` — editable backend source
-- `live/frontend/` — deployed public frontend output
-- `live/backend/` — runner-side backend output
+- `source/` — editable application source
+- `live/` — disposable deployed artifact/runtime output
+- `application.build.command` — optional structured build command
+- `application.runtime.command` — optional structured runtime command
+- `application.health` and `application.storage` — readiness and durable data policy
 
 Studio editing, CLI pull, remix/fork, snapshots, and import/export should prefer `source/`.
 
-Public app serving must never expose backend files, secrets, logs, runner state, or unsafe file types.
+Public app serving must never expose source files, secrets, logs, runner state, or unsafe file types.
 
 ## Requirements
 

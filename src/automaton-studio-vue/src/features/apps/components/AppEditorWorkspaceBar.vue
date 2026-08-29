@@ -89,7 +89,7 @@ const statusSummary = computed(() => {
 
   if (props.applicationState === 'Source changed') {
     if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
-      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Frontend requires build' }
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application requires a build' }
     }
 
     return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Ready to deploy' }
@@ -121,10 +121,10 @@ const deploymentStatus = computed(() => {
 
   if (props.applicationState === 'Source changed') {
     if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
-      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Frontend changes require CLI deploy' }
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application changes require CLI deploy' }
     }
 
-    return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Source changes pending deployment' }
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application changes pending deployment' }
   }
 
   if (props.applicationState === 'Build failed') {
@@ -278,7 +278,7 @@ const statusPrimaryAction = computed(() => {
 
   if (props.hasPendingBackendChanges && props.canDeployBackendFromStudio) {
     return {
-      label: 'Deploy Backend',
+      label: 'Deploy application',
       icon: 'pi pi-server',
       loading: props.isDeployingBackend,
       disabled: props.isDeployingBackend,
@@ -388,14 +388,14 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div v-if="frontendStatus" class="status-popover__section">
-                <div class="status-popover__section-label">Frontend</div>
+                <div class="status-popover__section-label">Application source</div>
                 <div class="status-popover__item">
                   <i :class="[frontendStatus.icon, `status-popover__icon status-popover__icon--${frontendStatus.severity}`]"></i>
                   <span>{{ frontendStatus.label }}</span>
                 </div>
               </div>
               <div v-if="backendStatus" class="status-popover__section">
-                <div class="status-popover__section-label">Backend</div>
+                <div class="status-popover__section-label">Runtime source</div>
                 <div class="status-popover__item">
                   <i :class="[backendStatus.icon, `status-popover__icon status-popover__icon--${backendStatus.severity}`]"></i>
                   <span>{{ backendStatus.label }}</span>

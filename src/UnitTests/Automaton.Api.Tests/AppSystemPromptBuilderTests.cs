@@ -31,8 +31,8 @@ public class AppSystemPromptBuilderTests
             "Tighten the dashboard layout.");
 
         Assert.That(prompt, Does.Contain("# Automaton App Contract (Compact)"));
-        Assert.That(prompt, Does.Contain("frontend/dist"));
-        Assert.That(prompt, Does.Contain("AUTOMATON_APP_DATA_DIR"));
+        Assert.That(prompt, Does.Contain("application.build.command"));
+        Assert.That(prompt, Does.Contain("persistent storage behavior"));
         Assert.That(prompt, Does.Contain("# Automaton Studio App Editor"));
 
         Assert.That(prompt, Does.Not.Contain("automaton login"));

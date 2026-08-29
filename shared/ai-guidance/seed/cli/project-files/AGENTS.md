@@ -39,10 +39,11 @@ Do not invent a generic project structure before making that decision.
 
 ## App layout
 
-- Frontend source normally lives in `frontend/`.
-- Backend source, when needed, normally lives in `backend/`.
-- Public frontend runtime normally comes from `frontend/dist/`.
-- `automaton.json` defines the real deploy contract.
+- Source layout is chosen by the application and is not prescribed by Automaton.
+- `automaton.json` defines the canonical build, runtime, health, environment,
+  and storage contract.
+- `application.build.outputDirectory` identifies the post-build artifact when a
+  build command is configured.
 - Durable runtime app data belongs under `AUTOMATON_APP_DATA_DIR`; read the guidance files under `.automaton/agents/references/llms/` for the recommended `media/`, `db/`, `generated/`, `cache/`, `logs/`, and `tmp/` convention.
 - `AUTOMATON_APP_DATA_DIR` is created and injected by the Automaton runner. Do not hardcode its physical path.
 
@@ -57,11 +58,11 @@ automaton deploy
 
 ## Default behavior
 
-- Default to frontend-only unless the requested feature truly needs backend execution.
-- If backend behavior is required, create an ordinary HTTP backend under `backend/`; the initial supported Python convention is FastAPI/ASGI with `main:app`.
-- Expose normal HTTP routes under `/api` and call them from the frontend with same-origin root-relative URLs such as `fetch('/api/todos')`; do not hardcode app IDs, hostnames, or ports.
-- Add a small amount of useful backend logging around meaningful actions and error paths.
-- Keep frontend console logging minimal. Prefer `console.warn(...)` and `console.error(...)` for real issues, and never log secrets or sensitive user data.
+- Choose the simplest suitable application technology without making it an
+  Automaton requirement.
+- Declare structured build/runtime executables, arguments, working directories,
+  environment, port, optional health path, and persistent data explicitly.
+- Keep application logs useful and never log secrets or sensitive user data.
 - Do not say the app is done until `automaton deploy` succeeds.
 
 ## Publishing rules

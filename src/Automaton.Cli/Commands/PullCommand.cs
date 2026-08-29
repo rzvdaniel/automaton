@@ -126,7 +126,7 @@ public static class PullCommand
         var sourceFiles = await ListSourceFilesAsync(client, appId);
         if (sourceFiles.Count == 0)
         {
-            throw new InvalidOperationException("This app does not have portable source files to pull. Runtime frontend fallback is not enabled.");
+            throw new InvalidOperationException("This app does not have portable source files to pull. Runtime artifact fallback is not enabled.");
         }
 
         var downloads = PrepareDownloads(sourceFiles, targetDir);

@@ -8,13 +8,13 @@ using System.CommandLine.Invocation;
 namespace Automaton.Cli.Commands;
 
 /// <summary>
-/// automaton deploy [--clean] [--skip-backend] [--publish]
+/// automaton deploy [--clean] [--publish]
 ///
 /// Workflow:
 ///   1. Read automaton.json for appId + application contract
 ///   2. Validate the contract and package source plus the runtime artifact when applicable
 ///   3. Upload the package; the assigned Runner executes the configured build once
-///   4. Deploy Actions and runtime (unless --skip-backend)
+///   4. Deploy Actions and the configured runtime
 /// </summary>
 public static class DeployCommand
 {
@@ -30,15 +30,11 @@ public static class DeployCommand
         {
             Arity = ArgumentArity.ZeroOrOne
         };
-        var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before backend deploy when needed");
+        var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before deployment when needed");
         var privilegedAckOption = new Option<bool>("--acknowledge-privileged-host-access", "Acknowledge elevated host access for a new Privileged Host assignment");
         var cleanOption = new Option<bool>(
             "--clean",
             "Wipe all server-side app files before uploading (full replace)");
-
-        var skipBackendOption = new Option<bool>(
-            "--skip-backend",
-            "Skip deploying backend Python scripts after upload");
 
         var dirOption = new Option<string?>(
             ["--dir", "-d"],
@@ -57,7 +53,6 @@ public static class DeployCommand
             runnerOption,
             privilegedAckOption,
             cleanOption,
-            skipBackendOption,
             dirOption,
             jsonOption,
             verboseOption,
@@ -73,7 +68,6 @@ public static class DeployCommand
             var runner = context.ParseResult.GetValueForOption(runnerOption);
             var privilegedAck = context.ParseResult.GetValueForOption(privilegedAckOption);
             var clean = context.ParseResult.GetValueForOption(cleanOption);
-            var skipBackend = context.ParseResult.GetValueForOption(skipBackendOption);
             var dir = context.ParseResult.GetValueForOption(dirOption);
             var asJson = context.ParseResult.GetValueForOption(jsonOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
@@ -158,7 +152,6 @@ public static class DeployCommand
                 var result = await deployService.DeployAsync(
                     cwd,
                     clean,
-                    skipBackend,
                     dir,
                     environmentName,
                     target,
@@ -257,7 +250,7 @@ public static class DeployCommand
             return result;
         }
 
-        var automaticRunnerReady = result.Success && result.Backend?.Success == true && result.Backend.RunnerCount > 0;
+        var automaticRunnerReady = result.Success && result.Runtime?.Success == true && result.Runtime.RunnerCount > 0;
         var preparationChecks = automaticRunnerReady
             ? preparation.Checks.Where(check => check.Name != DeployCheckNames.RunnerLookup || check.Success).ToList()
             : preparation.Checks;
@@ -280,14 +273,12 @@ public static class DeployCommand
             StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
-            SkipBackend = result.SkipBackend,
             Checks = preparationChecks.Concat(result.Checks).ToList(),
             NextSteps = preparationNextSteps.Concat(result.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             SourceUploaded = result.SourceUploaded,
-            Uploaded = result.Uploaded,
-            BackendUploaded = result.BackendUploaded,
-            Backend = result.Backend,
-            BackendRunning = result.BackendRunning
+            RuntimeUploaded = result.RuntimeUploaded,
+            Runtime = result.Runtime,
+            RuntimeRunning = result.RuntimeRunning
         };
     }
 
@@ -309,14 +300,12 @@ public static class DeployCommand
             StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
-            SkipBackend = result.SkipBackend,
             Checks = result.Checks,
             NextSteps = result.NextSteps,
             SourceUploaded = result.SourceUploaded,
-            Uploaded = result.Uploaded,
-            BackendUploaded = result.BackendUploaded,
-            Backend = result.Backend,
-            BackendRunning = result.BackendRunning
+            RuntimeUploaded = result.RuntimeUploaded,
+            Runtime = result.Runtime,
+            RuntimeRunning = result.RuntimeRunning
         };
 
     private static DeployResult AppendDefaultSuccessNextSteps(DeployResult result)
@@ -345,15 +334,13 @@ public static class DeployCommand
             StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
-            SkipBackend = result.SkipBackend,
             Checks = result.Checks,
             NextSteps = nextSteps,
             SourceUploaded = result.SourceUploaded,
-            Uploaded = result.Uploaded,
-            BackendUploaded = result.BackendUploaded,
-            Backend = result.Backend,
+            RuntimeUploaded = result.RuntimeUploaded,
+            Runtime = result.Runtime,
             HasWarnings = result.HasWarnings,
-            BackendRunning = result.BackendRunning
+            RuntimeRunning = result.RuntimeRunning
         };
     }
 
@@ -386,14 +373,12 @@ public static class DeployCommand
                 studioAppUrl = result.StudioAppUrl,
                 deployDirectory = result.DeployDirectory,
                 clean = result.Clean,
-                skipBackend = result.SkipBackend,
                 checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
                 nextSteps = result.NextSteps,
                 sourceUploaded = result.SourceUploaded,
-                uploaded = result.Uploaded,
-                backendUploaded = result.BackendUploaded,
-                backend = result.Backend,
-                backendRunning = result.BackendRunning
+                runtimeUploaded = result.RuntimeUploaded,
+                runtime = result.Runtime,
+                runtimeRunning = result.RuntimeRunning
             });
             return;
         }
@@ -570,15 +555,13 @@ public static class DeployCommand
         }
 
         WriteSkippedSection("Source ignored files", result.SourceUploaded);
-        WriteSkippedSection("Frontend ignored files", result.Uploaded);
-        WriteSkippedSection("Backend ignored files", result.BackendUploaded);
+        WriteSkippedSection("Runtime package ignored files", result.RuntimeUploaded);
     }
 
     private static void WritePlainResult(DeployResult result, bool verbose)
     {
         WritePlainSkippedSection("Source ignored files", result.SourceUploaded, verbose);
-        WritePlainSkippedSection("Frontend ignored files", result.Uploaded, verbose);
-        WritePlainSkippedSection("Backend ignored files", result.BackendUploaded, verbose);
+        WritePlainSkippedSection("Runtime package ignored files", result.RuntimeUploaded, verbose);
 
         if (result.NextSteps.Count > 0)
         {
@@ -660,16 +643,14 @@ public static class DeployCommand
             studioAppUrl = deployResult.StudioAppUrl,
             deployDirectory = deployResult.DeployDirectory,
             clean = deployResult.Clean,
-            skipBackend = deployResult.SkipBackend,
             checks = deployResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
             nextSteps = publishResult.Success
                 ? deployResult.NextSteps
                 : deployResult.NextSteps.Concat(publishResult.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase),
             sourceUploaded = deployResult.SourceUploaded,
-            uploaded = deployResult.Uploaded,
-            backendUploaded = deployResult.BackendUploaded,
-            backend = deployResult.Backend,
-            backendRunning = deployResult.BackendRunning,
+            runtimeUploaded = deployResult.RuntimeUploaded,
+            runtime = deployResult.Runtime,
+            runtimeRunning = deployResult.RuntimeRunning,
             url = publishResult.Url,
             slug = publishResult.Slug,
             publishChecks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message })

@@ -146,8 +146,7 @@ public class AppsService
                 },
                 Runtime = new AppListRuntimeDto
                 {
-                    FrontendAvailable = metadata.Frontend.RuntimeAvailable,
-                    BackendAvailable = metadata.Backend.RuntimeAvailable,
+                    RuntimeAvailable = metadata.Frontend.RuntimeAvailable || metadata.Backend.RuntimeAvailable,
                     RuntimeDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc ?? metadata.Backend.RuntimeDeployedAtUtc
                 }
             };
