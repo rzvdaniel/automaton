@@ -170,10 +170,11 @@ export interface AppListItem {
     runnerOnline: boolean
     runtimeDeployed: boolean
     genericRuntimeDeployed: boolean
+    lastSuccessfulDeploymentAtUtc?: string | null
     isStaticHosting?: boolean
     routePath: string
   } | null
-  runtime: { genericRuntimeDeployed: boolean; runtimeDeployedAtUtc?: string | null }
+  runtime: { genericRuntimeDeployed: boolean }
 }
 
 export const DeploymentTargetStatus = {

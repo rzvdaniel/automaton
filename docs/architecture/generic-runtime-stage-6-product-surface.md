@@ -75,7 +75,7 @@ available in the Runner workspace:
     "outputDirectory": "out"
   },
   "runtime": {
-    "command": { "executable": "./MyApp", "workingDirectory": "out" },
+    "command": { "executable": "out/MyApp", "workingDirectory": "out" },
     "port": 8080
   },
   "health": { "path": "/health" }
@@ -83,7 +83,9 @@ available in the Runner workspace:
 ```
 
 The Node build must place both the public files and `server.mjs` in `dist`, and
-the .NET publish output must contain the `MyApp` executable under `out`. A
+the .NET publish output must contain the `MyApp` executable under `out`. The
+non-bare .NET executable path is resolved from the artifact root, while its
+working directory is `out`. A
 public/static application still needs an HTTP server in its runtime artifact;
 there is no public static-file fallback for `runtime.command = null`.
 These examples illustrate the shape only. They are not technology detection

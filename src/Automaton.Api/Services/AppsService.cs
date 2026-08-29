@@ -124,15 +124,13 @@ public class AppsService
                         now) == RunnerStatus.Online,
                     RuntimeDeployed = row.LiveTarget.RuntimeDeployed,
                     GenericRuntimeDeployed = row.LiveTarget.GenericRuntimeDeployed,
+                    LastSuccessfulDeploymentAtUtc = row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime,
                     IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.GenericRuntimeDeployed,
                     RoutePath = $"/private/{row.Id:D}",
                 },
                 Runtime = new AppListRuntimeDto
                 {
-                    GenericRuntimeDeployed = row.LiveTarget?.GenericRuntimeDeployed == true,
-                    RuntimeDeployedAtUtc = row.LiveTarget?.GenericRuntimeDeployed == true
-                        ? row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime
-                        : null
+                    GenericRuntimeDeployed = row.LiveTarget?.GenericRuntimeDeployed == true
                 }
             };
         }).ToArray();

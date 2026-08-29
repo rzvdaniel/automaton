@@ -53,7 +53,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
   const genericRuntimeDeployed = ref(false)
-  const genericRuntimeDeployedAtUtc = ref<string | null>(null)
 
   // Preview warning message (missing assets, etc.)
   const applicationWarning = ref<string | null>(null)
@@ -125,9 +124,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     return genericRuntimeDeployed.value
   })
   const hasDeployedFrontend = computed(() => hasApplicationRuntime.value)
-  const applicationDeployedAtUtc = computed(() => {
-    return genericRuntimeDeployedAtUtc.value
-  })
   const frontendSourceModifiedAtUtc = computed(() => currentApp.value?.frontend.sourceModifiedAtUtc ?? null)
   const backendSourceModifiedAtUtc = computed(() => currentApp.value?.backend.sourceModifiedAtUtc ?? null)
 
@@ -375,7 +371,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) {
       assignedRunnerOnline.value = null
       genericRuntimeDeployed.value = false
-      genericRuntimeDeployedAtUtc.value = null
       return
     }
 
@@ -385,13 +380,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const defaultRunner = defaultTarget?.runner
       assignedRunnerOnline.value = defaultRunner ? defaultRunner.isOnline : null
       genericRuntimeDeployed.value = defaultTarget?.genericRuntimeDeployed ?? false
-      genericRuntimeDeployedAtUtc.value = defaultTarget?.genericRuntimeDeployed
-        ? defaultTarget.lastSuccessfulDeploymentAt ?? null
-        : null
     } catch {
       assignedRunnerOnline.value = null
       genericRuntimeDeployed.value = false
-      genericRuntimeDeployedAtUtc.value = null
     }
   }
 
@@ -1202,6 +1193,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     sourceChangedSinceDeploy.value = false
     lastDeployError.value = null
     assignedRunnerOnline.value = null
+    genericRuntimeDeployed.value = false
     applicationViewportMode.value = 'desktop'
     isLoading.value = false
     isSaving.value = false
@@ -1260,7 +1252,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     publicUrl,
     hasApplicationRuntime,
     hasDeployedFrontend,
-    applicationDeployedAtUtc,
     frontendSourceModifiedAtUtc,
     backendSourceModifiedAtUtc,
     hasBackendFolder,

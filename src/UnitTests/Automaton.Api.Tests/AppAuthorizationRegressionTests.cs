@@ -167,14 +167,14 @@ public class AppAuthorizationRegressionTests
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var updatedAtUtc = DateTime.UtcNow.AddDays(-2);
-        var frontendAtUtc = DateTime.UtcNow.AddHours(-3);
+        var genericPromotionAtUtc = DateTime.UtcNow.AddHours(-3);
         using var tempRoot = new TemporaryDirectory();
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "metadata-app");
         dbContext.WebApps.Single().Updated = updatedAtUtc;
         var target = dbContext.AppDeploymentTargets.Single();
         target.GenericRuntimeDeployed = true;
-        target.LastSuccessfulDeploymentAt = frontendAtUtc;
+        target.LastSuccessfulDeploymentAt = genericPromotionAtUtc;
         await dbContext.SaveChangesAsync();
 
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out _);
@@ -183,9 +183,22 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
-            Assert.That(app.Runtime.RuntimeDeployedAtUtc, Is.EqualTo(frontendAtUtc));
             Assert.That(app.Runtime.GenericRuntimeDeployed, Is.True);
             Assert.That(app.LiveEnvironment!.GenericRuntimeDeployed, Is.True);
+            Assert.That(app.LiveEnvironment.LastSuccessfulDeploymentAtUtc, Is.EqualTo(genericPromotionAtUtc));
+        });
+
+        var legacyCompletionAtUtc = DateTime.UtcNow.AddHours(-1);
+        target.RuntimeDeployed = true;
+        target.LastSuccessfulDeploymentAt = legacyCompletionAtUtc;
+        await dbContext.SaveChangesAsync();
+
+        var afterLegacyDeployment = (await service.ListAsync(cancellationToken: CancellationToken.None)).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(afterLegacyDeployment.Runtime.GenericRuntimeDeployed, Is.True);
+            Assert.That(afterLegacyDeployment.LiveEnvironment!.GenericRuntimeDeployed, Is.True);
+            Assert.That(afterLegacyDeployment.LiveEnvironment.LastSuccessfulDeploymentAtUtc, Is.EqualTo(legacyCompletionAtUtc));
         });
     }
 
