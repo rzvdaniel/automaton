@@ -335,6 +335,7 @@ public class AppDeploymentTargetManagementServiceTests
         {
             Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
             Assert.That(summary.RuntimeDeployed, Is.True);
+            Assert.That(summary.GenericRuntimeDeployed, Is.False);
             Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
         });
     }

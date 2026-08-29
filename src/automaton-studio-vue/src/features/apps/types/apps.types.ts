@@ -169,10 +169,11 @@ export interface AppListItem {
     applicationProfile?: string | null
     runnerOnline: boolean
     runtimeDeployed: boolean
+    genericRuntimeDeployed: boolean
     isStaticHosting?: boolean
     routePath: string
   } | null
-  runtime: { runtimeAvailable: boolean; runtimeDeployedAtUtc?: string | null }
+  runtime: { genericRuntimeDeployed: boolean; runtimeDeployedAtUtc?: string | null }
 }
 
 export const DeploymentTargetStatus = {
@@ -194,6 +195,7 @@ export interface AppDeploymentTarget {
   isDefault: boolean
   status: DeploymentTargetStatus
   runtimeDeployed: boolean
+  genericRuntimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
   cleanupPending: boolean

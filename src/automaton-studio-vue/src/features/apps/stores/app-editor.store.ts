@@ -52,6 +52,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const deployCapabilities = ref<AppDeployCapabilities | null>(null)
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
+  const genericRuntimeDeployed = ref(false)
+  const genericRuntimeDeployedAtUtc = ref<string | null>(null)
 
   // Preview warning message (missing assets, etc.)
   const applicationWarning = ref<string | null>(null)
@@ -120,17 +122,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    */
   const publicUrl = computed(() => currentApp.value?.publicUrl ?? '')
   const hasApplicationRuntime = computed(() => {
-    if (!currentApp.value) {
-      return false
-    }
-
-    return currentApp.value.frontend.runtimeAvailable || currentApp.value.hasDeployedFrontend
+    return genericRuntimeDeployed.value
   })
   const hasDeployedFrontend = computed(() => hasApplicationRuntime.value)
   const applicationDeployedAtUtc = computed(() => {
-    const frontendDeployed = currentApp.value?.frontend.runtimeDeployedAtUtc ?? null
-    const backendDeployed = currentApp.value?.backend.runtimeDeployedAtUtc ?? null
-    return getLatestIsoTimestamp(frontendDeployed, backendDeployed)
+    return genericRuntimeDeployedAtUtc.value
   })
   const frontendSourceModifiedAtUtc = computed(() => currentApp.value?.frontend.sourceModifiedAtUtc ?? null)
   const backendSourceModifiedAtUtc = computed(() => currentApp.value?.backend.sourceModifiedAtUtc ?? null)
@@ -205,22 +201,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!value) return null
     const millis = Date.parse(value)
     return Number.isFinite(millis) ? millis : null
-  }
-
-  function getLatestIsoTimestamp(...values: Array<string | null | undefined>): string | null {
-    let latestValue: string | null = null
-    let latestMillis: number | null = null
-
-    for (const value of values) {
-      const millis = toUtcMillis(value)
-      if (millis == null) continue
-      if (latestMillis == null || millis > latestMillis) {
-        latestMillis = millis
-        latestValue = value ?? null
-      }
-    }
-
-    return latestValue
   }
 
   function hasPersistedSourceDivergence(app: App | null): boolean {
@@ -394,15 +374,24 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   async function refreshAssignedRunnerStatus(): Promise<void> {
     if (!currentApp.value) {
       assignedRunnerOnline.value = null
+      genericRuntimeDeployed.value = false
+      genericRuntimeDeployedAtUtc.value = null
       return
     }
 
     try {
       const targets = await appsService.listDeploymentTargets(currentApp.value.id)
-      const defaultRunner = targets.find((target) => target.isDefault)?.runner
+      const defaultTarget = targets.find((target) => target.isDefault)
+      const defaultRunner = defaultTarget?.runner
       assignedRunnerOnline.value = defaultRunner ? defaultRunner.isOnline : null
+      genericRuntimeDeployed.value = defaultTarget?.genericRuntimeDeployed ?? false
+      genericRuntimeDeployedAtUtc.value = defaultTarget?.genericRuntimeDeployed
+        ? defaultTarget.lastSuccessfulDeploymentAt ?? null
+        : null
     } catch {
       assignedRunnerOnline.value = null
+      genericRuntimeDeployed.value = false
+      genericRuntimeDeployedAtUtc.value = null
     }
   }
 

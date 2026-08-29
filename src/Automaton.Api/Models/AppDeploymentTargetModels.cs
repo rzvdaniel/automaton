@@ -18,6 +18,7 @@ public sealed record AppDeploymentTargetSummary(
     bool IsDefault,
     DeploymentTargetStatus Status,
     bool RuntimeDeployed,
+    bool GenericRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DateTimeOffset? LastSuccessfulDeploymentAt,
     bool CleanupPending,

@@ -32,6 +32,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     isDefault: true,
     status: DeploymentTargetStatus.Running,
     runtimeDeployed: true,
+    genericRuntimeDeployed: true,
     cleanupPending: false,
     lastSuccessfulDeploymentAt: '2026-08-04T18:42:00Z',
     routePath: '/private/app-id',
@@ -324,7 +325,7 @@ describe('AppDeploymentTargets', () => {
 
   it.each([
     target({ runner: null, status: DeploymentTargetStatus.Unassigned }),
-    target({ runtimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
+    target({ runtimeDeployed: false, genericRuntimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
     target({
       runner: {
         id: 'runner-id',

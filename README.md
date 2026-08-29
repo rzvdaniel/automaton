@@ -34,7 +34,7 @@ Automaton apps use a source/runtime split. The source layout is application-defi
 - `source/` — editable application source
 - `live/` — disposable deployed artifact/runtime output
 - `application.build.command` — optional structured build command
-- `application.runtime.command` — optional structured runtime command
+- `application.runtime.command` — structured runtime command for HTTP/public applications; optional only for finite-work or Actions-only apps
 - `application.health` and `application.storage` — readiness and durable data policy
 
 Studio editing, CLI pull, remix/fork, snapshots, and import/export should prefer `source/`.

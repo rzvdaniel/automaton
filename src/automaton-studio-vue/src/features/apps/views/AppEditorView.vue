@@ -164,9 +164,9 @@ const rightPanelMode = ref<'aiAssistant'>('aiAssistant')
 const versionHistoryRef = ref<any>(null)
 
 // AI Assistant configuration
-const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
-You can create and modify HTML, CSS, and JavaScript code.
-When a runner is attached, you can also execute backend steps for data processing.`
+const aiSystemPrompt = `You are an AI assistant helping to build an application for Automaton.
+Work with the application's source layout and technology of choice. Create and modify the files needed by the user's request, and keep the persisted application contract accurate when build, runtime, readiness, environment, or storage behavior changes.
+An HTTP application should declare a runtime command, port, and optional health path. Finite-work applications may omit the runtime command. Do not assume a language, framework, package manager, frontend/backend split, or controller architecture.`
 
 const aiSuggestions = [
   'Add a login form',
@@ -756,7 +756,7 @@ async function handleDeployBackend() {
         : (result.backendDeploy.hasRequirements ? ' (packages installed)' : '')
       toast.add({
         severity: 'success',
-        summary: 'Backend Deployed',
+        summary: 'Legacy controller deployed',
         detail: `${result.backendAction === 'updated' ? `Updated ${result.backendFilesSynced} backend file(s) from source and ` : ''}deployed ${result.backendDeploy.deployedCount} script(s) to ${result.backendDeploy.runnerCount} runner(s)${packagesNote}`,
         life: 4000,
       })
@@ -811,7 +811,7 @@ async function handleDeployApp(targetSlug?: string, targetName?: string) {
 
       toast.add({
         severity: 'success',
-        summary: targetName ? `${targetName} deployed` : 'App Deployed',
+        summary: targetName ? `${targetName} legacy deployment complete` : 'Legacy application deployed',
         detail: `${targetName ? `Target ${targetSlug}.` : `${getOpenAppLabel()}: ${openAppUrl}`} Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
         life: 7000,
       })

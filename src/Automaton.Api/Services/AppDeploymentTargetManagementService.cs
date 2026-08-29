@@ -566,6 +566,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             target.IsDefault,
             GetEffectiveStatus(target),
             target.RuntimeDeployed,
+            target.GenericRuntimeDeployed,
             target.LastDeploymentAt,
             target.LastSuccessfulDeploymentAt,
             target.CleanupPending,

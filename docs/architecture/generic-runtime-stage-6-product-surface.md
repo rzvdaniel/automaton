@@ -29,9 +29,12 @@ runtime lifecycle.
 
 The App Settings > Application panel edits the same build, runtime, readiness,
 environment, and persistent-storage concepts that are serialized by the API.
-Deployment status is presented at the application/runtime level. Studio does
-not require a frontend directory, backend directory, Python entrypoint, Vue
-project, or package-manager-specific file.
+Deployment status and private-app launch eligibility are based on the selected
+deployment target's `GenericRuntimeDeployed` promotion marker. They do not use
+legacy frontend/backend storage metadata or the separate `RuntimeDeployed`
+controller-compatibility marker. Studio does not require a frontend directory,
+backend directory, Python entrypoint, Vue project, or package-manager-specific
+file.
 
 The existing controller/action editor and its Python-specific file operations
 remain deferred compatibility functionality. They are not part of the generic
@@ -55,7 +58,11 @@ available in the Runner workspace:
     "outputDirectory": "dist"
   },
   "runtime": {
-    "command": { "executable": "node", "arguments": ["server.mjs"] },
+    "command": {
+      "executable": "node",
+      "arguments": ["server.mjs"],
+      "workingDirectory": "dist"
+    },
     "port": 8080
   }
 }
@@ -75,8 +82,13 @@ available in the Runner workspace:
 }
 ```
 
+The Node build must place both the public files and `server.mjs` in `dist`, and
+the .NET publish output must contain the `MyApp` executable under `out`. A
+public/static application still needs an HTTP server in its runtime artifact;
+there is no public static-file fallback for `runtime.command = null`.
 These examples illustrate the shape only. They are not technology detection
-rules or required project layouts.
+rules or required project layouts. A null runtime command is reserved for
+finite-work or Actions-only applications without an HTTP endpoint.
 
 ## Scope boundary
 

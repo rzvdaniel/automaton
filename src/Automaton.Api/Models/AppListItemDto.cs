@@ -28,6 +28,7 @@ public sealed class AppListEnvironmentDto
     public string? ApplicationProfile { get; init; }
     public bool RunnerOnline { get; init; }
     public bool RuntimeDeployed { get; init; }
+    public bool GenericRuntimeDeployed { get; init; }
     public bool IsStaticHosting { get; init; }
     public string RoutePath { get; init; } = string.Empty;
 }
@@ -42,6 +43,6 @@ public sealed class AppListRunnerDto
 
 public sealed class AppListRuntimeDto
 {
-    public bool RuntimeAvailable { get; init; }
+    public bool GenericRuntimeDeployed { get; init; }
     public DateTime? RuntimeDeployedAtUtc { get; init; }
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputNumber from 'primevue/inputnumber'
 import InputSwitch from 'primevue/inputswitch'
+import Button from 'primevue/button'
 import type {
   ApplicationCommandSpec,
   ApplicationContract,
@@ -17,10 +18,24 @@ function clone<T>(value: T): T {
 }
 
 const draft = reactive<ApplicationContract>(clone(props.modelValue))
+const buildArgumentsText = ref('')
+const buildEnvironmentText = ref('')
+const runtimeArgumentsText = ref('')
+const runtimeEnvironmentText = ref('')
+
+function syncTextBuffers(): void {
+  buildArgumentsText.value = formatLines(draft.build.command?.arguments ?? [])
+  buildEnvironmentText.value = formatEnvironment(draft.build.command?.environment)
+  runtimeArgumentsText.value = formatLines(draft.runtime.command?.arguments ?? [])
+  runtimeEnvironmentText.value = formatEnvironment(draft.runtime.command?.environment)
+}
 
 watch(
   () => props.modelValue,
-  (value) => Object.assign(draft, clone(value)),
+  (value) => {
+    Object.assign(draft, clone(value))
+    syncTextBuffers()
+  },
   { deep: true },
 )
 
@@ -63,10 +78,44 @@ function updateCommand(section: 'build' | 'runtime', update: Partial<Application
   emit('update:modelValue', clone(draft))
 }
 
+function setCommandText(section: 'build' | 'runtime', field: 'arguments' | 'environment', value: string): void {
+  if (section === 'build' && field === 'arguments') buildArgumentsText.value = value
+  if (section === 'build' && field === 'environment') buildEnvironmentText.value = value
+  if (section === 'runtime' && field === 'arguments') runtimeArgumentsText.value = value
+  if (section === 'runtime' && field === 'environment') runtimeEnvironmentText.value = value
+}
+
+function commitCommandText(section: 'build' | 'runtime', field: 'arguments' | 'environment'): void {
+  const value = section === 'build'
+    ? field === 'arguments' ? buildArgumentsText.value : buildEnvironmentText.value
+    : field === 'arguments' ? runtimeArgumentsText.value : runtimeEnvironmentText.value
+  updateCommand(section, { [field]: field === 'arguments' ? parseLines(value) : parseEnvironment(value) })
+}
+
 function setCommandEnabled(section: 'build' | 'runtime', enabled: boolean) {
   draft[section].command = enabled ? commandFor(section) : null
+  syncTextBuffers()
   updateContract()
 }
+
+function updateMount(index: number, field: 'name' | 'relativePath', value: string): void {
+  draft.storage.mounts = draft.storage.mounts.map((mount, mountIndex) =>
+    mountIndex === index ? { ...mount, [field]: value } : mount,
+  )
+  updateContract()
+}
+
+function addMount(): void {
+  draft.storage.mounts.push({ name: '', relativePath: '', readOnly: false })
+  updateContract()
+}
+
+function removeMount(index: number): void {
+  draft.storage.mounts.splice(index, 1)
+  updateContract()
+}
+
+syncTextBuffers()
 
 function updateContract() {
   emit('update:modelValue', clone(draft))
@@ -79,7 +128,7 @@ function updateContract() {
     <div>
       <h3 class="mt-0 mb-2">Build</h3>
       <p class="text-color-secondary mt-0">
-        The assigned Runner executes this structured command once during deployment. Leave it disabled for an in-place or static artifact.
+        The assigned Runner executes this structured command once during deployment. Leave it disabled for finite-work applications without an HTTP endpoint.
       </p>
       <div class="flex align-items-center gap-2 mb-3">
         <InputSwitch :model-value="draft.build.command !== null" input-id="build-enabled" @update:model-value="setCommandEnabled('build', $event)" />
@@ -96,11 +145,15 @@ function updateContract() {
         </div>
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="build-arguments">Arguments <small>(one per line)</small></label>
-          <Textarea id="build-arguments" :model-value="formatLines(draft.build.command.arguments)" rows="3" @update:model-value="updateCommand('build', { arguments: parseLines($event) })" />
+          <Textarea id="build-arguments" :model-value="buildArgumentsText" rows="3" @update:model-value="setCommandText('build', 'arguments', $event || '')" @blur="commitCommandText('build', 'arguments')" />
         </div>
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="build-environment">Environment <small>(KEY=value per line)</small></label>
-          <Textarea id="build-environment" :model-value="formatEnvironment(draft.build.command.environment)" rows="3" @update:model-value="updateCommand('build', { environment: parseEnvironment($event) })" />
+          <Textarea id="build-environment" :model-value="buildEnvironmentText" rows="3" @update:model-value="setCommandText('build', 'environment', $event || '')" @blur="commitCommandText('build', 'environment')" />
+        </div>
+        <div class="col-12 md:col-6 flex align-items-center gap-2">
+          <InputSwitch :model-value="draft.build.command.useShell" input-id="build-use-shell" @update:model-value="updateCommand('build', { useShell: $event })" />
+          <label for="build-use-shell">Use shell (advanced explicit semantics)</label>
         </div>
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="build-output-directory">Output directory <small>(optional)</small></label>
@@ -131,11 +184,15 @@ function updateContract() {
         </div>
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="runtime-arguments">Arguments <small>(one per line)</small></label>
-          <Textarea id="runtime-arguments" :model-value="formatLines(draft.runtime.command.arguments)" rows="3" @update:model-value="updateCommand('runtime', { arguments: parseLines($event) })" />
+          <Textarea id="runtime-arguments" :model-value="runtimeArgumentsText" rows="3" @update:model-value="setCommandText('runtime', 'arguments', $event || '')" @blur="commitCommandText('runtime', 'arguments')" />
         </div>
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="runtime-environment">Environment <small>(KEY=value per line)</small></label>
-          <Textarea id="runtime-environment" :model-value="formatEnvironment(draft.runtime.command.environment)" rows="3" @update:model-value="updateCommand('runtime', { environment: parseEnvironment($event) })" />
+          <Textarea id="runtime-environment" :model-value="runtimeEnvironmentText" rows="3" @update:model-value="setCommandText('runtime', 'environment', $event || '')" @blur="commitCommandText('runtime', 'environment')" />
+        </div>
+        <div class="col-12 md:col-6 flex align-items-center gap-2">
+          <InputSwitch :model-value="draft.runtime.command.useShell" input-id="runtime-use-shell" @update:model-value="updateCommand('runtime', { useShell: $event })" />
+          <label for="runtime-use-shell">Use shell (advanced explicit semantics)</label>
         </div>
       </div>
       <div class="grid">
@@ -166,7 +223,27 @@ function updateContract() {
           <InputText id="data-directory" v-model="draft.storage.dataDirectory" placeholder="data" @update:model-value="updateContract" />
         </div>
       </div>
-      <small class="text-color-secondary">Persistent data is kept with the application and is not part of disposable runtime artifacts.</small>
+        <small class="text-color-secondary">Persistent data is kept with the application and is not part of disposable runtime artifacts.</small>
+      <div class="mt-3 flex flex-column gap-2">
+        <div class="flex align-items-center justify-content-between">
+          <label>Storage mounts</label>
+          <Button label="Add mount" icon="pi pi-plus" text size="small" @click="addMount" />
+        </div>
+        <small class="text-color-secondary">Mount names and workspace-relative paths are persisted. Read-only mounts are not supported.</small>
+        <div v-for="(mount, index) in draft.storage.mounts" :key="index" class="grid align-items-end">
+          <div class="col-12 md:col-5 flex flex-column gap-2">
+            <label :for="`storage-mount-name-${index}`">Name</label>
+            <InputText :id="`storage-mount-name-${index}`" :model-value="mount.name" placeholder="uploads" @update:model-value="updateMount(index, 'name', $event || '')" />
+          </div>
+          <div class="col-12 md:col-5 flex flex-column gap-2">
+            <label :for="`storage-mount-path-${index}`">Relative path</label>
+            <InputText :id="`storage-mount-path-${index}`" :model-value="mount.relativePath" placeholder="data/uploads" @update:model-value="updateMount(index, 'relativePath', $event || '')" />
+          </div>
+          <div class="col-12 md:col-2">
+            <Button label="Remove" icon="pi pi-trash" severity="secondary" text size="small" @click="removeMount(index)" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

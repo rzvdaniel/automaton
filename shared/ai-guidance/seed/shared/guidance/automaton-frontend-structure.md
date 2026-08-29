@@ -43,7 +43,9 @@ uses a build-based frontend and emits the generic build/runtime contract.
 
 ## Plain HTML/CSS/JS
 
-Use this only when the user explicitly wants a no-build static structure.
+Use this only when the user explicitly wants a small static-site template. A
+public HTTP application still needs an HTTP server in its runtime artifact;
+this template does not rely on Automaton's removed static-file fallback.
 
 ```text
 my-app/
@@ -51,28 +53,34 @@ my-app/
 |-- frontend/
 |   |-- index.html
 |   |-- styles.css
-|   `-- app.js
-`-- backend/
+|   |-- app.js
+|   `-- server.mjs
+`-- package.json
 ```
 
 Rules:
 - Do not use this as the default AI-generated local app structure.
-- Use it only for an explicit no-build static request.
+- Keep the HTTP server and its runtime dependency in the application artifact.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
-Root static deployment is acceptable only for an explicit no-build static request where the project root contains public files only:
+An artifact containing only public files is not deployable as an HTTP
+application. If a no-build project is requested, include a small server and
+its dependency in the runtime artifact:
 
 ```text
 my-app/
 |-- automaton.json
 |-- index.html
 |-- styles.css
-`-- app.js
+|-- app.js
+|-- server.mjs
+`-- package.json
 ```
 
 In that case:
-    - set `application.build` to null and keep the public artifact directory as the configured deploy directory
-- do not include source-only, backend, secret, or dependency files at the root
+    - set `application.build` to null only when this complete runtime artifact is already present
+    - set `application.runtime.command` to the server executable and point its working directory at the artifact root
+- do not include secrets or unrelated source files in the artifact
 
 ## Vite + vanilla TypeScript or HTML/CSS/JS
 
@@ -123,10 +131,17 @@ export default defineConfig({
     "build": {
       "command": { "executable": "npm", "arguments": ["run", "build"], "workingDirectory": "frontend" },
       "outputDirectory": "frontend/dist"
+    },
+    "runtime": {
+      "command": { "executable": "node", "arguments": ["server.mjs"], "workingDirectory": "frontend/dist" },
+      "port": 8080
     }
   }
 }
 ```
+
+The build must place the static files and `server.mjs` in `frontend/dist` (or
+use a build output directory that contains both).
 
 ### Canonical installable PWA starter
 
@@ -297,18 +312,21 @@ Frontend-plus-backend example:
   "application": {
     "build": {
       "command": { "executable": "npm", "arguments": ["run", "build"], "workingDirectory": "frontend" },
-      "outputDirectory": "frontend/dist"
+      "outputDirectory": "dist"
     },
     "runtime": {
-      "command": { "executable": "app-server", "workingDirectory": "backend" },
+      "command": { "executable": "node", "arguments": ["server.mjs"], "workingDirectory": "dist" },
       "port": 8080
     }
   }
 }
 ```
 
-If `automaton.json` already exists, add the missing generic `application.build`
-and `application.runtime` fields instead of assuming a platform-specific layout.
+The build in this example assembles the frontend output and the server entry
+point into `dist`; the runtime command therefore points only at files contained
+in the produced artifact. If `automaton.json` already exists, add the missing
+generic `application.build` and `application.runtime` fields instead of
+assuming a platform-specific layout.
 
 ## Frontend to backend calls
 

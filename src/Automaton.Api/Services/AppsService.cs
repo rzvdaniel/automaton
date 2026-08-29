@@ -71,9 +71,6 @@ public class AppsService
                 CanLaunchPublicly = app.IsPublished &&
                     app.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     app.AccessStatus == AppAccessStatuses.Active,
-                OwnerId = app.ProjectId.HasValue
-                    ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
-                    : app.WebAppUsers.OrderBy(u => u.UserId).Select(u => (Guid?)u.UserId).FirstOrDefault(),
                 Runner = dataContext.Runners
                     .Where(runner => app.DeploymentTargets.Any(target =>
                         target.IsDefault &&
@@ -90,6 +87,8 @@ public class AppsService
                         target.Name,
                         target.Status,
                         target.RuntimeDeployed,
+                        target.GenericRuntimeDeployed,
+                        target.LastSuccessfulDeploymentAt,
                         target.Id,
                         IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
                         Runner = target.ExecutionRunner == null ? null : new
@@ -101,25 +100,8 @@ public class AppsService
                     }).FirstOrDefault()
             }).ToListAsync(cancellationToken);
 
-        using var metadataGate = new SemaphoreSlim(8);
-        var items = await Task.WhenAll(rows.Select(async row =>
+        var items = rows.Select(row =>
         {
-            var ownerId = row.OwnerId ?? UserId;
-            await metadataGate.WaitAsync(cancellationToken);
-            AppStorageMetadata metadata;
-            try
-            {
-                metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, row.Id);
-            }
-            catch (Exception exception) when (exception is IOException or JsonException)
-            {
-                logger.Warning(exception, "Unable to load app storage metadata for {AppId}; treating runtime as unavailable", row.Id);
-                metadata = new AppStorageMetadata { Frontend = new(), Backend = new() };
-            }
-            finally
-            {
-                metadataGate.Release();
-            }
             return new AppListItemDto
             {
                 Id = row.Id, Name = row.Name, Summary = row.Summary ?? string.Empty,
@@ -141,16 +123,19 @@ public class AppsService
                         row.LiveTarget.Runner.LastHeartbeatAtUtc,
                         now) == RunnerStatus.Online,
                     RuntimeDeployed = row.LiveTarget.RuntimeDeployed,
-                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.RuntimeDeployed,
+                    GenericRuntimeDeployed = row.LiveTarget.GenericRuntimeDeployed,
+                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.GenericRuntimeDeployed,
                     RoutePath = $"/private/{row.Id:D}",
                 },
                 Runtime = new AppListRuntimeDto
                 {
-                    RuntimeAvailable = metadata.Frontend.RuntimeAvailable || metadata.Backend.RuntimeAvailable,
-                    RuntimeDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc ?? metadata.Backend.RuntimeDeployedAtUtc
+                    GenericRuntimeDeployed = row.LiveTarget?.GenericRuntimeDeployed == true,
+                    RuntimeDeployedAtUtc = row.LiveTarget?.GenericRuntimeDeployed == true
+                        ? row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime
+                        : null
                 }
             };
-        }));
+        }).ToArray();
         return items;
     }
 

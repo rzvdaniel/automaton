@@ -51,11 +51,14 @@ The canonical fields are `application.build.command`,
 `application.runtime.command`, `application.health`, and
 `application.storage`.
 
-`runtime.command` is optional for applications that only produce a static
-artifact or perform finite work. When present, the Runner starts that process,
-checks TCP or the configured HTTP health path, and exposes the healthy endpoint.
-Persistent application data belongs under the configured data directory and is
-not disposable runtime output.
+Applications that require an HTTP or public endpoint must declare
+`runtime.command`. A static site must include an HTTP server in its application
+code or runtime dependency and describe that server with the same generic
+runtime contract. `runtime.command` is optional only for finite-work or
+Actions-only applications with no HTTP endpoint. When present, the Runner
+starts that process, checks TCP or the configured HTTP health path, and exposes
+the healthy endpoint. Persistent application data belongs under the configured
+data directory and is not disposable runtime output.
 
 ## Deployment and publishing
 

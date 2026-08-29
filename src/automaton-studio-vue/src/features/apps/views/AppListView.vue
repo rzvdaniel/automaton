@@ -35,7 +35,7 @@ const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
 
 const getDeploymentSummary = (app: AppListItem) => {
-  return app.runtime.runtimeAvailable ? 'Runtime deployed' : 'Not deployed yet'
+  return app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
 }
 
 const getLiveDestinationLabel = (app: AppListItem) => {
@@ -51,7 +51,7 @@ const getLiveStatusLabel = (app: AppListItem) => {
   const environment = app.liveEnvironment
   if (!environment) return app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.runtimeDeployed) return 'Unassigned'
+  if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 }
 

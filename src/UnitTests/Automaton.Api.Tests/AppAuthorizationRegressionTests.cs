@@ -42,7 +42,7 @@ public class AppAuthorizationRegressionTests
             Assert.That(app.Summary, Is.EqualTo("Card summary"));
             Assert.That(app.Runner, Is.Null);
             Assert.That(app.CanDelete, Is.True);
-            Assert.That(app.Runtime.RuntimeAvailable, Is.False);
+            Assert.That(app.Runtime.GenericRuntimeDeployed, Is.False);
         });
     }
 
@@ -162,34 +162,58 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
-    public async Task ListAsync_MapsGenericRuntimeDeploymentMetadata()
+    public async Task ListAsync_MapsTargetLocalGenericRuntimeDeploymentState()
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var updatedAtUtc = DateTime.UtcNow.AddDays(-2);
         var frontendAtUtc = DateTime.UtcNow.AddHours(-3);
-        var backendAtUtc = DateTime.UtcNow.AddHours(-1);
         using var tempRoot = new TemporaryDirectory();
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "metadata-app");
         dbContext.WebApps.Single().Updated = updatedAtUtc;
+        var target = dbContext.AppDeploymentTargets.Single();
+        target.GenericRuntimeDeployed = true;
+        target.LastSuccessfulDeploymentAt = frontendAtUtc;
         await dbContext.SaveChangesAsync();
 
-        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out var storage);
-        await storage.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
-        {
-            metadata.Frontend.RuntimeAvailable = true;
-            metadata.Frontend.RuntimeDeployedAtUtc = frontendAtUtc;
-            metadata.Backend.RuntimeAvailable = true;
-            metadata.Backend.RuntimeDeployedAtUtc = backendAtUtc;
-        });
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out _);
 
         var app = (await service.ListAsync(cancellationToken: CancellationToken.None)).Single();
         Assert.Multiple(() =>
         {
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
             Assert.That(app.Runtime.RuntimeDeployedAtUtc, Is.EqualTo(frontendAtUtc));
-            Assert.That(app.Runtime.RuntimeAvailable, Is.True);
+            Assert.That(app.Runtime.GenericRuntimeDeployed, Is.True);
+            Assert.That(app.LiveEnvironment!.GenericRuntimeDeployed, Is.True);
+        });
+    }
+
+    [Test]
+    public async Task ListAsync_LegacyStorageMetadataCannotManufactureGenericRuntimeAvailability()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "legacy-metadata-app");
+        var target = dbContext.AppDeploymentTargets.Single();
+        target.RuntimeDeployed = true;
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out var storage);
+        await storage.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.Frontend.RuntimeAvailable = true;
+            metadata.Backend.RuntimeAvailable = true;
+        });
+
+        var app = (await service.ListAsync(cancellationToken: CancellationToken.None)).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.Runtime.GenericRuntimeDeployed, Is.False);
+            Assert.That(app.LiveEnvironment!.GenericRuntimeDeployed, Is.False);
         });
     }
 
@@ -212,7 +236,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(apps, Has.Count.EqualTo(2));
         var corrupt = apps.Single(app => app.Id == corruptAppId);
-        Assert.That(corrupt.Runtime.RuntimeAvailable, Is.False);
+        Assert.That(corrupt.Runtime.GenericRuntimeDeployed, Is.False);
     }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
