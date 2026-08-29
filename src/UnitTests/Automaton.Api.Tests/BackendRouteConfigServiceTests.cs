@@ -100,6 +100,47 @@ public class BackendRouteConfigServiceTests
     }
 
     [Test]
+    public async Task RefreshAsync_UsesTargetLocalPromotionWhenAnotherTargetChangesAppContract()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var targetA = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        targetA.RuntimeDeployed = true;
+        targetA.GenericRuntimeDeployed = true;
+        var targetB = new AppDeploymentTarget
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = appId,
+            Name = "Preview",
+            Slug = "preview",
+            ExecutionRunnerId = runnerId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        targetB.SynchronizeDefaultConstraint();
+        AddHostedRunner(dbContext, runnerId);
+        AddApp(dbContext, appId, targetA, GenericRuntimeContractJson());
+        var app = dbContext.WebApps.Local.Single();
+        app.DeploymentTargets.Add(targetB);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, rootPath);
+        await service.RefreshAsync();
+        var routePath = Path.Combine(rootPath, "managed-runtime-routes.yml");
+        var routeBeforeTargetBDeployment = await File.ReadAllTextAsync(routePath);
+
+        app.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract());
+        targetB.RuntimeDeployed = true;
+        targetB.GenericRuntimeDeployed = false;
+        await dbContext.SaveChangesAsync();
+        await service.RefreshAsync();
+
+        Assert.That(await File.ReadAllTextAsync(routePath), Is.EqualTo(routeBeforeTargetBDeployment));
+    }
+
+    [Test]
     public async Task RefreshAsync_WritesIndependentRoute_ForNamedTarget()
     {
         var rootPath = CreateTempDirectory();
@@ -183,7 +224,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.RuntimeDeployed = true;
-        target.GenericRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
@@ -358,7 +398,7 @@ public class BackendRouteConfigServiceTests
     }
 
     [Test]
-    public async Task RefreshAsync_DoesNotRouteDeploymentWithoutRuntimeCommand()
+    public async Task RefreshAsync_DoesNotRouteTargetWithoutGenericPromotionMarker()
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
@@ -366,7 +406,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.RuntimeDeployed = true;
-        target.GenericRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target);
         await dbContext.SaveChangesAsync();
@@ -425,6 +464,45 @@ public class BackendRouteConfigServiceTests
         await service.RefreshAsync();
 
         Assert.That(await File.ReadAllTextAsync(routePath), Is.EqualTo(healthyRoute));
+    }
+
+    [Test]
+    public async Task RefreshAsync_LegacyCompletionAfterRunnerReassignmentDoesNotResurrectRoute()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var appId = Guid.NewGuid();
+        var oldRunnerId = Guid.NewGuid();
+        var newRunnerId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, oldRunnerId);
+        target.RuntimeDeployed = true;
+        target.GenericRuntimeDeployed = true;
+        AddHostedRunner(dbContext, oldRunnerId);
+        AddHostedRunner(dbContext, newRunnerId);
+        AddApp(dbContext, appId, target, GenericRuntimeContractJson());
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext, rootPath);
+
+        await service.RefreshAsync();
+        var routePath = Path.Combine(rootPath, "managed-runtime-routes.yml");
+        Assert.That(File.Exists(routePath), Is.True);
+
+        target.ExecutionRunnerId = newRunnerId;
+        target.RuntimeDeployed = false;
+        target.GenericRuntimeDeployed = false;
+        await dbContext.SaveChangesAsync();
+
+        var stateService = new AppDeploymentTargetStateService(dbContext);
+        await stateService.MarkStartedAsync(appId, target.Id);
+        await stateService.MarkCompletedAsync(
+            appId,
+            target.Id,
+            success: true,
+            runtimeDeployed: true);
+        await service.RefreshAsync();
+
+        Assert.That(File.Exists(routePath), Is.False);
+        Assert.That(target.GenericRuntimeDeployed, Is.False);
     }
 
     private static void AddHostedRunner(ApplicationDbContext dbContext, Guid runnerId)

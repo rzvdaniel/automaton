@@ -172,7 +172,6 @@ public class AppDeploymentTargetStateServiceTests
         await db.SaveChangesAsync();
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         var service = new AppDeploymentTargetStateService(db);
-
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
             app.Id,
@@ -217,6 +216,7 @@ public class AppDeploymentTargetStateServiceTests
         await db.SaveChangesAsync();
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         var service = new AppDeploymentTargetStateService(db);
+        target.GenericRuntimeDeployed = true;
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
@@ -226,6 +226,7 @@ public class AppDeploymentTargetStateServiceTests
         {
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
             Assert.That(target.RuntimeDeployed, Is.False);
+            Assert.That(target.GenericRuntimeDeployed, Is.True);
             Assert.That(target.LastDeploymentAt, Is.Not.Null);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Null);
         });
@@ -238,17 +239,23 @@ public class AppDeploymentTargetStateServiceTests
         var app = AddAppWithTwoTargets(db);
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         target.RuntimeDeployed = true;
+        target.GenericRuntimeDeployed = true;
         await db.SaveChangesAsync();
         var service = new AppDeploymentTargetStateService(db);
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
-            app.Id, target.Id, success: true, runtimeDeployed: false);
+            app.Id,
+            target.Id,
+            success: true,
+            runtimeDeployed: false,
+            genericRuntimeDeployed: false);
 
         Assert.Multiple(() =>
         {
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
             Assert.That(target.RuntimeDeployed, Is.False);
+            Assert.That(target.GenericRuntimeDeployed, Is.False);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Not.Null);
         });
     }

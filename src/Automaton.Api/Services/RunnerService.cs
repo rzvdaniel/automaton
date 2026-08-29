@@ -977,6 +977,8 @@ public class RunnerService
             {
                 target.ExecutionRunnerId = null;
                 target.ExecutionRunner = null;
+                target.RuntimeDeployed = false;
+                target.GenericRuntimeDeployed = false;
                 target.Status = DeploymentTargetStatus.Unassigned;
                 target.UpdatedAt = DateTimeOffset.UtcNow;
             }
