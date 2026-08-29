@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Hosting;
@@ -144,6 +145,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     DeploymentTargetId = deploymentTargetId.ToString(),
                     Runtime = contract.Runtime,
                     Health = contract.Health,
+                    Storage = contract.Storage,
                     State = RuntimeReadinessState.Stopped
                 },
                 cancellationToken);
@@ -156,6 +158,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             DeploymentTargetId = deploymentTargetId.ToString(),
             Runtime = contract.Runtime,
             Health = contract.Health,
+            Storage = contract.Storage,
             ArtifactRoot = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(
                 appId,
                 deploymentTargetId,
@@ -222,7 +225,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         Directory.CreateDirectory(targetRoot);
         var workingDirectory = ResolveWorkspacePath(targetRoot, command.WorkingDirectory, "working directory");
         var executable = ResolveExecutable(targetRoot, command.Executable);
-        var logDirectory = Path.Combine(targetRoot, "logs");
+        var storage = workspace.PrepareApplicationStorage(
+            appId,
+            candidate.Storage ?? new ApplicationStorageSpec());
+        var logDirectory = workspace.GetAppRuntimeLogsDirectory(
+            appId,
+            deploymentTargetId,
+            candidate.ArtifactId ?? Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(logDirectory);
         var stdout = CreateLogWriter(Path.Combine(logDirectory, "runtime.stdout.log"));
         var stderr = CreateLogWriter(Path.Combine(logDirectory, "runtime.stderr.log"));
@@ -238,7 +247,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 effectivePort,
                 appId,
                 deploymentTargetId,
-                targetRoot);
+                targetRoot,
+                storage);
             process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Could not start runtime process for app {appId}.");
             process.OutputDataReceived += (_, args) => WriteLine(stdout, args.Data);
@@ -329,6 +339,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
             metadata.Runtime = candidateMetadata.Runtime;
             metadata.Health = candidateMetadata.Health;
+            metadata.Storage = candidateMetadata.Storage;
             metadata.EffectivePort = candidateMetadata.EffectivePort;
             metadata.ProcessId = candidateMetadata.ProcessId;
             metadata.ProcessStartTimeUtc = candidateMetadata.ProcessStartTimeUtc;
@@ -497,7 +508,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         catch (ArgumentException)
         {
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or COMException)
         {
         }
         catch (System.ComponentModel.Win32Exception)
@@ -516,6 +527,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             DeploymentTargetId = deploymentTargetId.ToString(),
             Runtime = previous?.Runtime,
             Health = previous?.Health,
+            Storage = previous?.Storage,
             EffectivePort = previous?.EffectivePort,
             ProcessId = previous?.ProcessId,
             ProcessStartTimeUtc = previous?.ProcessStartTimeUtc,
@@ -535,6 +547,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             DeploymentTargetId = current.DeploymentTargetId,
             Runtime = current.Runtime,
             Health = current.Health,
+            Storage = current.Storage,
             ArtifactRoot = current.ArtifactRoot,
             ArtifactId = current.ArtifactId,
             State = RuntimeReadinessState.Starting
@@ -561,7 +574,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         if (string.Equals(fullArtifactRoot, canonicalRoot, StringComparison.OrdinalIgnoreCase))
             return fullArtifactRoot;
 
-        var runtimeRoot = Path.GetFullPath(workspace.GetAppRuntimeRoot(appId, deploymentTargetId));
+        var artifactsRoot = Path.GetFullPath(workspace.GetAppArtifactsRoot(appId, deploymentTargetId));
         var candidateDirectory = Directory.GetParent(fullArtifactRoot);
         var candidatesDirectory = candidateDirectory is null
             ? null
@@ -574,7 +587,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             && candidatesDirectory is not null
             && candidateContainerParent is not null
             && string.Equals(Path.GetFileName(candidatesDirectory.FullName), "candidates", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(candidateContainerParent.FullName, runtimeRoot, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(candidateContainerParent.FullName, artifactsRoot, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(Path.GetFileName(candidateDirectory.FullName))
             && Path.GetFileName(candidateDirectory.FullName) is not "." and not "..")
             return fullArtifactRoot;
@@ -590,23 +603,24 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             return;
 
         var fullArtifactRoot = Path.GetFullPath(artifactRoot);
-        var appsRoot = Path.GetFullPath(workspace.AppsRoot).TrimEnd(Path.DirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
-        if (!fullArtifactRoot.StartsWith(appsRoot, StringComparison.OrdinalIgnoreCase))
+        var appsRoot = Path.GetFullPath(workspace.AppsRoot);
+        if (!ManagedPathBoundary.IsWithin(appsRoot, fullArtifactRoot))
             throw new InvalidOperationException("Runtime artifact root is outside the runner workspace.");
         if (!string.Equals(Path.GetFileName(fullArtifactRoot), "application", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Runtime artifact root is not a managed application directory.");
 
-        var candidateContainer = Directory.GetParent(fullArtifactRoot)?.FullName;
-        var containerParent = candidateContainer is null
+        var container = Directory.GetParent(fullArtifactRoot)?.FullName;
+        var containerParent = container is null
             ? null
-            : Directory.GetParent(candidateContainer)?.FullName;
+            : Directory.GetParent(container)?.FullName;
         if (containerParent is not null
             && string.Equals(Path.GetFileName(containerParent), "candidates", StringComparison.OrdinalIgnoreCase))
-            DeleteDirectoryIfExists(candidateContainer!);
-        else if (containerParent is not null
-            && string.Equals(Path.GetFileName(containerParent), "runtime", StringComparison.OrdinalIgnoreCase))
-            DeleteDirectoryIfExists(fullArtifactRoot);
+            DeleteDirectoryIfExists(container!);
+        else if (container is not null
+            && string.Equals(Path.GetFileName(container), "current", StringComparison.OrdinalIgnoreCase)
+            && containerParent is not null
+            && string.Equals(Path.GetFileName(containerParent), "artifacts", StringComparison.OrdinalIgnoreCase))
+            DeleteDirectoryIfExists(container);
         else
             throw new InvalidOperationException("Runtime artifact root is not a managed application directory.");
     }
@@ -661,7 +675,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         int effectivePort,
         Guid appId,
         Guid deploymentTargetId,
-        string targetRoot)
+        string targetRoot,
+        RunnerApplicationStorageRuntime storage)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -702,6 +717,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         startInfo.Environment["AUTOMATON_APP_ID"] = appId.ToString();
         startInfo.Environment["AUTOMATON_DEPLOYMENT_TARGET_ID"] = deploymentTargetId.ToString();
         startInfo.Environment["AUTOMATON_RUNTIME_ROOT"] = targetRoot;
+        startInfo.Environment["AUTOMATON_APP_DATA_DIR"] = storage.DataDirectory;
+        foreach (var mount in storage.Mounts)
+            startInfo.Environment[$"AUTOMATON_STORAGE_{mount.Key.ToUpperInvariant()}"] = mount.Value;
         return startInfo;
     }
 
@@ -772,7 +790,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     }
 
     private string GetMetadataPath(Guid appId, Guid deploymentTargetId)
-        => Path.Combine(workspace.GetDeploymentTargetRoot(appId, deploymentTargetId), MetadataFileName);
+        => Path.Combine(workspace.GetAppAutomationRoot(appId, deploymentTargetId), MetadataFileName);
 
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadMetadataAsync(
         string path,
@@ -841,23 +859,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     }
 
     private static string ResolveWorkspacePath(string root, string relativePath, string description)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath)
-            || Path.IsPathRooted(relativePath)
-            || (relativePath.Length >= 2 && char.IsLetter(relativePath[0]) && relativePath[1] == ':'))
-            throw new InvalidOperationException($"Runtime {description} must be relative to the managed application workspace.");
-
-        var normalized = relativePath.Replace('\\', '/');
-        if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is ".."))
-            throw new InvalidOperationException($"Runtime {description} must remain inside the managed application workspace.");
-
-        var fullRoot = Path.GetFullPath(root);
-        var fullPath = Path.GetFullPath(Path.Combine(fullRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
-        if (!fullPath.StartsWith(fullRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Runtime {description} must remain inside the managed application workspace.");
-        return fullPath;
-    }
+        => ManagedPathBoundary.ResolveInside(
+            root,
+            relativePath,
+            $"Runtime {description}");
 
     private static bool IsBareExecutable(string value)
         => !string.IsNullOrWhiteSpace(value)
@@ -914,7 +919,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 await process.WaitForExitAsync(CancellationToken.None)
                     .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
             }
-            catch (Exception cleanupException) when (cleanupException is InvalidOperationException or TimeoutException)
+            catch (Exception cleanupException) when (cleanupException is InvalidOperationException or TimeoutException or COMException)
             {
             }
         }
@@ -1014,6 +1019,7 @@ public sealed class RunnerRuntimeDeploymentMetadata
     public string DeploymentTargetId { get; set; } = string.Empty;
     public ApplicationRuntimeSpec? Runtime { get; set; }
     public ApplicationHealthSpec? Health { get; set; }
+    public ApplicationStorageSpec? Storage { get; set; }
     public int? EffectivePort { get; set; }
     public int? ProcessId { get; set; }
     public DateTimeOffset? ProcessStartTimeUtc { get; set; }

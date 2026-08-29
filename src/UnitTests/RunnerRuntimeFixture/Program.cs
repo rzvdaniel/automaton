@@ -52,7 +52,9 @@ if (args.Contains("--fail-with-output", StringComparer.Ordinal))
 }
 
 var port = int.Parse(Environment.GetEnvironmentVariable("AUTOMATON_PORT")!);
-Console.WriteLine($"stdout:{string.Join('|', args)}:{Environment.GetEnvironmentVariable("TEST_RUNTIME_VALUE")}");
+Console.WriteLine($"stdout:{string.Join('|', args)}:{Environment.GetEnvironmentVariable("TEST_RUNTIME_VALUE")}:" +
+    $"{Environment.GetEnvironmentVariable("AUTOMATON_APP_DATA_DIR")}:" +
+    $"{Environment.GetEnvironmentVariable("AUTOMATON_STORAGE_UPLOADS")}");
 Console.Error.WriteLine("stderr:fixture");
 Console.Out.Flush();
 Console.Error.Flush();

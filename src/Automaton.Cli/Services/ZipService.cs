@@ -74,12 +74,19 @@ public static class ZipService
                 "Set application.build.outputDirectory or pass --dir with an explicit project-relative directory.");
         }
 
-        var explicitPath = Path.GetFullPath(Path.Combine(projectRoot, deployDir));
-        var fullProjectRoot = Path.GetFullPath(projectRoot);
-        if (!explicitPath.StartsWith(fullProjectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(explicitPath, fullProjectRoot, StringComparison.OrdinalIgnoreCase))
+        string explicitPath;
+        try
         {
-            throw new InvalidOperationException($"artifact directory '{deployDir}' points outside the project root");
+            explicitPath = ManagedPathBoundary.ResolveInside(
+                projectRoot,
+                deployDir,
+                $"artifact directory '{deployDir}'");
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException(
+                $"artifact directory '{deployDir}' points outside the project root",
+                ex);
         }
 
         if (Directory.Exists(explicitPath)) return explicitPath;

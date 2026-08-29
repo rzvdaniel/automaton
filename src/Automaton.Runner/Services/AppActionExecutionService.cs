@@ -245,7 +245,7 @@ public sealed class AppActionExecutionService
         foreach (var executionsDirectory in Directory.GetDirectories(workspace.AppsRoot, "executions", SearchOption.AllDirectories))
         {
             var normalized = executionsDirectory.Replace('\\', '/');
-            if (!normalized.Contains("/runtime/actions/", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!normalized.Contains("/artifacts/current/actions/", StringComparison.OrdinalIgnoreCase)) continue;
             foreach (var directory in Directory.GetDirectories(executionsDirectory))
             {
                 if (Directory.GetLastWriteTimeUtc(directory) + ArtifactRetention > now) continue;

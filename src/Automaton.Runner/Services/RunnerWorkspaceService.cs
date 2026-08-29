@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -23,13 +24,11 @@ public class RunnerWorkspaceService
         ConfiguredWorkspaceRoot
         ?? GetDefaultWorkspaceRoot());
 
-    public string AppsRoot => UseLegacyScriptsLayout
-        ? Path.GetFullPath(ConfiguredRunnerScriptsDir!)
-        : GetFullPath(WorkspaceRoot, "apps");
+    // Generic runner storage always uses the configured workspace boundary.
+    // RUNNER_SCRIPTS_DIR is retained only by the deferred controller bridge.
+    public string AppsRoot => GetFullPath(WorkspaceRoot, "apps");
 
-    public string DataRoot => UseLegacyScriptsLayout
-        ? GetFullPath(Path.GetDirectoryName(AppsRoot) ?? WorkspaceRoot, "data")
-        : GetFullPath(WorkspaceRoot, "data");
+    public string DataRoot => GetFullPath(WorkspaceRoot, "data");
 
     public string CacheRoot => GetFullPath(WorkspaceRoot, "cache");
 
@@ -37,12 +36,30 @@ public class RunnerWorkspaceService
 
     public string GetFastApiScriptsRoot()
     {
-        return AppsRoot;
+        return UseLegacyScriptsLayout
+            ? Path.GetFullPath(ConfiguredRunnerScriptsDir!)
+            : AppsRoot;
     }
 
     public string GetAppRoot(Guid appId)
     {
         return GetFullPath(AppsRoot, appId.ToString());
+    }
+
+    private string GetLegacyControllerAppRoot(Guid appId)
+        => GetFullPath(GetFastApiScriptsRoot(), appId.ToString());
+
+    private string GetLegacyControllerTargetRoot(Guid appId, Guid deploymentTargetId)
+    {
+        if (appId == Guid.Empty)
+            throw new ArgumentException("App ID is required.", nameof(appId));
+        if (deploymentTargetId == Guid.Empty)
+            throw new ArgumentException(
+                "Deployment target ID is required.",
+                nameof(deploymentTargetId));
+        return GetFullPath(
+            GetFullPath(GetLegacyControllerAppRoot(appId), "targets"),
+            deploymentTargetId.ToString());
     }
 
     public string GetDeploymentTargetRoot(Guid appId, Guid deploymentTargetId)
@@ -58,8 +75,46 @@ public class RunnerWorkspaceService
             deploymentTargetId.ToString());
     }
 
+    public string GetAppWorkspaceRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "workspace");
+
+    public string GetAppAutomationRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "automaton");
+
+    public string GetAppArtifactsRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "artifacts");
+
+    public string GetAppLogsRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "logs");
+
+    public string GetAppCacheRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "cache");
+
+    public string GetAppRuntimeLogsDirectory(
+        Guid appId,
+        Guid deploymentTargetId,
+        string runtimeIdentity)
+    {
+        if (string.IsNullOrWhiteSpace(runtimeIdentity)
+            || runtimeIdentity.Any(character => !(char.IsLetterOrDigit(character) || character is '-' or '_')))
+            throw new ArgumentException("Runtime identity is invalid.", nameof(runtimeIdentity));
+        return GetFullPath(GetAppLogsRoot(appId, deploymentTargetId), runtimeIdentity);
+    }
+
+    public RunnerApplicationStoragePaths GetApplicationStoragePaths(Guid appId, Guid deploymentTargetId)
+        => new(
+            GetAppRoot(appId),
+            GetAppWorkspaceRoot(appId, deploymentTargetId),
+            GetAppSourceRoot(appId, deploymentTargetId),
+            GetAppAutomationRoot(appId, deploymentTargetId),
+            GetAppArtifactsRoot(appId, deploymentTargetId),
+            GetAppRuntimeRoot(appId, deploymentTargetId),
+            GetAppLogsRoot(appId, deploymentTargetId),
+            GetAppCacheRoot(appId, deploymentTargetId),
+            GetAppDataDirectory(appId));
+
     public string GetAppSourceRoot(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "source");
+        => GetFullPath(GetAppWorkspaceRoot(appId, deploymentTargetId), "source");
 
     public string GetAppRuntimeRoot(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "runtime");
@@ -70,11 +125,14 @@ public class RunnerWorkspaceService
     /// contract does not know this workspace layout.
     /// </summary>
     public string GetAppRuntimeApplicationDirectory(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "application");
+        => GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current", "application");
+
+    public string GetAppRuntimeCurrentDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current");
 
     public string GetAppRuntimeCandidateDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
         => GetFullPath(
-            GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "candidates"),
+            GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "candidates"),
             candidateId.ToString());
 
     public string GetAppRuntimeCandidateApplicationDirectory(Guid appId, Guid deploymentTargetId, Guid candidateId)
@@ -87,13 +145,13 @@ public class RunnerWorkspaceService
         => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "backend");
 
     public string GetAppRuntimeFrontendDirectory(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "frontend");
+        => GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current", "frontend");
 
     public string GetAppSourceActionsDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "actions");
 
     public string GetAppRuntimeActionsDirectory(Guid appId, Guid deploymentTargetId)
-        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "actions");
+        => GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current", "actions");
 
     public string GetAppActionRuntimeRoot(Guid appId, Guid deploymentTargetId, string actionKey)
     {
@@ -110,32 +168,106 @@ public class RunnerWorkspaceService
     public string GetAppActionExecutionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "executions");
 
-    public string GetAppBackendDirectory(Guid appId, Guid deploymentTargetId)
-    {
-        return GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "backend");
-    }
+    /// <summary>
+    /// Legacy controller bridge location. Generic applications must not use
+    /// this path; it remains aligned with controller_runner.py until that
+    /// bridge is removed in a later stage.
+    /// </summary>
+    public string GetLegacyControllerBackendDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetLegacyControllerTargetRoot(appId, deploymentTargetId), "runtime", "backend");
 
-    public string GetAppVenvDirectory(Guid appId, Guid deploymentTargetId)
-    {
-        return GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "venv");
-    }
+    /// <summary>
+    /// Legacy controller bridge virtual environment location.
+    /// </summary>
+    public string GetLegacyControllerVenvDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetLegacyControllerTargetRoot(appId, deploymentTargetId), "venv");
+
+    /// <summary>
+    /// Legacy controller bridge data location. In legacy scripts-layout mode
+    /// this remains beside the configured scripts root because FastAPI uses it;
+    /// generic runtime storage continues to use GetAppDataDirectory.
+    /// </summary>
+    public string GetLegacyControllerDataDirectory(Guid appId)
+        => UsesLegacyScriptsLayout
+            ? GetFullPath(GetLegacyControllerAppRoot(appId), "data")
+            : GetAppDataDirectory(appId);
 
     public string GetAppVersionsDirectory(Guid appId, Guid deploymentTargetId)
     {
-        return GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "versions");
+        return GetFullPath(GetAppAutomationRoot(appId, deploymentTargetId), "snapshots");
     }
 
     public string GetAppDataDirectory(Guid appId)
     {
-        return UseLegacyScriptsLayout
-            ? GetFullPath(GetAppRoot(appId), "data")
-            : GetFullPath(DataRoot, appId.ToString());
+        return GetFullPath(DataRoot, appId.ToString());
+    }
+
+    public string ResolveApplicationDataPath(Guid appId, string relativePath)
+        => ManagedPathBoundary.ResolveInside(
+            GetAppDataDirectory(appId),
+            relativePath,
+            "application persistent-data path");
+
+    public RunnerApplicationStorageRuntime PrepareApplicationStorage(
+        Guid appId,
+        ApplicationStorageSpec storage)
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+        ApplicationContractValidator.EnsureValid(new ApplicationContract { Storage = storage });
+
+        var dataDirectory = ResolveApplicationDataPath(appId, storage.DataDirectory);
+        Directory.CreateDirectory(dataDirectory);
+        var mounts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var mount in storage.Mounts)
+        {
+            var mountPath = ResolveApplicationDataPath(appId, mount.RelativePath);
+            Directory.CreateDirectory(mountPath);
+            mounts.Add(mount.Name, mountPath);
+        }
+
+        return new RunnerApplicationStorageRuntime(dataDirectory, mounts);
+    }
+
+    /// <summary>
+    /// Deletes deployment-target-owned state while preserving the application's
+    /// persistent data root. Persistent data has a separate explicit operation.
+    /// </summary>
+    public void DeleteApplicationTarget(Guid appId, Guid deploymentTargetId)
+    {
+        var targetRoots = new[]
+        {
+            GetDeploymentTargetRoot(appId, deploymentTargetId),
+            GetLegacyControllerTargetRoot(appId, deploymentTargetId)
+        };
+
+        foreach (var targetRoot in targetRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (Directory.Exists(targetRoot))
+                Directory.Delete(targetRoot, recursive: true);
+        }
+    }
+
+    public void DeletePersistentApplicationData(Guid appId)
+    {
+        var dataRoot = GetAppDataDirectory(appId);
+        if (Directory.Exists(dataRoot))
+            Directory.Delete(dataRoot, recursive: true);
+    }
+
+    public string ResolveStorageMountPath(Guid appId, ApplicationStorageMount mount)
+    {
+        ArgumentNullException.ThrowIfNull(mount);
+        ApplicationContractValidator.EnsureValid(new ApplicationContract
+        {
+            Storage = new ApplicationStorageSpec { Mounts = [mount] }
+        });
+        return ResolveApplicationDataPath(appId, mount.RelativePath);
     }
 
     public string ResolveBackendUploadPath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
         return ResolveRelativePath(
-            GetAppBackendDirectory(appId, deploymentTargetId),
+            GetLegacyControllerBackendDirectory(appId, deploymentTargetId),
             relativePath,
             "deployment target backend");
     }
@@ -143,21 +275,24 @@ public class RunnerWorkspaceService
     public string ResolveRunnerFilePath(Guid appId, Guid deploymentTargetId, string relativePath, string area)
     {
         var rootDirectory = area == AppRunnerFileAreas.Data
-            ? GetAppDataDirectory(appId)
-            : GetAppBackendDirectory(appId, deploymentTargetId);
+            ? GetLegacyControllerDataDirectory(appId)
+            : GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
 
         return ResolveRelativePath(rootDirectory, relativePath, "requested app directory");
     }
 
     public string ResolveAppMediaFilePath(Guid appId, string relativePath)
     {
-        return ResolveRelativePath(GetFullPath(GetAppDataDirectory(appId), "media"), relativePath, "app media directory");
+        return ResolveRelativePath(
+            GetFullPath(GetLegacyControllerDataDirectory(appId), "media"),
+            relativePath,
+            "app media directory");
     }
 
     public string ResolveAppBackendFilePath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
         return ResolveRelativePath(
-            GetAppBackendDirectory(appId, deploymentTargetId),
+            GetLegacyControllerBackendDirectory(appId, deploymentTargetId),
             relativePath,
             "deployment target backend directory");
     }
@@ -177,6 +312,12 @@ public class RunnerWorkspaceService
 
     private static string GetDefaultWorkspaceRoot()
     {
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(RunnerScriptsDirEnvironmentVariable)))
+        {
+            var scriptsRoot = Path.GetFullPath(Environment.GetEnvironmentVariable(RunnerScriptsDirEnvironmentVariable)!);
+            return Path.GetFullPath(Path.Combine(scriptsRoot, ".."));
+        }
+
         if (IsRunningInContainer())
         {
             return "/automaton/workspace";
@@ -185,24 +326,312 @@ public class RunnerWorkspaceService
         return Path.Combine(AppContext.BaseDirectory, "workspace");
     }
 
+    /// <summary>
+    /// Moves the pre-Stage 4 target layout into the explicit workspace,
+    /// artifact, log, cache, and automation roots. It is intentionally a
+    /// one-way migration: persistent source/data are retained, while old
+    /// directory names are not used as generic fallbacks afterward.
+    /// </summary>
+    public void MigrateLegacyLayout()
+    {
+        var legacyAppsRoots = new List<string> { AppsRoot };
+        var controllerAppsRoot = GetFastApiScriptsRoot();
+        if (UsesLegacyScriptsLayout
+            && !string.Equals(AppsRoot, controllerAppsRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            legacyAppsRoots.Add(controllerAppsRoot);
+        }
+
+        foreach (var legacyAppsRoot in legacyAppsRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(legacyAppsRoot))
+                continue;
+
+            ManagedPathBoundary.EnsureNoReparsePointEscape(
+                WorkspaceRoot,
+                legacyAppsRoot,
+                "legacy runner app root");
+
+            var preserveControllerData = UsesLegacyScriptsLayout
+                && string.Equals(legacyAppsRoot, controllerAppsRoot, StringComparison.OrdinalIgnoreCase);
+            foreach (var appRoot in Directory.GetDirectories(legacyAppsRoot))
+            {
+                ManagedPathBoundary.EnsureNoReparsePointEscape(
+                    legacyAppsRoot,
+                    appRoot,
+                    "legacy app directory");
+                if (!Guid.TryParse(Path.GetFileName(appRoot), out var appId))
+                    continue;
+
+                var oldData = Path.Combine(appRoot, "data");
+                if (!preserveControllerData && (Directory.Exists(oldData) || File.Exists(oldData)))
+                    MoveTree(oldData, GetAppDataDirectory(appId));
+
+                var targetsRoot = Path.Combine(appRoot, "targets");
+                if (!Directory.Exists(targetsRoot))
+                    continue;
+
+                ManagedPathBoundary.EnsureNoReparsePointEscape(
+                    legacyAppsRoot,
+                    targetsRoot,
+                    "legacy deployment targets");
+                foreach (var targetRoot in Directory.GetDirectories(targetsRoot))
+                {
+                    if (Guid.TryParse(Path.GetFileName(targetRoot), out var targetId))
+                        MigrateLegacyTarget(legacyAppsRoot, targetRoot, appId, targetId);
+                }
+            }
+        }
+    }
+
+    private void MigrateLegacyTarget(
+        string legacyAppsRoot,
+        string oldTargetRoot,
+        Guid appId,
+        Guid deploymentTargetId)
+    {
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            legacyAppsRoot,
+            oldTargetRoot,
+            "legacy deployment target");
+
+        var oldSource = Path.Combine(oldTargetRoot, "source");
+        if (Directory.Exists(oldSource))
+            MoveTree(oldSource, GetAppSourceRoot(appId, deploymentTargetId));
+
+        var oldRuntime = Path.Combine(oldTargetRoot, "runtime");
+        if (Directory.Exists(oldRuntime))
+        {
+            ManagedPathBoundary.EnsureNoReparsePointEscape(
+                legacyAppsRoot,
+                oldRuntime,
+                "legacy runtime tree");
+            var current = GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current");
+            var oldApplication = Path.Combine(oldRuntime, "application");
+            if (Directory.Exists(oldApplication))
+                MoveTree(oldApplication, GetAppRuntimeApplicationDirectory(appId, deploymentTargetId));
+
+            var oldCandidates = Path.Combine(oldRuntime, "candidates");
+            if (Directory.Exists(oldCandidates))
+                MoveTree(oldCandidates, GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "candidates"));
+
+            foreach (var entry in Directory.GetFileSystemEntries(oldRuntime))
+            {
+                if (string.Equals(Path.GetFileName(entry), "application", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.GetFileName(entry), "backend", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.GetFileName(entry), "candidates", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (string.Equals(Path.GetFileName(entry), "logs", StringComparison.OrdinalIgnoreCase))
+                    MoveTree(
+                        entry,
+                        Directory.Exists(entry)
+                            ? GetAppLogsRoot(appId, deploymentTargetId)
+                            : Path.Combine(GetAppLogsRoot(appId, deploymentTargetId), Path.GetFileName(entry)));
+                else
+                    MoveTree(
+                        entry,
+                        Directory.Exists(entry)
+                            ? current
+                            : Path.Combine(current, Path.GetFileName(entry)));
+            }
+
+            DeleteEmptyDirectory(oldRuntime);
+        }
+
+        MigrateMetadataFile(
+            Path.Combine(oldTargetRoot, "deployment.json"),
+            Path.Combine(GetAppAutomationRoot(appId, deploymentTargetId), "deployment.json"),
+            oldRuntime,
+            GetAppArtifactsRoot(appId, deploymentTargetId));
+        // Keep the legacy controller venv at target/venv until the controller
+        // bridge is removed. It is not a generic runtime cache.
+        MoveTree(
+            Path.Combine(oldTargetRoot, "versions"),
+            GetAppVersionsDirectory(appId, deploymentTargetId));
+    }
+
+    private void MoveTree(string source, string destination)
+    {
+        if (!Directory.Exists(source) && !File.Exists(source))
+            return;
+
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            WorkspaceRoot,
+            source,
+            "legacy migration source");
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            WorkspaceRoot,
+            destination,
+            "legacy migration destination");
+        ManagedPathBoundary.EnsureNoReparsePoints(source, "legacy migration source");
+        if (Directory.Exists(destination) || File.Exists(destination))
+            ManagedPathBoundary.EnsureNoReparsePoints(destination, "legacy migration destination");
+
+        ValidateMoveTree(source, destination);
+        MoveTreeContents(source, destination);
+    }
+
+    private static void ValidateMoveTree(string source, string destination)
+    {
+        if (File.Exists(source))
+        {
+            if (Directory.Exists(destination)
+                || (File.Exists(destination) && !FilesAreIdentical(source, destination)))
+            {
+                throw new InvalidOperationException(
+                    $"Legacy migration conflict: '{source}' and '{destination}' differ.");
+            }
+
+            return;
+        }
+
+        if (File.Exists(destination))
+            throw new InvalidOperationException(
+                $"Legacy migration conflict: '{source}' and '{destination}' have different types.");
+
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source))
+        {
+            ValidateMoveTree(entry, Path.Combine(destination, Path.GetFileName(entry)));
+        }
+    }
+
+    private static void MoveTreeContents(string source, string destination)
+    {
+        if (File.Exists(source))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            if (File.Exists(destination))
+                File.Delete(source);
+            else
+                File.Move(source, destination);
+            return;
+        }
+
+        Directory.CreateDirectory(destination);
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source).ToArray())
+        {
+            MoveTreeContents(entry, Path.Combine(destination, Path.GetFileName(entry)));
+        }
+
+        DeleteEmptyDirectory(source);
+    }
+
+    private static bool FilesAreIdentical(string first, string second)
+    {
+        var firstInfo = new FileInfo(first);
+        var secondInfo = new FileInfo(second);
+        if (firstInfo.Length != secondInfo.Length)
+            return false;
+
+        using var firstStream = File.OpenRead(first);
+        using var secondStream = File.OpenRead(second);
+        var firstBuffer = new byte[81920];
+        var secondBuffer = new byte[81920];
+        int firstRead;
+        while ((firstRead = firstStream.Read(firstBuffer, 0, firstBuffer.Length)) > 0)
+        {
+            var secondRead = secondStream.Read(secondBuffer, 0, secondBuffer.Length);
+            if (firstRead != secondRead || !firstBuffer.AsSpan(0, firstRead).SequenceEqual(secondBuffer.AsSpan(0, secondRead)))
+                return false;
+        }
+
+        return secondStream.ReadByte() == -1;
+    }
+
+    private static void MigrateMetadataFile(
+        string source,
+        string destination,
+        string oldRuntimeRoot,
+        string newArtifactsRoot)
+    {
+        if (!File.Exists(source))
+            return;
+
+        var metadata = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
+            File.ReadAllText(source),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        if (metadata is null)
+            throw new InvalidOperationException($"Runtime metadata at '{source}' is invalid.");
+
+        metadata.ArtifactRoot = MapLegacyArtifactPath(metadata.ArtifactRoot, oldRuntimeRoot, newArtifactsRoot);
+        if (metadata.Candidate is not null)
+        {
+            metadata.Candidate.ArtifactRoot = MapLegacyArtifactPath(
+                metadata.Candidate.ArtifactRoot,
+                oldRuntimeRoot,
+                newArtifactsRoot);
+        }
+
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            Path.GetDirectoryName(Path.GetDirectoryName(destination)!)!,
+            destination,
+            "legacy metadata destination");
+        var migratedContent = JsonSerializer.Serialize(metadata, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+        if (File.Exists(destination) || Directory.Exists(destination))
+        {
+            if (!File.Exists(destination)
+                || !string.Equals(File.ReadAllText(destination), migratedContent, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"Legacy migration conflict: '{source}' and '{destination}' differ.");
+            File.Delete(source);
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.WriteAllText(destination, migratedContent);
+        File.Delete(source);
+    }
+
+    private static string? MapLegacyArtifactPath(
+        string? path,
+        string oldRuntimeRoot,
+        string newArtifactsRoot)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return path;
+
+        var oldRoot = Path.GetFullPath(oldRuntimeRoot);
+        var fullPath = Path.GetFullPath(path);
+        if (!ManagedPathBoundary.IsWithin(oldRoot, fullPath))
+            return path;
+
+        var relative = Path.GetRelativePath(oldRoot, fullPath);
+        if (relative.Equals("application", StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(newArtifactsRoot, "current", "application");
+        if (relative.StartsWith("candidates" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(newArtifactsRoot, relative);
+        return Path.Combine(newArtifactsRoot, "current", relative);
+    }
+
+    private static void DeleteEmptyDirectory(string path)
+    {
+        if (Directory.Exists(path)
+            && !Directory.EnumerateFileSystemEntries(path).Any())
+            Directory.Delete(path);
+    }
+
     private string ResolveRelativePath(string rootDirectory, string relativePath, string scopeDescription)
     {
         var normalized = NormalizeRelativePath(relativePath);
-        var fullPath = Path.GetFullPath(Path.Combine(rootDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
-        var fullRoot = Path.GetFullPath(rootDirectory);
-
-        if (!fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            throw new UnauthorizedAccessException($"Path must stay inside the {scopeDescription}.");
+            return ManagedPathBoundary.ResolveInside(rootDirectory, normalized, scopeDescription);
         }
-
-        return fullPath;
+        catch (InvalidOperationException ex)
+        {
+            throw new UnauthorizedAccessException(ex.Message, ex);
+        }
     }
 
-    private static string GetFullPath(string root, string child)
+    private static string GetFullPath(string root, params string[] children)
     {
-        return Path.GetFullPath(Path.Combine(root, child));
+        var path = root;
+        foreach (var child in children)
+            path = Path.Combine(path, child);
+        return Path.GetFullPath(path);
     }
 
     private static bool IsRunningInContainer()

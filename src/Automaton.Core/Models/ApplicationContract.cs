@@ -163,17 +163,27 @@ public static class ApplicationContractValidator
             {
                 errors.Add("storage.mounts must be an array");
             }
-            else foreach (var mount in contract.Storage.Mounts)
+            else
             {
-                if (mount is null)
+                var environmentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var mount in contract.Storage.Mounts)
                 {
-                    errors.Add("storage.mounts entries must be objects");
-                    continue;
-                }
+                    if (mount is null)
+                    {
+                        errors.Add("storage.mounts entries must be objects");
+                        continue;
+                    }
 
-                if (string.IsNullOrWhiteSpace(mount.Name) || mount.Name.Contains('\0'))
-                    errors.Add("storage.mounts.name is required and must not contain NUL");
-                ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
+                    var validName = IsValidMountName(mount.Name);
+                    if (!validName)
+                        errors.Add("storage.mounts.name must be a valid environment-safe identifier");
+                    else if (!environmentNames.Add(mount.Name.ToUpperInvariant()))
+                        errors.Add("storage.mounts.name must be unique after environment-variable normalization");
+
+                    if (mount.ReadOnly)
+                        errors.Add("storage.mounts.readOnly is not supported by this runner");
+                    ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
+                }
             }
         }
 
@@ -227,11 +237,7 @@ public static class ApplicationContractValidator
             return;
         }
 
-        var normalized = value.Replace('\\', '/');
-        if (normalized.Contains('\0')
-            || normalized.StartsWith("/", StringComparison.Ordinal)
-            || LooksLikeWindowsRootedPath(normalized)
-            || normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == ".."))
+        if (!ManagedPathBoundary.IsSafeRelative(value, allowEmpty))
         {
             errors.Add($"{name} must remain inside the application workspace");
         }
@@ -251,6 +257,11 @@ public static class ApplicationContractValidator
 
     private static bool LooksLikeWindowsRootedPath(string value) =>
         value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':';
+
+    private static bool IsValidMountName(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && (char.IsLetter(value[0]) || value[0] == '_')
+        && value.Skip(1).All(character => char.IsLetterOrDigit(character) || character == '_');
 
     private static bool ContainsTraversalSegment(string value) =>
         value.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)

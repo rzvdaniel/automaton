@@ -105,7 +105,7 @@ public class RunnerDeploymentService
             {
                 runtimeCount = CopyTreeIfExists(
                     Path.Combine(tempExtractRoot, "runtime"),
-                    runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+                    runnerWorkspaceService.GetAppRuntimeCurrentDirectory(appId, deploymentTargetId));
             }
 
             logs.Add($"Deployed {sourceCount} source file(s) and {runtimeCount} runtime file(s).");
@@ -254,13 +254,7 @@ public class RunnerDeploymentService
         Guid deploymentTargetId)
     {
         await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
-        var targetRoot = runnerWorkspaceService.GetDeploymentTargetRoot(
-            appId,
-            deploymentTargetId);
-        if (Directory.Exists(targetRoot))
-        {
-            Directory.Delete(targetRoot, recursive: true);
-        }
+        runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
     }
 
     private AppDeploymentPackageManifest LoadManifest(string extractRoot, Guid requestAppId)
@@ -299,7 +293,7 @@ public class RunnerDeploymentService
         var snapshotSourceRoots = new[]
         {
             runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId),
-            runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId)
+            runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId)
         };
 
         if (!snapshotSourceRoots.Any(Directory.Exists))
@@ -324,8 +318,8 @@ public class RunnerDeploymentService
     {
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
         if (includeRuntime)
-            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId));
+            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId));
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppCacheRoot(appId, deploymentTargetId));
     }
 
     private void RestoreSnapshot(
@@ -339,14 +333,14 @@ public class RunnerDeploymentService
 
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
         if (restoreRuntime)
-            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+            DeleteDirectoryIfExists(runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId));
 
         var snapshotSource = Path.Combine(snapshotPath, "source");
-        var snapshotRuntime = Path.Combine(snapshotPath, "runtime");
+        var snapshotRuntime = Path.Combine(snapshotPath, "artifacts");
         if (Directory.Exists(snapshotSource))
             CopyDirectory(snapshotSource, runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
         if (restoreRuntime && Directory.Exists(snapshotRuntime))
-            CopyDirectory(snapshotRuntime, runnerWorkspaceService.GetAppRuntimeRoot(appId, deploymentTargetId));
+            CopyDirectory(snapshotRuntime, runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId));
     }
 
     private static void ValidateIncomingActions(string extractRoot, bool allowPrivilegedCapabilities)

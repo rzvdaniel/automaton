@@ -44,11 +44,11 @@ public sealed class RunnerRuntimeProcessManagerTests
 
         var targetRoot = workspace.GetDeploymentTargetRoot(appId, targetId);
         var metadata = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
-            await File.ReadAllTextAsync(Path.Combine(targetRoot, "deployment.json")),
+            await File.ReadAllTextAsync(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-        var runtimeRoot = metadata.ArtifactRoot!;
-        var stdout = await ReadSharedTextAsync(Path.Combine(runtimeRoot, "logs", "runtime.stdout.log"));
-        var stderr = await ReadSharedTextAsync(Path.Combine(runtimeRoot, "logs", "runtime.stderr.log"));
+        var logsRoot = workspace.GetAppRuntimeLogsDirectory(appId, targetId, metadata.ArtifactId!);
+        var stdout = await ReadSharedTextAsync(Path.Combine(logsRoot, "runtime.stdout.log"));
+        var stderr = await ReadSharedTextAsync(Path.Combine(logsRoot, "runtime.stderr.log"));
 
         Assert.Multiple(() =>
         {
@@ -58,7 +58,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             Assert.That(stderr, Does.Contain("stderr:fixture"));
             Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
             Assert.That(metadata.ProcessId, Is.Not.Null);
-            Assert.That(File.ReadAllText(Path.Combine(targetRoot, "deployment.json")), Does.Not.Contain("backendModule"));
+            Assert.That(File.ReadAllText(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")), Does.Not.Contain("backendModule"));
         });
 
         await manager.StopAsync(appId, targetId);
@@ -77,6 +77,37 @@ public sealed class RunnerRuntimeProcessManagerTests
 
         Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
         await manager.StopAsync(appId, targetId);
+    }
+
+    [Test]
+    public async Task RuntimeReceivesExplicitPersistentDataAndStorageMountPaths()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        using var manager = CreateManager(workspace, registry);
+        var contract = CreateContract(["--tcp", "storage"]);
+        contract.Storage = new ApplicationStorageSpec
+        {
+            DataDirectory = "app-data",
+            Mounts = [new ApplicationStorageMount { Name = "uploads", RelativePath = "media/uploads" }]
+        };
+
+        await manager.ApplyAsync(appId, targetId, contract);
+        var metadata = ReadMetadata(Path.Combine(
+            workspace.GetAppAutomationRoot(appId, targetId),
+            "deployment.json"));
+        var outputPath = Path.Combine(
+            workspace.GetAppRuntimeLogsDirectory(appId, targetId, metadata.ArtifactId!),
+            "runtime.stdout.log");
+        var output = await WaitForLogLineAsync(outputPath, "storage");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(output, Does.Contain(workspace.ResolveApplicationDataPath(appId, "app-data")));
+            Assert.That(output, Does.Contain(workspace.ResolveApplicationDataPath(appId, "media/uploads")));
+        });
     }
 
     [Test]
@@ -134,7 +165,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         using var manager = CreateManager(workspace, registry);
 
         await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "old"]));
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var first = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             await File.ReadAllTextAsync(metadataPath),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
@@ -165,7 +196,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         using var manager = CreateManager(workspace, registry);
 
         await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "original"]));
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var original = ReadMetadata(metadataPath);
         Assert.That(original.ProcessId, Is.Not.Null);
         Assert.That(registry.TryGet(appId, targetId, out var originalRoute), Is.True);
@@ -215,11 +246,10 @@ public sealed class RunnerRuntimeProcessManagerTests
                 Clean = true
             });
 
-            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
             var deployedMetadata = ReadMetadata(metadataPath);
             var logPath = Path.Combine(
-                deployedMetadata.ArtifactRoot!,
-                "logs",
+                workspace.GetAppRuntimeLogsDirectory(appId, targetId, deployedMetadata.ArtifactId!),
                 "runtime.stdout.log");
             var output = await WaitForLogLineAsync(logPath, "deployed");
             Assert.Multiple(() =>
@@ -264,7 +294,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             });
             Assert.That(originalResult.Success, Is.True, originalResult.Message);
 
-            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
             var original = ReadMetadata(metadataPath);
             var originalMarker = Path.Combine(original.ArtifactRoot!, "marker.txt");
             var originalContent = await File.ReadAllTextAsync(originalMarker);
@@ -342,7 +372,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             });
             Assert.That(originalResult.Success, Is.True, originalResult.Message);
 
-            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
             var original = ReadMetadata(metadataPath);
             var originalMarker = Path.Combine(original.ArtifactRoot!, "marker.txt");
             var originalContent = await File.ReadAllTextAsync(originalMarker);
@@ -417,7 +447,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             });
 
             Assert.That(result.Success, Is.True, result.Message);
-            var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+            var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
             var metadata = ReadMetadata(metadataPath);
             var builtFile = Path.Combine(metadata.ArtifactRoot!, "built.txt");
             Assert.Multiple(() =>
@@ -453,7 +483,7 @@ public sealed class RunnerRuntimeProcessManagerTests
                     : null);
 
         await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "original"]));
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var original = ReadMetadata(metadataPath);
         var originalArtifactRoot = original.ArtifactRoot!;
 
@@ -501,11 +531,10 @@ public sealed class RunnerRuntimeProcessManagerTests
         var targetId = Guid.NewGuid();
 
         await manager.ApplyAsync(appId, targetId, CreateContract(["--spawn-child"]));
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var metadata = ReadMetadata(metadataPath);
         var outputPath = Path.Combine(
-            metadata.ArtifactRoot!,
-            "logs",
+            workspace.GetAppRuntimeLogsDirectory(appId, targetId, metadata.ArtifactId!),
             "runtime.stdout.log");
         var output = await WaitForLogLineAsync(outputPath, "child:");
         var childMarker = output.LastIndexOf("child:", StringComparison.Ordinal);
@@ -580,7 +609,7 @@ public sealed class RunnerRuntimeProcessManagerTests
                 State = RuntimeReadinessState.Starting
             }
         };
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata));
 
@@ -640,7 +669,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             State = RuntimeReadinessState.Stopped,
             Candidate = candidateRecord
         };
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata));
 
@@ -729,7 +758,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         using var recoveryManager = CreateManager(workspace, registry);
         await recoveryManager.StartAsync(CancellationToken.None);
 
-        var metadataPath = Path.Combine(workspace.GetDeploymentTargetRoot(appId, targetId), "deployment.json");
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var metadataText = await File.ReadAllTextAsync(metadataPath);
         Assert.Multiple(() =>
         {
