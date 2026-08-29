@@ -528,6 +528,7 @@ public sealed partial class AppDeploymentTargetManagementService(
     private static void ResetDeploymentState(AppDeploymentTarget target)
     {
         target.RuntimeDeployed = false;
+        target.GenericRuntimeDeployed = false;
         target.LastDeploymentAt = null;
         target.LastSuccessfulDeploymentAt = null;
     }

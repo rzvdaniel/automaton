@@ -1,31 +1,28 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Net.Mime;
+using System.Net.Http.Headers;
 
 namespace Automaton.Runner.Console.Services;
 
-/// <summary>Hosts deployed frontend runtimes directly from the runner workspace.</summary>
+/// <summary>Proxies deployed application traffic to the healthy runtime process.</summary>
 public sealed class RunnerRuntimeGatewayService : IHostedService
 {
-    private readonly RunnerWorkspaceService workspace;
     private readonly RunnerRuntimeRegistry runtimeRegistry;
-    private readonly IHttpClientFactory httpClientFactory;
+    private readonly HttpClient runtimeClient;
     private readonly ILogger<RunnerRuntimeGatewayService> logger;
     private WebApplication? application;
 
     public RunnerRuntimeGatewayService(
-        RunnerWorkspaceService workspace,
         RunnerRuntimeRegistry runtimeRegistry,
-        IHttpClientFactory httpClientFactory,
+        HttpClient runtimeClient,
         ILogger<RunnerRuntimeGatewayService> logger)
     {
-        this.workspace = workspace;
         this.runtimeRegistry = runtimeRegistry;
-        this.httpClientFactory = httpClientFactory;
+        this.runtimeClient = runtimeClient;
         this.logger = logger;
     }
 
@@ -37,27 +34,36 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
         var app = builder.Build();
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-        app.MapGet("/ready", () => Results.Ok(new { status = "ready", workspace = workspace.WorkspaceRoot }));
-        app.MapMethods(
-            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/api/{**path}",
-            new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" },
-            ProxyApiAsync);
-        app.MapMethods(
-            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path}",
-            new[] { "GET", "HEAD" },
-            ServeFrontendAsync);
-        app.MapMethods(
-            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}",
-            new[] { "GET", "HEAD" },
-            (Guid appId, Guid deploymentTargetId) =>
-                ServeFrontendAsync(appId, deploymentTargetId, null));
+        app.MapGet("/ready", () => Results.Ok(new { status = "ready" }));
+        app.Map("/apps", branch => branch.Run(ProxyRuntimePathAsync));
 
         application = app;
         await app.StartAsync(cancellationToken);
         logger.LogInformation("Runner runtime gateway listening on {RuntimeUrl}", GetListenUrl());
     }
 
-    private async Task ProxyApiAsync(
+    private async Task ProxyRuntimePathAsync(HttpContext context)
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 3 ||
+            !Guid.TryParse(segments[0], out var appId) ||
+            !string.Equals(segments[1], "targets", StringComparison.OrdinalIgnoreCase) ||
+            !Guid.TryParse(segments[2], out var deploymentTargetId))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var targetMarker = $"/{appId:D}/targets/{deploymentTargetId:D}";
+        var markerIndex = path.IndexOf(targetMarker, StringComparison.OrdinalIgnoreCase);
+        var runtimePath = markerIndex >= 0
+            ? path[(markerIndex + targetMarker.Length)..]
+            : string.Empty;
+        await ProxyRuntimeAsync(context, appId, deploymentTargetId, runtimePath);
+    }
+
+    private async Task ProxyRuntimeAsync(
         HttpContext context,
         Guid appId,
         Guid deploymentTargetId,
@@ -72,29 +78,42 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
         var target = new UriBuilder("http", "127.0.0.1", runtime.Port)
         {
-            // The gateway route removes only /apps/{appId}; preserve /api for the application runtime.
-            Path = "/api/" + (path ?? string.Empty),
+            Path = string.IsNullOrEmpty(path) ? "/" : path.StartsWith('/') ? path : "/" + path,
             Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
         }.Uri;
 
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), target);
-        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+        if (context.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true)
             request.Content = new StreamContent(context.Request.Body);
+        var requestConnectionTokens = GetConnectionTokens(context.Request.Headers);
         foreach (var header in context.Request.Headers)
         {
+            if (IsHopByHopHeader(header.Key, requestConnectionTokens) ||
+                string.Equals(header.Key, "Host", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
                 request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
         }
 
         try
         {
-            using var response = await httpClientFactory.CreateClient().SendAsync(
+            using var response = await runtimeClient.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
             context.Response.StatusCode = (int)response.StatusCode;
+            var responseConnectionTokens = GetConnectionTokens(response.Headers);
             foreach (var header in response.Headers)
-                context.Response.Headers[header.Key] = header.Value.ToArray();
+            {
+                if (!IsHopByHopHeader(header.Key, responseConnectionTokens))
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
             foreach (var header in response.Content.Headers)
-                context.Response.Headers[header.Key] = header.Value.ToArray();
+            {
+                if (!IsHopByHopHeader(header.Key, responseConnectionTokens))
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
             await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
         }
         catch (HttpRequestException)
@@ -107,6 +126,40 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         }
     }
 
+    private static HashSet<string> GetConnectionTokens(IHeaderDictionary headers)
+    {
+        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in headers["Connection"])
+        {
+            foreach (var token in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                tokens.Add(token);
+        }
+
+        return tokens;
+    }
+
+    private static HashSet<string> GetConnectionTokens(HttpResponseHeaders headers)
+    {
+        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in headers.Connection)
+        {
+            foreach (var token in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                tokens.Add(token);
+        }
+
+        return tokens;
+    }
+
+    private static bool IsHopByHopHeader(string name, ISet<string> connectionTokens) =>
+        connectionTokens.Contains(name) || name.Equals("Connection", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Proxy-Authenticate", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Proxy-Authorization", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("TE", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Trailer", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Upgrade", StringComparison.OrdinalIgnoreCase);
+
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (application is not null)
@@ -115,53 +168,6 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
             await application.DisposeAsync();
             application = null;
         }
-    }
-
-    private async Task<IResult> ServeFrontendAsync(
-        Guid appId,
-        Guid deploymentTargetId,
-        string? path)
-    {
-        var root = workspace.GetAppRuntimeFrontendDirectory(appId, deploymentTargetId);
-        if (!Directory.Exists(root))
-        {
-            return Results.NotFound(new { error = "Frontend runtime is not deployed." });
-        }
-
-        var relativePath = string.IsNullOrWhiteSpace(path) ? "index.html" : path;
-        var candidate = Path.GetFullPath(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!IsWithinRoot(root, candidate))
-        {
-            return Results.BadRequest(new { error = "Invalid runtime path." });
-        }
-
-        if (!File.Exists(candidate))
-        {
-            if (relativePath.Contains("/api/", StringComparison.OrdinalIgnoreCase) ||
-                relativePath.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-            {
-                return Results.NotFound();
-            }
-
-            candidate = Path.Combine(root, "index.html");
-            if (!File.Exists(candidate))
-            {
-                return Results.NotFound(new { error = "Frontend entry point index.html is missing." });
-            }
-        }
-
-        var contentType = new FileExtensionContentTypeProvider().TryGetContentType(candidate, out var type)
-            ? type
-            : MediaTypeNames.Application.Octet;
-        var result = Results.File(candidate, contentType, enableRangeProcessing: true);
-        return await Task.FromResult(result);
-    }
-
-    private static bool IsWithinRoot(string root, string candidate)
-    {
-        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(candidate, normalizedRoot.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetListenUrl()

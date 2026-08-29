@@ -372,12 +372,14 @@ public class AppsControllerExecutionService
                     cancellationToken);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
+            var runtimeDeployed = result.Success && packageApplication.Runtime.Command is not null;
             await deploymentTargetStateService.MarkCompletedAsync(
                 appId,
                 target.Id,
                 result.Success,
-                runtimeDeployed: true,
-                cancellationToken);
+                runtimeDeployed,
+                cancellationToken,
+                genericRuntimeDeployed: runtimeDeployed);
 
             if (result.Success)
             {

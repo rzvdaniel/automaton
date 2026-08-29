@@ -26,6 +26,13 @@ public sealed class AppDeploymentTarget
 
     public bool RuntimeDeployed { get; set; }
 
+    /// <summary>
+    /// Indicates that the canonical generic runtime contract was promoted by
+    /// the generic runtime deployment path. Legacy controller deployment must
+    /// not make a target routable through the generic runtime gateway.
+    /// </summary>
+    public bool GenericRuntimeDeployed { get; set; }
+
     public DateTimeOffset? LastDeploymentAt { get; set; }
     public DateTimeOffset? LastSuccessfulDeploymentAt { get; set; }
 

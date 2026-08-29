@@ -99,5 +99,6 @@ The generic build and runtime paths use only the canonical roots and structured
 application contract. The existing `controller_runner.py`, FastAPI tunnel,
 source/backend helpers, and legacy Python virtual-environment tree remain
 behind the explicitly deferred Action/controller bridge tracked in the Stage 0
-inventory. The fixed frontend gateway and controller transport are not used by
-the generic runtime contract and remain later-stage work.
+inventory. The runtime gateway now forwards the opaque application HTTP
+contract; only the controller transport remains a later-stage compatibility
+boundary.

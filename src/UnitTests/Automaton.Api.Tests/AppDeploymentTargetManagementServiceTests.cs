@@ -244,6 +244,38 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
+    public async Task AssignRunner_AfterCleanupClearsGenericRuntimePromotion()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync(successfulCleanup: true);
+        var oldRunner = fixture.AddRunner(online: true);
+        var newRunner = fixture.AddRunner(online: true);
+        var target = await fixture.Db.AppDeploymentTargets
+            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+        target.ExecutionRunnerId = oldRunner.Id;
+        target.RuntimeDeployed = true;
+        target.GenericRuntimeDeployed = true;
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+
+        await fixture.Service.AssignRunnerAsync(
+            fixture.App.Id,
+            target.Id,
+            new AssignAppDeploymentTargetRunnerRequest
+            {
+                RunnerId = newRunner.Id,
+                CleanupDeployedRuntime = true
+            },
+            fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.ExecutionRunnerId, Is.EqualTo(newRunner.Id));
+            Assert.That(target.RuntimeDeployed, Is.False);
+            Assert.That(target.GenericRuntimeDeployed, Is.False);
+        });
+    }
+
+    [Test]
     public async Task CleanupFailure_IsRecordedAndCanBeRetried()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
@@ -496,7 +528,7 @@ public class AppDeploymentTargetManagementServiceTests
             UserId = userId;
         }
 
-        public static async Task<TestFixtureContext> CreateAsync()
+        public static async Task<TestFixtureContext> CreateAsync(bool successfulCleanup = false)
         {
             var db = new ApplicationDbContext(
                 new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -542,7 +574,7 @@ public class AppDeploymentTargetManagementServiceTests
                 db,
                 authorization,
                 new AppRunnerAuthorizationPolicy(db, authorization),
-                new RejectingHubContext(),
+                successfulCleanup ? new SuccessfulCleanupHubContext() : new RejectingHubContext(),
                 routeService,
                 new AppDeploymentTargetStateService(db));
             return new TestFixtureContext(db, app, service, routeRoot, userId);
@@ -594,6 +626,48 @@ public class AppDeploymentTargetManagementServiceTests
     {
         public IHubClients Clients { get; } = new RejectingHubClients();
         public IGroupManager Groups { get; } = null!;
+    }
+
+    private sealed class SuccessfulCleanupHubContext : IHubContext<AutomatonHub>
+    {
+        public IHubClients Clients { get; } = new SuccessfulCleanupHubClients();
+        public IGroupManager Groups { get; } = null!;
+    }
+
+    private sealed class SuccessfulCleanupHubClients : IHubClients
+    {
+        private readonly SuccessfulCleanupClientProxy clientProxy = new();
+
+        public IClientProxy All => throw new NotSupportedException();
+        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public ISingleClientProxy Client(string connectionId) => clientProxy;
+        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => clientProxy;
+        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
+        public IClientProxy Group(string groupName) => throw new NotSupportedException();
+        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
+        public IClientProxy User(string userId) => throw new NotSupportedException();
+        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
+    }
+
+    private sealed class SuccessfulCleanupClientProxy : ISingleClientProxy
+    {
+        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
+        {
+            if (method == AutomatonHubMethods.CleanupAppDeploymentTarget &&
+                args.Length > 0 && args[0] is CleanupAppDeploymentTargetRequest request)
+            {
+                return Task.FromResult((T)(object)new CleanupAppDeploymentTargetResult(
+                    request.AppId,
+                    request.DeploymentTargetId,
+                    Success: true));
+            }
+
+            throw new NotSupportedException($"Unexpected invoke method: {method}");
+        }
+
+        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class RejectingHubClients : IHubClients

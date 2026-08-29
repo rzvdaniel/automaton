@@ -132,7 +132,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         Guid deploymentTargetId,
         bool success,
         bool runtimeDeployed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool? genericRuntimeDeployed = null)
     {
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
         if (target.Status != DeploymentTargetStatus.Deploying)
@@ -145,7 +146,9 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         target.UpdatedAt = now;
         if (success)
         {
-            target.RuntimeDeployed |= runtimeDeployed;
+            target.RuntimeDeployed = runtimeDeployed;
+            if (genericRuntimeDeployed.HasValue)
+                target.GenericRuntimeDeployed = genericRuntimeDeployed.Value;
             target.LastSuccessfulDeploymentAt = now;
         }
         await dataContext.SaveChangesAsync(cancellationToken);
