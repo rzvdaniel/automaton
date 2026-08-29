@@ -1,29 +1,24 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Net.Mime;
 
 namespace Automaton.Runner.Console.Services;
 
-/// <summary>Hosts deployed frontend runtimes directly from the runner workspace.</summary>
+/// <summary>Proxies deployed application traffic to the healthy runtime process.</summary>
 public sealed class RunnerRuntimeGatewayService : IHostedService
 {
-    private readonly RunnerWorkspaceService workspace;
     private readonly RunnerRuntimeRegistry runtimeRegistry;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly ILogger<RunnerRuntimeGatewayService> logger;
     private WebApplication? application;
 
     public RunnerRuntimeGatewayService(
-        RunnerWorkspaceService workspace,
         RunnerRuntimeRegistry runtimeRegistry,
         IHttpClientFactory httpClientFactory,
         ILogger<RunnerRuntimeGatewayService> logger)
     {
-        this.workspace = workspace;
         this.runtimeRegistry = runtimeRegistry;
         this.httpClientFactory = httpClientFactory;
         this.logger = logger;
@@ -37,27 +32,23 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
         var app = builder.Build();
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
-        app.MapGet("/ready", () => Results.Ok(new { status = "ready", workspace = workspace.WorkspaceRoot }));
-        app.MapMethods(
-            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/api/{**path}",
-            new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" },
-            ProxyApiAsync);
+        app.MapGet("/ready", () => Results.Ok(new { status = "ready" }));
         app.MapMethods(
             "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path}",
-            new[] { "GET", "HEAD" },
-            ServeFrontendAsync);
+            new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" },
+            ProxyRuntimeAsync);
         app.MapMethods(
             "/apps/{appId:guid}/targets/{deploymentTargetId:guid}",
-            new[] { "GET", "HEAD" },
-            (Guid appId, Guid deploymentTargetId) =>
-                ServeFrontendAsync(appId, deploymentTargetId, null));
+            new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" },
+            (HttpContext context, Guid appId, Guid deploymentTargetId) =>
+                ProxyRuntimeAsync(context, appId, deploymentTargetId, null));
 
         application = app;
         await app.StartAsync(cancellationToken);
         logger.LogInformation("Runner runtime gateway listening on {RuntimeUrl}", GetListenUrl());
     }
 
-    private async Task ProxyApiAsync(
+    private async Task ProxyRuntimeAsync(
         HttpContext context,
         Guid appId,
         Guid deploymentTargetId,
@@ -72,8 +63,7 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
         var target = new UriBuilder("http", "127.0.0.1", runtime.Port)
         {
-            // The gateway route removes only /apps/{appId}; preserve /api for the application runtime.
-            Path = "/api/" + (path ?? string.Empty),
+            Path = string.IsNullOrWhiteSpace(path) ? "/" : "/" + path,
             Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
         }.Uri;
 
@@ -115,53 +105,6 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
             await application.DisposeAsync();
             application = null;
         }
-    }
-
-    private async Task<IResult> ServeFrontendAsync(
-        Guid appId,
-        Guid deploymentTargetId,
-        string? path)
-    {
-        var root = workspace.GetAppRuntimeFrontendDirectory(appId, deploymentTargetId);
-        if (!Directory.Exists(root))
-        {
-            return Results.NotFound(new { error = "Frontend runtime is not deployed." });
-        }
-
-        var relativePath = string.IsNullOrWhiteSpace(path) ? "index.html" : path;
-        var candidate = Path.GetFullPath(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!IsWithinRoot(root, candidate))
-        {
-            return Results.BadRequest(new { error = "Invalid runtime path." });
-        }
-
-        if (!File.Exists(candidate))
-        {
-            if (relativePath.Contains("/api/", StringComparison.OrdinalIgnoreCase) ||
-                relativePath.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-            {
-                return Results.NotFound();
-            }
-
-            candidate = Path.Combine(root, "index.html");
-            if (!File.Exists(candidate))
-            {
-                return Results.NotFound(new { error = "Frontend entry point index.html is missing." });
-            }
-        }
-
-        var contentType = new FileExtensionContentTypeProvider().TryGetContentType(candidate, out var type)
-            ? type
-            : MediaTypeNames.Application.Octet;
-        var result = Results.File(candidate, contentType, enableRangeProcessing: true);
-        return await Task.FromResult(result);
-    }
-
-    private static bool IsWithinRoot(string root, string candidate)
-    {
-        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(candidate, normalizedRoot.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetListenUrl()

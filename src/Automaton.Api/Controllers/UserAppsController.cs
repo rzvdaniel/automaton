@@ -18,11 +18,9 @@ namespace Automaton.Api.Controllers;
 /// Designed to be served from a separate subdomain (e.g., apps.automaton.monster)
 /// for security isolation from the main application.
 ///
-/// Routes:
-/// - GET /{slug}               → Serves index.html for the dedicated apps host
-/// - GET /{slug}/{*path}       → Serves any file from the dedicated apps host
-/// - GET /apps/{slug}          → Serves index.html for Studio/local hosts
-/// - GET /apps/{slug}/{*path}  → Serves any file for Studio/local hosts
+/// Runtime application routes are registered by the deployment router and point
+/// directly at a healthy Runner runtime endpoint. This controller retains only
+/// restricted preview and media helpers; it is not a static application host.
 ///
 /// Security:
 /// - Served from separate domain to prevent XSS access to main app cookies
@@ -38,12 +36,10 @@ public class UserAppsController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppMediaStorageService mediaStorageService;
-    private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly AppsControllerExecutionService appsControllerExecutionService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
-    private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public UserAppsController(
@@ -51,24 +47,20 @@ public class UserAppsController : ControllerBase
         AppsService appsService,
         AppFileStorageService fileStorageService,
         AppMediaStorageService mediaStorageService,
-        PublishedAppStorageService publishedAppStorageService,
         AppsControllerExecutionService appsControllerExecutionService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
         IOptions<WebAppConfig> webAppConfig,
-        IOptions<PublishedAppsConfig> publishedAppsConfig,
         PrivateAppLaunchService privateAppLaunchService)
     {
         this.dbContext = dbContext;
         this.appsService = appsService;
         this.fileStorageService = fileStorageService;
         this.mediaStorageService = mediaStorageService;
-        this.publishedAppStorageService = publishedAppStorageService;
         this.appsControllerExecutionService = appsControllerExecutionService;
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
-        this.publishedAppsConfig = publishedAppsConfig.Value;
         this.privateAppLaunchService = privateAppLaunchService;
     }
 
@@ -171,44 +163,11 @@ public class UserAppsController : ControllerBase
         return app;
     }
 
-    /// <summary>
-    /// Serve any file from a user app.
-    /// Example: https://apps.automaton.monster/my-cool-app/styles.css
-    /// </summary>
-    [HttpGet("apps/{slug}/{*path}")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServeStudioHostedAppFile(string slug, string path = "index.html")
-    {
-        return await ServePublishedAppFile(slug, path);
-    }
-
     [HttpGet("apps/{slug}/media/{*path}")]
     [AllowAnonymous]
     public async Task<IActionResult> ServeStudioHostedAppMedia(string slug, string path, CancellationToken cancellationToken)
     {
         return await ServePublishedAppMedia(slug, path, cancellationToken);
-    }
-
-    [HttpGet("{slug}/{*path}")]
-    [AppsHostOnly]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServeDedicatedAppsHostAppFile(string slug, string path = "index.html")
-    {
-        return await ServePublishedAppFile(slug, path);
-    }
-
-    [HttpGet("{*path}", Order = -10)]
-    [PublishedAppSubdomainOnly]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServePublishedSubdomainAppFile(string? path)
-    {
-        if (!PublishedAppHostNames.TryGetPublishedAppSlug(
-                Request.Host.Host, publishedAppsConfig.PublicBaseUrlHost, out var slug))
-        {
-            return NotFound();
-        }
-
-        return await ServePublishedAppFile(slug, string.IsNullOrWhiteSpace(path) ? "index.html" : path);
     }
 
     [HttpGet("{slug}/media/{*path}")]
@@ -217,80 +176,6 @@ public class UserAppsController : ControllerBase
     public async Task<IActionResult> ServeDedicatedAppsHostAppMedia(string slug, string path, CancellationToken cancellationToken)
     {
         return await ServePublishedAppMedia(slug, path, cancellationToken);
-    }
-
-    private async Task<IActionResult> ServePublishedAppFile(string slug, string path = "index.html")
-    {
-        try
-        {
-            var app = await dbContext.WebApps
-                .Include(a => a.WebAppUsers)
-                .FirstOrDefaultAsync(a =>
-                    a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    a.AccessStatus == AppAccessStatuses.Active &&
-                    a.PublicUrl != null &&
-                    a.PublicUrl.ToLower() == slug.ToLower());
-
-            if (app == null)
-            {
-                logger.LogWarning("App not found or not published: {Slug}", slug);
-                return HtmlPage(
-                    StatusCodes.Status404NotFound,
-                    "App Not Found",
-                    "This app does not exist or is not published.");
-            }
-
-            var isHtmlEntryPoint =
-                string.IsNullOrWhiteSpace(path) ||
-                string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(path, "/", StringComparison.OrdinalIgnoreCase) ||
-                Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
-
-            if (app.RequiresAuthentication && isHtmlEntryPoint && User.Identity?.IsAuthenticated != true)
-            {
-                logger.LogWarning("Unauthenticated access to protected app: {Slug}", slug);
-                return HtmlPage(
-                    StatusCodes.Status401Unauthorized,
-                    "Authentication Required",
-                    "This app requires you to be logged in.");
-            }
-
-            var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
-            if (ownerId == null)
-            {
-                logger.LogError("App has no owner: {AppId}", app.Id);
-                return HtmlPage(
-                    StatusCodes.Status500InternalServerError,
-                    "Configuration Error",
-                    "This app is not properly configured.");
-            }
-
-            logger.LogDebug(
-                "Published app launch tracked: slug={Slug}, path={Path}, appId={AppId}, htmlEntry={HtmlEntry}",
-                slug, path, app.Id, isHtmlEntryPoint);
-
-            return await ServePublishedStaticFileAsync(
-                app.Id,
-                slug,
-                path,
-                backendApiPath: $"/api/web-apps/{Uri.EscapeDataString(slug)}");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            logger.LogWarning("Path traversal attempt for app: {Slug}, path: {Path}", slug, path);
-            return HtmlPage(
-                StatusCodes.Status400BadRequest,
-                "Access Denied",
-                "Invalid file path.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error serving app file: {Slug}/{Path}", slug, path);
-            return HtmlPage(
-                StatusCodes.Status500InternalServerError,
-                "Error",
-                "An error occurred while loading this app.");
-        }
     }
 
     private async Task<IActionResult> ServePublishedAppMedia(string slug, string path, CancellationToken cancellationToken)
@@ -350,36 +235,6 @@ public class UserAppsController : ControllerBase
         {
             var html = Encoding.UTF8.GetString(content);
             var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath, useCurrentHostApiBase);
-            return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
-        }
-
-        return File(content, contentType);
-    }
-
-    private async Task<IActionResult> ServePublishedStaticFileAsync(Guid appId, string slug, string? path, string backendApiPath)
-    {
-        path = string.IsNullOrEmpty(path) ? "index.html" : path;
-
-        var publishedPath = Path.GetExtension(path).Length == 0 ? "index.html" : path;
-        if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(publishedPath))
-        {
-            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
-        }
-
-        var content = await publishedAppStorageService.ReadPublishedFileBytesAsync(slug, publishedPath);
-        if (content == null)
-        {
-            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
-        }
-
-        var contentType = WebAppRuntimeFilePolicy.GetContentType(publishedPath);
-        WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
-        WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, publishedPath, webAppConfig);
-
-        if (contentType == "text/html")
-        {
-            var html = Encoding.UTF8.GetString(content);
-            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath);
             return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
         }
 

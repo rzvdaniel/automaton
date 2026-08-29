@@ -58,12 +58,13 @@ public class BackendRouteConfigServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/api`)"));
-            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"\n      priority: 50"));
+            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"{Environment.NewLine}      priority: 50"));
             Assert.That(content, Does.Contain("tls: {}"));
             Assert.That(content, Does.Not.Contain("certResolver"));
             Assert.That(content, Does.Contain(
-                $"/apps/{appId}/targets/{defaultTarget.Id}/api/$1"));
+                $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
+            Assert.That(content, Does.Not.Contain("-api:"));
+            Assert.That(content, Does.Not.Contain("-frontend"));
             Assert.That(content, Does.Contain("http://runner-a:8080"));
         });
     }
@@ -203,11 +204,11 @@ public class BackendRouteConfigServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(content, Does.Contain("service: \"api-live-edge\""));
-            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"\n      priority: 50"));
-            Assert.That(content, Does.Contain(
-                $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/api/$1"));
+            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"{Environment.NewLine}      priority: 50"));
             Assert.That(content, Does.Contain(
                 $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/$1"));
+            Assert.That(content, Does.Not.Contain("-api:"));
+            Assert.That(content, Does.Not.Contain("-frontend"));
             Assert.That(content, Does.Not.Contain("http://runner-"));
         });
     }

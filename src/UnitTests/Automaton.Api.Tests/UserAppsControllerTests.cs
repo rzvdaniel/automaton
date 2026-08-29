@@ -80,11 +80,9 @@ public class UserAppsControllerTests
             null!,
             null!,
             null!,
-            null!,
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
-            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             CreatePrivateAppLaunchService())
         {
             ControllerContext = new ControllerContext
@@ -140,11 +138,9 @@ public class UserAppsControllerTests
             null!,
             null!,
             null!,
-            null!,
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
-            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             CreatePrivateAppLaunchService())
         {
             ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext

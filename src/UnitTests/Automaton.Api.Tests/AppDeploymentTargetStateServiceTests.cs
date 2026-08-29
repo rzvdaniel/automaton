@@ -186,6 +186,28 @@ public class AppDeploymentTargetStateServiceTests
     }
 
     [Test]
+    public async Task SuccessfulDeploymentWithoutRuntime_ClearsPreviousRuntimeRoute()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
+        target.RuntimeDeployed = true;
+        await db.SaveChangesAsync();
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.MarkStartedAsync(app.Id, target.Id);
+        await service.MarkCompletedAsync(
+            app.Id, target.Id, success: true, runtimeDeployed: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+            Assert.That(target.RuntimeDeployed, Is.False);
+            Assert.That(target.LastSuccessfulDeploymentAt, Is.Not.Null);
+        });
+    }
+
+    [Test]
     public async Task Completion_ForTargetFromAnotherApp_IsRejected()
     {
         await using var db = CreateDbContext();

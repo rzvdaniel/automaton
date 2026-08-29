@@ -145,7 +145,7 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         target.UpdatedAt = now;
         if (success)
         {
-            target.RuntimeDeployed |= runtimeDeployed;
+            target.RuntimeDeployed = runtimeDeployed;
             target.LastSuccessfulDeploymentAt = now;
         }
         await dataContext.SaveChangesAsync(cancellationToken);
