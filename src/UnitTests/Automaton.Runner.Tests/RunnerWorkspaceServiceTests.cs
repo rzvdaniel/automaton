@@ -389,6 +389,7 @@ public class RunnerWorkspaceServiceTests
         var link = Path.Combine(oldData, "linked");
         Directory.CreateDirectory(oldData);
         Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.txt"), "outside content");
 
         try
         {
@@ -403,12 +404,163 @@ public class RunnerWorkspaceServiceTests
             Assert.Ignore("The test environment does not support symbolic-link creation.");
         }
 
-        Assert.Throws<InvalidOperationException>(() => service.MigrateLegacyLayout());
+        var exception = Assert.Throws<InvalidOperationException>(() => service.MigrateLegacyLayout());
 
         Assert.Multiple(() =>
         {
             Assert.That(Directory.Exists(oldData), Is.True);
             Assert.That(File.GetAttributes(link).HasFlag(FileAttributes.ReparsePoint), Is.True);
+            Assert.That(exception!.Message, Does.Contain(link));
+            Assert.That(exception.Message, Does.Contain("legacy migration source"));
+            Assert.That(exception.Message, Does.Contain("target:"));
+            Assert.That(File.Exists(Path.Combine(service.GetAppDataDirectory(appId), "linked", "secret.txt")), Is.False);
+        });
+    }
+
+    [Test]
+    public void MigrateLegacyLayout_MigratesPreparedActionAndOpaqueVirtualEnvironment()
+    {
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        const string actionKey = "reprovision-hosted-runner";
+        var oldTargetRoot = Path.Combine(
+            Path.GetFullPath(workspaceRoot),
+            "apps",
+            appId.ToString(),
+            "targets",
+            targetId.ToString());
+        var oldActionRoot = Path.Combine(oldTargetRoot, "runtime", "actions", actionKey);
+        var oldActionCurrent = Path.Combine(oldActionRoot, "current");
+        var oldActionVersions = Path.Combine(oldActionRoot, "versions", "version-1");
+        var oldActionExecutions = Path.Combine(oldActionRoot, "executions", "execution-1");
+        var oldVenv = Path.Combine(oldActionCurrent, ".venv");
+        var outside = Path.Combine(Path.GetTempPath(), "runner-workspace-outside", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(oldActionCurrent);
+        Directory.CreateDirectory(oldActionVersions);
+        Directory.CreateDirectory(oldActionExecutions);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(oldActionCurrent, "action.yaml"), "name: reprovision-hosted-runner\n");
+        File.WriteAllText(Path.Combine(oldActionCurrent, "run.py"), "print('action')\n");
+        File.WriteAllText(Path.Combine(oldActionCurrent, ".automaton-action-deployment.json"), "{}\n");
+        File.WriteAllText(Path.Combine(oldActionVersions, "version.txt"), "version");
+        File.WriteAllText(Path.Combine(oldActionExecutions, "execution.txt"), "execution");
+        File.WriteAllText(Path.Combine(outside, "not-runtime-content.txt"), "outside");
+        CreatePythonVirtualEnvironmentFixture(oldVenv, outside);
+
+        service.MigrateLegacyLayout();
+
+        var migratedActionRoot = service.GetAppActionRuntimeRoot(appId, targetId, actionKey);
+        var migratedActionCurrent = service.GetAppActionCurrentDirectory(appId, targetId, actionKey);
+        var migratedVenv = Path.Combine(migratedActionCurrent, ".venv");
+        var migratedPython = Path.Combine(
+            migratedVenv,
+            "bin",
+            "python");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(migratedActionCurrent, "action.yaml")), Is.True);
+            Assert.That(File.Exists(Path.Combine(migratedActionCurrent, ".automaton-action-deployment.json")), Is.True);
+            Assert.That(File.Exists(Path.Combine(migratedActionCurrent, "run.py")), Is.True);
+            Assert.That(File.Exists(Path.Combine(service.GetAppActionVersionsDirectory(appId, targetId, actionKey), "version-1", "version.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(service.GetAppActionExecutionsDirectory(appId, targetId, actionKey), "execution-1", "execution.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(migratedVenv, "pyvenv.cfg")), Is.True);
+            Assert.That(File.GetAttributes(migratedPython).HasFlag(FileAttributes.ReparsePoint), Is.True);
+            Assert.That(Directory.Exists(oldActionRoot), Is.False);
+            Assert.That(Directory.Exists(oldVenv), Is.False);
+            Assert.That(File.Exists(Path.Combine(migratedActionCurrent, "not-runtime-content.txt")), Is.False);
+            Assert.That(File.Exists(Path.Combine(outside, "not-runtime-content.txt")), Is.True);
+        });
+
+        service.MigrateLegacyLayout();
+        Assert.That(File.Exists(Path.Combine(migratedActionCurrent, "action.yaml")), Is.True);
+        Assert.That(File.GetAttributes(migratedPython).HasFlag(FileAttributes.ReparsePoint), Is.True);
+    }
+
+    [Test]
+    public void MigrateLegacyLayout_DoesNotExemptVirtualEnvironmentInsideGenericArtifact()
+    {
+        if (!OperatingSystem.IsLinux())
+            Assert.Ignore("The regression requires a platform with supported symbolic-link creation.");
+
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var oldApplication = Path.Combine(
+            Path.GetFullPath(workspaceRoot),
+            "apps",
+            appId.ToString(),
+            "targets",
+            targetId.ToString(),
+            "runtime",
+            "application");
+        var outside = Path.Combine(Path.GetTempPath(), "runner-workspace-outside", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "external.txt"), "external");
+        CreatePythonVirtualEnvironmentFixture(Path.Combine(oldApplication, ".venv"), outside);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => service.MigrateLegacyLayout());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("legacy migration source"));
+            Assert.That(Directory.Exists(oldApplication), Is.True);
+            Assert.That(Directory.Exists(service.GetAppRuntimeApplicationDirectory(appId, targetId)), Is.False);
+            Assert.That(File.Exists(Path.Combine(service.GetAppRuntimeApplicationDirectory(appId, targetId), ".venv", "bin", "python")), Is.False);
+            Assert.That(File.Exists(Path.Combine(outside, "external.txt")), Is.True);
+        });
+    }
+
+    [Test]
+    public void MigrateLegacyLayout_RejectsUnrelatedActionReparsePoint()
+    {
+        if (!OperatingSystem.IsLinux())
+            Assert.Ignore("The regression requires a platform with supported symbolic-link creation.");
+
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        const string actionKey = "send-email";
+        var actionCurrent = Path.Combine(
+            Path.GetFullPath(workspaceRoot),
+            "apps",
+            appId.ToString(),
+            "targets",
+            targetId.ToString(),
+            "runtime",
+            "actions",
+            actionKey,
+            "current");
+        var outside = Path.Combine(Path.GetTempPath(), "runner-workspace-outside", Guid.NewGuid().ToString());
+        var link = Path.Combine(actionCurrent, "unexpected-link");
+        Directory.CreateDirectory(actionCurrent);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.txt"), "outside");
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("The test environment does not allow symbolic-link creation.");
+        }
+        catch (IOException)
+        {
+            Assert.Ignore("The test environment does not support symbolic-link creation.");
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() => service.MigrateLegacyLayout());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain(link));
+            Assert.That(exception.Message, Does.Contain("legacy migration source"));
+            Assert.That(Directory.Exists(service.GetAppActionCurrentDirectory(appId, targetId, actionKey)), Is.False);
+            Assert.That(File.Exists(Path.Combine(service.GetAppActionCurrentDirectory(appId, targetId, actionKey), "secret.txt")), Is.False);
+            Assert.That(File.Exists(Path.Combine(outside, "secret.txt")), Is.True);
         });
     }
 
@@ -433,7 +585,7 @@ public class RunnerWorkspaceServiceTests
         File.WriteAllText(Path.Combine(oldSource, "source.txt"), "source");
         File.WriteAllText(Path.Combine(oldApplication, "runtime.txt"), "artifact");
         File.WriteAllText(Path.Combine(oldBackend, "todos.py"), "controller");
-        File.WriteAllText(Path.Combine(oldVenv, "marker.txt"), "venv");
+        CreatePythonVirtualEnvironmentFixture(oldVenv);
         File.WriteAllText(Path.Combine(oldData, "user.db"), "durable");
         File.WriteAllText(
             Path.Combine(oldTargetRoot, "deployment.json"),
@@ -454,7 +606,8 @@ public class RunnerWorkspaceServiceTests
             Assert.That(File.Exists(Path.Combine(service.GetAppSourceRoot(appId, targetId), "source.txt")), Is.True);
             Assert.That(File.Exists(Path.Combine(service.GetAppRuntimeApplicationDirectory(appId, targetId), "runtime.txt")), Is.True);
             Assert.That(File.Exists(Path.Combine(oldBackend, "todos.py")), Is.True);
-            Assert.That(File.Exists(Path.Combine(oldVenv, "marker.txt")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldVenv, "pyvenv.cfg")), Is.True);
+            Assert.That(File.Exists(Path.Combine(oldVenv, "bin", "python")), Is.True);
             Assert.That(File.Exists(Path.Combine(oldData, "user.db")), Is.True);
             Assert.That(File.Exists(Path.Combine(oldTargetRoot, "deployment.json")), Is.False);
             Assert.That(Directory.Exists(service.GetAppDataDirectory(appId)), Is.False);
@@ -489,5 +642,30 @@ public class RunnerWorkspaceServiceTests
 
         Assert.DoesNotThrow(() => service.MigrateLegacyLayout());
         Assert.That(File.GetAttributes(link).HasFlag(FileAttributes.ReparsePoint), Is.True);
+    }
+
+    private static void CreatePythonVirtualEnvironmentFixture(string venvRoot, string? externalRoot = null)
+    {
+        var binRoot = Path.Combine(venvRoot, "bin");
+        Directory.CreateDirectory(binRoot);
+        File.WriteAllText(Path.Combine(venvRoot, "pyvenv.cfg"), "home = /usr/local/bin\n");
+        File.WriteAllText(Path.Combine(binRoot, "python3"), "python launcher\n");
+
+        var pythonTarget = externalRoot is null
+            ? "python3"
+            : Path.Combine(externalRoot, "not-runtime-content.txt");
+        var pythonLink = Path.Combine(binRoot, "python");
+        try
+        {
+            File.CreateSymbolicLink(pythonLink, pythonTarget);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("The test environment does not allow symbolic-link creation.");
+        }
+        catch (IOException)
+        {
+            Assert.Ignore("The test environment does not support symbolic-link creation.");
+        }
     }
 }
