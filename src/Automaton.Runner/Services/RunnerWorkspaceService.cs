@@ -409,38 +409,42 @@ public class RunnerWorkspaceService
             var current = GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current");
             var oldApplication = Path.Combine(oldRuntime, "application");
             if (Directory.Exists(oldApplication))
-                MoveTree(
-                    oldApplication,
-                    GetAppRuntimeApplicationDirectory(appId, deploymentTargetId),
-                    retainLegacyVirtualEnvironments: true);
+                MoveTree(oldApplication, GetAppRuntimeApplicationDirectory(appId, deploymentTargetId));
 
             var oldCandidates = Path.Combine(oldRuntime, "candidates");
             if (Directory.Exists(oldCandidates))
+                MoveTree(oldCandidates, GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "candidates"));
+
+            // Prepared Action environments are compatibility state with a
+            // narrow, explicit migration rule. Their virtualenv directory is
+            // moved as an opaque directory entry so interpreter links are
+            // preserved without traversing or dereferencing them.
+            var oldActions = Path.Combine(oldRuntime, "actions");
+            if (Directory.Exists(oldActions))
                 MoveTree(
-                    oldCandidates,
-                    GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "candidates"),
-                    retainLegacyVirtualEnvironments: true);
+                    oldActions,
+                    GetAppRuntimeActionsDirectory(appId, deploymentTargetId),
+                    movePreparedActionVirtualEnvironments: true);
 
             foreach (var entry in Directory.GetFileSystemEntries(oldRuntime))
             {
                 if (string.Equals(Path.GetFileName(entry), "application", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(Path.GetFileName(entry), "backend", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(Path.GetFileName(entry), "candidates", StringComparison.OrdinalIgnoreCase))
+                    || string.Equals(Path.GetFileName(entry), "candidates", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.GetFileName(entry), "actions", StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (string.Equals(Path.GetFileName(entry), "logs", StringComparison.OrdinalIgnoreCase))
                     MoveTree(
                         entry,
                         Directory.Exists(entry)
                             ? GetAppLogsRoot(appId, deploymentTargetId)
-                            : Path.Combine(GetAppLogsRoot(appId, deploymentTargetId), Path.GetFileName(entry)),
-                        retainLegacyVirtualEnvironments: true);
+                            : Path.Combine(GetAppLogsRoot(appId, deploymentTargetId), Path.GetFileName(entry)));
                 else
                     MoveTree(
                         entry,
                         Directory.Exists(entry)
                             ? current
-                            : Path.Combine(current, Path.GetFileName(entry)),
-                        retainLegacyVirtualEnvironments: true);
+                            : Path.Combine(current, Path.GetFileName(entry)));
             }
 
             DeleteEmptyDirectory(oldRuntime);
@@ -455,14 +459,13 @@ public class RunnerWorkspaceService
         // bridge is removed. It is not a generic runtime cache.
         MoveTree(
             Path.Combine(oldTargetRoot, "versions"),
-            GetAppVersionsDirectory(appId, deploymentTargetId),
-            retainLegacyVirtualEnvironments: true);
+            GetAppVersionsDirectory(appId, deploymentTargetId));
     }
 
     private void MoveTree(
         string source,
         string destination,
-        bool retainLegacyVirtualEnvironments = false)
+        bool movePreparedActionVirtualEnvironments = false)
     {
         if (!Directory.Exists(source) && !File.Exists(source))
             return;
@@ -475,29 +478,35 @@ public class RunnerWorkspaceService
             WorkspaceRoot,
             destination,
             "legacy migration destination");
-        if (retainLegacyVirtualEnvironments)
+        if (movePreparedActionVirtualEnvironments)
             EnsureNoUnexpectedReparsePoints(source, "legacy migration source");
         else
             ManagedPathBoundary.EnsureNoReparsePoints(source, "legacy migration source");
         if (Directory.Exists(destination) || File.Exists(destination))
         {
-            if (retainLegacyVirtualEnvironments)
+            if (movePreparedActionVirtualEnvironments)
                 EnsureNoUnexpectedReparsePoints(destination, "legacy migration destination");
             else
                 ManagedPathBoundary.EnsureNoReparsePoints(destination, "legacy migration destination");
         }
 
-        ValidateMoveTree(source, destination, retainLegacyVirtualEnvironments);
-        MoveTreeContents(source, destination, retainLegacyVirtualEnvironments);
+        ValidateMoveTree(source, destination, movePreparedActionVirtualEnvironments);
+        MoveTreeContents(source, destination, movePreparedActionVirtualEnvironments);
     }
 
     private static void ValidateMoveTree(
         string source,
         string destination,
-        bool retainLegacyVirtualEnvironments)
+        bool movePreparedActionVirtualEnvironments)
     {
-        if (retainLegacyVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(source))
+        if (movePreparedActionVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(source))
+        {
+            if (PathEntryExists(destination))
+                throw new InvalidOperationException(
+                    $"Legacy migration conflict: prepared Action virtual environment '{source}' cannot overwrite '{destination}'.");
+
             return;
+        }
 
         if (File.Exists(source))
         {
@@ -517,23 +526,24 @@ public class RunnerWorkspaceService
 
         foreach (var entry in Directory.EnumerateFileSystemEntries(source))
         {
-            if (retainLegacyVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(entry))
-                continue;
-
             ValidateMoveTree(
                 entry,
                 Path.Combine(destination, Path.GetFileName(entry)),
-                retainLegacyVirtualEnvironments);
+                movePreparedActionVirtualEnvironments);
         }
     }
 
     private static void MoveTreeContents(
         string source,
         string destination,
-        bool retainLegacyVirtualEnvironments)
+        bool movePreparedActionVirtualEnvironments)
     {
-        if (retainLegacyVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(source))
+        if (movePreparedActionVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(source))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            Directory.Move(source, destination);
             return;
+        }
 
         if (File.Exists(source))
         {
@@ -548,13 +558,10 @@ public class RunnerWorkspaceService
         Directory.CreateDirectory(destination);
         foreach (var entry in Directory.EnumerateFileSystemEntries(source).ToArray())
         {
-            if (retainLegacyVirtualEnvironments && IsLegacyVirtualEnvironmentDirectory(entry))
-                continue;
-
             MoveTreeContents(
                 entry,
                 Path.Combine(destination, Path.GetFileName(entry)),
-                retainLegacyVirtualEnvironments);
+                movePreparedActionVirtualEnvironments);
         }
 
         DeleteEmptyDirectory(source);
@@ -585,6 +592,23 @@ public class RunnerWorkspaceService
         return IsRegularFile(Path.Combine(path, "pyvenv.cfg"))
             && (IsRegularDirectory(Path.Combine(path, "bin"))
                 || IsRegularDirectory(Path.Combine(path, "Scripts")));
+    }
+
+    private static bool PathEntryExists(string path)
+    {
+        try
+        {
+            _ = File.GetAttributes(path);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
     }
 
     private static void EnsureNoUnexpectedReparsePoints(string root, string scope)
