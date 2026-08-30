@@ -13,6 +13,6 @@ public sealed record DeploymentTargetInfo(
     string Slug,
     bool IsDefault,
     string Status,
-    bool RuntimeDeployed,
+    bool LegacyControllerRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DeploymentTargetRunnerInfo? Runner);

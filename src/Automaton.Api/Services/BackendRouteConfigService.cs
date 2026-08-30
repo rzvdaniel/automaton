@@ -42,7 +42,6 @@ public class BackendRouteConfigService
             .AsNoTracking()
             .Where(target =>
                 target.ExecutionRunnerId != null &&
-                target.RuntimeDeployed &&
                 target.GenericRuntimeDeployed)
             .Join(
                 dbContext.HostedRunners.AsNoTracking().Where(r =>
@@ -79,7 +78,6 @@ public class BackendRouteConfigService
             .AsNoTracking()
             .Where(target =>
                 target.ExecutionRunnerId != null &&
-                target.RuntimeDeployed &&
                 target.GenericRuntimeDeployed &&
                 !dbContext.HostedRunners.Any(hostedRunner =>
                     hostedRunner.DeletedAt == null &&

@@ -27,7 +27,7 @@ public sealed class AppListEnvironmentDto
     public bool IsHostedRunner { get; init; }
     public string? ApplicationProfile { get; init; }
     public bool RunnerOnline { get; init; }
-    public bool RuntimeDeployed { get; init; }
+    public bool LegacyControllerRuntimeDeployed { get; init; }
     public bool GenericRuntimeDeployed { get; init; }
     public DateTime? LastSuccessfulDeploymentAtUtc { get; init; }
     public bool IsStaticHosting { get; init; }

@@ -37,8 +37,9 @@ public sealed class ManagedRunnerAppAssignmentService
         foreach (var app in apps)
         {
             var application = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
-            var hasDeployedRuntime = app.DeploymentTargets.Any(target => target.IsDefault && target.RuntimeDeployed);
-            if (application.Runtime.Command is null && !hasDeployedRuntime)
+            var hasLegacyControllerRuntime = app.DeploymentTargets.Any(
+                target => target.IsDefault && target.LegacyControllerRuntimeDeployed);
+            if (application.Runtime.Command is null && !hasLegacyControllerRuntime)
             {
                 continue;
             }

@@ -24,7 +24,13 @@ public sealed class AppDeploymentTarget
     /// </summary>
     public byte? DefaultConstraintKey { get; private set; }
 
-    public bool RuntimeDeployed { get; set; }
+    /// <summary>
+    /// Indicates that the deferred legacy controller runtime completed for
+    /// this target. This marker is intentionally separate from
+    /// <see cref="GenericRuntimeDeployed"/> and cannot make a generic route
+    /// eligible.
+    /// </summary>
+    public bool LegacyControllerRuntimeDeployed { get; set; }
 
     /// <summary>
     /// Indicates that the canonical generic runtime contract was promoted by

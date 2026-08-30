@@ -6,7 +6,8 @@ export function isRemovableLegacyDefault(target: AppDeploymentTarget): boolean {
   const slug = target.slug.trim().toLowerCase()
   return !target.isDefault &&
     !target.runner &&
-    !target.runtimeDeployed &&
+    !target.legacyControllerRuntimeDeployed &&
+    !target.genericRuntimeDeployed &&
     !target.lastDeploymentAt &&
     !target.lastSuccessfulDeploymentAt &&
     (target.status === 'Unassigned' || target.status === 'NotDeployed') &&

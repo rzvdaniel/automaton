@@ -17,7 +17,7 @@ public sealed record AppDeploymentTargetSummary(
     string Slug,
     bool IsDefault,
     DeploymentTargetStatus Status,
-    bool RuntimeDeployed,
+    bool LegacyControllerRuntimeDeployed,
     bool GenericRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DateTimeOffset? LastSuccessfulDeploymentAt,
