@@ -22,6 +22,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Runner\Automaton.Runner.csproj" />
     <ProjectReference Include="..\RunnerRuntimeFixture\RunnerRuntimeFixture.csproj" ReferenceOutputAssembly="false" />
+    <Content Include="..\GenericRuntimeAcceptanceFixtures\**\*"
+             Link="AcceptanceFixtures\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
