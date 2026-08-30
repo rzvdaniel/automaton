@@ -1,77 +1,73 @@
 # Automaton App Contract (Compact)
 
-Use this compact contract for in-product app editing where linked documents are not automatically available as prompt context.
+Use this contract for in-product app editing and AI-assisted app creation.
 
-## Required app shape
+## Source and contract
 
-- Keep `automaton.json` in the app root when it exists.
-- In Studio, file tools edit the app source surfaces rather than the local CLI scaffold directly.
-- Studio-backed app source is organized around optional frontend, backend, and Action module source roots.
-- Author and deploy Actions from the local App/Git checkout with `automaton deploy`; Studio operates deployed Action runtime state.
-- Frontend source normally lives in `frontend/`.
-- Frontend build output normally lives in `frontend/dist/`.
-- Backend source, when needed, lives in `backend/`.
-- Finite background work lives in `actions/{action-key}/`.
-- Treat frontend, backend, and Actions as separate execution surfaces owned by the same App.
-- Do not invent alternative top-level folders unless the existing app already uses them.
+- Keep `automaton.json` at the app root when it exists.
+- The `application` object in `automaton.json` is the source of truth for build,
+  runtime, readiness, environment, and persistent storage behavior.
+- Source layout is the application's choice. Do not require a frontend folder,
+  backend folder, package manifest, language, framework, or package manager.
+- Studio edits application source; the CLI validates and deploys the same
+  contract.
 
-Minimum expected source shape:
-
-```text
-frontend/
-  package.json
-  src/
-  public/
-  dist/
-
-backend/
-  *.py
-
-actions/
-  send-email/
-    action.yaml
-    main.py
-```
-
-## Frontend rules
-
-- Use relative frontend API URLs so deployed apps keep working across environments.
-- Do not hardcode localhost-only frontend URLs into the shipped app.
-- Prefer small, focused file changes when updating an existing app.
-
-## Backend rules
-
-- Automaton backends are ordinary HTTP applications. The initial supported convention is FastAPI/ASGI with `main:app`.
-- Frontends call same-origin root-relative HTTP paths such as `/api/posts`.
-- Published apps run on an app-specific origin derived from the slug; do not hardcode app IDs, hostnames, or ports.
-- Keep the backend server behind the runner gateway. The browser should not know that it is running on Automaton.
-- Use normal HTTP resources and methods, for example `GET /api/posts` and `POST /api/posts`.
-- Backend responses should use the application’s normal JSON shape.
+## Generic application contract
 
 ```json
-{ "posts": [] }
+{
+  "application": {
+    "build": {
+      "command": {
+        "executable": "build-tool",
+        "arguments": ["build"],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "outputDirectory": "dist",
+      "timeoutSeconds": 900
+    },
+    "runtime": {
+      "command": {
+        "executable": "app-server",
+        "arguments": [],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "port": 8080
+    },
+    "health": { "path": "/health", "startupTimeoutSeconds": 60 },
+    "storage": { "dataDirectory": "data", "mounts": [] }
+  }
+}
 ```
 
-- Return appropriate HTTP status codes and useful JSON error messages.
-- Keep backend files under `backend/`.
+Commands are structured by default. Use shell mode only when the application
+intentionally needs shell semantics. Paths are workspace-relative and validated
+by Automaton. Environment values must not contain secrets in source-controlled
+files.
 
-## Runtime data
+The canonical fields are `application.build.command`,
+`application.runtime.command`, `application.health`, and
+`application.storage`.
 
-- Durable per-app runtime data belongs under `AUTOMATON_APP_DATA_DIR`.
-- Do not hardcode the physical storage path.
-- Use subfolders like `media/`, `db/`, `generated/`, `cache/`, `logs/`, and `tmp/` when they fit.
-- Only create folders that the app actually needs.
+Applications that require an HTTP or public endpoint must declare
+`runtime.command`. A static site must include an HTTP server in its application
+code or runtime dependency and describe that server with the same generic
+runtime contract. `runtime.command` is optional only for finite-work or
+Actions-only applications with no HTTP endpoint. When present, the Runner
+starts that process, checks TCP or the configured HTTP health path, and exposes
+the healthy endpoint. Persistent application data belongs under the configured
+data directory and is not disposable runtime output.
 
-## Action rules
+## Deployment and publishing
 
-- Each direct child of `actions/` is one Action module and must contain `action.yaml`.
-- Supported runtimes are Python and Bash. Actions are console jobs, not HTTP servers.
-- Read exactly one JSON value from stdin, write exactly one JSON value to stdout, and write logs to stderr.
-- Exit non-zero on failure. Receive secrets through environment variables; never write them to output or logs.
-- Normal App Actions cannot request host or Docker privileges.
+- Run `automaton deploy` after validating the project and contract.
+- The remote Runner performs the configured build once when a build command is
+  present; the CLI does not implicitly build the same command locally first.
+- Ask before publishing an application publicly.
 
-## Publishing and deployment
-
-- Deploy and publish are separate actions.
-- Ask before publishing an app publicly.
-- When backend files change, remind the user that backend/runtime changes must be deployed before they take effect.
+Action modules remain a separate finite-work feature with their own manifest and
+execution semantics. The deferred legacy controller/FastAPI bridge and its
+Python-specific guidance are compatibility material, not requirements of this
+generic contract.

@@ -74,7 +74,7 @@ public class DeployServiceTests
 
         var service = new DeployService(configService);
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.False);
         AssertCheck(result, DeployCheckNames.Credentials, false, "API key could not be resolved");
@@ -97,10 +97,10 @@ public class DeployServiceTests
             configService,
             deployPackageAsync: (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
-                new DeployBackendResult(true, 1, "deployed"))),
+                new DeployRuntimeResult(true, 1, "deployed"))),
             createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
         AssertCheck(result, DeployCheckNames.Build, true, "deferred to the assigned Runner");
@@ -129,14 +129,14 @@ public class DeployServiceTests
                 Assert.That(zip.Length, Is.GreaterThan(0));
                 return Task.FromResult((
                     new DeployUploadResult(5, 0, 0.2),
-                    new DeployBackendResult(true, 1, "package deployed", Logs: ["stdout: runner build diagnostic"])));
+                    new DeployRuntimeResult(true, 1, "package deployed", Logs: ["stdout: runner build diagnostic"])));
             });
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.BackendRunning, Is.True);
-        Assert.That(result.Uploaded?.Written, Is.EqualTo(5));
+        Assert.That(result.RuntimeRunning, Is.True);
+        Assert.That(result.RuntimeUploaded?.Written, Is.EqualTo(5));
         Assert.That(progress, Has.Some.EqualTo("Creating deploy package..."));
         Assert.That(progress, Has.Some.EqualTo("Uploading deploy package to the assigned runner..."));
         Assert.That(progress, Has.Some.EqualTo("stdout: runner build diagnostic"));
@@ -145,7 +145,7 @@ public class DeployServiceTests
     }
 
     [Test]
-    public async Task DeployAsync_WhenSkipBackend_StillUploadsPackage()
+    public async Task DeployAsync_AlwaysDeploysTheConfiguredRuntime()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
@@ -162,13 +162,13 @@ public class DeployServiceTests
             configService,
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(4, 0, 0.1),
-                new DeployBackendResult(true, 1, "ignored"))));
+                new DeployRuntimeResult(true, 1, "deployed"))));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: true, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.SkipBackend, Is.True);
-        AssertCheck(result, DeployCheckNames.PackageDeploy, true, "backend deploy skipped by flag");
+        Assert.That(result.RuntimeRunning, Is.True);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, true, "deployed");
     }
 
     [Test]
@@ -189,14 +189,14 @@ public class DeployServiceTests
             configService,
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
-                new DeployBackendResult(
+                new DeployRuntimeResult(
                     false,
                     0,
                     "Managed runtime is being prepared.",
                     "preparingManagedRuntime",
                     true))));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.HasWarnings, Is.True);
@@ -230,7 +230,7 @@ public class DeployServiceTests
                 return Task.FromResult(document.RootElement.Clone());
             });
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(readinessCalled, Is.True);
         Assert.That(result.Success, Is.False);
@@ -256,17 +256,17 @@ public class DeployServiceTests
             configService,
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
-                new DeployBackendResult(
+                new DeployRuntimeResult(
                     false,
                     0,
                     "Managed backend runtime is not included in the current plan.",
                     "managedRuntimeUnavailable",
                     false))));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.NextSteps, Does.Contain("This workspace plan does not include managed backend runtime."));
+        Assert.That(result.NextSteps, Does.Contain("This workspace plan does not include managed application runtime."));
         Assert.That(result.NextSteps, Does.Contain("Assign a self-hosted runner or change the workspace plan, then rerun automaton deploy."));
         Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
         AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed backend runtime is not included in the current plan.");
@@ -290,14 +290,14 @@ public class DeployServiceTests
             configService,
             (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
-                new DeployBackendResult(
+                new DeployRuntimeResult(
                     false,
                     0,
                     "No connected runner is assigned to this app.",
                     "managedRuntimeUnavailable",
                     false))));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.NextSteps, Does.Contain("This app is assigned to a runner, but that runner is not currently connected."));
@@ -323,7 +323,7 @@ public class DeployServiceTests
             configService,
             (_, _, _, _, _, _, _) => throw new InvalidOperationException("package upload failed"));
 
-        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.False);
         AssertCheck(result, DeployCheckNames.PackageUpload, false, "package upload failed");
@@ -363,7 +363,7 @@ public class DeployServiceTests
                 requestedTarget = targetSlug;
                 return Task.FromResult((
                     new DeployUploadResult(1, 0, 0.1),
-                    new DeployBackendResult(true, 1, "deployed")));
+                    new DeployRuntimeResult(true, 1, "deployed")));
             },
             createSnapshotAsync: (_, _, _, _) =>
                 Task.FromResult((true, "snapshot created")));
@@ -371,7 +371,6 @@ public class DeployServiceTests
         var result = await service.DeployAsync(
             projectRoot,
             clean: false,
-            skipBackend: true,
             directoryOverride: null,
             target: target);
 

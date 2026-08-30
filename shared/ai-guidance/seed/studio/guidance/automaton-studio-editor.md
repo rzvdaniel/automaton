@@ -18,7 +18,7 @@ Use this guidance when the AI is editing an app inside Automaton Studio rather t
 
 - You are operating inside Automaton Studio App Editor.
 - File tools edit the app source directly.
-- Treat the compact shared Automaton app contract loaded with this prompt as the source of truth for app structure, backend rules, deploy shape, and runtime data.
+- Treat the compact shared Automaton application contract loaded with this prompt as the source of truth for build, runtime, health, storage, deploy shape, and runtime data. Source layout and technology are application choices.
 
 ## Studio-specific behavior
 
@@ -26,7 +26,7 @@ Use this guidance when the AI is editing an app inside Automaton Studio rather t
 - When changing an existing app, inspect the relevant files first rather than guessing the current shape.
 - Use Studio preview, UI verification, and backend runtime tools when available.
 - When you need deeper Automaton-specific guidance, use `list_automaton_guidance` to discover available focused references and `get_automaton_guidance` to load the exact one you need instead of guessing.
-- When backend files change, remind the user to deploy the backend/runtime so the new controller code is running.
+- When application source or its contract changes, remind the user to deploy the application so the new artifact/runtime is running.
 - Ask before publishing a deployed app publicly.
 - Use Studio/App Editor concepts first when describing what to do inside Studio.
 - Only mention CLI commands when explaining a local workflow outside Studio or when the user explicitly asks about local tooling.
@@ -42,8 +42,8 @@ Every tool call is a separate round-trip. Batch independent reads and writes whe
 ## Source editing model
 
 - Edit the app source, not deployed runtime output.
-- Preserve the frontend/backend separation defined by the shared app contract.
-- Use bundled frontend assets for shipped static files, and use `AUTOMATON_APP_DATA_DIR` only for durable runtime-generated backend data, according to the shared contract.
+- Preserve the generic application contract and its configured source/runtime boundaries. Frontend/backend layouts are optional template conventions, not requirements.
+- Use the declared build output for shipped artifacts and the configured persistent data directory for durable runtime-generated data.
 
 ## Code quality bias
 

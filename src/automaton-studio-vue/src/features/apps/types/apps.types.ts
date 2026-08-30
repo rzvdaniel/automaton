@@ -93,6 +93,60 @@ export interface App {
   hasDeployedFrontend: boolean
   frontend: AppComponentOwnership
   backend: AppComponentOwnership
+  application: ApplicationContract
+}
+
+/** The stack-neutral application contract persisted by the API and CLI. */
+export interface ApplicationCommandSpec {
+  executable: string
+  arguments: string[]
+  workingDirectory: string
+  environment: Record<string, string>
+  useShell: boolean
+}
+
+export interface ApplicationBuildSpec {
+  command: ApplicationCommandSpec | null
+  outputDirectory?: string | null
+  timeoutSeconds: number
+}
+
+export interface ApplicationRuntimeSpec {
+  command: ApplicationCommandSpec | null
+  port: number
+}
+
+export interface ApplicationHealthSpec {
+  path?: string | null
+  port?: number | null
+  startupTimeoutSeconds: number
+}
+
+export interface ApplicationStorageMount {
+  name: string
+  relativePath: string
+  readOnly: boolean
+}
+
+export interface ApplicationStorageSpec {
+  dataDirectory: string
+  mounts: ApplicationStorageMount[]
+}
+
+export interface ApplicationContract {
+  build: ApplicationBuildSpec
+  runtime: ApplicationRuntimeSpec
+  health: ApplicationHealthSpec
+  storage: ApplicationStorageSpec
+}
+
+export function createDefaultApplicationContract(): ApplicationContract {
+  return {
+    build: { command: null, outputDirectory: null, timeoutSeconds: 900 },
+    runtime: { command: null, port: 8080 },
+    health: { path: null, port: null, startupTimeoutSeconds: 60 },
+    storage: { dataDirectory: 'data', mounts: [] },
+  }
 }
 
 export interface AppListItem {
@@ -115,10 +169,12 @@ export interface AppListItem {
     applicationProfile?: string | null
     runnerOnline: boolean
     runtimeDeployed: boolean
+    genericRuntimeDeployed: boolean
+    lastSuccessfulDeploymentAtUtc?: string | null
     isStaticHosting?: boolean
     routePath: string
   } | null
-  runtime: { frontendAvailable: boolean; backendAvailable: boolean; runtimeDeployedAtUtc?: string | null }
+  runtime: { genericRuntimeDeployed: boolean }
 }
 
 export const DeploymentTargetStatus = {
@@ -140,6 +196,7 @@ export interface AppDeploymentTarget {
   isDefault: boolean
   status: DeploymentTargetStatus
   runtimeDeployed: boolean
+  genericRuntimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
   cleanupPending: boolean

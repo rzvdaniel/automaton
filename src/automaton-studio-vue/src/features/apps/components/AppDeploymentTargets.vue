@@ -330,21 +330,22 @@ function runtimeTransport(target: AppDeploymentTarget): string {
 function canOpenPreview(target: AppDeploymentTarget): boolean {
   return (
     !!target.runner &&
-    target.runtimeDeployed &&
+    target.genericRuntimeDeployed &&
     target.runner.isOnline &&
     target.status !== DeploymentTargetStatus.RunnerOffline
   )
 }
 
 function deploymentState(target: AppDeploymentTarget): string {
-  return target.runtimeDeployed ? 'Runtime deployed' : ''
+  if (target.genericRuntimeDeployed) return 'Generic runtime deployed'
+  return target.runtimeDeployed ? 'Legacy runtime deployed' : ''
 }
 
 function canPromote(target: AppDeploymentTarget): boolean {
   return (
     !!target.runner &&
     target.runner.isOnline &&
-    target.runtimeDeployed &&
+    target.genericRuntimeDeployed &&
     target.status !== DeploymentTargetStatus.Deploying
   )
 }

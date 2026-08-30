@@ -28,7 +28,9 @@ async function loadRuntimeView() {
   try {
     app.value = await appsService.get(appId.value)
 
-    if (!(app.value.frontend.runtimeAvailable || app.value.hasDeployedFrontend)) {
+    const targets = await appsService.listDeploymentTargets(appId.value)
+    const liveTarget = targets.find((target) => target.isDefault)
+    if (!liveTarget?.genericRuntimeDeployed) {
       error.value = 'This app has not been deployed yet.'
       return
     }

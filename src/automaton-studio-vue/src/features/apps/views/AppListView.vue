@@ -35,10 +35,7 @@ const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
 
 const getDeploymentSummary = (app: AppListItem) => {
-  if (app.runtime.frontendAvailable && app.runtime.backendAvailable) return 'Full stack deployed'
-  if (app.runtime.frontendAvailable) return 'Frontend deployed'
-  if (app.runtime.backendAvailable) return 'Backend deployed'
-  return 'Not deployed yet'
+  return app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
 }
 
 const getLiveDestinationLabel = (app: AppListItem) => {
@@ -54,7 +51,7 @@ const getLiveStatusLabel = (app: AppListItem) => {
   const environment = app.liveEnvironment
   if (!environment) return app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.runtimeDeployed) return 'Unassigned'
+  if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 }
 
@@ -567,8 +564,8 @@ const handleRetry = async () => {
             <div class="qs-code mb-2">automaton validate</div>
             <div class="qs-code mb-3">automaton deploy</div>
             <p class="text-color-secondary text-sm mb-2">
-              Automaton apps need to follow a specific project structure, backend controller pattern,
-              and frontend integration contract. Point your AI tool to
+              Automaton apps use a generic application contract for build, runtime, health, storage,
+              and environment settings. Point your AI tool to
               <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
               before it starts generating files.
             </p>

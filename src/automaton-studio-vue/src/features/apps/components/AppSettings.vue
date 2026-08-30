@@ -15,11 +15,12 @@ import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
+import ApplicationContractEditor from './ApplicationContractEditor.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
-import { AccessScope, type AppDeploymentTarget, type AppScreenshot } from '../types/apps.types'
+import { AccessScope, createDefaultApplicationContract, type AppDeploymentTarget, type AppScreenshot, type ApplicationContract } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
 import { resolveMediaUrl } from '../utils/media-url'
 
@@ -44,7 +45,7 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'application' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
@@ -73,7 +74,7 @@ const cliLoginCommand = computed(() =>
 )
 
 const starterPrompt = computed(() =>
-  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow that contract as the source of truth. Default to a Vite app in frontend/ with build output in frontend/dist, add backend/ only when the feature truly needs server-side behavior, and store durable backend data under AUTOMATON_APP_DATA_DIR.'
+  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow the generic application contract as the source of truth. Choose the simplest suitable technology, declare structured build and runtime commands in automaton.json, set working directories, listening port, optional health path, environment, and persistent data directory explicitly. Do not assume a frontend/backend layout or a particular language, framework, or package manager.'
 )
 
 // Local form state
@@ -85,6 +86,7 @@ const requiresAuthentication = ref(false)
 const isForkable = ref(false)
 const isProfileFeatured = ref(false)
 const thumbnailUrl = ref<string | undefined>(undefined)
+const applicationContract = ref<ApplicationContract>(createDefaultApplicationContract())
 const tags = ref<string[]>([])
 const originalTags = ref<string[]>([])
 const tagInput = ref('')
@@ -162,9 +164,14 @@ const hasChanges = computed(() => {
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
     !sameTags(tags.value, originalTags.value) ||
-    pendingTags.value.length > 0
+    pendingTags.value.length > 0 ||
+    JSON.stringify(applicationContract.value) !== JSON.stringify(app.value.application)
   )
 })
+
+function cloneApplicationContract(value: ApplicationContract): ApplicationContract {
+  return JSON.parse(JSON.stringify(value)) as ApplicationContract
+}
 
 const fullPublicUrl = computed(() => {
   if (!publicUrl.value) return ''
@@ -251,6 +258,7 @@ watch(
       isForkable.value = newApp.isForkable ?? false
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
+      applicationContract.value = cloneApplicationContract(newApp.application ?? createDefaultApplicationContract())
       isSample.value = newApp.isSample ?? false
       isFeatured.value = newApp.isFeatured ?? false
       const fallbackTags = parseLegacyTags(newApp.tags)
@@ -357,6 +365,7 @@ async function saveSettings() {
       requiresAuthentication: requiresAuthentication.value,
       isForkable: isForkable.value,
       isProfileFeatured: isProfileFeatured.value,
+      application: cloneApplicationContract(applicationContract.value),
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
     originalTags.value = [...tags.value]
@@ -370,6 +379,7 @@ async function saveSettings() {
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
       editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
+      editorStore.currentApp.application = cloneApplicationContract(applicationContract.value)
       editorStore.currentApp.tags = tags.value.join(',') || null
     }
 
@@ -610,6 +620,14 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'basic'"
               />
               <Button
+                label="Application"
+                icon="pi pi-code"
+                text
+                :class="{ 'surface-hover': activeSection === 'application' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'application'"
+              />
+              <Button
                 label="Publishing"
                 icon="pi pi-globe"
                 text
@@ -745,6 +763,28 @@ async function handleSaveTemplateStatus() {
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
                 <Button
                   label="Save Changes"
+                  icon="pi pi-save"
+                  :loading="isSaving"
+                  :disabled="!hasChanges"
+                  @click="saveSettings"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Generic application contract -->
+        <Card v-if="activeSection === 'application'">
+          <template #title>Application contract</template>
+          <template #content>
+            <div class="flex flex-column gap-4">
+              <Message severity="info" :closable="false">
+                This contract is the canonical description of how Automaton builds, starts, checks, and stores this application. It is intentionally independent of any language or framework.
+              </Message>
+              <ApplicationContractEditor v-model="applicationContract" />
+              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
+                <Button
+                  label="Save application contract"
                   icon="pi pi-save"
                   :loading="isSaving"
                   :disabled="!hasChanges"
@@ -1144,9 +1184,9 @@ async function handleSaveTemplateStatus() {
                 <div class="connect-snippet">
                   <pre>dotnet tool install -g Automaton.Cli</pre>
                   <Button
-                    :icon="copiedItem === 'npm' ? 'pi pi-check' : 'pi pi-copy'"
+                    :icon="copiedItem === 'cli' ? 'pi pi-check' : 'pi pi-copy'"
                     text rounded size="small" class="connect-copy-btn"
-                    @click="copyText('dotnet tool install -g Automaton.Cli', 'npm')"
+                    @click="copyText('dotnet tool install -g Automaton.Cli', 'cli')"
                   />
                 </div>
                 <div class="connect-snippet mt-2">
@@ -1184,29 +1224,23 @@ automaton deploy</pre>
                 </div>
               </div>
 
-              <!-- Structure reference -->
+              <!-- Contract reference -->
               <div>
-                <div class="font-semibold mb-1">Required file structure</div>
+                <div class="font-semibold mb-1">Generic application contract</div>
                 <div class="connect-tree">
                   <div><span class="ct-file">automaton.json</span> <span class="ct-comment">← app link written by CLI</span></div>
-                  <div><span class="ct-dir">frontend/</span> <span class="ct-comment">← default frontend source root</span></div>
-                  <div class="pl-3"><span class="ct-file">package.json</span></div>
-                  <div class="pl-3"><span class="ct-file">vite.config.ts</span> <span class="ct-comment">← use <code>base: './'</code></span></div>
-                  <div class="pl-3"><span class="ct-dir">public/</span> <span class="ct-comment">← bundled static assets only</span></div>
-                  <div class="pl-3"><span class="ct-dir">src/</span> <span class="ct-comment">← app source files</span></div>
-                  <div class="pl-3"><span class="ct-dir">dist/</span> <span class="ct-comment">← build output deployed publicly</span></div>
-                  <div><span class="ct-dir">backend/</span></div>
-                  <div class="pl-3"><span class="ct-file">controller.py</span> <span class="ct-comment">← exports handle(action_name, inputs)</span></div>
-                  <div class="pl-3"><span class="ct-file">requirements.txt</span> <span class="ct-comment">← optional pip deps</span></div>
-                  <div class="pl-3"><span class="ct-dir">shared/</span> <span class="ct-comment">← shared Python helpers</span></div>
-                  <div class="pl-3"><span class="ct-dir">mocks/</span> <span class="ct-comment">← local mock responses</span></div>
+                  <div><span class="ct-dir">application</span> <span class="ct-comment">← build/runtime/health/storage contract</span></div>
+                  <div class="pl-3"><span class="ct-file">build.command</span> <span class="ct-comment">← executable, arguments, working directory</span></div>
+                  <div class="pl-3"><span class="ct-file">runtime.command</span> <span class="ct-comment">← process that serves the application</span></div>
+                  <div class="pl-3"><span class="ct-file">runtime.port</span> <span class="ct-comment">← listening port</span></div>
+                  <div class="pl-3"><span class="ct-file">health.path</span> <span class="ct-comment">← optional HTTP readiness path</span></div>
+                  <div class="pl-3"><span class="ct-file">storage.dataDirectory</span> <span class="ct-comment">← persistent application data</span></div>
                 </div>
                 <p class="text-color-secondary text-sm mt-2 mb-0">
-                  Frontend code should call the app backend with same-origin HTTP requests under <code class="connect-code">/api</code>.
-                  The call returns the backend data payload directly and throws on error, so use <code class="connect-code">try/catch</code>.
+                  The source layout is your choice. Automaton packages the project, runs the declared build when present, starts the declared runtime, and exposes its healthy endpoint through the deployment target.
                 </p>
                 <p class="text-color-secondary text-sm mt-2 mb-0">
-                  Durable backend files such as SQLite databases, uploads, and generated exports belong under <code class="connect-code">AUTOMATON_APP_DATA_DIR</code>, typically in <code class="connect-code">db/</code>, <code class="connect-code">media/</code>, or <code class="connect-code">generated/</code>.
+                  Durable files such as databases, uploads, and generated exports belong under the configured persistent data directory. Framework-specific templates are optional examples, not platform requirements.
                 </p>
               </div>
             </div>

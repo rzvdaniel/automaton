@@ -90,24 +90,11 @@ const actionMenuItems = computed<MenuItem[]>(() => {
   }
 
   items.push({
-    label: 'Deploy App',
+    label: 'Deploy legacy application',
     icon: 'pi pi-cloud-upload',
     disabled: props.isDeployingApp || !props.canDeployFromStudio,
     command: () => emit('deployApp'),
   })
-  items.push({
-    label: 'Deploy Frontend',
-    icon: 'pi pi-desktop',
-    disabled: props.isDeployingApp || !props.canDeployFrontendFromStudio,
-    command: () => emit('deployFrontend'),
-  })
-  items.push({
-    label: 'Deploy Backend',
-    icon: 'pi pi-server',
-    disabled: props.isDeployingBackend,
-    command: () => emit('deployBackend'),
-  })
-
   if (props.isPublished) {
     items.push({ separator: true })
     items.push({
@@ -125,7 +112,7 @@ const primaryActionLabel = computed(() => {
     return openAppLabel.value
   }
 
-  return props.canDeployFromStudio ? 'Publish' : 'Deploy'
+  return props.canDeployFromStudio ? 'Publish' : 'Deploy with CLI'
 })
 
 const primaryActionIcon = computed(() => {

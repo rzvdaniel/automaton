@@ -5,7 +5,7 @@ import { getViewingTargetPreviewState, resolveViewingTarget } from './viewing-ta
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'live', isDefault: true,
-    status: DeploymentTargetStatus.Running, runtimeDeployed: true,
+    status: DeploymentTargetStatus.Running, runtimeDeployed: true, genericRuntimeDeployed: true,
     cleanupPending: false, routePath: '/private/app-id',
     runner: { id: 'runner-id', name: 'Hosted', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,

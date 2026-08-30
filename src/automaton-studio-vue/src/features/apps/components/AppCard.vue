@@ -70,11 +70,7 @@ const updatedAgo = computed(() => {
   return `Updated: ${diffWeeks}w ago`
 })
 const deploymentSummary = computed(() => {
-  const frontend = props.app.runtime.frontendAvailable
-  const backend = props.app.runtime.backendAvailable
-  if (!frontend && !backend) return 'Not deployed yet'
-
-  return frontend && backend ? 'Full stack deployed' : frontend ? 'Frontend deployed' : 'Backend deployed'
+  return props.app.runtime.genericRuntimeDeployed ? 'Generic runtime deployed' : 'Not deployed yet'
 })
 
 const liveEnvironment = computed(() => props.app.liveEnvironment)
@@ -83,7 +79,7 @@ const liveStatusLabel = computed(() => {
   if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
   if (environment.isStaticHosting) return 'Available'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
-  if (!environment.runtimeDeployed) return 'Unassigned'
+  if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 })
 const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveStatusLabel.value)
@@ -99,7 +95,7 @@ const liveDestinationLabel = computed(() => {
     : 'Self-hosted · Standard'
 })
 
-const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
+const canOpenPrivateApp = computed(() => props.app.runtime.genericRuntimeDeployed)
 const canOpenPublicApp = computed(() => props.app.canLaunchPublicly === true && !!props.app.publicUrl)
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
 const primaryAction = computed(() => canOpenApp.value

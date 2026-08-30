@@ -25,6 +25,7 @@ import type {
   RunnerFileArea,
   ForkAppRequest,
   ForkAppSource,
+  ApplicationContract,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 
@@ -453,6 +454,7 @@ class AppsService {
       executionRunnerId?: string
       isProfileFeatured?: boolean
       isForkable?: boolean
+      application?: ApplicationContract
     },
   ): Promise<void> {
     // Get current app and build update payload with only backend-expected fields
@@ -480,6 +482,7 @@ class AppsService {
       screenshots: app.screenshots,
       category: app.category,
       tags: app.tags,
+      application: settings.application ?? app.application,
     }
     await this.update(id, updatePayload)
   }

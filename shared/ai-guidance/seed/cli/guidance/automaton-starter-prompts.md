@@ -27,38 +27,18 @@ Link this folder to app id [app-id] with `automaton link [app-id]`. Then follow 
 Deploy with `automaton deploy`. Ask before publishing. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
 ```
 
-## Frontend-only prompt
+## Optional technology template prompt
 
 ```text
-Build [describe the app] as a frontend-only Automaton Monster app.
+Build [describe the app] using [technology] as an optional implementation choice.
 
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
+Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Authenticate with `automaton login`, then run `automaton new "[app-name]"` before creating app files.
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
-Use Vite unless I ask for another framework. Put source in `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`.
-```
-
-## React prompt
-
-```text
-Build [describe the app] as a React app for Automaton Monster.
-
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
-
-Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
-
-Use Vite React under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
-```
-
-## Vue prompt
-
-```text
-Build [describe the app] as a Vue app for Automaton Monster.
-
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
-
-Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
-
-Use Vite Vue under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
+Use the selected technology's normal source layout, but define the generic
+application contract explicitly: structured build command and output, runtime
+executable and arguments, working directories, port, optional health path,
+environment, and persistent data directory. Deploy with `automaton deploy`.
+The technology choice is a template convenience, not an Automaton requirement.
 ```

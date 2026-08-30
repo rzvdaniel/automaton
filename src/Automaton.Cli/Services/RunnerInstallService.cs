@@ -592,14 +592,14 @@ public sealed class RunnerInstallService
         try
         {
             await RunProcessCheckedAsync("python", "--version", cancellationToken);
-            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, "python detected for backend app execution");
+            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, "python detected for deferred controller compatibility");
         }
         catch
         {
             return new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.RunnerStart,
                 false,
-                "python not detected. The runner can still install, but Python 3.11+ is required for backend Python apps.",
+                "python not detected. The runner can still install; Python is only required for deferred controller compatibility.",
                 true);
         }
     }
