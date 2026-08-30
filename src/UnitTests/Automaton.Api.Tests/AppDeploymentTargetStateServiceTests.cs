@@ -172,17 +172,18 @@ public class AppDeploymentTargetStateServiceTests
         await db.SaveChangesAsync();
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         var service = new AppDeploymentTargetStateService(db);
+        target.LegacyControllerRuntimeDeployed = true;
+        await db.SaveChangesAsync();
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
             app.Id,
             target.Id,
             success: true,
-            legacyControllerRuntimeDeployed: false,
             genericRuntimeDeployed: true);
 
         Assert.Multiple(() =>
         {
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
+            Assert.That(target.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(target.GenericRuntimeDeployed, Is.True);
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
         });
@@ -196,6 +197,8 @@ public class AppDeploymentTargetStateServiceTests
         await db.SaveChangesAsync();
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         var service = new AppDeploymentTargetStateService(db);
+        target.GenericRuntimeDeployed = true;
+        await db.SaveChangesAsync();
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
@@ -205,7 +208,7 @@ public class AppDeploymentTargetStateServiceTests
             legacyControllerRuntimeDeployed: true);
 
         Assert.That(target.LegacyControllerRuntimeDeployed, Is.True);
-        Assert.That(target.GenericRuntimeDeployed, Is.False);
+        Assert.That(target.GenericRuntimeDeployed, Is.True);
     }
 
     [Test]
@@ -216,16 +219,18 @@ public class AppDeploymentTargetStateServiceTests
         await db.SaveChangesAsync();
         var target = app.DeploymentTargets.Single(candidate => !candidate.IsDefault);
         var service = new AppDeploymentTargetStateService(db);
+        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
+        await db.SaveChangesAsync();
 
         await service.MarkStartedAsync(app.Id, target.Id);
         await service.MarkCompletedAsync(
-            app.Id, target.Id, success: false, legacyControllerRuntimeDeployed: true);
+            app.Id, target.Id, success: false);
 
         Assert.Multiple(() =>
         {
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
+            Assert.That(target.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(target.GenericRuntimeDeployed, Is.True);
             Assert.That(target.LastDeploymentAt, Is.Not.Null);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Null);
@@ -248,13 +253,12 @@ public class AppDeploymentTargetStateServiceTests
             app.Id,
             target.Id,
             success: true,
-            legacyControllerRuntimeDeployed: false,
             genericRuntimeDeployed: false);
 
         Assert.Multiple(() =>
         {
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
+            Assert.That(target.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(target.GenericRuntimeDeployed, Is.False);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Not.Null);
         });

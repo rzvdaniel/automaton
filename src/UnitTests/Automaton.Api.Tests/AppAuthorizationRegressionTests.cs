@@ -377,6 +377,100 @@ public class AppAuthorizationRegressionTests
             Is.EqualTo(runnerId));
     }
 
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task UpdateRunner_RejectsChangingRunnerWhenRuntimeIsDeployed(
+        bool legacyControllerRuntimeDeployed,
+        bool genericRuntimeDeployed)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var currentRunnerId = Guid.NewGuid();
+        var nextRunnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var target = dbContext.AppDeploymentTargets.Single(item => item.WebAppId == appId && item.IsDefault);
+        target.ExecutionRunnerId = currentRunnerId;
+        target.LegacyControllerRuntimeDeployed = legacyControllerRuntimeDeployed;
+        target.GenericRuntimeDeployed = genericRuntimeDeployed;
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.UpdateRunner(appId, nextRunnerId));
+
+        Assert.That(exception!.Message, Does.Contain("explicitly clean up"));
+        var persisted = await dbContext.AppDeploymentTargets
+            .SingleAsync(item => item.WebAppId == appId && item.IsDefault);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.ExecutionRunnerId, Is.EqualTo(currentRunnerId));
+            Assert.That(persisted.LegacyControllerRuntimeDeployed, Is.EqualTo(legacyControllerRuntimeDeployed));
+            Assert.That(persisted.GenericRuntimeDeployed, Is.EqualTo(genericRuntimeDeployed));
+        });
+    }
+
+    [Test]
+    public async Task Update_RejectsChangingRunnerWhenGenericRuntimeIsDeployed()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var currentRunnerId = Guid.NewGuid();
+        var nextRunnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var target = dbContext.AppDeploymentTargets.Single(item => item.WebAppId == appId && item.IsDefault);
+        target.ExecutionRunnerId = currentRunnerId;
+        target.GenericRuntimeDeployed = true;
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+        var model = service.Get(appId)!;
+        model.ExecutionRunnerId = nextRunnerId;
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.Update(appId, model));
+
+        Assert.That(exception!.Message, Does.Contain("explicitly clean up"));
+        Assert.That(
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
+            Is.EqualTo(currentRunnerId));
+    }
+
+    [Test]
+    public async Task Publish_RejectsChangingRunnerWhenLegacyRuntimeIsDeployed()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var currentRunnerId = Guid.NewGuid();
+        var nextRunnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var target = dbContext.AppDeploymentTargets.Single(item => item.WebAppId == appId && item.IsDefault);
+        target.ExecutionRunnerId = currentRunnerId;
+        target.LegacyControllerRuntimeDeployed = true;
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.Publish(
+                appId,
+                "published-app",
+                executionRunnerId: nextRunnerId,
+                runtimeVisibility: AppRuntimeVisibilities.Private,
+                catalogVisibility: AppCatalogVisibilities.Unlisted));
+
+        Assert.That(exception!.Message, Does.Contain("explicitly clean up"));
+        Assert.That(
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
+            Is.EqualTo(currentRunnerId));
+    }
+
     [Test]
     public async Task UpdateRunner_RejectsInfrastructureRunner()
     {

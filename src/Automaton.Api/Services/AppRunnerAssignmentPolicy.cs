@@ -39,6 +39,13 @@ public sealed class AppRunnerAssignmentPolicy(
                 "The deployment target does not belong to this App.");
         }
 
+        if (target.ExecutionRunnerId != runnerId &&
+            (target.LegacyControllerRuntimeDeployed || target.GenericRuntimeDeployed))
+        {
+            throw new AppDeploymentTargetConflictException(
+                "This target owns a deployed runtime. Use the deployment-target assignment lifecycle and explicitly clean up the runtime before changing its Runner.");
+        }
+
         if (!runnerId.HasValue)
         {
             target.ExecutionRunnerId = null;

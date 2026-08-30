@@ -129,16 +129,15 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
 
     /// <summary>
     /// Commits deployment state while keeping the deferred controller marker
-    /// independent from the generic runtime promotion marker. Generic package
-    /// deployments must pass <c>false</c> for the legacy marker and use
-    /// <paramref name="genericRuntimeDeployed"/> for their promotion result.
+    /// independent from the generic runtime promotion marker. Each marker is
+    /// updated only when its corresponding argument is supplied.
     /// </summary>
     public async Task MarkCompletedAsync(
         Guid appId,
         Guid deploymentTargetId,
         bool success,
-        bool legacyControllerRuntimeDeployed,
         CancellationToken cancellationToken = default,
+        bool? legacyControllerRuntimeDeployed = null,
         bool? genericRuntimeDeployed = null)
     {
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
@@ -152,7 +151,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         target.UpdatedAt = now;
         if (success)
         {
-            target.LegacyControllerRuntimeDeployed = legacyControllerRuntimeDeployed;
+            if (legacyControllerRuntimeDeployed.HasValue)
+                target.LegacyControllerRuntimeDeployed = legacyControllerRuntimeDeployed.Value;
             if (genericRuntimeDeployed.HasValue)
                 target.GenericRuntimeDeployed = genericRuntimeDeployed.Value;
             target.LastSuccessfulDeploymentAt = now;

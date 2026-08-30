@@ -11,7 +11,11 @@ continues to exist as an explicitly legacy compatibility subsystem.
 marker for the deferred controller runtime. It replaces the ambiguous
 `RuntimeDeployed` name through the `Stage8NameLegacyControllerRuntimeState`
 one-way migration. Existing rows keep their value; historical migration files
-are not rewritten.
+are not rewritten. A migrated `true` is a conservative carry-forward from the
+historically ambiguous `RuntimeDeployed` value and may over-approximate legacy
+controller state, including targets that previously hosted a generic runtime.
+That ambiguity is cleanup-safe: it must not be inferred as `false` merely
+because the generic marker is also true.
 
 `AppDeploymentTarget.GenericRuntimeDeployed` is the independent marker for a
 successfully promoted generic runtime. Generic routing, preview eligibility,

@@ -26,6 +26,12 @@ remove product state or the deferred controller/action subsystem.
 | `AppFrontendDeployMode`, `IsStaticHosting`, static hosting projections | Legacy Studio/static publication terminology | Studio compatibility / product projection | Keep only where traced consumers still require it; generic deploy and route decisions use the contract and target promotion state. Removing this projection requires a separate UX/API migration. |
 | Historical EF migrations | Former `FrontendDeployed`, `BackendDeployed`, and `RuntimeDeployed` column names | Durable migration history | Do not rewrite applied migrations. New schema changes must use explicit legacy names. |
 
+The rename migration conservatively carries existing `RuntimeDeployed` values
+into `LegacyControllerRuntimeDeployed`. Because the old value was ambiguous,
+`true` can over-approximate legacy controller state, including targets that had
+also promoted a generic runtime. This is intentionally cleanup-safe; migration
+must not infer `false` for the legacy marker when the generic marker is true.
+
 ## Architectural rules locked by Stage 8
 
 1. The generic path is `ApplicationContract -> source -> build -> artifact ->
