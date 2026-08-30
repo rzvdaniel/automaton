@@ -77,7 +77,9 @@ public static class ManagedPathBoundary
             {
                 var attributes = File.GetAttributes(current);
                 if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                    throw new InvalidOperationException($"{description} cannot use a link outside the managed root.");
+                    throw CreateReparsePointException(
+                        current,
+                        $"{description} cannot use a link outside the managed root");
             }
 
             current = Path.GetDirectoryName(current)
@@ -96,9 +98,7 @@ public static class ManagedPathBoundary
         while (pending.Count > 0)
         {
             var current = pending.Pop();
-            var attributes = File.GetAttributes(current);
-            if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                throw new InvalidOperationException($"{description} cannot migrate a link or reparse point.");
+            var attributes = EnsureNoReparsePoint(current, description);
 
             if (!attributes.HasFlag(FileAttributes.Directory))
                 continue;
@@ -106,6 +106,47 @@ public static class ManagedPathBoundary
             foreach (var entry in Directory.EnumerateFileSystemEntries(current))
                 pending.Push(entry);
         }
+    }
+
+    public static FileAttributes EnsureNoReparsePoint(string path, string description)
+    {
+        var attributes = File.GetAttributes(path);
+        if (attributes.HasFlag(FileAttributes.ReparsePoint))
+            throw CreateReparsePointException(
+                path,
+                $"{description} cannot migrate a link or reparse point");
+
+        return attributes;
+    }
+
+    private static InvalidOperationException CreateReparsePointException(
+        string path,
+        string message)
+    {
+        string? linkTarget = null;
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            FileSystemInfo fileSystemInfo = attributes.HasFlag(FileAttributes.Directory)
+                ? new DirectoryInfo(path)
+                : new FileInfo(path);
+            linkTarget = fileSystemInfo.LinkTarget;
+        }
+        catch (IOException)
+        {
+            // The path and migration scope are still useful when the target
+            // cannot be read safely.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The path and migration scope are still useful when the target
+            // cannot be read safely.
+        }
+
+        var target = string.IsNullOrWhiteSpace(linkTarget)
+            ? string.Empty
+            : $" (target: '{linkTarget}')";
+        return new InvalidOperationException($"{message} at '{path}'{target}.");
     }
 
     private static StringComparison PathComparison =>
