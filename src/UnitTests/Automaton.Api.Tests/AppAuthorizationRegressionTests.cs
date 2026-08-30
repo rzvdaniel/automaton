@@ -189,7 +189,7 @@ public class AppAuthorizationRegressionTests
         });
 
         var legacyCompletionAtUtc = DateTime.UtcNow.AddHours(-1);
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
         target.LastSuccessfulDeploymentAt = legacyCompletionAtUtc;
         await dbContext.SaveChangesAsync();
 
@@ -211,7 +211,7 @@ public class AppAuthorizationRegressionTests
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "legacy-metadata-app");
         var target = dbContext.AppDeploymentTargets.Single();
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
         await dbContext.SaveChangesAsync();
 
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out var storage);

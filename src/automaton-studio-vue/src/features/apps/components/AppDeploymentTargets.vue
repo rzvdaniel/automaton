@@ -158,7 +158,8 @@ async function saveTarget() {
   try {
     if (editingTarget.value) {
       const runnerChanged = runnerId.value !== (editingTarget.value.runner?.id ?? null)
-      const hasRuntime = editingTarget.value.runtimeDeployed
+      const hasRuntime = editingTarget.value.legacyControllerRuntimeDeployed ||
+        editingTarget.value.genericRuntimeDeployed
       if (runnerChanged && hasRuntime) {
         confirm.require({
           header: 'Move deployed environment?',
@@ -338,7 +339,7 @@ function canOpenPreview(target: AppDeploymentTarget): boolean {
 
 function deploymentState(target: AppDeploymentTarget): string {
   if (target.genericRuntimeDeployed) return 'Generic runtime deployed'
-  return target.runtimeDeployed ? 'Legacy runtime deployed' : ''
+  return target.legacyControllerRuntimeDeployed ? 'Legacy runtime deployed' : ''
 }
 
 function canPromote(target: AppDeploymentTarget): boolean {

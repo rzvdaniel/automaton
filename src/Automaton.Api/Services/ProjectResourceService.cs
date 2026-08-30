@@ -414,7 +414,7 @@ public class ProjectResourceService
         {
             target.ExecutionRunnerId = null;
             target.ExecutionRunner = null;
-            target.RuntimeDeployed = false;
+            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
             target.Status = DeploymentTargetStatus.Unassigned;
             target.UpdatedAt = DateTimeOffset.UtcNow;

@@ -168,7 +168,7 @@ export interface AppListItem {
     isHostedRunner: boolean
     applicationProfile?: string | null
     runnerOnline: boolean
-    runtimeDeployed: boolean
+    legacyControllerRuntimeDeployed: boolean
     genericRuntimeDeployed: boolean
     lastSuccessfulDeploymentAtUtc?: string | null
     isStaticHosting?: boolean
@@ -195,7 +195,7 @@ export interface AppDeploymentTarget {
   slug: string
   isDefault: boolean
   status: DeploymentTargetStatus
-  runtimeDeployed: boolean
+  legacyControllerRuntimeDeployed: boolean
   genericRuntimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null

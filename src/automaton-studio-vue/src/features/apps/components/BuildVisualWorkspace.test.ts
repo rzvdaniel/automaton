@@ -13,7 +13,7 @@ import BuildVisualWorkspace from './BuildVisualWorkspace.vue'
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
     id: 'live-target-id', appId: 'app-id', name: 'Live', slug: 'live', isDefault: true,
-    status: DeploymentTargetStatus.Running, runtimeDeployed: true, genericRuntimeDeployed: true,
+    status: DeploymentTargetStatus.Running, legacyControllerRuntimeDeployed: true, genericRuntimeDeployed: true,
     cleanupPending: false, routePath: '/private/app-id/live',
     runner: { id: 'runner-id', name: 'Hosted', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
@@ -74,7 +74,8 @@ describe('BuildVisualWorkspace target preview', () => {
     const canary = target({ id: 'canary-target-id', name: 'privileged-canary', slug: 'privileged-canary', isDefault: false,
       runner: { id: 'runner-id', name: 'Privileged', purpose: 'Application', applicationProfile: 'PrivilegedHost', isHostedRunner: false, isOnline: true } })
     const legacy = target({ id: 'legacy-target-id', name: 'Default', slug: 'default', isDefault: false,
-      runner: null, runtimeDeployed: false, status: DeploymentTargetStatus.Unassigned })
+      runner: null, legacyControllerRuntimeDeployed: false, genericRuntimeDeployed: false,
+      status: DeploymentTargetStatus.Unassigned })
     const wrapper = mountWorkspace([live, canary, legacy], live)
 
     const selector = wrapper.getComponent(Select)
@@ -110,7 +111,7 @@ describe('BuildVisualWorkspace target preview', () => {
   })
 
   it.each([
-    target({ runtimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
+    target({ genericRuntimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
     target({ runner: { id: 'runner-id', name: 'Offline', purpose: 'Application', isHostedRunner: false, isOnline: false }, status: DeploymentTargetStatus.RunnerOffline }),
   ])('does not render an iframe for unavailable targets', (unavailableTarget) => {
     const wrapper = mountWorkspace([unavailableTarget])

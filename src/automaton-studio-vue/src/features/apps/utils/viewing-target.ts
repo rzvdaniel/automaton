@@ -19,7 +19,7 @@ export function getViewingTargetPreviewState(target?: AppDeploymentTarget | null
   message: string
 } {
   if (!target?.runner) return { available: false, message: 'No runtime assigned' }
-  if (!target.runtimeDeployed) return { available: false, message: 'Not deployed' }
+  if (!target.genericRuntimeDeployed) return { available: false, message: 'Not deployed' }
   if (!target.runner.isOnline || target.status === DeploymentTargetStatus.RunnerOffline) {
     return { available: false, message: 'Runtime is offline' }
   }

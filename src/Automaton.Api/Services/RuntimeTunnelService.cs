@@ -47,7 +47,7 @@ public sealed class RuntimeTunnelService(
                 target.Id == deploymentTargetId &&
                 target.WebAppId == appId &&
                 target.ExecutionRunnerId != null &&
-                target.RuntimeDeployed,
+                target.LegacyControllerRuntimeDeployed,
                 cancellationToken);
 
         if (target?.ExecutionRunner is not { } runner)

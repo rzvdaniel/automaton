@@ -42,7 +42,7 @@ public sealed class AppRunnerAssignmentPolicy(
         if (!runnerId.HasValue)
         {
             target.ExecutionRunnerId = null;
-            target.RuntimeDeployed = false;
+            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
             target.Status = DeploymentTargetStatus.Unassigned;
             target.UpdatedAt = DateTimeOffset.UtcNow;
@@ -57,7 +57,7 @@ public sealed class AppRunnerAssignmentPolicy(
         if (target.ExecutionRunnerId != runner.Id)
         {
             PrivilegedHostAssignmentGuard.EnsureAcknowledged(runner, privilegedHostAccessAcknowledged);
-            target.RuntimeDeployed = false;
+            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
         }
         await hostedRunnerAppCapacityService.AssignAsync(target, runnerId.Value, cancellationToken);

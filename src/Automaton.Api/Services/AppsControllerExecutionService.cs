@@ -140,7 +140,7 @@ public class AppsControllerExecutionService
                 if (runnersWithoutScripts.Count == 0)
                 {
                     if (manageTargetState)
-                        await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
+                        await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, legacyControllerRuntimeDeployed: true, cancellationToken);
                     return new DeployBackendResponse
                     {
                         DeploymentTargetId = target.Id,
@@ -153,7 +153,7 @@ public class AppsControllerExecutionService
 
                 await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, runnersWithoutScripts, cancellationToken);
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, legacyControllerRuntimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -171,7 +171,7 @@ public class AppsControllerExecutionService
             if (!runners.Any())
             {
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, runtimeDeployed: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -187,7 +187,7 @@ public class AppsControllerExecutionService
             if (storageBlock != null)
             {
                 if (manageTargetState)
-                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, runtimeDeployed: true, cancellationToken);
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, cancellationToken);
                 return new DeployBackendResponse
                 {
                     DeploymentTargetId = target.Id,
@@ -264,14 +264,14 @@ public class AppsControllerExecutionService
             };
             if (manageTargetState)
                 await deploymentTargetStateService.MarkCompletedAsync(
-                    appId, target.Id, response.Success, runtimeDeployed: true, cancellationToken);
+                    appId, target.Id, response.Success, legacyControllerRuntimeDeployed: true, cancellationToken);
             return response;
         }
         catch
         {
             if (manageTargetState)
                 await deploymentTargetStateService.MarkCompletedAsync(
-                    appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
+                    appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -372,14 +372,14 @@ public class AppsControllerExecutionService
                     cancellationToken);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
-            var runtimeDeployed = result.Success && packageApplication.Runtime.Command is not null;
+            var genericRuntimeDeployed = result.Success && packageApplication.Runtime.Command is not null;
             await deploymentTargetStateService.MarkCompletedAsync(
                 appId,
                 target.Id,
                 result.Success,
-                runtimeDeployed,
+                legacyControllerRuntimeDeployed: false,
                 cancellationToken,
-                genericRuntimeDeployed: runtimeDeployed);
+                genericRuntimeDeployed: genericRuntimeDeployed);
 
             if (result.Success)
             {
@@ -428,7 +428,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
+                appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -483,7 +483,7 @@ public class AppsControllerExecutionService
             await backendRouteConfigService.RefreshAsync(cancellationToken);
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, backendDeploy.Success, runtimeDeployed: true, cancellationToken);
+                appId, target.Id, backendDeploy.Success, legacyControllerRuntimeDeployed: true, cancellationToken);
             return new DeployAppResponse
             {
                 DeploymentTargetId = target.Id,
@@ -505,7 +505,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
+                appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -608,7 +608,7 @@ public class AppsControllerExecutionService
             });
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: true, runtimeDeployed: true, cancellationToken);
+                appId, target.Id, success: true, legacyControllerRuntimeDeployed: true, cancellationToken);
             await backendRouteConfigService.RefreshAsync(cancellationToken);
             return new DeployAppResponse
             {
@@ -626,7 +626,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
+                appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, CancellationToken.None);
             throw;
         }
     }
@@ -666,7 +666,7 @@ public class AppsControllerExecutionService
             await backendRouteConfigService.RefreshAsync(cancellationToken);
 
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, backendDeploy.Success, runtimeDeployed: true, cancellationToken);
+                appId, target.Id, backendDeploy.Success, legacyControllerRuntimeDeployed: true, cancellationToken);
             return new DeployAppResponse
             {
                 DeploymentTargetId = target.Id,
@@ -686,7 +686,7 @@ public class AppsControllerExecutionService
         catch
         {
             await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, runtimeDeployed: true, CancellationToken.None);
+                appId, target.Id, success: false, legacyControllerRuntimeDeployed: true, CancellationToken.None);
             throw;
         }
     }

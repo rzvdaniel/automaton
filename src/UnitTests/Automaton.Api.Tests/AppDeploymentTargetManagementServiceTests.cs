@@ -158,7 +158,7 @@ public class AppDeploymentTargetManagementServiceTests
             Name = "Default",
             Slug = "legacy-deployed-default",
             IsDefault = false,
-            RuntimeDeployed = true,
+            LegacyControllerRuntimeDeployed = true,
             LastDeploymentAt = DateTimeOffset.UtcNow,
             Status = DeploymentTargetStatus.Running,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -229,7 +229,30 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await fixture.Service.AssignRunnerAsync(
+                fixture.App.Id,
+                target.Id,
+                new AssignAppDeploymentTargetRunnerRequest { RunnerId = newRunner.Id },
+                fixture.UserId));
+
+        Assert.That(exception!.Message, Does.Contain("Explicit runtime cleanup"));
+    }
+
+    [Test]
+    public async Task AssignRunner_GenericRuntimeOnlyAlsoRequiresExplicitCleanup()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var oldRunner = fixture.AddRunner(online: true);
+        var newRunner = fixture.AddRunner(online: true);
+        var target = await fixture.Db.AppDeploymentTargets
+            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+        target.ExecutionRunnerId = oldRunner.Id;
+        target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -252,7 +275,7 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
@@ -270,7 +293,7 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(target.ExecutionRunnerId, Is.EqualTo(newRunner.Id));
-            Assert.That(target.RuntimeDeployed, Is.False);
+            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
             Assert.That(target.GenericRuntimeDeployed, Is.False);
         });
     }
@@ -291,7 +314,7 @@ public class AppDeploymentTargetManagementServiceTests
             },
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -324,7 +347,7 @@ public class AppDeploymentTargetManagementServiceTests
             },
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
-        target.RuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = true;
         target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddMinutes(-5);
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
@@ -334,7 +357,7 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
-            Assert.That(summary.RuntimeDeployed, Is.True);
+            Assert.That(summary.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(summary.GenericRuntimeDeployed, Is.False);
             Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
         });
