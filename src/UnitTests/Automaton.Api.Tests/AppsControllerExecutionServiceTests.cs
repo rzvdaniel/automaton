@@ -158,6 +158,60 @@ public sealed class AppsControllerExecutionServiceTests
         Assert.That(exception!.Message, Is.EqualTo("route refresh failed"));
     }
 
+    [Test]
+    public async Task DeployPackageAsync_FirstDeploymentCompletionFailureRemovesPendingRoute()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(routeThenStateConflict: true);
+        var package = fixture.CreatePackage(hasRuntime: true);
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(async () =>
+            await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                fixture.Target.Slug,
+                package,
+                clean: false,
+                CancellationToken.None));
+
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(target => target.Id == fixture.Target.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("no longer the active operation"));
+            Assert.That(target.GenericRuntimeDeployed, Is.False);
+            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
+            Assert.That(File.Exists(fixture.RouteFilePath), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task DeployPackageAsync_NoRuntimeCompletionFailureRestoresCommittedRoute()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(
+            initialGenericMarker: true,
+            routeThenStateConflict: true);
+        var package = fixture.CreatePackage(hasRuntime: false);
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(async () =>
+            await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                fixture.Target.Slug,
+                package,
+                clean: false,
+                CancellationToken.None));
+
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(target => target.Id == fixture.Target.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("no longer the active operation"));
+            Assert.That(target.GenericRuntimeDeployed, Is.True);
+            Assert.That(File.Exists(fixture.RouteFilePath), Is.True);
+            Assert.That(File.ReadAllText(fixture.RouteFilePath), Does.Contain("http://runner:8080"));
+        });
+    }
+
     private sealed class DeploymentFixture : IAsyncDisposable
     {
         private readonly string rootPath;
@@ -199,6 +253,7 @@ public sealed class AppsControllerExecutionServiceTests
             bool initialGenericMarker = false,
             bool routeRootAsFile = false,
             bool routeStateConflict = false,
+            bool routeThenStateConflict = false,
             DeployAppPackageResult? runnerResult = null)
         {
             var rootPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "package-deploy", Guid.NewGuid().ToString("N"));
@@ -278,7 +333,13 @@ public sealed class AppsControllerExecutionServiceTests
             });
             var resolver = new FixedTargetResolver(target);
             var routeOptions = Options.Create(new PublishedAppsConfig { TraefikDynamicConfigRoot = routeRoot });
-            var routeService = routeStateConflict
+            var routeService = routeThenStateConflict
+                ? new RouteThenStateConflictConfigService(
+                    db,
+                    routeOptions,
+                    environment,
+                    target.Id)
+                : routeStateConflict
                 ? new ConflictRouteConfigService(
                     db,
                     routeOptions,
@@ -439,6 +500,38 @@ public sealed class AppsControllerExecutionServiceTests
             target.Status = DeploymentTargetStatus.Running;
             await db.SaveChangesAsync(cancellationToken);
             throw new InvalidOperationException("route refresh failed");
+        }
+    }
+
+    private sealed class RouteThenStateConflictConfigService : BackendRouteConfigService
+    {
+        private readonly ApplicationDbContext db;
+        private readonly Guid targetId;
+
+        public RouteThenStateConflictConfigService(
+            ApplicationDbContext db,
+            IOptions<PublishedAppsConfig> options,
+            IWebHostEnvironment environment,
+            Guid targetId)
+            : base(db, options, environment, NullLogger<BackendRouteConfigService>.Instance)
+        {
+            this.db = db;
+            this.targetId = targetId;
+        }
+
+        public override async Task RefreshAsync(
+            CancellationToken cancellationToken = default,
+            Guid? pendingGenericRuntimeTargetId = null,
+            bool? pendingGenericRuntimeDeployed = null)
+        {
+            await base.RefreshAsync(
+                cancellationToken,
+                pendingGenericRuntimeTargetId,
+                pendingGenericRuntimeDeployed);
+
+            var target = await db.AppDeploymentTargets.SingleAsync(item => item.Id == targetId, cancellationToken);
+            target.Status = DeploymentTargetStatus.Running;
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 

@@ -346,6 +346,7 @@ public class AppsControllerExecutionService
         var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
         await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
         var targetStateFinalized = false;
+        var pendingRouteApplied = false;
         try
         {
             var runners = (await ResolveRunnersByOwnerAsync(
@@ -421,6 +422,7 @@ public class AppsControllerExecutionService
                     cancellationToken,
                     target.Id,
                     packageApplication.Runtime.Command is not null);
+                pendingRouteApplied = true;
 
                 // The Runner has established the candidate, but the API-side
                 // deployment is not successful until its contract, compatibility
@@ -469,6 +471,27 @@ public class AppsControllerExecutionService
                     logger.Error(
                         completionException,
                         "Failed to finalize failed package deployment state for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}; preserving the original deployment error",
+                        appId,
+                        target.Id);
+                }
+            }
+
+            if (pendingRouteApplied && !targetStateFinalized)
+            {
+                try
+                {
+                    // The pending refresh changed the live route file before
+                    // durable completion. Reconcile it from committed target
+                    // markers after any completion failure so an uncommitted
+                    // first deployment cannot remain exposed and an existing
+                    // route is restored after a failed no-runtime replacement.
+                    await backendRouteConfigService.RefreshAsync(CancellationToken.None);
+                }
+                catch (Exception compensationException)
+                {
+                    logger.Error(
+                        compensationException,
+                        "Failed to compensate pending route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}; preserving the original deployment error",
                         appId,
                         target.Id);
                 }
