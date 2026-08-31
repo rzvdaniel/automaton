@@ -118,6 +118,9 @@ def main() -> None:
     if cpu_limit <= 0:
         raise ValueError("cpuLimit must be positive")
 
+    # Refresh mutable tags before changing any existing container. A failed
+    # pull must leave the current hosted Runner available for retry.
+    host("docker", "pull", image)
     ensure_owned_volume(system_volume, runner_id, "system")
     ensure_owned_volume(user_volume, runner_id, "user")
     if host("docker", "network", "inspect", network, check=False).returncode != 0:

@@ -64,13 +64,17 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         action_key: str,
         existing_volumes: dict[str, dict[str, str]] | None = None,
         missing_volume_error: str = "No such volume: {name}",
+        image_pull_error: str | None = None,
+        calls_out: list[tuple[str, ...]] | None = None,
     ):
         module = load_action(action_key)
-        calls = []
+        calls = calls_out if calls_out is not None else []
         volumes = dict(existing_volumes or {})
 
         def fake_host(*arguments, check=True):
             calls.append(arguments)
+            if arguments[:2] == ("docker", "pull") and image_pull_error is not None:
+                raise RuntimeError(image_pull_error)
             if arguments[:3] == ("docker", "volume", "inspect"):
                 name = arguments[3]
                 if name not in volumes:
@@ -187,6 +191,38 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
 
         self.assertFalse(any(call[:3] == ("docker", "volume", "create") for call in calls))
         self.assert_resource_contract(calls)
+
+    def test_image_is_refreshed_before_container_replacement_for_both_actions(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls, _ = self.run_provision_action(action_key, existing)
+                pull_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "pull"))
+                remove_index = next(index for index, call in enumerate(calls) if call[:3] == ("docker", "rm", "-f"))
+                run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
+                self.assertEqual(calls[pull_index], ("docker", "pull", "automaton/runner:test"))
+                self.assertLess(pull_index, remove_index)
+                self.assertLess(pull_index, run_index)
+
+    def test_image_pull_failure_preserves_existing_container_for_both_actions(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "registry unavailable"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        image_pull_error="registry unavailable",
+                        calls_out=calls,
+                    )
+                self.assertEqual(calls, [("docker", "pull", "automaton/runner:test")])
 
     def test_existing_volume_with_missing_or_conflicting_labels_is_rejected(self):
         invalid_labels = [
