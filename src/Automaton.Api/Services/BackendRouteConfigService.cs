@@ -36,13 +36,41 @@ public class BackendRouteConfigService
         this.logger = logger;
     }
 
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Reconciles managed runtime routes from target-local promotion state.
+    /// A pending state is accepted only while a validated generic package
+    /// deployment is completing its API-side finalization; it is not persisted
+    /// or inferred from the mutable application contract.
+    /// </summary>
+    public virtual async Task RefreshAsync(
+        CancellationToken cancellationToken = default,
+        Guid? pendingGenericRuntimeTargetId = null,
+        bool? pendingGenericRuntimeDeployed = null)
     {
-        var hostedRoutes = await dbContext.AppDeploymentTargets
-            .AsNoTracking()
+        if (pendingGenericRuntimeTargetId.HasValue != pendingGenericRuntimeDeployed.HasValue)
+        {
+            throw new ArgumentException(
+                "A pending generic runtime target and its deployment state must be supplied together.",
+                nameof(pendingGenericRuntimeTargetId));
+        }
+
+        var eligibleTargets = dbContext.AppDeploymentTargets.AsNoTracking();
+        if (pendingGenericRuntimeTargetId is { } pendingTargetId)
+        {
+            var pendingDeploymentState = pendingGenericRuntimeDeployed!.Value;
+            eligibleTargets = eligibleTargets.Where(target =>
+                target.Id == pendingTargetId
+                    ? pendingDeploymentState
+                    : target.GenericRuntimeDeployed);
+        }
+        else
+        {
+            eligibleTargets = eligibleTargets.Where(target => target.GenericRuntimeDeployed);
+        }
+
+        var hostedRoutes = await eligibleTargets
             .Where(target =>
-                target.ExecutionRunnerId != null &&
-                target.GenericRuntimeDeployed)
+                target.ExecutionRunnerId != null)
             .Join(
                 dbContext.HostedRunners.AsNoTracking().Where(r =>
                     r.DeletedAt == null &&
@@ -74,11 +102,9 @@ public class BackendRouteConfigService
                 false))
             .ToListAsync(cancellationToken);
 
-        var selfHostedRouteCandidates = await dbContext.AppDeploymentTargets
-            .AsNoTracking()
+        var selfHostedRouteCandidates = await eligibleTargets
             .Where(target =>
                 target.ExecutionRunnerId != null &&
-                target.GenericRuntimeDeployed &&
                 !dbContext.HostedRunners.Any(hostedRunner =>
                     hostedRunner.DeletedAt == null &&
                     hostedRunner.RunnerId == target.ExecutionRunnerId))

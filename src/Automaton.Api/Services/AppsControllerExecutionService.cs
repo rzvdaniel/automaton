@@ -345,6 +345,8 @@ public class AppsControllerExecutionService
 
         var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
         await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        var targetStateFinalized = false;
+        var pendingRouteApplied = false;
         try
         {
             var runners = (await ResolveRunnersByOwnerAsync(
@@ -372,13 +374,18 @@ public class AppsControllerExecutionService
                     cancellationToken);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
-            var genericRuntimeDeployed = result.Success && packageApplication.Runtime.Command is not null;
-            await deploymentTargetStateService.MarkCompletedAsync(
-                appId,
-                target.Id,
-                result.Success,
-                cancellationToken: cancellationToken,
-                genericRuntimeDeployed: genericRuntimeDeployed);
+            if (!result.Success)
+            {
+                // A rejected candidate must leave the previous runtime and its
+                // deployment markers untouched while making this operation visibly
+                // failed. No legacy controller state is implied by package deploys.
+                await deploymentTargetStateService.MarkCompletedAsync(
+                    appId,
+                    target.Id,
+                    success: false,
+                    cancellationToken: CancellationToken.None);
+                targetStateFinalized = true;
+            }
 
             if (result.Success)
             {
@@ -407,7 +414,27 @@ public class AppsControllerExecutionService
                 });
 
                 await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, [runner], cancellationToken);
-                await backendRouteConfigService.RefreshAsync(cancellationToken);
+                // Route reconciliation must reflect the promoted Runner result
+                // before the durable target marker is committed. The explicit
+                // pending state is limited to this validated package operation;
+                // normal reconciliation remains marker-driven.
+                await backendRouteConfigService.RefreshAsync(
+                    cancellationToken,
+                    target.Id,
+                    packageApplication.Runtime.Command is not null);
+                pendingRouteApplied = true;
+
+                // The Runner has established the candidate, but the API-side
+                // deployment is not successful until its contract, compatibility
+                // source, metadata, flow artifacts, and route have all been
+                // finalized. Publish the target state only at that boundary.
+                await deploymentTargetStateService.MarkCompletedAsync(
+                    appId,
+                    target.Id,
+                    success: true,
+                    cancellationToken: CancellationToken.None,
+                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null);
+                targetStateFinalized = true;
             }
 
             return new DeployPackageResponse
@@ -424,10 +451,57 @@ public class AppsControllerExecutionService
                 Actions = result.Actions
             };
         }
-        catch
+        catch (Exception deploymentException)
         {
-            await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, success: false, cancellationToken: CancellationToken.None, legacyControllerRuntimeDeployed: true);
+            if (!targetStateFinalized)
+            {
+                try
+                {
+                    await deploymentTargetStateService.MarkCompletedAsync(
+                        appId,
+                        target.Id,
+                        success: false,
+                        cancellationToken: CancellationToken.None);
+                }
+                catch (Exception completionException)
+                {
+                    // Preserve the operation that actually failed. A stale
+                    // target-state write is secondary and must not hide the
+                    // source/metadata/route error from the caller.
+                    logger.Error(
+                        completionException,
+                        "Failed to finalize failed package deployment state for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}; preserving the original deployment error",
+                        appId,
+                        target.Id);
+                }
+            }
+
+            if (pendingRouteApplied && !targetStateFinalized)
+            {
+                try
+                {
+                    // The pending refresh changed the live route file before
+                    // durable completion. Reconcile it from committed target
+                    // markers after any completion failure so an uncommitted
+                    // first deployment cannot remain exposed and an existing
+                    // route is restored after a failed no-runtime replacement.
+                    await backendRouteConfigService.RefreshAsync(CancellationToken.None);
+                }
+                catch (Exception compensationException)
+                {
+                    logger.Error(
+                        compensationException,
+                        "Failed to compensate pending route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}; preserving the original deployment error",
+                        appId,
+                        target.Id);
+                }
+            }
+
+            logger.Error(
+                deploymentException,
+                "Generic package deployment failed for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+                appId,
+                target.Id);
             throw;
         }
     }
