@@ -8,6 +8,8 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -22,6 +24,87 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class AppsControllerExecutionServiceTests
 {
+    [Test]
+    public async Task AcceptingPackage_PersistsOperationBeforeReturning()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var routesPath = Path.GetDirectoryName(fixture.RouteFilePath)!;
+        var environment = new TestWebHostEnvironment
+        {
+            ContentRootPath = Directory.GetParent(routesPath)!.FullName
+        };
+        var userContext = new UserContextService(new HttpContextAccessor());
+        var authorization = new ResourceAuthorizationService(fixture.Db, userContext);
+        var publisher = new RecordingEventPublisher();
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            authorization,
+            new ImmediateTransactionExecutor(),
+            publisher,
+            environment,
+            null!,
+            new ApiInstanceIdentityService());
+
+        var response = await operations.AcceptAsync(
+            fixture.AppId,
+            fixture.OwnerId,
+            fixture.Target.Slug,
+            fixture.CreatePackage(hasRuntime: true),
+            clean: false,
+            CancellationToken.None);
+        var operation = await fixture.Db.DeploymentOperations.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo(DeploymentOperationStatuses.Pending));
+            Assert.That(operation.Id, Is.EqualTo(response.OperationId));
+            Assert.That(File.Exists(operation.PackagePath), Is.True);
+            Assert.That(publisher.OperationId, Is.EqualTo(response.OperationId));
+        });
+    }
+
+    [Test]
+    public async Task InterruptedRunningOperation_IsReclaimedByANewApiInstance()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var operation = new DeploymentOperation
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.AppId,
+            OwnerUserId = fixture.OwnerId,
+            Status = DeploymentOperationStatuses.Running,
+            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+            ExecutorInstanceId = "previous-api-instance",
+            StartedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
+        };
+        fixture.Db.DeploymentOperations.Add(operation);
+        await fixture.Db.SaveChangesAsync();
+
+        var environment = new TestWebHostEnvironment
+        {
+            ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
+        };
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            null!,
+            null!,
+            null!,
+            environment,
+            null!,
+            new ApiInstanceIdentityService());
+
+        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Failed));
+            Assert.That(completed.ExecutorInstanceId, Is.Not.EqualTo("previous-api-instance"));
+            Assert.That(completed.ErrorMessage, Does.Contain("missing-deployment.zip"));
+        });
+    }
+
     [Test]
     public async Task DeployPackageAsync_CompletesTargetOnlyAfterApiFinalization()
     {
@@ -543,5 +626,23 @@ public sealed class AppsControllerExecutionServiceTests
         public string EnvironmentName { get; set; } = "Testing";
         public string ContentRootPath { get; set; } = string.Empty;
         public IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    private sealed class ImmediateTransactionExecutor : ITransactionalEventExecutor
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default) =>
+            operation(cancellationToken);
+    }
+
+    private sealed class RecordingEventPublisher : IEventPublisher
+    {
+        public Guid OperationId { get; private set; }
+
+        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            OperationId = ((DeploymentPackageRequestedEvent)(object)message).OperationId;
+            return Task.CompletedTask;
+        }
     }
 }

@@ -39,6 +39,12 @@ public sealed class AppDeploymentTarget
     /// </summary>
     public bool GenericRuntimeDeployed { get; set; }
 
+    /// <summary>
+    /// Identifies the server-owned package deployment currently mutating this
+    /// target, so an older operation cannot complete after a newer one.
+    /// </summary>
+    public Guid? ActiveDeploymentOperationId { get; set; }
+
     public DateTimeOffset? LastDeploymentAt { get; set; }
     public DateTimeOffset? LastSuccessfulDeploymentAt { get; set; }
 

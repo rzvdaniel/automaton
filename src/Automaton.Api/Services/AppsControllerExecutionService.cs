@@ -319,7 +319,8 @@ public class AppsControllerExecutionService
         string? targetSlug,
         IFormFile? file,
         bool clean,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? deploymentOperationId = null)
     {
         if (file == null || file.Length <= 0)
         {
@@ -344,7 +345,7 @@ public class AppsControllerExecutionService
         }
 
         var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
-        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken, deploymentOperationId);
         var targetStateFinalized = false;
         var pendingRouteApplied = false;
         try
@@ -383,7 +384,8 @@ public class AppsControllerExecutionService
                     appId,
                     target.Id,
                     success: false,
-                    cancellationToken: CancellationToken.None);
+                    cancellationToken: CancellationToken.None,
+                    deploymentOperationId: deploymentOperationId);
                 targetStateFinalized = true;
             }
 
@@ -433,7 +435,8 @@ public class AppsControllerExecutionService
                     target.Id,
                     success: true,
                     cancellationToken: CancellationToken.None,
-                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null);
+                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null,
+                    deploymentOperationId: deploymentOperationId);
                 targetStateFinalized = true;
             }
 
@@ -461,7 +464,8 @@ public class AppsControllerExecutionService
                         appId,
                         target.Id,
                         success: false,
-                        cancellationToken: CancellationToken.None);
+                        cancellationToken: CancellationToken.None,
+                        deploymentOperationId: deploymentOperationId);
                 }
                 catch (Exception completionException)
                 {

@@ -15,17 +15,26 @@ public class AutomatonApiClientTargetTests
         string? targetSlug,
         string expectedPath)
     {
-        Uri? requestUri = null;
+        var requests = new List<Uri>();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
-            requestUri = request.RequestUri;
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            requests.Add(request.RequestUri!);
+            var response = request.Method == HttpMethod.Post
+                ? new HttpResponseMessage(HttpStatusCode.Accepted)
+                {
+                    Content = new StringContent(
+                        "{\"operationId\":\"11111111-1111-1111-1111-111111111111\",\"status\":\"Pending\"}",
+                        Encoding.UTF8,
+                        "application/json")
+                }
+                : new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    "{\"success\":true}",
+                    "{\"operationId\":\"11111111-1111-1111-1111-111111111111\",\"status\":\"Succeeded\",\"result\":{\"success\":true}}",
                     Encoding.UTF8,
                     "application/json")
             };
+            return response;
         }))
         {
             BaseAddress = new Uri("https://api.example.test/")
@@ -40,8 +49,9 @@ public class AutomatonApiClientTargetTests
             targetSlug: targetSlug);
 
         Assert.That(
-            requestUri?.PathAndQuery.TrimStart('/'),
+            requests[0].PathAndQuery.TrimStart('/'),
             Is.EqualTo(expectedPath));
+        Assert.That(requests[1].PathAndQuery, Is.EqualTo("/api/apps/app-1/deploy-operations/11111111-1111-1111-1111-111111111111"));
     }
 
     [Test]

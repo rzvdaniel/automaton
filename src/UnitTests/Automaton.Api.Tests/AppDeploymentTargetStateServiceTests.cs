@@ -57,6 +57,57 @@ public class AppDeploymentTargetStateServiceTests
     }
 
     [Test]
+    public async Task CompletionWithStaleOperationId_IsRejectedAndLeavesTargetDeploying()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+        var activeOperationId = Guid.NewGuid();
+
+        await service.MarkStartedAsync(app.Id, target.Id, deploymentOperationId: activeOperationId);
+
+        Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.MarkCompletedAsync(
+                app.Id,
+                target.Id,
+                success: true,
+                genericRuntimeDeployed: true,
+                deploymentOperationId: Guid.NewGuid()));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Deploying));
+            Assert.That(target.ActiveDeploymentOperationId, Is.EqualTo(activeOperationId));
+            Assert.That(target.GenericRuntimeDeployed, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task ResumingActiveOperation_IsAllowedForTheSameOperationId()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+        var operationId = Guid.NewGuid();
+
+        await service.MarkStartedAsync(app.Id, target.Id, deploymentOperationId: operationId);
+        await service.MarkStartedAsync(app.Id, target.Id, deploymentOperationId: operationId);
+        await service.MarkCompletedAsync(
+            app.Id,
+            target.Id,
+            success: true,
+            genericRuntimeDeployed: true,
+            deploymentOperationId: operationId);
+
+        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+        Assert.That(target.GenericRuntimeDeployed, Is.True);
+    }
+
+    [Test]
     public async Task DifferentTargets_CanBothHaveActiveDeployments()
     {
         await using var db = CreateDbContext();
@@ -104,6 +155,7 @@ public class AppDeploymentTargetStateServiceTests
                         WebAppId TEXT NOT NULL,
                         Status INTEGER NOT NULL,
                         LastDeploymentAt TEXT NULL,
+                        ActiveDeploymentOperationId TEXT NULL,
                         UpdatedAt TEXT NOT NULL
                     );
                     INSERT INTO AppDeploymentTargets (Id, WebAppId, Status, UpdatedAt)

@@ -780,6 +780,9 @@ namespace Automaton.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ActiveDeploymentOperationId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("CleanupPending")
                         .HasColumnType("tinyint(1)");
 
@@ -836,6 +839,8 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActiveDeploymentOperationId");
 
                     b.HasIndex("ExecutionRunnerId");
 
@@ -1472,6 +1477,65 @@ namespace Automaton.Api.Migrations
                     b.HasIndex(new[] { "CustomStepId" }, "IX_CustomStepUser_CustomStepId");
 
                     b.ToTable("CustomStepUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.DeploymentOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("Clean")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(4000)
+                        .HasColumnType("varchar(4000)");
+
+                    b.Property<string>("ExecutorInstanceId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("PackagePath")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("TargetSlug")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebAppId", "CreatedAtUtc");
+
+                    b.HasIndex("WebAppId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("DeploymentOperations");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.ExecutionSecretGrant", b =>
@@ -4375,6 +4439,15 @@ namespace Automaton.Api.Migrations
                     b.HasOne("Automaton.Api.Entities.CustomStep", null)
                         .WithMany("CustomStepUsers")
                         .HasForeignKey("CustomStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.DeploymentOperation", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

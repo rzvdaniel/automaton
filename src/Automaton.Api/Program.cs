@@ -213,6 +213,7 @@ services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>(
 services.AddSingleton<IEventPublisher, CapEventPublisher>();
 services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
 services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
+services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
 services.AddScoped<InfrastructureActionProvisioningHandler>();
 services.AddScoped<HostedRunnerRestartReconciler>();
 services.AddScoped<HostedRunnerLifecycleReconciler>();
@@ -384,6 +385,7 @@ services.AddScoped<RuntimeTunnelService>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
+services.AddScoped<DeploymentOperationService>();
 services.AddScoped<AppActionExecutionService>();
 services.AddScoped<ActionScheduleService>();
 services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
