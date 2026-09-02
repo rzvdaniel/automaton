@@ -108,6 +108,47 @@ public class AppDeploymentTargetStateServiceTests
     }
 
     [Test]
+    public async Task OlderExecutionAttempt_CannotCompleteAfterTakeover()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+        var operationId = Guid.NewGuid();
+        var firstAttemptId = Guid.NewGuid();
+        var secondAttemptId = Guid.NewGuid();
+
+        await service.MarkStartedAsync(app.Id, target.Id, deploymentOperationId: operationId, executionAttemptId: firstAttemptId);
+        await service.MarkStartedAsync(app.Id, target.Id, deploymentOperationId: operationId, executionAttemptId: secondAttemptId);
+
+        Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.MarkCompletedAsync(
+                app.Id,
+                target.Id,
+                success: true,
+                genericRuntimeDeployed: true,
+                deploymentOperationId: operationId,
+                executionAttemptId: firstAttemptId));
+
+        Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.MarkCompletedAsync(
+                app.Id,
+                target.Id,
+                success: false,
+                deploymentOperationId: operationId,
+                executionAttemptId: firstAttemptId));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Deploying));
+            Assert.That(target.ActiveDeploymentOperationId, Is.EqualTo(operationId));
+            Assert.That(target.ActiveDeploymentExecutionAttemptId, Is.EqualTo(secondAttemptId));
+            Assert.That(target.GenericRuntimeDeployed, Is.False);
+        });
+    }
+
+    [Test]
     public async Task DifferentTargets_CanBothHaveActiveDeployments()
     {
         await using var db = CreateDbContext();
@@ -156,6 +197,7 @@ public class AppDeploymentTargetStateServiceTests
                         Status INTEGER NOT NULL,
                         LastDeploymentAt TEXT NULL,
                         ActiveDeploymentOperationId TEXT NULL,
+                        ActiveDeploymentExecutionAttemptId TEXT NULL,
                         UpdatedAt TEXT NOT NULL
                     );
                     INSERT INTO AppDeploymentTargets (Id, WebAppId, Status, UpdatedAt)

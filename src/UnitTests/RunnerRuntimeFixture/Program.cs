@@ -51,6 +51,13 @@ if (args.Contains("--fail-with-output", StringComparer.Ordinal))
     return;
 }
 
+var delayIndex = Array.IndexOf(args, "--delay");
+if (delayIndex >= 0 && delayIndex + 1 < args.Length)
+{
+    await Task.Delay(int.Parse(args[delayIndex + 1]));
+    return;
+}
+
 var port = int.Parse(Environment.GetEnvironmentVariable("AUTOMATON_PORT")!);
 Console.WriteLine($"stdout:{string.Join('|', args)}:{Environment.GetEnvironmentVariable("TEST_RUNTIME_VALUE")}:" +
     $"{Environment.GetEnvironmentVariable("AUTOMATON_APP_DATA_DIR")}:" +

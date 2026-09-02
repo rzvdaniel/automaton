@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Text.Json;
 using Automaton.Core.Models;
@@ -15,6 +16,9 @@ public class RunnerDeploymentService
     private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly AppActionDeploymentService actionDeploymentService;
     private readonly ILogger logger;
+    private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), Guid> activeExecutionAttempts = new();
+    private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), CancellationTokenSource> executionCancellations = new();
+    private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), SemaphoreSlim> deploymentGates = new();
 
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
@@ -28,6 +32,45 @@ public class RunnerDeploymentService
     }
 
     public async Task<DeployAppPackageResult> DeployPackage(DeployAppPackageRequest request)
+    {
+        if (request.ExecutionAttemptId is not Guid executionAttemptId)
+            return await DeployPackageCore(request);
+
+        var key = (request.AppId, request.DeploymentTargetId);
+        activeExecutionAttempts[key] = executionAttemptId;
+        var executionCancellation = new CancellationTokenSource();
+        if (executionCancellations.TryGetValue(key, out var previousCancellation))
+            previousCancellation.Cancel();
+        executionCancellations[key] = executionCancellation;
+        var gate = deploymentGates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+        try
+        {
+            return await DeployPackageCore(request, executionCancellation.Token);
+        }
+        finally
+        {
+            executionCancellation.Cancel();
+            executionCancellation.Dispose();
+            gate.Release();
+            if (activeExecutionAttempts.TryGetValue(key, out var activeAttempt)
+                && activeAttempt == executionAttemptId)
+            {
+                ((ICollection<KeyValuePair<(Guid AppId, Guid TargetId), Guid>>)activeExecutionAttempts)
+                    .Remove(new KeyValuePair<(Guid AppId, Guid TargetId), Guid>(key, executionAttemptId));
+            }
+            if (executionCancellations.TryGetValue(key, out var activeCancellation)
+                && ReferenceEquals(activeCancellation, executionCancellation))
+            {
+                ((ICollection<KeyValuePair<(Guid AppId, Guid TargetId), CancellationTokenSource>>)executionCancellations)
+                    .Remove(new KeyValuePair<(Guid AppId, Guid TargetId), CancellationTokenSource>(key, executionCancellation));
+            }
+        }
+    }
+
+    private async Task<DeployAppPackageResult> DeployPackageCore(
+        DeployAppPackageRequest request,
+        CancellationToken executionCancellationToken = default)
     {
         var logs = new List<string>();
         var appId = request.AppId;
@@ -57,12 +100,13 @@ public class RunnerDeploymentService
                 manifest.Application,
                 Path.Combine(tempExtractRoot, "source"),
                 tempExtractRoot,
-                cancellationToken: CancellationToken.None);
+                cancellationToken: executionCancellationToken);
             logs.AddRange(buildResult.Logs);
             if (!buildResult.Succeeded)
             {
                 throw new InvalidOperationException(BuildFailureMessage(manifest.Application.Build, buildResult));
             }
+            EnsureExecutionAttemptIsCurrent(request, executionCancellationToken);
             snapshotPath = CreateSnapshotIfNeeded(appId, deploymentTargetId);
 
             if (request.Clean)
@@ -116,10 +160,12 @@ public class RunnerDeploymentService
                 request.SystemInfrastructure);
             logs.AddRange(actionResults.Select(result => $"Action {result.ActionKey}: {result.Status}."));
 
+            EnsureExecutionAttemptIsCurrent(request, executionCancellationToken);
             var runtimeApplyResult = await runtimeProcessManager.ApplyAsync(
                 appId,
                 deploymentTargetId,
                 manifest.Application,
+                cancellationToken: executionCancellationToken,
                 artifactRoot: candidateArtifactRoot);
             candidatePromoted = candidateArtifactRoot is not null
                 && runtimeApplyResult.PromotionIrreversible;
@@ -190,6 +236,22 @@ public class RunnerDeploymentService
             catch
             {
             }
+        }
+    }
+
+    private void EnsureExecutionAttemptIsCurrent(
+        DeployAppPackageRequest request,
+        CancellationToken executionCancellationToken)
+    {
+        executionCancellationToken.ThrowIfCancellationRequested();
+        if (request.ExecutionAttemptId is Guid attemptId
+            && (!activeExecutionAttempts.TryGetValue(
+                    (request.AppId, request.DeploymentTargetId),
+                    out var activeAttempt)
+                || activeAttempt != attemptId))
+        {
+            throw new InvalidOperationException(
+                "This deployment execution attempt was superseded before runtime promotion.");
         }
     }
 

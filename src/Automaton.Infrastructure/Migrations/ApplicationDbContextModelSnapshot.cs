@@ -780,6 +780,9 @@ namespace Automaton.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ActiveDeploymentExecutionAttemptId")
+                        .HasColumnType("char(36)");
+
                     b.Property<Guid?>("ActiveDeploymentOperationId")
                         .HasColumnType("char(36)");
 
@@ -839,6 +842,8 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActiveDeploymentExecutionAttemptId");
 
                     b.HasIndex("ActiveDeploymentOperationId");
 
@@ -1498,9 +1503,15 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("varchar(4000)");
 
+                    b.Property<Guid?>("ExecutionAttemptId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("ExecutorInstanceId")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
+
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("char(36)");

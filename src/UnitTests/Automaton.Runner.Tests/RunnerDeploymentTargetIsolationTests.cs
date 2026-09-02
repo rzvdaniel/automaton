@@ -190,10 +190,80 @@ public class RunnerDeploymentTargetIsolationTests
         });
     }
 
-    private string CreatePackage(Guid appId, string frontendContent, bool hasRuntime = false)
+    [Test]
+    public async Task SupersededExecutionAttempt_CannotReachRuntimePromotion()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace,
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var firstAttemptId = Guid.NewGuid();
+        var secondAttemptId = Guid.NewGuid();
+        var firstPackage = CreatePackage(
+            appId,
+            "first",
+            hasRuntime: true,
+            build: new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec
+                {
+                    Executable = "dotnet",
+                    Arguments = [FixturePath(), "--delay", "1500"]
+                }
+            });
+        var secondPackage = CreatePackage(appId, "second", hasRuntime: true);
+
+        var firstTask = service.DeployPackage(new DeployAppPackageRequest
+        {
+            AppId = appId,
+            DeploymentTargetId = targetId,
+            PackagePath = firstPackage,
+            Clean = true,
+            ExecutionAttemptId = firstAttemptId
+        });
+        await Task.Delay(150);
+        var secondTask = service.DeployPackage(new DeployAppPackageRequest
+        {
+            AppId = appId,
+            DeploymentTargetId = targetId,
+            PackagePath = secondPackage,
+            Clean = true,
+            ExecutionAttemptId = secondAttemptId
+        });
+
+        var results = await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(results[0].Success, Is.False);
+            Assert.That(results[0].Message, Does.Contain("canceled").IgnoreCase);
+            Assert.That(results[1].Success, Is.True, results[1].Message);
+            Assert.That(processManager.AppliedTargets.Count(target => target == targetId), Is.EqualTo(1));
+        });
+    }
+
+    private string CreatePackage(
+        Guid appId,
+        string frontendContent,
+        bool hasRuntime = false,
+        ApplicationBuildSpec? build = null)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
+        var application = hasRuntime
+            ? new ApplicationContract
+            {
+                Runtime = new ApplicationRuntimeSpec
+                {
+                    Command = new ApplicationCommandSpec { Executable = "dotnet" }
+                }
+            }
+            : ApplicationContractDefaults.Create();
+        application.Build = build ?? application.Build;
         using var archive = ZipFile.Open(packagePath, ZipArchiveMode.Create);
         WriteEntry(
             archive,
@@ -201,17 +271,10 @@ public class RunnerDeploymentTargetIsolationTests
             JsonSerializer.Serialize(new AppDeploymentPackageManifest
             {
                 AppId = appId.ToString(),
-                Application = hasRuntime
-                    ? new ApplicationContract
-                    {
-                        Runtime = new ApplicationRuntimeSpec
-                        {
-                            Command = new ApplicationCommandSpec { Executable = "dotnet" }
-                        }
-                    }
-                    : ApplicationContractDefaults.Create()
+                Application = application
             }));
         WriteEntry(archive, "runtime/application/index.html", frontendContent);
+        WriteEntry(archive, "source/placeholder.txt", "source");
         return packagePath;
     }
 
@@ -221,6 +284,12 @@ public class RunnerDeploymentTargetIsolationTests
         using var writer = new StreamWriter(entry.Open());
         writer.Write(content);
     }
+
+    private static string FixturePath()
+        => Path.GetFullPath(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "..", "..", "..", "..",
+            "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
 
     private sealed class StubBackendProcessManager : IAppRuntimeProcessManager
     {

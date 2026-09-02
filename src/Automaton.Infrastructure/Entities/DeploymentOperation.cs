@@ -29,6 +29,8 @@ public sealed class DeploymentOperation
     public DateTime? StartedAtUtc { get; set; }
     [MaxLength(120)]
     public string? ExecutorInstanceId { get; set; }
+    public Guid? ExecutionAttemptId { get; set; }
+    public DateTime? LeaseExpiresAtUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
 
     [MaxLength(4000)]

@@ -749,6 +749,7 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.WebAppId, e.DefaultConstraintKey }).IsUnique();
                 entity.HasIndex(e => e.ExecutionRunnerId);
                 entity.HasIndex(e => e.ActiveDeploymentOperationId);
+                entity.HasIndex(e => e.ActiveDeploymentExecutionAttemptId);
 
                 entity.HasOne(e => e.ExecutionRunner)
                     .WithMany(e => e.AppDeploymentTargets)
@@ -762,6 +763,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.PackagePath).IsRequired().HasMaxLength(1024);
                 entity.Property(e => e.TargetSlug).HasMaxLength(120);
+                entity.Property(e => e.ExecutorInstanceId).HasMaxLength(120);
                 entity.Property(e => e.ErrorMessage).HasMaxLength(4000);
                 entity.Property(e => e.ResultJson).HasColumnType("longtext");
                 entity.Property(e => e.CreatedAtUtc).IsRequired();

@@ -6,6 +6,8 @@ using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Automaton.Api.Services;
 
@@ -20,8 +22,12 @@ public sealed class DeploymentOperationService(
     IEventPublisher eventPublisher,
     IWebHostEnvironment webHostEnvironment,
     AppsControllerExecutionService deploymentService,
-    ApiInstanceIdentityService apiInstanceIdentityService)
+    ApiInstanceIdentityService apiInstanceIdentityService,
+    IServiceScopeFactory scopeFactory,
+    ILogger<DeploymentOperationService> logger)
 {
+    private static readonly TimeSpan ExecutionLeaseDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ExecutionLeaseRenewalInterval = TimeSpan.FromSeconds(30);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string executorInstanceId = apiInstanceIdentityService.ApiInstanceId;
 
@@ -110,13 +116,16 @@ public sealed class DeploymentOperationService(
 
     public async Task ExecuteAsync(Guid operationId, CancellationToken cancellationToken)
     {
-        var claimed = await ClaimAsync(operationId, cancellationToken);
+        var executionAttemptId = Guid.NewGuid();
+        var claimed = await ClaimAsync(operationId, executionAttemptId, cancellationToken);
         if (!claimed)
             return;
 
         var operation = await dataContext.DeploymentOperations
             .AsNoTracking()
-            .SingleAsync(item => item.Id == operationId, cancellationToken);
+            .SingleAsync(item => item.Id == operationId, CancellationToken.None);
+        using var leaseCancellation = new CancellationTokenSource();
+        var leaseTask = RenewLeaseAsync(operationId, executionAttemptId, leaseCancellation.Token);
 
         try
         {
@@ -134,10 +143,24 @@ public sealed class DeploymentOperationService(
                 operation.TargetSlug,
                 file,
                 operation.Clean,
-                cancellationToken,
-                operation.Id);
+                CancellationToken.None,
+                operation.Id,
+                executionAttemptId);
 
-            await CompleteAsync(operationId, result.Success, result, result.Success ? null : result.Message, cancellationToken);
+            await CompleteAsync(
+                operationId,
+                executionAttemptId,
+                result.Success,
+                result,
+                result.Success ? null : result.Message,
+                CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cancellation of the CAP/API wait does not establish that the
+            // Runner stopped. Leave the operation and staged package durable
+            // for retry/recovery rather than converting it to Failed.
+            throw;
         }
         catch (Exception exception)
         {
@@ -147,10 +170,32 @@ public sealed class DeploymentOperationService(
                 State = DeploymentOperationStatuses.Failed,
                 Message = exception.Message
             };
-            await CompleteAsync(operationId, false, result, exception.Message, CancellationToken.None);
+            await CompleteAsync(
+                operationId,
+                executionAttemptId,
+                false,
+                result,
+                exception.Message,
+                CancellationToken.None);
         }
         finally
         {
+            leaseCancellation.Cancel();
+            try
+            {
+                await leaseTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Deployment execution lease renewal stopped for operation {OperationId}",
+                    operationId);
+            }
+
             var current = await dataContext.DeploymentOperations
                 .AsNoTracking()
                 .Where(item => item.Id == operationId)
@@ -161,9 +206,13 @@ public sealed class DeploymentOperationService(
         }
     }
 
-    private async Task<bool> ClaimAsync(Guid operationId, CancellationToken cancellationToken)
+    private async Task<bool> ClaimAsync(
+        Guid operationId,
+        Guid executionAttemptId,
+        CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+        var leaseExpiresAt = now.Add(ExecutionLeaseDuration);
         if (dataContext.Database.IsRelational())
         {
             return await dataContext.DeploymentOperations
@@ -171,11 +220,13 @@ public sealed class DeploymentOperationService(
                     item.Id == operationId &&
                     (item.Status == DeploymentOperationStatuses.Pending ||
                      (item.Status == DeploymentOperationStatuses.Running &&
-                      (item.ExecutorInstanceId == null || item.ExecutorInstanceId != executorInstanceId))))
+                      (item.LeaseExpiresAtUtc == null || item.LeaseExpiresAtUtc <= now))))
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(item => item.Status, DeploymentOperationStatuses.Running)
                     .SetProperty(item => item.StartedAtUtc, now)
-                    .SetProperty(item => item.ExecutorInstanceId, executorInstanceId), cancellationToken) == 1;
+                    .SetProperty(item => item.ExecutorInstanceId, executorInstanceId)
+                    .SetProperty(item => item.ExecutionAttemptId, executionAttemptId)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, leaseExpiresAt), cancellationToken) == 1;
         }
 
         var operation = await dataContext.DeploymentOperations
@@ -183,17 +234,56 @@ public sealed class DeploymentOperationService(
         if (operation is null ||
             (operation.Status != DeploymentOperationStatuses.Pending &&
              (operation.Status != DeploymentOperationStatuses.Running ||
-              operation.ExecutorInstanceId == executorInstanceId)))
+              operation.LeaseExpiresAtUtc is not null && operation.LeaseExpiresAtUtc > now)))
             return false;
         operation.Status = DeploymentOperationStatuses.Running;
         operation.StartedAtUtc = now;
         operation.ExecutorInstanceId = executorInstanceId;
+        operation.ExecutionAttemptId = executionAttemptId;
+        operation.LeaseExpiresAtUtc = leaseExpiresAt;
         await dataContext.SaveChangesAsync(cancellationToken);
         return true;
     }
 
+    private async Task RenewLeaseAsync(
+        Guid operationId,
+        Guid executionAttemptId,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            await Task.Delay(ExecutionLeaseRenewalInterval, cancellationToken);
+            var leaseExpiresAt = DateTime.UtcNow.Add(ExecutionLeaseDuration);
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var leaseContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await leaseContext.DeploymentOperations
+                    .Where(item =>
+                        item.Id == operationId &&
+                        item.Status == DeploymentOperationStatuses.Running &&
+                        item.ExecutionAttemptId == executionAttemptId)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(item => item.LeaseExpiresAtUtc, leaseExpiresAt),
+                        CancellationToken.None);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Failed to renew deployment execution lease for operation {OperationId}",
+                    operationId);
+            }
+        }
+    }
+
     private async Task CompleteAsync(
         Guid operationId,
+        Guid executionAttemptId,
         bool success,
         DeployPackageResponse result,
         string? error,
@@ -207,10 +297,12 @@ public sealed class DeploymentOperationService(
                 .Where(item =>
                     item.Id == operationId &&
                     item.Status == DeploymentOperationStatuses.Running &&
+                    item.ExecutionAttemptId == executionAttemptId &&
                     item.ExecutorInstanceId == executorInstanceId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(item => item.Status, status)
                     .SetProperty(item => item.CompletedAtUtc, DateTime.UtcNow)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
                     .SetProperty(item => item.ErrorMessage, error)
                     .SetProperty(item => item.ResultJson, resultJson), cancellationToken);
             return;
@@ -220,10 +312,12 @@ public sealed class DeploymentOperationService(
             .SingleOrDefaultAsync(item => item.Id == operationId, cancellationToken);
         if (operation is null ||
             operation.Status != DeploymentOperationStatuses.Running ||
+            operation.ExecutionAttemptId != executionAttemptId ||
             operation.ExecutorInstanceId != executorInstanceId)
             return;
         operation.Status = status;
         operation.CompletedAtUtc = DateTime.UtcNow;
+        operation.LeaseExpiresAtUtc = null;
         operation.ErrorMessage = error;
         operation.ResultJson = resultJson;
         await dataContext.SaveChangesAsync(cancellationToken);

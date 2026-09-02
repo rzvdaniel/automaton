@@ -45,6 +45,13 @@ public sealed class AppDeploymentTarget
     /// </summary>
     public Guid? ActiveDeploymentOperationId { get; set; }
 
+    /// <summary>
+    /// Identifies the execution attempt currently allowed to complete the
+    /// active package operation. A retry may reuse the operation ID with a
+    /// new attempt after the previous lease expires.
+    /// </summary>
+    public Guid? ActiveDeploymentExecutionAttemptId { get; set; }
+
     public DateTimeOffset? LastDeploymentAt { get; set; }
     public DateTimeOffset? LastSuccessfulDeploymentAt { get; set; }
 

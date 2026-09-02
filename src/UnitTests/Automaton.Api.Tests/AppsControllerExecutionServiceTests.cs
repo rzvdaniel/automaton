@@ -43,7 +43,9 @@ public sealed class AppsControllerExecutionServiceTests
             publisher,
             environment,
             null!,
-            new ApiInstanceIdentityService());
+            new ApiInstanceIdentityService(),
+            null!,
+            null!);
 
         var response = await operations.AcceptAsync(
             fixture.AppId,
@@ -92,7 +94,9 @@ public sealed class AppsControllerExecutionServiceTests
             null!,
             environment,
             null!,
-            new ApiInstanceIdentityService());
+            new ApiInstanceIdentityService(),
+            null!,
+            null!);
 
         await operations.ExecuteAsync(operation.Id, CancellationToken.None);
         var completed = await fixture.Db.DeploymentOperations.SingleAsync();
@@ -102,6 +106,100 @@ public sealed class AppsControllerExecutionServiceTests
             Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Failed));
             Assert.That(completed.ExecutorInstanceId, Is.Not.EqualTo("previous-api-instance"));
             Assert.That(completed.ErrorMessage, Does.Contain("missing-deployment.zip"));
+        });
+    }
+
+    [Test]
+    public async Task LiveExecutionLease_PreventsDuplicateExecutionFromStealingOperation()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var operation = new DeploymentOperation
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.AppId,
+            OwnerUserId = fixture.OwnerId,
+            Status = DeploymentOperationStatuses.Running,
+            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+            ExecutorInstanceId = "another-live-api-instance",
+            ExecutionAttemptId = Guid.NewGuid(),
+            LeaseExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
+            StartedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        fixture.Db.DeploymentOperations.Add(operation);
+        await fixture.Db.SaveChangesAsync();
+
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            null!,
+            null!,
+            null!,
+            new TestWebHostEnvironment
+            {
+                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
+            },
+            null!,
+            new ApiInstanceIdentityService(),
+            null!,
+            null!);
+
+        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+        var unchanged = await fixture.Db.DeploymentOperations.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(unchanged.Status, Is.EqualTo(DeploymentOperationStatuses.Running));
+            Assert.That(unchanged.ExecutorInstanceId, Is.EqualTo("another-live-api-instance"));
+            Assert.That(unchanged.ExecutionAttemptId, Is.EqualTo(operation.ExecutionAttemptId));
+        });
+    }
+
+    [Test]
+    public async Task CallerCancellationDuringRunnerExecution_LeavesOperationDurable()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(
+            runnerInvocationDelay: TimeSpan.FromMilliseconds(250));
+        fixture.CreatePackage(hasRuntime: true);
+        var operation = new DeploymentOperation
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.AppId,
+            OwnerUserId = fixture.OwnerId,
+            TargetSlug = fixture.Target.Slug,
+            Status = DeploymentOperationStatuses.Pending,
+            PackagePath = fixture.PackagePath,
+            Clean = false,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        fixture.Db.DeploymentOperations.Add(operation);
+        await fixture.Db.SaveChangesAsync();
+
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            null!,
+            null!,
+            null!,
+            new TestWebHostEnvironment
+            {
+                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
+            },
+            fixture.Service,
+            new ApiInstanceIdentityService(),
+            null!,
+            NullLogger<DeploymentOperationService>.Instance);
+        using var cancellation = new CancellationTokenSource();
+        var execution = operations.ExecuteAsync(operation.Id, cancellation.Token);
+
+        await fixture.RunnerInvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        await execution;
+
+        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
+            Assert.That(completed.ErrorMessage, Is.Null);
+            Assert.That(completed.ExecutionAttemptId, Is.Not.Null);
         });
     }
 
@@ -307,6 +405,8 @@ public sealed class AppsControllerExecutionServiceTests
         public Guid AppId { get; }
         public AppDeploymentTarget Target { get; }
         public DeployAppPackageResult RunnerResult { get; }
+        public TaskCompletionSource<bool> RunnerInvocationStarted { get; }
+        public string PackagePath => packagePath;
         public string RouteFilePath => Path.Combine(rootPath, "routes", "managed-runtime-routes.yml");
 
         private DeploymentFixture(
@@ -318,7 +418,8 @@ public sealed class AppsControllerExecutionServiceTests
             DeployAppPackageResult runnerResult,
             string rootPath,
             string packagePath,
-            bool routeRootAsFile)
+            bool routeRootAsFile,
+            TaskCompletionSource<bool> runnerInvocationStarted)
         {
             Db = db;
             Service = service;
@@ -329,6 +430,7 @@ public sealed class AppsControllerExecutionServiceTests
             this.rootPath = rootPath;
             this.packagePath = packagePath;
             this.routeRootAsFile = routeRootAsFile;
+            RunnerInvocationStarted = runnerInvocationStarted;
         }
 
         public static async Task<DeploymentFixture> CreateAsync(
@@ -337,7 +439,8 @@ public sealed class AppsControllerExecutionServiceTests
             bool routeRootAsFile = false,
             bool routeStateConflict = false,
             bool routeThenStateConflict = false,
-            DeployAppPackageResult? runnerResult = null)
+            DeployAppPackageResult? runnerResult = null,
+            TimeSpan? runnerInvocationDelay = null)
         {
             var rootPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "package-deploy", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(rootPath);
@@ -408,12 +511,18 @@ public sealed class AppsControllerExecutionServiceTests
             var environment = new TestWebHostEnvironment { ContentRootPath = rootPath };
             var storage = new AppFileStorageService(environment, settings);
             var uploadRegistry = new FileUploadRegistry();
-            var hub = new PackageHubContext(uploadRegistry, packagePath, runnerResult ?? new DeployAppPackageResult
+            var runnerInvocationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var hub = new PackageHubContext(
+                uploadRegistry,
+                packagePath,
+                runnerResult ?? new DeployAppPackageResult
             {
                 DeploymentTargetId = target.Id,
                 Success = true,
                 Message = "package deployed"
-            });
+            },
+                runnerInvocationStarted,
+                runnerInvocationDelay);
             var resolver = new FixedTargetResolver(target);
             var routeOptions = Options.Create(new PublishedAppsConfig { TraefikDynamicConfigRoot = routeRoot });
             var routeService = routeThenStateConflict
@@ -450,7 +559,17 @@ public sealed class AppsControllerExecutionServiceTests
                 resolver,
                 new AppDeploymentTargetStateService(db));
 
-            return new DeploymentFixture(db, service, ownerId, appId, target, hub.RunnerResult, rootPath, packagePath, routeRootAsFile);
+            return new DeploymentFixture(
+                db,
+                service,
+                ownerId,
+                appId,
+                target,
+                hub.RunnerResult,
+                rootPath,
+                packagePath,
+                routeRootAsFile,
+                runnerInvocationStarted);
         }
 
         public IFormFile CreatePackage(bool hasRuntime)
@@ -499,10 +618,20 @@ public sealed class AppsControllerExecutionServiceTests
 
     private sealed class PackageHubContext : IHubContext<AutomatonHub>
     {
-        public PackageHubContext(FileUploadRegistry uploadRegistry, string packagePath, DeployAppPackageResult runnerResult)
+        public PackageHubContext(
+            FileUploadRegistry uploadRegistry,
+            string packagePath,
+            DeployAppPackageResult runnerResult,
+            TaskCompletionSource<bool> runnerInvocationStarted,
+            TimeSpan? runnerInvocationDelay)
         {
             RunnerResult = runnerResult;
-            Clients = new PackageHubClients(uploadRegistry, packagePath, runnerResult);
+            Clients = new PackageHubClients(
+                uploadRegistry,
+                packagePath,
+                runnerResult,
+                runnerInvocationStarted,
+                runnerInvocationDelay);
         }
 
         public DeployAppPackageResult RunnerResult { get; }
@@ -510,9 +639,24 @@ public sealed class AppsControllerExecutionServiceTests
         public IGroupManager Groups { get; } = null!;
     }
 
-    private sealed class PackageHubClients(FileUploadRegistry uploadRegistry, string packagePath, DeployAppPackageResult runnerResult) : IHubClients
+    private sealed class PackageHubClients : IHubClients
     {
-        private readonly PackageClientProxy clientProxy = new(uploadRegistry, packagePath, runnerResult);
+        private readonly PackageClientProxy clientProxy;
+
+        public PackageHubClients(
+            FileUploadRegistry uploadRegistry,
+            string packagePath,
+            DeployAppPackageResult runnerResult,
+            TaskCompletionSource<bool> runnerInvocationStarted,
+            TimeSpan? runnerInvocationDelay)
+        {
+            clientProxy = new PackageClientProxy(
+                uploadRegistry,
+                packagePath,
+                runnerResult,
+                runnerInvocationStarted,
+                runnerInvocationDelay);
+        }
 
         public IClientProxy All => throw new NotSupportedException();
         public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
@@ -529,12 +673,19 @@ public sealed class AppsControllerExecutionServiceTests
     private sealed class PackageClientProxy(
         FileUploadRegistry uploadRegistry,
         string packagePath,
-        DeployAppPackageResult runnerResult) : ISingleClientProxy
+        DeployAppPackageResult runnerResult,
+        TaskCompletionSource<bool> runnerInvocationStarted,
+        TimeSpan? runnerInvocationDelay) : ISingleClientProxy
     {
-        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
+        public async Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
         {
             if (method == AutomatonHubMethods.DeployAppPackage)
-                return Task.FromResult((T)(object)runnerResult);
+            {
+                runnerInvocationStarted.TrySetResult(true);
+                if (runnerInvocationDelay is { } delay)
+                    await Task.Delay(delay, CancellationToken.None);
+                return (T)(object)runnerResult;
+            }
 
             throw new NotSupportedException($"Unexpected invoke method: {method}");
         }
