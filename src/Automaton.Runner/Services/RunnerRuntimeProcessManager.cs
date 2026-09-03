@@ -652,16 +652,17 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     {
         lock (gate)
         {
+            var gatewayPort = RunnerPlatformPorts.GetRuntimeGatewayPort();
             var used = runtimes.Values.Concat(candidates.Values)
                 .Where(runtime => !runtime.Process.HasExited)
                 .Select(runtime => runtime.Port)
                 .ToHashSet();
 
-            if (!used.Contains(requestedPort) && CanBind(requestedPort))
+            if (requestedPort != gatewayPort && !used.Contains(requestedPort) && CanBind(requestedPort))
                 return requestedPort;
 
             for (var port = portStart; port <= portEnd; port++)
-                if (!used.Contains(port) && CanBind(port))
+                if (port != gatewayPort && !used.Contains(port) && CanBind(port))
                     return port;
         }
 
