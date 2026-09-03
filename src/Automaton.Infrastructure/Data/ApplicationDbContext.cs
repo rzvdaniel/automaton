@@ -58,6 +58,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<AiGuidanceDocument> AiGuidanceDocuments { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<AppDeploymentTarget> AppDeploymentTargets { get; set; }
+        public virtual DbSet<DeploymentOperation> DeploymentOperations { get; set; }
         public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
         public virtual DbSet<WebAppStar> WebAppStars { get; set; }
         public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
@@ -747,11 +748,31 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.WebAppId, e.Slug }).IsUnique();
                 entity.HasIndex(e => new { e.WebAppId, e.DefaultConstraintKey }).IsUnique();
                 entity.HasIndex(e => e.ExecutionRunnerId);
+                entity.HasIndex(e => e.ActiveDeploymentOperationId);
+                entity.HasIndex(e => e.ActiveDeploymentExecutionAttemptId);
 
                 entity.HasOne(e => e.ExecutionRunner)
                     .WithMany(e => e.AppDeploymentTargets)
                     .HasForeignKey(e => e.ExecutionRunnerId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<DeploymentOperation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.PackagePath).IsRequired().HasMaxLength(1024);
+                entity.Property(e => e.TargetSlug).HasMaxLength(120);
+                entity.Property(e => e.ExecutorInstanceId).HasMaxLength(120);
+                entity.Property(e => e.ErrorMessage).HasMaxLength(4000);
+                entity.Property(e => e.ResultJson).HasColumnType("longtext");
+                entity.Property(e => e.CreatedAtUtc).IsRequired();
+                entity.HasIndex(e => new { e.WebAppId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.WebAppId, e.Id }).IsUnique();
+                entity.HasOne<WebApp>()
+                    .WithMany()
+                    .HasForeignKey(e => e.WebAppId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<MarketplaceCategory>(entity =>

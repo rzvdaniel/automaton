@@ -319,7 +319,9 @@ public class AppsControllerExecutionService
         string? targetSlug,
         IFormFile? file,
         bool clean,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? deploymentOperationId = null,
+        Guid? executionAttemptId = null)
     {
         if (file == null || file.Length <= 0)
         {
@@ -344,7 +346,12 @@ public class AppsControllerExecutionService
         }
 
         var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
-        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(
+            appId,
+            target.Id,
+            cancellationToken,
+            deploymentOperationId,
+            executionAttemptId);
         var targetStateFinalized = false;
         var pendingRouteApplied = false;
         try
@@ -368,10 +375,12 @@ public class AppsControllerExecutionService
                         DeploymentTargetId = target.Id,
                         PackagePath = completion.LocalPath,
                         Clean = clean,
+                        DeploymentOperationId = deploymentOperationId,
+                        ExecutionAttemptId = executionAttemptId,
                         SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
                             && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
                     },
-                    cancellationToken);
+                    CancellationToken.None);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
             if (!result.Success)
@@ -383,7 +392,9 @@ public class AppsControllerExecutionService
                     appId,
                     target.Id,
                     success: false,
-                    cancellationToken: CancellationToken.None);
+                    cancellationToken: CancellationToken.None,
+                    deploymentOperationId: deploymentOperationId,
+                    executionAttemptId: executionAttemptId);
                 targetStateFinalized = true;
             }
 
@@ -433,7 +444,9 @@ public class AppsControllerExecutionService
                     target.Id,
                     success: true,
                     cancellationToken: CancellationToken.None,
-                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null);
+                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null,
+                    deploymentOperationId: deploymentOperationId,
+                    executionAttemptId: executionAttemptId);
                 targetStateFinalized = true;
             }
 
@@ -461,7 +474,9 @@ public class AppsControllerExecutionService
                         appId,
                         target.Id,
                         success: false,
-                        cancellationToken: CancellationToken.None);
+                        cancellationToken: CancellationToken.None,
+                        deploymentOperationId: deploymentOperationId,
+                        executionAttemptId: executionAttemptId);
                 }
                 catch (Exception completionException)
                 {

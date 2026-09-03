@@ -297,7 +297,34 @@ public class AutomatonApiClient : IDisposable
         using (resp)
         {
             await EnsureSuccessAsync(resp);
-            return await ReadJsonAsync(resp, ct);
+            var accepted = await ReadJsonAsync(resp, ct);
+            if (!accepted.TryGetProperty("operationId", out var operationIdProperty)
+                || !Guid.TryParse(operationIdProperty.GetString(), out var operationId))
+            {
+                throw new InvalidOperationException("Deploy package response did not contain an operation ID.");
+            }
+
+            while (true)
+            {
+                using var statusResponse = await _http.GetAsync(
+                    $"api/apps/{appId}/deploy-operations/{operationId}",
+                    ct);
+                await EnsureSuccessAsync(statusResponse);
+                var status = await ReadJsonAsync(statusResponse, ct);
+                var operationStatus = status.TryGetProperty("status", out var statusProperty)
+                    ? statusProperty.GetString()
+                    : null;
+                if (string.Equals(operationStatus, "Succeeded", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(operationStatus, "Failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return status.TryGetProperty("result", out var result)
+                        && result.ValueKind == JsonValueKind.Object
+                        ? result.Clone()
+                        : status;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            }
         }
     }
 

@@ -25,6 +25,7 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly IApplicationEventService applicationEventService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
+    private readonly DeploymentOperationService deploymentOperationService;
 
     public AppsControllerExecutionController(
         AppsService appsService,
@@ -34,7 +35,8 @@ public class AppsControllerExecutionController : ControllerBase
         PrivateAppLaunchService privateAppLaunchService,
         IAppDeployCapabilityService appDeployCapabilityService,
         IApplicationEventService applicationEventService,
-        ManagedRunnerBootstrapService managedRunnerBootstrapService)
+        ManagedRunnerBootstrapService managedRunnerBootstrapService,
+        DeploymentOperationService deploymentOperationService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
@@ -44,6 +46,7 @@ public class AppsControllerExecutionController : ControllerBase
         this.appDeployCapabilityService = appDeployCapabilityService;
         this.applicationEventService = applicationEventService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
+        this.deploymentOperationService = deploymentOperationService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -161,7 +164,7 @@ public class AppsControllerExecutionController : ControllerBase
 
     [HttpPost("api/apps/{appId:guid}/deploy-package")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult<DeployPackageResponse>> DeployPackage(
+    public async Task<ActionResult<DeploymentOperationResponse>> DeployPackage(
         Guid appId,
         [FromForm] IFormFile? file,
         [FromQuery] bool clean = false,
@@ -176,15 +179,33 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            var result = await controllerExecutionService.DeployPackageAsync(
+            var result = await deploymentOperationService.AcceptAsync(
                 appId, userId, targetSlug, file, clean, cancellationToken);
-            return Ok(result);
+            return AcceptedAtAction(
+                nameof(GetDeploymentOperation),
+                new { appId, operationId = result.OperationId },
+                result);
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Deploy package failed: AppId={AppId}", appId);
             return StatusCode(500, new { error = "Deploy package failed: " + ex.Message });
         }
+    }
+
+    [HttpGet("api/apps/{appId:guid}/deploy-operations/{operationId:guid}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeploymentOperationResponse>> GetDeploymentOperation(
+        Guid appId,
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await deploymentOperationService.GetAsync(
+            appId,
+            userContextService.GetUserId(),
+            operationId,
+            cancellationToken);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost("api/apps/{appId:guid}/deploy")]

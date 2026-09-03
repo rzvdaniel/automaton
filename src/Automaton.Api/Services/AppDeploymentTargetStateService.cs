@@ -34,6 +34,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
                     target.Status == originalStatus)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(target => target.Status, DeploymentTargetStatus.Deploying)
+                    .SetProperty(target => target.ActiveDeploymentOperationId, (Guid?)null)
+                    .SetProperty(target => target.ActiveDeploymentExecutionAttemptId, (Guid?)null)
                     .SetProperty(target => target.UpdatedAt, now), cancellationToken);
             if (updated != 1)
             {
@@ -48,6 +50,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
             throw new AppDeploymentTargetConflictException(conflictMessage);
         }
         target.Status = DeploymentTargetStatus.Deploying;
+        target.ActiveDeploymentOperationId = null;
+        target.ActiveDeploymentExecutionAttemptId = null;
         target.UpdatedAt = DateTimeOffset.UtcNow;
         await dataContext.SaveChangesAsync(cancellationToken);
         return originalStatus;
@@ -68,6 +72,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
                     target.Status == DeploymentTargetStatus.Deploying)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(target => target.Status, status)
+                    .SetProperty(target => target.ActiveDeploymentOperationId, (Guid?)null)
+                    .SetProperty(target => target.ActiveDeploymentExecutionAttemptId, (Guid?)null)
                     .SetProperty(target => target.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
             return;
         }
@@ -76,6 +82,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         if (target.Status == DeploymentTargetStatus.Deploying)
         {
             target.Status = status;
+            target.ActiveDeploymentOperationId = null;
+            target.ActiveDeploymentExecutionAttemptId = null;
             target.UpdatedAt = DateTimeOffset.UtcNow;
             await dataContext.SaveChangesAsync(cancellationToken);
         }
@@ -84,7 +92,9 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
     public async Task MarkStartedAsync(
         Guid appId,
         Guid deploymentTargetId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? deploymentOperationId = null,
+        Guid? executionAttemptId = null)
     {
         var now = DateTimeOffset.UtcNow;
         if (dataContext.Database.IsRelational())
@@ -93,10 +103,14 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
                 .Where(target =>
                     target.Id == deploymentTargetId &&
                     target.WebAppId == appId &&
-                    target.Status != DeploymentTargetStatus.Deploying)
+                    (target.Status != DeploymentTargetStatus.Deploying ||
+                     (deploymentOperationId.HasValue &&
+                      target.ActiveDeploymentOperationId == deploymentOperationId)))
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(target => target.Status, DeploymentTargetStatus.Deploying)
                     .SetProperty(target => target.LastDeploymentAt, now)
+                    .SetProperty(target => target.ActiveDeploymentOperationId, deploymentOperationId)
+                    .SetProperty(target => target.ActiveDeploymentExecutionAttemptId, executionAttemptId)
                     .SetProperty(target => target.UpdatedAt, now), cancellationToken);
             if (updated == 1)
             {
@@ -116,13 +130,16 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         }
 
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
-        if (target.Status == DeploymentTargetStatus.Deploying)
+        if (target.Status == DeploymentTargetStatus.Deploying &&
+            (!deploymentOperationId.HasValue || target.ActiveDeploymentOperationId != deploymentOperationId))
         {
             throw new AppDeploymentTargetConflictException(
                 "A deployment is already active for this target.");
         }
         target.Status = DeploymentTargetStatus.Deploying;
         target.LastDeploymentAt = now;
+        target.ActiveDeploymentOperationId = deploymentOperationId;
+        target.ActiveDeploymentExecutionAttemptId = executionAttemptId;
         target.UpdatedAt = now;
         await dataContext.SaveChangesAsync(cancellationToken);
     }
@@ -138,7 +155,9 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         bool success,
         CancellationToken cancellationToken = default,
         bool? legacyControllerRuntimeDeployed = null,
-        bool? genericRuntimeDeployed = null)
+        bool? genericRuntimeDeployed = null,
+        Guid? deploymentOperationId = null,
+        Guid? executionAttemptId = null)
     {
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
         if (target.Status != DeploymentTargetStatus.Deploying)
@@ -146,8 +165,20 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
             throw new AppDeploymentTargetConflictException(
                 "This deployment is no longer the active operation for the target.");
         }
+        if (deploymentOperationId.HasValue && target.ActiveDeploymentOperationId != deploymentOperationId)
+        {
+            throw new AppDeploymentTargetConflictException(
+                "This deployment is no longer the active operation for the target.");
+        }
+        if (executionAttemptId.HasValue && target.ActiveDeploymentExecutionAttemptId != executionAttemptId)
+        {
+            throw new AppDeploymentTargetConflictException(
+                "This deployment is no longer the active execution attempt for the target.");
+        }
         var now = DateTimeOffset.UtcNow;
         target.Status = success ? DeploymentTargetStatus.Running : DeploymentTargetStatus.Failed;
+        target.ActiveDeploymentOperationId = null;
+        target.ActiveDeploymentExecutionAttemptId = null;
         target.UpdatedAt = now;
         if (success)
         {
