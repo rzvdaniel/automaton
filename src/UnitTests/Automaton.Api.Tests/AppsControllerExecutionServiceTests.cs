@@ -77,6 +77,7 @@ public sealed class AppsControllerExecutionServiceTests
             Status = DeploymentOperationStatuses.Running,
             PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
             ExecutorInstanceId = "previous-api-instance",
+            LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1),
             StartedAtUtc = DateTime.UtcNow.AddMinutes(-1),
             CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
         };
@@ -143,7 +144,8 @@ public sealed class AppsControllerExecutionServiceTests
             null!,
             null!);
 
-        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+        Assert.ThrowsAsync<DeploymentOperationLeaseActiveException>(
+            async () => await operations.ExecuteAsync(operation.Id, CancellationToken.None));
         var unchanged = await fixture.Db.DeploymentOperations.SingleAsync();
 
         Assert.Multiple(() =>
@@ -152,6 +154,97 @@ public sealed class AppsControllerExecutionServiceTests
             Assert.That(unchanged.ExecutorInstanceId, Is.EqualTo("another-live-api-instance"));
             Assert.That(unchanged.ExecutionAttemptId, Is.EqualTo(operation.ExecutionAttemptId));
         });
+    }
+
+    [Test]
+    public async Task RedeliveryAfterLeaseExpiry_ReclaimsOperationWithoutManualStateReset()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        fixture.CreatePackage(hasRuntime: true);
+        var operation = new DeploymentOperation
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.AppId,
+            OwnerUserId = fixture.OwnerId,
+            TargetSlug = fixture.Target.Slug,
+            Status = DeploymentOperationStatuses.Running,
+            PackagePath = fixture.PackagePath,
+            Clean = false,
+            ExecutorInstanceId = "crashed-api-instance",
+            ExecutionAttemptId = Guid.NewGuid(),
+            LeaseExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
+            StartedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        fixture.Db.DeploymentOperations.Add(operation);
+        await fixture.Db.SaveChangesAsync();
+
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            null!,
+            null!,
+            null!,
+            new TestWebHostEnvironment
+            {
+                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
+            },
+            fixture.Service,
+            new ApiInstanceIdentityService(),
+            null!,
+            NullLogger<DeploymentOperationService>.Instance);
+        var abandonedAttemptId = operation.ExecutionAttemptId;
+
+        Assert.ThrowsAsync<DeploymentOperationLeaseActiveException>(
+            async () => await operations.ExecuteAsync(operation.Id, CancellationToken.None));
+
+        operation.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await fixture.Db.SaveChangesAsync();
+        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+
+        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
+            Assert.That(completed.ExecutorInstanceId, Is.Not.EqualTo("crashed-api-instance"));
+            Assert.That(completed.ExecutionAttemptId, Is.Not.EqualTo(abandonedAttemptId));
+        });
+    }
+
+    [Test]
+    public async Task TerminalOperation_IsNotReexecuted()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var operation = new DeploymentOperation
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.AppId,
+            OwnerUserId = fixture.OwnerId,
+            Status = DeploymentOperationStatuses.Succeeded,
+            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+            CompletedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        fixture.Db.DeploymentOperations.Add(operation);
+        await fixture.Db.SaveChangesAsync();
+
+        var operations = new DeploymentOperationService(
+            fixture.Db,
+            null!,
+            null!,
+            null!,
+            new TestWebHostEnvironment
+            {
+                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
+            },
+            null!,
+            new ApiInstanceIdentityService(),
+            null!,
+            null!);
+
+        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+
+        var unchanged = await fixture.Db.DeploymentOperations.SingleAsync();
+        Assert.That(unchanged.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
     }
 
     [Test]

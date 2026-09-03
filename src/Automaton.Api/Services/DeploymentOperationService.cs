@@ -117,8 +117,10 @@ public sealed class DeploymentOperationService(
     public async Task ExecuteAsync(Guid operationId, CancellationToken cancellationToken)
     {
         var executionAttemptId = Guid.NewGuid();
-        var claimed = await ClaimAsync(operationId, executionAttemptId, cancellationToken);
-        if (!claimed)
+        var claim = await ClaimAsync(operationId, executionAttemptId, cancellationToken);
+        if (claim == DeploymentOperationClaim.LiveLease)
+            throw new DeploymentOperationLeaseActiveException(operationId);
+        if (claim != DeploymentOperationClaim.Claimed)
             return;
 
         var operation = await dataContext.DeploymentOperations
@@ -206,7 +208,7 @@ public sealed class DeploymentOperationService(
         }
     }
 
-    private async Task<bool> ClaimAsync(
+    private async Task<DeploymentOperationClaim> ClaimAsync(
         Guid operationId,
         Guid executionAttemptId,
         CancellationToken cancellationToken)
@@ -215,7 +217,7 @@ public sealed class DeploymentOperationService(
         var leaseExpiresAt = now.Add(ExecutionLeaseDuration);
         if (dataContext.Database.IsRelational())
         {
-            return await dataContext.DeploymentOperations
+            var claimed = await dataContext.DeploymentOperations
                 .Where(item =>
                     item.Id == operationId &&
                     (item.Status == DeploymentOperationStatuses.Pending ||
@@ -227,22 +229,59 @@ public sealed class DeploymentOperationService(
                     .SetProperty(item => item.ExecutorInstanceId, executorInstanceId)
                     .SetProperty(item => item.ExecutionAttemptId, executionAttemptId)
                     .SetProperty(item => item.LeaseExpiresAtUtc, leaseExpiresAt), cancellationToken) == 1;
+            if (claimed)
+                return DeploymentOperationClaim.Claimed;
+
+            var current = await dataContext.DeploymentOperations
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == operationId, cancellationToken);
+            return GetUnclaimedOperationResult(current, now);
         }
 
         var operation = await dataContext.DeploymentOperations
             .SingleOrDefaultAsync(item => item.Id == operationId, cancellationToken);
-        if (operation is null ||
-            (operation.Status != DeploymentOperationStatuses.Pending &&
-             (operation.Status != DeploymentOperationStatuses.Running ||
-              operation.LeaseExpiresAtUtc is not null && operation.LeaseExpiresAtUtc > now)))
-            return false;
+        if (operation is null)
+            return DeploymentOperationClaim.Missing;
+        if (operation.Status != DeploymentOperationStatuses.Pending &&
+            operation.Status != DeploymentOperationStatuses.Running)
+            return DeploymentOperationClaim.Terminal;
+        if (operation.Status == DeploymentOperationStatuses.Running &&
+            operation.LeaseExpiresAtUtc is not null && operation.LeaseExpiresAtUtc > now)
+            return DeploymentOperationClaim.LiveLease;
         operation.Status = DeploymentOperationStatuses.Running;
         operation.StartedAtUtc = now;
         operation.ExecutorInstanceId = executorInstanceId;
         operation.ExecutionAttemptId = executionAttemptId;
         operation.LeaseExpiresAtUtc = leaseExpiresAt;
         await dataContext.SaveChangesAsync(cancellationToken);
-        return true;
+        return DeploymentOperationClaim.Claimed;
+    }
+
+    private static DeploymentOperationClaim GetUnclaimedOperationResult(
+        DeploymentOperation? operation,
+        DateTime now)
+    {
+        if (operation is null)
+            return DeploymentOperationClaim.Missing;
+        if (operation.Status != DeploymentOperationStatuses.Pending &&
+            operation.Status != DeploymentOperationStatuses.Running)
+            return DeploymentOperationClaim.Terminal;
+        if (operation.Status == DeploymentOperationStatuses.Running &&
+            operation.LeaseExpiresAtUtc is not null && operation.LeaseExpiresAtUtc > now)
+            return DeploymentOperationClaim.LiveLease;
+
+        // A concurrent writer changed the row between the conditional claim
+        // and this read. Treat it as retryable so CAP does not acknowledge a
+        // delivery that still needs an eventual claim.
+        return DeploymentOperationClaim.LiveLease;
+    }
+
+    private enum DeploymentOperationClaim
+    {
+        Claimed,
+        LiveLease,
+        Terminal,
+        Missing
     }
 
     private async Task RenewLeaseAsync(

@@ -225,6 +225,10 @@ services.AddHostedService<SecretGrantCleanupService>();
 services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 services.AddCap(options =>
 {
+    // A deployment blocked by another executor must remain retryable until
+    // the five-minute execution lease can be observed as expired.
+    options.FailedRetryCount = 50;
+    options.FailedRetryInterval = 60;
     options.UseEntityFramework<ApplicationDbContext>();
     var rabbitMqHost = configurationManager["RabbitMq:Host"]
         ?? throw new InvalidOperationException("RabbitMq:Host is required.");
