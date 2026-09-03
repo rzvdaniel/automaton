@@ -172,9 +172,6 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
     private static string GetListenUrl()
     {
-        var port = Environment.GetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT");
-        return int.TryParse(port, out var parsedPort) && parsedPort is > 0 and <= 65535
-            ? $"http://0.0.0.0:{parsedPort}"
-            : "http://0.0.0.0:8080";
+        return $"http://0.0.0.0:{RunnerPlatformPorts.GetRuntimeGatewayPort()}";
     }
 }
