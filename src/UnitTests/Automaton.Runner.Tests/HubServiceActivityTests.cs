@@ -19,6 +19,12 @@ public sealed class HubServiceActivityTests
     private static readonly FieldInfo ReconnectRequestedField =
         typeof(HubService).GetField("reconnectRequested", BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new MissingFieldException(nameof(HubService), "reconnectRequested");
+    private static readonly MethodInfo BeginPackageUploadActivityMethod =
+        typeof(HubService).GetMethod("BeginPackageUploadActivity", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingMethodException(nameof(HubService), "BeginPackageUploadActivity");
+    private static readonly MethodInfo EndPackageUploadActivityMethod =
+        typeof(HubService).GetMethod("EndPackageUploadActivity", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingMethodException(nameof(HubService), "EndPackageUploadActivity");
 
     [Test]
     public async Task PackageDeploymentActivityDefersReconnectUntilDeploymentCompletes()
@@ -60,6 +66,44 @@ public sealed class HubServiceActivityTests
 
         Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
         Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void PackageUploadSessionKeepsReconnectDeferredBetweenChunksAndReleasesOnCompletion()
+    {
+        var service = CreateService();
+        const string sessionId = "package-session";
+
+        BeginPackageUploadActivityMethod.Invoke(service, [sessionId]);
+        HandleReconnectWhenIdleMethod.Invoke(service, ["API cutover"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
+            Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(1));
+        });
+
+        // More chunks do not create additional activity or release the session boundary.
+        BeginPackageUploadActivityMethod.Invoke(service, [sessionId]);
+        Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
+
+        EndPackageUploadActivityMethod.Invoke(service, [sessionId]);
+
+        Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
+        Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void FailedOrAbandonedPackageUploadSessionCanBeReleasedWithoutLeakingActivity()
+    {
+        var service = CreateService();
+        const string sessionId = "abandoned-package-session";
+
+        BeginPackageUploadActivityMethod.Invoke(service, [sessionId]);
+        EndPackageUploadActivityMethod.Invoke(service, [sessionId]);
+        EndPackageUploadActivityMethod.Invoke(service, [sessionId]);
+
+        Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
     }
 
     private static async Task<T> InvokeActivityAsync<T>(HubService service, Func<Task<T>> operation)
