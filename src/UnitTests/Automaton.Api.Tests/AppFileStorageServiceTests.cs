@@ -62,6 +62,15 @@ public class AppFileStorageServiceTests
     }
 
     [Test]
+    public void DirectFileEditing_ContinuesToRejectUnsupportedExtensions()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => AppFileStorageService.ValidateFileExtensionPublic("Program.cs"));
+
+        Assert.That(exception!.Message, Does.Contain("File type '.cs' is not allowed"));
+    }
+
+    [Test]
     public async Task CopySourceFilesAsync_CopiesOnlyPortableSourceDirectories_AndSkipsSecrets()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
