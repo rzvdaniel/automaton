@@ -469,7 +469,8 @@ public class HubService
 
             connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, async (request) =>
             {
-                return await runnerDeploymentService.DeployPackage(request);
+                return await ExecuteWithRunnerActivityAsync(
+                    () => runnerDeploymentService.DeployPackage(request));
             });
 
             connection.On<ExecuteAppActionModuleRequest, AppActionExecutionResult>(ExecuteAppActionModuleMethod, request =>
@@ -1259,6 +1260,19 @@ public class HubService
         if (remaining == 0 && Volatile.Read(ref reconnectRequested) == 1)
         {
             QueueReconnectNow("Current work finished.");
+        }
+    }
+
+    private async Task<T> ExecuteWithRunnerActivityAsync<T>(Func<Task<T>> operation)
+    {
+        BeginRunnerActivity();
+        try
+        {
+            return await operation();
+        }
+        finally
+        {
+            EndRunnerActivity();
         }
     }
 
