@@ -1099,8 +1099,6 @@ public class AppsControllerExecutionService
                 continue;
             }
 
-            AppFileStorageService.ValidateFileExtensionPublic(relativeSourcePath);
-
             var destinationPath = Path.GetFullPath(Path.Combine(sourceRoot, relativeSourcePath));
             var fullSourceRoot = Path.GetFullPath(sourceRoot);
             if (!destinationPath.StartsWith(fullSourceRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))

@@ -66,6 +66,64 @@ public sealed class AppsControllerExecutionServiceTests
     }
 
     [Test]
+    public async Task DeployPackageAsync_PersistsOpaqueGenericSourceFiles()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var package = fixture.CreatePackage(
+            hasRuntime: true,
+            sourceFiles: new Dictionary<string, string>
+            {
+                [".gitattributes"] = "*.sh text eol=lf\n",
+                ["build.sh"] = "#!/bin/sh\n",
+                ["Program.cs"] = "class Program {}\n",
+                ["Generic.csproj"] = "<Project />\n",
+                ["appsettings"] = "opaque config\n"
+            });
+
+        var response = await fixture.Service.DeployPackageAsync(
+            fixture.AppId,
+            fixture.OwnerId,
+            fixture.Target.Slug,
+            package,
+            clean: false,
+            CancellationToken.None);
+
+        Assert.That(response.Success, Is.True);
+        var sourceRoot = Path.Combine(
+            fixture.RootPath,
+            "AppData",
+            "apps",
+            fixture.OwnerId.ToString(),
+            fixture.AppId.ToString(),
+            "source");
+        foreach (var file in new[] { ".gitattributes", "build.sh", "Program.cs", "Generic.csproj", "appsettings" })
+            Assert.That(File.Exists(Path.Combine(sourceRoot, file)), Is.True, file);
+    }
+
+    [Test]
+    public async Task DeployPackageAsync_RejectsSourcePathTraversal()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var package = fixture.CreatePackage(
+            hasRuntime: true,
+            sourceFiles: new Dictionary<string, string>
+            {
+                ["../outside.txt"] = "must not escape"
+            });
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                fixture.Target.Slug,
+                package,
+                clean: false,
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("escapes the app source directory"));
+    }
+
+    [Test]
     public async Task InterruptedRunningOperation_IsReclaimedByANewApiInstance()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
@@ -500,6 +558,7 @@ public sealed class AppsControllerExecutionServiceTests
         public DeployAppPackageResult RunnerResult { get; }
         public TaskCompletionSource<bool> RunnerInvocationStarted { get; }
         public string PackagePath => packagePath;
+        public string RootPath => rootPath;
         public string RouteFilePath => Path.Combine(rootPath, "routes", "managed-runtime-routes.yml");
 
         private DeploymentFixture(
@@ -665,7 +724,7 @@ public sealed class AppsControllerExecutionServiceTests
                 runnerInvocationStarted);
         }
 
-        public IFormFile CreatePackage(bool hasRuntime)
+        public IFormFile CreatePackage(bool hasRuntime, IReadOnlyDictionary<string, string>? sourceFiles = null)
         {
             var contract = new ApplicationContract();
             if (hasRuntime)
@@ -681,8 +740,21 @@ public sealed class AppsControllerExecutionServiceTests
             using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
             {
                 var manifest = archive.CreateEntry("manifest.json");
-                using var writer = new StreamWriter(manifest.Open());
-                writer.Write($"{{\"version\":1,\"appId\":\"{AppId}\",\"application\":{ApplicationContractSerialization.Serialize(contract)}}}");
+                using (var writer = new StreamWriter(manifest.Open()))
+                {
+                    writer.Write($"{{\"version\":1,\"appId\":\"{AppId}\",\"application\":{ApplicationContractSerialization.Serialize(contract)}}}");
+                }
+                if (sourceFiles is not null)
+                {
+                    foreach (var sourceFile in sourceFiles)
+                    {
+                        var sourceEntry = archive.CreateEntry($"source/{sourceFile.Key}");
+                        using (var sourceWriter = new StreamWriter(sourceEntry.Open()))
+                        {
+                            sourceWriter.Write(sourceFile.Value);
+                        }
+                    }
+                }
             }
 
             var bytes = stream.ToArray();
