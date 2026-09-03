@@ -12,7 +12,6 @@ using System.Threading;
 
 using System.Text;
 using System.Reflection;
-using System.Collections.Concurrent;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -88,7 +87,6 @@ public class HubService
     private int activeOperationCount = 0;
     private int reconnectRequested = 0;
     private int reconnectInProgress = 0;
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> activePackageUploads = new();
     private CancellationTokenSource? heartbeatTokenSource;
     private Task? heartbeatTask;
 
@@ -1412,12 +1410,6 @@ public class HubService
 
     private async Task HandleReceiveFileChunkAsync(FileUploadChunk chunk)
     {
-        var tracksPackageUpload = chunk.AppId.HasValue && string.IsNullOrEmpty(chunk.StorageScope);
-        if (tracksPackageUpload && chunk.ChunkIndex == 0)
-        {
-            BeginPackageUploadActivity(chunk.SessionId);
-        }
-
         try
         {
             var filePath = string.Equals(chunk.StorageScope, FileTransferStorageScopes.Media, StringComparison.Ordinal)
@@ -1442,16 +1434,10 @@ public class HubService
                     SessionId = chunk.SessionId,
                     LocalPath = filePath
                 });
-                EndPackageUploadActivity(chunk.SessionId);
             }
         }
         catch (Exception ex)
         {
-            if (tracksPackageUpload)
-            {
-                EndPackageUploadActivity(chunk.SessionId);
-            }
-
             logger.Error(ex, "Failed to handle upload chunk: SessionId={SessionId}", chunk.SessionId);
             try
             {
@@ -1466,56 +1452,6 @@ public class HubService
                 logger.Error(notifyEx, "Failed to notify server of upload failure: SessionId={SessionId}", chunk.SessionId);
             }
         }
-    }
-
-    private void BeginPackageUploadActivity(string sessionId)
-    {
-        if (string.IsNullOrWhiteSpace(sessionId))
-        {
-            return;
-        }
-
-        var expiry = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-        if (!activePackageUploads.TryAdd(sessionId, expiry))
-        {
-            expiry.Dispose();
-            return;
-        }
-
-        BeginRunnerActivity();
-        _ = ExpirePackageUploadActivityAsync(sessionId, expiry);
-    }
-
-    private async Task ExpirePackageUploadActivityAsync(string sessionId, CancellationTokenSource expiry)
-    {
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, expiry.Token);
-        }
-        catch (OperationCanceledException) when (expiry.IsCancellationRequested)
-        {
-            return;
-        }
-
-        if (activePackageUploads.TryRemove(new KeyValuePair<string, CancellationTokenSource>(sessionId, expiry)))
-        {
-            logger.Warning("Package upload activity expired: SessionId={SessionId}", sessionId);
-            EndRunnerActivity();
-        }
-        expiry.Dispose();
-    }
-
-    private void EndPackageUploadActivity(string sessionId)
-    {
-        if (string.IsNullOrWhiteSpace(sessionId)
-            || !activePackageUploads.TryRemove(sessionId, out var expiry))
-        {
-            return;
-        }
-
-        expiry.Cancel();
-        expiry.Dispose();
-        EndRunnerActivity();
     }
 
     private async Task HandleFetchFileChunkAsync(FetchFileChunkRequest request)
