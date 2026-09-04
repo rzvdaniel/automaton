@@ -299,7 +299,7 @@ public class BackendRouteConfigService
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
         var middlewares = route.RequiresAuthentication
-            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-rewrite\"]"
+            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{key}-rewrite\"]"
             : $"[\"{key}-rewrite\"]";
         builder.AppendLine($"      middlewares: {middlewares}");
     }
@@ -319,6 +319,11 @@ public class BackendRouteConfigService
         builder.AppendLine("          - Cookie");
         builder.AppendLine("          - X-App-Id");
         builder.AppendLine("          - X-Automaton-Runtime-Auth");
+        builder.AppendLine($"    {key}-auth-strip:");
+        builder.AppendLine("      headers:");
+        builder.AppendLine("        customRequestHeaders:");
+        builder.AppendLine("          X-App-Id: \"\"");
+        builder.AppendLine("          X-Automaton-Runtime-Auth: \"\"");
     }
 
     private static void AppendRuntimeRewrite(
