@@ -31,6 +31,7 @@ public sealed class AppListEnvironmentDto
     public bool GenericRuntimeDeployed { get; init; }
     public DateTime? LastSuccessfulDeploymentAtUtc { get; init; }
     public bool IsStaticHosting { get; init; }
+    /// <summary>Path relative to the app-specific private host, not the shared apps domain.</summary>
     public string RoutePath { get; init; } = string.Empty;
 }
 

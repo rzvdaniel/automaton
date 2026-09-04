@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Data;
+using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -586,9 +587,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                         RunnerStatus.Online.ToString(),
                         StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrWhiteSpace(target.ExecutionRunner.ConnectionId)),
-            target.IsDefault
-                ? $"/private/{target.WebAppId:D}"
-                : $"/a/{target.WebAppId:D}/t/{target.Id:D}/");
+            PublishedAppHostNames.BuildPrivateTargetPath(target.WebAppId, target.Id, target.IsDefault));
 
     private static bool IsLegacyDefaultTarget(AppDeploymentTarget target) =>
         string.Equals(target.Name, "default", StringComparison.OrdinalIgnoreCase) ||

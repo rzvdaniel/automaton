@@ -92,6 +92,8 @@ Use **Admin → Hosted Runners → Runner Containers** for managed tenant Runner
 
 ## Target statuses
 
+Private app links use `app-{appId:N}.{configured apps domain}`, with no hyphens in the app ID. The primary target opens at `/` on that host. Named targets open at `/a/{appId}/t/{targetId}/` on the same host. The API's `RoutePath` is relative to the app host, not the shared apps domain. Use Studio's Open or Copy URL action instead of constructing a `/private/{appId}` link. No legacy path redirect is provided.
+
 - **Unassigned** — no Runner is assigned.
 - **Not deployed** — a Runner is assigned, but no successful deployment is recorded.
 - **Deploying** — a deployment or protected lifecycle operation is active.

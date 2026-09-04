@@ -126,7 +126,7 @@ public class AppsService
                     GenericRuntimeDeployed = row.LiveTarget.GenericRuntimeDeployed,
                     LastSuccessfulDeploymentAtUtc = row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime,
                     IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.GenericRuntimeDeployed,
-                    RoutePath = $"/private/{row.Id:D}",
+                    RoutePath = PublishedAppHostNames.BuildPrivateTargetPath(row.Id, Guid.Empty, isDefault: true),
                 },
                 Runtime = new AppListRuntimeDto
                 {

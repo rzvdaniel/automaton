@@ -47,6 +47,9 @@ public static class PublishedAppHostNames
     public static string BuildPrivateAppHost(Guid appId, string appsDomain)
         => $"app-{appId:N}.{appsDomain}";
 
+    public static string BuildPrivateTargetPath(Guid appId, Guid targetId, bool isDefault)
+        => isDefault ? "/" : $"/a/{appId:D}/t/{targetId:D}/";
+
     private static bool TryGetLabel(string host, string appsDomain, out string label)
     {
         label = string.Empty;

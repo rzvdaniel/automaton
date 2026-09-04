@@ -35,7 +35,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     genericRuntimeDeployed: true,
     cleanupPending: false,
     lastSuccessfulDeploymentAt: '2026-08-04T18:42:00Z',
-    routePath: '/private/app-id',
+    routePath: '/',
     runner: {
       id: 'runner-id',
       name: 'hidden-hosted-runner',
@@ -112,7 +112,7 @@ describe('AppDeploymentTargets', () => {
     expect(wrapper.text()).toContain('Target ID: live-id')
     expect(wrapper.text()).toContain('Environment slug: live')
     expect(wrapper.text()).toContain('Runtime transport: Direct edge routing')
-    expect(wrapper.text()).toContain('Runtime route: /private/app-id')
+    expect(wrapper.text()).toContain('Runtime route: /')
     expect(wrapper.text()).toContain('Internal preview URL:')
   })
 
@@ -318,7 +318,7 @@ describe('AppDeploymentTargets', () => {
       await button.trigger('click')
     }
 
-    expect(wrapper.text()).toContain('Runtime route: /private/app-id')
+    expect(wrapper.text()).toContain('Runtime route: /')
     expect(wrapper.text()).toContain('Runtime route: /a/app-id/t/canary-id/')
     expect(wrapper.text()).toContain('Runtime route: /a/app-id/t/self-hosted-id/')
   })

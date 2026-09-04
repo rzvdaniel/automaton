@@ -48,6 +48,7 @@ public class AppDeploymentTargetManagementServiceTests
             Assert.That(created.RoutePath, Is.EqualTo(
                 $"/a/{fixture.App.Id:D}/t/{created.Id:D}/"));
             Assert.That(targets, Has.Count.EqualTo(2));
+            Assert.That(targets.Single(x => x.IsDefault).RoutePath, Is.EqualTo("/"));
         });
     }
 

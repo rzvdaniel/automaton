@@ -14,7 +14,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
   return {
     id: 'live-target-id', appId: 'app-id', name: 'Live', slug: 'live', isDefault: true,
     status: DeploymentTargetStatus.Running, legacyControllerRuntimeDeployed: true, genericRuntimeDeployed: true,
-    cleanupPending: false, routePath: '/private/app-id/live',
+    cleanupPending: false, routePath: '/',
     runner: { id: 'runner-id', name: 'Hosted', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
   }
@@ -91,20 +91,22 @@ describe('BuildVisualWorkspace target preview', () => {
     const wrapper = mountWorkspace([target()])
     const iframe = wrapper.get('iframe.application-iframe')
     const iframeUrl = iframe.attributes('src')
+    if (!iframeUrl) throw new Error('Preview iframe has no source URL')
 
-    expect(iframeUrl).toContain('/private/app-id/live')
+    expect(new URL(iframeUrl).pathname).toBe('/')
+    expect(new URL(iframeUrl).hostname).toContain('app-appid.')
     expect(iframeUrl).toContain('?v=')
 
     await wrapper.get('button').trigger('click')
     expect(window.open).toHaveBeenCalledWith(
-      expect.stringContaining('/private/app-id/live'), '_blank', 'noopener',
+      expect.stringContaining('://app-appid.'), '_blank', 'noopener',
     )
     const openedUrl = vi.mocked(window.open).mock.calls[0]?.[0]
     expect(openedUrl).toBeDefined()
     expect(openedUrl).not.toContain('?v=')
 
     await wrapper.get('button:nth-of-type(2)').trigger('click')
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/private/app-id/live'))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('://app-appid.'))
     const copiedUrl = vi.mocked(navigator.clipboard.writeText).mock.calls[0]?.[0]
     expect(copiedUrl).toBeDefined()
     expect(copiedUrl).not.toContain('?v=')

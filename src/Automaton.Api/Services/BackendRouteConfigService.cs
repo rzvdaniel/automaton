@@ -206,7 +206,8 @@ public class BackendRouteConfigService
             var key = $"private-{route.AppId:N}";
             var host = PublishedAppHostNames.BuildPrivateAppHost(
                 route.AppId, publishedAppsConfig.PublicBaseUrlHost);
-            AppendRuntimeRouter(builder, route, key, host, "/", 50);
+            AppendRuntimeRouter(builder, route, key, host,
+                PublishedAppHostNames.BuildPrivateTargetPath(route.AppId, route.DeploymentTargetId, true), 50);
         }
 
         foreach (var route in routes.Where(route => !route.IsDefault))
@@ -303,7 +304,7 @@ public class BackendRouteConfigService
     }
 
     private static string BuildTargetRoutePrefix(Guid appId, Guid deploymentTargetId)
-        => $"/a/{appId}/t/{deploymentTargetId}";
+        => PublishedAppHostNames.BuildPrivateTargetPath(appId, deploymentTargetId, false).TrimEnd('/');
 
     private static string BuildRuntimePath(RouteTarget route, string path)
     {
