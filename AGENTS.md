@@ -14,6 +14,10 @@ Read the matching skill before changing the related area:
 
 The `.agents/skills/` directory also contains developer-local skills. Do not edit or add those skills unless the task names them.
 
+## Agent orchestration
+
+Symphony is the orchestration system for repository coding agents. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/`.
+
 ## Core rules
 
 - Do not edit unrelated code, generated output, runtime state, secrets, `.env` files, local databases, or build artifacts.
@@ -38,9 +42,10 @@ The `.agents/skills/` directory also contains developer-local skills. Do not edi
 
 - Editable app content belongs under `source/`.
 - Deployed output belongs under `live/` and must not be edited as source.
-- Keep frontend and backend surfaces separate.
-- Do not expose backend files, secrets, logs, runner state, or unsafe file types through public serving.
-- Do not copy deployed backend output during fork or remix.
+- Do not introduce language-, framework-, frontend-, or backend-specific assumptions into generic runtime boundaries.
+- Legacy role-specific paths and controller behavior are compatibility surfaces only. Do not extend them into new generic-runtime architecture.
+- Public serving must stay within the intended application runtime boundary and must not expose secrets, logs, runtime state, durable private data, or other unintended files.
+- Do not copy deployed runtime output during fork or remix.
 - Preserve `automaton.json` link metadata.
 
 ## Runtime and deployment invariants

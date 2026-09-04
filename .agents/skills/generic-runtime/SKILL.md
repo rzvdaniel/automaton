@@ -12,9 +12,10 @@ Use this skill for app source and runtime changes across the CLI, Studio, API, R
 
 - Editable app content belongs under `source/`.
 - Deployed output belongs under `live/`. Never edit `live/` as source.
-- Keep frontend and backend surfaces separate.
-- Public serving may expose only safe frontend runtime files. Never expose backend files, secrets, logs, runner state, or unsafe extensions.
-- Forks and remixes copy portable editable source, preserve attribution, clear runner assignment, and never copy `live/backend/`.
+- Do not introduce language-, framework-, frontend-, or backend-specific assumptions into generic runtime boundaries.
+- Legacy role-specific paths and controller behavior are compatibility surfaces only. Do not extend them into new generic-runtime architecture.
+- Public serving must stay within the intended application runtime boundary and must not expose secrets, logs, runtime state, durable private data, or other unintended files.
+- Forks and remixes copy portable editable source, preserve attribution, clear runner assignment, and never copy deployed runtime output.
 - Preserve `automaton.json` link metadata.
 
 Within the application source payload, Automaton does not prescribe a language, framework, package manager, internal source layout, build system, or application architecture.
