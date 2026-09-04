@@ -758,9 +758,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
 
       await appsService.createRuntimeLaunch(currentApp.value.id)
-      const runtimeUrl = new URL(getOpenAppUrl(currentApp.value), window.location.origin)
-      runtimeUrl.searchParams.set('v', Date.now().toString())
-      applicationUrl.value = runtimeUrl.toString()
+      applicationUrl.value = new URL(getOpenAppUrl(currentApp.value), window.location.origin).toString()
       applicationWarning.value = getApplicationWarningMessage()
     } catch (err: unknown) {
       console.error('Failed to refresh application:', err)

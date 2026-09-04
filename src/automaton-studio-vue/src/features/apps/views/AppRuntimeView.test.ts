@@ -37,7 +37,8 @@ describe('AppRuntimeView runtime bootstrap', () => {
     const iframe = wrapper.get('iframe')
 
     expect(mocks.createRuntimeLaunch).toHaveBeenCalledWith('app-id')
-    expect(iframe.attributes('src')).toMatch(/^https?:\/\/app-appid\..+\/?\?v=/)
+    expect(iframe.attributes('src')).toMatch(/^https?:\/\/app-appid\..+\/?$/)
+    expect(iframe.attributes('src')).not.toContain('?v=')
     expect(iframe.attributes('src')).not.toContain('/api/apps/app-id/launch-runtime')
   })
 

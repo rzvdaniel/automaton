@@ -87,7 +87,7 @@ describe('BuildVisualWorkspace target preview', () => {
     expect(options[1]?.label).toContain('Privileged Host')
   })
 
-  it('uses a stable target URL for Open and Copy and reserves cache busting for the iframe', async () => {
+  it('uses an opaque target URL for the iframe, Open, and Copy', async () => {
     const wrapper = mountWorkspace([target()])
     const iframe = wrapper.get('iframe.application-iframe')
     const iframeUrl = iframe.attributes('src')
@@ -95,7 +95,7 @@ describe('BuildVisualWorkspace target preview', () => {
 
     expect(new URL(iframeUrl).pathname).toBe('/')
     expect(new URL(iframeUrl).hostname).toContain('app-appid.')
-    expect(iframeUrl).toContain('?v=')
+    expect(iframeUrl).not.toContain('?v=')
 
     await wrapper.get('button').trigger('click')
     expect(window.open).toHaveBeenCalledWith(
