@@ -497,7 +497,8 @@ Rules:
 
 - Published apps use public slugs.
 - Private deployed app URL:
-  - `https://apps.automaton.monster/private/{appId}`
+  - `https://app-{appId:N}.apps.automaton.monster/` (32 hexadecimal app ID digits, no hyphens).
+  - Derive scheme, domain, and port from the configured public apps base URL. API `RoutePath` is relative to this app-specific host: `/` for the primary target and `/a/{appId}/t/{targetId}/` for named targets. Do not construct `/private/{appId}` links.
 - Published public app URL:
   - `https://apps.automaton.monster/{slug}`
 

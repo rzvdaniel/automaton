@@ -6,7 +6,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'live', isDefault: true,
     status: DeploymentTargetStatus.Running, legacyControllerRuntimeDeployed: true, genericRuntimeDeployed: true,
-    cleanupPending: false, routePath: '/private/app-id',
+    cleanupPending: false, routePath: '/',
     runner: { id: 'runner-id', name: 'Hosted', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
   }

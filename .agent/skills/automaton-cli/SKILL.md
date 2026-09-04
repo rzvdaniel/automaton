@@ -26,6 +26,7 @@ Use this skill when touching:
   `Environment.ExitCode`, which System.CommandLine may overwrite before the
   process exits. Add an invocation or child-process test for new failure paths.
 - On successful deploy or publish, surface the resulting URL in user-facing output.
+- Private runtime URLs use `app-{appId:N}.{configured apps domain}` at `/`, not `/private/{appId}`. Preserve the configured scheme and port. API target `RoutePath` values are relative to that private host; named targets use `/a/{appId}/t/{targetId}/`.
 - Do not make interactive prompts mandatory for flows that agents need to run non-interactively; provide flags or safe defaults where practical.
 
 ## Source archive exclusions

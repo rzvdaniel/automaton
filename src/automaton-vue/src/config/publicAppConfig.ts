@@ -66,7 +66,14 @@ export function getPublishedAppUrl(slug?: string | null): string {
 
 export function getDeployedAppUrl(appId?: string | null): string {
   const normalizedAppId = appId?.trim()
-  return normalizedAppId ? `${publicAppsBaseUrl}/private/${encodeURIComponent(normalizedAppId)}/` : ''
+  if (!normalizedAppId) return ''
+
+  const base = new URL(publicAppsBaseUrl, window.location.origin)
+  base.hostname = `app-${normalizedAppId.replace(/-/g, '')}.${base.hostname}`
+  base.pathname = '/'
+  base.search = ''
+  base.hash = ''
+  return base.toString()
 }
 
 export const publicAppConfig = {

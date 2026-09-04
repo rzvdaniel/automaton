@@ -185,6 +185,7 @@ public class AppAuthorizationRegressionTests
             Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
             Assert.That(app.Runtime.GenericRuntimeDeployed, Is.True);
             Assert.That(app.LiveEnvironment!.GenericRuntimeDeployed, Is.True);
+            Assert.That(app.LiveEnvironment.RoutePath, Is.EqualTo("/"));
             Assert.That(app.LiveEnvironment.LastSuccessfulDeploymentAtUtc, Is.EqualTo(genericPromotionAtUtc));
         });
 

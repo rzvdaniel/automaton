@@ -40,6 +40,8 @@ export function getDeployedAppUrl(appId?: string | null): string {
     ? `app-${normalizedAppId.replace(/-/g, '')}${baseUrl.hostname.slice(appsMarker)}`
     : `app-${normalizedAppId.replace(/-/g, '')}.${baseUrl.hostname}`
   baseUrl.pathname = '/'
+  baseUrl.search = ''
+  baseUrl.hash = ''
   return baseUrl.toString()
 }
 

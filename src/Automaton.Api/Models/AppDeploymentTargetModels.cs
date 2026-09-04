@@ -10,6 +10,7 @@ public sealed record AppDeploymentTargetRunnerSummary(
     bool IsHostedRunner,
     bool IsOnline);
 
+/// <param name="RoutePath">Path relative to app-{AppId:N}.{configured apps domain}. The primary target uses /.</param>
 public sealed record AppDeploymentTargetSummary(
     Guid Id,
     Guid AppId,
