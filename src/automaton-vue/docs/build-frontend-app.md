@@ -1,84 +1,50 @@
 ---
-title: Build a Frontend App
-description: Build and host a static frontend app with AI using Automaton. Supports Vite, React, Vue, and vanilla JavaScript.
+title: Build a static app
+description: Build and deploy a static app with an application-owned HTTP runtime.
 ---
 
-# Build a Frontend App
+# Build a static app
 
-Frontend apps are hosted by Automaton.
-
-Use this page when your app is static HTML/CSS/JavaScript, Vue, React, or another frontend framework.
-
-## Create or link an app
-
-```bash
-automaton login
-automaton new "My Frontend App"
-```
-
-This creates the Automaton app and writes the local `automaton.json` file.
-
-If remote app creation fails, keep the generated local scaffold and continue building in the same folder. Link it later with `automaton create` or `automaton link <app-id>`.
-
-## Frontend folder
-
-For AI-generated apps and framework apps, keep frontend code in:
-
-```txt
-frontend/
-```
-
-Typical structure:
-
-```txt
-my-app/
-  automaton.json
-  .automatonignore
-  frontend/
-    package.json
-    src/
-```
-
-## Configure the frontend build
-
-For a normal Vite app, `automaton.json` should include:
+For an app that serves public files, choose any suitable technology and source
+layout. An optional build creates the runtime artifact, but the artifact must
+also contain or depend on an application-owned HTTP server. Automaton does not
+host a build directory by itself. Declare both the build and runtime contract
+in `automaton.json`.
 
 ```json
 {
-  "appId": "your-app-id",
-  "name": "My Frontend App",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
+  "name": "My App",
+  "application": {
+    "build": {
+      "command": {
+        "executable": "build-tool",
+        "arguments": ["build"],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "outputDirectory": "dist",
+      "timeoutSeconds": 900
+    },
+    "runtime": {
+      "command": {
+        "executable": "app-server",
+        "arguments": [],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "port": 8080
+    }
   }
 }
 ```
 
-`frontend.build` runs before upload.
+The runtime process must listen on the effective `AUTOMATON_PORT`. A static or
+frontend-only app still needs this HTTP runtime because its public URL is served
+by the application-owned process. A runtime-less deployment is only suitable
+for an Actions-only or other finite-work app with no HTTP endpoint.
 
-`frontend.deployDir` is the folder Automaton serves publicly after deploy.
+Run `automaton validate`, then `automaton deploy`. Wait for `Succeeded` and
+verify the deployed URL. Use `automaton publish` only after explicit approval.
 
-If you only have a local scaffold and no remote link yet, the same structure still applies. Add the `appId` later after `automaton create` or `automaton link`.
-
-For Vite apps, set `base: './'` and keep app-local asset URLs relative so the published app works correctly under its slug path.
-
-## Deploy
-
-```bash
-automaton deploy
-```
-
-## Publish when ready
-
-```bash
-automaton publish
-```
-
-## Frontend-only apps do not need a Runner
-
-A Runner is only needed when your app has backend code.
-
-For a fuller frontend contract and starter examples, see:
-
-- [Automaton frontend structure](https://automaton.monster/llms/automaton-frontend-structure.md)
-- [Automaton examples](https://automaton.monster/llms/automaton-examples.md)
+The [automaton.json reference](/automaton-json) documents the complete generic
+contract.

@@ -13,7 +13,7 @@ namespace Automaton.Api.Tests;
 public class AppSystemPromptBuilderTests
 {
     [Test]
-    public async Task BuildSystemPrompt_UsesCompactStudioContract_AndExcludesCliBootstrapPhrases()
+    public async Task BuildSystemPrompt_UsesGenericStudioContract_AndExcludesCliBootstrapPhrases()
     {
         await using var dbContext = CreateDbContext();
         var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
@@ -30,10 +30,10 @@ public class AppSystemPromptBuilderTests
             AppExecutionPolicyNames.Default,
             "Tighten the dashboard layout.");
 
-        Assert.That(prompt, Does.Contain("# Automaton App Contract (Compact)"));
-        Assert.That(prompt, Does.Contain("application.build.command"));
-        Assert.That(prompt, Does.Contain("persistent storage behavior"));
-        Assert.That(prompt, Does.Contain("# Automaton Studio App Editor"));
+        Assert.That(prompt, Does.Contain("# Automaton app contract"));
+        Assert.That(prompt, Does.Contain("`build.command`"));
+        Assert.That(prompt, Does.Contain("stores the app"));
+        Assert.That(prompt, Does.Contain("# Automaton Studio app editor"));
 
         Assert.That(prompt, Does.Not.Contain("automaton login"));
         Assert.That(prompt, Does.Not.Contain("automaton new"));
@@ -42,7 +42,7 @@ public class AppSystemPromptBuilderTests
     }
 
     [Test]
-    public async Task BuildSystemPrompt_IncludesFocusedBackendGuidance_WhenRequestNeedsPersistence()
+    public async Task BuildSystemPrompt_UsesTheGenericContract_WhenRequestNeedsPersistence()
     {
         await using var dbContext = CreateDbContext();
         var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
@@ -59,18 +59,17 @@ public class AppSystemPromptBuilderTests
             AppExecutionPolicyNames.Default,
             "Add a backend controller with sqlite persistence for todos.");
 
-        Assert.That(prompt, Does.Contain("# Automaton Backend Controllers"));
+        Assert.That(prompt, Does.Not.Contain("automaton-backend-controllers"));
     }
 
     [Test]
-    public void ContextSelector_AddsFrontendAndStarterGuidance_ForNewAppRequests()
+    public void ContextSelector_DoesNotAddStackGuidance_ForNewAppRequests()
     {
         var selector = new KeywordAppPromptContextSelector();
 
         var references = selector.SelectAdditionalReferences("Create a new app from scratch with an installable PWA.");
 
-        Assert.That(references, Does.Contain("automaton-frontend-structure"));
-        Assert.That(references, Does.Contain("automaton-starter-prompts"));
+        Assert.That(references, Is.Empty);
     }
 
     [Test]
@@ -80,17 +79,17 @@ public class AppSystemPromptBuilderTests
 
         var references = selector.SelectAdditionalReferences("Use the browser API and the OpenAI API from the frontend.");
 
-        Assert.That(references, Does.Not.Contain("automaton-backend-controllers"));
+        Assert.That(references, Is.Empty);
     }
 
     [Test]
-    public void ContextSelector_AddsDeployGuidance_ForPublishedAppFailures()
+    public void ContextSelector_DoesNotAddRemovedDeployGuidance_ForPublishedAppFailures()
     {
         var selector = new KeywordAppPromptContextSelector();
 
         var references = selector.SelectAdditionalReferences("The published app shows a blank screen and a 404 after publishing.");
 
-        Assert.That(references, Does.Contain("automaton-cli-deploy"));
+        Assert.That(references, Is.Empty);
     }
 
     [Test]
@@ -117,10 +116,10 @@ public class AppSystemPromptBuilderTests
         var references = json.RootElement.GetProperty("references").EnumerateArray().ToList();
         var studioEditor = references.Single(item => item.GetProperty("key").GetString() == "automaton-studio-editor");
 
-        Assert.That(references.Any(item => item.GetProperty("key").GetString() == "automaton-backend-controllers"), Is.True);
+        Assert.That(references.Any(item => item.GetProperty("key").GetString() == "automaton-actions"), Is.True);
         Assert.That(studioEditor.GetProperty("surface").GetString(), Is.EqualTo("studio"));
         Assert.That(studioEditor.GetProperty("documentKind").GetString(), Is.EqualTo("Guidance"));
-        Assert.That(studioEditor.GetProperty("description").GetString(), Does.Contain("Studio editor"));
+        Assert.That(studioEditor.GetProperty("description").GetString(), Does.Contain("Automaton Studio"));
     }
 
     [Test]
@@ -133,13 +132,13 @@ public class AppSystemPromptBuilderTests
             AutomatonGuidanceTool.GetGuidanceName,
             JsonDocument.Parse("""
                 {
-                  "key": "automaton-media-assets"
+                  "key": "automaton-actions"
                 }
                 """).RootElement,
             null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.Content, Does.Contain("# Automaton Media and Static Asset Rules"));
+        Assert.That(result.Content, Does.Contain("# Automaton Actions"));
     }
 
     private static ApplicationDbContext CreateDbContext()

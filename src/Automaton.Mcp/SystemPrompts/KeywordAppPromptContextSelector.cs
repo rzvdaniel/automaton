@@ -17,99 +17,17 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
         // Reserved for future routing refinements where higher tiers may opt into broader scaffolding guidance.
         _ = tier;
 
-        if (ContainsAnyPhrase(normalized,
-                "new app",
-                "from scratch",
-                "start from scratch",
-                "create an app",
-                "build an app",
-                "generate an app",
-                "scaffold",
-                "starter",
-                "blank app"))
-        {
-            AddReference(references, "automaton-frontend-structure");
-            AddReference(references, "automaton-starter-prompts");
-        }
-
-        if (ContainsWord(normalized, "backend") ||
-            ContainsWord(normalized, "controller") ||
-            ContainsAnyPhrase(normalized,
-                "backend api",
-                "server api",
-                "web api",
-                "api endpoint",
-                "rest api",
-                "database",
-                "persist",
-                "persistence",
-                "save data",
-                "store data",
-                "data model",
-                "crud") ||
-            ContainsWord(normalized, "sqlite") ||
-            ContainsWord(normalized, "sql"))
-        {
-            AddReference(references, "automaton-backend-controllers");
-        }
-
-        if (ContainsAnyPhrase(normalized,
-                "file picker",
-                "file upload") ||
-            ContainsAnyWord(normalized,
-                "upload",
-                "uploads",
-                "image",
-                "images",
-                "media",
-                "avatar",
-                "thumbnail",
-                "gallery",
-                "screenshot"))
-        {
-            AddReference(references, "automaton-media-assets");
-        }
-
-        if (ContainsAnyPhrase(normalized,
-                "add to home screen",
-                "beforeinstallprompt",
-                "service worker",
-                "offline") ||
-            ContainsAnyWord(normalized,
-                "pwa",
-                "installable",
-                "manifest"))
-        {
-            AddReference(references, "automaton-frontend-structure");
-        }
-
-        if (ContainsAnyPhrase(normalized,
-                "publish issue",
-                "publish problem",
-                "not working after deploy",
-                "fails after deploy",
-                "after publishing",
-                "live app",
-                "public app",
-                "blank screen") ||
-            ContainsAnyWord(normalized,
-                "deploy",
-                "deployed",
-                "deployment",
-                "runtime",
-                "runner",
-                "logs",
-                "production",
-                "published",
-                "404"))
-        {
-            AddReference(references, "automaton-cli-deploy");
-        }
-
         if (ContainsAnyWord(normalized,
                 "action", "actions", "job", "jobs", "scheduled", "schedule", "import", "export", "background"))
         {
             AddReference(references, "automaton-actions");
+        }
+
+        if (ContainsAnyWord(normalized,
+                "privileged", "docker", "host", "system", "metrics") ||
+            ContainsAnyPhrase(normalized, "host information", "host monitoring", "host runner"))
+        {
+            AddReference(references, "automaton-privileged-host-apps");
         }
 
         return references;

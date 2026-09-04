@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Backend section - showing how backend works
+// Server runtime section
 </script>
 
 <template>
@@ -9,25 +9,25 @@
         <div class="backend-text">
           <span class="section-label">
             <i class="pi pi-database" />
-            Backend
+            Server runtime
           </span>
-          <h2 class="section-title">Backend, simplified</h2>
+          <h2 class="section-title">Server runtime, simplified</h2>
           <p class="section-subtitle">
-            Put your Python code in <code>/backend</code>.
-            We handle the rest.
+            Add server-side code when your app needs it.
+            Automaton handles the configured runtime.
           </p>
 
           <ul class="backend-steps">
             <li>
               <span class="step-num">1</span>
               <div>
-                <strong>Add FastAPI in <code>/backend</code></strong>
+                <strong>Configure a server runtime</strong>
               </div>
             </li>
             <li>
               <span class="step-num">2</span>
               <div>
-                <strong>Use <code>/api</code> routes</strong>
+                <strong>Expose the routes your app needs</strong>
               </div>
             </li>
             <li>
@@ -42,24 +42,20 @@
         <div class="backend-code-wrap">
           <div class="code-block">
             <div class="code-header">
-              <span class="code-file">backend/main.py</span>
-              <span class="code-lang">Python · FastAPI</span>
+              <span class="code-file">server entry point</span>
+              <span class="code-lang">Configured runtime</span>
             </div>
-            <pre class="code-body"><span class="kw">from</span> fastapi <span class="kw">import</span> FastAPI
-
-app = FastAPI()
-
-<span class="fn">@app.get</span>(<span class="str">"/api/hello"</span>)
-<span class="kw">def</span> <span class="fn">hello</span>():
-    <span class="kw">return</span> {<span class="str">"message"</span>: <span class="str">"Hello from Automaton"</span>}</pre>
+            <pre class="code-body">command: start-server
+port: $AUTOMATON_PORT
+health: /health</pre>
           </div>
 
           <div class="code-block" style="margin-top: 16px">
             <div class="code-header">
-              <span class="code-file">ui/main.js</span>
+              <span class="code-file">client request</span>
               <span class="code-lang">JavaScript</span>
             </div>
-            <pre class="code-body"><span class="fn">fetch</span>(<span class="str">"/api/hello"</span>)
+            <pre class="code-body"><span class="fn">fetch</span>(<span class="str">"/your-route"</span>)
   .<span class="fn">then</span>(res => res.<span class="fn">json</span>())
   .<span class="fn">then</span>(data => {
     document.body.innerHTML = data.message
@@ -73,8 +69,8 @@ app = FastAPI()
             </div>
             <div class="structure-tree">
               <div class="tree-item"><span class="tree-dir">my-app/</span></div>
-              <div class="tree-item indent"><span class="tree-dir">ui/</span> <span class="tree-note">frontend</span></div>
-              <div class="tree-item indent"><span class="tree-dir">backend/</span> <span class="tree-note">Python · FastAPI</span></div>
+              <div class="tree-item indent"><span class="tree-dir">app-source/</span> <span class="tree-note">editable source</span></div>
+              <div class="tree-item indent"><span class="tree-dir">runtime/</span> <span class="tree-note">optional server code</span></div>
               <div class="tree-item indent"><span class="tree-file">automaton.json</span></div>
             </div>
           </div>

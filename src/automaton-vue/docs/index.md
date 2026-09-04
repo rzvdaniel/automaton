@@ -1,6 +1,6 @@
 ---
 title: Docs
-description: Automaton Monster documentation. Learn how to build, deploy and publish frontend and backend apps using the Automaton CLI.
+description: Automaton Monster documentation. Learn how to build, deploy, and publish apps using the Automaton CLI.
 ---
 
 # Documentation
@@ -10,8 +10,8 @@ description: Automaton Monster documentation. Learn how to build, deploy and pub
 - [Build an Automaton App](/build-an-automaton-app)
 - [Getting Started](/getting-started)
 - [Build with AI Tools](/cli-ai-tools)
-- [Build a Frontend App](/build-frontend-app)
-- [Build a Backend App](/build-backend-app)
+- [Build a Static App](/build-frontend-app)
+- [Run Server Code](/build-backend-app)
 
 ## Exact discovery targets
 
@@ -28,14 +28,14 @@ If you searched for one of these, you are in the right place:
 
 1. Install the CLI and sign in.
 2. Create or link an app.
-3. Build your frontend or backend.
+3. Build the app and configure any optional server runtime.
 4. Deploy with `automaton deploy`.
 5. Publish only when you are ready.
 
 ## Common paths
 
-- Frontend-only apps: no runner required
-- Backend apps: deploy a runner first
+- Static apps: declare an application-owned HTTP runtime and deploy a runner
+- Runtime-less apps: only finite-work applications without an HTTP endpoint
 - AI-assisted workflow: start with the prompt in [Build with AI Tools](/cli-ai-tools)
 - App contract and structure: start with [Build an Automaton App](/build-an-automaton-app)
 

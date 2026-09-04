@@ -37,7 +37,6 @@ public static class SyncAiCommand
                     checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
                     nextSteps = result.NextSteps,
                     mode = result.Mode,
-                    manifestPath = result.ManifestPath,
                     generatedFiles = result.GeneratedFiles
                 });
                 Environment.ExitCode = result.Success ? 0 : 1;
@@ -55,7 +54,6 @@ public static class SyncAiCommand
             if (result.Success)
             {
                 AnsiConsole.MarkupLine($"[green]✓[/] Local AI guidance synced for [bold]{result.Mode}[/] mode");
-                AnsiConsole.MarkupLine($"[grey]Manifest:[/] {result.ManifestPath}");
                 AnsiConsole.MarkupLine($"[grey]Generated files:[/] {result.GeneratedFiles.Count}");
             }
 
@@ -89,7 +87,6 @@ public static class SyncAiCommand
                     new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({syncResult.Mode})")
                 ],
                 Mode = syncResult.Mode,
-                ManifestPath = syncResult.ManifestPath,
                 GeneratedFiles = syncResult.GeneratedFiles
             };
         }

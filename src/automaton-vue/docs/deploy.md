@@ -1,6 +1,6 @@
 ---
 title: Deploy an App
-description: Deploy your Automaton app with the CLI. Ship frontend and backend apps in seconds using automaton deploy.
+description: Deploy your Automaton app with the CLI using automaton deploy.
 ---
 
 # Deploy
@@ -15,11 +15,13 @@ automaton deploy
 
 ## What deploy does
 
-- Uploads your frontend runtime
-- Uploads your backend runtime when your app has backend code
-- Makes backend APIs active automatically when an execution target is already available
+- Uploads the configured public runtime
+- Uploads optional server runtime code when configured
+- Starts server execution automatically when an execution target is available
 
-Backend apps need an execution target to run APIs, but deploy can still upload the backend before one exists.
+Any app with an HTTP/public endpoint needs an execution target for its runtime,
+including static apps. Deploy can still upload that runtime before a target
+exists.
 
 ## If no execution target exists yet
 
@@ -28,8 +30,11 @@ Deploy can still succeed.
 In that case, the CLI explains that:
 
 - the app was deployed
-- backend runtime was uploaded
-- backend APIs are not active yet
+- server runtime was uploaded
+- server execution is not active yet
+
+The public URL becomes available only after the application-owned runtime starts
+on a Runner. A build output directory alone does not create a public web app.
 
 Then it tells you the next step.
 

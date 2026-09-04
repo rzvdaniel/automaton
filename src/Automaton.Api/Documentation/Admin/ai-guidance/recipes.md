@@ -61,27 +61,9 @@ Use for:
 - Coding examples
 - Specialized knowledge
 
-## CLI Exported Guide
+## CLI project file
 
-Exported into generated projects as a reference file.
-
-| Property | Value |
-|---|---|
-| Surface | `cli` or `shared` |
-| Type | `Guidance` |
-| Required | No |
-| Discoverable | Yes |
-| Output Path | `.automaton/agents/references/llms/{key}.md` |
-
-Use for:
-
-- Deployment guidance
-- CLI references
-- Local AI knowledge
-
-## CLI Project File
-
-Written directly into generated projects.
+Written directly into a generated project.
 
 | Property | Value |
 |---|---|
@@ -89,10 +71,9 @@ Written directly into generated projects.
 | Type | `Guidance` |
 | Required | No |
 | Discoverable | No |
-| Output Path | `AGENTS.md` or another project path |
+| Output Path | `AGENTS.md` or `.automaton/agents/skills/automaton-app/SKILL.md` |
 
 Use for:
 
-- `AGENTS.md`
-- Skills
-- Project-level AI helper files
+- The generated `AGENTS.md`
+- The generated local app skill

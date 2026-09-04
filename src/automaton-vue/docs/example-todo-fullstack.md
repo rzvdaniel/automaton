@@ -1,67 +1,26 @@
 ---
-title: Full-Stack Todo Example
-description: Canonical Automaton Monster example project with Vite frontend, FastAPI backend, persistence, deploy, and publish flow.
+title: Todo example
+description: A checked-in Automaton example showing a small application, durable data, and deployment.
 ---
 
-# Full-Stack Todo Example
+# Todo example
 
-This is the canonical checked-in example project for Automaton Monster.
+The example repository shows one possible way to build a small Automaton app.
+Its technology and source layout are examples, not platform requirements.
 
-It shows:
-
-- `frontend/` Vite TypeScript UI
-- `backend/` FastAPI HTTP runtime
-- persistent todo storage in a JSON file
-- same-origin `/api` usage
-- `automaton deploy`
-- `automaton publish`
-
-## Example files
-
-Canonical GitHub repository:
+Repository:
 
 ```text
 https://github.com/automaton-monster/automaton-example-todo-fullstack
 ```
 
-Key files:
-
-- [Repository root](https://github.com/automaton-monster/automaton-example-todo-fullstack)
-- [automaton.json](https://github.com/automaton-monster/automaton-example-todo-fullstack/blob/main/automaton.json)
-- [frontend/src/main.ts](https://github.com/automaton-monster/automaton-example-todo-fullstack/blob/main/frontend/src/main.ts)
-- [frontend/src/api.ts](https://github.com/automaton-monster/automaton-example-todo-fullstack/blob/main/frontend/src/api.ts)
-- [backend/todos.py](https://github.com/automaton-monster/automaton-example-todo-fullstack/blob/main/backend/todos.py)
-- [README.md](https://github.com/automaton-monster/automaton-example-todo-fullstack/blob/main/README.md)
-
-## CLI flow
+Use it to compare a working `automaton.json`, application source, durable data
+handling, and the deployment flow. Start a new project with:
 
 ```bash
-automaton login
-automaton new "Todo Full-Stack"
-```
-
-If `automaton new` created a local scaffold but remote creation failed:
-
-```bash
-automaton create
+automaton new "Todo App"
+automaton validate
 automaton deploy
 ```
 
-## Deploy
-
-```bash
-cd frontend
-npm install
-npm run build
-
-cd ..
-automaton deploy
-```
-
-## Publish
-
-Only after explicit approval:
-
-```bash
-automaton publish --yes
-```
+Wait for `Succeeded`. Publish only after explicit approval.

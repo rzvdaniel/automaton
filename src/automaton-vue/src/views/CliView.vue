@@ -52,7 +52,7 @@ async function copyCode(key: string, code: string) {
             <span class="eyebrow">AI-native deployment workflow</span>
             <h1>Your AI already writes code. Automaton ships it.</h1>
             <p class="hero-copy">
-              Install the Automaton CLI, connect your AI coding workflow, and deploy real frontend and backend apps
+              Install the Automaton CLI, connect your AI coding workflow, and deploy real applications
               without manually wiring infrastructure.
             </p>
 
@@ -128,7 +128,7 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
         <div class="container">
           <div class="section-head">
             <h2>The workflow layer between AI-generated code and deployed software.</h2>
-            <p>Automaton CLI connects local AI tools, Automaton Studio, publishing, and optional backend execution.</p>
+            <p>Automaton CLI connects local AI tools, Automaton Studio, publishing, and optional server execution.</p>
           </div>
 
           <div class="flow">
@@ -136,7 +136,7 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
             <div class="flow-item"><strong>Automaton CLI</strong><span>Applies structure, metadata, and deployment commands.</span></div>
             <div class="flow-item"><strong>Automaton Studio</strong><span>Manages apps, publishing, visibility, and remixes.</span></div>
             <div class="flow-item"><strong>Published App</strong><span>Goes live as public, private, or forkable.</span></div>
-            <div class="flow-item"><strong>Runner</strong><span>Executes backend logic locally or in Docker.</span></div>
+            <div class="flow-item"><strong>Runner</strong><span>Executes configured server logic locally or in Docker.</span></div>
           </div>
         </div>
       </section>
@@ -157,7 +157,7 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           <div>
             <div class="section-head">
               <h2>Project structure</h2>
-              <p>Automaton apps stay simple. Frontend files live at the root, while backend execution remains optional.</p>
+              <p>Automaton apps stay simple. Editable source and optional server execution are described by the app contract.</p>
             </div>
 
             <div class="code-panel">
@@ -165,15 +165,12 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
 ├─ AGENTS.md
 ├─ .automaton/
 │  └─ app.json
-├─ index.html
-├─ styles.css
-├─ app.js
-└─ backend/
-   └─ main.py</pre>
+├─ app-source/
+└─ automaton.json</pre>
             </div>
 
             <p class="secondary-note">
-              AGENTS.md gives coding agents local guidance. The backend folder is optional and only needed for apps requiring backend execution.
+              AGENTS.md gives coding agents local guidance. Server-side execution is optional and follows the app contract.
             </p>
           </div>
         </div>
@@ -214,9 +211,9 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
       <section>
         <div class="container split">
           <article class="runner-card">
-            <h2>Backend apps need a Runner.</h2>
+            <h2>Server runtimes need a Runner.</h2>
             <p>
-              Static frontend apps can deploy instantly. Apps with backend logic execute through Automaton Runners.
+              Static apps can deploy instantly. Apps with server logic execute through Automaton Runners.
             </p>
             <p class="secondary-note">Run them locally, on your own server, in Docker, or later using managed runners.</p>
 
@@ -226,8 +223,8 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           </article>
 
           <div class="requirements">
-            <div class="requirement"><span>Static frontend apps</span><span>No runner required</span></div>
-            <div class="requirement"><span>Backend apps</span><span>Requires Runner</span></div>
+            <div class="requirement"><span>Static apps</span><span>Requires HTTP runtime</span></div>
+            <div class="requirement"><span>Server runtimes</span><span>Requires Runner</span></div>
             <div class="requirement"><span>Self-hosted Runner</span><span>Available today</span></div>
             <div class="requirement"><span>Managed Runner</span><span>Coming later</span></div>
           </div>

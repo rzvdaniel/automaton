@@ -4,31 +4,30 @@ Common problems and how to fix them.
 
 ---
 
-## Backend APIs are not active after deploy
+## Server-side execution is not active after deploy
 
-**Symptom:** You deployed an app with backend code, but the backend APIs are still not running.
+**Symptom:** You deployed an app with server-side code, but its execution target is not running.
 
 **Causes and fixes:**
 
-- **No execution target available yet** — Deploy can still upload backend runtime successfully even when no execution target is online. In that case, bring one online and rerun deploy.
-- **No runner connected in Studio** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, backend APIs cannot become active yet.
-- **Python syntax error** — A syntax error in any `backend/*.py` file will stop the deploy. Check the deploy log for the file and line number.
-- **Missing `handle()` export** — Every controller file must export a top-level `handle(action_name, inputs)` function. A file that is missing `handle` will cause the deploy to fail.
-- **No runner available** — Backend runtime can be uploaded successfully but still not be running. If deploy reports that backend was uploaded but is not running, assign/select a runner and rerun deploy.
+- **No execution target available yet** — Deploy can still upload the server runtime successfully even when no execution target is online. In that case, bring one online and rerun deploy.
+- **No runner connected in Studio** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, server routes cannot become active yet.
+- **Build or startup error** — Check the deploy log for the failing command and file or line number.
+- **Health check failure** — Confirm that the runtime listens on `AUTOMATON_PORT` and serves a successful response at the configured health path.
+- **No runner available** — Runtime files can upload successfully while execution waits for a runner. Assign or select a runner and deploy again.
 
 ---
 
-## Backend requests fail in the frontend
+## Requests to server-side code fail
 
-**Symptom:** A frontend request to a same-origin `/api/...` endpoint fails.
+**Symptom:** A client request to a same-origin server route fails.
 
 **Causes and fixes:**
 
-- **Backend not deployed** — Changes to Python files need a Deploy Backend step before they take effect. Deploy, then reload the preview.
-- **Backend uploaded but not running** — For CLI deploys, frontend and backend runtime may already be synced even when no runner is available. In that case rerun `automaton deploy --runner <runner-id-or-name>` after a runner is online.
-- **Wrong controller or action name** — The controller name is the filename without `.py`. The action name is the method name on the controller class. Check spelling.
-- **Backend returned an error** — Check the HTTP status and response body, then inspect the runner backend logs.
-- **Backend is not running** — Confirm the HTTP backend is listening and that the runner has restored the app process.
+- **Runtime not deployed** — Deploy the changed runtime before reloading the preview.
+- **Runtime uploaded but not running** — Rerun `automaton deploy --runner <runner-id-or-name>` after a runner is online.
+- **Route or input mismatch** — Check the route, method, request body, and response status.
+- **Runtime returned an error** — Inspect the response and runner logs for the failing command.
 
 ---
 
@@ -65,12 +64,12 @@ Common problems and how to fix them.
 
 ---
 
-## Frontend loads but shows blank content
+## The app loads but shows blank content
 
 **Symptom:** The app loads without an error but the page is empty.
 
 **Causes and fixes:**
 
-- **Entry point mismatch** — For explicit no-build static apps, `index.html` can live at the project root with `"frontend": { "deployDir": "." }`. For build-based apps, the deployable entry point should be `frontend/dist/index.html`. Confirm that `frontend.deployDir` matches the folder you intend to upload.
-- **Framework build not run** — For default Vite apps, run `cd frontend && npm run build` before deploying, or set `"frontend": { "build": "cd frontend && npm install && npm run build", "deployDir": "frontend/dist" }` in `automaton.json` so the CLI does it automatically.
+- **Entry point mismatch** — Confirm that the public target's configured output directory contains the entry file expected by the runtime.
+- **Build step not run** — Run the configured build command before deploying, or put that command and its output directory in `automaton.json` so the CLI can do it automatically.
 - **JavaScript error on load** — Open the browser console in the preview and look for errors.

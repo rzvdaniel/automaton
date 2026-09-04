@@ -58,4 +58,10 @@ Loading also depends on:
 
 - Required
 - Discoverable
-- Output Path
+- Output Path for CLI export
+
+The normal CLI export contains only enabled documents whose surface is `cli`
+and whose output path is set. The built-in export is exactly `AGENTS.md` and
+`.automaton/agents/skills/automaton-app/SKILL.md`. Studio, MCP, and shared
+guidance remain available to their own consumers without leaking into local
+project files.

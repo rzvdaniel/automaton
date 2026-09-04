@@ -941,7 +941,7 @@ async function deleteSelectedDocument() {
               v-model="form.outputPath"
               class="w-full"
               :disabled="isSeedManaged"
-              placeholder=".automaton/agents/references/llms/example.md"
+              placeholder="custom-guidance.md"
             />
             <small class="field-help">Output path means exported by CLI.</small>
           </div>

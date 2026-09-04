@@ -87,7 +87,9 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     {
         var documents = await _dbContext.AiGuidanceDocuments
             .AsNoTracking()
-            .Where(item => item.IsEnabled)
+            .Where(item => item.IsEnabled
+                && item.Surface == AutomatonGuidanceSeedCatalog.CliSurface
+                && item.OutputPath != null)
             .OrderBy(item => item.Surface)
             .ThenBy(item => item.SortOrder)
             .ThenBy(item => item.Title)

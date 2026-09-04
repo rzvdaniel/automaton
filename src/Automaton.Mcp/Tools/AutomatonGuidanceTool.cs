@@ -28,21 +28,21 @@ public sealed class AutomatonGuidanceTool : IMcpTool
             {
                 Name = ListGuidanceName,
                 Capability = ToolCapability.Read,
-                Description = "List focused Automaton guidance references available for Studio AI. Use this before guessing about Automaton-specific structure, backend controllers, media, PWA, deploy, or starter patterns.",
+                Description = "List focused Automaton guidance references available for Studio AI.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             },
             new()
             {
                 Name = GetGuidanceName,
                 Capability = ToolCapability.Read,
-                Description = "Retrieve a focused Automaton guidance reference by key, such as 'automaton-backend-controllers' or 'automaton-media-assets'. Use this when a task needs deeper Automaton-specific rules than the compact baseline prompt provides.",
+                Description = "Retrieve a focused Automaton guidance reference by key returned from list_automaton_guidance.",
                 InputSchema = JsonDocument.Parse("""
                     {
                         "type": "object",
                         "properties": {
                             "key": {
                                 "type": "string",
-                                "description": "Guidance key returned by list_automaton_guidance, for example 'automaton-backend-controllers'."
+                                "description": "A guidance key returned by list_automaton_guidance."
                             }
                         },
                         "required": ["key"]

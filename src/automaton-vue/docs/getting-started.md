@@ -1,70 +1,36 @@
 ---
-title: Getting Started
-description: Get started with Automaton Monster in 5 minutes. Install the CLI, create your first app and deploy it.
+title: Getting started
+description: Install the CLI, create an Automaton app, and deploy it.
 ---
 
-# 5-Minute Quickstart
+# Quickstart
 
-If you want the shortest path from zero to a deployed app, choose one of these flows.
-
-## CLI path
+Install and authenticate the CLI:
 
 ```bash
 dotnet tool install -g Automaton.Cli
 automaton login
-automaton new "My App"
-automaton deploy
 ```
 
-Use `automaton publish` only when you are ready to make the app public.
+Create a project and link it to a remote app:
 
-If remote app creation fails during `automaton new`, keep the generated local scaffold, then run:
+```bash
+automaton new "My App"
+```
+
+The command writes `automaton.json`, `AGENTS.md`, and the local Automaton app
+skill. Read those files before implementing the app.
+
+Choose any technology and source layout. Configure the generic application
+contract, then validate and deploy:
 
 ```bash
 automaton validate
-automaton create
 automaton deploy
 ```
 
-## AI-agent path
+Wait for the asynchronous deployment to reach `Succeeded`, then verify the URL.
+Use `automaton publish` only after explicit approval.
 
-You can also let an AI coding agent create and deploy the app for you.
-
-Paste this into Cursor, Claude Code, Codex, GitHub Copilot Chat, VS Code, or another coding agent:
-
-```text
-Build [APP IDEA] as an Automaton Monster app.
-
-First fetch and read:
-https://automaton.monster/llms.txt
-
-Follow the instructions and references found there.
-```
-
-Do not paste your API key into the AI chat. The normal `automaton login` flow opens Studio for explicit browser/device authorization. For CI/CD, set `AUTOMATON_API_KEY` in the environment and run the required CLI command directly.
-
-## What this gives you
-
-- A local project you can edit in Cursor, Claude Code, VS Code, or another IDE
-- A deployed app on Automaton
-- A public URL when you choose to publish
-
-## Default command model
-
-For most users, these are the only commands that matter:
-
-```bash
-automaton login
-automaton new
-automaton deploy
-automaton publish
-```
-
-Everything else is advanced.
-
-## What to read next
-
-- **Build with AI** if you want more copy-paste prompts and the recommended workflow
-- **Build Frontend App** if you are building a static app, React app, Vue app, or browser-only tool
-- **Build Backend App** if your app needs server-side logic, integrations, or private credentials
-- **Deploy** if you want the simplest explanation of what deploy does
+For an existing remote app, use `automaton link <app-id>`. Use
+`automaton sync-ai` to restore the two local guidance files if they are missing.

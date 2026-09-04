@@ -38,11 +38,9 @@ Guidance documents teach the AI about a specific topic.
 Examples:
 
 - Studio Editor
-- Backend Controllers
-- Frontend Structure
-- CLI Deploy
+- Actions
+- Privileged Host Apps
 - MCP
-- Examples
 
 Guidance may be:
 
@@ -100,13 +98,15 @@ Base Prompts are normally not discoverable.
 
 ### Output Path
 
-If specified, the document is exported into generated projects.
+If specified, the document is eligible for CLI export only when its Surface is
+`cli`. The normal built-in CLI export contains only `AGENTS.md` and the local
+Automaton app skill.
 
 Examples:
 
 ```text
 AGENTS.md
-.automaton/agents/references/llms/backend.md
+.automaton/agents/skills/automaton-app/SKILL.md
 ```
 
 Documents without an Output Path are runtime-only.

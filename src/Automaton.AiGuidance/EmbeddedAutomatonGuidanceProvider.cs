@@ -19,7 +19,7 @@ public sealed class EmbeddedAutomatonGuidanceProvider : IAutomatonGuidanceProvid
 
     private IReadOnlyList<GuidanceSource> LoadSeedSources()
     {
-        return _assembly
+        var sources = _assembly
             .GetManifestResourceNames()
             .Where(name => name.StartsWith(SeedPrefix, StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -33,6 +33,13 @@ public sealed class EmbeddedAutomatonGuidanceProvider : IAutomatonGuidanceProvid
                     reader.ReadToEnd());
             })
             .ToList();
+
+        foreach (var source in sources)
+        {
+            AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath);
+        }
+
+        return sources;
     }
 
     private static string NormalizeRelativePath(string suffix)
