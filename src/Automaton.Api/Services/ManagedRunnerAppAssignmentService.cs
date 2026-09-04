@@ -8,16 +8,68 @@ public sealed class ManagedRunnerAppAssignmentService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
+    private readonly ResourceAuthorizationService authorizationService;
+    private readonly BackendRouteConfigService routeConfigService;
     private readonly ILogger<ManagedRunnerAppAssignmentService> logger;
 
     public ManagedRunnerAppAssignmentService(
         ApplicationDbContext dbContext,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        ResourceAuthorizationService authorizationService,
+        BackendRouteConfigService routeConfigService,
         ILogger<ManagedRunnerAppAssignmentService> logger)
     {
         this.dbContext = dbContext;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
+        this.authorizationService = authorizationService;
+        this.routeConfigService = routeConfigService;
         this.logger = logger;
+    }
+
+    public async Task<int> ReconcileHostedRunnerIdentityAsync(
+        Guid userId,
+        Guid runnerId,
+        CancellationToken cancellationToken = default)
+    {
+        var hostedRunner = await dbContext.HostedRunners.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.RunnerId == runnerId && x.UserId == userId && x.DeletedAt == null,
+                cancellationToken);
+        if (hostedRunner == null) return 0;
+
+        var previousRunnerIds = dbContext.RunnerEnrollments
+            .Where(x => x.HostedRunnerId == hostedRunner.Id && x.RunnerId != null && x.RunnerId != runnerId)
+            .Select(x => x.RunnerId!.Value);
+        var accessibleAppIds = authorizationService.GetAccessibleAppsQuery(userId).Select(x => x.Id);
+        var targets = await dbContext.AppDeploymentTargets
+            .Where(x => x.ExecutionRunnerId != null && previousRunnerIds.Contains(x.ExecutionRunnerId.Value)
+                && accessibleAppIds.Contains(x.WebAppId))
+            .ToListAsync(cancellationToken);
+
+        // Enrollment history proves ownership of the same persisted runtime, not an ordinary Runner move.
+        foreach (var target in targets)
+        {
+            target.ExecutionRunnerId = runnerId;
+        }
+
+        if (targets.Count > 0) await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Reconnect also retries routing if an earlier refresh failed after the identity was saved.
+        if (await dbContext.AppDeploymentTargets.AnyAsync(
+                x => x.ExecutionRunnerId == runnerId && accessibleAppIds.Contains(x.WebAppId), cancellationToken))
+        {
+            try
+            {
+                await routeConfigService.RefreshAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Route publication failed for Hosted Runner {HostedRunnerId} and Runner {RunnerId}; persisted assignments are retained",
+                    hostedRunner.Id, runnerId);
+            }
+        }
+
+        return targets.Count;
     }
 
     public async Task<int> AssignEligibleAppsAsync(
