@@ -5,21 +5,24 @@ Use this workflow for any app in this folder.
 The app contract is the source of truth for build and runtime behavior. Inspect
 the existing files before choosing commands, paths, or dependencies.
 
-1. Inspect `automaton.json`.
-2. If it is missing and the user wants a new remote app, run
-   `automaton new "<name>"`.
-3. If the user names an existing remote app, run `automaton link <app-id>`.
-4. Understand the requested application.
-5. Choose any suitable technology and source layout.
-6. Implement the app.
-7. Fill the `application` fields in `automaton.json` for build, runtime,
+1. Inspect `automaton.json` and the current app link.
+2. If `automaton.json` is missing, run `automaton new "<name>"` for a new
+   remote app or `automaton link <app-id>` for an existing remote app.
+3. If `automaton.json` exists but is not linked in the current environment, run
+   `automaton create` for a new remote app for this scaffold or
+   `automaton link <app-id>` for an existing remote app.
+4. If the project is linked, continue with the normal workflow.
+5. Understand the requested application.
+6. Choose any suitable technology and source layout.
+7. Implement the app.
+8. Fill the `application` fields in `automaton.json` for build, runtime,
    health, and storage.
-8. Run `automaton validate` and fix its errors.
-9. Run `automaton deploy`.
-10. Wait for the asynchronous operation to reach a terminal result.
-11. If it reaches `Succeeded`, verify the deployed URL.
-12. If it fails, inspect the exact failure and fix it.
-13. Never publish unless the user explicitly requests it.
+9. Run `automaton validate` and fix its errors.
+10. Run `automaton deploy`.
+11. Wait for the asynchronous operation to reach a terminal result.
+12. If it reaches `Succeeded`, verify the deployed URL.
+13. If it fails, inspect the exact failure and fix it.
+14. Never publish unless the user explicitly requests it.
 
 Any app that exposes an HTTP/public URL must declare `application.runtime.command`.
 This includes frontend-only and static web apps. Their runtime artifact must

@@ -89,6 +89,8 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(normalizedExportedText, Does.Contain("no static-file serving fallback"));
             Assert.That(exportedText, Does.Contain("Actions-only or other finite-work"));
             Assert.That(exportedText, Does.Contain("no HTTP endpoint"));
+            Assert.That(exportedText, Does.Contain("automaton create"));
+            Assert.That(exportedText, Does.Contain("not linked in the current environment"));
             Assert.That(exportedText, Does.Not.Contain("When the app has no server-side process"));
 
             foreach (var staleTerm in new[]
