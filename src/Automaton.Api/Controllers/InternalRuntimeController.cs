@@ -52,7 +52,7 @@ public class InternalRuntimeController : ControllerBase
             return Unauthorized();
         }
 
-        var cookie = Request.Cookies[RuntimeCookieConstants.CookieName];
+        var cookie = Request.Cookies[RuntimeCookieConstants.GetCookieName(appId)];
         if (string.IsNullOrWhiteSpace(cookie))
         {
             logger.LogDebug("Runtime auth failed for app {AppId}: missing cookie.", appId);
