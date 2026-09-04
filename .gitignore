@@ -96,7 +96,15 @@ __pycache__/
 .prod-runtime/
 
 .artifacts/
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/generic-runtime/
+!.agents/skills/generic-runtime/**
+!.agents/skills/production-deployment/
+!.agents/skills/production-deployment/**
+!.agents/skills/admin-docs/
+!.agents/skills/admin-docs/**
 .vitepress/
 !src/automaton-vue/docs/.vitepress/
 src/automaton-vue/docs/.vitepress/cache/

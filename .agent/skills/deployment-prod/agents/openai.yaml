@@ -1,4 +1,0 @@
-interface:
-  display_name: "Automaton Production Deployment"
-  short_description: "Deploy and maintain Automaton production safely"
-  default_prompt: "Deploy or modify Automaton production infrastructure using the SSH, blue-green, rollback, and verification workflow."
