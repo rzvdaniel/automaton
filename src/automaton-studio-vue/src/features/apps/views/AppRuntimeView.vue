@@ -39,9 +39,7 @@ async function loadRuntimeView() {
       await appsService.createRuntimeLaunch(appId.value)
     }
 
-    const runtimeUrl = new URL(getOpenAppUrl(app.value), window.location.origin)
-    runtimeUrl.searchParams.set('v', Date.now().toString())
-    applicationUrl.value = runtimeUrl.toString()
+    applicationUrl.value = new URL(getOpenAppUrl(app.value), window.location.origin).toString()
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load application.'
   } finally {

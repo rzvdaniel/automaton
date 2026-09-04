@@ -178,9 +178,7 @@ const targetPreviewUrl = computed(() => {
 const previewRefreshKey = ref(Date.now())
 const iframePreviewUrl = computed(() => {
   if (!targetPreviewUrl.value) return ''
-  const runtimeUrl = new URL(targetPreviewUrl.value, window.location.origin)
-  runtimeUrl.searchParams.set('v', previewRefreshKey.value.toString())
-  return runtimeUrl.toString()
+  return new URL(targetPreviewUrl.value, window.location.origin).toString()
 })
 
 const canOpenApplication = computed(() => !!targetPreviewUrl.value)
@@ -321,7 +319,7 @@ async function refreshApplication(): Promise<void> {
           <div v-if="isHeavyRenderingSuspended" class="application-loading">
             <iframe
               v-if="iframePreviewUrl"
-              :key="iframePreviewUrl"
+              :key="previewRefreshKey"
               :src="iframePreviewUrl"
               class="application-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
@@ -342,7 +340,7 @@ async function refreshApplication(): Promise<void> {
           </div>
           <iframe
               v-else
-              :key="iframePreviewUrl"
+              :key="previewRefreshKey"
               :src="iframePreviewUrl"
               class="application-iframe"
               :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
@@ -417,7 +415,7 @@ async function refreshApplication(): Promise<void> {
             <div v-if="isHeavyRenderingSuspended" class="application-loading">
               <iframe
                 v-if="iframePreviewUrl"
-                :key="iframePreviewUrl"
+                :key="previewRefreshKey"
                 :src="iframePreviewUrl"
                 class="application-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
@@ -438,7 +436,7 @@ async function refreshApplication(): Promise<void> {
             </div>
             <iframe
               v-else
-              :key="iframePreviewUrl"
+              :key="previewRefreshKey"
               :src="iframePreviewUrl"
               class="application-iframe"
               :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
