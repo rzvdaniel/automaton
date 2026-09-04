@@ -11,6 +11,7 @@ namespace Automaton.Runner.Console.Services;
 /// <summary>Proxies deployed application traffic to the healthy runtime process.</summary>
 public sealed class RunnerRuntimeGatewayService : IHostedService
 {
+    private const string RuntimeCookiePrefix = "automaton_runtime_";
     private readonly RunnerRuntimeRegistry runtimeRegistry;
     private readonly HttpClient runtimeClient;
     private readonly ILogger<RunnerRuntimeGatewayService> logger;
@@ -94,6 +95,14 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
                 continue;
             }
 
+            if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
+            {
+                var applicationCookies = FilterRuntimeCookies(header.Value);
+                if (applicationCookies is not null)
+                    request.Headers.TryAddWithoutValidation("Cookie", applicationCookies);
+                continue;
+            }
+
             if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
                 request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
         }
@@ -136,6 +145,25 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         }
 
         return tokens;
+    }
+
+    private static string? FilterRuntimeCookies(IEnumerable<string> cookieHeaders)
+    {
+        var applicationCookies = cookieHeaders
+            .SelectMany(value => value.Split(';'))
+            .Select(cookie => cookie.Trim())
+            .Where(cookie => cookie.Length > 0)
+            .Where(cookie =>
+            {
+                var separator = cookie.IndexOf('=');
+                var name = separator >= 0 ? cookie[..separator].Trim() : cookie;
+                return !name.StartsWith(RuntimeCookiePrefix, StringComparison.OrdinalIgnoreCase);
+            })
+            .ToArray();
+
+        return applicationCookies.Length == 0
+            ? null
+            : string.Join("; ", applicationCookies);
     }
 
     private static HashSet<string> GetConnectionTokens(HttpResponseHeaders headers)

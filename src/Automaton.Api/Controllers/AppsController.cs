@@ -423,7 +423,7 @@ public class AppsController : BaseController
         var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
         var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
         Response.Cookies.Append(
-            RuntimeCookieConstants.CookieName,
+            RuntimeCookieConstants.GetCookieName(id),
             runtimeCookie,
             runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
 
@@ -443,7 +443,7 @@ public class AppsController : BaseController
         var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
         var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
         Response.Cookies.Append(
-            RuntimeCookieConstants.CookieName,
+            RuntimeCookieConstants.GetCookieName(id),
             runtimeCookie,
             runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
 

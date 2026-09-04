@@ -77,12 +77,23 @@ public class RuntimeCookieServiceTests
         Assert.That(options.HttpOnly, Is.True);
         Assert.That(options.Secure, Is.True);
         Assert.That(options.SameSite, Is.EqualTo(SameSiteMode.Lax));
-        Assert.That(options.Path, Is.EqualTo($"/a/{appId}"));
+        Assert.That(options.Path, Is.EqualTo("/"));
+        Assert.That(RuntimeCookieConstants.GetCookieName(appId), Is.EqualTo($"automaton_runtime_{appId:N}"));
         Assert.That(options.Domain, Is.EqualTo(".automaton.monster"));
         Assert.That(options.Expires, Is.EqualTo(expiresAtUtc));
         Assert.That(options.MaxAge, Is.Not.Null);
         Assert.That(options.MaxAge!.Value, Is.LessThanOrEqualTo(TimeSpan.FromMinutes(5)));
         Assert.That(options.MaxAge!.Value, Is.GreaterThan(TimeSpan.FromMinutes(4)));
+    }
+
+    [Test]
+    public void GetCookieName_IsAppSpecific()
+    {
+        var appA = Guid.NewGuid();
+        var appB = Guid.NewGuid();
+
+        Assert.That(RuntimeCookieConstants.GetCookieName(appA), Is.Not.EqualTo(RuntimeCookieConstants.GetCookieName(appB)));
+        Assert.That(RuntimeCookieConstants.GetCookieName(appA), Does.Contain(appA.ToString("N")));
     }
 
     [Test]

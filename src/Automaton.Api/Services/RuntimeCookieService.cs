@@ -8,10 +8,12 @@ namespace Automaton.Api.Services;
 
 public static class RuntimeCookieConstants
 {
-    public const string CookieName = "automaton_runtime";
+    private const string CookieNamePrefix = "automaton_runtime_";
     public const string AccessScope = "restricted-runtime";
     public const string AppIdHeader = "X-App-Id";
     public const string ProxyAuthHeader = "X-Automaton-Runtime-Auth";
+
+    public static string GetCookieName(Guid appId) => $"{CookieNamePrefix}{appId:N}";
 }
 
 public sealed class RuntimeCookieValidationResult
@@ -105,7 +107,7 @@ public class RuntimeCookieService
 
     public void ClearRuntimeCookie(HttpResponse response, Guid appId, HttpRequest request)
     {
-        response.Cookies.Delete(RuntimeCookieConstants.CookieName, BuildRuntimeCookieOptions(appId, request, DateTimeOffset.UtcNow));
+        response.Cookies.Delete(RuntimeCookieConstants.GetCookieName(appId), BuildRuntimeCookieOptions(appId, request, DateTimeOffset.UtcNow));
     }
 
     public CookieOptions BuildRuntimeCookieOptions(Guid appId, HttpRequest request, DateTimeOffset expiresAtUtc)
@@ -115,7 +117,7 @@ public class RuntimeCookieService
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Lax,
-            Path = $"/a/{appId}",
+            Path = "/",
             MaxAge = GetCookieMaxAge(expiresAtUtc),
             Expires = expiresAtUtc
         };

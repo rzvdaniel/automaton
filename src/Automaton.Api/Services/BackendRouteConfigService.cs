@@ -22,7 +22,8 @@ public class BackendRouteConfigService
         bool IsDefault,
         string RuntimeEndpoint,
         string? Slug,
-        bool UsesRuntimeTunnel);
+        bool UsesRuntimeTunnel,
+        bool RequiresAuthentication);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -85,6 +86,7 @@ public class BackendRouteConfigService
                     DeploymentTargetId = target.Id,
                     target.IsDefault,
                     RuntimeEndpoint = runner.RuntimeEndpoint!,
+                    RequiresAuthentication = target.WebApp.RequiresAuthentication,
                     Slug = target.IsDefault &&
                         target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                         target.WebApp.AccessStatus == AppAccessStatuses.Active
@@ -99,7 +101,8 @@ public class BackendRouteConfigService
                 x.IsDefault,
                 x.RuntimeEndpoint.Trim(),
                 x.Slug,
-                false))
+                false,
+                x.RequiresAuthentication))
             .ToListAsync(cancellationToken);
 
         var selfHostedRouteCandidates = await eligibleTargets
@@ -127,6 +130,7 @@ public class BackendRouteConfigService
                 candidate.Target.WebAppId,
                 candidate.Target.Id,
                 candidate.Target.IsDefault,
+                RequiresAuthentication = candidate.Target.WebApp.RequiresAuthentication,
                 Slug = candidate.Target.IsDefault &&
                     candidate.Target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     candidate.Target.WebApp.AccessStatus == AppAccessStatuses.Active
@@ -145,7 +149,8 @@ public class BackendRouteConfigService
                 candidate.IsDefault,
                 publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
                 candidate.Slug,
-                true))
+                true,
+                candidate.RequiresAuthentication))
             .ToList();
 
         var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
@@ -228,6 +233,19 @@ public class BackendRouteConfigService
         }
 
         builder.AppendLine("  middlewares:");
+        foreach (var route in routes.Where(route => route.RequiresAuthentication))
+        {
+            var key = route.IsDefault
+                ? $"private-{route.AppId:N}"
+                : $"target-{route.DeploymentTargetId:N}";
+            AppendRuntimeAuthorization(builder, route, key);
+
+            if (!string.IsNullOrWhiteSpace(route.Slug))
+            {
+                AppendRuntimeAuthorization(builder, route, $"slug-{route.AppId:N}");
+            }
+        }
+
         foreach (var route in routes.Where(route => route.IsDefault))
         {
             var key = $"private-{route.AppId:N}";
@@ -280,7 +298,32 @@ public class BackendRouteConfigService
         builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{pathPrefix}`)\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
-        builder.AppendLine($"      middlewares: [\"{key}-rewrite\"]");
+        var middlewares = route.RequiresAuthentication
+            ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{key}-rewrite\"]"
+            : $"[\"{key}-rewrite\"]";
+        builder.AppendLine($"      middlewares: {middlewares}");
+    }
+
+    private void AppendRuntimeAuthorization(StringBuilder builder, RouteTarget route, string key)
+    {
+        builder.AppendLine($"    {key}-auth-headers:");
+        builder.AppendLine("      headers:");
+        builder.AppendLine("        customRequestHeaders:");
+        builder.AppendLine($"          X-App-Id: \"{route.AppId}\"");
+        builder.AppendLine($"          X-Automaton-Runtime-Auth: \"{publishedAppsConfig.RuntimeProxyAuthKey}\"");
+        builder.AppendLine($"    {key}-auth:");
+        builder.AppendLine("      forwardAuth:");
+        builder.AppendLine($"        address: \"{publishedAppsConfig.ApiBaseUrl.TrimEnd('/')}/internal/runtime/auth\"");
+        builder.AppendLine("        trustForwardHeader: true");
+        builder.AppendLine("        authRequestHeaders:");
+        builder.AppendLine("          - Cookie");
+        builder.AppendLine("          - X-App-Id");
+        builder.AppendLine("          - X-Automaton-Runtime-Auth");
+        builder.AppendLine($"    {key}-auth-strip:");
+        builder.AppendLine("      headers:");
+        builder.AppendLine("        customRequestHeaders:");
+        builder.AppendLine("          X-App-Id: \"\"");
+        builder.AppendLine("          X-Automaton-Runtime-Auth: \"\"");
     }
 
     private static void AppendRuntimeRewrite(

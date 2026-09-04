@@ -35,9 +35,11 @@ async function loadRuntimeView() {
       return
     }
 
-    const runtimeUrl = app.value.requiresAuthentication
-      ? new URL(appsService.getRestrictedRuntimeLaunchUrl(appId.value), window.location.origin)
-      : new URL(getOpenAppUrl(app.value), window.location.origin)
+    if (app.value.requiresAuthentication) {
+      await appsService.createRuntimeLaunch(appId.value)
+    }
+
+    const runtimeUrl = new URL(getOpenAppUrl(app.value), window.location.origin)
     runtimeUrl.searchParams.set('v', Date.now().toString())
     applicationUrl.value = runtimeUrl.toString()
   } catch (err) {

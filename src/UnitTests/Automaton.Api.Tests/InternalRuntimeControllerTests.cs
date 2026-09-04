@@ -76,7 +76,7 @@ public class InternalRuntimeControllerTests
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader] = "expected-proxy-key";
         httpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader] = appId.ToString();
-        httpContext.Request.Headers.Cookie = $"{RuntimeCookieConstants.CookieName}={cookie}";
+        httpContext.Request.Headers.Cookie = $"{RuntimeCookieConstants.GetCookieName(appId)}={cookie}";
 
         var userContextService = CreateUserContextService(Guid.NewGuid());
         var controller = new InternalRuntimeController(

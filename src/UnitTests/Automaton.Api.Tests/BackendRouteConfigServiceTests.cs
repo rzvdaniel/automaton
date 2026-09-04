@@ -46,6 +46,7 @@ public class BackendRouteConfigServiceTests
             Description = string.Empty,
             Definition = "{}",
             ApplicationContractJson = GenericRuntimeContractJson(),
+            RequiresAuthentication = true,
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             DeploymentTargets = { defaultTarget }
@@ -69,6 +70,42 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Not.Contain("-api:"));
             Assert.That(content, Does.Not.Contain("-frontend"));
             Assert.That(content, Does.Contain("http://runner-a:8080"));
+            Assert.That(content, Does.Contain($"private-{appId:N}-auth-headers"));
+            Assert.That(content, Does.Contain("forwardAuth:"));
+            Assert.That(content, Does.Contain($"private-{appId:N}-auth-strip"));
+            Assert.That(content, Does.Contain("https://api.test/internal/runtime/auth"));
+            Assert.That(content, Does.Contain($"X-App-Id: \"{appId}\""));
+            Assert.That(content, Does.Contain("X-App-Id: \"\""));
+            Assert.That(content, Does.Contain("X-Automaton-Runtime-Auth: \"\""));
+            Assert.That(content, Does.Contain(
+                $"middlewares: [\"private-{appId:N}-auth-headers\", \"private-{appId:N}-auth\", \"private-{appId:N}-auth-strip\", \"private-{appId:N}-rewrite\"]"));
+        });
+    }
+
+    [Test]
+    public async Task RefreshAsync_DoesNotAuthorizeUnrestrictedRoute()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.LegacyControllerRuntimeDeployed = true;
+        target.GenericRuntimeDeployed = true;
+        AddHostedRunner(dbContext, runnerId);
+        AddApp(dbContext, appId, target, GenericRuntimeContractJson());
+        dbContext.WebApps.Local.Single().RequiresAuthentication = false;
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+        var content = await File.ReadAllTextAsync(Path.Combine(rootPath, "managed-runtime-routes.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain($"private-{appId:N}-runtime"));
+            Assert.That(content, Does.Contain($"private-{appId:N}-rewrite"));
+            Assert.That(content, Does.Not.Contain($"private-{appId:N}-auth"));
+            Assert.That(content, Does.Not.Contain("forwardAuth:"));
         });
     }
 
@@ -181,6 +218,7 @@ public class BackendRouteConfigServiceTests
             Description = string.Empty,
             Definition = "{}",
             ApplicationContractJson = GenericRuntimeContractJson(),
+            RequiresAuthentication = true,
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             DeploymentTargets = { defaultTarget, namedTarget }
@@ -197,6 +235,8 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain($"PathPrefix(`{targetPrefix}`)"));
             Assert.That(content, Does.Contain(
                 $"/apps/{appId}/targets/{namedTarget.Id}/$1"));
+            Assert.That(content, Does.Contain(
+                $"middlewares: [\"target-{namedTarget.Id:N}-auth-headers\", \"target-{namedTarget.Id:N}-auth\", \"target-{namedTarget.Id:N}-auth-strip\", \"target-{namedTarget.Id:N}-rewrite\"]"));
             Assert.That(content, Does.Contain(
                 $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
         });
@@ -546,7 +586,9 @@ public class BackendRouteConfigServiceTests
             dbContext,
             Options.Create(new PublishedAppsConfig
             {
-                TraefikDynamicConfigRoot = rootPath
+                TraefikDynamicConfigRoot = rootPath,
+                ApiBaseUrl = "https://api.test",
+                RuntimeProxyAuthKey = "test-runtime-key"
             }),
             new StubWebHostEnvironment(),
             NullLogger<BackendRouteConfigService>.Instance);
