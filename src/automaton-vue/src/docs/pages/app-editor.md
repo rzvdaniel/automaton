@@ -14,7 +14,7 @@ Use the App Editor when you want the fastest browser-first workflow.
 2. Create a new app
 3. Describe what you want
 4. Review the generated files
-5. Click **Deploy Backend** when backend code changes
+5. Click the deploy action when runtime code changes
 6. Click **Publish** when you want a public URL
 
 ## Example prompt

@@ -1,152 +1,77 @@
 ---
-title: automaton.json Reference
-description: Canonical reference for Automaton app configuration. Learn the required fields, default frontend/backend layout, and unlinked local scaffold shape.
+title: automaton.json reference
+description: Reference for the Automaton app identity and generic build, runtime, health, and storage contract.
 ---
 
-# automaton.json Reference
+# automaton.json reference
 
-`automaton.json` is the project-level contract for an Automaton app.
+`automaton.json` lives at the project root. It links the project to an Automaton
+app and declares the application contract.
 
-Keep it in the project root and commit it to Git.
-
-Typical location:
-
-```text
-my-app/
-  automaton.json
-  frontend/
-  backend/
-```
-
-## What it controls
-
-- App identity with `appId`
-- Friendly app name with `name`
-- Optional project server override with `server`
-- Frontend build and deploy output with `frontend`
-- Backend deploy directory with `backend`
-
-## Most common shape
-
-For the default local app layout, use:
+## Generic application shape
 
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "My App",
-  "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
-  },
-  "backend": {
-    "deployDir": "backend"
+  "application": {
+    "build": {
+      "command": {
+        "executable": "build-tool",
+        "arguments": ["build"],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "outputDirectory": "dist",
+      "timeoutSeconds": 900
+    },
+    "runtime": {
+      "command": {
+        "executable": "app-server",
+        "arguments": [],
+        "workingDirectory": ".",
+        "environment": {}
+      },
+      "port": 8080
+    },
+    "health": { "path": "/health", "startupTimeoutSeconds": 60 },
+    "storage": { "dataDirectory": "data", "mounts": [] }
   }
 }
 ```
 
-This matches the standard local structure:
+Automaton does not prescribe a language, framework, package manager, source
+layout, build system, or application architecture.
 
-```text
-my-app/
-  automaton.json
-  .automatonignore
-  frontend/
-    package.json
-    src/
-    dist/
-  backend/
-    *.py
-```
+## Fields
 
-## Unlinked local scaffold
+| Field | Meaning |
+|---|---|
+| `appId` | Remote app ID after linking. |
+| `name` | App display name. |
+| `server` | Optional configured Automaton server. |
+| `application.build.command` | Optional executable, arguments, working directory, environment, and shell setting. |
+| `application.build.outputDirectory` | Optional directory containing the build artifact. |
+| `application.build.timeoutSeconds` | Maximum build duration. |
+| `application.runtime.command` | Executable and arguments for the long-running app process. |
+| `application.runtime.port` | Port requested by the app contract. |
+| `application.health.path` | Optional HTTP readiness path. |
+| `application.health.startupTimeoutSeconds` | Maximum startup duration. |
+| `application.storage.dataDirectory` | Durable app data directory. |
 
-If `automaton new` created local files but remote app creation failed, `automaton.json` can exist without `appId` yet.
+The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
+path in `AUTOMATON_APP_DATA_DIR`. A configured health path is ready only after a
+2xx HTTP response. Build and runtime artifacts can be replaced.
 
-That is a valid temporary local state.
+Commands use structured arguments by default. Set `useShell` only when needed.
+Keep managed paths inside the project workspace.
 
-```json
-{
-  "name": "My App",
-  "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
-  },
-  "backend": {
-    "deployDir": "backend"
-  }
-}
-```
+Run `automaton validate`, then `automaton deploy`. Deployment is asynchronous.
+Wait for `Succeeded` before treating the app as deployed. Publishing is a
+separate action and requires explicit approval.
 
-Recover by running one of:
+## Create or link
 
-```bash
-automaton create
-automaton link <app-id>
-```
-
-After that succeeds, write `appId` into `automaton.json`.
-
-## Frontend-only app
-
-If the app has no backend, omit the `backend` section:
-
-```json
-{
-  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "name": "My Frontend App",
-  "server": "https://api.automaton.monster",
-  "frontend": {
-    "build": "cd frontend && npm install && npm run build",
-    "deployDir": "frontend/dist"
-  }
-}
-```
-
-## No-build static app
-
-Use this only for an explicit plain HTML/CSS/JS app with no frontend build step:
-
-```json
-{
-  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "name": "My Static App",
-  "server": "https://api.automaton.monster",
-  "frontend": {
-    "deployDir": "."
-  }
-}
-```
-
-## Field reference
-
-| Field | Required | Meaning |
-|---|---|---|
-| `appId` | Required for linked apps | Remote Automaton app ID |
-| `name` | Yes | Friendly display name |
-| `server` | Recommended | Automaton API base URL |
-| `frontend.build` | Optional | Command to run before frontend upload |
-| `frontend.deployDir` | Required for frontend deploys | Directory uploaded as public frontend runtime |
-| `frontend.include` | Optional | Extra frontend include patterns |
-| `frontend.exclude` | Optional | Extra frontend exclude patterns |
-| `backend.deployDir` | Optional | Directory uploaded as runner backend runtime |
-| `backend.include` | Optional | Extra backend include patterns |
-| `backend.exclude` | Optional | Extra backend exclude patterns |
-| `source.include` | Optional | Extra source upload include patterns |
-| `source.exclude` | Optional | Extra source upload exclude patterns |
-
-## Behavior notes
-
-- `automaton deploy` uploads `frontend.deployDir` as public frontend runtime.
-- `automaton deploy` uploads `backend.deployDir` as backend runtime when present.
-- `frontend/src/` is not public by itself. Only `frontend.deployDir` becomes public runtime.
-- Backend runtime files are not publicly served.
-- If backend Python files exist but `backend.deployDir` is missing, `automaton validate` and `automaton deploy` should fail clearly.
-
-## Related docs
-
-- [Getting Started](/getting-started)
-- [Build a Frontend App](/build-frontend-app)
-- [Build a Backend App](/build-backend-app)
-- [Automaton CLI Reference](/automaton-cli)
+Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`
+for an existing remote app. Both commands refresh `AGENTS.md` and the local app
+skill.

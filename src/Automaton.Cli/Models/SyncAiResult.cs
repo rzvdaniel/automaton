@@ -12,7 +12,5 @@ public sealed class SyncAiResult
 
     public string Mode { get; init; } = AiGuidanceModes.Project;
 
-    public string? ManifestPath { get; init; }
-
     public IReadOnlyList<string> GeneratedFiles { get; init; } = [];
 }

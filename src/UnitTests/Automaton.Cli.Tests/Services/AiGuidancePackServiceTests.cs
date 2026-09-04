@@ -1,8 +1,7 @@
-using Automaton.Cli.Services;
-using Automaton.Cli.Models;
 using Automaton.AiGuidance;
+using Automaton.Cli.Models;
+using Automaton.Cli.Services;
 using NUnit.Framework;
-using System.Text.Json;
 
 namespace Automaton.Cli.Tests.Services;
 
@@ -26,120 +25,102 @@ public class AiGuidancePackServiceTests
     }
 
     [Test]
-    public void Sync_WhenDirectoryIsAnAppRoot_GeneratesAgentPackAndManifest()
+    public void Sync_WhenDirectoryIsAnAppRoot_WritesExactlyTheCanonicalFiles()
     {
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-app");
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}\n");
 
-        var result = new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
+        var result = new AiGuidancePackService().Sync(projectRoot, GetExportSources());
+        var generatedFiles = result.GeneratedFiles
+            .Select(path => Path.GetRelativePath(projectRoot, path).Replace('\\', '/'))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
 
         Assert.That(result.Mode, Is.EqualTo("app"));
-        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "manifest.json")), Is.True);
-        Assert.That(File.Exists(result.ManifestPath), Is.True);
-
-        using var manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
-        Assert.That(manifest.RootElement.GetProperty("mode").GetString(), Is.EqualTo("app"));
-        Assert.That(manifest.RootElement.GetProperty("sources").GetArrayLength(), Is.GreaterThanOrEqualTo(5));
-        Assert.That(manifest.RootElement.GetProperty("entrypoints").GetProperty("root").GetString(), Is.EqualTo("AGENTS.md"));
-        Assert.That(manifest.RootElement.GetProperty("entrypoints").GetProperty("references").GetString(), Is.EqualTo(".automaton/agents/references/llms/"));
-        Assert.That(manifest.RootElement.GetProperty("adapters").GetArrayLength(), Is.EqualTo(1));
-
-        var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
-        Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms/"));
+        Assert.That(generatedFiles, Is.EqualTo(new[]
+        {
+            ".automaton/agents/skills/automaton-app/SKILL.md",
+            "AGENTS.md"
+        }));
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "manifest.json")), Is.False);
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
     }
 
     [Test]
-    public void Sync_WhenDirectoryIsAnAppRoot_GeneratesThinWrappersAndReferenceGuardrails()
+    public void Sync_RemovesPreviouslyGeneratedReferencesAndManifest()
     {
-        var projectRoot = CreateTempDirectory("automaton-cli-guidance-guardrails");
-        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}\n");
+        var projectRoot = CreateTempDirectory("automaton-cli-guidance-cleanup");
+        Directory.CreateDirectory(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms"));
+        File.WriteAllText(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms", "old.md"), "old");
+        File.WriteAllText(
+            Path.Combine(projectRoot, ".automaton", "agents", "manifest.json"),
+            "{\"generator\":{\"name\":\"Automaton.Cli\"}}\n");
 
-        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
+        new AiGuidancePackService().Sync(projectRoot, GetExportSources());
 
-        var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
-        var skillContent = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
-
-        Assert.That(agentsContent, Does.Contain("## STOP"));
-        Assert.That(agentsContent, Does.Contain("Before creating files:"));
-        Assert.That(agentsContent, Does.Contain("Check for `automaton.json`"));
-        Assert.That(agentsContent, Does.Contain("Do not create a custom project structure first"));
-        Assert.That(agentsContent, Does.Contain("This is an Automaton-managed local project"));
-        Assert.That(agentsContent, Does.Contain("Do not invent a generic project structure before making that decision"));
-        Assert.That(agentsContent, Does.Contain("automaton validate"));
-        Assert.That(agentsContent, Does.Contain("Do not create Express, FastAPI, Flask, or custom HTTP servers unless Automaton guidance explicitly requires them"));
-        Assert.That(agentsContent, Does.Contain("Do not treat this file as the full policy"));
-        Assert.That(agentsContent, Does.Contain("If it does not exist and the user wants a new app here, run `automaton new"));
-        Assert.That(agentsContent, Does.Contain("Do not run `automaton publish` unless the user explicitly requests publishing"));
-        Assert.That(agentsContent, Does.Contain("Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy"));
-        Assert.That(agentsContent, Does.Contain(".automaton/agents/skills/automaton-app/SKILL.md"));
-        Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms/"));
-        Assert.That(skillContent, Does.Contain("Check whether `automaton.json` exists in the project root"));
-        Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
-        Assert.That(skillContent, Does.Contain("Use `automaton validate` when the local contract or deploy shape is unclear"));
-        Assert.That(skillContent, Does.Contain("Automaton backends are ordinary HTTP applications"));
-        Assert.That(skillContent, Does.Contain("The initial supported Python convention is FastAPI/ASGI with an entrypoint of `main:app`"));
-        Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "manifest.json")), Is.False);
     }
 
     [Test]
-    public void Sync_WhenLegacyGeneratedAdaptersExist_RemovesOnlyGeneratedAdapters()
+    public void Sync_WithExplicitAdapter_WritesOnlyACanonicalPointer()
     {
-        var projectRoot = CreateTempDirectory("automaton-cli-guidance-legacy");
-        File.WriteAllText(Path.Combine(projectRoot, "CLAUDE.md"), "This file is generated by `automaton`. Do not edit it manually.");
-        Directory.CreateDirectory(Path.Combine(projectRoot, ".github"));
-        File.WriteAllText(Path.Combine(projectRoot, ".github", "copilot-instructions.md"), "This file is generated by `automaton`. Do not edit it manually.");
-        Directory.CreateDirectory(Path.Combine(projectRoot, ".automaton", "ai-guidance", "llms"));
-        File.WriteAllText(Path.Combine(projectRoot, ".automaton", "ai-guidance", "llms.txt"), "legacy llms");
-        File.WriteAllText(Path.Combine(projectRoot, ".automaton", "ai-guidance", "llms", "automaton-cli-install.md"), "legacy install");
-        File.WriteAllText(Path.Combine(projectRoot, ".automaton", "ai-guidance", "manifest.json"), """{"generator":{"name":"Automaton.Cli"}}""");
+        var projectRoot = CreateTempDirectory("automaton-cli-guidance-adapter");
 
-        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
+        var result = new AiGuidancePackService().Sync(projectRoot, GetExportSources(), AiGuidanceAdapters.Claude);
 
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "ai-guidance")), Is.False);
+        Assert.That(result.GeneratedFiles.Select(path => Path.GetFileName(path)), Does.Contain("CLAUDE.md"));
+        var adapter = File.ReadAllText(Path.Combine(projectRoot, "CLAUDE.md"));
+        Assert.That(adapter, Does.Contain("AGENTS.md"));
+        Assert.That(adapter, Does.Contain(".automaton/agents/skills/automaton-app/SKILL.md"));
+        Assert.That(adapter.Length, Is.LessThan(200));
+        Assert.That(adapter, Does.Not.Contain("AUTOMATON_PORT"));
     }
 
     [Test]
-    public void Sync_WhenClaudeAdapterRequested_GeneratesClaudeAdapterOnly()
+    public void Sync_IsDeterministicAndRestoresMissingCanonicalFiles()
     {
-        var projectRoot = CreateTempDirectory("automaton-cli-guidance-claude");
+        var projectRoot = CreateTempDirectory("automaton-cli-guidance-repeat");
+        var service = new AiGuidancePackService();
 
-        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.Claude);
+        service.Sync(projectRoot, GetExportSources());
+        var firstAgents = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
+        var firstSkill = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
 
-        var claudePath = Path.Combine(projectRoot, "CLAUDE.md");
-        Assert.That(File.Exists(claudePath), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
+        File.Delete(Path.Combine(projectRoot, "AGENTS.md"));
+        service.Sync(projectRoot, GetExportSources());
+
+        Assert.That(File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md")), Is.EqualTo(firstAgents));
+        Assert.That(File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.EqualTo(firstSkill));
+
+        File.Delete(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
+        service.Sync(projectRoot, GetExportSources());
+
+        Assert.That(File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.EqualTo(firstSkill));
+
+        var firstFiles = Directory.EnumerateFiles(projectRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(projectRoot, path).Replace('\\', '/'))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        service.Sync(projectRoot, GetExportSources());
+        var secondFiles = Directory.EnumerateFiles(projectRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(projectRoot, path).Replace('\\', '/'))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(secondFiles, Is.EqualTo(firstFiles));
     }
 
     [Test]
-    public void Sync_WhenAllAdaptersRequested_GeneratesAllOptionalAdapters()
-    {
-        var projectRoot = CreateTempDirectory("automaton-cli-guidance-all");
-
-        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.All);
-
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.False);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md")), Is.False);
-    }
-
-    [Test]
-    public void Sync_WhenDirectoryLooksLikeAppsWorkspace_GeneratesWorkspacePack()
+    public void Sync_WhenDirectoryLooksLikeAppsWorkspace_UsesWorkspaceMode()
     {
         var parentRoot = CreateTempDirectory("automaton-cli-guidance-workspace");
         var workspaceRoot = Path.Combine(parentRoot, "apps");
         Directory.CreateDirectory(workspaceRoot);
 
-        var result = new AiGuidancePackService().Sync(workspaceRoot, GetReferenceSources());
+        var result = new AiGuidancePackService().Sync(workspaceRoot, GetExportSources());
 
         Assert.That(result.Mode, Is.EqualTo("workspace"));
-        var agentsContent = File.ReadAllText(Path.Combine(workspaceRoot, "AGENTS.md"));
-        Assert.That(agentsContent, Does.Contain("apps workspace"));
     }
 
     private string CreateTempDirectory(string leaf)
@@ -150,24 +131,17 @@ public class AiGuidancePackServiceTests
         return root;
     }
 
-    private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
-        BuildExportSources();
-
-    private static IReadOnlyList<GuidanceSource> BuildExportSources()
+    private static IReadOnlyList<GuidanceSource> GetExportSources()
     {
         var provider = new EmbeddedAutomatonGuidanceProvider();
-        var seededSources = provider.GetSeedSources();
-        var sources = new List<GuidanceSource>();
-
-        foreach (var source in seededSources)
-        {
-            var metadata = AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath);
-            if (!string.IsNullOrWhiteSpace(metadata.OutputPath))
-            {
-                sources.Add(new GuidanceSource(metadata.OutputPath!, source.Content));
-            }
-        }
-
-        return sources;
+        return provider.GetSeedSources()
+            .Select(source => AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath))
+            .Where(metadata => metadata.Surface == "cli" && metadata.OutputPath is not null)
+            .Join(
+                provider.GetSeedSources(),
+                metadata => metadata.RelativePath,
+                source => source.RelativePath,
+                (metadata, source) => new GuidanceSource(metadata.OutputPath!, source.Content))
+            .ToList();
     }
 }

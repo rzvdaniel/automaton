@@ -83,11 +83,5 @@ export const publicAppConfig = {
   docsUrl: joinUrl(publicSiteUrl, 'docs'),
   apiBaseUrl,
   llmsUrl: joinUrl(publicSiteUrl, 'llms.txt'),
-  cliInstallGuideUrl: joinUrl(publicSiteUrl, 'llms/automaton-cli-install.md'),
-  cliWorkflowGuideUrl: joinUrl(publicSiteUrl, 'llms/automaton-cli-deploy.md'),
-  appsOverviewUrl: joinUrl(publicSiteUrl, 'llms/automaton-apps-overview.md'),
-  frontendStructureUrl: joinUrl(publicSiteUrl, 'llms/automaton-frontend-structure.md'),
-  backendControllersUrl: joinUrl(publicSiteUrl, 'llms/automaton-backend-controllers.md'),
-  starterPromptsUrl: joinUrl(publicSiteUrl, 'llms/automaton-starter-prompts.md'),
   mcpUrl: joinUrl(apiBaseUrl, 'api/mcp'),
 } as const

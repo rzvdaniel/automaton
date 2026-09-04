@@ -205,7 +205,7 @@ function listSeedGuidanceDocuments() {
 }
 
 function readSharedBasePrompt() {
-  const basePath = path.join(sharedAiGuidanceSeedRoot, 'shared', 'base', 'automaton-app-contract-compact.md')
+  const basePath = path.join(sharedAiGuidanceSeedRoot, 'shared', 'base', 'automaton-app-contract.md')
   return fs.readFileSync(basePath, 'utf-8').trim()
 }
 

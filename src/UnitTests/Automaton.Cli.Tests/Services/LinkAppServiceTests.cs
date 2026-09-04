@@ -45,7 +45,8 @@ public class LinkAppServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms")), Is.True);
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
         var env = new ConfigService().LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-456"));
     }

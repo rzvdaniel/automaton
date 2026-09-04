@@ -266,7 +266,7 @@ public class AdminAiGuidanceTests
         Assert.Multiple(() =>
         {
             Assert.That(document.Source, Is.EqualTo("Seed"));
-            Assert.That(document.ContentMarkdown, Does.Contain("Actions are executable modules"));
+            Assert.That(document.ContentMarkdown, Does.Contain("Use an Action for finite work"));
             Assert.That(document.IsEnabled, Is.False);
             Assert.That(document.SeedContentHash, Is.Not.Null.And.Not.Empty);
             Assert.That(document.LastSeedSynchronizedAt, Is.Not.Null);
