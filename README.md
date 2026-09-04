@@ -199,37 +199,14 @@ bash -n scripts/prod-reset-blue-green.sh
 
 Run only the commands relevant to the files you changed.
 
-For the full agent verification loop, see `.agent/harness/verification.md`.
+Agents should start with `AGENTS.md`, then read the matching skill from `.agents/skills/`.
 
-## Agent harness
-
-Automaton includes a neutral agent harness under `.agent/`:
-
-```txt
-.agent/
-  skills/
-  harness/
-```
-
-Agents should start with `AGENTS.md`, then read the relevant skill from `.agent/skills/<skill-name>/SKILL.md`, then follow `.agent/harness/verification.md`.
-
-Current skills include:
-
-- `automaton-cli`
-- `app-source-runtime`
-- `scaffolded-apps`
-- `studio-frontend`
-- `studio-backend`
-- `deployment-prod`
-- `runner-debugging`
-- `retro`
-- `vue-component-splitting`
+Repository-owned skills cover generic runtime behavior, production deployment, and administrator documentation. Developer-local skills may also exist there but are not part of the repository contract.
 
 ## Documentation
 
 - `AGENTS.md` — repository-level agent/developer contract
-- `.agent/harness/verification.md` — verification matrix
-- `.agent/skills/` — task-specific AI agent skills
+- `.agents/skills/` — task-specific AI agent skills
 - `docs/dev/messaging-rabbitmq.md` — internal CAP + RabbitMQ event publishing/consumption architecture
 - production `appsettings.Production.json` is mounted into both `Automaton.Api` and `Automaton.Worker`; RabbitMQ/MySQL credentials live there, not in the public reverse proxy
 - `docs/runners/docker-runner.md` — runner deployment details
