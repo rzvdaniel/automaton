@@ -130,6 +130,30 @@ public sealed class RunnerRuntimeGatewayServiceTests
         });
     }
 
+    [TestCase("session=abc", "session=abc")]
+    [TestCase("automaton_runtime_appA=secretA", null)]
+    [TestCase("automaton_runtime_appA=secretA; automaton_runtime_appB=secretB", null)]
+    [TestCase("session=abc; automaton_runtime_appA=secretA; preference=dark; automaton_runtime_appB=secretB", "session=abc; preference=dark")]
+    [TestCase(" session = abc ; AUTOMATON_RUNTIME_appA = secretA ; preference = dark ", "session = abc; preference = dark")]
+    public async Task GatewayFiltersPlatformRuntimeCookies(string incomingCookie, string? expectedCookie)
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler();
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler);
+
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, gateway.GetUri("/cookies"));
+        request.Headers.TryAddWithoutValidation("Cookie", incomingCookie);
+        using var response = await client.SendAsync(request);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(handler.Request, Is.Not.Null);
+        Assert.That(handler.Request!.Headers.TryGetValues("Cookie", out var values)
+            ? values.Single()
+            : null, Is.EqualTo(expectedCookie));
+    }
+
     private static async Task<GatewayHarness> StartGatewayAsync(
         Guid appId,
         Guid targetId,
