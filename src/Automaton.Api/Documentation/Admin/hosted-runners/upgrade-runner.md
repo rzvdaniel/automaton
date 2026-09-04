@@ -28,6 +28,8 @@ When the replacement Runner connects, Automaton uses enrollment history to rebin
 
 This identity repair does not move applications from another Hosted Runner or a self-hosted Runner. Ordinary Runner changes still require the deployment-target cleanup workflow.
 
+If route publication fails, the Runner can still connect and the repaired assignments remain saved. The API logs a warning identifying the Hosted Runner and current Runner. Correct the route-file configuration or filesystem error, then reconnect the Runner to retry publication.
+
 Changing a plan does not silently resize or move an existing running container. The existing container keeps its active snapshot, placement, port, and endpoint until explicit reprovisioning.
 
 The active specification snapshot is promoted only after provisioning succeeds. However, a failed reprovision currently leaves the runner in a failed state and may leave the newly selected placement fields recorded in the database. The existing container is not automatically restored by this workflow. Treat the upgrade as incomplete, review the failure, and use administrative recovery or another explicit reprovision attempt as appropriate.

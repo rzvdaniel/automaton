@@ -57,7 +57,16 @@ public sealed class ManagedRunnerAppAssignmentService
         if (await dbContext.AppDeploymentTargets.AnyAsync(
                 x => x.ExecutionRunnerId == runnerId && accessibleAppIds.Contains(x.WebAppId), cancellationToken))
         {
-            await routeConfigService.RefreshAsync(cancellationToken);
+            try
+            {
+                await routeConfigService.RefreshAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Route publication failed for Hosted Runner {HostedRunnerId} and Runner {RunnerId}; persisted assignments are retained",
+                    hostedRunner.Id, runnerId);
+            }
         }
 
         return targets.Count;

@@ -1,4 +1,5 @@
 using Automaton.Api.Config;
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -9,6 +10,7 @@ using Automaton.Core.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,12 +28,14 @@ public class ManagedRunnerAppAssignmentServiceTests
     private HostedRunner hosted = null!;
     private Guid previousRunnerId;
     private string routeRoot = null!;
+    private IdentitySaveFailureInterceptor saveFailure = null!;
 
     [SetUp]
     public void SetUp()
     {
+        saveFailure = new IdentitySaveFailureInterceptor();
         db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(saveFailure).Options);
         routeRoot = Path.Combine(Path.GetTempPath(), "automaton-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(routeRoot);
         userContext = new UserContextService(new HttpContextAccessor());
@@ -165,18 +169,71 @@ public class ManagedRunnerAppAssignmentServiceTests
     }
 
     [Test]
-    public async Task Reconcile_RefreshesAlreadyReboundTargets_AfterRouteWriteFailure()
+    public async Task UpdateConnection_CompletesDespiteRouteFailure_AndLaterReconciliationRepairsRoute()
     {
         var target = AddTarget(previousRunnerId);
+        target.LegacyControllerRuntimeDeployed = true;
+        target.ActiveDeploymentOperationId = Guid.NewGuid();
+        target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
         await db.SaveChangesAsync();
+        var before = db.Entry(target).CurrentValues.Properties
+            .Where(x => x.Name != nameof(AppDeploymentTarget.ExecutionRunnerId))
+            .ToDictionary(x => x.Name, x => db.Entry(target).Property(x.Name).CurrentValue);
+        var failingRoutes = new FailingRouteService(db);
         var failingService = new ManagedRunnerAppAssignmentService(db, null!, authorization,
-            new FailingRouteService(db), NullLogger<ManagedRunnerAppAssignmentService>.Instance);
-        Assert.ThrowsAsync<IOException>(() => failingService.ReconcileHostedRunnerIdentityAsync(hosted.UserId, hosted.RunnerId!.Value));
-        Assert.That(target.ExecutionRunnerId, Is.EqualTo(hosted.RunnerId));
+            failingRoutes, NullLogger<ManagedRunnerAppAssignmentService>.Instance);
+        var runners = new RunnerService(db, userContext, null!, authorization,
+            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, new HttpContextAccessor()),
+            new ApplicationEventService(db), failingService);
+
+        await runners.UpdateConnection(hosted.RunnerId!.Value, hosted.UserId, new RunnerDetails
+        {
+            ConnectionId = "connected-despite-route-failure", HostedRunnerId = hosted.Id,
+            Version = "test-version", MachineName = "test-machine"
+        }, CancellationToken.None);
+
+        Assert.That(failingRoutes.Calls, Is.EqualTo(1));
+        Assert.That(failingRoutes.PersistedRunnerId, Is.EqualTo(hosted.RunnerId), "Identity must be saved before route publication");
+        db.ChangeTracker.Clear();
+        var persisted = await db.AppDeploymentTargets.SingleAsync(x => x.Id == target.Id);
+        Assert.That(persisted.ExecutionRunnerId, Is.EqualTo(hosted.RunnerId));
+        foreach (var (name, value) in before)
+            Assert.That(db.Entry(persisted).Property(name).CurrentValue, Is.EqualTo(value), name);
+        var runner = await db.Runners.SingleAsync(x => x.Id == hosted.RunnerId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(runner.ConnectionId, Is.EqualTo("connected-despite-route-failure"));
+            Assert.That(runner.Status, Is.EqualTo(RunnerConnectivityStatuses.Online));
+            Assert.That(runner.LastConnectedAtUtc, Is.Not.Null);
+            Assert.That(runner.LastHeartbeatAtUtc, Is.Not.Null);
+            Assert.That(runner.Version, Is.EqualTo("test-version"));
+            Assert.That(runner.MachineName, Is.EqualTo("test-machine"));
+        });
+        Assert.That(await db.ApplicationEvents.AnyAsync(x => x.AppId == target.WebAppId), Is.True,
+            "Connection lifecycle continues after reconciliation");
 
         Assert.That(await service.ReconcileHostedRunnerIdentityAsync(hosted.UserId, hosted.RunnerId!.Value), Is.Zero);
         Assert.That(await File.ReadAllTextAsync(Path.Combine(routeRoot, "managed-runtime-routes.yml")),
             Does.Contain(hosted.RuntimeEndpoint));
+    }
+
+    [Test]
+    public async Task Reconcile_DoesNotSwallowIdentityPersistenceFailure_OrPublishRoutes()
+    {
+        var target = AddTarget(previousRunnerId);
+        await db.SaveChangesAsync();
+        var failingRoutes = new FailingRouteService(db);
+        var failingService = new ManagedRunnerAppAssignmentService(db, null!, authorization,
+            failingRoutes, NullLogger<ManagedRunnerAppAssignmentService>.Instance);
+        saveFailure.FailIdentitySave = true;
+
+        var exception = Assert.ThrowsAsync<DbUpdateException>(() =>
+            failingService.ReconcileHostedRunnerIdentityAsync(hosted.UserId, hosted.RunnerId!.Value));
+
+        Assert.That(exception, Is.SameAs(saveFailure.Error));
+        Assert.That(failingRoutes.Calls, Is.Zero);
+        db.ChangeTracker.Clear();
+        Assert.That((await db.AppDeploymentTargets.FindAsync(target.Id))!.ExecutionRunnerId, Is.EqualTo(previousRunnerId));
     }
 
     [Test]
@@ -242,9 +299,32 @@ public class ManagedRunnerAppAssignmentServiceTests
         : BackendRouteConfigService(db, Options.Create(new PublishedAppsConfig()), new TestEnvironment(),
             NullLogger<BackendRouteConfigService>.Instance)
     {
+        private readonly ApplicationDbContext database = db;
+        public int Calls { get; private set; }
+        public Guid? PersistedRunnerId { get; private set; }
+
         public override Task RefreshAsync(CancellationToken cancellationToken = default,
-            Guid? pendingGenericRuntimeTargetId = null, bool? pendingGenericRuntimeDeployed = null) =>
+            Guid? pendingGenericRuntimeTargetId = null, bool? pendingGenericRuntimeDeployed = null)
+        {
+            Calls++;
+            PersistedRunnerId = database.AppDeploymentTargets.AsNoTracking().Single().ExecutionRunnerId;
             throw new IOException("Route write failed");
+        }
+    }
+
+    private sealed class IdentitySaveFailureInterceptor : SaveChangesInterceptor
+    {
+        public bool FailIdentitySave { get; set; }
+        public DbUpdateException Error { get; } = new("Identity persistence failed");
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
+            InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (FailIdentitySave && eventData.Context!.ChangeTracker.Entries<AppDeploymentTarget>()
+                .Any(x => x.Property(target => target.ExecutionRunnerId).IsModified))
+                throw Error;
+            return ValueTask.FromResult(result);
+        }
     }
 
     private sealed class TestEnvironment : IWebHostEnvironment
