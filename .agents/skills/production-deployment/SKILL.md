@@ -20,6 +20,12 @@ Read the current scripts and [the production cheat sheet](../../../docs/prod/pro
 - `scripts/prod-redeploy-worker.sh`
 - `scripts/prod-verify.sh`
 
+## Docker maintenance
+
+For on-host Docker builds, also apply [.agents/skills/production-docker-maintenance/SKILL.md](../production-docker-maintenance/SKILL.md).
+
+Use it during preflight before starting a Docker build, whenever free disk is below its maintenance thresholds, and after a successful deployment to bound accumulated build cache. Do not bypass its volume, rollback-image, or destructive-prune safeguards. A production Docker build must not begin with less than 10 GB of free disk space.
+
 ## Safety rules
 
 1. Run read-only preflight checks on the production checkout, live colors, services, and protected state.
