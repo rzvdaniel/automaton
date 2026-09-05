@@ -15,4 +15,7 @@ public sealed record DeploymentTargetInfo(
     string Status,
     bool LegacyControllerRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
-    DeploymentTargetRunnerInfo? Runner);
+    DeploymentTargetRunnerInfo? Runner,
+    bool PrivilegedHostAccessApproved = false,
+    DateTimeOffset? PrivilegedHostAccessApprovedAtUtc = null,
+    string? PrivilegedHostAccessApprovedByUserId = null);

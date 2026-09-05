@@ -127,6 +127,12 @@ public static class TargetCommand
             var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
+                if (approve && !AnsiConsole.Confirm(
+                        "This target will be allowed to run application code with Privileged Host access. Continue?",
+                        defaultValue: false))
+                {
+                    throw new InvalidOperationException("Privileged Host access approval was not granted.");
+                }
                 var targetService = new DeploymentTargetService(config);
                 var target = approve
                     ? await targetService.ApprovePrivilegedHostAccessAsync(

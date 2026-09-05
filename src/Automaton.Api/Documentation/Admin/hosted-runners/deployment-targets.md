@@ -70,7 +70,9 @@ only after approval. Never delete target rows manually.
 For a release that changes target-aware SignalR methods, deploy API and Studio
 together and ask users to refresh existing Studio tabs. Verify one-environment
 deploy/publish, multi-environment preview and logs, Live promotion without
-redeployment, and Privileged Host acknowledgement. If rollback is required,
+redeployment, and Privileged Host approval state. Administrators grant or revoke
+approval on the target's Privileged Host access action; assignment remains
+blocked while approval is absent. If rollback is required,
 restore the previous API and Studio revision without changing the database or
 deployed environment rows, then repeat the route, log, and publish smoke checks.
 

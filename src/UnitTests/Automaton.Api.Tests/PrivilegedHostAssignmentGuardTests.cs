@@ -9,18 +9,21 @@ namespace Automaton.Api.Tests;
 public sealed class PrivilegedHostAssignmentGuardTests
 {
     [Test]
-    public void StandardRunner_does_not_require_acknowledgement()
+    public void StandardRunner_does_not_require_approval()
     {
-        Assert.DoesNotThrow(() => PrivilegedHostAssignmentGuard.EnsureAcknowledged(
-            new Runner { Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.Standard }, false));
+        Assert.DoesNotThrow(() => PrivilegedHostAssignmentGuard.EnsureApproved(
+            new AppDeploymentTarget(),
+            new Runner { Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.Standard }));
     }
 
     [Test]
-    public void PrivilegedHost_requires_acknowledgement()
+    public void PrivilegedHost_requires_persisted_approval()
     {
+        var target = new AppDeploymentTarget();
         var runner = new Runner { Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost };
-        var exception = Assert.Throws<InvalidOperationException>(() => PrivilegedHostAssignmentGuard.EnsureAcknowledged(runner, false));
-        Assert.That(exception!.Message, Does.Contain("requires explicit host-access acknowledgement"));
-        Assert.DoesNotThrow(() => PrivilegedHostAssignmentGuard.EnsureAcknowledged(runner, true));
+        var exception = Assert.Throws<InvalidOperationException>(() => PrivilegedHostAssignmentGuard.EnsureApproved(target, runner));
+        Assert.That(exception!.Message, Does.Contain("persisted Privileged Host access approval"));
+        target.PrivilegedHostAccessApproved = true;
+        Assert.DoesNotThrow(() => PrivilegedHostAssignmentGuard.EnsureApproved(target, runner));
     }
 }

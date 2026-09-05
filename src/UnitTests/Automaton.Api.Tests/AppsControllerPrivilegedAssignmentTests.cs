@@ -20,7 +20,7 @@ namespace Automaton.Api.Tests;
 public class AppsControllerPrivilegedAssignmentTests
 {
     [Test]
-    public async Task Post_ReturnsBadRequestWhenPrivilegedRunnerIsNotAcknowledged()
+    public async Task Post_ReturnsBadRequestWhenPrivilegedRunnerIsNotApproved()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -30,11 +30,11 @@ public class AppsControllerPrivilegedAssignmentTests
             ExecutionRunnerId = fixture.PrivilegedRunner.Id
         });
 
-        AssertAcknowledgementRequired(result);
+        AssertApprovalRequired(result);
     }
 
     [Test]
-    public async Task Put_ReturnsBadRequestWhenPrivilegedRunnerIsNotAcknowledged()
+    public async Task Put_ReturnsBadRequestWhenPrivilegedRunnerIsNotApproved()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -47,11 +47,11 @@ public class AppsControllerPrivilegedAssignmentTests
             ExecutionRunnerId = fixture.PrivilegedRunner.Id
         });
 
-        AssertAcknowledgementRequired(result);
+        AssertApprovalRequired(result);
     }
 
     [Test]
-    public async Task UpdateRunner_ReturnsBadRequestWhenPrivilegedRunnerIsNotAcknowledged()
+    public async Task UpdateRunner_ReturnsBadRequestWhenPrivilegedRunnerIsNotApproved()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -60,14 +60,14 @@ public class AppsControllerPrivilegedAssignmentTests
             ExecutionRunnerId = fixture.PrivilegedRunner.Id
         });
 
-        AssertAcknowledgementRequired(result);
+        AssertApprovalRequired(result);
     }
 
-    private static void AssertAcknowledgementRequired(IActionResult result)
+    private static void AssertApprovalRequired(IActionResult result)
     {
         Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
         Assert.That(((BadRequestObjectResult)result).Value?.ToString(),
-            Does.Contain("explicit host-access acknowledgement"));
+            Does.Contain("persisted Privileged Host access approval"));
     }
 
     private sealed class TestFixture : IAsyncDisposable

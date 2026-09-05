@@ -124,7 +124,7 @@ public class AutomatonApiClient : IDisposable
         CancellationToken ct = default)
     {
         using var resp = await PostJsonAsync(
-            $"api/apps/{appId}/targets/{targetId}/approve-privileged-host-access", "{}", ct);
+            $"api/apps/{appId}/targets/{targetId}/privileged-host-access", "{}", ct);
         await EnsureSuccessAsync(resp);
     }
 
@@ -133,8 +133,8 @@ public class AutomatonApiClient : IDisposable
         string targetId,
         CancellationToken ct = default)
     {
-        using var resp = await PostJsonAsync(
-            $"api/apps/{appId}/targets/{targetId}/revoke-privileged-host-access", "{}", ct);
+        using var resp = await _http.DeleteAsync(
+            $"api/apps/{appId}/targets/{targetId}/privileged-host-access", ct);
         await EnsureSuccessAsync(resp);
     }
 

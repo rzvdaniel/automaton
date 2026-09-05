@@ -403,7 +403,7 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
-    public async Task Create_PrivilegedHostRequiresAcknowledgementAndAcceptsConfirmedAssignment()
+    public async Task Create_PrivilegedHostRequiresPersistedApproval()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
         var runner = fixture.AddRunner(
@@ -426,21 +426,51 @@ public class AppDeploymentTargetManagementServiceTests
             new CreateAppDeploymentTargetRequest
             {
                 Name = "Confirmed privileged",
-                Slug = "confirmed-privileged",
-                RunnerId = runner.Id,
-                PrivilegedHostAccessAcknowledged = true
+                Slug = "confirmed-privileged"
             },
+            fixture.UserId);
+        await fixture.Service.SetPrivilegedHostApprovalAsync(fixture.App.Id, created.Id, fixture.UserId, true);
+        created = await fixture.Service.AssignRunnerAsync(
+            fixture.App.Id,
+            created.Id,
+            new AssignAppDeploymentTargetRunnerRequest { RunnerId = runner.Id },
             fixture.UserId);
 
         Assert.Multiple(() =>
         {
-            Assert.That(exception!.Message, Does.Contain("explicit host-access acknowledgement"));
+            Assert.That(exception!.Message, Does.Contain("persisted Privileged Host access approval"));
             Assert.That(created.Runner?.Id, Is.EqualTo(runner.Id));
         });
     }
 
     [Test]
-    public async Task AssignRunner_PrivilegedHostRequiresAcknowledgementOnlyWhenRunnerChanges()
+    public async Task PrivilegedHostApproval_IsIdempotentAndCanBeRevoked()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var target = await fixture.Db.AppDeploymentTargets
+            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+
+        var approved = await fixture.Service.SetPrivilegedHostApprovalAsync(
+            fixture.App.Id, target.Id, fixture.UserId, true);
+        var approvedAgain = await fixture.Service.SetPrivilegedHostApprovalAsync(
+            fixture.App.Id, target.Id, fixture.UserId, true);
+        var revoked = await fixture.Service.SetPrivilegedHostApprovalAsync(
+            fixture.App.Id, target.Id, fixture.UserId, false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(approved.PrivilegedHostAccessApproved, Is.True);
+            Assert.That(approved.PrivilegedHostAccessApprovedAtUtc, Is.Not.Null);
+            Assert.That(approved.PrivilegedHostAccessApprovedByUserId, Is.EqualTo(fixture.UserId));
+            Assert.That(approvedAgain.PrivilegedHostAccessApprovedAtUtc, Is.EqualTo(approved.PrivilegedHostAccessApprovedAtUtc));
+            Assert.That(revoked.PrivilegedHostAccessApproved, Is.False);
+            Assert.That(revoked.PrivilegedHostAccessApprovedAtUtc, Is.Null);
+            Assert.That(revoked.PrivilegedHostAccessApprovedByUserId, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task AssignRunner_PrivilegedHostRequiresPersistedApprovalOnlyWhenRunnerChanges()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
         var privilegedRunner = fixture.AddRunner(
@@ -457,13 +487,13 @@ public class AppDeploymentTargetManagementServiceTests
                 new AssignAppDeploymentTargetRunnerRequest { RunnerId = privilegedRunner.Id },
                 fixture.UserId));
 
+        await fixture.Service.SetPrivilegedHostApprovalAsync(fixture.App.Id, target.Id, fixture.UserId, true);
         var assigned = await fixture.Service.AssignRunnerAsync(
             fixture.App.Id,
             target.Id,
             new AssignAppDeploymentTargetRunnerRequest
             {
-                RunnerId = privilegedRunner.Id,
-                PrivilegedHostAccessAcknowledged = true
+                RunnerId = privilegedRunner.Id
             },
             fixture.UserId);
         var unchanged = await fixture.Service.AssignRunnerAsync(

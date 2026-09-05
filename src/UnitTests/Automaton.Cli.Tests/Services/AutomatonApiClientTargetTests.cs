@@ -81,9 +81,9 @@ public class AutomatonApiClientTargetTests
         Assert.That(exception.Message, Does.Not.Contain("ak_secret"));
     }
 
-    [TestCase(true, "api/apps/app-1/targets/target-1/approve-privileged-host-access")]
-    [TestCase(false, "api/apps/app-1/targets/target-1/revoke-privileged-host-access")]
-    public async Task PrivilegedHostAccessActions_UseTargetPostActionEndpoints(
+    [TestCase(true, "api/apps/app-1/targets/target-1/privileged-host-access")]
+    [TestCase(false, "api/apps/app-1/targets/target-1/privileged-host-access")]
+    public async Task PrivilegedHostAccessActions_UseTargetEndpoints(
         bool approve,
         string expectedPath)
     {
@@ -108,9 +108,12 @@ public class AutomatonApiClientTargetTests
         }
 
         Assert.That(capturedRequest, Is.Not.Null);
-        Assert.That(capturedRequest!.Method, Is.EqualTo(HttpMethod.Post));
+        Assert.That(capturedRequest!.Method, Is.EqualTo(approve ? HttpMethod.Post : HttpMethod.Delete));
         Assert.That(capturedRequest.RequestUri!.PathAndQuery.TrimStart('/'), Is.EqualTo(expectedPath));
-        Assert.That(capturedRequest.Content!.ReadAsStringAsync().GetAwaiter().GetResult(), Is.EqualTo("{}"));
+        if (approve)
+        {
+            Assert.That(capturedRequest.Content!.ReadAsStringAsync().GetAwaiter().GetResult(), Is.EqualTo("{}"));
+        }
     }
 
     private sealed class StubHandler(
