@@ -1,6 +1,8 @@
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -21,16 +23,19 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 {
     private readonly ApiKeyService apiKeyService;
     private readonly ApplicationDbContext dbContext;
+    private readonly UserManager<ApplicationUser> userManager;
 
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
         ApiKeyService apiKeyService,
-        ApplicationDbContext dbContext) : base(options, logger, encoder)
+        ApplicationDbContext dbContext,
+        UserManager<ApplicationUser> userManager) : base(options, logger, encoder)
     {
         this.apiKeyService = apiKeyService;
         this.dbContext = dbContext;
+        this.userManager = userManager;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -98,10 +103,20 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             new("uid", userId.ToString())
         };
 
+        AddRoleClaims(claims, await userManager.GetRolesAsync(user));
+
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
         return AuthenticateResult.Success(ticket);
+    }
+
+    internal static void AddRoleClaims(ICollection<Claim> claims, IEnumerable<string> roles)
+    {
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
     }
 }
