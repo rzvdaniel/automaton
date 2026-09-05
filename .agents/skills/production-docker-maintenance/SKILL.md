@@ -22,6 +22,8 @@ Do not start a production build with less than 10 GB free. If space is unexpecte
 
 ## Permitted cleanup
 
+Before cleanup, confirm that active containers and both the current and immediately previous immutable revision-tagged images are preserved. Cleanup must not remove images tagged with either revision.
+
 After confirming that active containers and rollback capacity are preserved, the bounded cleanup is:
 
 ```bash

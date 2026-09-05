@@ -18,6 +18,7 @@ Read the current scripts and [the production cheat sheet](../../../docs/prod/pro
 - `scripts/prod-redeploy-studio.sh`
 - `scripts/prod-redeploy-website.sh`
 - `scripts/prod-redeploy-worker.sh`
+- `scripts/prod-adopt-image-revisions.sh`
 - `scripts/prod-verify.sh`
 
 ## Docker maintenance
@@ -25,6 +26,22 @@ Read the current scripts and [the production cheat sheet](../../../docs/prod/pro
 For on-host Docker builds, also apply [.agents/skills/production-docker-maintenance/SKILL.md](../production-docker-maintenance/SKILL.md).
 
 Use it during preflight before starting a Docker build, whenever free disk is below its maintenance thresholds, and after a successful deployment to bound accumulated build cache. Do not bypass its volume, rollback-image, or destructive-prune safeguards. A production Docker build must not begin with less than 10 GB of free disk space.
+
+## Rollback image retention
+
+Before replacing a production revision, retain the currently deployed API, Studio,
+and Website images under immutable Git revision tags such as
+`automaton-prod-api:<git-sha>`. Deploy scripts record the current and immediately
+previous revision in blue-green state and accept `--revision` to select an
+existing immutable image explicitly for rollback. Never rely on `latest`, dangling
+images, or build cache as the rollback artifact.
+
+If blue-green state predates revision metadata, run
+`scripts/prod-adopt-image-revisions.sh` once with an explicit known revision for
+each live service being adopted, for example `--api <sha> --studio <sha>
+--website <sha>`. The command only verifies the live containers, tags their exact
+images, and records current revision metadata; it does not build, deploy, restart,
+switch colors, or change the database. Stop if any live image cannot be verified.
 
 ## Safety rules
 

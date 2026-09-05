@@ -23,6 +23,7 @@ CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
 LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 
 MIGRATION_EXPECTED_RUNNER_IDS=""
+PRODUCTION_REVISION="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
 json_array_field() {
     local field="$1"
@@ -114,6 +115,12 @@ write_default_state() {
 LIVE_API_COLOR=$LIVE_API_COLOR_DEFAULT
 LIVE_STUDIO_COLOR=$LIVE_STUDIO_COLOR_DEFAULT
 LIVE_WEBSITE_COLOR=$LIVE_WEBSITE_COLOR_DEFAULT
+API_CURRENT_REVISION=
+API_PREVIOUS_REVISION=
+STUDIO_CURRENT_REVISION=
+STUDIO_PREVIOUS_REVISION=
+WEBSITE_CURRENT_REVISION=
+WEBSITE_PREVIOUS_REVISION=
 EOF
 }
 
@@ -130,6 +137,12 @@ load_state() {
     LIVE_API_COLOR="${LIVE_API_COLOR:-$LIVE_API_COLOR_DEFAULT}"
     LIVE_STUDIO_COLOR="${LIVE_STUDIO_COLOR:-$LIVE_STUDIO_COLOR_DEFAULT}"
     LIVE_WEBSITE_COLOR="${LIVE_WEBSITE_COLOR:-$LIVE_WEBSITE_COLOR_DEFAULT}"
+    API_CURRENT_REVISION="${API_CURRENT_REVISION:-}"
+    API_PREVIOUS_REVISION="${API_PREVIOUS_REVISION:-}"
+    STUDIO_CURRENT_REVISION="${STUDIO_CURRENT_REVISION:-}"
+    STUDIO_PREVIOUS_REVISION="${STUDIO_PREVIOUS_REVISION:-}"
+    WEBSITE_CURRENT_REVISION="${WEBSITE_CURRENT_REVISION:-}"
+    WEBSITE_PREVIOUS_REVISION="${WEBSITE_PREVIOUS_REVISION:-}"
 }
 
 save_state() {
@@ -138,7 +151,65 @@ save_state() {
 LIVE_API_COLOR=$LIVE_API_COLOR
 LIVE_STUDIO_COLOR=$LIVE_STUDIO_COLOR
 LIVE_WEBSITE_COLOR=$LIVE_WEBSITE_COLOR
+API_CURRENT_REVISION=$API_CURRENT_REVISION
+API_PREVIOUS_REVISION=$API_PREVIOUS_REVISION
+STUDIO_CURRENT_REVISION=$STUDIO_CURRENT_REVISION
+STUDIO_PREVIOUS_REVISION=$STUDIO_PREVIOUS_REVISION
+WEBSITE_CURRENT_REVISION=$WEBSITE_CURRENT_REVISION
+WEBSITE_PREVIOUS_REVISION=$WEBSITE_PREVIOUS_REVISION
 EOF
+}
+
+service_image_name() {
+    local service="$1"
+    echo "automaton-prod-$service"
+}
+
+validate_revision() {
+    local revision="$1"
+    [[ "$revision" =~ ^[0-9a-fA-F]{7,64}$ ]] || {
+        echo "[ERROR] Invalid production image revision: $revision" >&2
+        return 1
+    }
+}
+
+get_service_revision() {
+    local service="$1"
+    local kind="$2"
+    load_state
+    case "$service:$kind" in
+        api:current) echo "$API_CURRENT_REVISION" ;;
+        api:previous) echo "$API_PREVIOUS_REVISION" ;;
+        studio:current) echo "$STUDIO_CURRENT_REVISION" ;;
+        studio:previous) echo "$STUDIO_PREVIOUS_REVISION" ;;
+        website:current) echo "$WEBSITE_CURRENT_REVISION" ;;
+        website:previous) echo "$WEBSITE_PREVIOUS_REVISION" ;;
+        *) echo "[ERROR] Unknown service revision: $service $kind" >&2; return 1 ;;
+    esac
+}
+
+preserve_current_service_image() {
+    local service="$1"
+    local color="$2"
+    local revision
+    revision="$(get_service_revision "$service" current)"
+    validate_revision "$revision" || {
+        echo "[ERROR] Cannot replace $service-$color without current immutable revision metadata." >&2
+        echo "[ERROR] Establish the deployed revision tag before retrying; no image was changed." >&2
+        return 1
+    }
+
+    local container_id
+    container_id="$(service_container_ids "$(compose_service_name "$service" "$color")" | head -n 1)"
+    if [[ -z "$container_id" ]]; then
+        echo "[ERROR] Cannot preserve $service-$color: no running container found." >&2
+        return 1
+    fi
+
+    local image_id
+    image_id="$(docker inspect --format '{{.Image}}' "$container_id")"
+    docker tag "$image_id" "$(service_image_name "$service"):$revision"
+    echo "[INFO] Preserved $service-$color rollback image as $(service_image_name "$service"):$revision"
 }
 
 render_template() {
@@ -513,7 +584,13 @@ wait_for_public_origin() {
 switch_live_color() {
     local service="$1"
     local color="$2"
+    local revision="${3:-}"
+    local previous_revision="${4:-}"
     local previous_color
+
+    if [[ -n "$revision" ]]; then
+        validate_revision "$revision"
+    fi
 
     previous_color="$(get_live_color "$service")"
 
@@ -550,15 +627,31 @@ switch_live_color() {
         exit 1
     fi
     soft_wait_for_public_origin "$service" || true
-    set_live_color_record "$service" "$color"
+    load_state
+    case "$service" in
+        api) LIVE_API_COLOR="$color" ;;
+        studio) LIVE_STUDIO_COLOR="$color" ;;
+        website) LIVE_WEBSITE_COLOR="$color" ;;
+        *) echo "[ERROR] Unknown service: $service" >&2; exit 1 ;;
+    esac
+    if [[ -n "$revision" ]]; then
+        case "$service" in
+            api) API_CURRENT_REVISION="$revision"; API_PREVIOUS_REVISION="$previous_revision" ;;
+            studio) STUDIO_CURRENT_REVISION="$revision"; STUDIO_PREVIOUS_REVISION="$previous_revision" ;;
+            website) WEBSITE_CURRENT_REVISION="$revision"; WEBSITE_PREVIOUS_REVISION="$previous_revision" ;;
+        esac
+    fi
+    save_state
 }
 
 rollback_live_color() {
     local service="$1"
     local color="$2"
+    local revision="${3:-}"
+    local previous_revision="${4:-}"
 
     echo "[WARN] Rolling $service traffic back to $color"
-    if ! switch_live_color "$service" "$color"; then
+    if ! switch_live_color "$service" "$color" "$revision" "$previous_revision"; then
         echo "[ERROR] Failed to roll $service traffic back to $color" >&2
         return 1
     fi
@@ -575,9 +668,18 @@ rollback_all_live_colors() {
     local api_color="$1"
     local studio_color="$2"
     local website_color="$3"
+    local api_revision="${4:-}"
+    local api_previous_revision="${5:-}"
+    local studio_revision="${6:-}"
+    local studio_previous_revision="${7:-}"
+    local website_revision="${8:-}"
+    local website_previous_revision="${9:-}"
 
     echo "[WARN] Rolling all public traffic back to API=$api_color Studio=$studio_color Website=$website_color"
-    if ! switch_all_live_colors "$api_color" "$studio_color" "$website_color"; then
+    if ! switch_all_live_colors "$api_color" "$studio_color" "$website_color" \
+        "$api_revision" "$api_previous_revision" \
+        "$studio_revision" "$studio_previous_revision" \
+        "$website_revision" "$website_previous_revision"; then
         echo "[ERROR] Failed to roll all public traffic back to the previous colors" >&2
         return 1
     fi
@@ -594,9 +696,19 @@ switch_all_live_colors() {
     local api_color="$1"
     local studio_color="$2"
     local website_color="$3"
+    local api_revision="${4:-}"
+    local api_previous_revision="${5:-}"
+    local studio_revision="${6:-}"
+    local studio_previous_revision="${7:-}"
+    local website_revision="${8:-}"
+    local website_previous_revision="${9:-}"
     local previous_api_color
     local previous_studio_color
     local previous_website_color
+
+    [[ -z "$api_revision" ]] || validate_revision "$api_revision"
+    [[ -z "$studio_revision" ]] || validate_revision "$studio_revision"
+    [[ -z "$website_revision" ]] || validate_revision "$website_revision"
 
     previous_api_color="$(get_live_color api)"
     previous_studio_color="$(get_live_color studio)"
@@ -630,6 +742,18 @@ switch_all_live_colors() {
     LIVE_API_COLOR="$api_color"
     LIVE_STUDIO_COLOR="$studio_color"
     LIVE_WEBSITE_COLOR="$website_color"
+    if [[ -n "$api_revision" ]]; then
+        API_CURRENT_REVISION="$api_revision"
+        API_PREVIOUS_REVISION="$api_previous_revision"
+    fi
+    if [[ -n "$studio_revision" ]]; then
+        STUDIO_CURRENT_REVISION="$studio_revision"
+        STUDIO_PREVIOUS_REVISION="$studio_previous_revision"
+    fi
+    if [[ -n "$website_revision" ]]; then
+        WEBSITE_CURRENT_REVISION="$website_revision"
+        WEBSITE_PREVIOUS_REVISION="$website_previous_revision"
+    fi
     save_state
 
     soft_wait_for_public_origin api || true
@@ -698,11 +822,29 @@ traefik_target_probe_command() {
 deploy_color() {
     local service="$1"
     local color="$2"
+    local revision="${3:-$PRODUCTION_REVISION}"
+    local explicit_revision="${4:-false}"
     local compose_service
     compose_service="$(compose_service_name "$service" "$color")"
 
-    echo "[INFO] Deploying $compose_service"
-    docker compose -f "$COMPOSE_FILE" up -d --build "$compose_service"
+    validate_revision "$revision"
+
+    local image_name
+    image_name="$(service_image_name "$service")"
+    if ! docker image inspect "$image_name:$revision" >/dev/null 2>&1; then
+        if [[ "$explicit_revision" == "true" ]]; then
+            echo "[ERROR] Immutable image $image_name:$revision does not exist locally; refusing to build or change containers." >&2
+            return 1
+        fi
+        echo "[INFO] Building $compose_service as $image_name:$revision"
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --build "$compose_service"
+        docker tag "$image_name:$revision" "$image_name:latest"
+    else
+        echo "[INFO] Reusing immutable rollback image $image_name:$revision for $compose_service"
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --no-build "$compose_service"
+        docker tag "$image_name:$revision" "$image_name:latest"
+    fi
+
     wait_for_service_healthy "$compose_service"
     verify_target_from_traefik_network "$service" "$color"
 
