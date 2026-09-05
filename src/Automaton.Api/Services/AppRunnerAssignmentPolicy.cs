@@ -82,6 +82,8 @@ public sealed class AppRunnerAssignmentPolicy(
             cancellationToken);
         var runner = target.ExecutionRunner!;
 
+        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
+
         if (requireOnline &&
             !RunnerPresenceEvaluator.IsOnline(
                 runner.ConnectionId,
