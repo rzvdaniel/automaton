@@ -15,6 +15,10 @@ public sealed class AppDeploymentTarget
     public Guid? ExecutionRunnerId { get; set; }
     public Runner? ExecutionRunner { get; set; }
 
+    public bool PrivilegedHostAccessApproved { get; set; }
+    public DateTimeOffset? PrivilegedHostAccessApprovedAtUtc { get; set; }
+    public Guid? PrivilegedHostAccessApprovedByUserId { get; set; }
+
     public bool IsDefault { get; set; }
 
     /// <summary>

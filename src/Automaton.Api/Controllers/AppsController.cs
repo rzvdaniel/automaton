@@ -352,7 +352,6 @@ public class AppsController : BaseController
                 request.PublicUrl,
                 request.RequiresAuthentication,
                 request.ExecutionRunnerId,
-                request.PrivilegedHostAccessAcknowledged,
                 request.Category,
                 request.Tags,
                 request.IsForkable,
@@ -459,7 +458,7 @@ public class AppsController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        try { await appsService.UpdateRunner(id, request.ExecutionRunnerId, request.PrivilegedHostAccessAcknowledged); }
+        try { await appsService.UpdateRunner(id, request.ExecutionRunnerId); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
@@ -2132,7 +2131,6 @@ public class PublishAppRequest
     public required string PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; } = false;
     public Guid? ExecutionRunnerId { get; set; }
-    public bool PrivilegedHostAccessAcknowledged { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }
     public bool IsForkable { get; set; } = false;
@@ -2154,7 +2152,6 @@ public class CreateAppStepRequest
 public class UpdateRunnerRequest
 {
     public Guid? ExecutionRunnerId { get; set; }
-    public bool PrivilegedHostAccessAcknowledged { get; set; }
 }
 
 public class SetSampleStatusRequest

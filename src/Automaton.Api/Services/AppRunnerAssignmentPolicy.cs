@@ -18,11 +18,10 @@ public sealed class AppRunnerAssignmentPolicy(
         WebApp app,
         Guid? runnerId,
         Guid userId,
-        CancellationToken cancellationToken = default,
-        bool privilegedHostAccessAcknowledged = false)
+        CancellationToken cancellationToken = default)
     {
         var target = await GetOrCreateDefaultTargetAsync(app, cancellationToken);
-        await AssignAsync(app, target, runnerId, userId, cancellationToken, privilegedHostAccessAcknowledged);
+        await AssignAsync(app, target, runnerId, userId, cancellationToken);
     }
 
     public async Task AssignAsync(
@@ -30,8 +29,7 @@ public sealed class AppRunnerAssignmentPolicy(
         AppDeploymentTarget target,
         Guid? runnerId,
         Guid userId,
-        CancellationToken cancellationToken = default,
-        bool privilegedHostAccessAcknowledged = false)
+        CancellationToken cancellationToken = default)
     {
         if (target.WebAppId != app.Id)
         {
@@ -63,7 +61,7 @@ public sealed class AppRunnerAssignmentPolicy(
             cancellationToken);
         if (target.ExecutionRunnerId != runner.Id)
         {
-            PrivilegedHostAssignmentGuard.EnsureAcknowledged(runner, privilegedHostAccessAcknowledged);
+            PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
             target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
         }
@@ -83,6 +81,8 @@ public sealed class AppRunnerAssignmentPolicy(
             userId,
             cancellationToken);
         var runner = target.ExecutionRunner!;
+
+        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
 
         if (requireOnline &&
             !RunnerPresenceEvaluator.IsOnline(

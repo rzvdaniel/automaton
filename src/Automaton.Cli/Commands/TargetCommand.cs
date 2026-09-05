@@ -13,6 +13,8 @@ public static class TargetCommand
         var command = new Command("target", "Manage deployment targets for the linked app");
         command.AddCommand(BuildList(config));
         command.AddCommand(BuildAdd(config));
+        command.AddCommand(BuildPrivilegedHostAccess(config, approve: true));
+        command.AddCommand(BuildPrivilegedHostAccess(config, approve: false));
         command.AddCommand(BuildRemove(config));
         command.AddCommand(BuildPrimary(config));
         command.AddCommand(BuildDefaultAlias(config));
@@ -58,19 +60,14 @@ public static class TargetCommand
     private static Command BuildAdd(ConfigService config)
     {
         var slugArgument = new Argument<string>("slug", "Target slug");
-        var runnerOption = new Option<string>("--runner", "Runner ID or exact Runner name")
-        {
-            IsRequired = true
-        };
+        var runnerOption = new Option<string?>("--runner", "Runner ID or exact Runner name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
-        var privilegedAckOption = new Option<bool>("--acknowledge-privileged-host-access", "Acknowledge elevated host access for a new Privileged Host assignment");
         var environmentOption = EnvironmentOption();
         var command = new Command("add", "Add a deployment target")
         {
             slugArgument,
             runnerOption,
             jsonOption,
-            privilegedAckOption,
             environmentOption
         };
         command.SetHandler(async (InvocationContext context) =>
@@ -78,12 +75,11 @@ public static class TargetCommand
             var slug = context.ParseResult.GetValueForArgument(slugArgument);
             var runner = context.ParseResult.GetValueForOption(runnerOption);
             var asJson = context.ParseResult.GetValueForOption(jsonOption);
-            var privilegedAck = context.ParseResult.GetValueForOption(privilegedAckOption);
             var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 var target = await new DeploymentTargetService(config).AddAsync(
-                    Directory.GetCurrentDirectory(), slug, runner!, environmentName, privilegedAck, CliInteraction.IsNonInteractive(false, asJson));
+                    Directory.GetCurrentDirectory(), slug, runner, environmentName);
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, target });
@@ -101,6 +97,71 @@ public static class TargetCommand
                 context.ExitCode = 1;
             }
         });
+        return command;
+    }
+
+    private static Command BuildPrivilegedHostAccess(ConfigService config, bool approve)
+    {
+        var slugArgument = new Argument<string>("slug", "Target slug");
+        var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = EnvironmentOption();
+        var verb = approve ? "approve" : "revoke";
+        var command = new Command(
+            verb,
+            approve
+                ? "Persist approval for Privileged Host access on a deployment target"
+                : "Revoke persisted Privileged Host access approval from a deployment target")
+        {
+            slugArgument,
+            jsonOption,
+            environmentOption
+        };
+
+        command.SetHandler(async (InvocationContext context) =>
+        {
+            var slug = context.ParseResult.GetValueForArgument(slugArgument);
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
+            try
+            {
+                if (approve && !AnsiConsole.Confirm(
+                        "This target will be allowed to run application code with Privileged Host access. Continue?",
+                        defaultValue: false))
+                {
+                    throw new InvalidOperationException("Privileged Host access approval was not granted.");
+                }
+                var targetService = new DeploymentTargetService(config);
+                var target = approve
+                    ? await targetService.ApprovePrivilegedHostAccessAsync(
+                        Directory.GetCurrentDirectory(), slug, environmentName, context.GetCancellationToken())
+                    : await targetService.RevokePrivilegedHostAccessAsync(
+                        Directory.GetCurrentDirectory(), slug, environmentName, context.GetCancellationToken());
+                if (asJson)
+                {
+                    CliJson.Write(new
+                    {
+                        success = true,
+                        target = target.Slug,
+                        privilegedHostAccessApproved = approve
+                    });
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine(
+                        approve
+                            ? $"[green]Privileged Host access approved:[/] {Markup.Escape(target.Slug)}"
+                            : $"[green]Privileged Host access approval revoked:[/] {Markup.Escape(target.Slug)}");
+                }
+
+                context.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                WriteError(ex, asJson);
+                context.ExitCode = 1;
+            }
+        });
+
         return command;
     }
 

@@ -81,6 +81,70 @@ public class AutomatonApiClientTargetTests
         Assert.That(exception.Message, Does.Not.Contain("ak_secret"));
     }
 
+    [TestCase(true, "api/apps/app-1/targets/target-1/privileged-host-access")]
+    [TestCase(false, "api/apps/app-1/targets/target-1/privileged-host-access")]
+    public async Task PrivilegedHostAccessActions_UseTargetEndpoints(
+        bool approve,
+        string expectedPath)
+    {
+        HttpRequestMessage? capturedRequest = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.test/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "ak_test");
+
+        if (approve)
+        {
+            await client.ApproveDeploymentTargetPrivilegedHostAccessAsync("app-1", "target-1");
+        }
+        else
+        {
+            await client.RevokeDeploymentTargetPrivilegedHostAccessAsync("app-1", "target-1");
+        }
+
+        Assert.That(capturedRequest, Is.Not.Null);
+        Assert.That(capturedRequest!.Method, Is.EqualTo(approve ? HttpMethod.Post : HttpMethod.Delete));
+        Assert.That(capturedRequest.RequestUri!.PathAndQuery.TrimStart('/'), Is.EqualTo(expectedPath));
+        if (approve)
+        {
+            Assert.That(capturedRequest.Content!.ReadAsStringAsync().GetAwaiter().GetResult(), Is.EqualTo("{}"));
+        }
+    }
+
+    [Test]
+    public async Task CreateDeploymentTargetAsync_AllowsAnUnassignedTarget()
+    {
+        string? payload = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            payload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent(
+                    "{\"id\":\"target-1\",\"name\":\"canary\",\"slug\":\"canary\",\"isDefault\":false,\"status\":\"Unassigned\",\"legacyControllerRuntimeDeployed\":false,\"runner\":null}",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.test/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "ak_test");
+
+        var target = await client.CreateDeploymentTargetAsync("app-1", "canary", "canary", null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Runner, Is.Null);
+            Assert.That(payload, Does.Not.Contain("runnerId"));
+        });
+    }
+
     private sealed class StubHandler(
         Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {

@@ -143,26 +143,22 @@ public sealed class DeploymentTargetService(ConfigService config)
     public async Task<DeploymentTargetInfo> AddAsync(
         string directory,
         string slug,
-        string runnerReference,
+        string? runnerReference,
         string? environmentName = null,
-        bool privilegedHostAccessAcknowledged = false,
-        bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runner = await ResolveRunnerAsync(
-                client, runnerReference, cancellationToken);
-            var acknowledged = await EnsurePrivilegedAcknowledgementAsync(
-                runner.IsPrivilegedHost, privilegedHostAccessAcknowledged, nonInteractive);
+            var runner = string.IsNullOrWhiteSpace(runnerReference)
+                ? null
+                : await ResolveRunnerAsync(client, runnerReference, cancellationToken);
             var normalizedSlug = slug.Trim().ToLowerInvariant();
             return await client.CreateDeploymentTargetAsync(
                 appId,
                 normalizedSlug,
                 normalizedSlug,
-                runner.Id,
-                acknowledged,
+                runner,
                 cancellationToken);
         }
     }
@@ -172,8 +168,6 @@ public sealed class DeploymentTargetService(ConfigService config)
         DeploymentTargetInfo target,
         string runnerReference,
         string? environmentName = null,
-        bool privilegedHostAccessAcknowledged = false,
-        bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
@@ -181,15 +175,42 @@ public sealed class DeploymentTargetService(ConfigService config)
         {
             var runner = await ResolveRunnerAsync(
                 client, runnerReference, cancellationToken);
-            var unchangedPrivilegedAssignment = target.Runner?.Id == runner.Id && target.Runner.ApplicationProfile == "PrivilegedHost";
-            var acknowledged = unchangedPrivilegedAssignment || await EnsurePrivilegedAcknowledgementAsync(
-                runner.IsPrivilegedHost, privilegedHostAccessAcknowledged, nonInteractive);
             await client.AssignDeploymentTargetRunnerAsync(
-                appId, target.Id, runner.Id,
-                privilegedHostAccessAcknowledged: acknowledged,
-                ct: cancellationToken);
+                appId, target.Id, runner, ct: cancellationToken);
         }
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
+    }
+
+    public async Task<DeploymentTargetInfo> ApprovePrivilegedHostAccessAsync(
+        string directory,
+        string slug,
+        string? environmentName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = await ResolveAsync(directory, slug, environmentName, cancellationToken);
+        var (client, appId, _) = CreateClient(directory, environmentName);
+        using (client)
+        {
+            await client.ApproveDeploymentTargetPrivilegedHostAccessAsync(appId, target.Id, cancellationToken);
+        }
+
+        return await ResolveAsync(directory, slug, environmentName, cancellationToken);
+    }
+
+    public async Task<DeploymentTargetInfo> RevokePrivilegedHostAccessAsync(
+        string directory,
+        string slug,
+        string? environmentName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = await ResolveAsync(directory, slug, environmentName, cancellationToken);
+        var (client, appId, _) = CreateClient(directory, environmentName);
+        using (client)
+        {
+            await client.RevokeDeploymentTargetPrivilegedHostAccessAsync(appId, target.Id, cancellationToken);
+        }
+
+        return await ResolveAsync(directory, slug, environmentName, cancellationToken);
     }
 
     public async Task<DeploymentTargetInfo> ClearRunnerAsync(
@@ -256,7 +277,7 @@ public sealed class DeploymentTargetService(ConfigService config)
             project.Name ?? resolved.AppId);
     }
 
-    private static async Task<(string Id, bool IsPrivilegedHost)> ResolveRunnerAsync(
+    private static async Task<string> ResolveRunnerAsync(
         AutomatonApiClient client,
         string runnerReference,
         CancellationToken cancellationToken)
@@ -292,21 +313,7 @@ public sealed class DeploymentTargetService(ConfigService config)
                 $"Several Runners match '{runnerReference}'. Use the Runner ID.");
         }
         var match = matches[0];
-        var profile = match.TryGetProperty("applicationProfile", out var profileProperty)
-            ? profileProperty.GetString() : null;
-        return (match.GetProperty("id").GetString()!, string.Equals(profile, "PrivilegedHost", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static Task<bool> EnsurePrivilegedAcknowledgementAsync(bool isPrivilegedHost, bool acknowledged, bool nonInteractive)
-    {
-        if (!isPrivilegedHost || acknowledged) return Task.FromResult(acknowledged);
-        if (nonInteractive)
-        {
-            throw new InvalidOperationException("Privileged Host assignment requires --acknowledge-privileged-host-access.");
-        }
-        var confirmed = AnsiConsole.Confirm("This environment will run on a Privileged Host Runner.\nThe App container receives elevated host access.\nContinue?", defaultValue: false);
-        if (!confirmed) throw new InvalidOperationException("Privileged Host assignment was not acknowledged.");
-        return Task.FromResult(true);
+        return match.GetProperty("id").GetString()!;
     }
 
     private static string? ToSlug(string? value)

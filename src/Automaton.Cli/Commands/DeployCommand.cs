@@ -31,7 +31,6 @@ public static class DeployCommand
             Arity = ArgumentArity.ZeroOrOne
         };
         var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before deployment when needed");
-        var privilegedAckOption = new Option<bool>("--acknowledge-privileged-host-access", "Acknowledge elevated host access for a new Privileged Host assignment");
         var cleanOption = new Option<bool>(
             "--clean",
             "Wipe all server-side app files before uploading (full replace)");
@@ -51,7 +50,6 @@ public static class DeployCommand
         {
             targetArgument,
             runnerOption,
-            privilegedAckOption,
             cleanOption,
             dirOption,
             jsonOption,
@@ -66,7 +64,6 @@ public static class DeployCommand
         {
             var targetSlug = context.ParseResult.GetValueForArgument(targetArgument);
             var runner = context.ParseResult.GetValueForOption(runnerOption);
-            var privilegedAck = context.ParseResult.GetValueForOption(privilegedAckOption);
             var clean = context.ParseResult.GetValueForOption(cleanOption);
             var dir = context.ParseResult.GetValueForOption(dirOption);
             var asJson = context.ParseResult.GetValueForOption(jsonOption);
@@ -104,8 +101,6 @@ public static class DeployCommand
                         target,
                         runner,
                         environmentName,
-                        privilegedAck,
-                        nonInteractive,
                         context.GetCancellationToken());
                 }
                 DeploymentTargetService.EnsureDeployable(target);

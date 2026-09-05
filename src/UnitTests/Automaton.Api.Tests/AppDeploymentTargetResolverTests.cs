@@ -201,6 +201,11 @@ public class AppDeploymentTargetResolverTests
         var app = AddApp(db, userId, runnerId: null);
         await db.SaveChangesAsync();
 
+        var target = await db.AppDeploymentTargets
+            .SingleAsync(x => x.WebAppId == app.Id && x.IsDefault);
+        target.PrivilegedHostAccessApproved = true;
+        await db.SaveChangesAsync();
+
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
             new HostedRunnerAppCapacityService(db),

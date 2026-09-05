@@ -34,6 +34,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     legacyControllerRuntimeDeployed: true,
     genericRuntimeDeployed: true,
     cleanupPending: false,
+    privilegedHostAccessApproved: false,
     lastSuccessfulDeploymentAt: '2026-08-04T18:42:00Z',
     routePath: '/',
     runner: {
