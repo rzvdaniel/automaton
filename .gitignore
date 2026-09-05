@@ -103,6 +103,8 @@ __pycache__/
 !.agents/skills/generic-runtime/**
 !.agents/skills/production-deployment/
 !.agents/skills/production-deployment/**
+!.agents/skills/production-docker-maintenance/
+!.agents/skills/production-docker-maintenance/**
 !.agents/skills/admin-docs/
 !.agents/skills/admin-docs/**
 .vitepress/

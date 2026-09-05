@@ -10,6 +10,7 @@ Read the matching skill before changing the related area:
 
 - [Generic runtime](.agents/skills/generic-runtime/SKILL.md) for app source and runtime behavior, deployment contracts, public serving, archives, forks, and remixes.
 - [Production deployment](.agents/skills/production-deployment/SKILL.md) for production scripts, Compose, blue-green cutovers, Traefik, certificates, health checks, and rollback.
+- [Production Docker maintenance](.agents/skills/production-docker-maintenance/SKILL.md) for inspecting and safely reclaiming Docker disk space on production hosts.
 - [Admin docs](.agents/skills/admin-docs/SKILL.md) for administrator-visible Studio or API behavior and its documentation.
 
 The `.agents/skills/` directory also contains developer-local skills. Do not edit or add those skills unless the task names them.
