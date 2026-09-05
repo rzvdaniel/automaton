@@ -229,7 +229,7 @@ services.AddCap(options =>
     // the five-minute execution lease can be observed as expired.
     options.FailedRetryCount = 50;
     options.FailedRetryInterval = 60;
-    options.UseEntityFramework<ApplicationDbContext>();
+    CapRegistration.ConfigureStorage(options);
     var rabbitMqHost = configurationManager["RabbitMq:Host"]
         ?? throw new InvalidOperationException("RabbitMq:Host is required.");
     var rabbitMqUsername = configurationManager["RabbitMq:Username"]

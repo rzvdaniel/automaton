@@ -87,7 +87,7 @@ builder.Services.AddCap(options =>
     var rabbitMqPassword = builder.Configuration["RabbitMq:Password"]
         ?? throw new InvalidOperationException("RabbitMq:Password is required.");
 
-    options.UseMySql(connectionString);
+    CapRegistration.ConfigureStorage(options, connectionString);
     options.UseRabbitMQ(rabbitMq =>
     {
         rabbitMq.HostName = rabbitMqHost;
