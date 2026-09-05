@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
@@ -19,9 +18,7 @@ import {
   getDeploymentTargetRunnerOptions,
   getDeploymentTargetRunnerProjectId,
   isPrivilegedSelfHostedRunner,
-  requiresPrivilegedHostAcknowledgement,
   resolveAutomatonHostedRunnerId,
-  shouldResetPrivilegedHostAcknowledgement,
 } from '../utils/deployment-target-runner'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
@@ -44,7 +41,6 @@ const editingTarget = ref<AppDeploymentTarget | null>(null)
 const name = ref('')
 const slug = ref('')
 const runnerId = ref<string | null>(null)
-const privilegedHostAccessAcknowledged = ref(false)
 const purpose = ref<'Staging' | 'Canary' | 'Custom'>('Custom')
 const advancedTargetIds = ref<string[]>([])
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -53,13 +49,6 @@ const actionMenuTarget = ref<AppDeploymentTarget | null>(null)
 const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
 const selectedRunnerIsPrivileged = computed(() =>
   isPrivilegedSelfHostedRunner(selectedRunner.value)
-)
-const requiresPrivilegedAcknowledgement = computed(() =>
-  requiresPrivilegedHostAcknowledgement(
-    selectedRunner.value,
-    runnerId.value,
-    editingTarget.value?.runner?.id ?? null
-  )
 )
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
 const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
@@ -127,7 +116,6 @@ function openCreate() {
   slug.value = ''
   runnerId.value = null
   purpose.value = 'Custom'
-  privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
 }
 
@@ -147,7 +135,6 @@ function openEdit(target: AppDeploymentTarget) {
   slug.value = target.slug
   runnerId.value = target.runner?.id ?? null
   purpose.value = 'Custom'
-  privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
 }
 
@@ -180,7 +167,6 @@ async function saveTarget() {
         name: name.value.trim(),
         slug: normalizedSlug.value,
         runnerId: runnerId.value,
-        privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged.value,
       })
       showEditor.value = false
       toast.add({
@@ -210,8 +196,7 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
         props.appId,
         target.id,
         runnerId.value,
-        cleanupDeployedRuntime,
-        privilegedHostAccessAcknowledged.value
+        cleanupDeployedRuntime
       )
     }
     showEditor.value = false
@@ -228,12 +213,6 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
     busyTargetId.value = null
   }
 }
-
-watch(runnerId, (nextRunnerId, previousRunnerId) => {
-  if (shouldResetPrivilegedHostAcknowledgement(nextRunnerId, previousRunnerId)) {
-    privilegedHostAccessAcknowledged.value = false
-  }
-})
 
 function makeDefault(target: AppDeploymentTarget) {
   confirm.require({
@@ -349,6 +328,61 @@ function canPromote(target: AppDeploymentTarget): boolean {
     target.genericRuntimeDeployed &&
     target.status !== DeploymentTargetStatus.Deploying
   )
+}
+
+function canSaveTarget(): boolean {
+  if (!name.value.trim() || !normalizedSlug.value) return false
+  if (!selectedRunnerIsPrivileged.value) return true
+  if (editingTarget.value?.runner?.id === runnerId.value) return true
+  return !!editingTarget.value?.privilegedHostAccessApproved
+}
+
+function approvePrivilegedHostAccess(target: AppDeploymentTarget) {
+  confirm.require({
+    header: 'Approve Privileged Host access?',
+    message:
+      'This grants the target permission to run on a Privileged Host. The App may read and modify host files, inspect host processes and Docker containers, affect services and system state, and access host secrets.',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Approve access',
+    accept: () => void setPrivilegedHostAccessApproval(target, true),
+  })
+}
+
+function revokePrivilegedHostAccess(target: AppDeploymentTarget) {
+  confirm.require({
+    header: 'Revoke Privileged Host access?',
+    message:
+      'This removes the target approval and prevents it from being assigned to a Privileged Host until an administrator approves it again.',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    acceptLabel: 'Revoke access',
+    accept: () => void setPrivilegedHostAccessApproval(target, false),
+  })
+}
+
+async function setPrivilegedHostAccessApproval(target: AppDeploymentTarget, approved: boolean) {
+  busyTargetId.value = target.id
+  try {
+    await (approved
+      ? appsService.approvePrivilegedHostAccess(props.appId, target.id)
+      : appsService.revokePrivilegedHostAccess(props.appId, target.id))
+    toast.add({
+      severity: 'success',
+      summary: approved ? 'Privileged Host access approved' : 'Privileged Host access revoked',
+      detail: approved
+        ? `${target.name} can now be assigned to a Privileged Host.`
+        : `${target.name} can no longer be assigned to a Privileged Host.`,
+      life: 3000,
+    })
+    await load()
+    if (editingTarget.value?.id === target.id) {
+      editingTarget.value = targets.value.find((item) => item.id === target.id) ?? null
+    }
+  } catch (error) {
+    showError(error, approved ? 'Failed to approve Privileged Host access' : 'Failed to revoke Privileged Host access')
+  } finally {
+    busyTargetId.value = null
+  }
 }
 
 function formatDeploymentTime(target: AppDeploymentTarget): string {
@@ -680,34 +714,51 @@ watch(() => props.refreshRevision, load)
           are eligible application Runners only.</small
         >
       </div>
-      <Message v-if="selectedRunnerIsPrivileged" severity="warn" :closable="false">
+      <Message v-if="selectedRunnerIsPrivileged && !editingTarget" severity="warn" :closable="false">
         <strong>Privileged Host access</strong><br />
         This App may read and modify host files, inspect host processes and Docker containers,
         affect services and system state, and access host secrets.
-        <div v-if="requiresPrivilegedAcknowledgement" class="flex align-items-start gap-2 mt-3">
-          <Checkbox
-            v-model="privilegedHostAccessAcknowledged"
-            input-id="privileged-host-acknowledgement"
-            binary
-          />
-          <label for="privileged-host-acknowledgement"
-            >I understand that this App will have administrator-level access to the selected
-            machine.</label
-          >
-        </div>
-        <small v-else class="block mt-3"
-          >This existing Privileged Host assignment was previously confirmed.</small
+        <small class="block mt-3"
+          >Create this target without a destination, save it, then approve Privileged Host access
+          before assigning the destination.</small
         >
+      </Message>
+      <Message v-if="editingTarget" severity="warn" :closable="false">
+        <strong>Privileged Host approval</strong><br />
+        Approval is persisted on this target and is required before it can be assigned to a
+        Privileged Host. Approved access permits the App to read and modify host files, inspect
+        host processes and Docker containers, affect services and system state, and access host
+        secrets.
+        <div class="flex align-items-center gap-2 mt-3">
+          <Tag
+            :value="editingTarget.privilegedHostAccessApproved ? 'Approved' : 'Not approved'"
+            :severity="editingTarget.privilegedHostAccessApproved ? 'success' : 'secondary'"
+          />
+          <Button
+            v-if="!editingTarget.privilegedHostAccessApproved"
+            label="Approve access"
+            icon="pi pi-shield"
+            size="small"
+            :loading="busyTargetId === editingTarget.id"
+            @click="approvePrivilegedHostAccess(editingTarget)"
+          />
+          <Button
+            v-else
+            label="Revoke access"
+            icon="pi pi-ban"
+            severity="danger"
+            outlined
+            size="small"
+            :loading="busyTargetId === editingTarget.id"
+            @click="revokePrivilegedHostAccess(editingTarget)"
+          />
+        </div>
       </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
         <Button
           label="Save environment"
-          :disabled="
-            !name.trim() ||
-            !normalizedSlug ||
-            (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)
-          "
+          :disabled="!canSaveTarget()"
           :loading="busyTargetId !== null"
           @click="saveTarget"
         />

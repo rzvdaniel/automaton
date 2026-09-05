@@ -324,6 +324,21 @@ class AppsService {
     return data
   }
 
+  async approvePrivilegedHostAccess(id: string, targetId: string): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.post<AppDeploymentTarget>(
+      `/api/apps/${id}/targets/${targetId}/privileged-host-access`,
+      {},
+    )
+    return data
+  }
+
+  async revokePrivilegedHostAccess(id: string, targetId: string): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.delete<AppDeploymentTarget>(
+      `/api/apps/${id}/targets/${targetId}/privileged-host-access`,
+    )
+    return data
+  }
+
   async makeDefaultDeploymentTarget(id: string, targetId: string): Promise<AppDeploymentTarget> {
     const { data } = await apiClient.post<AppDeploymentTarget>(
       `/api/apps/${id}/targets/${targetId}/make-default`,
