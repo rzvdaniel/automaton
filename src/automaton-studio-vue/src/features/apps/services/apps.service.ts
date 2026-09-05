@@ -295,7 +295,7 @@ class AppsService {
 
   async createDeploymentTarget(
     id: string,
-    request: { name: string; slug: string; runnerId?: string | null; privilegedHostAccessAcknowledged?: boolean },
+    request: { name: string; slug: string; runnerId?: string | null },
   ): Promise<AppDeploymentTarget> {
     const { data } = await apiClient.post<AppDeploymentTarget>(`/api/apps/${id}/targets`, request)
     return data
@@ -315,11 +315,10 @@ class AppsService {
     targetId: string,
     runnerId: string | null,
     cleanupDeployedRuntime: boolean,
-    privilegedHostAccessAcknowledged = false,
   ): Promise<AppDeploymentTarget> {
     const { data } = await apiClient.post<AppDeploymentTarget>(
       `/api/apps/${id}/targets/${targetId}/assign-runner`,
-      { runnerId, cleanupDeployedRuntime, privilegedHostAccessAcknowledged },
+      { runnerId, cleanupDeployedRuntime },
     )
     return data
   }
