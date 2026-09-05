@@ -60,10 +60,7 @@ public static class TargetCommand
     private static Command BuildAdd(ConfigService config)
     {
         var slugArgument = new Argument<string>("slug", "Target slug");
-        var runnerOption = new Option<string>("--runner", "Runner ID or exact Runner name")
-        {
-            IsRequired = true
-        };
+        var runnerOption = new Option<string?>("--runner", "Runner ID or exact Runner name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var environmentOption = EnvironmentOption();
         var command = new Command("add", "Add a deployment target")
@@ -82,7 +79,7 @@ public static class TargetCommand
             try
             {
                 var target = await new DeploymentTargetService(config).AddAsync(
-                    Directory.GetCurrentDirectory(), slug, runner!, environmentName);
+                    Directory.GetCurrentDirectory(), slug, runner, environmentName);
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, target });

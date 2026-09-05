@@ -143,15 +143,16 @@ public sealed class DeploymentTargetService(ConfigService config)
     public async Task<DeploymentTargetInfo> AddAsync(
         string directory,
         string slug,
-        string runnerReference,
+        string? runnerReference,
         string? environmentName = null,
         CancellationToken cancellationToken = default)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runner = await ResolveRunnerAsync(
-                client, runnerReference, cancellationToken);
+            var runner = string.IsNullOrWhiteSpace(runnerReference)
+                ? null
+                : await ResolveRunnerAsync(client, runnerReference, cancellationToken);
             var normalizedSlug = slug.Trim().ToLowerInvariant();
             return await client.CreateDeploymentTargetAsync(
                 appId,

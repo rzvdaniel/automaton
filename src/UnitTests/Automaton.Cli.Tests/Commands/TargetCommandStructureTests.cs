@@ -44,6 +44,15 @@ public class TargetCommandStructureTests
     }
 
     [Test]
+    public void TargetAdd_AllowsCreatingAnUnassignedTarget()
+    {
+        var add = TargetCommand.Build(new ConfigService()).Subcommands.Single(item => item.Name == "add");
+        var runner = add.Options.Single(option => option.Name == "runner");
+
+        Assert.That(runner.IsRequired, Is.False);
+    }
+
+    [Test]
     public void DeployCommand_AcceptsOptionalTargetArgument()
     {
         var command = DeployCommand.Build(new ConfigService());

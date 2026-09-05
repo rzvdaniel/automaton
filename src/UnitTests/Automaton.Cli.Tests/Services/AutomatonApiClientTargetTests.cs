@@ -116,6 +116,35 @@ public class AutomatonApiClientTargetTests
         }
     }
 
+    [Test]
+    public async Task CreateDeploymentTargetAsync_AllowsAnUnassignedTarget()
+    {
+        string? payload = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            payload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent(
+                    "{\"id\":\"target-1\",\"name\":\"canary\",\"slug\":\"canary\",\"isDefault\":false,\"status\":\"Unassigned\",\"legacyControllerRuntimeDeployed\":false,\"runner\":null}",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.test/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "ak_test");
+
+        var target = await client.CreateDeploymentTargetAsync("app-1", "canary", "canary", null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Runner, Is.Null);
+            Assert.That(payload, Does.Not.Contain("runnerId"));
+        });
+    }
+
     private sealed class StubHandler(
         Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {
