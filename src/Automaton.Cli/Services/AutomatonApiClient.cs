@@ -83,10 +83,9 @@ public class AutomatonApiClient : IDisposable
         string name,
         string slug,
         string? runnerId,
-        bool privilegedHostAccessAcknowledged = false,
         CancellationToken ct = default)
     {
-        var payload = JsonSerializer.Serialize(new { name, slug, runnerId, privilegedHostAccessAcknowledged }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { name, slug, runnerId }, JsonOptions);
         using var resp = await PostJsonAsync($"api/apps/{appId}/targets", payload, ct);
         await EnsureSuccessAsync(resp);
         return JsonSerializer.Deserialize<DeploymentTargetInfo>(
@@ -109,14 +108,33 @@ public class AutomatonApiClient : IDisposable
         string targetId,
         string? runnerId,
         bool cleanupDeployedRuntime = false,
-        bool privilegedHostAccessAcknowledged = false,
         CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(
-            new { runnerId, cleanupDeployedRuntime, privilegedHostAccessAcknowledged },
+            new { runnerId, cleanupDeployedRuntime },
             JsonOptions);
         using var resp = await PostJsonAsync(
             $"api/apps/{appId}/targets/{targetId}/assign-runner", payload, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task ApproveDeploymentTargetPrivilegedHostAccessAsync(
+        string appId,
+        string targetId,
+        CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync(
+            $"api/apps/{appId}/targets/{targetId}/approve-privileged-host-access", "{}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task RevokeDeploymentTargetPrivilegedHostAccessAsync(
+        string appId,
+        string targetId,
+        CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync(
+            $"api/apps/{appId}/targets/{targetId}/revoke-privileged-host-access", "{}", ct);
         await EnsureSuccessAsync(resp);
     }
 

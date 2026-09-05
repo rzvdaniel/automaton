@@ -17,11 +17,30 @@ public class TargetCommandStructureTests
 
         Assert.That(
             command.Subcommands.Select(item => item.Name),
-            Is.EquivalentTo(new[] { "list", "add", "remove", "primary", "default" }));
+            Is.EquivalentTo(new[] { "list", "add", "approve", "revoke", "remove", "primary", "default" }));
 
         Assert.That(
             command.Subcommands.Single(item => item.Name == "default").IsHidden,
             Is.True);
+    }
+
+    [Test]
+    public void PrivilegedHostApproval_IsExplicitAndOldAcknowledgementFlagIsNotExposed()
+    {
+        var target = TargetCommand.Build(new ConfigService());
+        var deploy = DeployCommand.Build(new ConfigService());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.Subcommands.Single(item => item.Name == "approve").Description, Does.Contain("Persist approval"));
+            Assert.That(target.Subcommands.Single(item => item.Name == "revoke").Description, Does.Contain("Revoke persisted"));
+            Assert.That(
+                target.Subcommands.SelectMany(item => item.Options).Any(option => option.Name == "acknowledge-privileged-host-access"),
+                Is.False);
+            Assert.That(
+                deploy.Options.Any(option => option.Name == "acknowledge-privileged-host-access"),
+                Is.False);
+        });
     }
 
     [Test]

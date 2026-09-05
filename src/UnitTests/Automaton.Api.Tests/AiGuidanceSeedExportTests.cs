@@ -62,8 +62,9 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(document.ContentMarkdown, Does.Contain("shell=False"));
             Assert.That(document.ContentMarkdown, Does.Contain("Standard Runner"));
             Assert.That(document.ContentMarkdown, Does.Contain("automatic fallback"));
-            Assert.That(document.ContentMarkdown, Does.Contain("--acknowledge-privileged-host-access"));
-            Assert.That(document.ContentMarkdown, Does.Contain("explicitly approved"));
+            Assert.That(document.ContentMarkdown, Does.Contain("automaton target approve <environment>"));
+            Assert.That(document.ContentMarkdown, Does.Contain("automaton target revoke <environment>"));
+            Assert.That(document.ContentMarkdown, Does.Contain("explicit user approval"));
         });
     }
 
