@@ -1,9 +1,17 @@
 using System.Text;
 using Automaton.Api.Config;
+using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Hubs;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
+using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Tests;
 
@@ -176,5 +184,103 @@ public class RuntimeTunnelPolicyTests
         Assert.That(
             RuntimeTunnelService.IsCurrentApiInstance(runnerApiInstanceId, currentApiInstanceId),
             Is.EqualTo(expected));
+    }
+
+    [Test]
+    public async Task ForwardAsync_AllowsGenericRuntimeDeploymentWithoutLegacyMarker()
+    {
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.GenericRuntimeDeployed = true;
+        target.LegacyControllerRuntimeDeployed = false;
+
+        await using var dbContext = CreateDbContext();
+        var identity = new ApiInstanceIdentityService();
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "Self-hosted standard",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ConnectionId = "connection",
+            ApiInstanceId = identity.ApiInstanceId,
+            LastHeartbeatAtUtc = DateTime.UtcNow
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Generic runtime app",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            DeploymentTargets = { target }
+        });
+        await dbContext.SaveChangesAsync();
+
+        var registry = new TunnelRequestRegistry();
+        var service = new RuntimeTunnelService(
+            dbContext,
+            new CompletingHubContext(registry),
+            registry,
+            Options.Create(new RuntimeTunnelConfig()),
+            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
+            identity,
+            NullLogger<RuntimeTunnelService>.Instance);
+        var request = new DefaultHttpContext().Request;
+        request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
+
+        var response = await service.ForwardAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
+
+        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
+    }
+
+    private static ApplicationDbContext CreateDbContext() => new(
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+
+    private sealed class CompletingHubContext(TunnelRequestRegistry registry) : IHubContext<AutomatonHub>
+    {
+        public IHubClients Clients { get; } = new CompletingHubClients(registry);
+        public IGroupManager Groups { get; } = null!;
+    }
+
+    private sealed class CompletingHubClients(TunnelRequestRegistry registry) : IHubClients
+    {
+        private readonly CompletingClientProxy client = new(registry);
+
+        public IClientProxy All => throw new NotSupportedException();
+        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public ISingleClientProxy Client(string connectionId) => client;
+        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => client;
+        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
+        public IClientProxy Group(string groupName) => throw new NotSupportedException();
+        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
+        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
+        public IClientProxy User(string userId) => throw new NotSupportedException();
+        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
+    }
+
+    private sealed class CompletingClientProxy(TunnelRequestRegistry registry) : ISingleClientProxy
+    {
+        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
+        {
+            if (method == AutomatonHubMethods.TunnelRequest && args[0] is TunnelRequest request)
+            {
+                registry.TryComplete(new TunnelResponse
+                {
+                    RequestId = request.RequestId,
+                    StatusCode = StatusCodes.Status200OK
+                });
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }

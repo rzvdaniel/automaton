@@ -209,10 +209,18 @@ function readSharedBasePrompt() {
   return fs.readFileSync(basePath, 'utf-8').trim()
 }
 
+function readPublicBootstrap() {
+  const bootstrapPath = path.join(sharedAiGuidanceRoot, 'public', 'automaton-app-bootstrap.md')
+  return fs.readFileSync(bootstrapPath, 'utf-8').trim()
+}
+
 function buildPublicLlmsAssets() {
+  const bootstrap = readPublicBootstrap()
   const basePrompt = readSharedBasePrompt()
   const guidanceDocuments = listSeedGuidanceDocuments()
   const llmsTextLines = [
+    bootstrap,
+    '',
     basePrompt,
     '',
     '## Linked guidance',

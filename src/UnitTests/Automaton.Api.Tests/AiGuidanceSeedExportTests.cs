@@ -61,6 +61,9 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(document.ContentMarkdown, Does.Contain("/var/run/docker.sock"));
             Assert.That(document.ContentMarkdown, Does.Contain("shell=False"));
             Assert.That(document.ContentMarkdown, Does.Contain("Standard Runner"));
+            Assert.That(document.ContentMarkdown, Does.Contain("automatic fallback"));
+            Assert.That(document.ContentMarkdown, Does.Contain("--acknowledge-privileged-host-access"));
+            Assert.That(document.ContentMarkdown, Does.Contain("explicitly approved"));
         });
     }
 
