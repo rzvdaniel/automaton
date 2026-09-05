@@ -24,6 +24,12 @@ the existing files before choosing commands, paths, or dependencies.
 13. If it fails, inspect the exact failure and fix it.
 14. Never publish unless the user explicitly requests it.
 
+Prefer a Standard or Hosted Runner for ordinary applications. Do not use a
+Privileged Host Runner as an automatic fallback. Never pass
+`--acknowledge-privileged-host-access` unless the user has explicitly approved
+privileged host access for this app and environment. If only a Privileged Host
+Runner appears usable, stop and ask the user for explicit approval.
+
 Any app that exposes an HTTP/public URL must declare `application.runtime.command`.
 This includes frontend-only and static web apps. Their runtime artifact must
 contain or depend on an HTTP server described by the same generic contract.

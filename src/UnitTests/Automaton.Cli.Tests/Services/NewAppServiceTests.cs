@@ -47,6 +47,10 @@ public class NewAppServiceTests
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
         Assert.That(File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md")), Does.Contain("automaton validate"));
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
+        var skill = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
+        Assert.That(skill, Does.Contain("Prefer a Standard or Hosted Runner for ordinary applications"));
+        Assert.That(skill, Does.Contain("--acknowledge-privileged-host-access"));
+        Assert.That(skill, Does.Contain("explicitly approved"));
 
         var configService = new ConfigService();
         var config = configService.LoadProjectConfig(projectRoot);

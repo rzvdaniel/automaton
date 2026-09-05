@@ -3,6 +3,12 @@
 Use a Privileged Host Runner only when the app needs approved host metrics,
 Docker information, operating-system data, or another host capability.
 
+Prefer a Standard or Hosted Runner for ordinary applications. Do not assign a
+Privileged Host Runner as an automatic fallback, and never pass
+`--acknowledge-privileged-host-access` unless the user has explicitly approved
+privileged host access for that app and environment. If only a Privileged Host
+Runner appears usable, stop and ask the user for that approval.
+
 Privilege comes from the Runner assignment. It is not requested by
 `automaton.json` or by an app request. A Standard Runner may not provide these
 capabilities. Keep monitoring and administration apps private unless the user
