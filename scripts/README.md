@@ -85,7 +85,14 @@ cd /opt/automaton
 CLI releases are independent of website deployment. When `src/Automaton.Cli` changes,
 run `azure-pipelines-cli.yml` against `main` to publish the .NET global tool package
 to NuGet.org; see `docs/prod/cli-nuget-publishing.md`.
-Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window.
+Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window. Each API, Studio, and website build is also tagged with the full Git revision, and the current and immediately previous revision are recorded in blue-green state. Use `--revision <git-sha>` to explicitly deploy a retained image for rollback; do not rely on `latest` or dangling images.
+If blue-green state predates revision metadata, first adopt the known live image revisions without deploying:
+
+```bash
+./scripts/prod-adopt-image-revisions.sh --api <sha> --studio <sha> --website <sha>
+```
+
+The adoption command verifies the current live containers, tags their exact images, and records current revisions. It performs no build, restart, cutover, or database change.
 These production shell scripts are committed with the executable bit set, so a normal `git pull` on Linux should not show them as locally modified just because you ran `chmod +x` once.
 
 Examples:

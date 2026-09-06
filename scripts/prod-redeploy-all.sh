@@ -11,16 +11,19 @@ KEEP_PREVIOUS=false
 API_COLOR=""
 STUDIO_COLOR=""
 WEBSITE_COLOR=""
+DEPLOY_REVISION="$PRODUCTION_REVISION"
+EXPLICIT_REVISION=false
 
 print_usage() {
     cat <<'EOF'
-Usage: ./scripts/prod-redeploy-all.sh [--keep-previous] [--api-color blue|green] [--studio-color blue|green] [--website-color blue|green]
+Usage: ./scripts/prod-redeploy-all.sh [--keep-previous] [--revision git-sha] [--api-color blue|green] [--studio-color blue|green] [--website-color blue|green]
 
 Options:
   --keep-previous         Leave the previous color running after the cutover for easy rollback.
   --api-color blue|green      Force the API deploy target color.
   --studio-color blue|green   Force the Studio deploy target color.
   --website-color blue|green  Force the website deploy target color.
+  --revision git-sha       Deploy an existing immutable image instead of building from source.
 EOF
 }
 
@@ -51,6 +54,11 @@ while [[ $# -gt 0 ]]; do
             WEBSITE_COLOR="${2:-}"
             shift 2
             ;;
+        --revision)
+            DEPLOY_REVISION="${2:-}"
+            EXPLICIT_REVISION=true
+            shift 2
+            ;;
         --help|-h)
             print_usage
             exit 0
@@ -73,19 +81,29 @@ DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
 CURRENT_API_COLOR="$(get_live_color api)"
 CURRENT_STUDIO_COLOR="$(get_live_color studio)"
 CURRENT_WEBSITE_COLOR="$(get_live_color website)"
+CURRENT_API_REVISION="$(get_service_revision api current)"
+CURRENT_API_PREVIOUS_REVISION="$(get_service_revision api previous)"
+CURRENT_STUDIO_REVISION="$(get_service_revision studio current)"
+CURRENT_STUDIO_PREVIOUS_REVISION="$(get_service_revision studio previous)"
+CURRENT_WEBSITE_REVISION="$(get_service_revision website current)"
+CURRENT_WEBSITE_PREVIOUS_REVISION="$(get_service_revision website previous)"
 
 TARGET_API_COLOR="${API_COLOR:-$(resolve_target_color api)}"
 TARGET_STUDIO_COLOR="${STUDIO_COLOR:-$(resolve_target_color studio)}"
 TARGET_WEBSITE_COLOR="${WEBSITE_COLOR:-$(resolve_target_color website)}"
 
+preserve_current_service_image api "$CURRENT_API_COLOR"
+preserve_current_service_image studio "$CURRENT_STUDIO_COLOR"
+preserve_current_service_image website "$CURRENT_WEBSITE_COLOR"
+
 echo "[INFO] Redeploying API to $TARGET_API_COLOR (current live color: $CURRENT_API_COLOR)"
-deploy_color api "$TARGET_API_COLOR"
+deploy_color api "$TARGET_API_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
 
 echo "[INFO] Redeploying Studio to $TARGET_STUDIO_COLOR (current live color: $CURRENT_STUDIO_COLOR)"
-deploy_color studio "$TARGET_STUDIO_COLOR"
+deploy_color studio "$TARGET_STUDIO_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
 
 echo "[INFO] Redeploying website to $TARGET_WEBSITE_COLOR (current live color: $CURRENT_WEBSITE_COLOR)"
-deploy_color website "$TARGET_WEBSITE_COLOR"
+deploy_color website "$TARGET_WEBSITE_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
 
 if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
     if ! snapshot_api_color_runner_ids "$CURRENT_API_COLOR" "$TARGET_API_COLOR"; then
@@ -93,20 +111,29 @@ if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
     fi
 fi
 
-switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSITE_COLOR"
+switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSITE_COLOR" \
+    "$DEPLOY_REVISION" "$CURRENT_API_REVISION" \
+    "$DEPLOY_REVISION" "$CURRENT_STUDIO_REVISION" \
+    "$DEPLOY_REVISION" "$CURRENT_WEBSITE_REVISION"
 
 echo "[INFO] Traefik is now routing api, studio, and website to the freshly deployed colors"
 
 if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
     if ! signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"; then
-        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" || true
+        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
+            "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
+            "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
+            "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" || true
         exit 1
     fi
 fi
 
 if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
     if ! drain_api_color_runners "$CURRENT_API_COLOR" "$TARGET_API_COLOR" "$DRAIN_WAIT_SECONDS"; then
-        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" || true
+        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
+            "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
+            "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
+            "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" || true
         exit 1
     fi
 fi

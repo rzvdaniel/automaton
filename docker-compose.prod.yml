@@ -20,7 +20,7 @@ x-api-common: &api-common
   build:
     context: .
     dockerfile: docker/Dockerfile.server
-  image: automaton-prod-api:latest
+  image: automaton-prod-api:${AUTOMATON_PRODUCTION_IMAGE_TAG:-latest}
   restart: unless-stopped
   logging: &default-json-logging
     driver: json-file
@@ -98,7 +98,7 @@ x-studio-common: &studio-common
       VITE_ENABLE_MOCK_API: "false"
       VITE_SUBSCRIPTIONS_ENABLED: "true"
       VITE_PUBLIC_APPS_BASE_URL: https://${APPS_DOMAIN:?APPS_DOMAIN is required in .env}
-  image: automaton-prod-studio:latest
+  image: automaton-prod-studio:${AUTOMATON_PRODUCTION_IMAGE_TAG:-latest}
   restart: unless-stopped
   logging: *default-json-logging
   networks:
@@ -114,7 +114,7 @@ x-website-common: &website-common
   build:
     context: .
     dockerfile: docker/Dockerfile.website
-  image: automaton-prod-website:latest
+  image: automaton-prod-website:${AUTOMATON_PRODUCTION_IMAGE_TAG:-latest}
   restart: unless-stopped
   logging: *default-json-logging
   networks:
