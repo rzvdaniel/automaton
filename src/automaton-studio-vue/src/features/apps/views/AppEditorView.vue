@@ -47,7 +47,7 @@ import {
 } from '../services/application-automation-bridge'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
-import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
+import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel, resolveStudioDeployAction } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 
 const route = useRoute()
@@ -491,12 +491,18 @@ function handleDeployTarget() {
 
 function handleTopLevelDeploy() {
   const targets = deployableTargets.value
-  if (targets.length === 1) {
+  const action = resolveStudioDeployAction(editorStore.canDeployFromStudio, targets.length)
+  if (action === 'cli') {
+    handleDeployApp()
+    return
+  }
+
+  if (action === 'deploy') {
     if (targets[0]) handleDeployApp()
     return
   }
 
-  if (targets.length > 1) {
+  if (action === 'select-target') {
     selectedDeployTargetSlug.value = null
     showDeployTargetDialog.value = true
     return
@@ -506,6 +512,11 @@ function handleTopLevelDeploy() {
 }
 
 function confirmTopLevelDeploy() {
+  if (!editorStore.canDeployFromStudio) {
+    showDeployTargetDialog.value = false
+    handleDeployApp()
+    return
+  }
   const target = selectedDeployTarget.value
   if (!target) return
   showDeployTargetDialog.value = false
