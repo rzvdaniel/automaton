@@ -23,15 +23,16 @@ complete.
 ## Deliberately remaining compatibility consumers
 
 `AppsControllerExecutionService` remains registered only for the existing
-Studio/controller compatibility endpoints and connected-flow artifact path.
-`AppsControllerExecutionController` still exposes those endpoints, and
-`UserAppsController` still uses its restricted compatibility helpers. Runner
-`HubService`, `fastapi_server`, and the legacy workspace/dependency helpers
-remain for that bridge. Product-level Automaton Action semantics and the
-separate Action module executor are also intentionally unchanged in 2A.
+backend/controller compatibility endpoints and connected-flow artifact path.
+The controller-action endpoints are now an explicit retired boundary and no
+longer execute Actions. `UserAppsController` still uses restricted
+compatibility helpers. Runner `HubService`, `fastapi_server`, and the legacy
+workspace/dependency helpers remain for that bridge. Product-level Automaton
+Action semantics and the separate Action module executor are preserved by
+Stage 2B.
 
 No new generic deployment caller may depend on these compatibility services.
-Stage 2B must migrate Action execution while preserving product semantics;
-Stage 2C may then remove the controller/FastAPI bridge and its legacy runtime
-state after all consumers are gone. This sequencing does not make the bridge a
-second generic runtime architecture or a fallback for package deployment.
+Stage 2C may remove the controller/FastAPI bridge and its legacy runtime state
+after connected-flow artifacts and the remaining backend consumers are gone.
+This sequencing does not make the bridge a second generic runtime architecture
+or a fallback for package deployment or Action execution.
