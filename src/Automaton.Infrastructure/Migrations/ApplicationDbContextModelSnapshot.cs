@@ -817,9 +817,6 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTimeOffset?>("LastSuccessfulDeploymentAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<bool>("LegacyControllerRuntimeDeployed")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)

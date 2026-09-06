@@ -16,6 +16,15 @@ export function getDeployableTargets(targets: AppDeploymentTarget[]): AppDeploym
   )
 }
 
+export type StudioDeployAction = 'cli' | 'deploy' | 'select-target' | 'no-target'
+
+export function resolveStudioDeployAction(canDeployFromStudio: boolean, deployableTargetCount: number): StudioDeployAction {
+  if (!canDeployFromStudio) return 'cli'
+  if (deployableTargetCount === 1) return 'deploy'
+  if (deployableTargetCount > 1) return 'select-target'
+  return 'no-target'
+}
+
 export function getLiveTarget(targets: AppDeploymentTarget[]): AppDeploymentTarget | null {
   return targets.find((target) => target.isDefault) ?? null
 }

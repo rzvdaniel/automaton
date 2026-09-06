@@ -77,7 +77,6 @@ const liveEnvironment = computed(() => props.app.liveEnvironment)
 const liveStatusLabel = computed(() => {
   const environment = liveEnvironment.value
   if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
-  if (environment.isStaticHosting) return 'Available'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
   if (!environment.genericRuntimeDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
@@ -87,7 +86,6 @@ const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveSta
   : 'runner-status--offline')
 const liveDestinationLabel = computed(() => {
   const environment = liveEnvironment.value
-  if (environment?.isStaticHosting) return 'Static hosting'
   if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
   if (environment.isHostedRunner) return 'Automaton Hosted'
   return environment.applicationProfile === 'PrivilegedHost'

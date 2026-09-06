@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
-import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from './deployment-target-actions'
+import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel, resolveStudioDeployAction } from './deployment-target-actions'
 
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'hosted-control', isDefault: true,
-    status: DeploymentTargetStatus.Running, legacyControllerRuntimeDeployed: true, genericRuntimeDeployed: true,
+    status: DeploymentTargetStatus.Running, genericRuntimeDeployed: true,
     cleanupPending: false, privilegedHostAccessApproved: false, routePath: '/',
     runner: { id: 'runner-id', name: 'Runner', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
@@ -34,5 +34,17 @@ describe('deployment target actions', () => {
   it('identifies the viewed target without selecting it', () => {
     const canary = target({ id: 'canary-id', name: 'Canary', slug: 'privileged-canary', isDefault: false, runner: { ...target().runner!, isHostedRunner: false, applicationProfile: 'PrivilegedHost' } })
     expect(getDeployTargetOptionLabel(canary, 'canary-id')).toBe('Canary · Additional · Self-hosted · Privileged Host · Running · Viewing')
+  })
+
+  it('always uses CLI guidance when Studio deployment is disabled', () => {
+    expect(resolveStudioDeployAction(false, 0)).toBe('cli')
+    expect(resolveStudioDeployAction(false, 1)).toBe('cli')
+    expect(resolveStudioDeployAction(false, 3)).toBe('cli')
+  })
+
+  it('only inspects targets for a real Studio deployment capability', () => {
+    expect(resolveStudioDeployAction(true, 0)).toBe('no-target')
+    expect(resolveStudioDeployAction(true, 1)).toBe('deploy')
+    expect(resolveStudioDeployAction(true, 2)).toBe('select-target')
   })
 })

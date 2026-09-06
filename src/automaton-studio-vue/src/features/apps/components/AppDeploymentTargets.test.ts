@@ -31,7 +31,6 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     slug: 'live',
     isDefault: true,
     status: DeploymentTargetStatus.Running,
-    legacyControllerRuntimeDeployed: true,
     genericRuntimeDeployed: true,
     cleanupPending: false,
     privilegedHostAccessApproved: false,
@@ -124,7 +123,6 @@ describe('AppDeploymentTargets', () => {
       slug: 'default',
       isDefault: false,
       runner: null,
-      legacyControllerRuntimeDeployed: false,
       status: DeploymentTargetStatus.Unassigned,
       lastSuccessfulDeploymentAt: null,
     })
@@ -326,7 +324,7 @@ describe('AppDeploymentTargets', () => {
 
   it.each([
     target({ runner: null, status: DeploymentTargetStatus.Unassigned }),
-    target({ legacyControllerRuntimeDeployed: false, genericRuntimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
+    target({ genericRuntimeDeployed: false, status: DeploymentTargetStatus.NotDeployed }),
     target({
       runner: {
         id: 'runner-id',

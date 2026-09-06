@@ -18,16 +18,9 @@ const props = defineProps<{
   isSaving: boolean
   hasUnsavedChanges: boolean
   canDeployFromStudio: boolean
-  canDeployFrontendFromStudio: boolean
-  canDeployBackendFromStudio: boolean
-  deployBlockedReason: string | null
-  frontendDeployMode: 'none' | 'static-copy' | 'build-required'
   isDeployingApp: boolean
-  isDeployingBackend: boolean
   applicationState: 'Deployed' | 'Source changed' | 'Build failed' | 'Runner offline' | 'Not deployed'
   sourceChangedSinceDeploy: boolean
-  hasPendingFrontendChanges: boolean
-  hasPendingBackendChanges: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,8 +31,6 @@ const emit = defineEmits<{
   cancelEditing: []
   saveAll: []
   deployApp: []
-  deployFrontend: []
-  deployBackend: []
   publish: []
   openPublishingSettings: []
   unpublish: []
@@ -55,7 +46,7 @@ const showsEditorActions = computed(() =>
 )
 
 const isPrimaryActionDisabled = computed(() => {
-  return !props.canDeployFromStudio || props.isDeployingApp
+  return props.isDeployingApp
 })
 
 const statusUi = computed(() => {
@@ -88,10 +79,6 @@ const statusSummary = computed(() => {
   }
 
   if (props.applicationState === 'Source changed') {
-    if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
-      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application requires a build' }
-    }
-
     return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Ready to deploy' }
   }
 
@@ -120,10 +107,6 @@ const deploymentStatus = computed(() => {
   }
 
   if (props.applicationState === 'Source changed') {
-    if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
-      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application changes require CLI deploy' }
-    }
-
       return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Application changes pending deployment' }
   }
 
@@ -136,34 +119,6 @@ const deploymentStatus = computed(() => {
   }
 
   return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'No pending changes' }
-})
-
-const frontendStatus = computed(() => {
-  if (!props.hasPendingFrontendChanges) {
-    return null
-  }
-
-  if (props.frontendDeployMode === 'build-required') {
-    return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Requires CLI build' }
-  }
-
-  if (props.canDeployFrontendFromStudio) {
-    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Legacy controller compatibility available' }
-  }
-
-  return null
-})
-
-const backendStatus = computed(() => {
-  if (!props.hasPendingBackendChanges) {
-    return null
-  }
-
-  if (props.canDeployBackendFromStudio) {
-    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Can be deployed from Studio' }
-  }
-
-  return { icon: 'pi pi-info-circle', severity: 'secondary' as const, label: 'Legacy controller deploy unavailable' }
 })
 
 const publishingStatus = computed(() => {
@@ -266,27 +221,13 @@ const statusPrimaryAction = computed(() => {
     return null
   }
 
-  if (props.canDeployFromStudio) {
-    return {
-      label: 'Deploy legacy application',
-      icon: 'pi pi-cloud-upload',
-      loading: props.isDeployingApp,
-      disabled: props.isDeployingApp,
-      command: () => emit('deployApp'),
-    }
+  return {
+    label: props.canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI',
+    icon: 'pi pi-cloud-upload',
+    loading: props.isDeployingApp,
+    disabled: props.isDeployingApp,
+    command: () => emit('deployApp'),
   }
-
-  if (props.hasPendingBackendChanges && props.canDeployBackendFromStudio) {
-    return {
-      label: 'Deploy legacy controller',
-      icon: 'pi pi-server',
-      loading: props.isDeployingBackend,
-      disabled: props.isDeployingBackend,
-      command: () => emit('deployBackend'),
-    }
-  }
-
-  return null
 })
 
 watch(
@@ -387,20 +328,6 @@ onBeforeUnmount(() => {
                   <span>{{ deploymentStatus.label }}</span>
                 </div>
               </div>
-              <div v-if="frontendStatus" class="status-popover__section">
-                <div class="status-popover__section-label">Application source</div>
-                <div class="status-popover__item">
-                  <i :class="[frontendStatus.icon, `status-popover__icon status-popover__icon--${frontendStatus.severity}`]"></i>
-                  <span>{{ frontendStatus.label }}</span>
-                </div>
-              </div>
-              <div v-if="backendStatus" class="status-popover__section">
-                <div class="status-popover__section-label">Legacy controller compatibility</div>
-                <div class="status-popover__item">
-                  <i :class="[backendStatus.icon, `status-popover__icon status-popover__icon--${backendStatus.severity}`]"></i>
-                  <span>{{ backendStatus.label }}</span>
-                </div>
-              </div>
               <div class="status-popover__section">
                 <div class="status-popover__section-label">Publishing</div>
                 <div class="status-popover__item">
@@ -418,9 +345,6 @@ onBeforeUnmount(() => {
               :disabled="statusPrimaryAction.disabled"
               @click="statusPrimaryAction.command"
             />
-            <div v-else-if="deployBlockedReason" class="status-popover__summary-line">
-              {{ deployBlockedReason }}
-            </div>
           </div>
         </Popover>
       </div>
@@ -430,15 +354,18 @@ onBeforeUnmount(() => {
     <div class="workspace-actions">
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
-          label="Deploy legacy application"
+          :label="canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI'"
           icon="pi pi-cloud-upload"
           class="deploy-main-button"
           severity="success"
           :disabled="isPrimaryActionDisabled"
           :loading="isDeployingApp"
-          v-tooltip.bottom="deployBlockedReason ?? 'Studio deployment is legacy compatibility. Use automaton deploy for the generic application contract.'"
+          v-tooltip.bottom="'Deploy the application using its generic runtime contract.'"
           @click="handlePrimaryAction"
         />
+        <span v-if="!canDeployFromStudio" class="deploy-cli-hint">
+          Deploy with the Automaton CLI
+        </span>
       </div>
 
       <Button

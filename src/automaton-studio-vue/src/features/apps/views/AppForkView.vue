@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
-import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
@@ -17,13 +16,13 @@ const toast = useToast()
 
 const source = ref<ForkAppSource | null>(null)
 const appName = ref('')
-const publishImmediately = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const error = ref('')
 
 const sourceAppId = computed(() => String(route.params.sourceAppId || ''))
 const localPullReference = computed(() => source.value?.publicUrl || source.value?.id || '')
+const hasDeclaredRuntime = computed(() => Boolean(source.value?.application?.runtime?.command))
 
 const lineageLabel = computed(() => {
   if (!source.value) return ''
@@ -63,7 +62,6 @@ async function submitFork() {
   try {
     const app = await appsService.fork(source.value.id, {
       name,
-      publishImmediately: publishImmediately.value,
     })
 
     toast.add({
@@ -83,10 +81,6 @@ async function submitFork() {
 
 function cancel() {
   void router.back()
-}
-
-function goToRunners() {
-  void router.push('/runners')
 }
 
 onMounted(loadForkSource)
@@ -122,39 +116,14 @@ onMounted(loadForkSource)
             />
           </div>
 
-          <section class="choice-panel" aria-labelledby="fork-visibility">
-            <h2 id="fork-visibility">Visibility</h2>
-            <label class="choice-row">
-              <Checkbox :model-value="!publishImmediately" binary @update:model-value="publishImmediately = !$event" />
-              <span>
-                <strong>Private draft</strong>
-                <small>Recommended. Publish later when your remix is ready.</small>
-              </span>
-            </label>
-            <label class="choice-row">
-              <Checkbox v-model="publishImmediately" binary />
-              <span>
-                <strong>Public immediately</strong>
-                <small>Creates a public URL as part of the remix.</small>
-              </span>
-            </label>
-          </section>
-
-          <section class="info-panel" :class="{ warning: source.hasBackendExecution }">
+          <section class="info-panel">
             <h2>Runtime</h2>
-            <p>{{ source.runtimeLabel }}</p>
-            <template v-if="source.hasBackendExecution">
-              <p class="warning-copy">This app uses backend execution.</p>
-              <ul>
-                <li>To run your remix, you need your own Runner.</li>
-                <li>Managed Runners will be available when hosted execution rolls out.</li>
-              </ul>
-            </template>
+            <p>{{ hasDeclaredRuntime ? 'Application contract declares a long-running HTTP runtime.' : 'Application contract does not declare a long-running HTTP runtime.' }}</p>
           </section>
 
           <section class="info-panel">
             <h2>What gets copied</h2>
-            <p>Remix creates an editable copy of this app’s source. Runtime backend files and secrets are not copied.</p>
+            <p>Remix creates an editable copy of this app’s source. Deployed runtime files and secrets are not copied.</p>
           </section>
 
           <section class="info-panel">
@@ -170,14 +139,7 @@ onMounted(loadForkSource)
           <div class="actions">
             <Button label="Cancel" severity="secondary" outlined @click="cancel" />
             <Button
-              v-if="source.hasBackendExecution"
-              label="Set up runner"
-              severity="secondary"
-              outlined
-              @click="goToRunners"
-            />
-            <Button
-              :label="source.hasBackendExecution ? 'Continue remix' : 'Remix app'"
+              label="Remix app"
               icon="pi pi-code-branch"
               :loading="submitting"
               @click="submitFork"

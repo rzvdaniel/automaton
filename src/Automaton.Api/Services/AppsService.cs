@@ -410,10 +410,8 @@ public class AppsService
         await fileStorageService.UpdateAppStorageMetadataAsync(UserId, entity.Id, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            metadata.Frontend.SourceAvailable = true;
-            metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
-            metadata.Backend.SourceAvailable = true;
-            metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+            metadata.SourceAvailable = true;
+            metadata.RuntimeSource = AppRuntimeSources.Studio;
         });
 
         await fileStorageService.WriteSourceFileAsync(
@@ -1163,7 +1161,7 @@ public class AppsService
             })
             .FirstOrDefaultAsync();
 
-        var hasBackendExecution = fileStorageService.HasBackendSourceEntries(sourceOwner, sourceAppId);
+        var hasApplicationSource = fileStorageService.HasAnySourceEntries(sourceOwner, sourceAppId);
 
         return new Models.ForkAppSourceModel
         {
@@ -1175,7 +1173,8 @@ public class AppsService
             ThumbnailUrl = source.ThumbnailUrl,
             CreatorPublicUsername = creator?.PublicUsername,
             CreatorDisplayName = creator?.DisplayName ?? "Automaton creator",
-            HasBackendExecution = hasBackendExecution
+            HasApplicationSource = hasApplicationSource,
+            Application = ApplicationContractSerialization.Deserialize(source.ApplicationContractJson)
         };
     }
 
@@ -1219,8 +1218,6 @@ public class AppsService
         var newId = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var appName = NormalizeForkName(request.Name, source.Name);
-        var publicUrl = request.PublishImmediately ? GenerateUniqueSlug(appName) : null;
-
         var entity = new Entities.WebApp
         {
             Id = newId,
@@ -1229,10 +1226,10 @@ public class AppsService
             Description = source.Description,
             Definition = "{}",
             ApplicationContractJson = source.ApplicationContractJson,
-            IsPublished = request.PublishImmediately,
+            IsPublished = false,
             IsForkable = false,
-            PublicUrl = publicUrl,
-            PublishedAt = request.PublishImmediately ? now : null,
+            PublicUrl = null,
+            PublishedAt = null,
             Version = 1,
             RequiresAuthentication = false,
             Scope = AccessScope.Personal,
@@ -1270,7 +1267,6 @@ public class AppsService
         await dataContext.SaveChangesAsync();
 
         await fileStorageService.CopySourceFilesAsync(sourceOwner, sourceAppId, UserId, newId);
-        await fileStorageService.CopyRuntimeFrontendFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
@@ -1287,8 +1283,7 @@ public class AppsService
                 SourceAppId = sourceAppId,
                 SourceAppName = source.Name,
                 NewAppId = newId,
-                NewAppName = entity.Name,
-                request.PublishImmediately
+                NewAppName = entity.Name
             }
         });
 
@@ -1332,54 +1327,31 @@ public class AppsService
     public Task SetLocalDevelopmentMetadataAsync(
         Guid appId,
         Guid ownerId,
-        bool? frontendSourceAvailable = null,
-        string? frontendRuntimeSource = null,
-        bool? frontendRuntimeAvailable = null,
-        bool? backendSourceAvailable = null,
-        string? backendRuntimeSource = null,
-        bool? backendRuntimeAvailable = null)
+        bool? sourceAvailable = null,
+        string? runtimeSource = null,
+        bool? runtimeAvailable = null)
     {
         return fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Local;
-            if (frontendSourceAvailable.HasValue)
+            if (sourceAvailable.HasValue)
             {
-                metadata.Frontend.SourceAvailable = frontendSourceAvailable.Value;
-                if (frontendSourceAvailable.Value && metadata.Frontend.SourceModifiedAtUtc == null)
+                metadata.SourceAvailable = sourceAvailable.Value;
+                if (sourceAvailable.Value && metadata.SourceModifiedAtUtc == null)
                 {
-                    metadata.Frontend.SourceModifiedAtUtc = DateTime.UtcNow;
+                    metadata.SourceModifiedAtUtc = DateTime.UtcNow;
                 }
             }
-            if (!string.IsNullOrWhiteSpace(frontendRuntimeSource))
+            if (!string.IsNullOrWhiteSpace(runtimeSource))
             {
-                metadata.Frontend.RuntimeSource = frontendRuntimeSource;
+                metadata.RuntimeSource = runtimeSource;
             }
-            if (frontendRuntimeAvailable.HasValue)
+            if (runtimeAvailable.HasValue)
             {
-                metadata.Frontend.RuntimeAvailable = frontendRuntimeAvailable.Value;
-                if (frontendRuntimeAvailable.Value && metadata.Frontend.RuntimeDeployedAtUtc == null)
+                metadata.RuntimeAvailable = runtimeAvailable.Value;
+                if (runtimeAvailable.Value && metadata.RuntimeDeployedAtUtc == null)
                 {
-                    metadata.Frontend.RuntimeDeployedAtUtc = DateTime.UtcNow;
-                }
-            }
-            if (backendSourceAvailable.HasValue)
-            {
-                metadata.Backend.SourceAvailable = backendSourceAvailable.Value;
-                if (backendSourceAvailable.Value && metadata.Backend.SourceModifiedAtUtc == null)
-                {
-                    metadata.Backend.SourceModifiedAtUtc = DateTime.UtcNow;
-                }
-            }
-            if (!string.IsNullOrWhiteSpace(backendRuntimeSource))
-            {
-                metadata.Backend.RuntimeSource = backendRuntimeSource;
-            }
-            if (backendRuntimeAvailable.HasValue)
-            {
-                metadata.Backend.RuntimeAvailable = backendRuntimeAvailable.Value;
-                if (backendRuntimeAvailable.Value && metadata.Backend.RuntimeDeployedAtUtc == null)
-                {
-                    metadata.Backend.RuntimeDeployedAtUtc = DateTime.UtcNow;
+                    metadata.RuntimeDeployedAtUtc = DateTime.UtcNow;
                 }
             }
         });
@@ -1517,27 +1489,8 @@ public class AppsService
         }
 
         app.DevelopmentMode = metadata.DevelopmentMode;
-        app.Frontend = new Models.AppComponentOwnershipModel
-        {
-            SourceAvailable = metadata.Frontend.SourceAvailable,
-            SourceModifiedAtUtc = metadata.Frontend.SourceModifiedAtUtc,
-            RuntimeSource = metadata.Frontend.RuntimeSource,
-            RuntimeAvailable = metadata.Frontend.RuntimeAvailable,
-            RuntimeDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc
-        };
-        app.Backend = new Models.AppComponentOwnershipModel
-        {
-            SourceAvailable = metadata.Backend.SourceAvailable,
-            SourceModifiedAtUtc = metadata.Backend.SourceModifiedAtUtc,
-            RuntimeSource = metadata.Backend.RuntimeSource,
-            RuntimeAvailable = metadata.Backend.RuntimeAvailable,
-            RuntimeDeployedAtUtc = metadata.Backend.RuntimeDeployedAtUtc
-        };
-        app.SourceAvailable = app.Frontend.SourceAvailable || app.Backend.SourceAvailable;
-        app.RuntimeSource = app.Frontend.RuntimeSource == app.Backend.RuntimeSource
-            ? app.Frontend.RuntimeSource
-            : $"{app.Frontend.RuntimeSource}|{app.Backend.RuntimeSource}";
-        app.HasDeployedFrontend = metadata.Frontend.RuntimeAvailable;
+        app.SourceAvailable = metadata.SourceAvailable;
+        app.RuntimeSource = metadata.RuntimeSource;
     }
 
     private async Task<string> LoadDefaultFrontendTemplateAsync()

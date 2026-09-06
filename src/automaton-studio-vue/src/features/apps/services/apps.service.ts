@@ -20,34 +20,14 @@ import type {
   ScopedFilesResponse,
   FileNode,
   CreateAppStepRequest,
-  RunnerBackendFileContent,
-  RunnerBackendFilesResponse,
-  RunnerFileArea,
   ForkAppRequest,
   ForkAppSource,
   ApplicationContract,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 
-export type DeployBackendResult = {
-  success: boolean
-  deployedCount: number
-  totalScripts: number
-  runnerCount: number
-  hasRequirements: boolean
-  message: string
-  installLogs?: string[]
-  state?: string
-  requiresRetry?: boolean
-}
-
 export type DeployAppResult = {
   success: boolean
-  frontendFilesSynced: number
-  backendFilesSynced: number
-  frontendAction: string
-  backendAction: string
-  backendDeploy: DeployBackendResult
   message?: string
   state?: string
   requiresRetry?: boolean
@@ -256,35 +236,8 @@ class AppsService {
     await apiClient.post(`/api/apps/${id}/unpublish`)
   }
 
-  /**
-   * Returns a lightweight pre-deploy summary (script count, whether requirements.txt is present).
-   * GET /api/apps/{id}/backend/deploy-info
-   */
-  async getDeployInfo(id: string): Promise<{ scriptCount: number; hasRequirements: boolean }> {
-    const { data } = await apiClient.get(`/api/apps/${id}/backend/deploy-info`)
-    return data
-  }
-
   async getDeployCapabilities(id: string): Promise<AppDeployCapabilities> {
     const { data } = await apiClient.get<AppDeployCapabilities>(`/api/apps/${id}/deploy-capabilities`)
-    return data
-  }
-
-  /**
-   * Deploy backend scripts to the app's configured runner(s).
-   * POST /api/apps/{id}/backend/deploy
-   */
-  async deployBackend(id: string, targetSlug?: string): Promise<DeployBackendResult> {
-    const { data } = await apiClient.post<DeployBackendResult>(`/api/apps/${id}/backend/deploy`, {}, {
-      params: targetSlug ? { targetSlug } : undefined,
-    })
-    return data
-  }
-
-  async deployApp(id: string, targetSlug?: string): Promise<DeployAppResult> {
-    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {}, {
-      params: targetSlug ? { targetSlug } : undefined,
-    })
     return data
   }
 
@@ -396,23 +349,6 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
   }
 
-  async deployFrontend(id: string): Promise<{
-    success: boolean
-    frontendFilesSynced: number
-    backendFilesSynced: number
-    frontendAction: string
-    backendAction: string
-    message?: string
-  }> {
-    const { data } = await apiClient.post(`/api/apps/${id}/frontend/deploy`, {})
-    return data
-  }
-
-  async redeployBackendComponent(id: string): Promise<DeployAppResult> {
-    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/backend/redeploy`, {})
-    return data
-  }
-
   async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string }> {
     const { data } = await apiClient.post<{ runtimeToken: string }>(`/api/apps/${id}/runtime-launch`, {})
     return data
@@ -421,28 +357,6 @@ class AppsService {
   getRestrictedRuntimeLaunchUrl(id: string): string {
     const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
     return `${apiBaseUrl}/api/apps/${encodeURIComponent(id)}/launch-runtime`
-  }
-
-  async listRunnerBackendFiles(id: string, area: RunnerFileArea): Promise<RunnerBackendFilesResponse> {
-    const { data } = await apiClient.get<RunnerBackendFilesResponse>(
-      `/api/apps/${id}/runner-backend/files`,
-      { params: { area } },
-    )
-    return data
-  }
-
-  async readRunnerBackendFile(id: string, path: string, area: RunnerFileArea): Promise<RunnerBackendFileContent> {
-    const { data } = await apiClient.get<RunnerBackendFileContent>(
-      `/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`,
-      { params: { area } },
-    )
-    return data
-  }
-
-  async deleteRunnerBackendFile(id: string, path: string, area: RunnerFileArea): Promise<void> {
-    await apiClient.delete(`/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`, {
-      params: { area },
-    })
   }
 
   /**

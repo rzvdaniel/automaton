@@ -190,7 +190,6 @@ public class AppAuthorizationRegressionTests
         });
 
         var legacyCompletionAtUtc = DateTime.UtcNow.AddHours(-1);
-        target.LegacyControllerRuntimeDeployed = true;
         target.LastSuccessfulDeploymentAt = legacyCompletionAtUtc;
         await dbContext.SaveChangesAsync();
 
@@ -212,14 +211,12 @@ public class AppAuthorizationRegressionTests
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "legacy-metadata-app");
         var target = dbContext.AppDeploymentTargets.Single();
-        target.LegacyControllerRuntimeDeployed = true;
         await dbContext.SaveChangesAsync();
 
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out var storage);
         await storage.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
-            metadata.Frontend.RuntimeAvailable = true;
-            metadata.Backend.RuntimeAvailable = true;
+            metadata.RuntimeAvailable = true;
         });
 
         var app = (await service.ListAsync(cancellationToken: CancellationToken.None)).Single();
@@ -379,7 +376,7 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
-    public async Task UpdateRunner_LegacyMarkerAloneDoesNotBlockRunnerReassignment()
+    public async Task UpdateRunner_WhenGenericRuntimeIsNotDeployed_AllowsRunnerReassignment()
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -391,7 +388,6 @@ public class AppAuthorizationRegressionTests
         SeedApp(dbContext, appId, ownerId, "owner-app");
         var target = dbContext.AppDeploymentTargets.Single(item => item.WebAppId == appId && item.IsDefault);
         target.ExecutionRunnerId = currentRunnerId;
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = false;
         dbContext.Runners.Add(new Runner
         {
@@ -414,7 +410,6 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(persisted.ExecutionRunnerId, Is.EqualTo(nextRunnerId));
-            Assert.That(persisted.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(persisted.GenericRuntimeDeployed, Is.False);
         });
     }
@@ -448,7 +443,7 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
-    public async Task Publish_LegacyMarkerAloneDoesNotBlockRunnerAssignment()
+    public async Task Publish_WhenGenericRuntimeIsNotDeployed_AllowsRunnerAssignment()
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -460,7 +455,6 @@ public class AppAuthorizationRegressionTests
         SeedApp(dbContext, appId, ownerId, "owner-app");
         var target = dbContext.AppDeploymentTargets.Single(item => item.WebAppId == appId && item.IsDefault);
         target.ExecutionRunnerId = currentRunnerId;
-        target.LegacyControllerRuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
             Id = nextRunnerId,
@@ -487,7 +481,6 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(persisted.ExecutionRunnerId, Is.EqualTo(nextRunnerId));
-            Assert.That(persisted.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(persisted.GenericRuntimeDeployed, Is.False);
         });
     }

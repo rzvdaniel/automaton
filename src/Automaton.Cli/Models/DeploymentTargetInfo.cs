@@ -13,7 +13,6 @@ public sealed record DeploymentTargetInfo(
     string Slug,
     bool IsDefault,
     string Status,
-    bool LegacyControllerRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DeploymentTargetRunnerInfo? Runner,
     bool PrivilegedHostAccessApproved = false,

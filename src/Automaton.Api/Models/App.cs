@@ -55,9 +55,6 @@ public class AppModel
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
-    public bool HasDeployedFrontend { get; set; }
-    public AppComponentOwnershipModel Frontend { get; set; } = new();
-    public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
     // The full app representation includes the canonical contract, but update
@@ -66,19 +63,9 @@ public class AppModel
     public ApplicationContract? Application { get; set; }
 }
 
-public class AppComponentOwnershipModel
-{
-    public bool SourceAvailable { get; set; } = true;
-    public DateTime? SourceModifiedAtUtc { get; set; }
-    public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
-    public bool RuntimeAvailable { get; set; }
-    public DateTime? RuntimeDeployedAtUtc { get; set; }
-}
-
 public class ForkAppRequest
 {
     public string? Name { get; set; }
-    public bool PublishImmediately { get; set; } = false;
 }
 
 public class ForkAppSourceModel
@@ -91,10 +78,11 @@ public class ForkAppSourceModel
     public string? ThumbnailUrl { get; set; }
     public string? CreatorPublicUsername { get; set; }
     public string CreatorDisplayName { get; set; } = "Automaton creator";
-    public bool HasBackendExecution { get; set; }
-    public string RuntimeLabel => HasBackendExecution
-        ? "Backend app — runner required"
-        : "Static app — no runner required";
+    public bool HasApplicationSource { get; set; }
+    public ApplicationContract? Application { get; set; }
+    public string RuntimeLabel => HasApplicationSource
+        ? "Application runtime is defined by its contract"
+        : "No application source";
 }
 
 public class AppScreenshotModel

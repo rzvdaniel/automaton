@@ -115,7 +115,7 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToListAsync();
 
-        await PopulateBackendExecutionFlagsAsync(apps);
+            await PopulateApplicationSourceFlagsAsync(apps);
 
         return Ok(apps);
     }
@@ -202,7 +202,7 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToListAsync();
 
-        await PopulateBackendExecutionFlagsAsync([app]);
+        await PopulateApplicationSourceFlagsAsync([app]);
 
         app.RelatedApps = await _dbContext.WebApps
             .AsNoTracking()
@@ -271,7 +271,7 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToListAsync();
 
-        await PopulateBackendExecutionFlagsAsync(app.RelatedApps);
+        await PopulateApplicationSourceFlagsAsync(app.RelatedApps);
 
         app.ForksAndRemixes = await _dbContext.WebApps
             .AsNoTracking()
@@ -335,7 +335,7 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToListAsync();
 
-        await PopulateBackendExecutionFlagsAsync(app.ForksAndRemixes);
+        await PopulateApplicationSourceFlagsAsync(app.ForksAndRemixes);
 
         return Ok(app);
     }
@@ -423,7 +423,7 @@ public class PublicMarketplaceController : ControllerBase
             })
             .ToListAsync();
 
-        await PopulateBackendExecutionFlagsAsync(apps);
+        await PopulateApplicationSourceFlagsAsync(apps);
 
         return Ok(apps);
     }
@@ -481,7 +481,7 @@ public class PublicMarketplaceController : ControllerBase
         return Guid.TryParse(userIdString, out var userId) ? userId : null;
     }
 
-    private async Task PopulateBackendExecutionFlagsAsync(IEnumerable<MarketplaceAppCardDto> apps)
+    private async Task PopulateApplicationSourceFlagsAsync(IEnumerable<MarketplaceAppCardDto> apps)
     {
         var appList = apps.ToList();
         if (appList.Count == 0)
@@ -502,9 +502,9 @@ public class PublicMarketplaceController : ControllerBase
 
         foreach (var app in appList)
         {
-            app.HasBackendExecution = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
+            app.HasApplicationSource = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
                 ownerUserId != Guid.Empty &&
-                _appFileStorageService.HasBackendSourceEntries(ownerUserId, app.Id);
+                _appFileStorageService.HasAnySourceEntries(ownerUserId, app.Id);
         }
     }
 }
@@ -529,7 +529,7 @@ public class MarketplaceAppCardDto
     public bool CanLaunch { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public bool HasBackendExecution { get; set; }
+    public bool HasApplicationSource { get; set; }
     public bool IsFeatured { get; set; }
     public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }

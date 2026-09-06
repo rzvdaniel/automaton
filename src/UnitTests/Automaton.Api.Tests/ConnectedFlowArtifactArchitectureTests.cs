@@ -18,7 +18,6 @@ public sealed class ConnectedFlowArtifactArchitectureTests
 
         Assert.That(members, Has.None.Contains("UploadControllerScript"));
         Assert.That(members, Has.None.Contains("FastAPI"));
-        Assert.That(members, Has.None.Contains("LegacyControllerRuntimeDeployed"));
     }
 
     [Test]

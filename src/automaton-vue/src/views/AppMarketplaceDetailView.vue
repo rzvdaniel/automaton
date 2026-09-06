@@ -368,7 +368,7 @@ onBeforeUnmount(() => {
                 <span class="badge">{{ app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                 <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
                 <span v-if="app.canRemix" class="badge badge-forkable">Forkable</span>
-                <span class="badge badge-static">{{ app.hasBackendExecution ? 'Backend' : 'Static' }}</span>
+                <span class="badge badge-static">Application</span>
               </div>
 
               <div class="summary-main">
@@ -423,7 +423,7 @@ onBeforeUnmount(() => {
 
                 <div class="hero-pills" aria-label="App metadata">
                   <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
-                  <span class="hero-pill">{{ app.hasBackendExecution ? 'Backend app' : 'Static app' }}</span>
+                  <span class="hero-pill">Application</span>
                   <span v-if="app.canRemix" class="hero-pill hero-pill-forkable">Free to fork</span>
                   <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
                 </div>
@@ -595,14 +595,13 @@ onBeforeUnmount(() => {
               <section class="detail-card">
                 <h3>Runtime</h3>
                 <div class="runtime-list">
-                  <div class="runtime-item"><span>Frontend</span><span>Static hosting</span></div>
                   <div class="runtime-item">
-                    <span>Backend</span>
-                    <span>{{ app.hasBackendExecution ? 'Automaton Hosted or self-hosted' : 'Not required' }}</span>
+                    <span>Application runtime</span>
+                    <span>Defined by the application contract</span>
                   </div>
                   <div class="runtime-item">
                     <span>Fork & publish</span>
-                    <span>{{ app.hasBackendExecution ? 'Configure a runtime after remixing' : 'Free' }}</span>
+                    <span>Configure a runtime after remixing</span>
                   </div>
                 </div>
               </section>

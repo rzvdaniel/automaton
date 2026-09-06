@@ -24,7 +24,6 @@ import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
-import BackendServerFiles from '../components/BackendServerFiles.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 import AppActionContextBar from '../components/AppActionContextBar.vue'
@@ -46,11 +45,10 @@ import {
   UiAutomationAction,
   type UiAutomationResult,
 } from '../services/application-automation-bridge'
-import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
-import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
+import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel, resolveStudioDeployAction } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
-import { isRemovableLegacyDefault } from '../utils/environment-display'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,7 +164,7 @@ const versionHistoryRef = ref<any>(null)
 // AI Assistant configuration
 const aiSystemPrompt = `You are an AI assistant helping to build an application for Automaton.
 Work with the application's source layout and technology of choice. Create and modify the files needed by the user's request, and keep the persisted application contract accurate when build, runtime, readiness, environment, or storage behavior changes.
-An HTTP application should declare a runtime command, port, and optional health path. Finite-work applications may omit the runtime command. Do not assume a language, framework, package manager, frontend/backend split, or controller architecture.`
+An HTTP application should declare a runtime command, port, and optional health path. Finite-work applications may omit the runtime command. Do not assume a language, framework, package manager, or internal source layout.`
 
 const aiSuggestions = [
   'Add a login form',
@@ -431,7 +429,7 @@ async function refreshDefaultTarget() {
 }
 
 function handleTargetsChanged(targets: AppDeploymentTarget[]) {
-  deploymentTargets.value = targets.filter((target) => !isRemovableLegacyDefault(target))
+  deploymentTargets.value = targets
   if (!selectedRunnerId.value) {
     selectedRunnerId.value = (targets.find((target) => target.isDefault) ?? targets[0])?.runner?.id ?? null
   }
@@ -486,20 +484,25 @@ watch(() => route.query.target, () => {
   }
 })
 
-async function handleDeployTarget(target: AppDeploymentTarget) {
-  await handleDeployApp(target.slug, target.name)
+function handleDeployTarget() {
+  handleDeployApp()
   targetsRevision.value += 1
 }
 
 function handleTopLevelDeploy() {
   const targets = deployableTargets.value
-  if (targets.length === 1) {
-    const target = targets[0]
-    if (target) void handleDeployApp(target.slug, target.name)
+  const action = resolveStudioDeployAction(editorStore.canDeployFromStudio, targets.length)
+  if (action === 'cli') {
+    handleDeployApp()
     return
   }
 
-  if (targets.length > 1) {
+  if (action === 'deploy') {
+    if (targets[0]) handleDeployApp()
+    return
+  }
+
+  if (action === 'select-target') {
     selectedDeployTargetSlug.value = null
     showDeployTargetDialog.value = true
     return
@@ -509,10 +512,15 @@ function handleTopLevelDeploy() {
 }
 
 function confirmTopLevelDeploy() {
+  if (!editorStore.canDeployFromStudio) {
+    showDeployTargetDialog.value = false
+    handleDeployApp()
+    return
+  }
   const target = selectedDeployTarget.value
   if (!target) return
   showDeployTargetDialog.value = false
-  void handleDeployApp(target.slug, target.name)
+  handleDeployApp()
 }
 
 // Cleanup on unmount
@@ -648,18 +656,6 @@ function handleBack() {
   }
 }
 
-function getOpenAppLabel(): string {
-  if (editorStore.currentApp?.isPublished) {
-    return 'Open Public App'
-  }
-
-  if (editorStore.currentApp?.hasDeployedFrontend) {
-    return 'Open Application'
-  }
-
-  return 'Open App'
-}
-
 function openAssistantPanel(): void {
   if (activeTab.value === 'services') {
     return
@@ -731,98 +727,8 @@ function handleCloseTab(event: Event, path: string) {
   }
 }
 
-// Handle deploy backend
-async function handleDeployBackend() {
-  try {
-    const result = await editorStore.deployBackendComponent()
-    if (!result.success) {
-      toast.add({
-        severity: result.requiresRetry ? 'info' : 'warn',
-        summary: result.requiresRetry ? 'Preparing Managed Runtime' : 'Deploy Failed',
-        detail: result.message ?? result.backendDeploy.message,
-        life: 5000,
-      })
-    } else if (result.backendDeploy.totalScripts === 0) {
-      toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
-    } else if (!result.backendDeploy.deployedCount) {
-      toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.backendDeploy.message, life: 5000 })
-    } else {
-      const installLogs = result.backendDeploy.installLogs
-      const lastInstallLog = installLogs && installLogs.length > 0
-        ? installLogs[installLogs.length - 1]
-        : undefined
-      const packagesNote = lastInstallLog
-        ? ` — ${lastInstallLog}`
-        : (result.backendDeploy.hasRequirements ? ' (packages installed)' : '')
-      toast.add({
-        severity: 'success',
-        summary: 'Legacy controller deployed',
-        detail: `${result.backendAction === 'updated' ? `Updated ${result.backendFilesSynced} backend file(s) from source and ` : ''}deployed ${result.backendDeploy.deployedCount} script(s) to ${result.backendDeploy.runnerCount} runner(s)${packagesNote}`,
-        life: 4000,
-      })
-    }
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Deploy Failed',
-      detail: err instanceof Error ? err.message : 'Failed to deploy backend',
-      life: 5000,
-    })
-  }
-}
-
-async function handleDeployFrontend() {
-  try {
-    const result = await editorStore.deployFrontend()
-    toast.add({
-      severity: 'success',
-      summary: 'Frontend Deployed',
-      detail: result.frontendAction === 'updated'
-        ? `Updated live/frontend from source/frontend with ${result.frontendFilesSynced} file(s).`
-        : 'Preserved existing live/frontend because source/frontend is empty.',
-      life: 4000,
-    })
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Deploy Failed',
-      detail: err instanceof Error ? err.message : 'Failed to deploy frontend',
-      life: 5000,
-    })
-  }
-}
-
-async function handleDeployApp(targetSlug?: string, targetName?: string) {
-  try {
-    const result = await editorStore.deployApp(targetSlug)
-    if (!result.success) {
-      toast.add({
-        severity: result.requiresRetry ? 'info' : 'warn',
-        summary: result.requiresRetry ? 'Preparing Managed Runtime' : 'Deploy Failed',
-        detail: result.message ?? result.backendDeploy.message,
-        life: 5000,
-      })
-      return
-    }
-    const openAppUrl = editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
-    const backendMessage = result.backendDeploy.totalScripts > 0
-      ? ` Backend: ${result.backendDeploy.deployedCount}/${result.backendDeploy.totalScripts} scripts to ${result.backendDeploy.runnerCount} runner(s).`
-      : ' No backend scripts found.'
-
-      toast.add({
-        severity: 'success',
-        summary: targetName ? `${targetName} legacy deployment complete` : 'Legacy application deployed',
-        detail: `${targetName ? `Target ${targetSlug}.` : `${getOpenAppLabel()}: ${openAppUrl}`} Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
-        life: 7000,
-      })
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Deploy Failed',
-      detail: err instanceof Error ? err.message : 'Failed to deploy app',
-      life: 5000,
-    })
-  }
+function handleDeployApp() {
+  toast.add({ severity: 'info', summary: 'Deploy with CLI', detail: 'Deploy this application with the Automaton CLI. Studio does not build the canonical application package.', life: 5000 })
 }
 
 // Handle publish
@@ -1228,16 +1134,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-saving="editorStore.isSaving"
         :has-unsaved-changes="editorStore.hasUnsavedChanges"
         :can-deploy-from-studio="editorStore.canDeployFromStudio"
-        :can-deploy-frontend-from-studio="editorStore.canDeployFrontendFromStudio"
-        :can-deploy-backend-from-studio="editorStore.canDeployBackendFromStudio"
-        :deploy-blocked-reason="editorStore.deployBlockedReason"
-        :frontend-deploy-mode="editorStore.frontendDeployMode"
-        :is-deploying-app="editorStore.isDeployingApp"
-        :is-deploying-backend="editorStore.isDeployingBackend"
+        :is-deploying-app="false"
         :application-state="editorStore.applicationState"
         :source-changed-since-deploy="editorStore.sourceChangedSinceDeploy"
-        :has-pending-frontend-changes="editorStore.hasPendingFrontendSourceChanges"
-        :has-pending-backend-changes="editorStore.hasPendingBackendSourceChanges"
         @back="handleBack"
         @update:editing-name="editingName = $event"
         @start-editing="startEditingName"
@@ -1245,8 +1144,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @cancel-editing="cancelEditingName"
         @save-all="handleSaveAll"
         @deploy-app="handleTopLevelDeploy"
-        @deploy-frontend="handleDeployFrontend"
-        @deploy-backend="handleDeployBackend"
         @publish="showPublishDialog = true"
         @open-publishing-settings="openPublishingSettings"
         @unpublish="handleUnpublish"
@@ -1292,10 +1189,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               @view-target-logs="handleViewTargetLogs"
               @targets-changed="handleTargetsChanged"
             />
-          </div>
-
-          <div v-if="activeTab === 'services'" class="backend-server-view">
-            <BackendServerFiles :app-id="resolvedAppId" />
           </div>
 
           <!-- Build View - single shared layout for Visual (Build tab) and Files modes (Files tab) -->

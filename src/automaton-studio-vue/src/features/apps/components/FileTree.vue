@@ -215,7 +215,6 @@ function canDeleteFile(path: string | undefined): boolean {
   }
 
   return normalizedPath !== 'source/index.html' &&
-    normalizedPath !== 'source/frontend/index.html' &&
     normalizedPath !== 'source/_metadata.json' &&
     normalizedPath !== '_metadata.json'
 }
@@ -236,12 +235,7 @@ function canDeleteFolder(path: string | undefined): boolean {
     return false
   }
 
-  return normalizedPath !== 'source' &&
-    normalizedPath !== 'live' &&
-    normalizedPath !== 'source/frontend' &&
-    normalizedPath !== 'source/backend' &&
-    normalizedPath !== 'live/frontend' &&
-    normalizedPath !== 'live/backend'
+  return normalizedPath !== 'source' && normalizedPath !== 'live'
 }
 </script>
 

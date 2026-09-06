@@ -17,7 +17,7 @@ export type MarketplaceAppCard = {
   canLaunch: boolean
   publishedAt?: string
   updatedAt?: string
-  hasBackendExecution: boolean
+  hasApplicationSource: boolean
   isFeatured?: boolean
   isProfileFeatured?: boolean
   screenshots: MarketplaceAppScreenshot[]

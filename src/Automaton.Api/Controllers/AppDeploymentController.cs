@@ -8,7 +8,7 @@ namespace Automaton.Api.Controllers;
 
 /// <summary>Generic application deployment endpoints.</summary>
 [ApiController]
-public sealed class AppsControllerExecutionController(
+public sealed class AppDeploymentController(
     AppsService appsService,
     UserContextService userContextService,
     ConfirmedEmailGuardService confirmedEmailGuardService,

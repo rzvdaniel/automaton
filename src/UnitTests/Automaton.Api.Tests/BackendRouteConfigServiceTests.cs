@@ -36,7 +36,6 @@ public class BackendRouteConfigServiceTests
         });
 
         var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        defaultTarget.LegacyControllerRuntimeDeployed = true;
         defaultTarget.GenericRuntimeDeployed = true;
         dbContext.WebApps.Add(new WebApp
         {
@@ -90,7 +89,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
@@ -144,7 +142,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var targetA = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        targetA.LegacyControllerRuntimeDeployed = true;
         targetA.GenericRuntimeDeployed = true;
         var targetB = new AppDeploymentTarget
         {
@@ -169,7 +166,6 @@ public class BackendRouteConfigServiceTests
         var routeBeforeTargetBDeployment = await File.ReadAllTextAsync(routePath);
 
         app.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract());
-        targetB.LegacyControllerRuntimeDeployed = true;
         targetB.GenericRuntimeDeployed = false;
         await dbContext.SaveChangesAsync();
         await service.RefreshAsync();
@@ -185,7 +181,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        defaultTarget.LegacyControllerRuntimeDeployed = true;
         defaultTarget.GenericRuntimeDeployed = true;
         var namedTarget = new AppDeploymentTarget
         {
@@ -194,7 +189,6 @@ public class BackendRouteConfigServiceTests
             Name = "Server EU",
             Slug = "server-eu",
             ExecutionRunnerId = runnerId,
-            LegacyControllerRuntimeDeployed = true,
             GenericRuntimeDeployed = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -263,7 +257,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
@@ -310,7 +303,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
             {
@@ -356,7 +348,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         dbContext.Runners.Add(new Runner
         {
@@ -392,7 +383,6 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         dbContext.HostedRunners.Add(new HostedRunner
         {
@@ -427,7 +417,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target);
         await dbContext.SaveChangesAsync();
@@ -445,7 +434,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target);
         await dbContext.SaveChangesAsync();
@@ -463,7 +451,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
@@ -482,7 +469,6 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         AddHostedRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
@@ -499,7 +485,6 @@ public class BackendRouteConfigServiceTests
             appId,
             target.Id,
             success: false,
-            legacyControllerRuntimeDeployed: false,
             genericRuntimeDeployed: false);
         await service.RefreshAsync();
 
@@ -515,7 +500,6 @@ public class BackendRouteConfigServiceTests
         var oldRunnerId = Guid.NewGuid();
         var newRunnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, oldRunnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         AddHostedRunner(dbContext, oldRunnerId);
         AddHostedRunner(dbContext, newRunnerId);
@@ -528,7 +512,6 @@ public class BackendRouteConfigServiceTests
         Assert.That(File.Exists(routePath), Is.True);
 
         target.ExecutionRunnerId = newRunnerId;
-        target.LegacyControllerRuntimeDeployed = false;
         target.GenericRuntimeDeployed = false;
         await dbContext.SaveChangesAsync();
 
@@ -538,7 +521,7 @@ public class BackendRouteConfigServiceTests
             appId,
             target.Id,
             success: true,
-            legacyControllerRuntimeDeployed: true);
+            genericRuntimeDeployed: false);
         await service.RefreshAsync();
 
         Assert.That(File.Exists(routePath), Is.False);

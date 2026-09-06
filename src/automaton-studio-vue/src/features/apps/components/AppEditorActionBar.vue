@@ -14,11 +14,9 @@ const props = defineProps<{
   hasUnsavedChanges: boolean
   chatStats: AppChatStats | null
   canDeployFromStudio: boolean
-  canDeployFrontendFromStudio: boolean
   isDeployingApp: boolean
-  isDeployingBackend: boolean
   isPublished: boolean
-  hasDeployedFrontend: boolean
+  hasApplicationRuntime: boolean
   publicUrl: string | null | undefined
   appId: string | null | undefined
 }>()
@@ -30,8 +28,6 @@ const emit = defineEmits<{
   preview: []
   openApp: []
   deployApp: []
-  deployFrontend: []
-  deployBackend: []
   publish: []
   openPublishedApp: []
   openPublishingSettings: []
@@ -49,7 +45,7 @@ const openAppLabel = computed(() => {
     return 'Open Public App'
   }
 
-  if (props.hasDeployedFrontend) {
+  if (props.hasApplicationRuntime) {
     return 'Open Application'
   }
 
@@ -59,7 +55,7 @@ const openAppLabel = computed(() => {
 const actionMenuItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
 
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     items.push({
       label: openAppLabel.value,
       icon: 'pi pi-external-link',
@@ -90,9 +86,9 @@ const actionMenuItems = computed<MenuItem[]>(() => {
   }
 
   items.push({
-    label: 'Deploy legacy application',
+    label: props.canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI',
     icon: 'pi pi-cloud-upload',
-    disabled: props.isDeployingApp || !props.canDeployFromStudio,
+    disabled: props.isDeployingApp,
     command: () => emit('deployApp'),
   })
   if (props.isPublished) {
@@ -108,7 +104,7 @@ const actionMenuItems = computed<MenuItem[]>(() => {
 })
 
 const primaryActionLabel = computed(() => {
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     return openAppLabel.value
   }
 
@@ -116,7 +112,7 @@ const primaryActionLabel = computed(() => {
 })
 
 const primaryActionIcon = computed(() => {
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     return 'pi pi-external-link'
   }
 
@@ -128,7 +124,7 @@ const primaryActionIcon = computed(() => {
 })
 
 const isPrimaryActionDisabled = computed(() => {
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     return false
   }
 
@@ -136,7 +132,7 @@ const isPrimaryActionDisabled = computed(() => {
 })
 
 const isPrimaryActionLoading = computed(() => {
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     return false
   }
 
@@ -148,14 +144,13 @@ function toggleActionMenu(event: Event) {
 }
 
 function handlePrimaryAction() {
-  if (props.isPublished || props.hasDeployedFrontend) {
+  if (props.isPublished || props.hasApplicationRuntime) {
     emit('openApp')
     return
   }
 
-  if (props.canDeployFromStudio) {
-    emit('publish')
-  }
+  if (props.canDeployFromStudio) emit('publish')
+  else emit('deployApp')
 }
 
 function formatTokenCount(count: number): string {

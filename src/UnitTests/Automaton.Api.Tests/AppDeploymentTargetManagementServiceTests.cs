@@ -88,122 +88,6 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
-    public async Task RepairLegacyTargets_DryRunDoesNotDeleteRedundantTarget()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        fixture.Db.AppDeploymentTargets.Add(new AppDeploymentTarget
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.App.Id,
-            Name = "Default",
-            Slug = "default",
-            IsDefault = false,
-            Status = DeploymentTargetStatus.Unassigned,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-        await fixture.Db.SaveChangesAsync();
-
-        var result = await fixture.Service.RepairLegacyTargetsAsync(
-            fixture.App.Id, fixture.UserId);
-        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.DryRun, Is.True);
-            Assert.That(result.Candidates, Has.Count.EqualTo(1));
-            Assert.That(targets, Has.Count.EqualTo(2));
-            Assert.That(targets.Count(target => target.IsDefault), Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public async Task RepairLegacyTargets_DeletesOnlyDryRunCandidateAfterRevalidation()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        fixture.Db.AppDeploymentTargets.Add(new AppDeploymentTarget
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.App.Id,
-            Name = "Default",
-            Slug = "default",
-            IsDefault = false,
-            Status = DeploymentTargetStatus.Unassigned,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-        await fixture.Db.SaveChangesAsync();
-
-        var result = await fixture.Service.RepairLegacyTargetsAsync(
-            fixture.App.Id, fixture.UserId, dryRun: false);
-        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.DryRun, Is.False);
-            Assert.That(result.RemovedCount, Is.EqualTo(1));
-            Assert.That(targets, Has.Count.EqualTo(1));
-            Assert.That(targets.Single().IsDefault, Is.True);
-            Assert.That(targets.Single().Name, Is.EqualTo("Live"));
-        });
-    }
-
-    [Test]
-    public async Task List_PreservesLegacyDefaultTargetWithDeploymentOrExecutionHistory()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var deployed = new AppDeploymentTarget
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.App.Id,
-            Name = "Default",
-            Slug = "legacy-deployed-default",
-            IsDefault = false,
-            LegacyControllerRuntimeDeployed = true,
-            LastDeploymentAt = DateTimeOffset.UtcNow,
-            Status = DeploymentTargetStatus.Running,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        var withHistory = new AppDeploymentTarget
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.App.Id,
-            Name = "Unused target",
-            Slug = "default",
-            IsDefault = false,
-            Status = DeploymentTargetStatus.Unassigned,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        fixture.Db.AppDeploymentTargets.AddRange(deployed, withHistory);
-        fixture.Db.AppModuleExecutions.Add(new AppModuleExecution
-        {
-            Id = Guid.NewGuid(),
-            AppId = fixture.App.Id,
-            DeploymentTargetId = withHistory.Id,
-            ModuleType = "deployment",
-            ModuleKey = "legacy",
-            TriggerType = "manual",
-            Status = "Completed",
-            CreatedAtUtc = DateTime.UtcNow
-        });
-        await fixture.Db.SaveChangesAsync();
-
-        var result = await fixture.Service.RepairLegacyTargetsAsync(
-            fixture.App.Id, fixture.UserId, dryRun: false);
-        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(targets.Select(target => target.Id), Does.Contain(deployed.Id));
-            Assert.That(targets.Select(target => target.Id), Does.Contain(withHistory.Id));
-            Assert.That(targets.Count(target => target.IsDefault), Is.EqualTo(1));
-            Assert.That(result.RemovedCount, Is.Zero);
-        });
-    }
-
-    [Test]
     public async Task AssignRunner_WhileDeployingIsRejected()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
@@ -230,7 +114,6 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
-        target.LegacyControllerRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -276,7 +159,6 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
-        target.LegacyControllerRuntimeDeployed = true;
         target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
@@ -294,7 +176,6 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(target.ExecutionRunnerId, Is.EqualTo(newRunner.Id));
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
             Assert.That(target.GenericRuntimeDeployed, Is.False);
         });
     }
@@ -315,7 +196,6 @@ public class AppDeploymentTargetManagementServiceTests
             },
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
-        target.LegacyControllerRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -348,7 +228,6 @@ public class AppDeploymentTargetManagementServiceTests
             },
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
-        target.LegacyControllerRuntimeDeployed = true;
         target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddMinutes(-5);
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
@@ -358,7 +237,6 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
-            Assert.That(summary.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(summary.GenericRuntimeDeployed, Is.False);
             Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
         });

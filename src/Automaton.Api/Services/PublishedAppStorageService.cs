@@ -37,7 +37,7 @@ public class PublishedAppStorageService
         PublishedAppPackageMetadata metadata,
         CancellationToken cancellationToken = default)
     {
-        var sourcePath = fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, appId);
+        var sourcePath = fileStorageService.GetAppRuntimeDirectoryPath(ownerId, appId);
         if (!Directory.Exists(sourcePath))
         {
             throw new DirectoryNotFoundException($"Published app frontend runtime folder not found: {sourcePath}");

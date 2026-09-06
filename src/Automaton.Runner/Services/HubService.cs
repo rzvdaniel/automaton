@@ -45,9 +45,6 @@ public class HubService
     private const string FileChunkReadyMethod = "FileChunkReady";
     private const string GetAppMediaStatsMethod = "GetAppMediaStats";
     private const string GetAppMediaFileMetadataMethod = "GetAppMediaFileMetadata";
-    private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
-    private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
-    private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
     private const string DeployAppPackageMethod = "DeployAppPackage";
     private const string ExecuteAppActionModuleMethod = "ExecuteAppActionModule";
     private const string CancelAppModuleExecutionMethod = "CancelAppModuleExecution";
@@ -445,21 +442,6 @@ public class HubService
                 return GetAppMediaFileMetadata(appId, relativePath);
             });
 
-            connection.On<ListAppBackendFilesRequest, AppBackendFilesResponse>(ListAppBackendFilesMethod, request =>
-            {
-                return ListAppBackendFiles(request);
-            });
-
-            connection.On<AppBackendFileRequest, AppBackendFileContentResponse>(ReadAppBackendFileMethod, request =>
-            {
-                return ReadAppBackendFile(request);
-            });
-
-            connection.On<AppBackendFileRequest, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, request =>
-            {
-                return DeleteAppBackendFile(request);
-            });
-
             connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, async (request) =>
             {
                 return await ExecuteWithRunnerActivityAsync(
@@ -691,173 +673,6 @@ public class HubService
         }
     }
 
-    private AppBackendFilesResponse ListAppBackendFiles(ListAppBackendFilesRequest request)
-    {
-        try
-        {
-            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
-            var rootDirectory = GetRunnerFileRootDirectory(
-                request.AppId,
-                request.DeploymentTargetId,
-                runnerFileArea);
-            if (!Directory.Exists(rootDirectory))
-            {
-                return new AppBackendFilesResponse
-                {
-                    Success = true,
-                    Area = runnerFileArea
-                };
-            }
-
-            var files = Directory
-                .EnumerateFiles(rootDirectory, "*", SearchOption.AllDirectories)
-                .Select(path =>
-                {
-                    var info = new FileInfo(path);
-                    var relativePath = Path.GetRelativePath(rootDirectory, path).Replace(Path.DirectorySeparatorChar, '/');
-                    return new AppBackendFileEntry
-                    {
-                        Path = relativePath,
-                        Name = info.Name,
-                        Size = info.Length,
-                        LastModifiedUtc = info.LastWriteTimeUtc,
-                        IsText = IsTextFile(relativePath)
-                    };
-                })
-                .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            return new AppBackendFilesResponse
-            {
-                Success = true,
-                Area = runnerFileArea,
-                Files = files
-            };
-        }
-        catch (Exception ex)
-        {
-            return new AppBackendFilesResponse
-            {
-                Success = false,
-                Area = NormalizeRunnerFileArea(request.Area),
-                Error = ex.Message
-            };
-        }
-    }
-
-    private AppBackendFileContentResponse ReadAppBackendFile(AppBackendFileRequest request)
-    {
-        var relativePath = request.Path;
-        try
-        {
-            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
-            var path = runnerWorkspaceService.ResolveRunnerFilePath(
-                request.AppId,
-                request.DeploymentTargetId,
-                relativePath,
-                runnerFileArea);
-            var normalizedRelativePath = runnerWorkspaceService.NormalizeRelativePath(relativePath);
-            if (!File.Exists(path))
-            {
-                return new AppBackendFileContentResponse
-                {
-                    Success = false,
-                    Area = runnerFileArea,
-                    Path = normalizedRelativePath,
-                    Error = "File not found."
-                };
-            }
-
-            var info = new FileInfo(path);
-            var isText = IsTextFile(normalizedRelativePath);
-            if (!isText)
-            {
-                return new AppBackendFileContentResponse
-                {
-                    Success = true,
-                    Area = runnerFileArea,
-                    Path = normalizedRelativePath,
-                    Size = info.Length,
-                    IsText = false,
-                    Error = "Binary preview is not supported."
-                };
-            }
-
-            const long maxPreviewBytes = 1024 * 1024;
-            if (info.Length > maxPreviewBytes)
-            {
-                return new AppBackendFileContentResponse
-                {
-                    Success = false,
-                    Area = runnerFileArea,
-                    Path = normalizedRelativePath,
-                    Size = info.Length,
-                    IsText = true,
-                    Error = "File is larger than the 1 MB preview limit."
-                };
-            }
-
-            return new AppBackendFileContentResponse
-            {
-                Success = true,
-                Area = runnerFileArea,
-                Path = normalizedRelativePath,
-                Content = File.ReadAllText(path),
-                Size = info.Length,
-                IsText = true
-            };
-        }
-        catch (Exception ex)
-        {
-            return new AppBackendFileContentResponse
-            {
-                Success = false,
-                Area = NormalizeRunnerFileArea(request.Area),
-                Path = runnerWorkspaceService.NormalizeRelativePath(relativePath),
-                Error = ex.Message
-            };
-        }
-    }
-
-    private AppBackendFileDeleteResponse DeleteAppBackendFile(AppBackendFileRequest request)
-    {
-        var relativePath = request.Path;
-        try
-        {
-            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
-            var path = runnerWorkspaceService.ResolveRunnerFilePath(
-                request.AppId,
-                request.DeploymentTargetId,
-                relativePath,
-                runnerFileArea);
-            if (!File.Exists(path))
-            {
-                return new AppBackendFileDeleteResponse
-                {
-                    Success = false,
-                    Area = runnerFileArea,
-                    Error = "File not found."
-                };
-            }
-
-            File.Delete(path);
-            return new AppBackendFileDeleteResponse
-            {
-                Success = true,
-                Area = runnerFileArea
-            };
-        }
-        catch (Exception ex)
-        {
-            return new AppBackendFileDeleteResponse
-            {
-                Success = false,
-                Area = NormalizeRunnerFileArea(request.Area),
-                Error = ex.Message
-            };
-        }
-    }
-
     private async Task<CleanupAppDeploymentTargetResult> CleanupDeploymentTargetAsync(
         CleanupAppDeploymentTargetRequest request)
     {
@@ -887,23 +702,6 @@ public class HubService
         }
     }
 
-    private static string NormalizeRunnerFileArea(string? area)
-    {
-        return string.Equals(area, AppRunnerFileAreas.Data, StringComparison.OrdinalIgnoreCase)
-            ? AppRunnerFileAreas.Data
-            : AppRunnerFileAreas.Backend;
-    }
-
-    private string GetRunnerFileRootDirectory(
-        Guid appId,
-        Guid deploymentTargetId,
-        string area)
-    {
-        return area == AppRunnerFileAreas.Data
-            ? runnerWorkspaceService.GetLegacyControllerDataDirectory(appId)
-            : runnerWorkspaceService.GetLegacyControllerBackendDirectory(appId, deploymentTargetId);
-    }
-
     private static Guid ParseAppId(string appId)
     {
         if (!Guid.TryParse(appId, out var parsed))
@@ -912,14 +710,6 @@ public class HubService
         }
 
         return parsed;
-    }
-
-    private static bool IsTextFile(string relativePath)
-    {
-        var fileName = Path.GetFileName(relativePath).ToLowerInvariant();
-        var extension = Path.GetExtension(relativePath).ToLowerInvariant();
-        return fileName is ".env"
-            || extension is ".py" or ".txt" or ".json" or ".md" or ".csv" or ".log" or ".yml" or ".yaml" or ".ini" or ".toml";
     }
 
     /// <summary>
