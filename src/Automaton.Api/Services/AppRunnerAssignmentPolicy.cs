@@ -38,7 +38,7 @@ public sealed class AppRunnerAssignmentPolicy(
         }
 
         if (target.ExecutionRunnerId != runnerId &&
-            (target.LegacyControllerRuntimeDeployed || target.GenericRuntimeDeployed))
+            target.GenericRuntimeDeployed)
         {
             throw new AppDeploymentTargetConflictException(
                 "This target owns a deployed runtime. Use the deployment-target assignment lifecycle and explicitly clean up the runtime before changing its Runner.");
@@ -47,7 +47,6 @@ public sealed class AppRunnerAssignmentPolicy(
         if (!runnerId.HasValue)
         {
             target.ExecutionRunnerId = null;
-            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
             target.Status = DeploymentTargetStatus.Unassigned;
             target.UpdatedAt = DateTimeOffset.UtcNow;
@@ -62,7 +61,6 @@ public sealed class AppRunnerAssignmentPolicy(
         if (target.ExecutionRunnerId != runner.Id)
         {
             PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
-            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
         }
         await hostedRunnerAppCapacityService.AssignAsync(target, runnerId.Value, cancellationToken);

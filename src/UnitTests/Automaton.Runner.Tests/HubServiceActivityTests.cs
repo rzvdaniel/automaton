@@ -70,5 +70,5 @@ public sealed class HubServiceActivityTests
     }
 
     private static HubService CreateService() => new(
-        null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 }

@@ -49,7 +49,6 @@ def _effective_workspace_root() -> str:
 
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
 WORKSPACE_ROOT = _effective_workspace_root()
-RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controller_runner.py")
 RUNNER_DLL = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "automaton-runner.dll"))
 DOTNET_HOST = shutil.which("dotnet") or "dotnet"
 FASTAPI_HOST = os.environ.get("RUNNER_FASTAPI_HOST", "127.0.0.1").strip() or "127.0.0.1"
@@ -94,106 +93,11 @@ async def debug_scripts_dir():
     }
 
 
-def _venv_python_path(app_id: str, deployment_target_id: str) -> str:
-    target_home = os.path.join(
-        SCRIPTS_DIR, app_id, "targets", deployment_target_id
-    )
-    if sys.platform == "win32":
-        return os.path.join(target_home, "venv", "Scripts", "python.exe")
-    return os.path.join(target_home, "venv", "bin", "python")
-
-
 def _app_data_dir(app_home: str, app_id: str) -> str:
     if _workspace_root_from_env() is None and os.environ.get("RUNNER_SCRIPTS_DIR"):
         return os.path.join(app_home, "data")
 
     return os.path.join(WORKSPACE_ROOT, "data", app_id)
-
-
-def _execute_in_app_env(
-    app_id: str,
-    deployment_target_id: str,
-    controller_name: str,
-    action_name: str,
-    inputs: dict,
-):
-    target_home, backend_dir, data_dir = _resolve_app_paths(
-        app_id, deployment_target_id
-    )
-    python_path = _venv_python_path(app_id, deployment_target_id)
-    if not os.path.exists(python_path):
-        raise HTTPException(
-            500,
-            f"App virtual environment not found for app '{app_id}'. Deploy the backend again to create it.",
-        )
-
-    if not os.path.isdir(backend_dir):
-        raise HTTPException(
-            500,
-            f"App backend directory not found for app '{app_id}'. Deploy the backend again.",
-        )
-
-    os.makedirs(data_dir, exist_ok=True)
-
-    payload = json.dumps({"action": action_name, "inputs": inputs})
-    env = os.environ.copy()
-    env.update(
-        {
-            "AUTOMATON_APP_ID": app_id,
-            "AUTOMATON_DEPLOYMENT_TARGET_ID": deployment_target_id,
-            "AUTOMATON_APP_HOME": target_home,
-            "AUTOMATON_APP_BACKEND_DIR": backend_dir,
-            "AUTOMATON_APP_DATA_DIR": data_dir,
-        }
-    )
-
-    process = subprocess.run(
-        [
-            python_path,
-            RUNNER_SCRIPT,
-            SCRIPTS_DIR,
-            app_id,
-            deployment_target_id,
-            controller_name,
-        ],
-        input=payload,
-        text=True,
-        capture_output=True,
-        check=False,
-        cwd=backend_dir,
-        env=env,
-    )
-
-    stdout = process.stdout.strip()
-    stderr = process.stderr.strip()
-
-    if process.returncode != 0:
-        detail = stderr or stdout or f"controller runner exit code {process.returncode}"
-        return {
-            "success": False,
-            "data": None,
-            "error": f"Controller process failed: {detail}",
-            "output": None,
-        }
-
-    if not stdout:
-        return {
-            "success": False,
-            "data": None,
-            "error": "Controller process returned no JSON payload.",
-            "output": stderr or None,
-        }
-
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as ex:
-        detail = stderr or stdout
-        return {
-            "success": False,
-            "data": None,
-            "error": f"Controller returned invalid JSON: {ex}",
-            "output": detail or None,
-        }
 
 
 def _resolve_app_paths(
@@ -256,33 +160,6 @@ def _safe_download_file(session_id: str) -> str | None:
     return None
 
 
-@app.post("/api/controller/{controller_name}")
-async def execute_controller(controller_name: str, request: Request) -> JSONResponse:
-    try:
-        body = await request.json()
-        app_id = str(body.get("app_id", ""))
-        deployment_target_id = str(body.get("deployment_target_id", ""))
-        action_name = body.get("action", "")
-        inputs = body.get("inputs", {})
-
-        result = _execute_in_app_env(
-            app_id,
-            deployment_target_id,
-            controller_name,
-            action_name,
-            inputs,
-        )
-
-        return JSONResponse(status_code=200, content=result)
-    except HTTPException:
-        raise
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "data": None, "error": str(e)},
-        )
-
-
 @app.post("/api/runtime-file")
 async def read_runtime_file(request: Request) -> JSONResponse:
     try:
@@ -320,32 +197,6 @@ async def read_runtime_file(request: Request) -> JSONResponse:
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.post("/internal/apps/{app_id}/targets/{deployment_target_id}/api/controllers/{controller_name}/actions/{action_name}/execute")
-async def execute_internal_controller(
-    app_id: str,
-    deployment_target_id: str,
-    controller_name: str,
-    action_name: str,
-    request: Request,
-) -> JSONResponse:
-    try:
-        _resolve_app_paths(app_id, deployment_target_id)
-        body = await request.json()
-        inputs = body.get("inputs", {}) if isinstance(body, dict) else {}
-        result = _execute_in_app_env(
-            app_id,
-            deployment_target_id,
-            controller_name,
-            action_name,
-            inputs,
-        )
-        return JSONResponse(status_code=200, content=result)
-    except HTTPException as ex:
-        return JSONResponse(status_code=ex.status_code, content={"success": False, "data": None, "error": ex.detail})
-    except Exception as ex:
-        return JSONResponse(status_code=500, content={"success": False, "data": None, "error": str(ex)})
 
 
 @app.post("/internal/apps/{app_id}/targets/{deployment_target_id}/api/flows/{flow_identifier}/execute")

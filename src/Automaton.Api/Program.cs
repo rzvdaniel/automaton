@@ -388,7 +388,7 @@ services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSect
 services.AddScoped<RuntimeTunnelService>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
-services.AddScoped<AppsControllerExecutionService>();
+services.AddScoped<RuntimeFileProxyService>();
 services.AddScoped<ApplicationDeploymentService>();
 services.AddScoped<ConnectedFlowArtifactService>();
 services.AddScoped<DeploymentOperationService>();

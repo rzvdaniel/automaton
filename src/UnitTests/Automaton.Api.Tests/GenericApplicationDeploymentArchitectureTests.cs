@@ -12,7 +12,6 @@ public sealed class GenericApplicationDeploymentArchitectureTests
         var parameterTypes = constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
 
         Assert.That(parameterTypes, Does.Contain(typeof(ApplicationDeploymentService)));
-        Assert.That(parameterTypes, Does.Not.Contain(typeof(AppsControllerExecutionService)));
     }
 
     [Test]

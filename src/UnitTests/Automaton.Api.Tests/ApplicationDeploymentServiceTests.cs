@@ -376,7 +376,6 @@ public sealed class ApplicationDeploymentServiceTests
             Assert.That(response.Success, Is.True);
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
             Assert.That(target.GenericRuntimeDeployed, Is.True);
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
             Assert.That(target.LastSuccessfulDeploymentAt, Is.Not.Null);
             Assert.That(app.ApplicationContractJson, Does.Contain("server"));
             Assert.That(File.Exists(fixture.RouteFilePath), Is.True);
@@ -413,7 +412,6 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task DeployPackageAsync_RunnerFailureMarksTargetFailedWithoutChangingMarkers()
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
-            initialLegacyMarker: true,
             initialGenericMarker: true,
             runnerResult: new DeployAppPackageResult
             {
@@ -438,7 +436,6 @@ public sealed class ApplicationDeploymentServiceTests
         {
             Assert.That(response.Success, Is.False);
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.True);
             Assert.That(target.GenericRuntimeDeployed, Is.True);
         });
     }
@@ -447,7 +444,6 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task DeployPackageAsync_FinalizationFailurePreservesOriginalErrorAndDoesNotClaimLegacyRuntime()
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
-            initialLegacyMarker: false,
             initialGenericMarker: true,
             routeRootAsFile: true);
         var package = fixture.CreatePackage(hasRuntime: true);
@@ -467,7 +463,6 @@ public sealed class ApplicationDeploymentServiceTests
         {
             Assert.That(exception!.Message, Does.Not.Contain("no longer the active operation"));
             Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
             Assert.That(target.GenericRuntimeDeployed, Is.True);
         });
     }
@@ -511,7 +506,6 @@ public sealed class ApplicationDeploymentServiceTests
         {
             Assert.That(exception!.Message, Does.Contain("no longer the active operation"));
             Assert.That(target.GenericRuntimeDeployed, Is.False);
-            Assert.That(target.LegacyControllerRuntimeDeployed, Is.False);
             Assert.That(File.Exists(fixture.RouteFilePath), Is.False);
         });
     }
@@ -586,7 +580,6 @@ public sealed class ApplicationDeploymentServiceTests
         }
 
         public static async Task<DeploymentFixture> CreateAsync(
-            bool initialLegacyMarker = false,
             bool initialGenericMarker = false,
             bool routeRootAsFile = false,
             bool routeStateConflict = false,
@@ -621,7 +614,6 @@ public sealed class ApplicationDeploymentServiceTests
                     RunnerPurposes.Managed)
             };
             var target = AppDeploymentTarget.CreateDefault(appId, runner.Id);
-            target.LegacyControllerRuntimeDeployed = initialLegacyMarker;
             target.GenericRuntimeDeployed = initialGenericMarker;
             target.ExecutionRunner = runner;
             var app = new WebApp

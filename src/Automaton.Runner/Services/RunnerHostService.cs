@@ -1239,13 +1239,6 @@ public class RunnerHostService
         WriteLine($"   • .NET Version: {Environment.Version}");
         WriteLine();
 
-        // Python Environment Information (Verbose)
-        if (VerboseOptions.Verbose)
-        {
-            var detected = PythonEnvironmentDiagnostics.Detect();
-            PythonEnvironmentDiagnostics.PrintIndented(detected);
-        }
-
         // Available Commands
         WriteLine("📋 Available Commands:");
         WriteLine("   • automaton-runner (start runner)");

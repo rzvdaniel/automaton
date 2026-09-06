@@ -36,7 +36,7 @@ public class UserAppsController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppMediaStorageService mediaStorageService;
-    private readonly AppsControllerExecutionService appsControllerExecutionService;
+    private readonly RuntimeFileProxyService runtimeFileProxyService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
@@ -47,7 +47,7 @@ public class UserAppsController : ControllerBase
         AppsService appsService,
         AppFileStorageService fileStorageService,
         AppMediaStorageService mediaStorageService,
-        AppsControllerExecutionService appsControllerExecutionService,
+        RuntimeFileProxyService runtimeFileProxyService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
         IOptions<WebAppConfig> webAppConfig,
@@ -57,7 +57,7 @@ public class UserAppsController : ControllerBase
         this.appsService = appsService;
         this.fileStorageService = fileStorageService;
         this.mediaStorageService = mediaStorageService;
-        this.appsControllerExecutionService = appsControllerExecutionService;
+        this.runtimeFileProxyService = runtimeFileProxyService;
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
@@ -216,7 +216,7 @@ public class UserAppsController : ControllerBase
             return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
         }
 
-        var runnerContent = await appsControllerExecutionService.ReadRuntimeFrontendFileFromRunnerAsync(
+        var runnerContent = await runtimeFileProxyService.ReadAsync(
             appId,
             ownerId,
             runtimePath,
