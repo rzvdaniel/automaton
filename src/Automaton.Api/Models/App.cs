@@ -66,7 +66,6 @@ public class AppModel
 public class ForkAppRequest
 {
     public string? Name { get; set; }
-    public bool PublishImmediately { get; set; } = false;
 }
 
 public class ForkAppSourceModel
@@ -80,8 +79,9 @@ public class ForkAppSourceModel
     public string? CreatorPublicUsername { get; set; }
     public string CreatorDisplayName { get; set; } = "Automaton creator";
     public bool HasApplicationSource { get; set; }
+    public ApplicationContract? Application { get; set; }
     public string RuntimeLabel => HasApplicationSource
-        ? "Application source available"
+        ? "Application runtime is defined by its contract"
         : "No application source";
 }
 

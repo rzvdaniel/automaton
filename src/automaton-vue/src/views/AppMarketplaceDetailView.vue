@@ -595,10 +595,9 @@ onBeforeUnmount(() => {
               <section class="detail-card">
                 <h3>Runtime</h3>
                 <div class="runtime-list">
-                  <div class="runtime-item"><span>Frontend</span><span>Static hosting</span></div>
                   <div class="runtime-item">
-                    <span>Backend</span>
-                    <span>Configured by the application</span>
+                    <span>Application runtime</span>
+                    <span>Defined by the application contract</span>
                   </div>
                   <div class="runtime-item">
                     <span>Fork & publish</span>

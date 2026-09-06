@@ -86,9 +86,9 @@ const actionMenuItems = computed<MenuItem[]>(() => {
   }
 
   items.push({
-    label: 'Deploy application',
+    label: props.canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI',
     icon: 'pi pi-cloud-upload',
-    disabled: props.isDeployingApp || !props.canDeployFromStudio,
+    disabled: props.isDeployingApp,
     command: () => emit('deployApp'),
   })
   if (props.isPublished) {
@@ -149,9 +149,8 @@ function handlePrimaryAction() {
     return
   }
 
-  if (props.canDeployFromStudio) {
-    emit('publish')
-  }
+  if (props.canDeployFromStudio) emit('publish')
+  else emit('deployApp')
 }
 
 function formatTokenCount(count: number): string {

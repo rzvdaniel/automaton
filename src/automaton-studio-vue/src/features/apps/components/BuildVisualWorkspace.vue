@@ -106,10 +106,10 @@ function handleSplitterResizing(): void {
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
 const isAdvancedExpanded = ref(true)
 
-// Backend connection status
-const backendConnected = computed(() => !!props.runnerId)
+// A declared long-running runtime needs an assigned Runner before it can run.
+const runtimeConnected = computed(() => !!props.runnerId)
 const showBackendPrompt = computed(
-  () => editorStore.hasBackendFolder && !backendConnected.value,
+  () => !!editorStore.currentApp?.application?.runtime?.command && !runtimeConnected.value,
 )
 
 // Card dismissed by user — re-opens if they click the badge
@@ -352,8 +352,8 @@ async function refreshApplication(): Promise<void> {
               <div class="backend-prompt-card">
                 <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
-                  <p class="backend-prompt-title">Backend execution requires Pro</p>
-                  <p class="backend-prompt-desc">The running application can render without backend execution. Live logic, APIs, and workflows require a Pro plan or a self-hosted runner.</p>
+                  <p class="backend-prompt-title">Application runtime requires a Runner</p>
+                  <p class="backend-prompt-desc">This application declares a long-running runtime. Assign a Runner to run its HTTP process.</p>
                   <div class="backend-prompt-actions">
                     <button
                       class="prompt-btn prompt-btn--primary"
@@ -448,8 +448,8 @@ async function refreshApplication(): Promise<void> {
               <div class="backend-prompt-card">
                 <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
-                  <p class="backend-prompt-title">Backend execution requires Pro</p>
-                  <p class="backend-prompt-desc">The running application can render without backend execution. Live logic, APIs, and workflows require a Pro plan or a self-hosted runner.</p>
+                  <p class="backend-prompt-title">Application runtime requires a Runner</p>
+                  <p class="backend-prompt-desc">This application declares a long-running runtime. Assign a Runner to run its HTTP process.</p>
                   <div class="backend-prompt-actions">
                     <button
                       class="prompt-btn prompt-btn--primary"

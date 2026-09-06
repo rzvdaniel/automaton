@@ -46,7 +46,7 @@ const showsEditorActions = computed(() =>
 )
 
 const isPrimaryActionDisabled = computed(() => {
-  return !props.canDeployFromStudio || props.isDeployingApp
+  return props.isDeployingApp
 })
 
 const statusUi = computed(() => {
@@ -221,17 +221,13 @@ const statusPrimaryAction = computed(() => {
     return null
   }
 
-  if (props.canDeployFromStudio) {
-    return {
-      label: 'Deploy application',
-      icon: 'pi pi-cloud-upload',
-      loading: props.isDeployingApp,
-      disabled: props.isDeployingApp,
-      command: () => emit('deployApp'),
-    }
+  return {
+    label: props.canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI',
+    icon: 'pi pi-cloud-upload',
+    loading: props.isDeployingApp,
+    disabled: props.isDeployingApp,
+    command: () => emit('deployApp'),
   }
-
-  return null
 })
 
 watch(
@@ -358,7 +354,7 @@ onBeforeUnmount(() => {
     <div class="workspace-actions">
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
-          label="Deploy application"
+          :label="canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI'"
           icon="pi pi-cloud-upload"
           class="deploy-main-button"
           severity="success"

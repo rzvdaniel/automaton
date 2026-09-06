@@ -260,7 +260,6 @@ export interface PublishAppRequest {
 
 export interface ForkAppRequest {
   name?: string
-  publishImmediately?: boolean
 }
 
 export interface ForkAppSource {
@@ -274,6 +273,7 @@ export interface ForkAppSource {
   creatorDisplayName: string
   hasApplicationSource: boolean
   runtimeLabel: string
+  application?: ApplicationContract | null
 }
 
 export interface ExportAppResponse {

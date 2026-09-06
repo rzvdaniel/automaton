@@ -45,7 +45,7 @@ import {
   UiAutomationAction,
   type UiAutomationResult,
 } from '../services/application-automation-bridge'
-import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
@@ -484,16 +484,15 @@ watch(() => route.query.target, () => {
   }
 })
 
-async function handleDeployTarget(target: AppDeploymentTarget) {
-  await handleDeployApp(target.slug, target.name)
+function handleDeployTarget() {
+  handleDeployApp()
   targetsRevision.value += 1
 }
 
 function handleTopLevelDeploy() {
   const targets = deployableTargets.value
   if (targets.length === 1) {
-    const target = targets[0]
-    if (target) void handleDeployApp(target.slug, target.name)
+    if (targets[0]) handleDeployApp()
     return
   }
 
@@ -510,7 +509,7 @@ function confirmTopLevelDeploy() {
   const target = selectedDeployTarget.value
   if (!target) return
   showDeployTargetDialog.value = false
-  void handleDeployApp(target.slug, target.name)
+  handleDeployApp()
 }
 
 // Cleanup on unmount
@@ -646,18 +645,6 @@ function handleBack() {
   }
 }
 
-function getOpenAppLabel(): string {
-  if (editorStore.currentApp?.isPublished) {
-    return 'Open Public App'
-  }
-
-  if (editorStore.hasApplicationRuntime) {
-    return 'Open Application'
-  }
-
-  return 'Open App'
-}
-
 function openAssistantPanel(): void {
   if (activeTab.value === 'services') {
     return
@@ -729,33 +716,8 @@ function handleCloseTab(event: Event, path: string) {
   }
 }
 
-async function handleDeployApp(targetSlug?: string, targetName?: string) {
-  try {
-    const result = await editorStore.deployApp(targetSlug)
-    if (!result.success) {
-      toast.add({
-        severity: result.requiresRetry ? 'info' : 'warn',
-        summary: result.requiresRetry ? 'Preparing Managed Runtime' : 'Deploy Failed',
-        detail: result.message ?? 'Application deployment failed.',
-        life: 5000,
-      })
-      return
-    }
-    const openAppUrl = editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
-      toast.add({
-        severity: 'success',
-        summary: targetName ? `${targetName} deployment complete` : 'Application deployed',
-        detail: `${targetName ? `Target ${targetSlug}.` : `${getOpenAppLabel()}: ${openAppUrl}`} Application source and runtime were deployed successfully.`,
-        life: 7000,
-      })
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Deploy Failed',
-      detail: err instanceof Error ? err.message : 'Failed to deploy app',
-      life: 5000,
-    })
-  }
+function handleDeployApp() {
+  toast.add({ severity: 'info', summary: 'Deploy with CLI', detail: 'Deploy this application with the Automaton CLI. Studio does not build the canonical application package.', life: 5000 })
 }
 
 // Handle publish
@@ -1161,7 +1123,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-saving="editorStore.isSaving"
         :has-unsaved-changes="editorStore.hasUnsavedChanges"
         :can-deploy-from-studio="editorStore.canDeployFromStudio"
-        :is-deploying-app="editorStore.isDeployingApp"
+        :is-deploying-app="false"
         :application-state="editorStore.applicationState"
         :source-changed-since-deploy="editorStore.sourceChangedSinceDeploy"
         @back="handleBack"

@@ -722,9 +722,7 @@ public class AppFileStorageService
             DevelopmentMode = legacy.DevelopmentMode,
             SourceAvailable = HasAnyEntries(GetSourcePath(userId, appId)),
             SourceModifiedAtUtc = sourceModifiedAtUtc,
-            RuntimeSource = !string.IsNullOrWhiteSpace(legacy.Backend?.RuntimeSource)
-                ? legacy.Backend.RuntimeSource
-                : legacy.Frontend?.RuntimeSource ?? Constants.AppRuntimeSources.Studio,
+            RuntimeSource = SelectLegacyRuntimeSource(legacy.Frontend, legacy.Backend),
             RuntimeAvailable = legacy.Frontend?.RuntimeAvailable == true || legacy.Backend?.RuntimeAvailable == true,
             RuntimeDeployedAtUtc = runtimeDeployedAtUtc
         };
@@ -735,6 +733,44 @@ public class AppFileStorageService
 
     private static DateTime? Max(DateTime? left, DateTime? right) =>
         left.HasValue && right.HasValue ? (left > right ? left : right) : left ?? right;
+
+    private static string SelectLegacyRuntimeSource(LegacyComponentStorageMetadata? frontend, LegacyComponentStorageMetadata? backend)
+    {
+        var components = new[] { frontend, backend }.Where(component => component is not null).Cast<LegacyComponentStorageMetadata>().ToArray();
+        var deployed = components.Where(component => component.RuntimeDeployedAtUtc.HasValue)
+            .OrderByDescending(component => component.RuntimeDeployedAtUtc).ToArray();
+        if (deployed.Length > 0)
+            return NormalizeRuntimeSource(deployed[0].RuntimeSource);
+
+        var available = components.Where(component => component.RuntimeAvailable).ToArray();
+        if (available.Length == 1)
+            return NormalizeRuntimeSource(available[0].RuntimeSource);
+
+        var meaningful = components.Select(component => component.RuntimeSource)
+            .Where(source => !string.IsNullOrWhiteSpace(source) && !string.Equals(source, Constants.AppRuntimeSources.Studio, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (meaningful.Length == 1)
+            return NormalizeRuntimeSource(meaningful[0]);
+
+        var values = components.Select(component => component.RuntimeSource)
+            .Where(source => !string.IsNullOrWhiteSpace(source)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return values.Length == 1 ? NormalizeRuntimeSource(values[0]) : Constants.AppRuntimeSources.Studio;
+    }
+
+    private static string NormalizeRuntimeSource(string? source) => source switch
+    {
+        null => Constants.AppRuntimeSources.Studio,
+        var value when string.Equals(value, "CliBuild", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, Constants.AppRuntimeSources.CliBuild, StringComparison.OrdinalIgnoreCase)
+            => Constants.AppRuntimeSources.CliBuild,
+        var value when string.Equals(value, "CliDeploy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, Constants.AppRuntimeSources.CliDeploy, StringComparison.OrdinalIgnoreCase)
+            => Constants.AppRuntimeSources.CliDeploy,
+        var value when string.Equals(value, "Studio", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, Constants.AppRuntimeSources.Studio, StringComparison.OrdinalIgnoreCase)
+            => Constants.AppRuntimeSources.Studio,
+        _ => source
+    };
 
     private sealed class LegacyAppStorageMetadata
     {
@@ -823,24 +859,6 @@ public class AppFileStorageService
         }
 
         return false;
-    }
-
-    private static bool IsExcludedBackendDeployPath(string relativePath, IEnumerable<string> rules)
-    {
-        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
-        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (segments.Length == 0)
-        {
-            return true;
-        }
-
-        if (normalized.Contains("../", StringComparison.Ordinal) || Path.IsPathRooted(normalized))
-        {
-            return true;
-        }
-
-        return MatchesExcludeRule(relativePath, rules);
     }
 
     private Task CopyDirectoryFilesAsync(

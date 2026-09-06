@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Automaton.Api.Config;
+using Automaton.Api.Constants;
 
 namespace Automaton.Api.Tests;
 
@@ -94,7 +96,7 @@ public class AppFileStorageServiceTests
             Directory.CreateDirectory(Path.Combine(appRoot, "source"));
             File.WriteAllText(Path.Combine(appRoot, "source", "Program.cs"), "class Program {}");
             File.WriteAllText(Path.Combine(appRoot, "_metadata.json"), """
-                {"Version":3,"DevelopmentMode":"Studio","Frontend":{"SourceAvailable":true,"SourceModifiedAtUtc":"2026-01-01T00:00:00Z","RuntimeSource":"CliBuild","RuntimeAvailable":true},"Backend":{"SourceAvailable":false,"RuntimeAvailable":false},"ConnectedFlowIds":["flow-1"]}
+                {"Version":3,"DevelopmentMode":"Studio","Frontend":{"SourceAvailable":true,"SourceModifiedAtUtc":"2026-01-01T00:00:00Z","RuntimeSource":"CliBuild","RuntimeAvailable":true,"RuntimeDeployedAtUtc":"2026-01-02T00:00:00Z"},"Backend":{"SourceAvailable":false,"SourceModifiedAtUtc":"2026-01-01T00:00:00Z","RuntimeSource":"Studio","RuntimeAvailable":false,"RuntimeDeployedAtUtc":null},"ConnectedFlowIds":["flow-1"],"Settings":{"theme":"dark"},"GitHub":{"repository":"owner/repo"}}
                 """);
 
             var metadata = await service.GetAppStorageMetadataAsync(userId, appId);
@@ -102,7 +104,96 @@ public class AppFileStorageServiceTests
             Assert.That(metadata.MetadataSchemaVersion, Is.EqualTo(2));
             Assert.That(metadata.SourceAvailable, Is.True);
             Assert.That(metadata.ConnectedFlowIds, Is.EqualTo(new[] { "flow-1" }));
+            Assert.That(metadata.RuntimeSource, Is.EqualTo(AppRuntimeSources.CliBuild));
             Assert.That(File.ReadAllText(Path.Combine(appRoot, "_metadata.json")), Does.Contain("MetadataSchemaVersion"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestCase("CliBuild", "Studio", true, false, "cli-build")]
+    [TestCase("Studio", "CliDeploy", false, true, "cli-deploy")]
+    public async Task GetAppStorageMetadataAsync_UsesOnlyAvailableLegacyRuntimeComponent(
+        string frontendSource, string backendSource, bool frontendAvailable, bool backendAvailable, string expectedSource)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var appRoot = service.GetAppRootPath(userId, appId);
+            Directory.CreateDirectory(Path.Combine(appRoot, "source"));
+            File.WriteAllText(Path.Combine(appRoot, "_metadata.json"), JsonSerializer.Serialize(new
+            {
+                Version = 1,
+                DevelopmentMode = "Studio",
+                Frontend = new { SourceAvailable = true, SourceModifiedAtUtc = "2026-01-01T00:00:00Z", RuntimeSource = frontendSource, RuntimeAvailable = frontendAvailable, RuntimeDeployedAtUtc = (string?)null },
+                Backend = new { SourceAvailable = true, SourceModifiedAtUtc = "2026-01-01T00:00:00Z", RuntimeSource = backendSource, RuntimeAvailable = backendAvailable, RuntimeDeployedAtUtc = (string?)null },
+                ConnectedFlowIds = new[] { "flow-1" },
+                Settings = new { theme = "dark" },
+                GitHub = new { repository = "owner/repo" }
+            }));
+
+            var metadata = await service.GetAppStorageMetadataAsync(userId, appId);
+
+            Assert.That(metadata.RuntimeSource, Is.EqualTo(expectedSource));
+            Assert.That(metadata.ConnectedFlowIds, Is.EqualTo(new[] { "flow-1" }));
+            Assert.That(File.ReadAllText(Path.Combine(appRoot, "_metadata.json")), Does.Contain("\"MetadataSchemaVersion\": 2"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task GetAppStorageMetadataAsync_PrefersNewestLegacyDeploymentTimestamp()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var appRoot = service.GetAppRootPath(userId, appId);
+            Directory.CreateDirectory(Path.Combine(appRoot, "source"));
+            File.WriteAllText(Path.Combine(appRoot, "_metadata.json"), """
+                {"Version":1,"DevelopmentMode":"Studio","Frontend":{"SourceAvailable":true,"SourceModifiedAtUtc":"2026-01-01T00:00:00Z","RuntimeSource":"CliBuild","RuntimeAvailable":true,"RuntimeDeployedAtUtc":"2026-01-03T00:00:00Z"},"Backend":{"SourceAvailable":true,"SourceModifiedAtUtc":"2026-01-01T00:00:00Z","RuntimeSource":"CliDeploy","RuntimeAvailable":true,"RuntimeDeployedAtUtc":"2026-01-02T00:00:00Z"},"ConnectedFlowIds":[],"Settings":null,"GitHub":null}
+                """);
+
+            var metadata = await service.GetAppStorageMetadataAsync(userId, appId);
+            Assert.That(metadata.RuntimeSource, Is.EqualTo(AppRuntimeSources.CliBuild));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task GetAppStorageMetadataAsync_UsesDeterministicFallbackWhenNothingWasDeployed()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var appRoot = service.GetAppRootPath(userId, appId);
+            Directory.CreateDirectory(Path.Combine(appRoot, "source"));
+            File.WriteAllText(Path.Combine(appRoot, "_metadata.json"), """
+                {"Version":1,"DevelopmentMode":"Studio","Frontend":{"SourceAvailable":true,"SourceModifiedAtUtc":null,"RuntimeSource":"Studio","RuntimeAvailable":false,"RuntimeDeployedAtUtc":null},"Backend":{"SourceAvailable":false,"SourceModifiedAtUtc":null,"RuntimeSource":"Studio","RuntimeAvailable":false,"RuntimeDeployedAtUtc":null},"ConnectedFlowIds":[],"Settings":null,"GitHub":null}
+                """);
+
+            var metadata = await service.GetAppStorageMetadataAsync(userId, appId);
+            Assert.That(metadata.RuntimeSource, Is.EqualTo(AppRuntimeSources.Studio));
+            Assert.That(metadata.RuntimeAvailable, Is.False);
         }
         finally
         {

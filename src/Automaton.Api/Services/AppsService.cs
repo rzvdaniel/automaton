@@ -1173,7 +1173,8 @@ public class AppsService
             ThumbnailUrl = source.ThumbnailUrl,
             CreatorPublicUsername = creator?.PublicUsername,
             CreatorDisplayName = creator?.DisplayName ?? "Automaton creator",
-            HasApplicationSource = hasApplicationSource
+            HasApplicationSource = hasApplicationSource,
+            Application = ApplicationContractSerialization.Deserialize(source.ApplicationContractJson)
         };
     }
 
@@ -1217,8 +1218,6 @@ public class AppsService
         var newId = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var appName = NormalizeForkName(request.Name, source.Name);
-        var publicUrl = request.PublishImmediately ? GenerateUniqueSlug(appName) : null;
-
         var entity = new Entities.WebApp
         {
             Id = newId,
@@ -1227,10 +1226,10 @@ public class AppsService
             Description = source.Description,
             Definition = "{}",
             ApplicationContractJson = source.ApplicationContractJson,
-            IsPublished = request.PublishImmediately,
+            IsPublished = false,
             IsForkable = false,
-            PublicUrl = publicUrl,
-            PublishedAt = request.PublishImmediately ? now : null,
+            PublicUrl = null,
+            PublishedAt = null,
             Version = 1,
             RequiresAuthentication = false,
             Scope = AccessScope.Personal,
@@ -1284,8 +1283,7 @@ public class AppsService
                 SourceAppId = sourceAppId,
                 SourceAppName = source.Name,
                 NewAppId = newId,
-                NewAppName = entity.Name,
-                request.PublishImmediately
+                NewAppName = entity.Name
             }
         });
 

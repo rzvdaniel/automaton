@@ -5,7 +5,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
-import type { DeployAppResult } from '../services/apps.service'
 import type {
   App,
   AppDeployCapabilities,
@@ -63,9 +62,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const isLoading = ref(false)
   const isSaving = ref(false)
   const isLoadingApplication = ref(false)
-  const isDeployingApp = ref(false)
   const deployStatusMessage = ref<string | null>(null)
-  const deployAppStatusMessage = ref<string | null>(null)
 
   // Error state
   const error = ref<string | null>(null)
@@ -106,7 +103,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Main HTML file (index.html)
    */
   const mainHtmlFile = computed(() => {
-    return openFiles.value.find((f) => f.scope === FileSystemScope.Source && f.path === 'source/frontend/index.html')
+    return openFiles.value.find((f) => f.scope === FileSystemScope.Source && f.path === 'source/index.html')
   })
 
   /**
@@ -227,31 +224,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     applicationWarning.value = getApplicationWarningMessage()
   }
 
-  function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      window.setTimeout(resolve, ms)
-    })
-  }
-
-  async function finalizeSuccessfulDeployment(): Promise<void> {
-    // Clear the pending-deploy warning immediately after a successful deploy.
-    // The API metadata can lag briefly, which otherwise leaves the UI orange
-    // even though the deploy toast already reported success.
-    localDeployBaseline.value = currentApp.value?.updated ?? null
-    sourceChangedSinceDeploy.value = false
-    clearPendingDeployChanges()
-    lastDeployError.value = null
-
-    await refreshCurrentAppMetadata()
-    await refreshApplication()
-
-    if (!localDeployBaseline.value || hasSourceChangedSinceLocalDeploy(currentApp.value)) {
-      await sleep(1500)
-      await refreshCurrentAppMetadata()
-      await refreshApplication()
-    }
-  }
-
   function getApplicationWarningMessage(): string | null {
     if (!currentApp.value) {
       return null
@@ -369,9 +341,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       activeFilePath.value = null
 
       // Auto-open index.html if it exists
-      const preferredFile =
-        findFileInTree(fileTree.value, 'source/frontend/index.html') ??
-        findFileInTree(fileTree.value, 'source/index.html')
+      const preferredFile = findFileInTree(fileTree.value, 'source/index.html')
       if (preferredFile) {
         await openFile(preferredFile.path)
       }
@@ -777,45 +747,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Deploy backend scripts to the app's configured runner(s).
-   * Checks for requirements.txt up-front and surfaces a status label beneath the button
-   * for the duration of the operation — no blocking toast needed.
-   */
-  async function deployApp(targetSlug?: string): Promise<DeployAppResult> {
-    if (!currentApp.value) throw new Error('No app loaded')
-    if (!canDeployFromStudio.value) {
-      throw new Error(deployBlockedReason.value || 'This app cannot be fully deployed from Studio.')
-    }
-
-    isDeployingApp.value = true
-    deployAppStatusMessage.value = 'Syncing source to live...'
-    try {
-      if (hasUnsavedChanges.value) {
-        deployAppStatusMessage.value = 'Saving source files...'
-        await saveAllFiles()
-        deployAppStatusMessage.value = 'Syncing source to live...'
-      }
-
-      throw new Error('Deploy this application with the Automaton CLI. Studio does not yet build the canonical application package.')
-      await loadUnifiedFileTree(currentApp.value.id)
-      currentApp.value = await appsService.get(currentApp.value.id)
-      await refreshAssignedRunnerStatus()
-      if (result.success) {
-        await finalizeSuccessfulDeployment()
-      } else {
-        lastDeployError.value = result.message ?? 'Application deployment failed.'
-      }
-      return result
-    } catch (err: unknown) {
-      lastDeployError.value = getErrorMessage(err)
-      throw err
-    } finally {
-      isDeployingApp.value = false
-      deployAppStatusMessage.value = null
-    }
-  }
-
-  /**
    * Update the name of the current app
    */
   async function updateAppName(name: string): Promise<void> {
@@ -1076,7 +1007,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoading,
     isSaving,
     isLoadingApplication,
-    isDeployingApp,
     error,
     consoleEntries,
 
@@ -1117,8 +1047,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setApplicationWarning,
     publishApp,
     unpublishApp,
-    deployApp,
-    deployAppStatusMessage,
     deployStatusMessage,
     updateAppName,
     refreshFileTree,

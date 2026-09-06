@@ -72,6 +72,47 @@ public sealed class GenericRuntimeStage3ArchitectureTests
         Assert.That(typeof(AppDeploymentTarget).GetProperty(nameof(AppDeploymentTarget.GenericRuntimeDeployed)), Is.Not.Null);
     }
 
+    [Test]
+    public void ActiveProductSurfacesDoNotReintroduceSplitRuntimeSemantics()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var activeSurfaces = new[]
+        {
+            Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppsService.cs"),
+            Path.Combine(repositoryRoot, "src", "Automaton.Api", "Controllers", "PublicMarketplaceController.cs"),
+            Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "stores", "app-editor.store.ts"),
+            Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "views", "AppForkView.vue"),
+            Path.Combine(repositoryRoot, "src", "automaton-vue", "src", "views", "AppMarketplaceDetailView.vue")
+        };
+        var forbidden = new[]
+        {
+            "source/frontend", "source/backend", "live/frontend", "live/backend",
+            "CanDeployFrontendFromStudio", "CanDeployBackendFromStudio",
+            "DeployFrontend", "DeployBackend", "LegacyControllerRuntimeDeployed"
+        };
+
+        foreach (var path in activeSurfaces)
+        {
+            var contents = File.ReadAllText(path);
+            foreach (var term in forbidden)
+                Assert.That(contents, Does.Not.Contain(term), $"{term} reintroduced in {path}");
+        }
+    }
+
+    [Test]
+    public void RemixCreationCannotPublishOrAdvertiseADeploymentBeforeGenericDeployment()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var appsService = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppsService.cs"));
+        var forkView = File.ReadAllText(Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "views", "AppForkView.vue"));
+
+        Assert.That(appsService, Does.Not.Contain("request.PublishImmediately"));
+        Assert.That(appsService, Does.Contain("IsPublished = false"));
+        Assert.That(appsService, Does.Contain("PublicUrl = null"));
+        Assert.That(forkView, Does.Not.Contain("Public immediately"));
+        Assert.That(forkView, Does.Not.Contain("To run your remix, you need your own Runner"));
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
