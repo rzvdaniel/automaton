@@ -54,3 +54,29 @@ New production runtime code must not reference controller execution,
 FastAPI/Python application startup, split frontend/backend runtime state, or
 `LegacyControllerRuntimeDeployed`. Historical inventories and migration
 records may retain those names when documenting what was removed.
+
+## Validation record
+
+The generic `ApplicationDeploymentServiceTests` fixture is retained under its
+current name and continues to cover operation persistence, execution leases,
+package/source validation, generic runtime promotion, route reconciliation,
+failure compensation, and fencing. Legacy-marker-only inputs and assertions
+were removed.
+
+`GenericRuntimeStage2CArchitectureTests` checks that the deleted controller
+service is not loadable and scans production execution sources for the deleted
+controller transport and Python execution boundary. It separately scans
+runtime decision services/controllers/hubs for the legacy deployment marker.
+
+The API and Runner projects build successfully. Focused API tests pass for the
+restored generic deployment fixture and the generic deployment/action/connected-
+flow/Stage 2C guardrail group. The broader API action/authorization filter
+passes 115 of 118 tests; its three failures are the pre-existing published-app
+owner regression and legacy-runtime authorization expectations, not restored
+controller execution coverage.
+
+Runner suites were run independently for generic runtime/deployment, process
+management, Actions, connected flows, workspace handling, Hub/tunnel behavior,
+and the readiness regression; all passed. The full Runner project also
+completed successfully: 110 passed, 8 skipped, 0 failed in 1m56s. The Worker
+Release build also succeeds.

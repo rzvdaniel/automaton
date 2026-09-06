@@ -121,7 +121,6 @@ public class AppsService
                         row.LiveTarget.Runner.ConnectionId,
                         row.LiveTarget.Runner.LastHeartbeatAtUtc,
                         now) == RunnerStatus.Online,
-                    LegacyControllerRuntimeDeployed = false,
                     GenericRuntimeDeployed = row.LiveTarget.GenericRuntimeDeployed,
                     LastSuccessfulDeploymentAtUtc = row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime,
                     IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.GenericRuntimeDeployed,
