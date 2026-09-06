@@ -11,11 +11,6 @@ public sealed class ConnectedFlowArtifactArchitectureTests
     [Test]
     public void ConnectedFlowArtifactServiceIsIndependentOfControllerExecution()
     {
-        var constructor = typeof(ConnectedFlowArtifactService).GetConstructors().Single();
-        var parameterTypes = constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
-
-        Assert.That(parameterTypes, Does.Not.Contain(typeof(AppsControllerExecutionService)));
-
         var members = typeof(ConnectedFlowArtifactService)
             .GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Select(member => member.ToString() ?? string.Empty)
@@ -24,18 +19,6 @@ public sealed class ConnectedFlowArtifactArchitectureTests
         Assert.That(members, Has.None.Contains("UploadControllerScript"));
         Assert.That(members, Has.None.Contains("FastAPI"));
         Assert.That(members, Has.None.Contains("LegacyControllerRuntimeDeployed"));
-    }
-
-    [Test]
-    public void ControllerExecutionServiceNoLongerOwnsConnectedFlowDeployment()
-    {
-        var members = typeof(AppsControllerExecutionService)
-            .GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Select(member => member.ToString() ?? string.Empty)
-            .ToArray();
-
-        Assert.That(members, Has.None.Contains("DeployManagedFlowArtifactsAsync"));
-        Assert.That(members, Has.None.Contains("managed-flow-artifact"));
     }
 
     [Test]

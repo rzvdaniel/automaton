@@ -231,7 +231,6 @@ public sealed partial class AppDeploymentTargetManagementService(
             target.WebAppId == appId &&
             !target.IsDefault &&
             target.ExecutionRunnerId == null &&
-            !target.LegacyControllerRuntimeDeployed &&
             target.LastDeploymentAt == null &&
             target.LastSuccessfulDeploymentAt == null &&
             (target.Status == DeploymentTargetStatus.Unassigned ||
@@ -562,14 +561,13 @@ public sealed partial class AppDeploymentTargetManagementService(
 
     private static void ResetDeploymentState(AppDeploymentTarget target)
     {
-        target.LegacyControllerRuntimeDeployed = false;
         target.GenericRuntimeDeployed = false;
         target.LastDeploymentAt = null;
         target.LastSuccessfulDeploymentAt = null;
     }
 
     private static bool IsDeployed(AppDeploymentTarget target) =>
-        target.LegacyControllerRuntimeDeployed || target.GenericRuntimeDeployed;
+        target.GenericRuntimeDeployed;
 
     private static string NormalizeName(string name)
     {
@@ -600,7 +598,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             target.Slug,
             target.IsDefault,
             GetEffectiveStatus(target),
-            target.LegacyControllerRuntimeDeployed,
+            false,
             target.GenericRuntimeDeployed,
             target.LastDeploymentAt,
             target.LastSuccessfulDeploymentAt,

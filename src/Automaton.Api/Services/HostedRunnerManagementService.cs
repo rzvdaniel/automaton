@@ -74,7 +74,6 @@ public class HostedRunnerManagementService
         foreach (var target in appAssignments)
         {
             target.ExecutionRunnerId = null;
-            target.LegacyControllerRuntimeDeployed = false;
             target.GenericRuntimeDeployed = false;
             target.Status = DeploymentTargetStatus.Unassigned;
             target.UpdatedAt = DateTimeOffset.UtcNow;

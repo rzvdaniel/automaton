@@ -178,9 +178,9 @@ public class RunnerWorkspaceService
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "executions");
 
     /// <summary>
-    /// Legacy controller bridge location. Generic applications must not use
-    /// this path; it remains aligned with controller_runner.py until that
-    /// bridge is removed in a later stage.
+    /// Legacy control-plane compatibility location. Generic applications must
+    /// not use this path; remaining file-management consumers are Stage 3
+    /// cleanup candidates.
     /// </summary>
     public string GetLegacyControllerBackendDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetLegacyControllerTargetRoot(appId, deploymentTargetId), "runtime", "backend");

@@ -34,7 +34,6 @@ public class HubService
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
-    private const string UploadControllerScriptMethod = "UploadControllerScript";
     private const string SynchronizeApplicationManagedArtifactsMethod = "SynchronizeApplicationManagedArtifacts";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
@@ -77,7 +76,6 @@ public class HubService
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
-    private readonly RunnerBackendEnvironmentService backendEnvironmentService;
     private readonly RunnerDeploymentService runnerDeploymentService;
     private readonly InfrastructureCommandService infrastructureCommandService;
     private readonly AppActionExecutionService appActionExecutionService;
@@ -112,7 +110,6 @@ public class HubService
         TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
-        RunnerBackendEnvironmentService backendEnvironmentService,
         RunnerDeploymentService runnerDeploymentService,
         InfrastructureCommandService infrastructureCommandService,
         AppActionExecutionService appActionExecutionService,
@@ -124,7 +121,6 @@ public class HubService
         this.tunnelForwarder = tunnelForwarder;
         this.serviceProvider = serviceProvider;
         this.runnerWorkspaceService = runnerWorkspaceService;
-        this.backendEnvironmentService = backendEnvironmentService;
         this.runnerDeploymentService = runnerDeploymentService;
         this.infrastructureCommandService = infrastructureCommandService;
         this.appActionExecutionService = appActionExecutionService;
@@ -363,14 +359,6 @@ public class HubService
             connection.On<InfrastructureCommandRequest, InfrastructureCommandResponse>(
                 RunInfrastructureCommandMethod,
                 request => infrastructureCommandService.ExecuteAsync(request, CancellationToken.None));
-
-            // Register script upload handler — runner saves scripts to local disk for FastAPI to read
-            connection.On<AppControllerUploadPayload, AppControllerUploadResult>(UploadControllerScriptMethod, (payload) =>
-            {
-                var result = UploadControllerScriptHandler(payload);
-                result.DeploymentTargetId = payload.DeploymentTargetId;
-                return result;
-            });
 
             connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
                 SynchronizeApplicationManagedArtifactsMethod,
@@ -703,93 +691,6 @@ public class HubService
         }
     }
 
-    /// <summary>
-    /// Receives a controller script from the server and writes it to local disk for FastAPI to read.
-    /// Each app gets its own Python virtual environment under the persistent app data directory.
-    /// requirements.txt rebuilds that app's venv so removed packages do not linger.
-    /// </summary>
-    private AppControllerUploadResult UploadControllerScriptHandler(AppControllerUploadPayload payload)
-    {
-        try
-        {
-            var backendDir = runnerWorkspaceService.GetLegacyControllerBackendDirectory(
-                payload.AppId,
-                payload.DeploymentTargetId);
-            var dataDir = runnerWorkspaceService.GetLegacyControllerDataDirectory(payload.AppId);
-
-            Directory.CreateDirectory(backendDir);
-            Directory.CreateDirectory(dataDir);
-
-            var relativePath = string.IsNullOrWhiteSpace(payload.RelativePath)
-                ? BuildLegacyRelativePath(payload)
-                : NormalizeBackendRelativePath(payload.RelativePath);
-
-            // requirements.txt — write as plain text, then rebuild/install the app-specific venv
-            if (payload.Language == "Text" && string.Equals(relativePath, "requirements.txt", StringComparison.OrdinalIgnoreCase))
-            {
-                var reqPath = Path.Combine(backendDir, "requirements.txt");
-                File.WriteAllBytes(reqPath, payload.Content);
-
-                return InstallRequirements(payload.AppId, payload.DeploymentTargetId, reqPath);
-            }
-
-            // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
-            if (payload.Language == "Text" && string.Equals(relativePath, "system-requirements.txt", StringComparison.OrdinalIgnoreCase))
-            {
-                var sysReqPath = Path.Combine(backendDir, "system-requirements.txt");
-                File.WriteAllBytes(sysReqPath, payload.Content);
-
-                var aptLogs = InstallSystemPackages(
-                    payload.AppId,
-                    payload.DeploymentTargetId,
-                    Encoding.UTF8.GetString(payload.Content));
-                return new AppControllerUploadResult { Success = true, Logs = aptLogs };
-            }
-
-            EnsureAppVirtualEnvironment(
-                payload.AppId,
-                payload.DeploymentTargetId,
-                recreate: false);
-
-            var filePath = runnerWorkspaceService.ResolveBackendUploadPath(
-                payload.AppId,
-                payload.DeploymentTargetId,
-                relativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-            File.WriteAllBytes(filePath, payload.Content);
-
-            logger.Debug("Deployed backend file {RelativePath} for app {AppId}",
-                relativePath, payload.AppId);
-            WriteLine($"📦 Deployed backend file: {relativePath} (app {payload.AppId})");
-
-            return new AppControllerUploadResult { Success = true };
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to save controller script {ControllerName} for app {AppId}",
-                payload.ControllerName, payload.AppId);
-            WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
-            return new AppControllerUploadResult { Success = false, Logs = [$"❌ {ex.Message}"] };
-        }
-    }
-
-    private static string BuildLegacyRelativePath(AppControllerUploadPayload payload)
-    {
-        var extension = payload.Language switch
-        {
-            "Python" => ".py",
-            "Batch" => ".bat",
-            _ => ".txt"
-        };
-
-        return NormalizeBackendRelativePath(payload.ControllerName + extension);
-    }
-
-    private static string NormalizeBackendRelativePath(string relativePath)
-    {
-        return relativePath.Replace('\\', '/').TrimStart('/');
-    }
-
     private AppBackendFilesResponse ListAppBackendFiles(ListAppBackendFilesRequest request)
     {
         try
@@ -1029,121 +930,6 @@ public class HubService
         string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase)
         // Fallback: Linux containers always have this sentinel file
         || File.Exists("/.dockerenv");
-
-    private AppControllerUploadResult InstallRequirements(
-        Guid appId,
-        Guid deploymentTargetId,
-        string requirementsPath)
-    {
-        try
-        {
-            var logs = backendEnvironmentService.InstallRequirements(
-                appId,
-                deploymentTargetId,
-                requirementsPath);
-            return new AppControllerUploadResult { Success = true, Logs = logs };
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to set up app virtual environment for app {AppId}", appId);
-            WriteLine($"⚠️ App dependency install failed for app {appId}: {ex.Message}");
-            return new AppControllerUploadResult { Success = false, Logs = [$"ERROR: {ex.Message}"] };
-        }
-    }
-
-    private List<string> EnsureAppVirtualEnvironment(
-        Guid appId,
-        Guid deploymentTargetId,
-        bool recreate)
-    {
-        return backendEnvironmentService.EnsureAppVirtualEnvironment(
-            appId,
-            deploymentTargetId,
-            recreate);
-    }
-
-    private static string GetVenvPythonPath(string venvDir)
-    {
-        return RunnerBackendEnvironmentService.GetVenvPythonPath(venvDir);
-    }
-
-    private static string GetVenvPipPath(string venvDir)
-    {
-        return OperatingSystem.IsWindows()
-            ? Path.Combine(venvDir, "Scripts", "pip.exe")
-            : Path.Combine(venvDir, "bin", "pip");
-    }
-
-    private static (int ExitCode, string Stdout, string Stderr) RunProcessCapture(string fileName, string arguments, int timeoutMs)
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = fileName,
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = System.Diagnostics.Process.Start(psi)
-            ?? throw new InvalidOperationException($"Failed to start process: {fileName}");
-
-        var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
-        var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
-
-        if (!process.WaitForExit(timeoutMs))
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-            }
-
-            throw new TimeoutException($"Process timed out after {timeoutMs / 1000}s: {fileName} {arguments}");
-        }
-
-        var stdout = stdoutTask.Result;
-        var stderr = stderrTask.Result;
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Process failed (exit code {process.ExitCode}): {fileName} {arguments}{Environment.NewLine}{stderr}".Trim());
-        }
-
-        return (process.ExitCode, stdout, stderr);
-    }
-
-    private static void AppendProcessLogs(List<string> logs, string stdout, string stderr)
-    {
-        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            logs.Add(line);
-
-        if (!string.IsNullOrWhiteSpace(stderr))
-        {
-            foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                logs.Add($"⚠️ {line}");
-        }
-    }
-
-    /// <summary>
-    /// Installs system (apt-get) packages declared in system-requirements.txt.
-    /// Only works on Docker runners; silently skips with a warning on non-container deployments.
-    /// Packages install to the container filesystem and are reinstalled by docker-entrypoint.sh on container restart.
-    /// </summary>
-    private List<string> InstallSystemPackages(
-        Guid appId,
-        Guid deploymentTargetId,
-        string packageListContent)
-    {
-        return backendEnvironmentService.InstallSystemPackages(
-            appId,
-            deploymentTargetId,
-            packageListContent);
-    }
 
     private async Task HandleConnectionError(Exception ex)
     {

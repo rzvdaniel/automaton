@@ -159,6 +159,7 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         Guid? deploymentOperationId = null,
         Guid? executionAttemptId = null)
     {
+        _ = legacyControllerRuntimeDeployed;
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
         if (target.Status != DeploymentTargetStatus.Deploying)
         {
@@ -182,8 +183,6 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         target.UpdatedAt = now;
         if (success)
         {
-            if (legacyControllerRuntimeDeployed.HasValue)
-                target.LegacyControllerRuntimeDeployed = legacyControllerRuntimeDeployed.Value;
             if (genericRuntimeDeployed.HasValue)
                 target.GenericRuntimeDeployed = genericRuntimeDeployed.Value;
             target.LastSuccessfulDeploymentAt = now;

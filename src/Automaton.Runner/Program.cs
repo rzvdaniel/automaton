@@ -164,10 +164,6 @@ public class Program
         command.SetHandler(async (bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
-            if (verbose)
-            {
-                PythonEnvironmentDiagnostics.DetectAndPrintIfVerbose(true);
-            }
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
@@ -360,7 +356,6 @@ public class Program
                 services.AddSingleton<ApiKeyAuthenticationService>();
                 services.AddSingleton<RunnerWorkspaceService>();
                 services.AddHostedService<RunnerStorageMigrationService>();
-                services.AddSingleton<RunnerBackendEnvironmentService>();
                 services.AddSingleton<AppActionDeploymentService>();
                 services.AddSingleton<AppActionExecutionService>();
                 services.AddSingleton<AppActionExecutionCoordinator>();
