@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Diagnostics;
-using System.Text.Json;
 using Automaton.Api.Services;
 using Automaton.Api.Constants;
 using Automaton.Api.Models;
@@ -21,7 +19,6 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly UserContextService userContextService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly Serilog.ILogger logger;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly IApplicationEventService applicationEventService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
@@ -32,7 +29,6 @@ public class AppsControllerExecutionController : ControllerBase
         AppsControllerExecutionService controllerExecutionService,
         UserContextService userContextService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
-        PrivateAppLaunchService privateAppLaunchService,
         IAppDeployCapabilityService appDeployCapabilityService,
         IApplicationEventService applicationEventService,
         ManagedRunnerBootstrapService managedRunnerBootstrapService,
@@ -42,7 +38,6 @@ public class AppsControllerExecutionController : ControllerBase
         this.controllerExecutionService = controllerExecutionService;
         this.userContextService = userContextService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
-        this.privateAppLaunchService = privateAppLaunchService;
         this.appDeployCapabilityService = appDeployCapabilityService;
         this.applicationEventService = applicationEventService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
@@ -429,242 +424,55 @@ public class AppsControllerExecutionController : ControllerBase
     }
 
     /// <summary>
-    /// Execute a controller action from a published app (by slug).
+    /// Legacy controller-action execution is retired. Use the canonical Automaton Action API.
+    /// This compatibility route remains only as an explicit Stage 2C deletion boundary.
     /// </summary>
     [HttpPost("api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicyNames.PublicAppControllerExecution)]
-    public async Task<ActionResult<AppControllerActionResponse>> ExecuteAction(
+    public ActionResult<AppControllerActionResponse> ExecuteAction(
         string appSlug,
         string controllerName,
         string actionName,
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
-        var sw = Stopwatch.StartNew();
-
-        try
-        {
-            logger.Debug(
-                "Controller action request: App={AppSlug}, Controller={ControllerName}, Action={ActionName}",
-                appSlug, controllerName, actionName);
-
-            var app = await appsService.GetPublishedAppInfoAsync(appSlug, cancellationToken);
-
-            if (app == null)
-            {
-                return NotFound(new { error = "App not found" });
-            }
-
-            if (app.OwnerId == null)
-            {
-                return StatusCode(500, new { error = "App configuration error: no owner" });
-            }
-
-            if (app.RequiresAuthentication && User.Identity?.IsAuthenticated != true)
-            {
-                return Unauthorized(new { error = "Authentication required" });
-            }
-
-            var inputs = request.Inputs != null
-                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId);
-            var useMockBackend = request.UseMockBackend == true;
-
-            var result = await controllerExecutionService.ExecuteActionAsync(
-                app,
-                controllerName,
-                actionName,
-                inputs,
-                request.RunnerNames,
-                useMockBackend,
-                cancellationToken);
-
-            sw.Stop();
-
-            return Ok(result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            sw.Stop();
-            logger.Warning(ex, "Invalid controller action: {ControllerName}.{ActionName}", controllerName, actionName);
-
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            logger.Error(ex, "Controller action failed: App={AppSlug}, Controller={ControllerName}, Action={ActionName}",
-                appSlug, controllerName, actionName);
-
-            return StatusCode(500, new { error = "Internal server error during controller action execution" });
-        }
+        return RetiredControllerActionResponse();
     }
 
     /// <summary>
-    /// Execute a controller action in preview mode (by app ID, requires auth).
+    /// Legacy controller-action preview is retired. This is a Stage 2C deletion boundary.
     /// </summary>
     [HttpPost("api/web-apps/preview/{appId:guid}/controllers/{controllerName}/actions/{actionName}/execute")]
     [Authorize]
-    public async Task<ActionResult<AppControllerActionResponse>> ExecuteActionPreview(
+    public ActionResult<AppControllerActionResponse> ExecuteActionPreview(
         Guid appId,
         string controllerName,
         string actionName,
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
-        var sw = Stopwatch.StartNew();
-
-        try
-        {
-            logger.Debug(
-                "Preview controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
-                appId, controllerName, actionName);
-
-            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
-
-            if (app == null)
-            {
-                return NotFound(new { error = "App not found" });
-            }
-
-            if (app.OwnerId == null)
-            {
-                return StatusCode(500, new { error = "App configuration error: no owner" });
-            }
-
-            var inputs = request.Inputs != null
-                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId);
-            var useMockBackend = request.UseMockBackend != false;
-
-            var result = await controllerExecutionService.ExecuteActionAsync(
-                app,
-                controllerName,
-                actionName,
-                inputs,
-                request.RunnerNames,
-                useMockBackend,
-                cancellationToken);
-
-            sw.Stop();
-
-            return Ok(result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            sw.Stop();
-            logger.Warning(ex, "Invalid preview controller action: {ControllerName}.{ActionName}", controllerName, actionName);
-
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            logger.Error(ex, "Preview controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
-                appId, controllerName, actionName);
-
-            return StatusCode(500, new { error = "Internal server error during controller action execution" });
-        }
+        return RetiredControllerActionResponse();
     }
 
     /// <summary>
-    /// Execute a controller action from a private deployed app (by app ID, requires auth).
+    /// Legacy private controller-action execution is retired. This is a Stage 2C deletion boundary.
     /// </summary>
     [HttpPost("api/web-apps/app/{appId:guid}/controllers/{controllerName}/actions/{actionName}/execute")]
     [Authorize]
-    public async Task<ActionResult<AppControllerActionResponse>> ExecuteActionPrivate(
+    public ActionResult<AppControllerActionResponse> ExecuteActionPrivate(
         Guid appId,
         string controllerName,
         string actionName,
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
-        if (User.Identity?.IsAuthenticated != true ||
-            (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
-        {
-            return Unauthorized(new { error = "Authentication required" });
-        }
-
-        var sw = Stopwatch.StartNew();
-
-        try
-        {
-            logger.Debug(
-                "Private deployed controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
-                appId, controllerName, actionName);
-
-            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
-            if (app == null)
-            {
-                return NotFound(new { error = "App not found" });
-            }
-
-            if (app.OwnerId == null)
-            {
-                return StatusCode(500, new { error = "App configuration error: no owner" });
-            }
-
-            var inputs = request.Inputs != null
-                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId);
-
-            var result = await controllerExecutionService.ExecuteActionAsync(
-                app,
-                controllerName,
-                actionName,
-                inputs,
-                request.RunnerNames,
-                useMockBackend: false,
-                cancellationToken);
-
-            sw.Stop();
-
-            return Ok(result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            sw.Stop();
-            logger.Warning(ex, "Invalid private deployed controller action: {ControllerName}.{ActionName}", controllerName, actionName);
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            logger.Error(ex, "Private deployed controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
-                appId, controllerName, actionName);
-            return StatusCode(500, new { error = "Internal server error during controller action execution" });
-        }
+        return RetiredControllerActionResponse();
     }
 
-    private void ApplyTestRunIdInput(
-        Dictionary<string, JsonElement> inputs,
-        string? bodyTestRunId)
-    {
-        var testRunId = ResolveTestRunId(bodyTestRunId);
-        if (string.IsNullOrWhiteSpace(testRunId))
-            return;
-
-        using var doc = JsonDocument.Parse($"\"{testRunId}\"");
-        inputs[AppExecutionContextKeys.TestRunIdInput] = doc.RootElement.Clone();
-    }
-
-    private string? ResolveTestRunId(string? bodyTestRunId)
-    {
-        if (!string.IsNullOrWhiteSpace(bodyTestRunId))
-            return bodyTestRunId.Trim();
-
-        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
+    private ActionResult<AppControllerActionResponse> RetiredControllerActionResponse() =>
+        StatusCode(StatusCodes.Status410Gone, new
         {
-            var headerValue = headerValues.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(headerValue))
-                return headerValue.Trim();
-        }
-
-        return null;
-    }
+            error = "Legacy controller action execution is retired. Use the canonical Automaton Action API."
+        });
 }
