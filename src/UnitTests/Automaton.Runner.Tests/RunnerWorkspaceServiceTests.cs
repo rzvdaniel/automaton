@@ -118,6 +118,105 @@ public class RunnerWorkspaceServiceTests
     }
 
     [Test]
+    public void ManagedArtifactSynchronizationCreatesCleanTargetAndReplacesRemovedFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var firstPath = $"{Guid.NewGuid():N}.json";
+        var secondPath = $"{Guid.NewGuid():N}.json";
+
+        try
+        {
+            ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [
+                    new ApplicationManagedArtifactFile(firstPath, "first"u8.ToArray()),
+                    new ApplicationManagedArtifactFile(secondPath, "second"u8.ToArray())
+                ],
+                static path => path);
+
+            Assert.That(File.ReadAllText(Path.Combine(root, firstPath)), Is.EqualTo("first"));
+            Assert.That(File.Exists(Path.Combine(root, secondPath)), Is.True);
+
+            ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(firstPath, "updated"u8.ToArray())],
+                static path => path);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(Path.Combine(root, firstPath)), Is.EqualTo("updated"));
+                Assert.That(File.Exists(Path.Combine(root, secondPath)), Is.False);
+            });
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ManagedArtifactSynchronizationRestoresPreviousSetWhenFinalRenameFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var path = "flow.json";
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, path), "previous");
+
+            Assert.Throws<IOException>(() => ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(path, "replacement"u8.ToArray())],
+                static value => value,
+                static (source, destination) =>
+                {
+                    if (source.Contains(".flows-staging-", StringComparison.OrdinalIgnoreCase)
+                        && destination.EndsWith(Path.Combine(".automaton", "flows"), StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("simulated final rename failure");
+                    Directory.Move(source, destination);
+                }));
+
+            Assert.That(File.ReadAllText(Path.Combine(root, path)), Is.EqualTo("previous"));
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ManagedArtifactSynchronizationIgnoresBackupCleanupFailureAfterCommit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var path = "flow.json";
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, path), "previous");
+
+            Assert.DoesNotThrow(() => ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(path, "replacement"u8.ToArray())],
+                static value => value,
+                deleteDirectory: static _ => throw new IOException("simulated backup cleanup failure")));
+
+            Assert.That(File.ReadAllText(Path.Combine(root, path)), Is.EqualTo("replacement"));
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
     public void RejectsTraversalOutsideWorkspaceRoots()
     {
         var appId = Guid.NewGuid();

@@ -37,9 +37,6 @@ public sealed class ConnectedFlowArtifactService
         CancellationToken cancellationToken)
     {
         var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
-        if (metadata.ConnectedFlowIds is null)
-            return;
-
         var flowIds = metadata.ConnectedFlowIds?
             .Select(value => Guid.TryParse(value, out var parsed) ? parsed : (Guid?)null)
             .Where(value => value.HasValue)
@@ -47,15 +44,18 @@ public sealed class ConnectedFlowArtifactService
             .Distinct()
             .ToList() ?? [];
 
-        var ownerFlowsService = flowsServiceFactory.CreateForUser(ownerId);
         var flows = new List<CoreFlow>();
-        foreach (var flowId in flowIds)
+        if (flowIds.Count > 0)
         {
-            var flow = ownerFlowsService.Get(flowId);
-            if (flow == null)
-                continue;
+            var ownerFlowsService = flowsServiceFactory.CreateForUser(ownerId);
+            foreach (var flowId in flowIds)
+            {
+                var flow = ownerFlowsService.Get(flowId);
+                if (flow == null)
+                    continue;
 
-            flows.Add(flow);
+                flows.Add(flow);
+            }
         }
 
         var files = BuildArtifactFiles(flows);
@@ -77,9 +77,9 @@ public sealed class ConnectedFlowArtifactService
     }
 
     internal static IReadOnlyList<ApplicationManagedArtifactFile> BuildArtifactFiles(
-        IEnumerable<CoreFlow> flows)
+        IEnumerable<CoreFlow>? flows)
     {
-        var flowList = flows.ToList();
+        var flowList = (flows ?? []).ToList();
         var files = flowList
             .Select(flow => new ApplicationManagedArtifactFile(
                 $"{flow.Id:N}.json",

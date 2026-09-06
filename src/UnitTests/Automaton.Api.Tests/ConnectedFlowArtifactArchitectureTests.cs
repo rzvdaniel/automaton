@@ -65,4 +65,19 @@ public sealed class ConnectedFlowArtifactArchitectureTests
             Assert.That(index[0].GetProperty("Name").GetString(), Is.EqualTo("Second"));
         });
     }
+
+    [Test]
+    public void NullAndEmptyFlowSetsBothProduceAnEmptyIndex()
+    {
+        var nullFiles = ConnectedFlowArtifactService.BuildArtifactFiles(null);
+        var emptyFiles = ConnectedFlowArtifactService.BuildArtifactFiles([]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(nullFiles.Select(file => file.RelativePath), Is.EqualTo(new[] { "index.json" }));
+            Assert.That(emptyFiles.Select(file => file.RelativePath), Is.EqualTo(new[] { "index.json" }));
+            Assert.That(JsonSerializer.Deserialize<JsonElement>(nullFiles[0].Content).GetArrayLength(), Is.Zero);
+            Assert.That(JsonSerializer.Deserialize<JsonElement>(emptyFiles[0].Content).GetArrayLength(), Is.Zero);
+        });
+    }
 }
