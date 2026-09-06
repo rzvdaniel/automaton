@@ -23,7 +23,9 @@ complete.
 ## Deliberately remaining compatibility consumers
 
 `AppsControllerExecutionService` remains registered only for the existing
-backend/controller compatibility endpoints and connected-flow artifact path.
+backend/controller compatibility endpoints. Connected-flow artifacts are now
+owned by `ConnectedFlowArtifactService` and transported through the generic
+managed-artifact boundary.
 The controller-action endpoints are now an explicit retired boundary and no
 longer execute Actions. `UserAppsController` still uses restricted
 compatibility helpers. Runner `HubService`, `fastapi_server`, and the legacy

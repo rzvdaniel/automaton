@@ -34,5 +34,6 @@
         public const string PrepareAppActionModule = "PrepareAppActionModule";
         public const string SynchronizeAppActionModules = "SynchronizeAppActionModules";
         public const string CleanupAppDeploymentTarget = "CleanupAppDeploymentTarget";
+        public const string SynchronizeApplicationManagedArtifacts = "SynchronizeApplicationManagedArtifacts";
     }
 }

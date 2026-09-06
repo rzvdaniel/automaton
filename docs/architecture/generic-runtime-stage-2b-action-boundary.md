@@ -33,11 +33,35 @@ The following controller-era surfaces remain intentionally isolated for the
 next migration slices:
 
 - legacy backend deployment and backend runtime file compatibility endpoints;
-- connected-flow artifact transfer through `UploadControllerScript` (Stage 2B2);
 - Runner `UploadControllerScript` handling and the controller transport;
 - the FastAPI controller runner and its `/api/controller` routes;
 - legacy backend source/storage and target/app virtual-environment assumptions.
 
-These are not part of canonical Action execution. Stage 2C must delete the
-controller/FastAPI execution bridge after connected-flow artifacts have a
-canonical owner, then remove its remaining production state and transport.
+Connected flows are no longer in this list: Stage 2B2 owns them through the
+generic managed-artifact synchronization boundary described below. These
+remaining consumers are not part of canonical Action execution. Stage 2C must
+delete the controller/FastAPI execution bridge and its remaining production
+state and transport.
+
+## Connected-flow artifact boundary
+
+`ConnectedFlowArtifactService` reads the owner-authorized `ConnectedFlowIds`,
+serializes each flow plus `index.json`, and sends a complete artifact set to
+the assigned target through `SynchronizeApplicationManagedArtifacts`. Runner
+stages the set and atomically replaces the target's
+`artifacts/current/.automaton/flows` directory. This preserves updates and
+removals, target isolation, and path containment without controller names,
+backend paths, or application execution semantics. `AppFlowExecutionService`
+reads the same generic artifact root.
+
+`UploadControllerScript` remains only for these concrete legacy consumers:
+
+- `AppsControllerExecutionService.DeployBackendToRunnersAsync`, which transfers
+  legacy backend files;
+- `Runner.HubService.UploadControllerScriptHandler`, which receives that legacy
+  controller/backend payload;
+- the remaining FastAPI controller routes and
+  `fastapi_server/controller_runner.py` compatibility path.
+
+Stage 2C may remove the transport after those consumers are migrated;
+connected-flow behavior must not be moved back to it.

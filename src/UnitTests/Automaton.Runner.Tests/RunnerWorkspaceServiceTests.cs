@@ -94,6 +94,129 @@ public class RunnerWorkspaceServiceTests
     }
 
     [Test]
+    public void ConnectedFlowArtifactsUseTargetScopedGenericArtifactRoot()
+    {
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        var root = service.GetAppFlowArtifactsRoot(appId, targetId);
+        var flow = service.ResolveAppFlowArtifactPath(appId, targetId, "flow-id.json");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(root, Is.EqualTo(Path.Combine(
+                Path.GetFullPath(workspaceRoot), "apps", appId.ToString(), "targets", targetId.ToString(),
+                "artifacts", "current", ".automaton", "flows")));
+            Assert.That(flow, Is.EqualTo(Path.Combine(root, "flow-id.json")));
+            Assert.That(() => service.ResolveAppFlowArtifactPath(appId, targetId, "../escape.json"),
+                Throws.TypeOf<ArgumentException>());
+            Assert.That(() => service.ResolveAppFlowArtifactPath(appId, targetId, "nested/../../escape.json"),
+                Throws.TypeOf<ArgumentException>());
+        });
+    }
+
+    [Test]
+    public void ManagedArtifactSynchronizationCreatesCleanTargetAndReplacesRemovedFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var firstPath = $"{Guid.NewGuid():N}.json";
+        var secondPath = $"{Guid.NewGuid():N}.json";
+
+        try
+        {
+            ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [
+                    new ApplicationManagedArtifactFile(firstPath, "first"u8.ToArray()),
+                    new ApplicationManagedArtifactFile(secondPath, "second"u8.ToArray())
+                ],
+                static path => path);
+
+            Assert.That(File.ReadAllText(Path.Combine(root, firstPath)), Is.EqualTo("first"));
+            Assert.That(File.Exists(Path.Combine(root, secondPath)), Is.True);
+
+            ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(firstPath, "updated"u8.ToArray())],
+                static path => path);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(Path.Combine(root, firstPath)), Is.EqualTo("updated"));
+                Assert.That(File.Exists(Path.Combine(root, secondPath)), Is.False);
+            });
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ManagedArtifactSynchronizationRestoresPreviousSetWhenFinalRenameFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var path = "flow.json";
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, path), "previous");
+
+            Assert.Throws<IOException>(() => ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(path, "replacement"u8.ToArray())],
+                static value => value,
+                static (source, destination) =>
+                {
+                    if (source.Contains(".flows-staging-", StringComparison.OrdinalIgnoreCase)
+                        && destination.EndsWith(Path.Combine(".automaton", "flows"), StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("simulated final rename failure");
+                    Directory.Move(source, destination);
+                }));
+
+            Assert.That(File.ReadAllText(Path.Combine(root, path)), Is.EqualTo("previous"));
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ManagedArtifactSynchronizationIgnoresBackupCleanupFailureAfterCommit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "managed-artifacts", Guid.NewGuid().ToString("N"), ".automaton", "flows");
+        var path = "flow.json";
+
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, path), "previous");
+
+            Assert.DoesNotThrow(() => ManagedApplicationArtifactSynchronizer.Replace(
+                root,
+                [new ApplicationManagedArtifactFile(path, "replacement"u8.ToArray())],
+                static value => value,
+                deleteDirectory: static _ => throw new IOException("simulated backup cleanup failure")));
+
+            Assert.That(File.ReadAllText(Path.Combine(root, path)), Is.EqualTo("replacement"));
+        }
+        finally
+        {
+            var managedRoot = Directory.GetParent(root)?.Parent?.FullName;
+            if (managedRoot is not null && Directory.Exists(managedRoot))
+                Directory.Delete(managedRoot, recursive: true);
+        }
+    }
+
+    [Test]
     public void RejectsTraversalOutsideWorkspaceRoots()
     {
         var appId = Guid.NewGuid();

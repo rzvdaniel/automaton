@@ -48,3 +48,18 @@ public sealed record CleanupAppDeploymentTargetResult(
     Guid DeploymentTargetId,
     bool Success,
     string? Error = null);
+
+public sealed record ApplicationManagedArtifactFile(
+    string RelativePath,
+    byte[] Content);
+
+public sealed record SynchronizeApplicationManagedArtifactsRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    IReadOnlyList<ApplicationManagedArtifactFile> Files);
+
+public sealed record SynchronizeApplicationManagedArtifactsResult(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    bool Success,
+    string? Error = null);

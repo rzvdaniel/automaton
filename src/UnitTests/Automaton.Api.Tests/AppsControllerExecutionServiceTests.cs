@@ -704,7 +704,8 @@ public sealed class ApplicationDeploymentServiceTests
                 runnerPolicy,
                 resolver,
                 new AppDeploymentTargetStateService(db),
-                routeService);
+                routeService,
+                new ConnectedFlowArtifactService(storage, null!, hub));
 
             return new DeploymentFixture(
                 db,
@@ -845,6 +846,15 @@ public sealed class ApplicationDeploymentServiceTests
                 if (runnerInvocationDelay is { } delay)
                     await Task.Delay(delay, CancellationToken.None);
                 return (T)(object)runnerResult;
+            }
+
+            if (method == AutomatonHubMethods.SynchronizeApplicationManagedArtifacts)
+            {
+                var request = (SynchronizeApplicationManagedArtifactsRequest)args[0]!;
+                return (T)(object)new SynchronizeApplicationManagedArtifactsResult(
+                    request.AppId,
+                    request.DeploymentTargetId,
+                    true);
             }
 
             throw new NotSupportedException($"Unexpected invoke method: {method}");

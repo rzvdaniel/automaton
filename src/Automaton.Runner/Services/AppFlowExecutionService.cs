@@ -7,8 +7,6 @@ namespace Automaton.Runner.Console.Services;
 
 public class AppFlowExecutionService
 {
-    private const string FlowArtifactsDirectoryName = ".automaton";
-    private const string FlowArtifactsFolderName = "flows";
     private const string FlowIndexFileName = "index.json";
 
     private readonly RunnerWorkspaceService runnerWorkspaceService;
@@ -139,16 +137,10 @@ public class AppFlowExecutionService
     }
 
     private string GetFlowIndexPath(Guid appId, Guid deploymentTargetId)
-        => Path.Combine(GetFlowArtifactsDirectory(appId, deploymentTargetId), FlowIndexFileName);
+        => Path.Combine(runnerWorkspaceService.GetAppFlowArtifactsRoot(appId, deploymentTargetId), FlowIndexFileName);
 
     private string GetFlowArtifactPath(Guid appId, Guid deploymentTargetId, Guid flowId)
-        => Path.Combine(GetFlowArtifactsDirectory(appId, deploymentTargetId), $"{flowId:N}.json");
-
-    private string GetFlowArtifactsDirectory(Guid appId, Guid deploymentTargetId)
-        => Path.Combine(
-            runnerWorkspaceService.GetAppArtifactsRoot(appId, deploymentTargetId),
-            FlowArtifactsDirectoryName,
-            FlowArtifactsFolderName);
+        => runnerWorkspaceService.ResolveAppFlowArtifactPath(appId, deploymentTargetId, $"{flowId:N}.json");
 
     private static JsonSerializerOptions JsonOptions()
         => new()

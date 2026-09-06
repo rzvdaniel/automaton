@@ -24,7 +24,6 @@ namespace Automaton.Api.Services;
 /// </summary>
 public class AppsControllerExecutionService
 {
-    private const string FlowArtifactsRelativeRoot = ".automaton/flows";
     private readonly ApplicationDbContext dataContext;
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
@@ -38,6 +37,7 @@ public class AppsControllerExecutionService
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
+    private readonly ConnectedFlowArtifactService connectedFlowArtifactService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -53,7 +53,8 @@ public class AppsControllerExecutionService
         ManagedRunnerBootstrapService managedRunnerBootstrapService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
-        AppDeploymentTargetStateService deploymentTargetStateService)
+        AppDeploymentTargetStateService deploymentTargetStateService,
+        ConnectedFlowArtifactService connectedFlowArtifactService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -68,6 +69,7 @@ public class AppsControllerExecutionService
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.deploymentTargetStateService = deploymentTargetStateService;
+        this.connectedFlowArtifactService = connectedFlowArtifactService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -146,7 +148,8 @@ public class AppsControllerExecutionService
                     };
                 }
 
-                await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, runnersWithoutScripts, cancellationToken);
+                await connectedFlowArtifactService.SynchronizeAsync(
+                    appId, target.Id, ownerId, runnersWithoutScripts, cancellationToken);
                 if (manageTargetState)
                     await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, cancellationToken: cancellationToken, legacyControllerRuntimeDeployed: true);
                 return new DeployBackendResponse
@@ -236,7 +239,8 @@ public class AppsControllerExecutionService
 
                 try
                 {
-                    await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, [runner], cancellationToken);
+                    await connectedFlowArtifactService.SynchronizeAsync(
+                        appId, target.Id, ownerId, [runner], cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -652,80 +656,6 @@ public class AppsControllerExecutionService
     private static string GetActionLabel(bool updated, int fileCount) =>
         updated ? $"updated from source ({fileCount} file(s))" : "preserved existing live files";
 
-
-    private async Task DeployManagedFlowArtifactsAsync(
-        Guid appId,
-        Guid deploymentTargetId,
-        Guid ownerId,
-        IEnumerable<Runner> runners,
-        CancellationToken cancellationToken)
-    {
-        var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
-        var flowIds = metadata.ConnectedFlowIds?
-            .Select(value => Guid.TryParse(value, out var parsed) ? parsed : (Guid?)null)
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .Distinct()
-            .ToList() ?? [];
-
-        if (flowIds.Count == 0)
-        {
-            return;
-        }
-
-        var ownerFlowsService = flowsServiceFactory.CreateForUser(ownerId);
-        var indexEntries = new List<object>();
-        var artifacts = new List<(string RelativePath, byte[] Content)>();
-
-        foreach (var flowId in flowIds)
-        {
-            var flow = ownerFlowsService.Get(flowId);
-            if (flow == null)
-            {
-                logger.Warning("Connected flow {FlowId} for app {AppId} could not be loaded for deployment", flowId, appId);
-                continue;
-            }
-
-            indexEntries.Add(new
-            {
-                FlowId = flow.Id,
-                flow.Name
-            });
-
-            artifacts.Add((
-                $"{FlowArtifactsRelativeRoot}/{flow.Id:N}.json",
-                JsonSerializer.SerializeToUtf8Bytes(flow)));
-        }
-
-        artifacts.Add((
-            $"{FlowArtifactsRelativeRoot}/index.json",
-            JsonSerializer.SerializeToUtf8Bytes(indexEntries)));
-
-        foreach (var runner in runners)
-        {
-            foreach (var artifact in artifacts)
-            {
-                var payload = new
-                {
-                    AppId = appId,
-                    DeploymentTargetId = deploymentTargetId,
-                    RelativePath = artifact.RelativePath,
-                    ControllerName = "managed-flow-artifact",
-                    Content = artifact.Content,
-                    Language = "Text"
-                };
-
-                var result = await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
-
-                ValidateDeploymentTargetResponse(deploymentTargetId, result.DeploymentTargetId);
-                if (!result.Success)
-                {
-                    throw new InvalidOperationException($"Runner '{runner.Name}' rejected backend file '{artifact.RelativePath}'.");
-                }
-            }
-        }
-    }
 
     private static void ValidateDeploymentTargetResponse(
         Guid expectedDeploymentTargetId,
