@@ -21,7 +21,7 @@ public sealed class DeploymentOperationService(
     ITransactionalEventExecutor transactionalEventExecutor,
     IEventPublisher eventPublisher,
     IWebHostEnvironment webHostEnvironment,
-    AppsControllerExecutionService deploymentService,
+    ApplicationDeploymentService deploymentService,
     ApiInstanceIdentityService apiInstanceIdentityService,
     IServiceScopeFactory scopeFactory,
     ILogger<DeploymentOperationService> logger)

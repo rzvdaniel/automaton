@@ -389,6 +389,7 @@ services.AddScoped<RuntimeTunnelService>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
+services.AddScoped<ApplicationDeploymentService>();
 services.AddScoped<DeploymentOperationService>();
 services.AddScoped<AppActionExecutionService>();
 services.AddScoped<ActionScheduleService>();
