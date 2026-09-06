@@ -40,29 +40,48 @@ runtime state. Non-Python fixtures and architecture guardrail tests in
 
 ## Temporary compatibility boundary
 
-The generic deployment path is the Stage 1 path. Historical controller/action
-execution remains behind its existing adapter paths only so the rest of the
-repository can migrate incrementally. Those paths may retain Python,
-`runtime/backend`, virtual-environment, controller, and FastAPI control-plane
-details; none are part of `ApplicationContract` or generic runtime process
-execution. New generic code must not depend on them.
+The generic deployment path is the Stage 1 path. Product-level Automaton
+Action semantics remain valid product behavior: declared actions, execution
+state and history, inputs and results, logs and artifacts, limits,
+idempotency, and redaction are not legacy concepts merely because one current
+executor is stack-specific. Any Action execution retained after the runtime
+migration must use generic execution boundaries.
+
+The temporary adapter is only the legacy controller architecture, retained so
+the rest of the repository can migrate incrementally. It includes
+`AppsControllerExecutionService` controller deployment/execution,
+controller auto-deploy and tunnel behavior, `fastapi_server/controller_runner.py`,
+the Python `handle(action, inputs)` convention, `runtime/backend`, target/app
+virtual environments, requirements-driven controller setup, and
+controller-specific FastAPI transport. None of these are part of
+`ApplicationContract` or generic runtime process execution. New generic code
+must not depend on them, and Stage 2 must not leave a second legacy production
+execution architecture as a fallback.
 
 ## Stage 2 removal candidates
 
 The following remain deliberately outside this Stage 1 change and are tracked
 by the Stage 0 inventory:
 
-- controller/action execution, including the Python module and controller
-  tunnel bridge;
+- the legacy controller deployment/execution and transport paths listed above;
 - legacy Runner workspace, dependency, and process helpers;
 - split frontend/backend deployment state and capability checks;
 - legacy CLI packaging/validation and API-side frontend/backend storage
   assumptions;
-- framework-specific publishing and Studio deployment surfaces.
+- durable-state migration required by removing those paths.
 
-Stage 2 should remove or replace these callers after their ownership and
-durable-state migration paths are mapped. It must not add new compatibility
-fields or infer generic runtime behavior from legacy roles.
+Stage 2 is the point at which generic runtime becomes the sole production
+runtime architecture: it removes the legacy deployment state and execution
+paths, migrates durable state, and eliminates controller, FastAPI, and
+frontend/backend runtime dependencies. No legacy production execution fallback
+remains. It must not delete the Automaton Actions product feature merely
+because its current implementation contains Python-specific execution.
+
+Stage 3 is the later product-surface cleanup: remove remaining legacy
+API/CLI/Studio/public terminology and UX, obsolete user-facing contracts and
+schema leftovers, and publishing or framework-specific product surfaces. Full
+Studio and publishing cleanup is not a Stage 2 responsibility unless it is
+needed to eliminate a production runtime dependency.
 
 Related execution and storage details are documented in
 `generic-runtime-stage-3-build-executor.md` and
