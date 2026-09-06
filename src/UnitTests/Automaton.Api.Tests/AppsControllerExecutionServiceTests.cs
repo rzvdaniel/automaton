@@ -22,7 +22,7 @@ using static Automaton.Api.Hubs.AutomatonHub;
 namespace Automaton.Api.Tests;
 
 [TestFixture]
-public sealed class AppsControllerExecutionServiceTests
+public sealed class ApplicationDeploymentServiceTests
 {
     [Test]
     public async Task AcceptingPackage_PersistsOperationBeforeReturning()
@@ -551,7 +551,7 @@ public sealed class AppsControllerExecutionServiceTests
         private readonly bool routeRootAsFile;
 
         public ApplicationDbContext Db { get; }
-        public AppsControllerExecutionService Service { get; }
+        public ApplicationDeploymentService Service { get; }
         public Guid OwnerId { get; }
         public Guid AppId { get; }
         public AppDeploymentTarget Target { get; }
@@ -563,7 +563,7 @@ public sealed class AppsControllerExecutionServiceTests
 
         private DeploymentFixture(
             ApplicationDbContext db,
-            AppsControllerExecutionService service,
+            ApplicationDeploymentService service,
             Guid ownerId,
             Guid appId,
             AppDeploymentTarget target,
@@ -695,21 +695,16 @@ public sealed class AppsControllerExecutionServiceTests
                     environment,
                     NullLogger<BackendRouteConfigService>.Instance);
             var runnerPolicy = new AppRunnerAssignmentPolicy(db, null!, null!, resolver);
-            var service = new AppsControllerExecutionService(
+            var service = new ApplicationDeploymentService(
                 db,
                 storage,
                 hub,
-                new TunnelRequestRegistry(),
                 uploadRegistry,
-                Options.Create(new AppsTunnelConfig()),
-                new ApiInstanceIdentityService(),
-                new AppDeployCapabilityService(storage),
-                null!,
-                routeService,
                 null!,
                 runnerPolicy,
                 resolver,
-                new AppDeploymentTargetStateService(db));
+                new AppDeploymentTargetStateService(db),
+                routeService);
 
             return new DeploymentFixture(
                 db,
