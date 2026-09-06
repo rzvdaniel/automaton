@@ -94,6 +94,30 @@ public class RunnerWorkspaceServiceTests
     }
 
     [Test]
+    public void ConnectedFlowArtifactsUseTargetScopedGenericArtifactRoot()
+    {
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        var root = service.GetAppFlowArtifactsRoot(appId, targetId);
+        var flow = service.ResolveAppFlowArtifactPath(appId, targetId, "flow-id.json");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(root, Is.EqualTo(Path.Combine(
+                Path.GetFullPath(workspaceRoot), "apps", appId.ToString(), "targets", targetId.ToString(),
+                "artifacts", "current", ".automaton", "flows")));
+            Assert.That(flow, Is.EqualTo(Path.Combine(root, "flow-id.json")));
+            Assert.That(() => service.ResolveAppFlowArtifactPath(appId, targetId, "../escape.json"),
+                Throws.TypeOf<ArgumentException>());
+            Assert.That(() => service.ResolveAppFlowArtifactPath(appId, targetId, "nested/../../escape.json"),
+                Throws.TypeOf<ArgumentException>());
+        });
+    }
+
+    [Test]
     public void RejectsTraversalOutsideWorkspaceRoots()
     {
         var appId = Guid.NewGuid();

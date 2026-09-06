@@ -153,6 +153,15 @@ public class RunnerWorkspaceService
     public string GetAppRuntimeActionsDirectory(Guid appId, Guid deploymentTargetId)
         => GetFullPath(GetAppArtifactsRoot(appId, deploymentTargetId), "current", "actions");
 
+    public string GetAppFlowArtifactsRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppRuntimeCurrentDirectory(appId, deploymentTargetId), ".automaton", "flows");
+
+    public string ResolveAppFlowArtifactPath(Guid appId, Guid deploymentTargetId, string relativePath)
+        => ManagedPathBoundary.ResolveInside(
+            GetAppFlowArtifactsRoot(appId, deploymentTargetId),
+            NormalizeRelativePath(relativePath),
+            "managed application artifact");
+
     public string GetAppActionRuntimeRoot(Guid appId, Guid deploymentTargetId, string actionKey)
     {
         AppActionManifestParser.ValidateKey(actionKey);

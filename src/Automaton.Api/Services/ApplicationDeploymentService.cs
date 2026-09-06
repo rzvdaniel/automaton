@@ -27,6 +27,7 @@ public sealed class ApplicationDeploymentService
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
     private readonly BackendRouteConfigService backendRouteConfigService;
+    private readonly ConnectedFlowArtifactService connectedFlowArtifactService;
     private readonly Serilog.ILogger logger;
 
     public ApplicationDeploymentService(
@@ -38,7 +39,8 @@ public sealed class ApplicationDeploymentService
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
-        BackendRouteConfigService backendRouteConfigService)
+        BackendRouteConfigService backendRouteConfigService,
+        ConnectedFlowArtifactService connectedFlowArtifactService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -49,6 +51,7 @@ public sealed class ApplicationDeploymentService
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.deploymentTargetStateService = deploymentTargetStateService;
         this.backendRouteConfigService = backendRouteConfigService;
+        this.connectedFlowArtifactService = connectedFlowArtifactService;
         logger = Serilog.Log.ForContext<ApplicationDeploymentService>();
     }
 
@@ -130,6 +133,12 @@ public sealed class ApplicationDeploymentService
 
             if (result.Success)
             {
+                await connectedFlowArtifactService.SynchronizeAsync(
+                    appId,
+                    target.Id,
+                    ownerId,
+                    [runner],
+                    cancellationToken);
                 await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
                 await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
                 await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>

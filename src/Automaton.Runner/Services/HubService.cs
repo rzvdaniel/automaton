@@ -35,6 +35,7 @@ public class HubService
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
     private const string UploadControllerScriptMethod = "UploadControllerScript";
+    private const string SynchronizeApplicationManagedArtifactsMethod = "SynchronizeApplicationManagedArtifacts";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
     private const string PingMethod = "Ping";
@@ -371,6 +372,10 @@ public class HubService
                 return result;
             });
 
+            connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
+                SynchronizeApplicationManagedArtifactsMethod,
+                request => SynchronizeApplicationManagedArtifacts(request));
+
             // Register tunnel forwarding handler
             connection.On<TunnelRequest>(TunnelRequestMethod, async (request) =>
             {
@@ -671,6 +676,55 @@ public class HubService
         finally
         {
             EndRunnerActivity();
+        }
+    }
+
+    /// <summary>
+    /// Replaces the managed connected-flow artifact set under the generic application artifact root.
+    /// </summary>
+    private SynchronizeApplicationManagedArtifactsResult SynchronizeApplicationManagedArtifacts(
+        SynchronizeApplicationManagedArtifactsRequest request)
+    {
+        var artifactRoot = runnerWorkspaceService.GetAppFlowArtifactsRoot(request.AppId, request.DeploymentTargetId);
+        var currentRoot = runnerWorkspaceService.GetAppRuntimeCurrentDirectory(request.AppId, request.DeploymentTargetId);
+        var stagingRoot = Path.Combine(currentRoot, $".flow-artifacts-staging-{Guid.NewGuid():N}");
+        var backupRoot = Path.Combine(currentRoot, $".flow-artifacts-backup-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(stagingRoot);
+            foreach (var file in request.Files ?? [])
+            {
+                var relativePath = runnerWorkspaceService.NormalizeRelativePath(file.RelativePath);
+                var destination = ManagedPathBoundary.ResolveInside(stagingRoot, relativePath, "managed application artifact");
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.WriteAllBytes(destination, file.Content ?? []);
+            }
+
+            if (Directory.Exists(artifactRoot))
+                Directory.Move(artifactRoot, backupRoot);
+            Directory.Move(stagingRoot, artifactRoot);
+            if (Directory.Exists(backupRoot))
+                Directory.Delete(backupRoot, recursive: true);
+
+            return new SynchronizeApplicationManagedArtifactsResult(request.AppId, request.DeploymentTargetId, true);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                if (Directory.Exists(stagingRoot))
+                    Directory.Delete(stagingRoot, recursive: true);
+                if (Directory.Exists(backupRoot) && !Directory.Exists(artifactRoot))
+                    Directory.Move(backupRoot, artifactRoot);
+            }
+            catch (Exception restoreException)
+            {
+                logger.Error(restoreException, "Failed to restore managed flow artifacts for AppId={AppId}", request.AppId);
+            }
+
+            logger.Error(ex, "Failed to synchronize managed flow artifacts for AppId={AppId}", request.AppId);
+            return new SynchronizeApplicationManagedArtifactsResult(request.AppId, request.DeploymentTargetId, false, ex.Message);
         }
     }
 
