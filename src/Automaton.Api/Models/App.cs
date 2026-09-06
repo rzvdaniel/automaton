@@ -55,24 +55,12 @@ public class AppModel
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
-    public bool HasDeployedFrontend { get; set; }
-    public AppComponentOwnershipModel Frontend { get; set; } = new();
-    public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
     // The full app representation includes the canonical contract, but update
     // payloads may omit it when changing unrelated metadata. The service then
     // preserves the persisted contract instead of replacing it with defaults.
     public ApplicationContract? Application { get; set; }
-}
-
-public class AppComponentOwnershipModel
-{
-    public bool SourceAvailable { get; set; } = true;
-    public DateTime? SourceModifiedAtUtc { get; set; }
-    public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
-    public bool RuntimeAvailable { get; set; }
-    public DateTime? RuntimeDeployedAtUtc { get; set; }
 }
 
 public class ForkAppRequest

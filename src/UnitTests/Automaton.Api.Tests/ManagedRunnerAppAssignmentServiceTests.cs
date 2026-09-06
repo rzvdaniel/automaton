@@ -81,7 +81,6 @@ public class ManagedRunnerAppAssignmentServiceTests
     {
         var target = AddTarget(previousRunnerId);
         target.GenericRuntimeDeployed = generic;
-        target.LegacyControllerRuntimeDeployed = legacy;
         target.Status = DeploymentTargetStatus.Deploying;
         target.ActiveDeploymentOperationId = Guid.NewGuid();
         target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
@@ -172,7 +171,6 @@ public class ManagedRunnerAppAssignmentServiceTests
     public async Task UpdateConnection_CompletesDespiteRouteFailure_AndLaterReconciliationRepairsRoute()
     {
         var target = AddTarget(previousRunnerId);
-        target.LegacyControllerRuntimeDeployed = true;
         target.ActiveDeploymentOperationId = Guid.NewGuid();
         target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
         await db.SaveChangesAsync();

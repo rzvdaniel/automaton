@@ -61,11 +61,9 @@ The shared source is deployed into independent environments:
 App → Environment → Runtime destination
 ```
 
-Before a migration or rollout, inventory Apps with multiple primary targets,
-no primary target, and redundant unassigned `default` targets. Preserve every
-assigned, deployed, Live, or historically referenced target. Use the repair
-endpoint's dry-run result as the review list, then run the transactional repair
-only after approval. Never delete target rows manually.
+Before a migration or rollout, inventory Apps with multiple primary targets and
+no primary target. Preserve every assigned, deployed, Live, or historically
+referenced target. Never delete target rows manually.
 
 For a release that changes target-aware SignalR methods, deploy API and Studio
 together and ask users to refresh existing Studio tabs. Verify one-environment
@@ -75,16 +73,6 @@ approval on the target's Privileged Host access action; assignment remains
 blocked while approval is absent. If rollback is required,
 restore the previous API and Studio revision without changing the database or
 deployed environment rows, then repeat the route, log, and publish smoke checks.
-
-## Legacy target cleanup
-
-Legacy targets are never removed when an administrator opens an App or lists its targets. Use the explicit repair endpoint only after reviewing its dry-run result:
-
-1. Request `POST /api/apps/{appId}/targets/repair-legacy?dryRun=true`.
-2. Confirm that every returned target is unassigned, undeployed, non-Live, and has no execution history.
-3. Request the same endpoint with `dryRun=false` to remove only the revalidated targets.
-
-The repair operation rechecks the target state and all deployment-target references in its transaction. A changed or referenced target is preserved.
 
 ## Where administrators manage Runner infrastructure
 

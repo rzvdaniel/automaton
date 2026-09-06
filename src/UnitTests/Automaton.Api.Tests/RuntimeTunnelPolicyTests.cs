@@ -193,7 +193,6 @@ public class RuntimeTunnelPolicyTests
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-        target.LegacyControllerRuntimeDeployed = false;
 
         await using var dbContext = CreateDbContext();
         var identity = new ApiInstanceIdentityService();

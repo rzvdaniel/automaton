@@ -1,9 +1,11 @@
 using Automaton.Api.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Entities;
 
 namespace Automaton.Api.Tests;
 
 [TestFixture]
-public sealed class GenericRuntimeStage2CArchitectureTests
+public sealed class GenericRuntimeStage3ArchitectureTests
 {
     [Test]
     public void RemovedControllerExecutionTypeIsNotLoaded()
@@ -14,7 +16,7 @@ public sealed class GenericRuntimeStage2CArchitectureTests
     }
 
     [Test]
-    public void ProductionExecutionSourcesDoNotReintroduceControllerBridge()
+    public void ProductionExecutionSourcesDoNotReintroduceHistoricalApplicationExecution()
     {
         var repositoryRoot = FindRepositoryRoot();
         var sourceFiles = Directory.EnumerateFiles(
@@ -57,6 +59,17 @@ public sealed class GenericRuntimeStage2CArchitectureTests
 
         foreach (var path in decisionRoots.SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)))
             Assert.That(File.ReadAllText(path), Does.Not.Contain("LegacyControllerRuntimeDeployed"), path);
+    }
+
+    [Test]
+    public void ActiveStorageAndDeploymentModelsExposeOnlyGenericRuntimeState()
+    {
+        Assert.That(typeof(AppStorageMetadata).GetProperty("Frontend"), Is.Null);
+        Assert.That(typeof(AppStorageMetadata).GetProperty("Backend"), Is.Null);
+        Assert.That(typeof(AppModel).GetProperty("Frontend"), Is.Null);
+        Assert.That(typeof(AppModel).GetProperty("Backend"), Is.Null);
+        Assert.That(typeof(AppDeploymentTarget).GetProperty("LegacyControllerRuntimeDeployed"), Is.Null);
+        Assert.That(typeof(AppDeploymentTarget).GetProperty(nameof(AppDeploymentTarget.GenericRuntimeDeployed)), Is.Not.Null);
     }
 
     private static string FindRepositoryRoot()

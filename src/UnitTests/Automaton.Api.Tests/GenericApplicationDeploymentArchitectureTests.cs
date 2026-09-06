@@ -26,6 +26,5 @@ public sealed class GenericApplicationDeploymentArchitectureTests
         Assert.That(members, Has.None.Contains("UploadControllerScript"));
         Assert.That(members, Has.None.Contains("ExecuteAction"));
         Assert.That(members, Has.None.Contains("FastAPI"));
-        Assert.That(members, Has.None.Contains("LegacyControllerRuntimeDeployed"));
     }
 }

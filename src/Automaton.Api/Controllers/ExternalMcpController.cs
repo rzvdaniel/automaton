@@ -353,8 +353,8 @@ public class ExternalMcpController : ControllerBase
                 updatedAt = app.Updated,
                 createdAt = app.Created,
                 sourceAvailable = app.SourceAvailable,
-                frontendSourceAvailable = app.Frontend.SourceAvailable,
-                backendSourceAvailable = app.Backend.SourceAvailable
+                frontendSourceAvailable = app.SourceAvailable,
+                backendSourceAvailable = app.SourceAvailable
             })
             .ToList();
 

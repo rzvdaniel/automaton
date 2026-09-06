@@ -41,10 +41,10 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
         // can change the decision logic here without changing the client-side meaning of
         // "can deploy app/frontend/backend from Studio".
         var canDeployFrontendFromStudio =
-            metadata.Frontend.SourceAvailable &&
+            metadata.SourceAvailable &&
             string.Equals(frontendDeployMode, AppFrontendDeployModes.StaticCopy, StringComparison.Ordinal);
 
-        var canDeployBackendFromStudio = metadata.Backend.SourceAvailable;
+        var canDeployBackendFromStudio = metadata.SourceAvailable;
 
         // "Deploy app" must keep a single meaning in the UI: deploy the application.
         // If Studio cannot safely complete that promise end to end, this stays false and
@@ -53,9 +53,9 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
         // path end to end. Build-required frontends intentionally block that default path
         // until Studio gains its own build pipeline.
         var canDeployAppFromStudio =
-            (canDeployFrontendFromStudio || !metadata.Frontend.SourceAvailable) &&
-            (canDeployBackendFromStudio || !metadata.Backend.SourceAvailable) &&
-            (metadata.Frontend.SourceAvailable || metadata.Backend.SourceAvailable || actionsAvailable);
+            (canDeployFrontendFromStudio || !metadata.SourceAvailable) &&
+            (canDeployBackendFromStudio || !metadata.SourceAvailable) &&
+            (metadata.SourceAvailable || actionsAvailable);
 
         return new AppDeployCapabilitiesResponse
         {
@@ -63,7 +63,7 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
             CanDeployFrontendFromStudio = canDeployFrontendFromStudio,
             CanDeployBackendFromStudio = canDeployBackendFromStudio,
             FrontendDeployMode = frontendDeployMode,
-            FrontendDeployBlockReason = !canDeployFrontendFromStudio && metadata.Frontend.SourceAvailable
+            FrontendDeployBlockReason = !canDeployFrontendFromStudio && metadata.SourceAvailable
                 ? "This app requires a frontend build. Deploy from the CLI to update the frontend."
                 : null,
         };

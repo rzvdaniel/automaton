@@ -1687,7 +1687,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                frontendRuntimeSource: AppRuntimeSources.CliBuild);
+                runtimeSource: AppRuntimeSources.CliBuild);
 
             if (written.Count > 0)
             {
@@ -1803,21 +1803,14 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                frontendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Frontend.SourceAvailable,
-                frontendRuntimeSource: AppRuntimeSources.CliBuild,
-                backendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Backend.SourceAvailable);
+                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
+                runtimeSource: AppRuntimeSources.CliBuild);
 
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, id, metadata =>
             {
                 var modifiedAtUtc = DateTime.UtcNow;
-                if (metadata.Frontend.SourceAvailable)
-                {
-                    metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
-                }
-                if (metadata.Backend.SourceAvailable)
-                {
-                    metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
-                }
+                if (metadata.SourceAvailable)
+                    metadata.SourceModifiedAtUtc = modifiedAtUtc;
             });
 
             return Ok(new { success = true, written, skipped, errors });
@@ -1926,7 +1919,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                backendRuntimeSource: AppRuntimeSources.CliDeploy);
+                runtimeSource: AppRuntimeSources.CliDeploy);
 
             return Ok(new { success = true, written, skipped, errors });
         }

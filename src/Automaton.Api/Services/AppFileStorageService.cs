@@ -385,10 +385,10 @@ public class AppFileStorageService
     public async Task<AppStorageMetadata> GetAppStorageMetadataAsync(Guid userId, Guid appId)
     {
         var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
-        metadata.Frontend.SourceAvailable = HasFrontendSourceEntries(userId, appId);
-        metadata.Backend.SourceAvailable = HasBackendSourceEntries(userId, appId);
-        metadata.Frontend.RuntimeAvailable = metadata.Frontend.RuntimeAvailable || HasFrontendRuntimeEntries(userId, appId);
-        metadata.Backend.RuntimeAvailable = metadata.Backend.RuntimeAvailable || HasBackendRuntimeEntries(userId, appId);
+        metadata.SourceAvailable = HasAnySourceEntries(userId, appId);
+        metadata.RuntimeAvailable = metadata.RuntimeAvailable
+            || HasFrontendRuntimeEntries(userId, appId)
+            || HasBackendRuntimeEntries(userId, appId);
         return metadata;
     }
 
@@ -609,8 +609,7 @@ public class AppFileStorageService
         Directory.CreateDirectory(sourcePath);
         await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
         {
-            metadata.Frontend.SourceModifiedAtUtc = DateTime.UtcNow;
-            metadata.Backend.SourceModifiedAtUtc = DateTime.UtcNow;
+            metadata.SourceModifiedAtUtc = DateTime.UtcNow;
         });
     }
 
@@ -718,8 +717,8 @@ public class AppFileStorageService
         Directory.CreateDirectory(runtimePath);
         await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
         {
-            metadata.Frontend.RuntimeAvailable = false;
-            metadata.Frontend.RuntimeDeployedAtUtc = null;
+            metadata.RuntimeAvailable = HasBackendRuntimeEntries(userId, appId);
+            metadata.RuntimeDeployedAtUtc = metadata.RuntimeAvailable ? metadata.RuntimeDeployedAtUtc : null;
         });
     }
 
@@ -857,8 +856,8 @@ public class AppFileStorageService
         Directory.CreateDirectory(runtimePath);
         await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
         {
-            metadata.Backend.RuntimeAvailable = false;
-            metadata.Backend.RuntimeDeployedAtUtc = null;
+            metadata.RuntimeAvailable = HasFrontendRuntimeEntries(userId, appId);
+            metadata.RuntimeDeployedAtUtc = metadata.RuntimeAvailable ? metadata.RuntimeDeployedAtUtc : null;
         });
     }
 
@@ -915,6 +914,11 @@ public class AppFileStorageService
         return HasAnyEntries(GetSourceBackendPath(userId, appId));
     }
 
+    public bool HasAnySourceEntries(Guid userId, Guid appId)
+    {
+        return HasFrontendSourceEntries(userId, appId) || HasBackendSourceEntries(userId, appId);
+    }
+
     public bool HasFrontendRuntimeEntries(Guid userId, Guid appId)
     {
         return HasAnyEntries(GetLiveFrontendPath(userId, appId));
@@ -932,19 +936,7 @@ public class AppFileStorageService
 
         return UpdateAppStorageMetadataAsync(userId, appId, metadata =>
         {
-            if (normalized.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
-            {
-                metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
-            }
-            else if (normalized.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
-            {
-                metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
-            }
-            else
-            {
-                metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
-                metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
-            }
+            metadata.SourceModifiedAtUtc = modifiedAtUtc;
         });
     }
 

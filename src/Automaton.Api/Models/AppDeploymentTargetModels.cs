@@ -18,7 +18,6 @@ public sealed record AppDeploymentTargetSummary(
     string Slug,
     bool IsDefault,
     DeploymentTargetStatus Status,
-    bool LegacyControllerRuntimeDeployed,
     bool GenericRuntimeDeployed,
     DateTimeOffset? LastDeploymentAt,
     DateTimeOffset? LastSuccessfulDeploymentAt,
@@ -30,11 +29,6 @@ public sealed record AppDeploymentTargetSummary(
     bool PrivilegedHostAccessApproved = false,
     DateTimeOffset? PrivilegedHostAccessApprovedAtUtc = null,
     Guid? PrivilegedHostAccessApprovedByUserId = null);
-
-public sealed record LegacyDeploymentTargetRepairResult(
-    bool DryRun,
-    IReadOnlyList<AppDeploymentTargetSummary> Candidates,
-    int RemovedCount);
 
 public sealed class CreateAppDeploymentTargetRequest
 {
