@@ -80,4 +80,45 @@ public sealed class ConnectedFlowArtifactArchitectureTests
             Assert.That(JsonSerializer.Deserialize<JsonElement>(emptyFiles[0].Content).GetArrayLength(), Is.Zero);
         });
     }
+
+    [Test]
+    public void MatchingSynchronizationResponseIdentityIsAccepted()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        Assert.DoesNotThrow(() => ConnectedFlowArtifactService.ValidateSynchronizationResponse(
+            appId,
+            targetId,
+            new SynchronizeApplicationManagedArtifactsResult(appId, targetId, true)));
+    }
+
+    [Test]
+    public void MismatchedSynchronizationResponseTargetIsRejected()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ConnectedFlowArtifactService.ValidateSynchronizationResponse(
+                appId,
+                targetId,
+                new SynchronizeApplicationManagedArtifactsResult(appId, Guid.NewGuid(), true)));
+
+        Assert.That(exception!.Message, Does.Contain("unexpected deployment target"));
+    }
+
+    [Test]
+    public void MismatchedSynchronizationResponseAppIsRejected()
+    {
+        var targetId = Guid.NewGuid();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ConnectedFlowArtifactService.ValidateSynchronizationResponse(
+                Guid.NewGuid(),
+                targetId,
+                new SynchronizeApplicationManagedArtifactsResult(Guid.NewGuid(), targetId, true)));
+
+        Assert.That(exception!.Message, Does.Contain("unexpected app"));
+    }
 }

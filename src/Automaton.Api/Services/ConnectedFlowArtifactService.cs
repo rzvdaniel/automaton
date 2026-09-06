@@ -71,9 +71,24 @@ public sealed class ConnectedFlowArtifactService
                     new SynchronizeApplicationManagedArtifactsRequest(appId, deploymentTargetId, files),
                     cancellationToken);
 
+            ValidateSynchronizationResponse(appId, deploymentTargetId, result);
             if (!result.Success)
                 throw new InvalidOperationException(result.Error ?? $"Runner '{runner.Name}' rejected managed artifacts.");
         }
+    }
+
+    internal static void ValidateSynchronizationResponse(
+        Guid expectedAppId,
+        Guid expectedDeploymentTargetId,
+        SynchronizeApplicationManagedArtifactsResult result)
+    {
+        if (result.AppId != expectedAppId)
+            throw new InvalidOperationException(
+                $"Runner returned managed-artifact response for unexpected app '{result.AppId}'.");
+
+        if (result.DeploymentTargetId != expectedDeploymentTargetId)
+            throw new InvalidOperationException(
+                $"Runner returned managed-artifact response for unexpected deployment target '{result.DeploymentTargetId}'.");
     }
 
     internal static IReadOnlyList<ApplicationManagedArtifactFile> BuildArtifactFiles(
