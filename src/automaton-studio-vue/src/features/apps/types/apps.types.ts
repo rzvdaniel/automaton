@@ -272,7 +272,7 @@ export interface ForkAppSource {
   thumbnailUrl?: string | null
   creatorPublicUsername?: string | null
   creatorDisplayName: string
-  hasBackendExecution: boolean
+  hasApplicationSource: boolean
   runtimeLabel: string
 }
 

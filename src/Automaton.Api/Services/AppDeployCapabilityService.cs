@@ -5,23 +5,11 @@ namespace Automaton.Api.Services;
 
 public class AppDeployCapabilityService : IAppDeployCapabilityService
 {
-    private readonly AppFileStorageService fileStorageService;
-
-    public AppDeployCapabilityService(AppFileStorageService fileStorageService)
-    {
-        this.fileStorageService = fileStorageService;
-    }
-
     public async Task<AppDeployCapabilitiesResponse> GetCapabilitiesAsync(
         Guid ownerId,
         Guid appId,
         CancellationToken cancellationToken = default)
     {
-        var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
-        var actionsRoot = Path.Combine(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId), "actions");
-        var actionsAvailable = Directory.Exists(actionsRoot)
-            && Directory.EnumerateDirectories(actionsRoot).Any(directory => File.Exists(Path.Combine(directory, "action.yaml")));
-
         // Design rule:
         // The UI never decides what is deployable. Studio always asks the backend for the
         // current capability contract, and the backend remains the source of truth.
@@ -45,8 +33,9 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
         // "Deploy app" is the safe default action only when Studio can complete the full
         // path end to end. Build-required applications intentionally block that default path
         // until Studio gains its own build pipeline.
-        var canDeployApplicationFromStudio =
-            metadata.SourceAvailable || actionsAvailable;
+        // Studio does not yet build the canonical deploy package. Keep the
+        // capability disabled instead of exposing a request path it cannot fulfill.
+        var canDeployApplicationFromStudio = false;
 
         return new AppDeployCapabilitiesResponse
         {

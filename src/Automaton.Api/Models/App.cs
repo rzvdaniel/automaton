@@ -79,10 +79,10 @@ public class ForkAppSourceModel
     public string? ThumbnailUrl { get; set; }
     public string? CreatorPublicUsername { get; set; }
     public string CreatorDisplayName { get; set; } = "Automaton creator";
-    public bool HasBackendExecution { get; set; }
-    public string RuntimeLabel => HasBackendExecution
-        ? "Backend app — runner required"
-        : "Static app — no runner required";
+    public bool HasApplicationSource { get; set; }
+    public string RuntimeLabel => HasApplicationSource
+        ? "Application source available"
+        : "No application source";
 }
 
 public class AppScreenshotModel

@@ -1161,7 +1161,7 @@ public class AppsService
             })
             .FirstOrDefaultAsync();
 
-        var hasBackendExecution = fileStorageService.HasBackendSourceEntries(sourceOwner, sourceAppId);
+        var hasApplicationSource = fileStorageService.HasAnySourceEntries(sourceOwner, sourceAppId);
 
         return new Models.ForkAppSourceModel
         {
@@ -1173,7 +1173,7 @@ public class AppsService
             ThumbnailUrl = source.ThumbnailUrl,
             CreatorPublicUsername = creator?.PublicUsername,
             CreatorDisplayName = creator?.DisplayName ?? "Automaton creator",
-            HasBackendExecution = hasBackendExecution
+            HasApplicationSource = hasApplicationSource
         };
     }
 
@@ -1268,7 +1268,6 @@ public class AppsService
         await dataContext.SaveChangesAsync();
 
         await fileStorageService.CopySourceFilesAsync(sourceOwner, sourceAppId, UserId, newId);
-        await fileStorageService.CopyRuntimeFrontendFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest

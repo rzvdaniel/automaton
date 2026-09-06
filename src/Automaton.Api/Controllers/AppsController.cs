@@ -1618,12 +1618,12 @@ public class AppsController : BaseController
                 return NotFound(new { success = false, message = "App not found" });
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var runtimePath = fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id);
+            var runtimePath = fileStorageService.GetAppRuntimeDirectoryPath(ownerId, id);
 
             // clean=true: delete current public frontend live files before extracting.
             if (clean)
             {
-                await fileStorageService.ClearFrontendRuntimeAsync(ownerId, id);
+                await fileStorageService.ClearApplicationRuntimeAsync(ownerId, id);
             }
             else
             {

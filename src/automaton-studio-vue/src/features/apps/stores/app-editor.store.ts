@@ -128,7 +128,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const canDeployFromStudio = computed(() =>
     deployCapabilities.value?.canDeployApplicationFromStudio ?? false,
   )
-  const deployBlockedReason = computed(() => canDeployFromStudio.value ? null : 'The application is not ready to deploy.')
+  const deployBlockedReason = computed(() => canDeployFromStudio.value ? null : 'Deploy with the Automaton CLI. Studio does not currently build the canonical application package.')
   const runnerOffline = computed(() => assignedRunnerOnline.value === false)
   const applicationState = computed(() => {
     if (lastDeployError.value) return 'Build failed'
@@ -796,7 +796,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         deployAppStatusMessage.value = 'Syncing source to live...'
       }
 
-      const result = await appsService.deployApp(currentApp.value.id, targetSlug)
+      throw new Error('Deploy this application with the Automaton CLI. Studio does not yet build the canonical application package.')
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()

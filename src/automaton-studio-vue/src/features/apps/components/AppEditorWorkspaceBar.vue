@@ -367,6 +367,9 @@ onBeforeUnmount(() => {
           v-tooltip.bottom="'Deploy the application using its generic runtime contract.'"
           @click="handlePrimaryAction"
         />
+        <span v-if="!canDeployFromStudio" class="deploy-cli-hint">
+          Deploy with the Automaton CLI
+        </span>
       </div>
 
       <Button

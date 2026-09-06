@@ -502,9 +502,9 @@ public class PublicMarketplaceController : ControllerBase
 
         foreach (var app in appList)
         {
-            app.HasBackendExecution = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
+            app.HasApplicationSource = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
                 ownerUserId != Guid.Empty &&
-                _appFileStorageService.HasBackendSourceEntries(ownerUserId, app.Id);
+                _appFileStorageService.HasAnySourceEntries(ownerUserId, app.Id);
         }
     }
 }
@@ -529,7 +529,7 @@ public class MarketplaceAppCardDto
     public bool CanLaunch { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public bool HasBackendExecution { get; set; }
+    public bool HasApplicationSource { get; set; }
     public bool IsFeatured { get; set; }
     public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }

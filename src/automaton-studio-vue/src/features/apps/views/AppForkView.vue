@@ -140,10 +140,10 @@ onMounted(loadForkSource)
             </label>
           </section>
 
-          <section class="info-panel" :class="{ warning: source.hasBackendExecution }">
+          <section class="info-panel" :class="{ warning: source.hasApplicationSource }">
             <h2>Runtime</h2>
             <p>{{ source.runtimeLabel }}</p>
-            <template v-if="source.hasBackendExecution">
+            <template v-if="source.hasApplicationSource">
               <p class="warning-copy">This app uses backend execution.</p>
               <ul>
                 <li>To run your remix, you need your own Runner.</li>
@@ -154,7 +154,7 @@ onMounted(loadForkSource)
 
           <section class="info-panel">
             <h2>What gets copied</h2>
-            <p>Remix creates an editable copy of this app’s source. Runtime backend files and secrets are not copied.</p>
+            <p>Remix creates an editable copy of this app’s source. Deployed runtime files and secrets are not copied.</p>
           </section>
 
           <section class="info-panel">
@@ -170,14 +170,14 @@ onMounted(loadForkSource)
           <div class="actions">
             <Button label="Cancel" severity="secondary" outlined @click="cancel" />
             <Button
-              v-if="source.hasBackendExecution"
+              v-if="source.hasApplicationSource"
               label="Set up runner"
               severity="secondary"
               outlined
               @click="goToRunners"
             />
             <Button
-              :label="source.hasBackendExecution ? 'Continue remix' : 'Remix app'"
+              :label="source.hasApplicationSource ? 'Continue remix' : 'Remix app'"
               icon="pi pi-code-branch"
               :loading="submitting"
               @click="submitFork"

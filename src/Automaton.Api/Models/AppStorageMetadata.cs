@@ -2,6 +2,7 @@ namespace Automaton.Api.Models;
 
 public class AppStorageMetadata
 {
+    public int MetadataSchemaVersion { get; set; } = 2;
     public int Version { get; set; } = 1;
     public AppSettings? Settings { get; set; }
     public GitHubSettings? GitHub { get; set; }

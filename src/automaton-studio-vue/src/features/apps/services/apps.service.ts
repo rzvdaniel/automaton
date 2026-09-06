@@ -241,13 +241,6 @@ class AppsService {
     return data
   }
 
-  async deployApp(id: string, targetSlug?: string): Promise<DeployAppResult> {
-    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {}, {
-      params: targetSlug ? { targetSlug } : undefined,
-    })
-    return data
-  }
-
   async listDeploymentTargets(id: string): Promise<AppDeploymentTarget[]> {
     const { data } = await apiClient.get<AppDeploymentTarget[]>(`/api/apps/${id}/targets`)
     return data
