@@ -5,7 +5,7 @@ import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from 
 function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarget {
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'hosted-control', isDefault: true,
-    status: DeploymentTargetStatus.Running, legacyControllerRuntimeDeployed: true, genericRuntimeDeployed: true,
+    status: DeploymentTargetStatus.Running, genericRuntimeDeployed: true,
     cleanupPending: false, privilegedHostAccessApproved: false, routePath: '/',
     runner: { id: 'runner-id', name: 'Runner', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,

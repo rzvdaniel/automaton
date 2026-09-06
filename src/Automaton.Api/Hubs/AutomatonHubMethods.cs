@@ -18,9 +18,6 @@
         public const string FileChunkReady = "FileChunkReady";
         public const string GetAppMediaStats = "GetAppMediaStats";
         public const string GetAppMediaFileMetadata = "GetAppMediaFileMetadata";
-        public const string ListAppBackendFiles = "ListAppBackendFiles";
-        public const string ReadAppBackendFile = "ReadAppBackendFile";
-        public const string DeleteAppBackendFile = "DeleteAppBackendFile";
         public const string DeployAppPackage = "DeployAppPackage";
         public const string ExecuteAppActionModule = "ExecuteAppActionModule";
         public const string CancelAppModuleExecution = "CancelAppModuleExecution";

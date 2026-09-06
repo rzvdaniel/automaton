@@ -11,7 +11,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
-import { getEnvironmentDisplayName, isRemovableLegacyDefault } from '../utils/environment-display'
+import { getEnvironmentDisplayName } from '../utils/environment-display'
 
 const props = withDefaults(
   defineProps<{
@@ -161,7 +161,7 @@ const previewViewportStyle = computed(() => {
 })
 
 const previewState = computed(() => getViewingTargetPreviewState(props.selectedTarget))
-const visibleTargets = computed(() => props.targets.filter((target) => !isRemovableLegacyDefault(target)))
+const visibleTargets = computed(() => props.targets)
 const targetOptions = computed(() => visibleTargets.value.map((target) => ({
   value: target.slug,
   label: `${getEnvironmentDisplayName(target)} · ${getTargetDestinationLabel(target)} · ${getTargetStatusLabel(target)}`,

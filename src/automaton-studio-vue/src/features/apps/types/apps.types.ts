@@ -90,9 +90,6 @@ export interface App {
   developmentMode: AppDevelopmentMode
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource
-  hasDeployedFrontend: boolean
-  frontend: AppComponentOwnership
-  backend: AppComponentOwnership
   application: ApplicationContract
 }
 
@@ -168,7 +165,6 @@ export interface AppListItem {
     isHostedRunner: boolean
     applicationProfile?: string | null
     runnerOnline: boolean
-    legacyControllerRuntimeDeployed: boolean
     genericRuntimeDeployed: boolean
     lastSuccessfulDeploymentAtUtc?: string | null
     isStaticHosting?: boolean
@@ -195,7 +191,6 @@ export interface AppDeploymentTarget {
   slug: string
   isDefault: boolean
   status: DeploymentTargetStatus
-  legacyControllerRuntimeDeployed: boolean
   genericRuntimeDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
@@ -220,14 +215,6 @@ export interface AppTagSettings {
   tags: string[]
 }
 
-export interface AppComponentOwnership {
-  sourceAvailable: boolean
-  sourceModifiedAtUtc?: string | null
-  runtimeSource: AppRuntimeSource
-  runtimeAvailable: boolean
-  runtimeDeployedAtUtc?: string | null
-}
-
 export const AppDevelopmentMode = {
   Studio: 'studio',
   Local: 'local',
@@ -243,20 +230,8 @@ export const AppRuntimeSource = {
 
 export type AppRuntimeSource = (typeof AppRuntimeSource)[keyof typeof AppRuntimeSource]
 
-export const AppFrontendDeployMode = {
-  None: 'none',
-  StaticCopy: 'static-copy',
-  BuildRequired: 'build-required',
-} as const
-
-export type AppFrontendDeployMode = (typeof AppFrontendDeployMode)[keyof typeof AppFrontendDeployMode]
-
 export interface AppDeployCapabilities {
-  canDeployAppFromStudio: boolean
-  canDeployFrontendFromStudio: boolean
-  canDeployBackendFromStudio: boolean
-  frontendDeployMode: AppFrontendDeployMode
-  frontendDeployBlockReason?: string | null
+  canDeployApplicationFromStudio: boolean
 }
 
 /**
@@ -370,44 +345,11 @@ export interface ScopedFileContentResponse {
   content: string
 }
 
-export interface RunnerBackendFile {
-  path: string
-  name: string
-  size: number
-  lastModifiedUtc: string
-  isText: boolean
-}
-
-export const RunnerFileArea = {
-  Backend: 'backend',
-  Data: 'data',
-} as const
-
-export type RunnerFileArea = (typeof RunnerFileArea)[keyof typeof RunnerFileArea]
-
-export interface RunnerBackendFilesResponse {
-  success: boolean
-  area: RunnerFileArea
-  error?: string
-  files: RunnerBackendFile[]
-}
-
-export interface RunnerBackendFileContent {
-  success: boolean
-  area: RunnerFileArea
-  error?: string
-  path: string
-  content?: string
-  size: number
-  isText: boolean
-}
-
 /**
  * App statistics for display
  */
 export interface AppStats {
   fileCount: number
-  backendStepCount: number
 }
 
 // ============================================

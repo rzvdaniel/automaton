@@ -622,27 +622,11 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Get all deployed backend live files for an app.
-    /// </summary>
-    public Task<IEnumerable<string>> GetRuntimeBackendFilesAsync(Guid userId, Guid appId)
-    {
-        return GetFilesAsync(GetLiveBackendPath(userId, appId));
-    }
-
-    /// <summary>
     /// Read a deployed frontend live file for an app.
     /// </summary>
     public Task<string?> ReadRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
         return ReadFileAsync(GetLiveFrontendPath(userId, appId), relativePath);
-    }
-
-    /// <summary>
-    /// Read a deployed backend live file for an app.
-    /// </summary>
-    public Task<string?> ReadRuntimeBackendFileAsync(Guid userId, Guid appId, string relativePath)
-    {
-        return ReadFileAsync(GetLiveBackendPath(userId, appId), relativePath);
     }
 
     /// <summary>
@@ -720,49 +704,6 @@ public class AppFileStorageService
             metadata.RuntimeAvailable = HasBackendRuntimeEntries(userId, appId);
             metadata.RuntimeDeployedAtUtc = metadata.RuntimeAvailable ? metadata.RuntimeDeployedAtUtc : null;
         });
-    }
-
-    /// <summary>
-    /// Rebuild the runner backend live package from editable source/backend files when present.
-    /// Missing source preserves the current live/backend package.
-    /// </summary>
-    public async Task<(int CopiedFiles, bool Updated)> SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
-    {
-        var sourceBackendPath = GetSourceBackendPath(userId, appId);
-        var runtimeBackendPath = GetLiveBackendPath(userId, appId);
-        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
-
-        if (!HasAnyEntries(sourceBackendPath))
-        {
-            logger.Debug("No source/backend files found for app {AppId}; preserving existing live/backend", appId);
-            return (0, false);
-        }
-
-        if (Directory.Exists(runtimeBackendPath))
-        {
-            Directory.Delete(runtimeBackendPath, recursive: true);
-        }
-
-        Directory.CreateDirectory(runtimeBackendPath);
-
-        var copied = 0;
-        foreach (var sourceFile in Directory.EnumerateFiles(sourceBackendPath, "*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(sourceBackendPath, sourceFile);
-            if (AppFileStorageService.MatchesExcludeRule(relativePath, rules.BackendExclude))
-                continue;
-
-            var targetFilePath = Path.Combine(runtimeBackendPath, relativePath);
-            var targetDirectory = Path.GetDirectoryName(targetFilePath);
-            if (!string.IsNullOrEmpty(targetDirectory))
-                Directory.CreateDirectory(targetDirectory);
-
-            File.Copy(sourceFile, targetFilePath, overwrite: true);
-            copied++;
-        }
-
-        logger.Debug("Synced source/backend to live/backend for app {AppId}", appId);
-        return (copied, true);
     }
 
     public async Task<(int CopiedFiles, bool Updated)> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
@@ -843,25 +784,6 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Remove all deployed backend live files while preserving source, frontend live files, and versions.
-    /// </summary>
-    public async Task ClearRuntimeBackendAsync(Guid userId, Guid appId)
-    {
-        var runtimePath = GetLiveBackendPath(userId, appId);
-        if (Directory.Exists(runtimePath))
-        {
-            Directory.Delete(runtimePath, recursive: true);
-        }
-
-        Directory.CreateDirectory(runtimePath);
-        await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
-        {
-            metadata.RuntimeAvailable = HasFrontendRuntimeEntries(userId, appId);
-            metadata.RuntimeDeployedAtUtc = metadata.RuntimeAvailable ? metadata.RuntimeDeployedAtUtc : null;
-        });
-    }
-
-    /// <summary>
     /// Validates that the file extension is in the allowed whitelist.
     /// Throws InvalidOperationException if the extension is not allowed.
     /// </summary>
@@ -894,19 +816,6 @@ public class AppFileStorageService
     public bool HasFrontendSourceEntries(Guid userId, Guid appId)
     {
         return HasAnyEntries(GetSourceFrontendPath(userId, appId));
-    }
-
-    public string GetFrontendStudioDeployMode(Guid userId, Guid appId)
-    {
-        var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
-        if (!HasAnyEntries(sourceFrontendPath))
-        {
-            return Models.AppFrontendDeployModes.None;
-        }
-
-        return IsBuildBasedFrontendSourcePath(sourceFrontendPath)
-            ? Models.AppFrontendDeployModes.BuildRequired
-            : Models.AppFrontendDeployModes.StaticCopy;
     }
 
     public bool HasBackendSourceEntries(Guid userId, Guid appId)
@@ -969,140 +878,6 @@ public class AppFileStorageService
         var metadataPath = GetMetadataPath(userId, appId);
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
     }
-
-    // ── Backend controller file helpers ──────────────────────────────────────
-
-    /// <summary>
-    /// Returns the file extension for a given script language (e.g. "Python" → ".py").
-    /// </summary>
-    public static string GetControllerExtension(string language) => language.ToLowerInvariant() switch
-    {
-        "python" => ".py",
-        "batch"  => ".bat",
-        _        => ".txt"
-    };
-
-    /// <summary>
-    /// Reads the controller code from the app's source/backend/ folder.
-    /// File: AppData/apps/{userId}/{appId}/source/backend/{controllerName}{ext}
-    /// </summary>
-    public async Task<string?> ReadControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
-    {
-        var appPath = GetSourcePath(userId, appId);
-        var backendPath = GetSourceBackendPath(userId, appId);
-        var ext = GetControllerExtension(language);
-        var filePath = Path.Combine(backendPath, controllerName + ext);
-        if (!File.Exists(filePath)) return null;
-        return await File.ReadAllTextAsync(filePath);
-    }
-
-    /// <summary>
-    /// Writes controller code to the app's source/backend/ folder.
-    /// </summary>
-    public async Task WriteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language, string code)
-    {
-        var appPath = GetSourcePath(userId, appId);
-        var backendPath = GetSourceBackendPath(userId, appId);
-        Directory.CreateDirectory(backendPath);
-
-        var ext = GetControllerExtension(language);
-        var filePath = Path.Combine(backendPath, controllerName + ext);
-
-        // Security: ensure path stays within app directory
-        if (!Path.GetFullPath(filePath).StartsWith(Path.GetFullPath(appPath)))
-            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
-
-        await File.WriteAllTextAsync(filePath, code);
-        logger.Debug("Wrote controller {Name} for app {AppId}", controllerName, appId);
-    }
-
-    /// <summary>
-    /// Deletes a controller code file from the app's backend/ folder.
-    /// </summary>
-    public Task DeleteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
-    {
-        var ext = GetControllerExtension(language);
-        var filePath = Path.Combine(GetSourceBackendPath(userId, appId), controllerName + ext);
-        if (File.Exists(filePath)) File.Delete(filePath);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Lists all controller script files in the app's source/backend/ folder.
-    /// </summary>
-    public async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesAsync(Guid userId, Guid appId)
-    {
-        var backendPath = GetSourceBackendPath(userId, appId);
-        var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
-        return await ListBackendFilesFromDirectoryAsync(backendPath, deployRules.BackendExclude);
-    }
-
-    /// <summary>
-    /// Lists all script files in the app's live/backend/ package.
-    /// </summary>
-    public async Task<IReadOnlyList<BackendScriptFile>> ListRuntimeBackendFilesAsync(Guid userId, Guid appId)
-    {
-        var backendPath = GetLiveBackendPath(userId, appId);
-        var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
-        return await ListBackendFilesFromDirectoryAsync(backendPath, deployRules.BackendExclude);
-    }
-
-    private static async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesFromDirectoryAsync(string backendPath, IEnumerable<string> excludeRules)
-    {
-        if (!Directory.Exists(backendPath)) return [];
-
-        var results = new List<BackendScriptFile>();
-        // SearchOption.AllDirectories so backend/shared/*.py files are included
-        foreach (var file in Directory.GetFiles(backendPath, "*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(backendPath, file);
-            if (IsExcludedBackendDeployPath(relativePath, excludeRules))
-            {
-                continue;
-            }
-
-            var ext = Path.GetExtension(file).ToLowerInvariant();
-            var normalizedRelativePath = relativePath.Replace('\\', '/');
-            var controllerName = Path.ChangeExtension(normalizedRelativePath, null) ?? normalizedRelativePath;
-            results.Add(new BackendScriptFile(
-                normalizedRelativePath,
-                controllerName,
-                await File.ReadAllBytesAsync(file),
-                GetLanguageFromExtension(ext)));
-        }
-        return results;
-    }
-
-    /// <summary>
-    /// Finds a controller file by name (any supported extension) in the app's backend/ folder.
-    /// Returns (code, language) or null if not found.
-    /// File: AppData/apps/{userId}/{appId}/source/backend/{controllerName}.{py|bat|...}
-    /// </summary>
-    public async Task<(string Code, string Language)?> FindControllerFileAsync(Guid userId, Guid appId, string controllerName)
-    {
-        var backendPath = GetSourceBackendPath(userId, appId);
-        if (!Directory.Exists(backendPath)) return null;
-
-        foreach (var ext in new[] { ".py", ".bat", ".txt" })
-        {
-            var filePath = Path.Combine(backendPath, controllerName + ext);
-            if (File.Exists(filePath))
-            {
-                var code = await File.ReadAllTextAsync(filePath);
-                return (code, GetLanguageFromExtension(ext));
-            }
-        }
-        return null;
-    }
-
-    /// <summary>Maps a file extension to a language name.</summary>
-    public static string GetLanguageFromExtension(string ext) => ext.ToLowerInvariant() switch
-    {
-        ".json" => "Json",
-        ".py"  => "Python",
-        ".bat" => "Batch",
-        _      => "Text"
-    };
 
     public static bool MatchesExcludeRule(string relativePath, IEnumerable<string> rules)
     {

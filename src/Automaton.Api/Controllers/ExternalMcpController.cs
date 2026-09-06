@@ -36,7 +36,7 @@ namespace Automaton.Api.Controllers;
 ///   list_runners    — List the user's connected runners
 ///
 /// For file writes and deployment use the automaton CLI:
-///   automaton deploy   — build, upload, deploy backend
+///   automaton deploy   — build, upload, and deploy the application
 ///   automaton pull     — sync server files locally, with overwrite confirmation for matching local files
 ///   automaton publish  — save a version snapshot
 ///   automaton runners  — list runners
@@ -307,7 +307,7 @@ public class ExternalMcpController : ControllerBase
             .ToListAsync();
 
         var runnerSection = runners.Count == 0
-            ? "No runners are registered on this account. If the app has a Python backend, register a runner first."
+            ? "No runners are registered on this account. Register a Runner before deploying an application that requires one."
             : "Available runners:\n" + string.Join("\n", runners.Select(r =>
                 $"- {r.Name} ({(r.Connected ? "connected" : "offline")})"));
 
@@ -325,9 +325,9 @@ public class ExternalMcpController : ControllerBase
             {{runnerSection}}
 
             NEXT STEPS:
-            - If the app needs a Python backend, you will need to assign a runner before deploying.
+            - If the application requires a Runner, assign one before deploying.
             - Run 'automaton set-runner <runnerName>' from the CLI to assign a runner.
-            - Run 'automaton deploy' to upload files and deploy the backend.
+            - Run 'automaton deploy' to upload files and deploy the application.
             """;
     }
 
@@ -353,8 +353,7 @@ public class ExternalMcpController : ControllerBase
                 updatedAt = app.Updated,
                 createdAt = app.Created,
                 sourceAvailable = app.SourceAvailable,
-                frontendSourceAvailable = app.SourceAvailable,
-                backendSourceAvailable = app.SourceAvailable
+                runtimeSource = app.RuntimeSource
             })
             .ToList();
 

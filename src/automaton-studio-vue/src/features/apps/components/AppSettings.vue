@@ -74,7 +74,7 @@ const cliLoginCommand = computed(() =>
 )
 
 const starterPrompt = computed(() =>
-  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow the generic application contract as the source of truth. Choose the simplest suitable technology, declare structured build and runtime commands in automaton.json, set working directories, listening port, optional health path, environment, and persistent data directory explicitly. Do not assume a frontend/backend layout or a particular language, framework, or package manager.'
+  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow the generic application contract as the source of truth. Choose the simplest suitable technology, declare structured build and runtime commands in automaton.json, set working directories, listening port, optional health path, environment, and persistent data directory explicitly. Do not assume a particular language, framework, package manager, or internal source layout.'
 )
 
 // Local form state
