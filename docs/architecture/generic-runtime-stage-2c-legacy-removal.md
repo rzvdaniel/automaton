@@ -71,9 +71,11 @@ runtime decision services/controllers/hubs for the legacy deployment marker.
 The API and Runner projects build successfully. Focused API tests pass for the
 restored generic deployment fixture and the generic deployment/action/connected-
 flow/Stage 2C guardrail group. The broader API action/authorization filter
-passes 115 of 118 tests; its three failures are the pre-existing published-app
-owner regression and legacy-runtime authorization expectations, not restored
-controller execution coverage.
+passes 116 of 117 tests. The one remaining failure,
+`GetPublishedAppInfoAsync_UsesProjectOwnerAsOwnerId`, also fails on the
+Stage 2C base commit `8fb54788d452ee30973b2c8864de7b473730e919` and is
+pre-existing. The legacy-marker authorization expectations were updated to
+prove that the inert marker does not block reassignment or publishing.
 
 Runner suites were run independently for generic runtime/deployment, process
 management, Actions, connected flows, workspace handling, Hub/tunnel behavior,
