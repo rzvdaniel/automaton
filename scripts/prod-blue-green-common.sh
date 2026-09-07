@@ -173,6 +173,41 @@ validate_revision() {
     }
 }
 
+validate_recovery_artifact_reference() {
+    local service="$1"
+    local reference="$2"
+    local expected_prefix="$(service_image_name "$service"):"
+    local tag
+
+    [[ "$reference" == "$expected_prefix"* ]] || {
+        echo "[ERROR] Recovery artifact must use the $expected_prefix image repository." >&2
+        return 1
+    }
+    tag="${reference#"$expected_prefix"}"
+    [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ && "$tag" != "latest" ]] || {
+        echo "[ERROR] Recovery artifact must use a dedicated immutable tag, not latest or a mutable reference." >&2
+        return 1
+    }
+    docker image inspect "$reference" >/dev/null 2>&1 || {
+        echo "[ERROR] Recovery artifact $reference does not exist locally." >&2
+        return 1
+    }
+}
+
+validate_recovery_deployment_options() {
+    local service="$1"
+    local recovery_reference="$2"
+    local explicit_revision="$3"
+
+    if [[ -n "$recovery_reference" ]]; then
+        [[ "$explicit_revision" != "true" ]] || {
+            echo "[ERROR] Recovery artifact deployment cannot be combined with --revision." >&2
+            return 1
+        }
+        validate_recovery_artifact_reference "$service" "$recovery_reference" || return 1
+    fi
+}
+
 get_service_revision() {
     local service="$1"
     local kind="$2"
@@ -191,13 +226,9 @@ get_service_revision() {
 preserve_current_service_image() {
     local service="$1"
     local color="$2"
+    local current_artifact_reference="${3:-}"
     local revision
     revision="$(get_service_revision "$service" current)"
-    validate_revision "$revision" || {
-        echo "[ERROR] Cannot replace $service-$color without current immutable revision metadata." >&2
-        echo "[ERROR] Establish the deployed revision tag before retrying; no image was changed." >&2
-        return 1
-    }
 
     local container_id
     container_id="$(service_container_ids "$(compose_service_name "$service" "$color")" | head -n 1)"
@@ -208,6 +239,31 @@ preserve_current_service_image() {
 
     local image_id
     image_id="$(docker inspect --format '{{.Image}}' "$container_id")"
+
+    if [[ -z "$revision" ]]; then
+        if [[ -z "$current_artifact_reference" ]]; then
+            echo "[ERROR] Cannot replace $service-$color without current immutable revision metadata." >&2
+            echo "[ERROR] Supply the explicitly verified current artifact reference for this one-time provenance recovery." >&2
+            return 1
+        fi
+
+        validate_recovery_artifact_reference "$service" "$current_artifact_reference" || return 1
+
+        local artifact_image_id
+        artifact_image_id="$(docker image inspect --format '{{.Id}}' "$current_artifact_reference" 2>/dev/null || true)"
+        if [[ -z "$artifact_image_id" || "$artifact_image_id" != "$image_id" ]]; then
+            echo "[ERROR] Current artifact reference does not match the running $service-$color image; refusing replacement." >&2
+            return 1
+        fi
+
+        echo "[INFO] Verified $service-$color against explicitly supplied recovery artifact $current_artifact_reference"
+        return 0
+    fi
+
+    validate_revision "$revision" || {
+        echo "[ERROR] Cannot replace $service-$color with invalid current immutable revision metadata." >&2
+        return 1
+    }
     docker tag "$image_id" "$(service_image_name "$service"):$revision"
     echo "[INFO] Preserved $service-$color rollback image as $(service_image_name "$service"):$revision"
 }
@@ -586,7 +642,15 @@ switch_live_color() {
     local color="$2"
     local revision="${3:-}"
     local previous_revision="${4:-}"
+    local revision_state="${5:-preserve}"
     local previous_color
+
+    if [[ "$revision_state" == "unknown" ]]; then
+        [[ -z "$revision" ]] || { echo "[ERROR] Unknown revision state cannot include a Git revision." >&2; exit 1; }
+    elif [[ "$revision_state" != "preserve" ]]; then
+        echo "[ERROR] Unknown revision state: $revision_state" >&2
+        exit 1
+    fi
 
     if [[ -n "$revision" ]]; then
         validate_revision "$revision"
@@ -634,7 +698,13 @@ switch_live_color() {
         website) LIVE_WEBSITE_COLOR="$color" ;;
         *) echo "[ERROR] Unknown service: $service" >&2; exit 1 ;;
     esac
-    if [[ -n "$revision" ]]; then
+    if [[ "$revision_state" == "unknown" ]]; then
+        case "$service" in
+            api) API_CURRENT_REVISION=""; API_PREVIOUS_REVISION="$previous_revision" ;;
+            studio) STUDIO_CURRENT_REVISION=""; STUDIO_PREVIOUS_REVISION="$previous_revision" ;;
+            website) WEBSITE_CURRENT_REVISION=""; WEBSITE_PREVIOUS_REVISION="$previous_revision" ;;
+        esac
+    elif [[ -n "$revision" ]]; then
         case "$service" in
             api) API_CURRENT_REVISION="$revision"; API_PREVIOUS_REVISION="$previous_revision" ;;
             studio) STUDIO_CURRENT_REVISION="$revision"; STUDIO_PREVIOUS_REVISION="$previous_revision" ;;
@@ -649,9 +719,10 @@ rollback_live_color() {
     local color="$2"
     local revision="${3:-}"
     local previous_revision="${4:-}"
+    local revision_state="${5:-preserve}"
 
     echo "[WARN] Rolling $service traffic back to $color"
-    if ! switch_live_color "$service" "$color" "$revision" "$previous_revision"; then
+    if ! switch_live_color "$service" "$color" "$revision" "$previous_revision" "$revision_state"; then
         echo "[ERROR] Failed to roll $service traffic back to $color" >&2
         return 1
     fi
@@ -674,12 +745,16 @@ rollback_all_live_colors() {
     local studio_previous_revision="${7:-}"
     local website_revision="${8:-}"
     local website_previous_revision="${9:-}"
+    local api_revision_state="${10:-preserve}"
+    local studio_revision_state="${11:-preserve}"
+    local website_revision_state="${12:-preserve}"
 
     echo "[WARN] Rolling all public traffic back to API=$api_color Studio=$studio_color Website=$website_color"
     if ! switch_all_live_colors "$api_color" "$studio_color" "$website_color" \
         "$api_revision" "$api_previous_revision" \
         "$studio_revision" "$studio_previous_revision" \
-        "$website_revision" "$website_previous_revision"; then
+        "$website_revision" "$website_previous_revision" \
+        "$api_revision_state" "$studio_revision_state" "$website_revision_state"; then
         echo "[ERROR] Failed to roll all public traffic back to the previous colors" >&2
         return 1
     fi
@@ -702,6 +777,9 @@ switch_all_live_colors() {
     local studio_previous_revision="${7:-}"
     local website_revision="${8:-}"
     local website_previous_revision="${9:-}"
+    local api_revision_state="${10:-preserve}"
+    local studio_revision_state="${11:-preserve}"
+    local website_revision_state="${12:-preserve}"
     local previous_api_color
     local previous_studio_color
     local previous_website_color
@@ -709,6 +787,9 @@ switch_all_live_colors() {
     [[ -z "$api_revision" ]] || validate_revision "$api_revision"
     [[ -z "$studio_revision" ]] || validate_revision "$studio_revision"
     [[ -z "$website_revision" ]] || validate_revision "$website_revision"
+    [[ "$api_revision_state" == "preserve" || "$api_revision_state" == "unknown" ]] || return 1
+    [[ "$studio_revision_state" == "preserve" || "$studio_revision_state" == "unknown" ]] || return 1
+    [[ "$website_revision_state" == "preserve" || "$website_revision_state" == "unknown" ]] || return 1
 
     previous_api_color="$(get_live_color api)"
     previous_studio_color="$(get_live_color studio)"
@@ -742,15 +823,24 @@ switch_all_live_colors() {
     LIVE_API_COLOR="$api_color"
     LIVE_STUDIO_COLOR="$studio_color"
     LIVE_WEBSITE_COLOR="$website_color"
-    if [[ -n "$api_revision" ]]; then
+    if [[ "$api_revision_state" == "unknown" ]]; then
+        API_CURRENT_REVISION=""
+        API_PREVIOUS_REVISION="$api_previous_revision"
+    elif [[ -n "$api_revision" ]]; then
         API_CURRENT_REVISION="$api_revision"
         API_PREVIOUS_REVISION="$api_previous_revision"
     fi
-    if [[ -n "$studio_revision" ]]; then
+    if [[ "$studio_revision_state" == "unknown" ]]; then
+        STUDIO_CURRENT_REVISION=""
+        STUDIO_PREVIOUS_REVISION="$studio_previous_revision"
+    elif [[ -n "$studio_revision" ]]; then
         STUDIO_CURRENT_REVISION="$studio_revision"
         STUDIO_PREVIOUS_REVISION="$studio_previous_revision"
     fi
-    if [[ -n "$website_revision" ]]; then
+    if [[ "$website_revision_state" == "unknown" ]]; then
+        WEBSITE_CURRENT_REVISION=""
+        WEBSITE_PREVIOUS_REVISION="$website_previous_revision"
+    elif [[ -n "$website_revision" ]]; then
         WEBSITE_CURRENT_REVISION="$website_revision"
         WEBSITE_PREVIOUS_REVISION="$website_previous_revision"
     fi
@@ -824,13 +914,23 @@ deploy_color() {
     local color="$2"
     local revision="${3:-$PRODUCTION_REVISION}"
     local explicit_revision="${4:-false}"
+    local recovery_artifact_reference="${5:-}"
     local compose_service
     compose_service="$(compose_service_name "$service" "$color")"
 
-    validate_revision "$revision"
-
     local image_name
     image_name="$(service_image_name "$service")"
+    if [[ -n "$recovery_artifact_reference" ]]; then
+        [[ "$explicit_revision" != "true" ]] || {
+            echo "[ERROR] Recovery artifact deployment cannot be combined with --revision." >&2
+            return 1
+        }
+        validate_recovery_artifact_reference "$service" "$recovery_artifact_reference" || return 1
+        local recovery_tag="${recovery_artifact_reference#"$image_name:"}"
+        echo "[INFO] Reusing verified recovery artifact $recovery_artifact_reference for $compose_service"
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$recovery_tag" docker compose -f "$COMPOSE_FILE" up -d --no-build "$compose_service"
+    else
+        validate_revision "$revision"
     if ! docker image inspect "$image_name:$revision" >/dev/null 2>&1; then
         if [[ "$explicit_revision" == "true" ]]; then
             echo "[ERROR] Immutable image $image_name:$revision does not exist locally; refusing to build or change containers." >&2
@@ -843,6 +943,7 @@ deploy_color() {
         echo "[INFO] Reusing immutable rollback image $image_name:$revision for $compose_service"
         AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --no-build "$compose_service"
         docker tag "$image_name:$revision" "$image_name:latest"
+    fi
     fi
 
     wait_for_service_healthy "$compose_service"

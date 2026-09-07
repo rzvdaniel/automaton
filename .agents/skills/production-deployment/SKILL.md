@@ -43,6 +43,32 @@ each live service being adopted, for example `--api <sha> --studio <sha>
 images, and records current revision metadata; it does not build, deploy, restart,
 switch colors, or change the database. Stop if any live image cannot be verified.
 
+If a live Studio or Website image cannot be attributed to a known Git revision,
+do not guess one. First preserve and verify an immutable recovery tag for the
+exact running image, then pass that tag to the corresponding redeploy command:
+`--current-artifact-ref <image-ref>`. The script compares the reference's image
+ID with the live container before it builds or changes traffic. This one-time
+path leaves historical Git revision metadata blank; after the new revision is
+accepted, the normal immutable revision metadata becomes authoritative.
+
+For a recovery rollback after the old color has stopped, use the separate
+`--recovery-artifact-ref <image-ref>` option. The complete one-time sequence is:
+
+```text
+live unknown image
+  -> capture its exact image ID
+  -> create a dedicated non-latest recovery tag
+  -> verify tag and live image IDs match
+  -> deploy the new known Git revision
+  -> retain the recovery tag through Stage 4 acceptance
+```
+
+If rollback is required, deploy the verified recovery tag without a build,
+complete the normal health and reachability checks, and then cut traffic back.
+The service's current Git revision becomes blank/unknown; the Docker artifact
+reference and Git revision are separate kinds of provenance. Never infer a Git
+SHA from a Docker tag or use `latest` as the recovery artifact.
+
 ## Safety rules
 
 1. Run read-only preflight checks on the production checkout, live colors, services, and protected state.
