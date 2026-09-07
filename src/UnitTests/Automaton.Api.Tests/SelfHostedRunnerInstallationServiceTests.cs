@@ -37,6 +37,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("AUTOMATON_HOST_WORKSPACE_ROOT"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("/automaton/workspace"));
         Assert.That(enrollment.EnrollmentTokenHash, Does.Not.Contain("AUTOMATON_ENROLLMENT_TOKEN"));
         Assert.That(enrollment.EnrollmentTokenHash, Is.Not.EqualTo(string.Empty));
         Assert.That(enrollment.UserId, Is.EqualTo(userId));
@@ -60,10 +62,23 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Contain("--pid host"));
         Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
         Assert.That(response.InstallationCommand, Does.Contain("-v /:/host"));
+        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/workspace'"));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            $"AUTOMATON_HOST_WORKSPACE_ROOT='/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            $"-v '/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace:/automaton/workspace'"));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            $"mkdir -p '/opt/automaton/self-hosted-runners/{response.InstallationId}' '/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
         Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_PURPOSE='Managed'"));
+        Assert.That(response.InstallationCommand, Does.Contain("docker image inspect --format '{{index .RepoDigests 0}}' \"$runner_image\""));
+        Assert.That(response.InstallationCommand, Does.Contain("case \"$resolved_image\" in"));
+        Assert.That(response.InstallationCommand, Does.Contain("@sha256:"));
+        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_IMAGE=$resolved_image"));
+        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image"));
+        Assert.That(response.InstallationCommand, Does.Contain("\"$resolved_image\""));
         Assert.That(response.InstallationCommand, Does.Not.Contain("RUNNER_HOST_ID"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("HOSTED_RUNNER_ID"));
     }
@@ -89,8 +104,12 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(second.InstallationCommand, Is.Not.EqualTo(first.InstallationCommand));
         Assert.That(first.InstallationCommand, Does.Not.Contain("--network host"));
         Assert.That(second.InstallationCommand, Does.Not.Contain("--network host"));
-        Assert.That(first.InstallationCommand, Does.Not.Contain("-p "));
-        Assert.That(second.InstallationCommand, Does.Not.Contain("-p "));
+        Assert.That(first.InstallationCommand, Does.Not.Contain("-p 8001"));
+        Assert.That(first.InstallationCommand, Does.Not.Contain("-p 8080"));
+        Assert.That(first.InstallationCommand, Does.Not.Contain("--publish"));
+        Assert.That(second.InstallationCommand, Does.Not.Contain("-p 8001"));
+        Assert.That(second.InstallationCommand, Does.Not.Contain("-p 8080"));
+        Assert.That(second.InstallationCommand, Does.Not.Contain("--publish"));
     }
 
     [Test]
@@ -108,6 +127,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Contain("command -v docker"));
         Assert.That(response.InstallationCommand, Does.Contain("docker info"));
         Assert.That(response.InstallationCommand, Does.Contain("docker pull"));
+        Assert.That(response.InstallationCommand, Does.Contain("docker image inspect --format '{{index .RepoDigests 0}}'"));
+        Assert.That(response.InstallationCommand, Does.Contain("did not resolve to an immutable repository digest"));
         Assert.That(response.InstallationCommand, Does.Contain("{{.State.Status}}"));
         Assert.That(response.InstallationCommand, Does.Contain("restarting|exited|dead"));
         Assert.That(response.InstallationCommand, Does.Contain("docker logs --tail 80"));
@@ -234,6 +255,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
         Assert.That(runner.CapabilitiesJson, Does.Contain(RunnerCapabilities.ApplicationHosting));
         Assert.That(runner.CapabilitiesJson, Does.Contain(RunnerCapabilities.WorkflowExecution));
+        Assert.That(runner.CapabilitiesJson, Does.Not.Contain(RunnerCapabilities.DockerManagement));
         Assert.That(await db.HostedRunners.CountAsync(), Is.EqualTo(0));
         Assert.That(await db.RunnerHosts.CountAsync(), Is.EqualTo(0));
         Assert.That(await db.RunnerUsers.AnyAsync(x => x.RunnerId == runner.Id && x.UserId == userId), Is.True);

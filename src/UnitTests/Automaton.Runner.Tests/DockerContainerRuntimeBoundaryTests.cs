@@ -20,6 +20,18 @@ public sealed class DockerContainerRuntimeBoundaryTests
     }
 
     [Test]
+    public void HostPathTranslationUsesTheGeneratedPrivilegedHostWorkspaceMountShape()
+    {
+        var translator = new RunnerManagedHostPathTranslator(
+            "/automaton/workspace",
+            "/opt/automaton/self-hosted-runners/sh_acceptance/workspace");
+
+        Assert.That(
+            translator.Translate("/automaton/workspace/apps/x/runtime"),
+            Is.EqualTo("/opt/automaton/self-hosted-runners/sh_acceptance/workspace/apps/x/runtime"));
+    }
+
+    [Test]
     public void HostPathTranslationRejectsPathsOutsideTheManagedWorkspace()
     {
         var translator = new RunnerManagedHostPathTranslator(
