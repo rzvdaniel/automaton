@@ -16,6 +16,7 @@ app and declares the application contract.
   "name": "My App",
   "application": {
     "build": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "build-tool",
         "arguments": ["build"],
@@ -26,6 +27,7 @@ app and declares the application contract.
       "timeoutSeconds": 900
     },
     "runtime": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "app-server",
         "arguments": [],
@@ -51,9 +53,11 @@ layout, build system, or application architecture.
 | `name` | App display name. |
 | `server` | Optional configured Automaton server. |
 | `application.build.command` | Optional executable, arguments, working directory, environment, and shell setting. |
+| `application.build.image` | Optional OCI image used to execute the build command; defaults to `runtime.image`. |
 | `application.build.outputDirectory` | Optional directory containing the build artifact. |
 | `application.build.timeoutSeconds` | Maximum build duration. |
 | `application.runtime.command` | Executable and arguments for the long-running app process. |
+| `application.runtime.image` | OCI image that executes the runtime command; required when `runtime.command` is present. |
 | `application.runtime.port` | Port requested by the app contract. |
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |

@@ -59,6 +59,7 @@ public sealed class GenericRuntimeArchitectureGuardrailTests
 
     [TestCase(typeof(RunnerDeploymentService))]
     [TestCase(typeof(RunnerRuntimeProcessManager))]
+    [TestCase(typeof(RunnerRuntimeContainerManager))]
     public void GenericRunnerServices_UseTheWorkspaceBoundaryAndAvoidLegacyDependencies(Type serviceType)
     {
         var constructorTypes = serviceType

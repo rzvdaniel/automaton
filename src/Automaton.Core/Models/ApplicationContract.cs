@@ -17,6 +17,11 @@ public sealed class ApplicationContract
 
 public sealed class ApplicationBuildSpec
 {
+    /// <summary>
+    /// OCI image used to execute the build command. When omitted, the runtime
+    /// image is used for applications that declare a runtime image.
+    /// </summary>
+    public string? Image { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public string? OutputDirectory { get; set; }
     public int TimeoutSeconds { get; set; } = 900;
@@ -24,6 +29,8 @@ public sealed class ApplicationBuildSpec
 
 public sealed class ApplicationRuntimeSpec
 {
+    /// <summary>OCI image that owns the application runtime process.</summary>
+    public string? Image { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public int Port { get; set; } = 8080;
 }
@@ -122,6 +129,19 @@ public static class ApplicationContractValidator
 
         ValidateCommand(contract.Build?.Command, "build.command", errors);
         ValidateCommand(contract.Runtime?.Command, "runtime.command", errors);
+
+        ValidateImage(contract.Build?.Image, "build.image", errors);
+        ValidateImage(contract.Runtime?.Image, "runtime.image", errors);
+
+        if (contract.Runtime?.Command is not null && string.IsNullOrWhiteSpace(contract.Runtime.Image))
+            errors.Add("runtime.image is required when runtime.command is declared");
+
+        if (contract.Build?.Command is not null
+            && string.IsNullOrWhiteSpace(contract.Build.Image)
+            && string.IsNullOrWhiteSpace(contract.Runtime?.Image))
+        {
+            errors.Add("build.image or runtime.image is required when build.command is declared");
+        }
 
         if (contract.Build is null)
             errors.Add("build is required");
@@ -226,6 +246,22 @@ public static class ApplicationContractValidator
             if (pair.Value is null || pair.Value.Contains('\0'))
                 errors.Add($"{name}.environment contains a value with an invalid NUL character");
         }
+    }
+
+    private static void ValidateImage(string? image, string name, ICollection<string> errors)
+    {
+        if (image is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(image) || image.Contains('\0') || image.Any(char.IsWhiteSpace))
+            errors.Add($"{name} must be a non-empty OCI image reference without whitespace or NUL");
+        else if (image.StartsWith("-", StringComparison.Ordinal)
+            || image.Contains('"')
+            || image.Contains('\'')
+            || image.Contains(';')
+            || image.Contains('|')
+            || image.Contains('&'))
+            errors.Add($"{name} is not a valid OCI image reference");
     }
 
     private static void ValidateRelativePath(string? value, string name, ICollection<string> errors, bool allowEmpty)

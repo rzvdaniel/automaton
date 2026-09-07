@@ -32,6 +32,7 @@ public sealed class DeployPackageContractServiceTests
             },
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "arbitrary-server",

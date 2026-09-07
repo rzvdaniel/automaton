@@ -362,9 +362,12 @@ public class Program
                 services.AddHostedService<AppActionArtifactCleanupService>();
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerRuntimeRegistry>();
+                services.AddSingleton<IApplicationContainerRuntime, DockerContainerRuntime>();
+                services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
+                services.AddSingleton<RunnerRuntimeContainerManager>();
+                services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeContainerManager>());
+                services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeContainerManager>());
                 services.AddSingleton<RunnerRuntimeProcessManager>();
-                services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
-                services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeProcessManager>());
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();
                 services.AddHostedService<StorageTelemetryBackgroundService>();

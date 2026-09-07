@@ -1024,6 +1024,10 @@ public sealed class RunnerRuntimeDeploymentMetadata
     public int? EffectivePort { get; set; }
     public int? ProcessId { get; set; }
     public DateTimeOffset? ProcessStartTimeUtc { get; set; }
+    public string? ContainerId { get; set; }
+    public string? ContainerName { get; set; }
+    public string? RequestedRuntimeImage { get; set; }
+    public string? ResolvedRuntimeImage { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
     public string? ArtifactRoot { get; set; }
     public string? ArtifactId { get; set; }

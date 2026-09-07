@@ -14,6 +14,7 @@ layout, build system, or application architecture.
 {
   "application": {
     "build": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "build-tool",
         "arguments": ["build"],
@@ -25,6 +26,7 @@ layout, build system, or application architecture.
       "timeoutSeconds": 900
     },
     "runtime": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "app-server",
         "arguments": [],
@@ -42,10 +44,12 @@ layout, build system, or application architecture.
 
 `build.command` is optional. When present, Automaton runs its executable with
 its arguments, working directory, environment, shell setting, and timeout.
+When `build.image` is omitted, `runtime.image` is used.
 `build.outputDirectory` is optional and identifies the build artifact to use.
 
 `runtime.command` names the process to start. It is required when the application
 exposes an HTTP or public endpoint, including frontend-only and static web apps.
+It requires `runtime.image`; the image owns the application process.
 Those apps must provide or depend on an HTTP server in the runtime artifact and
 declare it through this contract. Automaton has no static-file serving fallback.
 A null `runtime.command` is valid only for Actions-only or other finite-work

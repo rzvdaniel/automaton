@@ -16,9 +16,10 @@ internal static class ApplicationContractTestFactory
             },
             OutputDirectory = outputDirectory
         },
-        Runtime = new ApplicationRuntimeSpec
-        {
-            Command = new ApplicationCommandSpec
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Image = "test/runtime:1",
+                Command = new ApplicationCommandSpec
             {
                 Executable = "serve",
                 Arguments = [outputDirectory],

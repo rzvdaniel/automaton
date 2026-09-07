@@ -567,6 +567,7 @@ public sealed class GenericRuntimeAcceptanceTests
                 },
                 Runtime = new ApplicationRuntimeSpec
                 {
+                    Image = "test/runtime:1",
                     Command = new ApplicationCommandSpec
                     {
                         Executable = runtimeExecutable,

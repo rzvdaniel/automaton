@@ -962,6 +962,7 @@ public sealed class RunnerRuntimeProcessManagerTests
             Build = build ?? new ApplicationBuildSpec(),
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "dotnet",
@@ -1065,6 +1066,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         {
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "dotnet",
