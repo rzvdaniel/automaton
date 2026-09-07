@@ -210,9 +210,18 @@ public sealed class SelfHostedRunnerInstallationService(
     private string BuildCommand(SelfHostedRunnerEnrollment enrollment, string token)
     {
         var root = $"/opt/automaton/self-hosted-runners/{enrollment.InstallationId}";
+        var workspace = $"{root}/workspace";
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
-        var args = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost
+        var isPrivilegedHost = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost;
+        var network = $"automaton-self-hosted-{enrollment.InstallationId}-runtime";
+        var args = isPrivilegedHost
             ? $" {RunnerDockerArguments.PrivilegedHostApplication}"
+            : string.Empty;
+        var workspaceArgs = isPrivilegedHost
+            ? string.Join(" ",
+                $"-e AUTOMATON_WORKSPACE_ROOT={Quote("/automaton/workspace")}",
+                $"-e AUTOMATON_HOST_WORKSPACE_ROOT={Quote(workspace)}",
+                $"-v {Quote(workspace + ":/automaton/workspace")}")
             : string.Empty;
         var dockerRun = string.Join(" ",
             "docker run -d", $"--name {Quote(container)}", "--restart unless-stopped",
@@ -221,7 +230,14 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_RUNNER_PURPOSE={Quote(RunnerPurposes.Managed)}",
             $"-e AUTOMATON_RUNNER_APPLICATION_PROFILE={Quote(enrollment.ApplicationProfile)}",
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
-            $"-v {Quote(root + ":/app/config")}", args.Trim(), Quote(hostedRunnerOptions.Value.DockerImage));
+            (isPrivilegedHost ? "--network \"$runtime_network\"" : string.Empty),
+            (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
+            "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
+            "-e \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image\"",
+            $"-v {Quote(root + ":/app/config")}",
+            workspaceArgs,
+            args.Trim(),
+            "\"$resolved_image\"");
 
         return string.Join('\n',
             "/bin/sh <<'AUTOMATON_RUNNER_INSTALL'",
@@ -237,8 +253,28 @@ public sealed class SelfHostedRunnerInstallationService(
             "  exit 1",
             "fi",
             "docker pull \"$runner_image\"",
+            "if ! resolved_image=$(docker image inspect --format '{{index .RepoDigests 0}}' \"$runner_image\"); then",
+            "  echo 'The Runner image digest could not be resolved after pulling the image.' >&2",
+            "  exit 1",
+            "fi",
+            "case \"$resolved_image\" in",
+            "  *@sha256:*) ;;",
+            "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
+            "esac",
+            (isPrivilegedHost ? $"runtime_network={Quote(network)}" : string.Empty),
+            (isPrivilegedHost ? "if ! docker network create \"$runtime_network\" >/dev/null; then" : string.Empty),
+            (isPrivilegedHost ? "  echo 'The private Runner runtime network could not be created.' >&2" : string.Empty),
+            (isPrivilegedHost ? "  exit 1" : string.Empty),
+            (isPrivilegedHost ? "fi" : string.Empty),
+            (isPrivilegedHost ? "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then" : string.Empty),
+            (isPrivilegedHost ? "  echo 'The private Runner runtime network gateway could not be resolved.' >&2" : string.Empty),
+            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
+            (isPrivilegedHost ? "  exit 1" : string.Empty),
+            (isPrivilegedHost ? "fi" : string.Empty),
+            (isPrivilegedHost ? $"mkdir -p {Quote(root)} {Quote(workspace)}" : string.Empty),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
+            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
             "  exit 1",
             "fi",
             "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",

@@ -38,6 +38,20 @@ public sealed class RunnerRuntimeGatewayServiceTests
     }
 
     [Test]
+    public async Task GatewayUsesConfiguredRuntimeHostAddress()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var handler = new CapturingHandler();
+        await using var gateway = await StartGatewayAsync(appId, targetId, handler, "172.30.0.1");
+
+        using var client = new HttpClient();
+        using var response = await client.GetAsync(gateway.GetUri("/health"));
+
+        Assert.That(handler.Request?.RequestUri?.Host, Is.EqualTo("172.30.0.1"));
+    }
+
+    [Test]
     public async Task Gateway_ForwardsBodyWhenRequestDoesNotDeclareContentLength()
     {
         var appId = Guid.NewGuid();
@@ -157,7 +171,8 @@ public sealed class RunnerRuntimeGatewayServiceTests
     private static async Task<GatewayHarness> StartGatewayAsync(
         Guid appId,
         Guid targetId,
-        CapturingHandler handler)
+        CapturingHandler handler,
+        string? runtimeHostAddress = null)
     {
         var registry = new RunnerRuntimeRegistry();
         registry.Register(appId, targetId, 18_321);
@@ -166,18 +181,26 @@ public sealed class RunnerRuntimeGatewayServiceTests
             new HttpClient(handler),
             NullLogger<RunnerRuntimeGatewayService>.Instance);
         var previousPort = Environment.GetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT");
+        var previousRuntimeHostAddress = Environment.GetEnvironmentVariable(
+            RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
         var port = GetFreePort();
         Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT", port.ToString());
+        Environment.SetEnvironmentVariable(
+            RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable,
+            runtimeHostAddress);
 
         try
         {
             await gateway.StartAsync(CancellationToken.None);
-            return new GatewayHarness(gateway, previousPort, port, appId, targetId);
+            return new GatewayHarness(gateway, previousPort, previousRuntimeHostAddress, port, appId, targetId);
         }
         catch
         {
             await gateway.StopAsync(CancellationToken.None);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT", previousPort);
+            Environment.SetEnvironmentVariable(
+                RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable,
+                previousRuntimeHostAddress);
             throw;
         }
     }
@@ -192,6 +215,7 @@ public sealed class RunnerRuntimeGatewayServiceTests
     private sealed class GatewayHarness(
         RunnerRuntimeGatewayService gateway,
         string? previousPort,
+        string? previousRuntimeHostAddress,
         int port,
         Guid appId,
         Guid targetId) : IAsyncDisposable
@@ -203,6 +227,9 @@ public sealed class RunnerRuntimeGatewayServiceTests
         {
             await gateway.StopAsync(CancellationToken.None);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HTTP_PORT", previousPort);
+            Environment.SetEnvironmentVariable(
+                RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable,
+                previousRuntimeHostAddress);
         }
     }
 

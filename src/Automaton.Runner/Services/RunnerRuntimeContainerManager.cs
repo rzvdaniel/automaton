@@ -27,6 +27,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     private Task? supervisionTask;
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
+    private readonly string runtimeHostAddress = RunnerRuntimeEndpointConfiguration.HostAddress;
+    private readonly bool canProbeRuntimeHost;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public RunnerRuntimeContainerManager(
@@ -39,6 +41,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         this.registry = registry;
         this.containers = containers;
         this.logger = logger;
+        canProbeRuntimeHost = IPAddress.IsLoopback(IPAddress.Parse(runtimeHostAddress));
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -545,11 +548,11 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 if (health.Path is null)
                 {
                     using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(IPAddress.Loopback, healthPort, timeout.Token);
+                    await tcp.ConnectAsync(runtimeHostAddress, healthPort, timeout.Token);
                     return;
                 }
                 using var response = await client!.GetAsync(
-                    new UriBuilder("http", IPAddress.Loopback.ToString(), healthPort) { Path = health.Path }.Uri,
+                    new UriBuilder("http", runtimeHostAddress, healthPort) { Path = health.Path }.Uri,
                     timeout.Token);
                 if ((int)response.StatusCode is >= 200 and < 300)
                     return;
@@ -569,7 +572,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 break;
             }
         }
-        throw new TimeoutException($"Runtime container did not become ready on 127.0.0.1:{healthPort}.");
+        throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{healthPort}.");
     }
 
     private string GetMetadataPath(Guid appId, Guid targetId)
@@ -619,11 +622,13 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         throw new InvalidOperationException("No managed runtime ports are available.");
     }
 
-    private static bool CanBind(int port)
+    private bool CanBind(int port)
     {
+        if (!canProbeRuntimeHost)
+            return true;
         try
         {
-            using var listener = new TcpListener(IPAddress.Loopback, port);
+            using var listener = new TcpListener(IPAddress.Parse(runtimeHostAddress), port);
             listener.Start();
             listener.Stop();
             return true;

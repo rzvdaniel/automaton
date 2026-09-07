@@ -20,6 +20,18 @@ public sealed class DockerContainerRuntimeBoundaryTests
     }
 
     [Test]
+    public void HostPathTranslationUsesTheGeneratedPrivilegedHostWorkspaceMountShape()
+    {
+        var translator = new RunnerManagedHostPathTranslator(
+            "/automaton/workspace",
+            "/opt/automaton/self-hosted-runners/sh_acceptance/workspace");
+
+        Assert.That(
+            translator.Translate("/automaton/workspace/apps/x/runtime"),
+            Is.EqualTo("/opt/automaton/self-hosted-runners/sh_acceptance/workspace/apps/x/runtime"));
+    }
+
+    [Test]
     public void HostPathTranslationRejectsPathsOutsideTheManagedWorkspace()
     {
         var translator = new RunnerManagedHostPathTranslator(
@@ -56,6 +68,110 @@ public sealed class DockerContainerRuntimeBoundaryTests
         DockerContainerRuntime.AddCommandArguments(args, command);
 
         Assert.That(args, Is.EqualTo(new[] { "--entrypoint", "/bin/sh", "-c", @"'server --mode '\''safe'\''' '--flag'" }));
+    }
+
+    [Test]
+    public async Task ApplicationPublishDefaultsToLoopback()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, null);
+        var arguments = new List<string>();
+        var runtime = new DockerContainerRuntime((args, _, _, _) =>
+        {
+            arguments.AddRange(args);
+            if (args.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", ""));
+            if (args.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", ""));
+        });
+
+        try
+        {
+            await runtime.CreateApplicationAsync(new DockerApplicationContainerRequest(
+                "app", "runtime:1", Path.GetTempPath(), ".", new ApplicationCommandSpec { Executable = "server" },
+                8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid()));
+            Assert.That(arguments, Does.Contain("127.0.0.1:18080:8080"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public async Task ApplicationPublishUsesConfiguredAddress()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "172.30.0.1");
+        var arguments = new List<string>();
+        var runtime = new DockerContainerRuntime((args, _, _, _) =>
+        {
+            arguments.AddRange(args);
+            if (args.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", ""));
+            if (args.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", ""));
+        });
+
+        try
+        {
+            await runtime.CreateApplicationAsync(new DockerApplicationContainerRequest(
+                "app", "runtime:1", Path.GetTempPath(), ".", new ApplicationCommandSpec { Executable = "server" },
+                8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid()));
+            Assert.That(arguments, Does.Contain("172.30.0.1:18080:8080"));
+            Assert.That(arguments, Does.Not.Contain("0.0.0.0:18080:8080"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressRejectsMalformedExplicitValue()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "not-an-ip");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => _ = RunnerRuntimeEndpointConfiguration.HostAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressRejectsWildcardValue()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "0.0.0.0");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => _ = RunnerRuntimeEndpointConfiguration.HostAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressDefaultsToLoopback()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, null);
+        try
+        {
+            Assert.That(RunnerRuntimeEndpointConfiguration.HostAddress, Is.EqualTo("127.0.0.1"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
     }
 
     [Test]

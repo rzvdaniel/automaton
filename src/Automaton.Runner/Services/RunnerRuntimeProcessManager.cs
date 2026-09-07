@@ -724,7 +724,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         return startInfo;
     }
 
-    private static async Task WaitForReadinessAsync(
+    private async Task WaitForReadinessAsync(
         Process process,
         int effectivePort,
         ApplicationHealthSpec health,
