@@ -11,15 +11,21 @@ TARGET_COLOR=""
 KEEP_PREVIOUS=false
 DEPLOY_REVISION="$PRODUCTION_REVISION"
 EXPLICIT_REVISION=false
+CURRENT_ARTIFACT_REFERENCE=""
+RECOVERY_ARTIFACT_REFERENCE=""
 
 print_usage() {
     cat <<'EOF'
-Usage: ./scripts/prod-redeploy-studio.sh [--color blue|green] [--keep-previous] [--revision git-sha]
+Usage: ./scripts/prod-redeploy-studio.sh [--color blue|green] [--keep-previous] [--revision git-sha] [--current-artifact-ref image-ref] [--recovery-artifact-ref image-ref]
 
 Options:
   --color blue|green  Deploy to a specific color. Default: deploy to the inactive color.
   --keep-previous     Leave the previous color running after the cutover for easy rollback.
   --revision git-sha  Deploy an existing immutable image instead of building from source.
+  --current-artifact-ref image-ref
+                      Verify the currently running image when its Git revision is unknown.
+  --recovery-artifact-ref image-ref
+                      Deploy a previously verified immutable recovery artifact without building.
 EOF
 }
 
@@ -36,6 +42,14 @@ while [[ $# -gt 0 ]]; do
         --revision)
             DEPLOY_REVISION="${2:-}"
             EXPLICIT_REVISION=true
+            shift 2
+            ;;
+        --current-artifact-ref)
+            CURRENT_ARTIFACT_REFERENCE="${2:-}"
+            shift 2
+            ;;
+        --recovery-artifact-ref)
+            RECOVERY_ARTIFACT_REFERENCE="${2:-}"
             shift 2
             ;;
         --help|-h)
@@ -55,16 +69,28 @@ if [[ -n "$TARGET_COLOR" && "$TARGET_COLOR" != "blue" && "$TARGET_COLOR" != "gre
     exit 1
 fi
 
-ensure_infrastructure
+validate_recovery_deployment_options studio "$RECOVERY_ARTIFACT_REFERENCE" "$EXPLICIT_REVISION"
 
 CURRENT_COLOR="$(get_live_color studio)"
 TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color studio)}"
 CURRENT_REVISION="$(get_service_revision studio current)"
-preserve_current_service_image studio "$CURRENT_COLOR"
+if [[ -z "$CURRENT_REVISION" ]]; then
+    preserve_current_service_image studio "$CURRENT_COLOR" "$CURRENT_ARTIFACT_REFERENCE"
+fi
+
+ensure_infrastructure
+
+if [[ -n "$CURRENT_REVISION" ]]; then
+    preserve_current_service_image studio "$CURRENT_COLOR"
+fi
 
 echo "[INFO] Redeploying production Studio to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
-deploy_color studio "$TARGET_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
-switch_live_color studio "$TARGET_COLOR" "$DEPLOY_REVISION" "$CURRENT_REVISION"
+deploy_color studio "$TARGET_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION" "$RECOVERY_ARTIFACT_REFERENCE"
+if [[ -n "$RECOVERY_ARTIFACT_REFERENCE" ]]; then
+    switch_live_color studio "$TARGET_COLOR" "" "$CURRENT_REVISION" unknown
+else
+    switch_live_color studio "$TARGET_COLOR" "$DEPLOY_REVISION" "$CURRENT_REVISION"
+fi
 echo "[INFO] Switched $STUDIO_DOMAIN traffic to studio-$TARGET_COLOR via Traefik dynamic configuration"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
