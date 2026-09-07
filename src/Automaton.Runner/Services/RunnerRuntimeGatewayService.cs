@@ -77,7 +77,7 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
             return;
         }
 
-        var target = new UriBuilder("http", "127.0.0.1", runtime.Port)
+        var target = new UriBuilder("http", RunnerRuntimeEndpointConfiguration.HostAddress, runtime.Port)
         {
             Path = string.IsNullOrEmpty(path) ? "/" : path.StartsWith('/') ? path : "/" + path,
             Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty

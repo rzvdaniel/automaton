@@ -62,6 +62,18 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Contain("--pid host"));
         Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
         Assert.That(response.InstallationCommand, Does.Contain("-v /:/host"));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            $"runtime_network='automaton-self-hosted-{response.InstallationId}-runtime'"));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            "docker network create \"$runtime_network\""));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            "docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\""));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            "--network \"$runtime_network\""));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            "AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\""));
+        Assert.That(response.InstallationCommand, Does.Contain(
+            "AUTOMATON_RUNTIME_PUBLISH_ADDRESS=\"$runtime_host_address\""));
         Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/workspace'"));
         Assert.That(response.InstallationCommand, Does.Contain(
             $"AUTOMATON_HOST_WORKSPACE_ROOT='/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));

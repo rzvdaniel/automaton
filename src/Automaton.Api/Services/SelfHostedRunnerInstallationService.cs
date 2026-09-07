@@ -213,6 +213,7 @@ public sealed class SelfHostedRunnerInstallationService(
         var workspace = $"{root}/workspace";
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
         var isPrivilegedHost = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost;
+        var network = $"automaton-self-hosted-{enrollment.InstallationId}-runtime";
         var args = isPrivilegedHost
             ? $" {RunnerDockerArguments.PrivilegedHostApplication}"
             : string.Empty;
@@ -229,6 +230,9 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_RUNNER_PURPOSE={Quote(RunnerPurposes.Managed)}",
             $"-e AUTOMATON_RUNNER_APPLICATION_PROFILE={Quote(enrollment.ApplicationProfile)}",
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
+            (isPrivilegedHost ? "--network \"$runtime_network\"" : string.Empty),
+            (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
+            (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_PUBLISH_ADDRESS=\"$runtime_host_address\"" : string.Empty),
             "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
             "-e \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image\"",
             $"-v {Quote(root + ":/app/config")}",
@@ -258,9 +262,20 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
+            (isPrivilegedHost ? $"runtime_network={Quote(network)}" : string.Empty),
+            (isPrivilegedHost ? "if ! docker network create \"$runtime_network\" >/dev/null; then" : string.Empty),
+            (isPrivilegedHost ? "  echo 'The private Runner runtime network could not be created.' >&2" : string.Empty),
+            (isPrivilegedHost ? "  exit 1" : string.Empty),
+            (isPrivilegedHost ? "fi" : string.Empty),
+            (isPrivilegedHost ? "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then" : string.Empty),
+            (isPrivilegedHost ? "  echo 'The private Runner runtime network gateway could not be resolved.' >&2" : string.Empty),
+            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
+            (isPrivilegedHost ? "  exit 1" : string.Empty),
+            (isPrivilegedHost ? "fi" : string.Empty),
             (isPrivilegedHost ? $"mkdir -p {Quote(root)} {Quote(workspace)}" : string.Empty),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
+            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
             "  exit 1",
             "fi",
             "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",

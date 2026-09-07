@@ -190,7 +190,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         if (network == "bridge")
         {
             args.Add("--publish");
-            args.Add($"127.0.0.1:{request.HostPort}:{request.ContainerPort}");
+            args.Add($"{RunnerRuntimeEndpointConfiguration.PublishAddress}:{request.HostPort}:{request.ContainerPort}");
         }
 
         foreach (var mount in request.StorageMounts)

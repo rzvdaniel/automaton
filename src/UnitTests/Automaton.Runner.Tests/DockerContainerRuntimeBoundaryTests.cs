@@ -71,6 +71,65 @@ public sealed class DockerContainerRuntimeBoundaryTests
     }
 
     [Test]
+    public async Task ApplicationPublishDefaultsToLoopback()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, null);
+        var arguments = new List<string>();
+        var runtime = new DockerContainerRuntime((args, _, _, _) =>
+        {
+            arguments.AddRange(args);
+            if (args.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", ""));
+            if (args.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", ""));
+        });
+
+        try
+        {
+            await runtime.CreateApplicationAsync(new DockerApplicationContainerRequest(
+                "app", "runtime:1", Path.GetTempPath(), ".", new ApplicationCommandSpec { Executable = "server" },
+                8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid()));
+            Assert.That(arguments, Does.Contain("127.0.0.1:18080:8080"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public async Task ApplicationPublishUsesConfiguredAddress()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, "172.30.0.1");
+        var arguments = new List<string>();
+        var runtime = new DockerContainerRuntime((args, _, _, _) =>
+        {
+            arguments.AddRange(args);
+            if (args.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "", ""));
+            if (args.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), ""));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", ""));
+        });
+
+        try
+        {
+            await runtime.CreateApplicationAsync(new DockerApplicationContainerRequest(
+                "app", "runtime:1", Path.GetTempPath(), ".", new ApplicationCommandSpec { Executable = "server" },
+                8080, 18080, Path.GetTempPath(), new Dictionary<string, string>(), Guid.NewGuid(), Guid.NewGuid()));
+            Assert.That(arguments, Does.Contain("172.30.0.1:18080:8080"));
+            Assert.That(arguments, Does.Not.Contain("0.0.0.0:18080:8080"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
     public async Task InspectTreatsOnlyRecognizedMissingContainerErrorsAsAbsent()
     {
         var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(

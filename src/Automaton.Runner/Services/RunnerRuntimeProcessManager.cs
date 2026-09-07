@@ -46,6 +46,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> candidates = [];
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
+    private readonly string runtimeHostAddress = RunnerRuntimeEndpointConfiguration.HostAddress;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -724,7 +725,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         return startInfo;
     }
 
-    private static async Task WaitForReadinessAsync(
+    private async Task WaitForReadinessAsync(
         Process process,
         int effectivePort,
         ApplicationHealthSpec health,
@@ -747,13 +748,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 if (health.Path is null)
                 {
                     using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(IPAddress.Loopback, healthPort, timeout.Token);
+                    await tcp.ConnectAsync(runtimeHostAddress, healthPort, timeout.Token);
                     return;
                 }
                 else
                 {
                     using var response = await httpClient!.GetAsync(
-                        new UriBuilder("http", IPAddress.Loopback.ToString(), healthPort)
+                        new UriBuilder("http", runtimeHostAddress, healthPort)
                         {
                             Path = health.Path
                         }.Uri,
@@ -787,7 +788,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
 
         throw new TimeoutException(
-            $"Runtime did not become ready on 127.0.0.1:{healthPort} within {health.StartupTimeoutSeconds} seconds.");
+            $"Runtime did not become ready on {runtimeHostAddress}:{healthPort} within {health.StartupTimeoutSeconds} seconds.");
     }
 
     private string GetMetadataPath(Guid appId, Guid deploymentTargetId)
@@ -961,11 +962,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         catch { return null; }
     }
 
-    private static bool CanBind(int port)
+    private bool CanBind(int port)
     {
         try
         {
-            using var listener = new TcpListener(IPAddress.Loopback, port);
+            using var listener = new TcpListener(IPAddress.Parse(runtimeHostAddress), port);
             listener.Start();
             return true;
         }
