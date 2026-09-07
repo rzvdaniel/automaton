@@ -22,6 +22,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveContainer> active = [];
     private readonly CancellationTokenSource supervisionCts = new();
+    private volatile bool acceptingLifecycleWork;
     private Task? supervisionTask;
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
@@ -41,6 +42,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        acceptingLifecycleWork = true;
         foreach (var metadataPath in Directory.Exists(workspace.AppsRoot)
             ? Directory.EnumerateFiles(workspace.AppsRoot, MetadataFileName, SearchOption.AllDirectories)
             : [])
@@ -65,10 +67,18 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                     {
                         if (!string.IsNullOrWhiteSpace(metadata.ContainerId)
                             && !string.Equals(metadata.ContainerId, candidate.ContainerId, StringComparison.Ordinal))
-                            await containers.StopAndRemoveAsync(metadata.ContainerId, CancellationToken.None);
-                        candidate.Candidate = null;
-                        await WriteMetadataAsync(candidate, cancellationToken);
-                        Register(appId, targetId, candidateIdentity.Id, candidate.ContainerName, candidate.EffectivePort);
+                        {
+                            var previousIdentity = await containers.InspectAsync(metadata.ContainerId, cancellationToken);
+                            if (previousIdentity.Exists && HasExpectedIdentity(previousIdentity, appId, targetId))
+                                await containers.StopAndRemoveAsync(previousIdentity.Id, CancellationToken.None);
+                            else
+                                logger.LogWarning("Preserving previous runtime container {ContainerId} because its Automaton ownership labels could not be verified.", metadata.ContainerId);
+                        }
+                        var promoted = CloneMetadata(candidate);
+                        promoted.Candidate = null;
+                        promoted.State = RuntimeReadinessState.Ready;
+                        await WriteMetadataAsync(promoted, cancellationToken);
+                        Register(appId, targetId, candidateIdentity.Id, promoted.ContainerName, promoted.EffectivePort);
                         continue;
                     }
                     logger.LogWarning("Discarding an uncommitted or invalid managed runtime candidate {ContainerId}.", candidate.ContainerId);
@@ -120,10 +130,16 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        acceptingLifecycleWork = false;
         supervisionCts.Cancel();
         if (supervisionTask is not null)
             await supervisionTask.WaitAsync(cancellationToken);
-        await StopAllAsync(cancellationToken);
+        lock (gate)
+        {
+            foreach (var runtime in active.Values)
+                registry.Remove(runtime.AppId, runtime.TargetId);
+            active.Clear();
+        }
     }
 
     public async Task<RuntimeApplyResult> ApplyAsync(
@@ -133,6 +149,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         CancellationToken cancellationToken = default,
         string? artifactRoot = null)
     {
+        if (!acceptingLifecycleWork)
+            throw new InvalidOperationException("The managed runtime container manager is stopping and is not accepting new lifecycle work.");
         ApplicationContractValidator.EnsureDeployable(contract);
         if (contract.Health.Port is not null && contract.Health.Port != contract.Runtime.Port)
             throw new InvalidOperationException("A health.port different from runtime.port is not supported by the isolated application-container network boundary.");
@@ -265,29 +283,33 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         CancellationToken cancellationToken)
     {
         var key = new DeploymentRuntimeKey(appId, targetId);
-        candidate.State = RuntimeReadinessState.Ready;
-        candidate.Candidate = null;
+        var readyCandidate = CloneMetadata(candidate);
+        readyCandidate.State = RuntimeReadinessState.Ready;
+        readyCandidate.Candidate = null;
         // This durable candidate record is the recovery point immediately before
         // the irreversible registry/color transition.
-        await WriteMetadataAsync(new RunnerRuntimeDeploymentMetadata
-        {
-            AppId = candidate.AppId,
-            DeploymentTargetId = candidate.DeploymentTargetId,
-            Runtime = candidate.Runtime,
-            Health = candidate.Health,
-            Storage = candidate.Storage,
-            Candidate = candidate,
-            EffectivePort = previous?.EffectivePort,
-            State = RuntimeReadinessState.Starting
-        }, cancellationToken);
+        var checkpoint = previous is null
+            ? new RunnerRuntimeDeploymentMetadata
+            {
+                AppId = appId.ToString(),
+                DeploymentTargetId = targetId.ToString(),
+                Runtime = readyCandidate.Runtime,
+                Health = readyCandidate.Health,
+                Storage = readyCandidate.Storage,
+                State = RuntimeReadinessState.Starting
+            }
+            : CloneMetadata(previous);
+        checkpoint.Candidate = readyCandidate;
+        checkpoint.State = RuntimeReadinessState.Starting;
+        await WriteMetadataAsync(checkpoint, cancellationToken);
         ActiveContainer? old;
         lock (gate)
         {
             active.TryGetValue(key, out old);
             if (old is null && !string.IsNullOrWhiteSpace(previous?.ContainerId))
                 old = new ActiveContainer(appId, targetId, previous.ContainerId!, previous.ContainerName ?? previous.ContainerId!, previous.EffectivePort ?? 0);
-            active[key] = new ActiveContainer(appId, targetId, candidate.ContainerId!, candidate.ContainerName!, candidate.EffectivePort!.Value);
-            registry.Register(appId, targetId, candidate.EffectivePort.Value);
+            active[key] = new ActiveContainer(appId, targetId, readyCandidate.ContainerId!, readyCandidate.ContainerName!, readyCandidate.EffectivePort!.Value);
+            registry.Register(appId, targetId, readyCandidate.EffectivePort.Value);
         }
 
         var warnings = new List<string>();
@@ -305,24 +327,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             }
         }
 
-        try { await WriteMetadataAsync(candidate, cancellationToken); }
+        try { await WriteMetadataAsync(readyCandidate, cancellationToken); }
         catch (Exception ex)
         {
             warnings.Add($"Runtime metadata compaction deferred until Runner reconciliation: {ex.Message}");
         }
         return warnings.Count == 0 ? null : string.Join(" ", warnings);
-    }
-
-    private async Task StopAllAsync(CancellationToken cancellationToken)
-    {
-        ActiveContainer[] current;
-        lock (gate)
-        {
-            current = active.Values.ToArray();
-            active.Clear();
-        }
-        foreach (var runtime in current)
-            await containers.StopAndRemoveAsync(runtime.ContainerId, cancellationToken);
     }
 
     private async Task SuperviseAsync(CancellationToken cancellationToken)

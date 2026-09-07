@@ -14,10 +14,14 @@ build command is present. Image references are resolved through Docker and the
 resolved digest is retained in runtime metadata. Image identity is separate
 from Automaton Git revision provenance.
 
-The application owns its command and HTTP process. The container receives the
-effective `AUTOMATON_PORT` and the stable `/automaton/data` value in
-`AUTOMATON_APP_DATA_DIR`. Durable data is mounted separately from the
-read-only application artifact.
+The application owns its command and HTTP process. The container receives its
+container listening port in `AUTOMATON_PORT` and the stable `/automaton/data`
+value in `AUTOMATON_APP_DATA_DIR`. The application must bind that port to
+`0.0.0.0` (or the equivalent all-interfaces address) inside the container;
+binding only to `127.0.0.1` is not reachable through Docker bridge publication.
+The Runner registry and gateway use the separately allocated effective
+host-side port. Durable data is mounted separately from the read-only
+application artifact.
 
 ## Runner boundary
 

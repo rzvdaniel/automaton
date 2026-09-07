@@ -96,10 +96,17 @@ public interface IApplicationContainerRuntime
 public sealed class DockerContainerRuntime : IApplicationContainerRuntime
 {
     private readonly string dockerExecutable;
+    private readonly DockerCommandExecutor? commandExecutor;
 
     public DockerContainerRuntime(string dockerExecutable = "docker")
     {
         this.dockerExecutable = dockerExecutable;
+    }
+
+    internal DockerContainerRuntime(DockerCommandExecutor commandExecutor)
+    {
+        dockerExecutable = "docker";
+        this.commandExecutor = commandExecutor;
     }
 
     public async Task<DockerImageIdentity> ResolveImageAsync(
@@ -227,7 +234,13 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         var result = await ExecuteAsync(
             ["inspect", "--format", "{{.State.Running}}", containerIdOrName],
             TimeSpan.FromSeconds(15), cancellationToken, allowFailure: true);
-        return result.ExitCode == 0 && string.Equals(result.StandardOutput.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+        if (result.ExitCode != 0)
+        {
+            if (LooksAbsent(result.CombinedOutput))
+                return false;
+            throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
+        }
+        return string.Equals(result.StandardOutput.Trim(), "true", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
@@ -236,7 +249,11 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
             ["inspect", "--format", "{{.Id}}|{{.State.Running}}|{{range $k, $v := .Config.Labels}}{{$k}}={{$v}};{{end}}", containerIdOrName],
             TimeSpan.FromSeconds(15), cancellationToken, allowFailure: true);
         if (result.ExitCode != 0)
-            return new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>());
+        {
+            if (LooksAbsent(result.CombinedOutput))
+                return new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>());
+            throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
+        }
         var parts = result.StandardOutput.Trim().Split('|', 3);
         var labels = (parts.Length == 3 ? parts[2] : string.Empty)
             .Split(';', StringSplitOptions.RemoveEmptyEntries)
@@ -259,6 +276,9 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         CancellationToken cancellationToken,
         bool allowFailure = false)
     {
+        if (commandExecutor is not null)
+            return await commandExecutor(arguments, timeout, cancellationToken, allowFailure);
+
         var startInfo = new ProcessStartInfo
         {
             FileName = dockerExecutable,
@@ -367,7 +387,13 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
     private static string QuoteShellArgument(string value)
         => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
-    private sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
+    internal delegate Task<CommandResult> DockerCommandExecutor(
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        bool allowFailure);
+
+    internal sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
     {
         public string CombinedOutput => StandardOutput + StandardError;
     }

@@ -22,9 +22,12 @@ Commands are opaque executable, argument, working-directory, environment, and
 shell settings. The contract does not select a language, framework, package
 manager, internal source layout, build system, or application architecture.
 
-The runtime process receives the effective `AUTOMATON_PORT` and the resolved
-`AUTOMATON_APP_DATA_DIR`. It must own and serve its HTTP endpoint on that
-boundary. Readiness is modeled by the generic health contract rather than by a
+The runtime process receives its container listening port in `AUTOMATON_PORT`
+and the resolved `AUTOMATON_APP_DATA_DIR`. It must own and serve its HTTP
+endpoint on that boundary and bind to `0.0.0.0` (or the equivalent
+all-interfaces address) inside the container; binding only to `127.0.0.1`
+inside the container is not reachable through Docker bridge publication.
+Readiness is modeled by the generic health contract rather than by a
 framework-specific probe. An Actions-only or other finite-work application
 without an HTTP endpoint may omit the runtime command.
 

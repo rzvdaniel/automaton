@@ -92,6 +92,32 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task TransientInspectFailureKeepsReadyRuntimeRegistered()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var manager = CreateManager(fake, registry, workspace);
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19009));
+        var port = fake.LastRequest!.HostPort;
+        fake.InspectFailure = new InvalidOperationException("Docker daemon unavailable.");
+
+        await Task.Delay(2500);
+
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(metadata.ContainerId, Is.EqualTo("container-1"));
+            Assert.That(registry.IsPortRegistered(port), Is.True);
+        });
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task OccupiedRequestedPortUsesDifferentHostPortButKeepsContainerPort()
     {
         using var occupied = new TcpListener(IPAddress.Loopback, 19005);
@@ -108,10 +134,88 @@ public sealed class RunnerRuntimeContainerManagerTests
         await manager.StopAsync(CancellationToken.None);
     }
 
+    [Test]
+    public async Task HostedShutdownLeavesContainerForReplacementManagerToAdopt()
+    {
+        var fake = new FakeContainerRuntime();
+        var registry = new RunnerRuntimeRegistry();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var manager = CreateManager(fake, registry, workspace);
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19006));
+
+        await manager.StopAsync(CancellationToken.None);
+
+        Assert.That(fake.Running["container-1"], Is.True);
+        var replacementRegistry = new RunnerRuntimeRegistry();
+        var replacement = CreateManager(fake, replacementRegistry, workspace);
+        await replacement.StartAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.StartCalls, Is.EqualTo(1));
+            Assert.That(replacementRegistry.IsPortRegistered(fake.LastRequest!.HostPort), Is.True);
+        });
+
+        await replacement.StopAsync(appId, targetId);
+        Assert.That(fake.Running["container-1"], Is.False);
+    }
+
+    [Test]
+    public async Task ReadyCandidateRecoveryDoesNotRemovePreviousContainerWithMismatchedLabels()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+        await manager.ApplyAsync(appId, targetId, Contract(19007));
+
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        fake.AddRunning("container-2", appId, targetId, 19008);
+        var candidate = Clone(metadata);
+        candidate.ContainerId = "container-2";
+        candidate.ContainerName = "candidate";
+        candidate.EffectivePort = 19008;
+        candidate.State = RuntimeReadinessState.Ready;
+        candidate.ArtifactRoot = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, Guid.NewGuid());
+        Directory.CreateDirectory(candidate.ArtifactRoot);
+        metadata.Candidate = candidate;
+        metadata.State = RuntimeReadinessState.Starting;
+        fake.OverrideIdentity("container-1", Guid.NewGuid(), targetId);
+        await WriteMetadataAsync(workspace, metadata);
+
+        var replacement = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await replacement.StartAsync(CancellationToken.None);
+
+        Assert.That(fake.StoppedContainers, Does.Not.Contain("container-1"));
+        Assert.That(fake.Running["container-1"], Is.True);
+        Assert.That((await ReadMetadataAsync(workspace, appId, targetId)).ContainerId, Is.EqualTo("container-2"));
+        await replacement.StopAsync(appId, targetId);
+        await fake.StopAndRemoveAsync("container-1");
+    }
+
     private (RunnerRuntimeContainerManager Manager, RunnerWorkspaceService Workspace, Guid AppId, Guid TargetId) CreateManager(FakeContainerRuntime fake)
     {
         var workspace = new RunnerWorkspaceService();
-        return (new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake, NullLogger<RunnerRuntimeContainerManager>.Instance), workspace, Guid.NewGuid(), Guid.NewGuid());
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        return (CreateManager(fake, new RunnerRuntimeRegistry(), workspace), workspace, appId, targetId);
+    }
+
+    private RunnerRuntimeContainerManager CreateManager(
+        FakeContainerRuntime fake,
+        RunnerRuntimeRegistry? registry = null,
+        RunnerWorkspaceService? workspace = null)
+    {
+        return new RunnerRuntimeContainerManager(
+            workspace ?? new RunnerWorkspaceService(),
+            registry ?? new RunnerRuntimeRegistry(),
+            fake,
+            NullLogger<RunnerRuntimeContainerManager>.Instance);
     }
 
     private static ApplicationContract Contract(int port) => new()
@@ -130,14 +234,31 @@ public sealed class RunnerRuntimeContainerManagerTests
             await File.ReadAllTextAsync(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")),
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
 
+    private static async Task WriteMetadataAsync(RunnerWorkspaceService workspace, RunnerRuntimeDeploymentMetadata metadata)
+    {
+        var path = Path.Combine(workspace.GetAppAutomationRoot(Guid.Parse(metadata.AppId), Guid.Parse(metadata.DeploymentTargetId)), "deployment.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(
+            metadata,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+    }
+
+    private static RunnerRuntimeDeploymentMetadata Clone(RunnerRuntimeDeploymentMetadata metadata)
+        => System.Text.Json.JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
+            System.Text.Json.JsonSerializer.Serialize(metadata, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
     private sealed class FakeContainerRuntime : IApplicationContainerRuntime
     {
         public bool StartReady { get; set; } = true;
         public Dictionary<string, bool> Running { get; } = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (Guid AppId, Guid TargetId)> identities = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TcpListener> listeners = new(StringComparer.Ordinal);
         private int sequence;
         public int StartCalls { get; private set; }
         public DockerApplicationContainerRequest? LastRequest { get; private set; }
+        public List<string> StoppedContainers { get; } = [];
+        public Exception? InspectFailure { get; set; }
 
         public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
             => Task.FromResult(new DockerImageIdentity(image, image + "@sha256:" + new string('a', 64)));
@@ -151,6 +272,7 @@ public sealed class RunnerRuntimeContainerManagerTests
             LastRequest = request;
             var id = "container-" + (++sequence);
             Running[id] = true;
+            identities[id] = (request.AppId, request.DeploymentTargetId);
             if (StartReady)
             {
                 var listener = new TcpListener(IPAddress.Loopback, request.HostPort);
@@ -162,23 +284,47 @@ public sealed class RunnerRuntimeContainerManagerTests
 
         public Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         {
+            StoppedContainers.Add(containerIdOrName);
             Running[containerIdOrName] = false;
+            identities.Remove(containerIdOrName);
             if (listeners.Remove(containerIdOrName, out var listener)) listener.Stop();
             return Task.CompletedTask;
         }
+
+        public void AddRunning(string id, Guid appId, Guid targetId, int port)
+        {
+            Running[id] = true;
+            identities[id] = (appId, targetId);
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+            listeners[id] = listener;
+        }
+
+        public void OverrideIdentity(string id, Guid appId, Guid targetId)
+            => identities[id] = (appId, targetId);
 
         public Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default)
             => Task.FromResult(Running.TryGetValue(containerIdOrName, out var running) && running);
 
         public Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-            => Task.FromResult(new DockerContainerIdentity(containerIdOrName, Running.ContainsKey(containerIdOrName), IsRunningAsync(containerIdOrName).Result,
-                new Dictionary<string, string>
-                {
-                    ["com.automaton.managed"] = "true",
-                    ["com.automaton.app-id"] = "unknown",
-                    ["com.automaton.deployment-target-id"] = "unknown",
-                    ["com.automaton.runtime-kind"] = "generic"
-                }));
+        {
+            if (InspectFailure is not null) throw InspectFailure;
+            return Task.FromResult(CreateIdentity(containerIdOrName));
+        }
+
+        private DockerContainerIdentity CreateIdentity(string containerIdOrName)
+        {
+            var exists = Running.ContainsKey(containerIdOrName);
+            var labels = new Dictionary<string, string>();
+            if (identities.TryGetValue(containerIdOrName, out var identity))
+            {
+                labels["com.automaton.managed"] = "true";
+                labels["com.automaton.app-id"] = identity.AppId.ToString();
+                labels["com.automaton.deployment-target-id"] = identity.TargetId.ToString();
+                labels["com.automaton.runtime-kind"] = "generic";
+            }
+            return new DockerContainerIdentity(containerIdOrName, exists, exists && Running[containerIdOrName], labels);
+        }
 
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
             => Task.FromResult(string.Empty);

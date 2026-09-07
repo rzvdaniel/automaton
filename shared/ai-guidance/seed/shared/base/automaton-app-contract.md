@@ -57,9 +57,12 @@ declare it through this contract. Automaton has no static-file serving fallback.
 A null `runtime.command` is valid only for Actions-only or other finite-work
 applications with no HTTP endpoint.
 
-Automaton supplies the effective port in `AUTOMATON_PORT`, regardless of the
-requested `runtime.port`. The process must listen on that port. Runtime command
-fields use the same execution rules as the build command.
+Automaton supplies the container listening port in `AUTOMATON_PORT`, regardless
+of the requested `runtime.port`. The process must listen on that port and bind
+to `0.0.0.0` (or the equivalent all-interfaces address) inside its container.
+Binding only to container loopback (`127.0.0.1`) is not reachable through
+Docker bridge publication. Runtime command fields use the same execution rules
+as the build command.
 
 `health.path` is optional. When configured, readiness requires a successful
 2xx HTTP response on that path. `health.startupTimeoutSeconds` limits startup.

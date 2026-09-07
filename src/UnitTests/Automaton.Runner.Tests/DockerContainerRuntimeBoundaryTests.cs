@@ -57,4 +57,24 @@ public sealed class DockerContainerRuntimeBoundaryTests
 
         Assert.That(args, Is.EqualTo(new[] { "--entrypoint", "/bin/sh", "-c", @"'server --mode '\''safe'\''' '--flag'" }));
     }
+
+    [Test]
+    public async Task InspectTreatsOnlyRecognizedMissingContainerErrorsAsAbsent()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(1, string.Empty, "Error: No such object: container-1")));
+
+        var identity = await runtime.InspectAsync("container-1");
+
+        Assert.That(identity.Exists, Is.False);
+    }
+
+    [Test]
+    public void InspectSurfacesDockerDaemonFailuresInsteadOfReportingAbsence()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(1, string.Empty, "permission denied connecting to Docker daemon")));
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => runtime.InspectAsync("container-1"));
+    }
 }
