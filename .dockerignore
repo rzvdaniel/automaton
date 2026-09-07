@@ -59,11 +59,14 @@ node_modules/
 !.env.example
 
 # Protected production state and credentials
-backups/
-secrets/
-venv/
-privatekey.xml
-publickey.xml
+/backups
+/backups/**
+/secrets
+/secrets/**
+/venv
+/venv/**
+/privatekey.xml
+/publickey.xml
 
 # Temporary files
 *.tmp
