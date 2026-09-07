@@ -17,7 +17,8 @@ public sealed record DockerApplicationContainerRequest(
     string ArtifactRoot,
     string WorkingDirectory,
     ApplicationCommandSpec Command,
-    int Port,
+    int ContainerPort,
+    int HostPort,
     string DataDirectory,
     IReadOnlyDictionary<string, string> StorageMounts,
     Guid AppId,
@@ -135,9 +136,10 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
             "--security-opt", "no-new-privileges",
             "--cap-drop", "ALL"
         };
+        AddEntrypoint(args, request.Command, "/automaton/source");
         AddEnvironment(args, environment);
         args.Add(image.ResolvedReference);
-        AddCommand(args, request.Command, "/automaton/source");
+        AddCommandArguments(args, request.Command);
         try
         {
             await ExecuteAsync(args, TimeSpan.FromSeconds(request.TimeoutSeconds), cancellationToken);
@@ -171,7 +173,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         if (network == "bridge")
         {
             args.Add("--publish");
-            args.Add($"127.0.0.1:{request.Port}:{request.Port}");
+            args.Add($"127.0.0.1:{request.HostPort}:{request.ContainerPort}");
         }
 
         foreach (var mount in request.StorageMounts)
@@ -182,7 +184,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
 
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["AUTOMATON_PORT"] = request.Port.ToString(),
+            ["AUTOMATON_PORT"] = request.ContainerPort.ToString(),
             ["AUTOMATON_APP_DATA_DIR"] = "/automaton/data",
             ["AUTOMATON_APP_ID"] = request.AppId.ToString(),
             ["AUTOMATON_DEPLOYMENT_TARGET_ID"] = request.DeploymentTargetId.ToString()
@@ -193,8 +195,9 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
             environment[$"AUTOMATON_STORAGE_{mount.Key.ToUpperInvariant()}"] = $"/automaton/data/{mount.Key}";
         AddEnvironment(args, environment);
 
+        AddEntrypoint(args, request.Command, "/automaton/app");
         args.Add(image.ResolvedReference);
-        AddCommand(args, request.Command, "/automaton/app");
+        AddCommandArguments(args, request.Command);
         var created = await ExecuteAsync(args, TimeSpan.FromSeconds(30), cancellationToken);
         var id = created.StandardOutput.Trim();
         if (string.IsNullOrWhiteSpace(id))
@@ -214,7 +217,9 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
     public async Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(containerIdOrName)) return;
-        await ExecuteAsync(["rm", "-f", containerIdOrName], TimeSpan.FromSeconds(30), cancellationToken, allowFailure: true);
+        var result = await ExecuteAsync(["rm", "-f", containerIdOrName], TimeSpan.FromSeconds(30), cancellationToken, allowFailure: true);
+        if (result.ExitCode != 0 && !LooksAbsent(result.CombinedOutput))
+            throw new InvalidOperationException($"Failed to remove managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
     }
 
     public async Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default)
@@ -299,19 +304,29 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         }
     }
 
-    private static void AddCommand(List<string> args, ApplicationCommandSpec command, string root)
+    internal static void AddEntrypoint(List<string> args, ApplicationCommandSpec command, string root)
     {
         if (command.UseShell)
         {
+            args.Add("--entrypoint");
             args.Add("/bin/sh");
+            return;
+        }
+
+        args.Add("--entrypoint");
+        args.Add(command.Executable.Contains('/')
+            ? Path.Combine(root, command.Executable).Replace('\\', '/')
+            : command.Executable);
+    }
+
+    internal static void AddCommandArguments(List<string> args, ApplicationCommandSpec command)
+    {
+        if (command.UseShell)
+        {
             args.Add("-c");
             args.Add(string.Join(" ", new[] { command.Executable }.Concat(command.Arguments).Select(QuoteShellArgument)));
             return;
         }
-
-        args.Add(command.Executable.Contains('/')
-            ? Path.Combine(root, command.Executable).Replace('\\', '/')
-            : command.Executable);
         args.AddRange(command.Arguments);
     }
 
@@ -338,6 +353,10 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
             index > 0 && string.Equals(arguments[index - 1], "--env", StringComparison.Ordinal)
                 ? argument[..Math.Min(argument.IndexOf('=') < 0 ? argument.Length : argument.IndexOf('='), 80)] + "=<redacted>"
                 : argument));
+
+    private static bool LooksAbsent(string output) =>
+        output.Contains("No such container", StringComparison.OrdinalIgnoreCase)
+        || output.Contains("no such object", StringComparison.OrdinalIgnoreCase);
 
     private static void ValidateImage(string image)
     {
