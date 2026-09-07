@@ -6,6 +6,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Messaging.Abstractions;
@@ -24,6 +25,51 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class ApplicationDeploymentServiceTests
 {
+    [Test]
+    public async Task IncompatibleRunnerFailsBeforeManagedArtifactDeployment()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(
+            runnerApiCompatibilityVersion: RunnerApiCompatibilityVersions.Legacy);
+
+        var package = fixture.CreatePackage(hasRuntime: true);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                targetSlug: fixture.Target.Slug,
+                package,
+                clean: true,
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("Upgrade the Runner before deploying"));
+        Assert.That(fixture.RunnerInvocationStarted.Task.IsCompleted, Is.False);
+
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(item => item.Id == fixture.Target.Id);
+        Assert.That(target.GenericRuntimeDeployed, Is.False);
+        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
+    }
+
+    [Test]
+    public async Task IncompatibleRunnerDoesNotClearAnExistingGenericRuntimeDeployment()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(
+            initialGenericMarker: true,
+            runnerApiCompatibilityVersion: RunnerApiCompatibilityVersions.Legacy);
+
+        var package = fixture.CreatePackage(hasRuntime: true);
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                fixture.Target.Slug,
+                package,
+                clean: true,
+                CancellationToken.None));
+
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(item => item.Id == fixture.Target.Id);
+        Assert.That(target.GenericRuntimeDeployed, Is.True);
+    }
+
     [Test]
     public async Task AcceptingPackage_PersistsOperationBeforeReturning()
     {
@@ -585,7 +631,8 @@ public sealed class ApplicationDeploymentServiceTests
             bool routeStateConflict = false,
             bool routeThenStateConflict = false,
             DeployAppPackageResult? runnerResult = null,
-            TimeSpan? runnerInvocationDelay = null)
+            TimeSpan? runnerInvocationDelay = null,
+            string? runnerApiCompatibilityVersion = null)
         {
             var rootPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "package-deploy", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(rootPath);
@@ -609,6 +656,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ConnectionId = "package-deployment-connection",
                 LastHeartbeatAtUtc = DateTime.UtcNow,
                 Status = RunnerStatus.Online.ToString(),
+                ApiCompatibilityVersion = runnerApiCompatibilityVersion ?? RunnerApiCompatibilityVersions.Current,
                 CapabilitiesJson = RunnerCapabilities.Serialize(
                     RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
                     RunnerPurposes.Managed)

@@ -65,6 +65,8 @@ public sealed class ConnectedFlowArtifactService
             if (string.IsNullOrWhiteSpace(runner.ConnectionId))
                 throw new InvalidOperationException($"Runner '{runner.Name}' is not connected.");
 
+            RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
+
             var result = await automatonHub.Clients.Client(runner.ConnectionId)
                 .InvokeAsync<SynchronizeApplicationManagedArtifactsResult>(
                     AutomatonHubMethods.SynchronizeApplicationManagedArtifacts,

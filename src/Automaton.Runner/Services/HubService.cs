@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Automaton.Runner.Console.Models;
 using Automaton.Core.Models;
 using Automaton.Core.Enums;
+using Automaton.Core.Constants;
 using System.Threading;
 
 using System.Text;
@@ -17,6 +18,7 @@ namespace Automaton.Runner.Console.Services;
 
 public class HubService
 {
+    internal const string CurrentRunnerApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current;
     private const string RunnerIdHeader = "RunnerId";
     private const string RunnerNameHeader = "RunnerName";
     private const string RunnerVersionHeader = "RunnerVersion";
@@ -293,7 +295,7 @@ public class HubService
                     options.Headers.Add(RunnerMachineNameHeader, Environment.MachineName);
                     options.Headers.Add(RunnerImageDigestHeader, Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE_DIGEST") ?? string.Empty);
                     options.Headers.Add(RunnerSpecificationVersionHeader, Environment.GetEnvironmentVariable("AUTOMATON_CONTAINER_SPECIFICATION_VERSION") ?? string.Empty);
-                    options.Headers.Add(RunnerApiCompatibilityVersionHeader, "1");
+                    options.Headers.Add(RunnerApiCompatibilityVersionHeader, CurrentRunnerApiCompatibilityVersion);
                     options.Headers.Add(RunnerOperatingSystemHeader, System.Runtime.InteropServices.RuntimeInformation.OSDescription);
                     options.Headers.Add(RunnerArchitectureHeader, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString());
                     var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
