@@ -15,6 +15,7 @@ public class RunnerDeploymentService
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly AppActionDeploymentService actionDeploymentService;
+    private readonly IRunnerApplicationBuildExecutor buildExecutor;
     private readonly ILogger logger;
     private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), Guid> activeExecutionAttempts = new();
     private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), CancellationTokenSource> executionCancellations = new();
@@ -23,11 +24,13 @@ public class RunnerDeploymentService
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
         IAppRuntimeProcessManager runtimeProcessManager,
-        AppActionDeploymentService actionDeploymentService)
+        AppActionDeploymentService actionDeploymentService,
+        IRunnerApplicationBuildExecutor? buildExecutor = null)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.runtimeProcessManager = runtimeProcessManager;
         this.actionDeploymentService = actionDeploymentService;
+        this.buildExecutor = buildExecutor ?? new RunnerApplicationBuildExecutor(new DockerContainerRuntime());
         logger = Log.ForContext<RunnerDeploymentService>();
     }
 
@@ -75,7 +78,8 @@ public class RunnerDeploymentService
         var logs = new List<string>();
         var appId = request.AppId;
         var deploymentTargetId = request.DeploymentTargetId;
-        var tempExtractRoot = Path.Combine(Path.GetTempPath(), "automaton-deploy", Guid.NewGuid().ToString("N"));
+        var tempExtractRoot = runnerWorkspaceService.GetDeploymentStagingDirectory(
+            appId, deploymentTargetId, Guid.NewGuid());
         string? snapshotPath = null;
         string? candidateRuntimeRoot = null;
         var candidatePromoted = false;
@@ -255,7 +259,7 @@ public class RunnerDeploymentService
         }
     }
 
-    private static async Task<ApplicationBuildExecutionResult> ExecuteBuildAsync(
+    private async Task<ApplicationBuildExecutionResult> ExecuteBuildAsync(
         ApplicationContract application,
         string buildWorkspace,
         string extractRoot,
@@ -268,10 +272,10 @@ public class RunnerDeploymentService
         if (!Directory.Exists(buildWorkspace))
             throw new InvalidOperationException("A build command requires a source workspace in the deployment package.");
 
-        var result = await ApplicationBuildExecutor.ExecuteAsync(
-            build,
-            buildWorkspace,
-            cancellationToken);
+        var result = !string.IsNullOrWhiteSpace(build.Image)
+            || !string.IsNullOrWhiteSpace(application.Runtime.Image)
+            ? await buildExecutor.ExecuteAsync(build, application.Runtime, buildWorkspace, cancellationToken)
+            : await ApplicationBuildExecutor.ExecuteAsync(build, buildWorkspace, cancellationToken);
 
         var artifactDirectory = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);
         if (result.Succeeded && application.Runtime.Command is not null)
@@ -339,7 +343,7 @@ public class RunnerDeploymentService
             throw new InvalidOperationException("Deployment package manifest app ID does not match the deployment request.");
         }
 
-        ApplicationContractValidator.EnsureValid(manifest.Application);
+        ApplicationContractValidator.EnsureDeployable(manifest.Application);
 
         return manifest;
     }

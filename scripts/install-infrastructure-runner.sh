@@ -118,7 +118,8 @@ run_canonical_container() {
   local args=(run -d --name "$AUTOMATON_CONTAINER_NAME" --restart unless-stopped --privileged --user 0:0 --pid host --network host
     --label "automaton.installation-id=$id" --label "automaton.runner-version=${image#*:}" --label "automaton.image-digest=$digest" --label "automaton.specification-version=$SPECIFICATION_VERSION"
     -v /var/run/docker.sock:/var/run/docker.sock -v /:/host
-    -v "$AUTOMATON_DATA_ROOT/config:/app/config" -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace"
+    -v "$AUTOMATON_DATA_ROOT/config:/app/config" -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace" \
+    -e AUTOMATON_HOST_WORKSPACE_ROOT="$AUTOMATON_DATA_ROOT/workflows"
     -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts" -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
     -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL" -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure" -e "AUTOMATON_RUNNER_IMAGE=$image"
     -e "AUTOMATON_RUNNER_IMAGE_DIGEST=$digest" -e "AUTOMATON_CONTAINER_SPECIFICATION_VERSION=$SPECIFICATION_VERSION")

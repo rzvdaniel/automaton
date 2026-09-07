@@ -50,6 +50,26 @@ public sealed class ApplicationDeploymentServiceTests
     }
 
     [Test]
+    public async Task ManagedArtifactRunnerV2FailsBeforeContainerApplicationUpload()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync(
+            runnerApiCompatibilityVersion: RunnerApiCompatibilityVersions.ManagedApplicationArtifacts);
+
+        var package = fixture.CreatePackage(hasRuntime: true);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await fixture.Service.DeployPackageAsync(
+                fixture.AppId,
+                fixture.OwnerId,
+                fixture.Target.Slug,
+                package,
+                clean: true,
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("container-based application execution"));
+        Assert.That(fixture.RunnerInvocationStarted.Task.IsCompleted, Is.False);
+    }
+
+    [Test]
     public async Task IncompatibleRunnerDoesNotClearAnExistingGenericRuntimeDeployment()
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
@@ -765,6 +785,7 @@ public sealed class ApplicationDeploymentServiceTests
             var contract = new ApplicationContract();
             if (hasRuntime)
             {
+                contract.Runtime.Image = "test/runtime:1";
                 contract.Runtime.Command = new ApplicationCommandSpec
                 {
                     Executable = "server",

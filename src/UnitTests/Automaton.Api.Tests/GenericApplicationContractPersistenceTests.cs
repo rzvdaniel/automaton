@@ -17,6 +17,7 @@ public sealed class GenericApplicationContractPersistenceTests
         {
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "arbitrary-runtime",
@@ -55,6 +56,23 @@ public sealed class GenericApplicationContractPersistenceTests
         Assert.That(loaded.Runtime.Command.WorkingDirectory, Is.EqualTo("service"));
         Assert.That(loaded.Health.Path, Is.EqualTo("/ready"));
         Assert.That(loaded.Storage.DataDirectory, Is.EqualTo("var/data"));
+    }
+
+    [Test]
+    public void HistoricalRuntimeContractWithoutImageRemainsReadableButIsNotDeployable()
+    {
+        var contract = ApplicationContractSerialization.Deserialize("""
+            {
+              "build": { "command": null },
+              "runtime": { "command": { "executable": "server" }, "port": 8080 },
+              "health": {},
+              "storage": { "dataDirectory": "data", "mounts": [] }
+            }
+            """);
+
+        Assert.That(contract.Runtime.Command!.Executable, Is.EqualTo("server"));
+        Assert.That(ApplicationContractValidator.ValidateForDeployment(contract), Has.Some.Contains("runtime.image"));
+        Assert.Throws<InvalidOperationException>(() => ApplicationContractValidator.EnsureDeployable(contract));
     }
 
     private static ApplicationDbContext CreateContext(string databaseName)

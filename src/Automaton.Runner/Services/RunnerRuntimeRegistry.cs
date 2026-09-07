@@ -38,4 +38,10 @@ public sealed class RunnerRuntimeRegistry
         lock (gate)
             registrations.Remove(new DeploymentRuntimeKey(appId, deploymentTargetId));
     }
+
+    public bool IsPortRegistered(int port)
+    {
+        lock (gate)
+            return registrations.Values.Any(registration => registration.Port == port);
+    }
 }

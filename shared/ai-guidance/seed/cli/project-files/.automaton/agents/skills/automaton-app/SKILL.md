@@ -56,6 +56,7 @@ existing app metadata and unrelated user files while editing.
 {
   "application": {
     "build": {
+      "image": "build-image:tag",
       "command": {
         "executable": "build-tool",
         "arguments": ["build"],
@@ -66,6 +67,7 @@ existing app metadata and unrelated user files while editing.
       "timeoutSeconds": 900
     },
     "runtime": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "app-server",
         "arguments": [],
@@ -79,3 +81,9 @@ existing app metadata and unrelated user files while editing.
   }
 }
 ```
+
+The runtime image is explicit and is not inferred from the executable or source
+files. For illustration only, a project may use `node:22-bookworm-slim` with
+`node server.js`, `python:3.13-slim` with `python app.py`, or an ASP.NET runtime
+image with its published application command. Choose the image and command for
+the application; Automaton does not detect or select a stack.

@@ -241,7 +241,7 @@ public class ManagedRunnerAppAssignmentServiceTests
         target.GenericRuntimeDeployed = false;
         target.WebApp.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract
         {
-            Runtime = new ApplicationRuntimeSpec { Command = new ApplicationCommandSpec { Executable = "server" } }
+            Runtime = new ApplicationRuntimeSpec { Image = "test/runtime:1", Command = new ApplicationCommandSpec { Executable = "server" } }
         });
         await db.SaveChangesAsync();
 

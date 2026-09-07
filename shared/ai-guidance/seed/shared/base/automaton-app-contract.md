@@ -14,6 +14,7 @@ layout, build system, or application architecture.
 {
   "application": {
     "build": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "build-tool",
         "arguments": ["build"],
@@ -25,6 +26,7 @@ layout, build system, or application architecture.
       "timeoutSeconds": 900
     },
     "runtime": {
+      "image": "runtime-image:tag",
       "command": {
         "executable": "app-server",
         "arguments": [],
@@ -42,18 +44,25 @@ layout, build system, or application architecture.
 
 `build.command` is optional. When present, Automaton runs its executable with
 its arguments, working directory, environment, shell setting, and timeout.
+When `build.image` is omitted, `runtime.image` is used.
 `build.outputDirectory` is optional and identifies the build artifact to use.
 
 `runtime.command` names the process to start. It is required when the application
 exposes an HTTP or public endpoint, including frontend-only and static web apps.
+For a new container deployment it requires an explicit `runtime.image`; the image
+owns the application process. Historical stored contracts without an image remain
+readable, but must declare one before they can be deployed again.
 Those apps must provide or depend on an HTTP server in the runtime artifact and
 declare it through this contract. Automaton has no static-file serving fallback.
 A null `runtime.command` is valid only for Actions-only or other finite-work
 applications with no HTTP endpoint.
 
-Automaton supplies the effective port in `AUTOMATON_PORT`, regardless of the
-requested `runtime.port`. The process must listen on that port. Runtime command
-fields use the same execution rules as the build command.
+Automaton supplies the container listening port in `AUTOMATON_PORT`, regardless
+of the requested `runtime.port`. The process must listen on that port and bind
+to `0.0.0.0` (or the equivalent all-interfaces address) inside its container.
+Binding only to container loopback (`127.0.0.1`) is not reachable through
+Docker bridge publication. Runtime command fields use the same execution rules
+as the build command.
 
 `health.path` is optional. When configured, readiness requires a successful
 2xx HTTP response on that path. `health.startupTimeoutSeconds` limits startup.

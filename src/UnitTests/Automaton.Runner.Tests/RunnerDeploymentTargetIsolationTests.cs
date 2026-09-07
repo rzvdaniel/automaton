@@ -119,6 +119,36 @@ public class RunnerDeploymentTargetIsolationTests
     }
 
     [Test]
+    public async Task CleanupTargetAsync_WhenRuntimeCleanupFailsPreservesTargetMetadata()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager
+        {
+            StopFailure = new InvalidOperationException("runtime cleanup unavailable")
+        };
+        var service = new RunnerDeploymentService(
+            workspace,
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var targetRoot = workspace.GetDeploymentTargetRoot(appId, targetId);
+        Directory.CreateDirectory(targetRoot);
+        var metadataPath = Path.Combine(targetRoot, "automaton", "deployment.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        File.WriteAllText(metadataPath, "managed container identity");
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => service.CleanupTargetAsync(appId, targetId));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Directory.Exists(targetRoot), Is.True);
+            Assert.That(File.Exists(metadataPath), Is.True);
+            Assert.That(File.ReadAllText(metadataPath), Is.EqualTo("managed container identity"));
+        });
+    }
+
+    [Test]
     public async Task CleanupTargetAsync_WithCustomScriptsRoot_RemovesBothTargetTreesAndPreservesBothDataRoots()
     {
         var scriptsRoot = Path.Combine(root, "legacy-controller-files");
@@ -259,6 +289,7 @@ public class RunnerDeploymentTargetIsolationTests
             {
                 Runtime = new ApplicationRuntimeSpec
                 {
+                    Image = "test/runtime:1",
                     Command = new ApplicationCommandSpec { Executable = "dotnet" }
                 }
             }
@@ -297,6 +328,7 @@ public class RunnerDeploymentTargetIsolationTests
         public List<Guid> StoppedTargets { get; } = [];
         public List<Guid> AppliedTargets { get; } = [];
         public Dictionary<Guid, ApplicationContract> StartedContracts { get; } = [];
+        public Exception? StopFailure { get; set; }
 
         public Task<RuntimeApplyResult> ApplyAsync(
             Guid appId,
@@ -318,6 +350,7 @@ public class RunnerDeploymentTargetIsolationTests
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId)
         {
+            if (StopFailure is not null) throw StopFailure;
             StoppedTargets.Add(deploymentTargetId);
             return Task.CompletedTask;
         }

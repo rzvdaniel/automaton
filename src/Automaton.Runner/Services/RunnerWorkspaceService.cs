@@ -34,6 +34,9 @@ public class RunnerWorkspaceService
 
     public string RunnerRoot => GetFullPath(WorkspaceRoot, "runner");
 
+    public string GetDeploymentStagingDirectory(Guid appId, Guid deploymentTargetId, Guid operationId)
+        => GetFullPath(RunnerRoot, "deployments", appId.ToString(), deploymentTargetId.ToString(), operationId.ToString());
+
     public string GetFastApiScriptsRoot()
     {
         return UseLegacyScriptsLayout

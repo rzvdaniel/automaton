@@ -43,7 +43,9 @@ public static class ApplicationBuildExecutor
             return new ApplicationBuildExecutionResult { Succeeded = true };
 
         var command = build.Command;
-        ApplicationContractValidator.EnsureValid(new ApplicationContract { Build = build });
+        // Full image requirements are validated on the complete application
+        // contract before Runner deployment. This low-level executor remains
+        // usable for local command tests and diagnostics.
         var fullWorkspaceRoot = Path.GetFullPath(workspaceRoot);
         if (!Directory.Exists(fullWorkspaceRoot))
             throw new DirectoryNotFoundException($"Build workspace does not exist: {fullWorkspaceRoot}");

@@ -60,6 +60,7 @@ public class ConfigServiceTests
             },
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "custom-server",
@@ -117,6 +118,7 @@ public class ConfigServiceTests
         {
             Runtime = new ApplicationRuntimeSpec
             {
+                Image = "test/runtime:1",
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "binary-with-any-name",
@@ -142,6 +144,7 @@ public class ConfigServiceTests
     public void ApplicationContractValidator_ValidatesExecutablePathBoundaries(string executable, bool expectedValid)
     {
         var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Image = "test/runtime:1";
         contract.Runtime.Command = new ApplicationCommandSpec { Executable = executable };
 
         var errors = ApplicationContractValidator.Validate(contract);
@@ -223,6 +226,33 @@ public class ConfigServiceTests
             Assert.That(typeof(AutomatonConfig).GetProperty("Frontend"), Is.Null);
             Assert.That(typeof(AutomatonConfig).GetProperty("Backend"), Is.Null);
         });
+    }
+
+    [Test]
+    public void ApplicationContract_RequiresAnExplicitRuntimeImageForRuntimeCommands()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Command = new ApplicationCommandSpec { Executable = "app-server" };
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+        Assert.That(ApplicationContractValidator.ValidateForDeployment(contract), Has.Some.EqualTo(
+            "runtime.image is required when runtime.command is declared for container deployment"));
+
+        contract.Runtime.Image = "runtime-image:1";
+        Assert.That(ApplicationContractValidator.ValidateForDeployment(contract), Is.Empty);
+    }
+
+    [Test]
+    public void ApplicationContract_UsesRuntimeImageAsBuildImageFallback()
+    {
+        var contract = ApplicationContractDefaults.Create();
+        contract.Runtime.Image = "runtime-image:1";
+        contract.Runtime.Command = new ApplicationCommandSpec { Executable = "app-server" };
+        contract.Build.Command = new ApplicationCommandSpec { Executable = "build-tool" };
+
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+        Assert.That(contract.Build.Image, Is.Null);
+        Assert.That(contract.Runtime.Image, Is.EqualTo("runtime-image:1"));
     }
 
     [Test]

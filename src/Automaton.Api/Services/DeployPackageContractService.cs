@@ -33,7 +33,9 @@ internal static class DeployPackageContractService
         }
 
         var application = GetRequiredProperty(root, "application");
-        return ApplicationContractSerialization.Deserialize(application.GetRawText());
+        var contract = ApplicationContractSerialization.Deserialize(application.GetRawText());
+        ApplicationContractValidator.EnsureDeployable(contract);
+        return contract;
     }
 
     public static async Task PersistAsync(
