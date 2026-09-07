@@ -77,4 +77,22 @@ public sealed class DockerContainerRuntimeBoundaryTests
 
         Assert.ThrowsAsync<InvalidOperationException>(() => runtime.InspectAsync("container-1"));
     }
+
+    [Test]
+    public void InspectRejectsMalformedSuccessfulOutput()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(0, "container-1|maybe|label=value", string.Empty)));
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => runtime.InspectAsync("container-1"));
+    }
+
+    [Test]
+    public void IsRunningRejectsMalformedSuccessfulOutput()
+    {
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(0, "", string.Empty)));
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => runtime.IsRunningAsync("container-1"));
+    }
 }

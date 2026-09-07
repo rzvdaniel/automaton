@@ -240,7 +240,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
                 return false;
             throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
         }
-        return string.Equals(result.StandardOutput.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+        return ParseRunningState(result.StandardOutput, containerIdOrName);
     }
 
     public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
@@ -254,16 +254,22 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
                 return new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>());
             throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
         }
-        var parts = result.StandardOutput.Trim().Split('|', 3);
-        var labels = (parts.Length == 3 ? parts[2] : string.Empty)
-            .Split(';', StringSplitOptions.RemoveEmptyEntries)
-            .Select(value => value.Split('=', 2))
-            .Where(value => value.Length == 2)
-            .ToDictionary(value => value[0], value => value[1], StringComparer.Ordinal);
+        var parts = result.StandardOutput.Trim().Split('|');
+        if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[0]))
+            throw MalformedInspection(containerIdOrName, result.StandardOutput);
+        var running = ParseRunningState(parts[1], containerIdOrName);
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in parts[2].Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var label = entry.Split('=', 2);
+            if (label.Length != 2 || string.IsNullOrWhiteSpace(label[0]))
+                throw MalformedInspection(containerIdOrName, result.StandardOutput);
+            labels[label[0]] = label[1];
+        }
         return new DockerContainerIdentity(
-            parts.ElementAtOrDefault(0) ?? containerIdOrName,
+            parts[0].Trim(),
             true,
-            string.Equals(parts.ElementAtOrDefault(1), "true", StringComparison.OrdinalIgnoreCase),
+            running,
             labels);
     }
 
@@ -377,6 +383,19 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
     private static bool LooksAbsent(string output) =>
         output.Contains("No such container", StringComparison.OrdinalIgnoreCase)
         || output.Contains("no such object", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ParseRunningState(string value, string containerIdOrName)
+    {
+        var normalized = value.Trim();
+        if (string.Equals(normalized, "true", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.Equals(normalized, "false", StringComparison.OrdinalIgnoreCase))
+            return false;
+        throw MalformedInspection(containerIdOrName, value);
+    }
+
+    private static InvalidOperationException MalformedInspection(string containerIdOrName, string output)
+        => new($"Docker inspect returned malformed state for managed container '{containerIdOrName}': {output.Trim()}");
 
     private static void ValidateImage(string image)
     {

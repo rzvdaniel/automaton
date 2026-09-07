@@ -70,6 +70,22 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task CandidateCleanupFailuresDoNotReplaceOriginalDeploymentFailure()
+    {
+        var fake = new FakeContainerRuntime { StartReady = false };
+        var (manager, _, appId, targetId) = CreateManager(fake);
+        await manager.StartAsync(CancellationToken.None);
+        fake.GetLogsFailure = new InvalidOperationException("logs unavailable");
+        fake.StopFailure = new InvalidOperationException("remove unavailable");
+
+        var failure = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await manager.ApplyAsync(appId, targetId, Contract(19013)));
+
+        Assert.That(failure!.Message, Does.Contain("did not become ready"));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
     public async Task ExitedCurrentIsRemovedFromRegistryAndMarkedFailed()
     {
         var fake = new FakeContainerRuntime();
@@ -115,6 +131,107 @@ public sealed class RunnerRuntimeContainerManagerTests
             Assert.That(registry.IsPortRegistered(port), Is.True);
         });
         await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task StartupRetriesTransientInspectFailureAndAdoptsExistingContainer()
+    {
+        var fake = new FakeContainerRuntime();
+        var first = CreateManager(fake);
+        await first.Manager.StartAsync(CancellationToken.None);
+        await first.Manager.ApplyAsync(first.AppId, first.TargetId, Contract(19010));
+        await first.Manager.StopAsync(CancellationToken.None);
+
+        fake.InspectFailure = new InvalidOperationException("Docker daemon temporarily unavailable.");
+        var registry = new RunnerRuntimeRegistry();
+        var replacement = CreateManager(fake, registry, first.Workspace);
+        await replacement.StartAsync(CancellationToken.None);
+        fake.InspectFailure = null;
+
+        await Task.Delay(2500);
+
+        var metadata = await ReadMetadataAsync(first.Workspace, first.AppId, first.TargetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.StartCalls, Is.EqualTo(1));
+            Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(metadata.ContainerId, Is.EqualTo("container-1"));
+            Assert.That(registry.IsPortRegistered(fake.LastRequest!.HostPort), Is.True);
+        });
+        await replacement.StopAsync(first.AppId, first.TargetId);
+    }
+
+    [Test]
+    public async Task LegacyCurrentWithReadyOciCandidatePromotesCandidateWithoutDockerizingLegacyProcess()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("candidate-1", appId, targetId, 19011);
+        var metadata = LegacyMetadata(appId, targetId);
+        metadata.Candidate = OciMetadata(appId, targetId, "candidate-1", 19011, RuntimeReadinessState.Ready);
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restored = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.ContainerId, Is.EqualTo("candidate-1"));
+            Assert.That(restored.Candidate, Is.Null);
+            Assert.That(restored.ProcessId, Is.Null);
+            Assert.That(fake.StartCalls, Is.Zero);
+        });
+        await manager.StopAsync(appId, targetId);
+    }
+
+    [Test]
+    public async Task LegacyCurrentWithStartingOciCandidateRemovesOwnedCandidateAndPreservesLegacyMetadata()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("candidate-1", appId, targetId, 19012);
+        var metadata = LegacyMetadata(appId, targetId);
+        metadata.Candidate = OciMetadata(appId, targetId, "candidate-1", 19012, RuntimeReadinessState.Starting);
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restored = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Candidate, Is.Null);
+            Assert.That(restored.ProcessId, Is.EqualTo(1234));
+            Assert.That(fake.Running["candidate-1"], Is.False);
+            Assert.That(fake.StartCalls, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task HistoricalCurrentWithoutOciCandidateRemainsReadableWithoutRecreation()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var metadata = LegacyMetadata(appId, targetId);
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restored = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.ProcessId, Is.EqualTo(1234));
+            Assert.That(restored.ContainerId, Is.Null);
+            Assert.That(fake.StartCalls, Is.Zero);
+        });
     }
 
     [Test]
@@ -229,6 +346,44 @@ public sealed class RunnerRuntimeContainerManagerTests
         Health = new ApplicationHealthSpec { StartupTimeoutSeconds = 1 }
     };
 
+    private static RunnerRuntimeDeploymentMetadata LegacyMetadata(Guid appId, Guid targetId) => new()
+    {
+        AppId = appId.ToString(),
+        DeploymentTargetId = targetId.ToString(),
+        Runtime = new ApplicationRuntimeSpec
+        {
+            Port = 19000,
+            Command = new ApplicationCommandSpec { Executable = "legacy-server" }
+        },
+        Health = new ApplicationHealthSpec { StartupTimeoutSeconds = 1 },
+        Storage = new ApplicationStorageSpec(),
+        ProcessId = 1234,
+        State = RuntimeReadinessState.Ready
+    };
+
+    private static RunnerRuntimeDeploymentMetadata OciMetadata(
+        Guid appId,
+        Guid targetId,
+        string containerId,
+        int port,
+        string state) => new()
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = new ApplicationRuntimeSpec
+            {
+                Image = "runtime:1",
+                Port = port,
+                Command = new ApplicationCommandSpec { Executable = "server" }
+            },
+            Health = new ApplicationHealthSpec { StartupTimeoutSeconds = 1 },
+            Storage = new ApplicationStorageSpec(),
+            ContainerId = containerId,
+            ContainerName = containerId,
+            EffectivePort = port,
+            State = state
+        };
+
     private static async Task<RunnerRuntimeDeploymentMetadata> ReadMetadataAsync(RunnerWorkspaceService workspace, Guid appId, Guid targetId)
         => System.Text.Json.JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             await File.ReadAllTextAsync(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")),
@@ -259,6 +414,8 @@ public sealed class RunnerRuntimeContainerManagerTests
         public DockerApplicationContainerRequest? LastRequest { get; private set; }
         public List<string> StoppedContainers { get; } = [];
         public Exception? InspectFailure { get; set; }
+        public Exception? GetLogsFailure { get; set; }
+        public Exception? StopFailure { get; set; }
 
         public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
             => Task.FromResult(new DockerImageIdentity(image, image + "@sha256:" + new string('a', 64)));
@@ -284,6 +441,7 @@ public sealed class RunnerRuntimeContainerManagerTests
 
         public Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         {
+            if (StopFailure is not null) throw StopFailure;
             StoppedContainers.Add(containerIdOrName);
             Running[containerIdOrName] = false;
             identities.Remove(containerIdOrName);
@@ -327,6 +485,9 @@ public sealed class RunnerRuntimeContainerManagerTests
         }
 
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-            => Task.FromResult(string.Empty);
+        {
+            if (GetLogsFailure is not null) throw GetLogsFailure;
+            return Task.FromResult(string.Empty);
+        }
     }
 }
