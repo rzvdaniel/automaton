@@ -102,6 +102,8 @@ public sealed class ApplicationDeploymentService
                 throw new InvalidOperationException("No connected runner is assigned to this app.");
 
             RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
+            if (packageApplication.Runtime.Command is not null || packageApplication.Build.Command is not null)
+                RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(runner);
 
             var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
             var result = await automatonHub.Clients.Client(runner.ConnectionId)

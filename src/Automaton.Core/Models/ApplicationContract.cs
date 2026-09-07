@@ -133,16 +133,6 @@ public static class ApplicationContractValidator
         ValidateImage(contract.Build?.Image, "build.image", errors);
         ValidateImage(contract.Runtime?.Image, "runtime.image", errors);
 
-        if (contract.Runtime?.Command is not null && string.IsNullOrWhiteSpace(contract.Runtime.Image))
-            errors.Add("runtime.image is required when runtime.command is declared");
-
-        if (contract.Build?.Command is not null
-            && string.IsNullOrWhiteSpace(contract.Build.Image)
-            && string.IsNullOrWhiteSpace(contract.Runtime?.Image))
-        {
-            errors.Add("build.image or runtime.image is required when build.command is declared");
-        }
-
         if (contract.Build is null)
             errors.Add("build is required");
         else
@@ -215,6 +205,25 @@ public static class ApplicationContractValidator
         var errors = Validate(contract);
         if (errors.Count > 0)
             throw new InvalidOperationException($"Invalid application contract: {string.Join("; ", errors)}");
+    }
+
+    public static IReadOnlyList<string> ValidateForDeployment(ApplicationContract? contract)
+    {
+        var errors = Validate(contract).ToList();
+        if (contract?.Runtime?.Command is not null && string.IsNullOrWhiteSpace(contract.Runtime.Image))
+            errors.Add("runtime.image is required when runtime.command is declared for container deployment");
+        if (contract?.Build?.Command is not null
+            && string.IsNullOrWhiteSpace(contract.Build.Image)
+            && string.IsNullOrWhiteSpace(contract.Runtime?.Image))
+            errors.Add("build.image or runtime.image is required when build.command is declared for container deployment");
+        return errors;
+    }
+
+    public static void EnsureDeployable(ApplicationContract contract)
+    {
+        var errors = ValidateForDeployment(contract);
+        if (errors.Count > 0)
+            throw new InvalidOperationException($"Application contract is not deployable: {string.Join("; ", errors)}");
     }
 
     private static void ValidateCommand(ApplicationCommandSpec? command, string name, ICollection<string> errors)

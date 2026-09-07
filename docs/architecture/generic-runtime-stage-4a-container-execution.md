@@ -6,7 +6,9 @@ environment and does not select a language or framework.
 
 ## Contract
 
-`application.runtime.image` is required when `runtime.command` is declared.
+`application.runtime.image` is required when `runtime.command` is declared for
+new container deployments. Historical persisted contracts remain structurally
+readable, but cannot be deployed until an image is explicitly declared.
 `application.build.image` is optional and falls back to `runtime.image` when a
 build command is present. Image references are resolved through Docker and the
 resolved digest is retained in runtime metadata. Image identity is separate
@@ -29,8 +31,17 @@ mode. `no-new-privileges` and dropped Linux capabilities are applied.
 The existing runtime registry and deployment metadata remain the source of
 current/candidate readiness and routing state. Stage 4A adds container identity,
 requested image, and resolved image digest to that metadata. On restart, only
-Runner-labelled containers with matching app/target identity are eligible for
-reconciliation; arbitrary containers are not adopted.
+Runner-labelled containers with matching app/target/runtime-kind identity are
+eligible for reconciliation; arbitrary containers are not adopted. Candidate
+metadata is reconciled as well as current metadata, and a resolved digest is
+retained for future recovery.
+
+When the Runner itself is containerized, `AUTOMATON_HOST_WORKSPACE_ROOT` must
+name the host path corresponding to its `AUTOMATON_WORKSPACE_ROOT` mount. Only
+paths inside that configured Runner workspace are translated for child Docker
+bind mounts. There is no `/host` path inference. Application containers use an
+isolated bridge network and loopback-only host publication; they never share the
+Runner or host network namespace.
 
 Actions and connected-flow artifact synchronization remain separate product
 boundaries in this stage. Existing process metadata without an image is not

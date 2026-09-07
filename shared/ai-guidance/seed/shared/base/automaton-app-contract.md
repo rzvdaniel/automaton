@@ -49,7 +49,9 @@ When `build.image` is omitted, `runtime.image` is used.
 
 `runtime.command` names the process to start. It is required when the application
 exposes an HTTP or public endpoint, including frontend-only and static web apps.
-It requires `runtime.image`; the image owns the application process.
+For a new container deployment it requires an explicit `runtime.image`; the image
+owns the application process. Historical stored contracts without an image remain
+readable, but must declare one before they can be deployed again.
 Those apps must provide or depend on an HTTP server in the runtime artifact and
 declare it through this contract. Automaton has no static-file serving fallback.
 A null `runtime.command` is valid only for Actions-only or other finite-work

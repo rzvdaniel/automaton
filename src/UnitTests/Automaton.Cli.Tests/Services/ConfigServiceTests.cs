@@ -234,11 +234,12 @@ public class ConfigServiceTests
         var contract = ApplicationContractDefaults.Create();
         contract.Runtime.Command = new ApplicationCommandSpec { Executable = "app-server" };
 
-        Assert.That(ApplicationContractValidator.Validate(contract), Has.Some.EqualTo(
-            "runtime.image is required when runtime.command is declared"));
+        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+        Assert.That(ApplicationContractValidator.ValidateForDeployment(contract), Has.Some.EqualTo(
+            "runtime.image is required when runtime.command is declared for container deployment"));
 
         contract.Runtime.Image = "runtime-image:1";
-        Assert.That(ApplicationContractValidator.Validate(contract), Is.Empty);
+        Assert.That(ApplicationContractValidator.ValidateForDeployment(contract), Is.Empty);
     }
 
     [Test]

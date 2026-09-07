@@ -75,6 +75,8 @@ public sealed class RunnerApplicationBuildExecutorTests
 
         public Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+            => Task.FromResult(new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>()));
         public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
     }
 }

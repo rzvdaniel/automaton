@@ -17,4 +17,14 @@ public static class RunnerProtocolCompatibilityPolicy
                 $"Runner '{runner.Name}' is incompatible with the current application deployment protocol. Upgrade the Runner before deploying.");
         }
     }
+
+    public static void EnsureSupportsContainerApplicationExecution(Runner runner)
+    {
+        if (!int.TryParse(runner.ApiCompatibilityVersion, out var version)
+            || version < int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution))
+        {
+            throw new InvalidOperationException(
+                $"Runner '{runner.Name}' must be upgraded for container-based application execution before deployment.");
+        }
+    }
 }

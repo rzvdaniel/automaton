@@ -27,6 +27,25 @@ public sealed class RunnerProtocolCompatibilityPolicyTests
         Assert.That(exception.Message, Does.Not.Contain("api-key"));
     }
 
+    [TestCase(RunnerApiCompatibilityVersions.ManagedApplicationArtifacts)]
+    [TestCase(RunnerApiCompatibilityVersions.Legacy)]
+    [TestCase(null)]
+    public void ContainerApplicationExecutionRequiresProtocolThree(string? version)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(CreateRunner(version)));
+
+        Assert.That(exception!.Message, Does.Contain("container-based application execution"));
+    }
+
+    [Test]
+    public void ContainerApplicationExecutionAcceptsProtocolThree()
+    {
+        Assert.DoesNotThrow(() =>
+            RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(
+                CreateRunner(RunnerApiCompatibilityVersions.ContainerApplicationExecution)));
+    }
+
     private static Runner CreateRunner(string? version) => new()
     {
         Id = Guid.NewGuid(),

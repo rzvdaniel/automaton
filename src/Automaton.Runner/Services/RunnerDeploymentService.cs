@@ -78,7 +78,8 @@ public class RunnerDeploymentService
         var logs = new List<string>();
         var appId = request.AppId;
         var deploymentTargetId = request.DeploymentTargetId;
-        var tempExtractRoot = Path.Combine(Path.GetTempPath(), "automaton-deploy", Guid.NewGuid().ToString("N"));
+        var tempExtractRoot = runnerWorkspaceService.GetDeploymentStagingDirectory(
+            appId, deploymentTargetId, Guid.NewGuid());
         string? snapshotPath = null;
         string? candidateRuntimeRoot = null;
         var candidatePromoted = false;
@@ -342,7 +343,7 @@ public class RunnerDeploymentService
             throw new InvalidOperationException("Deployment package manifest app ID does not match the deployment request.");
         }
 
-        ApplicationContractValidator.EnsureValid(manifest.Application);
+        ApplicationContractValidator.EnsureDeployable(manifest.Application);
 
         return manifest;
     }

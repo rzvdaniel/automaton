@@ -57,7 +57,7 @@ layout, build system, or application architecture.
 | `application.build.outputDirectory` | Optional directory containing the build artifact. |
 | `application.build.timeoutSeconds` | Maximum build duration. |
 | `application.runtime.command` | Executable and arguments for the long-running app process. |
-| `application.runtime.image` | OCI image that executes the runtime command; required when `runtime.command` is present. |
+| `application.runtime.image` | OCI image that executes the runtime command; required for new container deployments when `runtime.command` is present. Historical stored contracts remain readable until redeployed with an image. |
 | `application.runtime.port` | Port requested by the app contract. |
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |
