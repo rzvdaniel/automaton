@@ -46,7 +46,6 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> candidates = [];
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
-    private readonly string runtimeHostAddress = RunnerRuntimeEndpointConfiguration.HostAddress;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -748,13 +747,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 if (health.Path is null)
                 {
                     using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(runtimeHostAddress, healthPort, timeout.Token);
+                    await tcp.ConnectAsync(IPAddress.Loopback, healthPort, timeout.Token);
                     return;
                 }
                 else
                 {
                     using var response = await httpClient!.GetAsync(
-                        new UriBuilder("http", runtimeHostAddress, healthPort)
+                        new UriBuilder("http", IPAddress.Loopback.ToString(), healthPort)
                         {
                             Path = health.Path
                         }.Uri,
@@ -788,7 +787,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         }
 
         throw new TimeoutException(
-            $"Runtime did not become ready on {runtimeHostAddress}:{healthPort} within {health.StartupTimeoutSeconds} seconds.");
+            $"Runtime did not become ready on 127.0.0.1:{healthPort} within {health.StartupTimeoutSeconds} seconds.");
     }
 
     private string GetMetadataPath(Guid appId, Guid deploymentTargetId)
@@ -962,11 +961,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         catch { return null; }
     }
 
-    private bool CanBind(int port)
+    private static bool CanBind(int port)
     {
         try
         {
-            using var listener = new TcpListener(IPAddress.Parse(runtimeHostAddress), port);
+            using var listener = new TcpListener(IPAddress.Loopback, port);
             listener.Start();
             return true;
         }

@@ -73,8 +73,8 @@ public sealed class DockerContainerRuntimeBoundaryTests
     [Test]
     public async Task ApplicationPublishDefaultsToLoopback()
     {
-        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable);
-        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, null);
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, null);
         var arguments = new List<string>();
         var runtime = new DockerContainerRuntime((args, _, _, _) =>
         {
@@ -95,15 +95,15 @@ public sealed class DockerContainerRuntimeBoundaryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, previous);
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
         }
     }
 
     [Test]
     public async Task ApplicationPublishUsesConfiguredAddress()
     {
-        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable);
-        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, "172.30.0.1");
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "172.30.0.1");
         var arguments = new List<string>();
         var runtime = new DockerContainerRuntime((args, _, _, _) =>
         {
@@ -125,7 +125,52 @@ public sealed class DockerContainerRuntimeBoundaryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.PublishAddressEnvironmentVariable, previous);
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressRejectsMalformedExplicitValue()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "not-an-ip");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => _ = RunnerRuntimeEndpointConfiguration.HostAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressRejectsWildcardValue()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "0.0.0.0");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => _ = RunnerRuntimeEndpointConfiguration.HostAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
+        }
+    }
+
+    [Test]
+    public void RuntimeHostAddressDefaultsToLoopback()
+    {
+        var previous = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
+        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, null);
+        try
+        {
+            Assert.That(RunnerRuntimeEndpointConfiguration.HostAddress, Is.EqualTo("127.0.0.1"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, previous);
         }
     }
 

@@ -72,8 +72,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
             "--network \"$runtime_network\""));
         Assert.That(response.InstallationCommand, Does.Contain(
             "AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\""));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            "AUTOMATON_RUNTIME_PUBLISH_ADDRESS=\"$runtime_host_address\""));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("AUTOMATON_RUNTIME_PUBLISH_ADDRESS"));
         Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/workspace'"));
         Assert.That(response.InstallationCommand, Does.Contain(
             $"AUTOMATON_HOST_WORKSPACE_ROOT='/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));

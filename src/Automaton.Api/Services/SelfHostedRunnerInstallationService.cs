@@ -232,7 +232,6 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
             (isPrivilegedHost ? "--network \"$runtime_network\"" : string.Empty),
             (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
-            (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_PUBLISH_ADDRESS=\"$runtime_host_address\"" : string.Empty),
             "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
             "-e \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image\"",
             $"-v {Quote(root + ":/app/config")}",
