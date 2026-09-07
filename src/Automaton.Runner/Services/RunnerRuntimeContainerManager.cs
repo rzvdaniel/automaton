@@ -105,8 +105,15 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             if (candidateIdentity.Exists && HasExpectedIdentity(candidateIdentity, appId, targetId))
             {
                 logger.LogWarning("Discarding an uncommitted managed runtime candidate {ContainerId}.", candidate.ContainerId);
-                try { await containers.StopAndRemoveAsync(candidateIdentity.Id, CancellationToken.None); }
-                catch (Exception ex) { logger.LogWarning(ex, "Could not remove invalid managed runtime candidate {ContainerId}.", candidateIdentity.Id); }
+                try
+                {
+                    await containers.StopAndRemoveAsync(candidateIdentity.Id, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Could not remove invalid managed runtime candidate {ContainerId}; retaining metadata for retry.", candidateIdentity.Id);
+                    throw;
+                }
                 metadata.Candidate = null;
                 await WriteMetadataAsync(metadata, cancellationToken);
             }
@@ -266,7 +273,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             var warning = await PromoteAsync(appId, deploymentTargetId, previous, candidate, cancellationToken);
             return new RuntimeApplyResult { PromotionIrreversible = true, Warning = warning };
         }
-        catch
+        catch (Exception deploymentError)
         {
             if (started is not null)
             {
@@ -282,24 +289,33 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 {
                     logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
                 }
-                var cleanupWarnings = new List<string>();
-                await TryStopOwnedContainerAsync(started.Id, appId, deploymentTargetId, cleanupWarnings, "failed runtime");
-                foreach (var warning in cleanupWarnings)
-                    logger.LogWarning("{Warning}", warning);
             }
-            else
-            {
-                var cleanupWarnings = new List<string>();
-                await TryStopOwnedContainerAsync(candidate.ContainerName!, appId, deploymentTargetId, cleanupWarnings, "failed runtime candidate");
-                foreach (var warning in cleanupWarnings)
-                    logger.LogWarning("{Warning}", warning);
-            }
+            var candidateCleanupWarnings = new List<string>();
+            var candidateCleanupConfirmed = await TryStopOwnedContainerAsync(
+                started?.Id ?? candidate.ContainerName!,
+                appId,
+                deploymentTargetId,
+                candidateCleanupWarnings,
+                "failed runtime candidate");
+            foreach (var warning in candidateCleanupWarnings)
+                logger.LogWarning("{Warning}", warning);
             try
             {
-                if (previous is not null)
+                if (candidateCleanupConfirmed && previous is not null)
                     await WriteMetadataAsync(previous, CancellationToken.None);
-                else if (File.Exists(metadataPath))
+                else if (candidateCleanupConfirmed && File.Exists(metadataPath))
                     File.Delete(metadataPath);
+                else
+                {
+                    candidate.State = RuntimeReadinessState.Failed;
+                    candidate.LastError = deploymentError.Message;
+                    var retained = previous is null
+                        ? CloneMetadata(pending)
+                        : CloneMetadata(previous);
+                    retained.Candidate = candidate;
+                    retained.State = previous?.State ?? RuntimeReadinessState.Failed;
+                    await WriteMetadataAsync(retained, CancellationToken.None);
+                }
             }
             catch (Exception restoreError)
             {
@@ -332,6 +348,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             await TryStopOwnedContainerAsync(id, appId, deploymentTargetId, warnings, "explicit runtime stop");
         foreach (var warning in warnings)
             logger.LogWarning("{Warning}", warning);
+        if (warnings.Count > 0)
+            throw new InvalidOperationException($"Managed runtime cleanup for {appId}/{deploymentTargetId} is incomplete; target state was preserved for retry. {string.Join(" ", warnings)}");
     }
 
     private async Task<string?> PromoteAsync(

@@ -73,7 +73,7 @@ public sealed class RunnerRuntimeContainerManagerTests
     public async Task CandidateCleanupFailuresDoNotReplaceOriginalDeploymentFailure()
     {
         var fake = new FakeContainerRuntime { StartReady = false };
-        var (manager, _, appId, targetId) = CreateManager(fake);
+        var (manager, workspace, appId, targetId) = CreateManager(fake);
         await manager.StartAsync(CancellationToken.None);
         fake.GetLogsFailure = new InvalidOperationException("logs unavailable");
         fake.StopFailure = new InvalidOperationException("remove unavailable");
@@ -82,6 +82,19 @@ public sealed class RunnerRuntimeContainerManagerTests
             await manager.ApplyAsync(appId, targetId, Contract(19013)));
 
         Assert.That(failure!.Message, Does.Contain("did not become ready"));
+        var retained = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(retained.Candidate, Is.Not.Null);
+            Assert.That(retained.Candidate!.State, Is.EqualTo(RuntimeReadinessState.Failed));
+            Assert.That(retained.Candidate.ContainerId, Is.EqualTo("container-1"));
+        });
+        fake.StopFailure = null;
+        var replacement = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await replacement.StartAsync(CancellationToken.None);
+        var reconciled = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.That(reconciled.Candidate, Is.Null);
+        await replacement.StopAsync(CancellationToken.None);
         await manager.StopAsync(CancellationToken.None);
     }
 
@@ -148,7 +161,16 @@ public sealed class RunnerRuntimeContainerManagerTests
         await replacement.StartAsync(CancellationToken.None);
         fake.InspectFailure = null;
 
-        await Task.Delay(2500);
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(250);
+            var current = await ReadMetadataAsync(first.Workspace, first.AppId, first.TargetId);
+            if (current.State == RuntimeReadinessState.Ready &&
+                registry.IsPortRegistered(fake.LastRequest!.HostPort))
+            {
+                break;
+            }
+        }
 
         var metadata = await ReadMetadataAsync(first.Workspace, first.AppId, first.TargetId);
         Assert.Multiple(() =>
@@ -295,10 +317,34 @@ public sealed class RunnerRuntimeContainerManagerTests
         await WriteMetadataAsync(workspace, OciMetadata(appId, targetId, "unverified", 19018, RuntimeReadinessState.Ready));
 
         var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
-        await manager.StopAsync(appId, targetId);
+        var error = Assert.ThrowsAsync<InvalidOperationException>(() => manager.StopAsync(appId, targetId));
 
         Assert.That(fake.Running["unverified"], Is.True);
+        Assert.That(error!.Message, Does.Contain("incomplete"));
         await fake.StopAndRemoveAsync("unverified");
+    }
+
+    [Test]
+    public async Task ExplicitStopFailurePreservesPersistedMetadataForRetry()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("current", appId, targetId, 19019);
+        await WriteMetadataAsync(workspace, OciMetadata(appId, targetId, "current", 19019, RuntimeReadinessState.Ready));
+        fake.StopFailure = new InvalidOperationException("remove unavailable");
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        Assert.ThrowsAsync<InvalidOperationException>(() => manager.StopAsync(appId, targetId));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Running["current"], Is.True);
+            Assert.That(File.Exists(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")), Is.True);
+        });
+        fake.StopFailure = null;
+        await fake.StopAndRemoveAsync("current");
     }
 
     [Test]
