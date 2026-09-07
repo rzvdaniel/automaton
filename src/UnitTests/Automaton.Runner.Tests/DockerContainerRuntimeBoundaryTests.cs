@@ -95,4 +95,79 @@ public sealed class DockerContainerRuntimeBoundaryTests
 
         Assert.ThrowsAsync<InvalidOperationException>(() => runtime.IsRunningAsync("container-1"));
     }
+
+    [Test]
+    public async Task InspectParsesOwnershipLabelsWhenUnrelatedLabelsContainDelimiters()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var runtime = new DockerContainerRuntime((_, _, _, _) => Task.FromResult(
+            new DockerContainerRuntime.CommandResult(
+                0,
+                $"container-1|true|{{\"com.automaton.managed\":\"true\",\"com.automaton.app-id\":\"{appId}\",\"com.automaton.deployment-target-id\":\"{targetId}\",\"com.automaton.runtime-kind\":\"generic\",\"image.label\":\"a;b|c=d\"}}",
+                string.Empty)));
+
+        var identity = await runtime.InspectAsync("container-1");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(identity.Running, Is.True);
+            Assert.That(identity.Labels["com.automaton.app-id"], Is.EqualTo(appId.ToString()));
+            Assert.That(identity.Labels["image.label"], Is.EqualTo("a;b|c=d"));
+        });
+    }
+
+    [Test]
+    public void ApplicationStartCleanupFailurePreservesStartFailure()
+    {
+        var runtime = new DockerContainerRuntime((arguments, _, _, _) =>
+        {
+            if (arguments.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, string.Empty, string.Empty));
+            if (arguments.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), string.Empty));
+            if (arguments.Contains("create"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "container-1", string.Empty));
+            if (arguments.Contains("start"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(1, string.Empty, "start failed"));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(1, string.Empty, "cleanup failed"));
+        });
+
+        var error = Assert.ThrowsAsync<AggregateException>(() => runtime.StartApplicationAsync(
+            new DockerApplicationContainerRequest(
+                "app",
+                "runtime:1",
+                Path.GetTempPath(),
+                ".",
+                new ApplicationCommandSpec { Executable = "server" },
+                8080,
+                18080,
+                Path.GetTempPath(),
+                new Dictionary<string, string>(),
+                Guid.NewGuid(),
+                 Guid.NewGuid())))!;
+
+        Assert.That(error.InnerExceptions[0].Message, Does.Contain("start failed"));
+    }
+
+    [Test]
+    public void BuildCleanupFailurePreservesBuildFailure()
+    {
+        var runtime = new DockerContainerRuntime((arguments, _, _, _) =>
+        {
+            if (arguments.Contains("pull"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, string.Empty, string.Empty));
+            if (arguments.Contains("image"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(0, "runtime:1@sha256:" + new string('a', 64), string.Empty));
+            if (arguments.Contains("run"))
+                return Task.FromResult(new DockerContainerRuntime.CommandResult(1, string.Empty, "build failed"));
+            return Task.FromResult(new DockerContainerRuntime.CommandResult(1, string.Empty, "cleanup failed"));
+        });
+
+        var error = Assert.ThrowsAsync<AggregateException>(() => runtime.RunBuildAsync(
+            new DockerBuildRequest("runtime:1", new ApplicationCommandSpec { Executable = "build" }, Path.GetTempPath(), 1),
+            new Dictionary<string, string>()))!;
+
+        Assert.That(error.InnerExceptions[0].Message, Does.Contain("build failed"));
+    }
 }

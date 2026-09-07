@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -93,7 +94,13 @@ public interface IApplicationContainerRuntime
     Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default);
 }
 
-public sealed class DockerContainerRuntime : IApplicationContainerRuntime
+public interface IStagedApplicationContainerRuntime
+{
+    Task<DockerApplicationContainer> CreateApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default);
+    Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default);
+}
+
+public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime
 {
     private readonly string dockerExecutable;
     private readonly DockerCommandExecutor? commandExecutor;
@@ -151,13 +158,16 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         {
             await ExecuteAsync(args, TimeSpan.FromSeconds(request.TimeoutSeconds), cancellationToken);
         }
-        finally
+        catch (Exception primaryError)
         {
-            await StopAndRemoveAsync(containerName, CancellationToken.None);
+            try { await StopAndRemoveAsync(containerName, CancellationToken.None); }
+            catch (Exception cleanupError) { throw new AggregateException("Docker build failed and cleanup also failed.", primaryError, cleanupError); }
+            throw;
         }
+        await StopAndRemoveAsync(containerName, CancellationToken.None);
     }
 
-    public async Task<DockerApplicationContainer> StartApplicationAsync(
+    public async Task<DockerApplicationContainer> CreateApplicationAsync(
         DockerApplicationContainerRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -209,14 +219,26 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         var id = created.StandardOutput.Trim();
         if (string.IsNullOrWhiteSpace(id))
             throw new InvalidOperationException("Docker did not return an application container ID.");
+        return new DockerApplicationContainer(id, request.Name, image);
+    }
+
+    public Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+        => ExecuteAsync(["start", containerIdOrName], TimeSpan.FromSeconds(30), cancellationToken);
+
+    public async Task<DockerApplicationContainer> StartApplicationAsync(
+        DockerApplicationContainerRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var created = await CreateApplicationAsync(request, cancellationToken);
         try
         {
-            await ExecuteAsync(["start", id], TimeSpan.FromSeconds(30), cancellationToken);
-            return new DockerApplicationContainer(id, request.Name, image);
+            await StartApplicationAsync(created.Id, cancellationToken);
+            return created;
         }
-        catch
+        catch (Exception primaryError)
         {
-            await StopAndRemoveAsync(id, CancellationToken.None);
+            try { await StopAndRemoveAsync(created.Id, CancellationToken.None); }
+            catch (Exception cleanupError) { throw new AggregateException("Docker application start failed and cleanup also failed.", primaryError, cleanupError); }
             throw;
         }
     }
@@ -246,7 +268,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
     public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
         var result = await ExecuteAsync(
-            ["inspect", "--format", "{{.Id}}|{{.State.Running}}|{{range $k, $v := .Config.Labels}}{{$k}}={{$v}};{{end}}", containerIdOrName],
+            ["inspect", "--format", "{{.Id}}|{{.State.Running}}|{{json .Config.Labels}}", containerIdOrName],
             TimeSpan.FromSeconds(15), cancellationToken, allowFailure: true);
         if (result.ExitCode != 0)
         {
@@ -254,17 +276,23 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
                 return new DockerContainerIdentity(containerIdOrName, false, false, new Dictionary<string, string>());
             throw new InvalidOperationException($"Docker inspect failed for managed container '{containerIdOrName}': {result.CombinedOutput.Trim()}");
         }
-        var parts = result.StandardOutput.Trim().Split('|');
+        var parts = result.StandardOutput.Trim().Split('|', 3);
         if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[0]))
             throw MalformedInspection(containerIdOrName, result.StandardOutput);
         var running = ParseRunningState(parts[1], containerIdOrName);
-        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var entry in parts[2].Split(';', StringSplitOptions.RemoveEmptyEntries))
+        Dictionary<string, string> labels;
+        try
         {
-            var label = entry.Split('=', 2);
-            if (label.Length != 2 || string.IsNullOrWhiteSpace(label[0]))
+            labels = JsonSerializer.Deserialize<Dictionary<string, string>>(parts[2])
+                ?? throw new JsonException("Docker returned null labels.");
+        }
+        catch (JsonException)
+        {
+            throw MalformedInspection(containerIdOrName, result.StandardOutput);
+        }
+        if (labels.Keys.Any(string.IsNullOrWhiteSpace))
+        {
                 throw MalformedInspection(containerIdOrName, result.StandardOutput);
-            labels[label[0]] = label[1];
         }
         return new DockerContainerIdentity(
             parts[0].Trim(),
@@ -283,7 +311,12 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime
         bool allowFailure = false)
     {
         if (commandExecutor is not null)
-            return await commandExecutor(arguments, timeout, cancellationToken, allowFailure);
+        {
+            var result = await commandExecutor(arguments, timeout, cancellationToken, allowFailure);
+            if (!allowFailure && result.ExitCode != 0)
+                throw new InvalidOperationException($"Docker command failed ({DescribeArguments(arguments)}): {result.CombinedOutput.Trim()}");
+            return result;
+        }
 
         var startInfo = new ProcessStartInfo
         {

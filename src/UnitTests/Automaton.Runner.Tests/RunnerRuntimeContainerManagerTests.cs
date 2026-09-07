@@ -213,6 +213,95 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task StartupClearsCandidateNameWhenNoContainerWasCreated()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var metadata = LegacyMetadata(appId, targetId);
+        metadata.Candidate = OciMetadata(appId, targetId, null, 19014, RuntimeReadinessState.Starting);
+        metadata.Candidate.ContainerName = "candidate-before-create";
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restored = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Candidate, Is.Null);
+            Assert.That(restored.ProcessId, Is.EqualTo(1234));
+            Assert.That(fake.StartCalls, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task StartupRemovesStartingCandidateFoundByPersistedContainerName()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("candidate-before-id-persist", appId, targetId, 19015);
+        var metadata = LegacyMetadata(appId, targetId);
+        metadata.Candidate = OciMetadata(appId, targetId, null, 19015, RuntimeReadinessState.Starting);
+        metadata.Candidate.ContainerName = "candidate-before-id-persist";
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restored = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Candidate, Is.Null);
+            Assert.That(restored.ProcessId, Is.EqualTo(1234));
+            Assert.That(fake.Running["candidate-before-id-persist"], Is.False);
+        });
+    }
+
+    [Test]
+    public async Task ExplicitStopRemovesVerifiedCurrentAndCandidateContainers()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("current", appId, targetId, 19016);
+        fake.AddRunning("candidate", appId, targetId, 19017);
+        var metadata = OciMetadata(appId, targetId, "current", 19016, RuntimeReadinessState.Ready);
+        metadata.Candidate = OciMetadata(appId, targetId, "candidate", 19017, RuntimeReadinessState.Ready);
+        await WriteMetadataAsync(workspace, metadata);
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StopAsync(appId, targetId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Running["current"], Is.False);
+            Assert.That(fake.Running["candidate"], Is.False);
+        });
+    }
+
+    [Test]
+    public async Task ExplicitStopPreservesUnverifiedPersistedContainer()
+    {
+        var fake = new FakeContainerRuntime();
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        fake.AddRunning("unverified", Guid.NewGuid(), targetId, 19018);
+        await WriteMetadataAsync(workspace, OciMetadata(appId, targetId, "unverified", 19018, RuntimeReadinessState.Ready));
+
+        var manager = CreateManager(fake, new RunnerRuntimeRegistry(), workspace);
+        await manager.StopAsync(appId, targetId);
+
+        Assert.That(fake.Running["unverified"], Is.True);
+        await fake.StopAndRemoveAsync("unverified");
+    }
+
+    [Test]
     public async Task HistoricalCurrentWithoutOciCandidateRemainsReadableWithoutRecreation()
     {
         var fake = new FakeContainerRuntime();
@@ -364,7 +453,7 @@ public sealed class RunnerRuntimeContainerManagerTests
     private static RunnerRuntimeDeploymentMetadata OciMetadata(
         Guid appId,
         Guid targetId,
-        string containerId,
+        string? containerId,
         int port,
         string state) => new()
         {
@@ -403,11 +492,12 @@ public sealed class RunnerRuntimeContainerManagerTests
             System.Text.Json.JsonSerializer.Serialize(metadata, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
 
-    private sealed class FakeContainerRuntime : IApplicationContainerRuntime
+    private sealed class FakeContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime
     {
         public bool StartReady { get; set; } = true;
         public Dictionary<string, bool> Running { get; } = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (Guid AppId, Guid TargetId)> identities = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, DockerApplicationContainerRequest> requests = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TcpListener> listeners = new(StringComparer.Ordinal);
         private int sequence;
         public int StartCalls { get; private set; }
@@ -423,20 +513,34 @@ public sealed class RunnerRuntimeContainerManagerTests
         public Task RunBuildAsync(DockerBuildRequest request, IReadOnlyDictionary<string, string> environment, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
-        public Task<DockerApplicationContainer> StartApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
+        public Task<DockerApplicationContainer> CreateApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
         {
             StartCalls++;
             LastRequest = request;
             var id = "container-" + (++sequence);
-            Running[id] = true;
+            Running[id] = false;
             identities[id] = (request.AppId, request.DeploymentTargetId);
-            if (StartReady)
+            requests[id] = request;
+            return Task.FromResult(new DockerApplicationContainer(id, request.Name, new DockerImageIdentity(request.Image, request.Image + "@sha256:" + new string('a', 64))));
+        }
+
+        public Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+        {
+            Running[containerIdOrName] = true;
+            if (StartReady && requests.TryGetValue(containerIdOrName, out var request))
             {
                 var listener = new TcpListener(IPAddress.Loopback, request.HostPort);
                 listener.Start();
-                listeners[id] = listener;
+                listeners[containerIdOrName] = listener;
             }
-            return Task.FromResult(new DockerApplicationContainer(id, request.Name, new DockerImageIdentity(request.Image, request.Image + "@sha256:" + new string('a', 64))));
+            return Task.CompletedTask;
+        }
+
+        public async Task<DockerApplicationContainer> StartApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
+        {
+            var created = await CreateApplicationAsync(request, cancellationToken);
+            await StartApplicationAsync(created.Id, cancellationToken);
+            return created;
         }
 
         public Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
@@ -445,6 +549,7 @@ public sealed class RunnerRuntimeContainerManagerTests
             StoppedContainers.Add(containerIdOrName);
             Running[containerIdOrName] = false;
             identities.Remove(containerIdOrName);
+            requests.Remove(containerIdOrName);
             if (listeners.Remove(containerIdOrName, out var listener)) listener.Stop();
             return Task.CompletedTask;
         }

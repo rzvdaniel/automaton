@@ -70,7 +70,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             || !Guid.TryParse(metadata.DeploymentTargetId, out var targetId))
             throw new InvalidOperationException("Runtime deployment metadata contains invalid identifiers.");
 
-        var candidateIsOci = IsOciContainerMetadata(metadata.Candidate);
+        var candidateIsOci = IsOciCandidateMetadata(metadata.Candidate);
         var currentIsOci = IsOciContainerMetadata(metadata);
         if (!candidateIsOci && !currentIsOci)
             return;
@@ -78,7 +78,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         var candidate = metadata.Candidate;
         if (candidateIsOci && candidate is not null)
         {
-            var candidateIdentity = await containers.InspectAsync(candidate.ContainerId!, cancellationToken);
+            var candidateIdentity = await containers.InspectAsync(candidate.ContainerId ?? candidate.ContainerName!, cancellationToken);
             if (candidateIdentity.Exists
                 && candidateIdentity.Running
                 && HasExpectedIdentity(candidateIdentity, appId, targetId)
@@ -205,10 +205,41 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         Directory.CreateDirectory(artifact);
         var storage = workspace.PrepareApplicationStorage(appId, contract.Storage);
         var containerName = $"automaton-app-{appId:N}-{deploymentTargetId:N}-{Guid.NewGuid():N}";
+        var candidate = new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = deploymentTargetId.ToString(),
+            Runtime = contract.Runtime,
+            Health = contract.Health,
+            Storage = contract.Storage,
+            ArtifactRoot = artifact,
+            ArtifactId = Path.GetFileName(Path.GetDirectoryName(artifact) ?? artifact),
+            ContainerName = containerName,
+            RequestedRuntimeImage = runtimeImage,
+            EffectivePort = effectivePort,
+            State = RuntimeReadinessState.Starting
+        };
+        var pending = previous is null
+            ? new RunnerRuntimeDeploymentMetadata
+            {
+                AppId = appId.ToString(),
+                DeploymentTargetId = deploymentTargetId.ToString(),
+                Runtime = contract.Runtime,
+                Health = contract.Health,
+                Storage = contract.Storage,
+                State = RuntimeReadinessState.Starting
+            }
+            : CloneMetadata(previous);
+        pending.Candidate = candidate;
+        pending.State = RuntimeReadinessState.Starting;
+        await WriteMetadataAsync(pending, cancellationToken);
+
         DockerApplicationContainer? started = null;
         try
         {
-            started = await containers.StartApplicationAsync(
+            if (containers is not IStagedApplicationContainerRuntime stagedContainers)
+                throw new InvalidOperationException("Managed application lifecycle requires the staged Docker container boundary.");
+            started = await stagedContainers.CreateApplicationAsync(
                 new DockerApplicationContainerRequest(
                     containerName,
                     runtimeImage,
@@ -222,38 +253,13 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                     appId,
                     deploymentTargetId),
                 cancellationToken);
-
-            var candidate = new RunnerRuntimeDeploymentMetadata
-            {
-                AppId = appId.ToString(),
-                DeploymentTargetId = deploymentTargetId.ToString(),
-                Runtime = contract.Runtime,
-                Health = contract.Health,
-                Storage = contract.Storage,
-                ArtifactRoot = artifact,
-                ArtifactId = Path.GetFileName(Path.GetDirectoryName(artifact) ?? artifact),
-                ContainerId = started.Id,
-                ContainerName = started.Name,
-                RequestedRuntimeImage = started.Image.RequestedReference,
-                ResolvedRuntimeImage = started.Image.ResolvedReference,
-                EffectivePort = effectivePort,
-                State = RuntimeReadinessState.Starting
-            };
-            var pending = previous is null
-                ? new RunnerRuntimeDeploymentMetadata
-                {
-                    AppId = appId.ToString(),
-                    DeploymentTargetId = deploymentTargetId.ToString(),
-                    Runtime = contract.Runtime,
-                    Health = contract.Health,
-                    Storage = contract.Storage,
-                    State = RuntimeReadinessState.Starting
-                }
-                : CloneMetadata(previous);
-            pending.Candidate = candidate;
-            pending.State = RuntimeReadinessState.Starting;
+            candidate.ContainerId = started.Id;
+            candidate.ContainerName = started.Name;
+            candidate.RequestedRuntimeImage = started.Image.RequestedReference;
+            candidate.ResolvedRuntimeImage = started.Image.ResolvedReference;
             await WriteMetadataAsync(pending, cancellationToken);
 
+            await stagedContainers.StartApplicationAsync(started.Id, cancellationToken);
             await WaitForReadinessAsync(effectivePort, contract.Health, cancellationToken);
             if (!await containers.IsRunningAsync(started.Id, cancellationToken))
                 throw new InvalidOperationException("The runtime container exited after readiness and before promotion.");
@@ -276,14 +282,17 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 {
                     logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
                 }
-                try
-                {
-                    await containers.StopAndRemoveAsync(started.Id, CancellationToken.None);
-                }
-                catch (Exception cleanupError)
-                {
-                    logger.LogWarning(cleanupError, "Could not remove failed managed runtime container {ContainerId}.", started.Id);
-                }
+                var cleanupWarnings = new List<string>();
+                await TryStopOwnedContainerAsync(started.Id, appId, deploymentTargetId, cleanupWarnings, "failed runtime");
+                foreach (var warning in cleanupWarnings)
+                    logger.LogWarning("{Warning}", warning);
+            }
+            else
+            {
+                var cleanupWarnings = new List<string>();
+                await TryStopOwnedContainerAsync(candidate.ContainerName!, appId, deploymentTargetId, cleanupWarnings, "failed runtime candidate");
+                foreach (var warning in cleanupWarnings)
+                    logger.LogWarning("{Warning}", warning);
             }
             try
             {
@@ -313,9 +322,16 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         var metadata = File.Exists(metadataPath)
             ? await ReadMetadataAsync(metadataPath, CancellationToken.None)
             : null;
-        var id = current?.ContainerId ?? metadata?.ContainerId;
-        if (!string.IsNullOrWhiteSpace(id))
-            await containers.StopAndRemoveAsync(id, CancellationToken.None);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(current?.ContainerId)) ids.Add(current.ContainerId);
+        if (!string.IsNullOrWhiteSpace(metadata?.ContainerId)) ids.Add(metadata.ContainerId);
+        if (!string.IsNullOrWhiteSpace(metadata?.Candidate?.ContainerId)) ids.Add(metadata.Candidate.ContainerId);
+        if (!string.IsNullOrWhiteSpace(metadata?.Candidate?.ContainerName)) ids.Add(metadata.Candidate.ContainerName);
+        var warnings = new List<string>();
+        foreach (var id in ids)
+            await TryStopOwnedContainerAsync(id, appId, deploymentTargetId, warnings, "explicit runtime stop");
+        foreach (var warning in warnings)
+            logger.LogWarning("{Warning}", warning);
     }
 
     private async Task<string?> PromoteAsync(
@@ -359,8 +375,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         var oldRemoved = string.IsNullOrWhiteSpace(old?.ContainerId);
         if (!string.IsNullOrWhiteSpace(old?.ContainerId))
         {
-            try { await containers.StopAndRemoveAsync(old.ContainerId, CancellationToken.None); oldRemoved = true; }
-            catch (Exception ex) { warnings.Add($"Previous runtime cleanup deferred: {ex.Message}"); }
+            oldRemoved = await TryStopOwnedContainerAsync(
+                old.ContainerId,
+                appId,
+                targetId,
+                warnings,
+                "previous runtime");
             if (oldRemoved && previous?.ArtifactRoot is not null
                 && !string.Equals(previous.ArtifactRoot, candidate.ArtifactRoot, StringComparison.OrdinalIgnoreCase)
                 && Directory.Exists(previous.ArtifactRoot))
@@ -376,6 +396,42 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             warnings.Add($"Runtime metadata compaction deferred until Runner reconciliation: {ex.Message}");
         }
         return warnings.Count == 0 ? null : string.Join(" ", warnings);
+    }
+
+    private async Task<bool> TryStopOwnedContainerAsync(
+        string containerIdOrName,
+        Guid appId,
+        Guid targetId,
+        ICollection<string> warnings,
+        string description)
+    {
+        DockerContainerIdentity identity;
+        try
+        {
+            identity = await containers.InspectAsync(containerIdOrName, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"{description} cleanup deferred because ownership could not be verified for {containerIdOrName}: {ex.Message}");
+            return false;
+        }
+        if (!identity.Exists)
+            return true;
+        if (!HasExpectedIdentity(identity, appId, targetId))
+        {
+            warnings.Add($"Preserved {description} container {containerIdOrName}; Automaton ownership labels did not match.");
+            return false;
+        }
+        try
+        {
+            await containers.StopAndRemoveAsync(identity.Id, CancellationToken.None);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"{description} cleanup deferred: {ex.Message}");
+            return false;
+        }
     }
 
     private async Task SuperviseAsync(CancellationToken cancellationToken)
@@ -586,6 +642,11 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     private static bool IsOciContainerMetadata(RunnerRuntimeDeploymentMetadata? metadata)
         => metadata is not null
             && !string.IsNullOrWhiteSpace(metadata.ContainerId)
+            && !string.IsNullOrWhiteSpace(metadata.Runtime?.Image);
+
+    private static bool IsOciCandidateMetadata(RunnerRuntimeDeploymentMetadata? metadata)
+        => metadata is not null
+            && (!string.IsNullOrWhiteSpace(metadata.ContainerId) || !string.IsNullOrWhiteSpace(metadata.ContainerName))
             && !string.IsNullOrWhiteSpace(metadata.Runtime?.Image);
 
     private static ApplicationRuntimeSpec CloneRuntimeWithResolvedImage(
