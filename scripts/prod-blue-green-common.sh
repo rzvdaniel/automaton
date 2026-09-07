@@ -173,6 +173,51 @@ validate_revision() {
     }
 }
 
+resolve_production_revision() {
+    local revision="$1"
+    git -C "$REPO_ROOT" rev-parse --verify "$revision^{commit}" 2>/dev/null
+}
+
+create_production_build_context() {
+    local revision="$1"
+    local resolved_revision
+    resolved_revision="$(resolve_production_revision "$revision")" || {
+        echo "[ERROR] Git revision does not resolve to a commit: $revision" >&2
+        return 1
+    }
+
+    local context
+    context="$(mktemp -d "${TMPDIR:-/tmp}/automaton-prod-build-${resolved_revision}-XXXXXX")"
+    if ! git -C "$REPO_ROOT" archive --format=tar "$resolved_revision" | tar -xf - -C "$context"; then
+        rm -rf -- "$context"
+        echo "[ERROR] Could not create the tracked production build context for $resolved_revision." >&2
+        return 1
+    fi
+
+    printf '%s\n' "$context"
+}
+
+run_source_build() (
+    local service="$1"
+    local color="$2"
+    local revision="$3"
+    run_source_build_service "$(compose_service_name "$service" "$color")" "$revision"
+)
+
+run_source_build_service() (
+    local compose_service="$1"
+    local revision="$2"
+    shift 2
+    local compose_options=("$@")
+
+    local context
+    context="$(create_production_build_context "$revision")" || return 1
+    trap 'rm -rf -- "$context"' EXIT HUP INT TERM
+    AUTOMATON_PRODUCTION_BUILD_CONTEXT="$context" \
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" \
+        docker compose -f "$COMPOSE_FILE" up -d --build "${compose_options[@]}" "$compose_service"
+)
+
 validate_recovery_artifact_reference() {
     local service="$1"
     local reference="$2"
@@ -937,7 +982,7 @@ deploy_color() {
             return 1
         fi
         echo "[INFO] Building $compose_service as $image_name:$revision"
-        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --build "$compose_service"
+        run_source_build "$service" "$color" "$revision" || return 1
         docker tag "$image_name:$revision" "$image_name:latest"
     else
         echo "[INFO] Reusing immutable rollback image $image_name:$revision for $compose_service"

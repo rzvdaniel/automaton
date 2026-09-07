@@ -18,7 +18,7 @@ name: automaton-prod
 
 x-api-common: &api-common
   build:
-    context: .
+    context: ${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-.}
     dockerfile: docker/Dockerfile.server
   image: automaton-prod-api:${AUTOMATON_PRODUCTION_IMAGE_TAG:-latest}
   restart: unless-stopped
@@ -62,7 +62,7 @@ x-api-common: &api-common
 
 x-worker-common: &worker-common
   build:
-    context: .
+    context: ${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-.}
     dockerfile: docker/Dockerfile.worker
   image: automaton-prod-worker:latest
   restart: unless-stopped
@@ -90,7 +90,7 @@ x-worker-common: &worker-common
 
 x-studio-common: &studio-common
   build:
-    context: .
+    context: ${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-.}
     dockerfile: docker/Dockerfile.studio
     args:
       VITE_API_BASE_URL: https://${API_DOMAIN:?API_DOMAIN is required in .env}
@@ -112,7 +112,7 @@ x-studio-common: &studio-common
 
 x-website-common: &website-common
   build:
-    context: .
+    context: ${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-.}
     dockerfile: docker/Dockerfile.website
   image: automaton-prod-website:${AUTOMATON_PRODUCTION_IMAGE_TAG:-latest}
   restart: unless-stopped

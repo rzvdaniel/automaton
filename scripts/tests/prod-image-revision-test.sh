@@ -32,6 +32,10 @@ source "$REPO_ROOT/scripts/prod-blue-green-common.sh"
 PRODUCTION_REVISION="0123456789abcdef0123456789abcdef01234567"
 CUTOVER_WARMUP_SECONDS=0
 compose_calls=()
+create_production_build_context() {
+    echo "Source build context must not be created for immutable image reuse." >&2
+    return 1
+}
 docker() {
     compose_calls+=("$*")
     if [[ "$*" == image\ inspect* ]]; then
