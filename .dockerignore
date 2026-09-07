@@ -58,6 +58,13 @@ node_modules/
 .env.*
 !.env.example
 
+# Protected production state and credentials
+backups/
+secrets/
+venv/
+privatekey.xml
+publickey.xml
+
 # Temporary files
 *.tmp
 *.bak
