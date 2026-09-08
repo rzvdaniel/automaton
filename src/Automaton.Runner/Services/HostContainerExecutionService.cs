@@ -62,12 +62,10 @@ public sealed class HostContainerExecutionService
         if (request.Operation == HostContainerOperationKinds.ResolveImage)
             return await ResolveImageAsync(request, cancellationToken);
 
-        if (request.Resources is null)
-            return Failure("trusted_mapping_unavailable", "The trusted workspace/resource mapping is not enabled yet.");
+        // Stage 4B1 intentionally has no trusted resource resolver. Caller
+        // supplied identities do not establish a host mapping.
+        return Failure("trusted_mapping_unavailable", "The trusted workspace/resource mapping is not enabled yet.");
 
-        // Stage 4B1 intentionally has no workspace mapping. Rejecting an
-        // unresolved identity is safer than accepting a caller-controlled path.
-        return Failure("storage", "The trusted workspace/resource mapping is not enabled yet.");
     }
 
     private async Task<HostContainerExecutionResponse> ResolveImageAsync(

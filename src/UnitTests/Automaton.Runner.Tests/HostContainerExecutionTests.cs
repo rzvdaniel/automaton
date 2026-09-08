@@ -76,6 +76,47 @@ public sealed class HostContainerExecutionTests
     }
 
     [Test]
+    public async Task ProductionServicePathUsesDedicatedCapabilityWithoutHostExecution()
+    {
+        var invoked = false;
+        var infrastructureCommands = new InfrastructureCommandService((arguments, _, _) =>
+        {
+            invoked = true;
+            if (arguments[1] == "pull")
+                Assert.That(arguments, Is.EqualTo(new[] { "docker", "pull", "python:3.13-slim" }));
+            else
+                Assert.That(arguments, Does.Contain("inspect"));
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = "pulled" });
+        });
+        var service = new HostContainerExecutionService(infrastructureCommands);
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+            {
+                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Operation = HostContainerOperationKinds.ResolveImage,
+                RequestedImage = "python:3.13-slim"
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Success, Is.False);
+                Assert.That(result.ErrorCode, Is.EqualTo("image_digest"));
+                Assert.That(invoked, Is.True);
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    [Test]
     public async Task StorageDependentOperationFailsWithMappingError()
     {
         var service = new HostContainerExecutionService((_, _) =>
@@ -125,6 +166,35 @@ public sealed class HostContainerExecutionTests
         finally
         {
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+        }
+    }
+
+    [Test]
+    public async Task SuppliedResourceIdsDoNotEstablishTrustedMapping()
+    {
+        var service = new HostContainerExecutionService((_, _) =>
+            Task.FromResult(new InfrastructureCommandResponse { Success = true }));
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+            {
+                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Operation = HostContainerOperationKinds.CreateApplicationContainer,
+                RequestedImage = "python:3.13-slim",
+                Command = new(),
+                Resources = new("caller-workspace", "caller-artifact", "caller-data")
+            });
+
+            Assert.That(result.ErrorCode, Is.EqualTo("trusted_mapping_unavailable"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
         }
     }
 }
