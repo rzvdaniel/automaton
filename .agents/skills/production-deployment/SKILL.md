@@ -1,6 +1,6 @@
 ---
 name: production-deployment
-description: Use when changing or operating Automaton production deployment scripts, Compose, Traefik routes, certificates, health checks, blue-green cutovers, or rollback.
+description: Use when changing or operating Automaton production deployment, Runner image release/publishing, production scripts, Compose, Traefik routes, certificates, health checks, blue-green cutovers, or rollback.
 license: Apache-2.0
 ---
 
@@ -20,6 +20,24 @@ Read the current scripts and [the production cheat sheet](../../../docs/prod/pro
 - `scripts/prod-redeploy-worker.sh`
 - `scripts/prod-adopt-image-revisions.sh`
 - `scripts/prod-verify.sh`
+
+## Runner image release authority
+
+Production Runner Docker images are built and published by the repository's
+Azure DevOps pipeline, `azure-pipelines-runner-docker.yml`.
+
+Do not create a parallel production Runner build or publishing path on a
+production host or developer machine. For changes under `src/Automaton.Runner/`:
+
+1. Validate the change locally as appropriate.
+2. Merge it to the intended release revision.
+3. Let the Azure DevOps Runner pipeline build and publish the production image.
+4. Verify the exact published image digest and image-level smoke checks.
+5. Deploy or install Runners from that CI-produced artifact.
+
+A local Docker build is development validation only. It is not a production
+release artifact. Do not infer that `latest` is in use because its tag changed.
+Record and verify the immutable RepoDigest used by each deployed Runner.
 
 ## Docker maintenance
 

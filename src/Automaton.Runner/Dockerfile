@@ -48,14 +48,16 @@ RUN dotnet publish Automaton.Runner/Automaton.Runner.csproj \
 # =============================================================================
 FROM python:3.13-slim AS final
 
-# Install .NET 9 runtime dependencies
+# Install .NET 9 runtime dependencies. Docker CLI only. The Runner controls the
+# host Docker daemon through the mounted /var/run/docker.sock; it does not run
+# Docker-in-Docker.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu76 \
     libssl3 \
     ca-certificates \
     wget \
     curl \
-    docker.io \
+    docker-cli \
     util-linux \
     sudo \
     ffmpeg \
