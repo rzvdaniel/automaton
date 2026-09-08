@@ -30,6 +30,9 @@ The application contract is implemented by the CLI and Runner. Read the current 
 
 The build command is optional. A web application must declare a runtime command and the process must listen on the effective `AUTOMATON_PORT`. Actions-only or finite-work applications without an HTTP endpoint may omit the runtime command.
 
+When a Generic Runtime change requires a new Automaton.Runner image, follow the
+production-deployment skill for Runner build and release provenance.
+
 Runtime-created durable data belongs under `AUTOMATON_APP_DATA_DIR`. Build output, runtime artifacts, caches, and dependencies are disposable. Prefer structured commands and keep managed paths inside the application workspace.
 
 ## Verification

@@ -76,6 +76,11 @@ stages:
                 latest
               arguments: '--no-cache'
 
+          - script: |
+              set -eu
+              docker run --rm --entrypoint /bin/sh $(imageRepository):$(imageTag) -c 'command -v docker && docker --version'
+            displayName: 'Smoke test Docker CLI'
+
           - task: Docker@2
             displayName: 'Push Docker Image'
             inputs:

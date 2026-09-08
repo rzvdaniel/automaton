@@ -4,7 +4,12 @@ This guide covers deploying an Automaton Runner on any Linux server (Hetzner, Di
 
 ## How the Release Pipeline Works
 
-The runner is built and published automatically by `azure-pipelines-runner-docker.yml` when a git tag matching `v*` or `runner-v*` is pushed:
+The Runner is built and published by `azure-pipelines-runner-docker.yml`.
+
+The pipeline runs for relevant Runner or shared-code changes merged to `main`,
+and also for `v*` or `runner-v*` release tags. It is the production Runner
+artifact authority. Do not manually build or push a production Runner image
+from a developer machine or production host.
 
 ```bash
 git tag runner-v1.2.0
