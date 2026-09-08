@@ -13,6 +13,7 @@ public static class RunnerCapabilities
     private static readonly string[] PrivilegedCapabilities =
     [
         DockerManagement,
+        HostContainerExecution,
         HostExecution,
         HostedRunnerProvisioning,
         RouteManagement,
@@ -22,6 +23,7 @@ public static class RunnerCapabilities
     public const string ApplicationHosting = "ApplicationHosting";
     public const string WorkflowExecution = "WorkflowExecution";
     public const string DockerManagement = "DockerManagement";
+    public const string HostContainerExecution = "HostContainerExecution";
     public const string HostExecution = "HostExecution";
     public const string HostedRunnerProvisioning = "HostedRunnerProvisioning";
     public const string RouteManagement = "RouteManagement";
@@ -37,6 +39,7 @@ public static class RunnerCapabilities
                 ApplicationHosting,
                 WorkflowExecution,
                 DockerManagement,
+                HostContainerExecution,
                 HostExecution,
                 HostedRunnerProvisioning,
                 RouteManagement,

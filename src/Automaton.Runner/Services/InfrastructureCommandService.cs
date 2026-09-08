@@ -11,6 +11,19 @@ namespace Automaton.Runner.Console.Services;
 /// </summary>
 public sealed class InfrastructureCommandService
 {
+    private readonly Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> typedDockerExecutor;
+
+    public InfrastructureCommandService()
+        : this(RunTypedDockerProcessAsync)
+    {
+    }
+
+    internal InfrastructureCommandService(
+        Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> typedDockerExecutor)
+    {
+        this.typedDockerExecutor = typedDockerExecutor;
+    }
+
     private bool IsEnabled() => RunnerCapabilities.Normalize(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
@@ -79,6 +92,77 @@ public sealed class InfrastructureCommandService
         finally
         {
             process?.Dispose();
+        }
+    }
+
+    internal Task<InfrastructureCommandResponse> ExecuteTypedDockerAsync(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        if (arguments.Count == 0 || !string.Equals(arguments[0], "docker", StringComparison.Ordinal))
+            return Task.FromResult(Failure("Only typed Docker operations are supported."));
+
+        var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+        if (!string.Equals(purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal))
+            return Task.FromResult(Failure("Typed host-container execution requires an Infrastructure Runner."));
+
+        var capabilities = RunnerCapabilities.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            purpose);
+        if (!capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase))
+            return Task.FromResult(Failure("Host container execution capability is not enabled."));
+
+        return typedDockerExecutor(arguments, TimeSpan.FromSeconds(900), cancellationToken);
+    }
+
+    private static async Task<InfrastructureCommandResponse> RunTypedDockerProcessAsync(
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = arguments[0],
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+        foreach (var argument in arguments.Skip(1))
+            process.StartInfo.ArgumentList.Add(argument);
+
+        try
+        {
+            if (!process.Start())
+                return Failure("Failed to start the typed Docker process.");
+            var outputTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var errorTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            await process.WaitForExitAsync(timeoutCts.Token);
+            var output = await outputTask;
+            var error = await errorTask;
+            return new InfrastructureCommandResponse
+            {
+                Success = process.ExitCode == 0,
+                ExitStatus = process.ExitCode,
+                Output = output,
+                Error = error
+            };
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            return Failure($"Typed Docker operation timed out after {timeout.TotalSeconds:0} seconds.", 124);
+        }
+        catch (Exception exception)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            return Failure(exception.Message);
         }
     }
 
