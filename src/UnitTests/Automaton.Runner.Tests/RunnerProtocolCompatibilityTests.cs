@@ -18,6 +18,20 @@ public sealed class RunnerProtocolCompatibilityTests
     }
 
     [Test]
+    public void HostContainerExecutionIsProtocolFourAndInfrastructureOnly()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(RunnerApiCompatibilityVersions.HostContainerExecution, Is.EqualTo("4"));
+            Assert.That(RunnerApiCompatibilityVersions.Current, Is.EqualTo("4"));
+            Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+            Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                Does.Contain(RunnerCapabilities.HostContainerExecution));
+        });
+    }
+
+    [Test]
     public void HubServiceContainsTheCanonicalManagedArtifactHandlerContract()
     {
         var handler = typeof(HubService).GetMethod(

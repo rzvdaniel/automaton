@@ -82,6 +82,23 @@ public sealed class InfrastructureCommandService
         }
     }
 
+    internal Task<InfrastructureCommandResponse> ExecuteDockerAsync(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        if (arguments.Count == 0 || !string.Equals(arguments[0], "docker", StringComparison.Ordinal))
+            return Task.FromResult(Failure("Only typed Docker operations are supported."));
+
+        return ExecuteAsync(new InfrastructureCommandRequest
+        {
+            Script = string.Join(' ', arguments.Select(QuoteShellArgument)),
+            TimeoutSeconds = 900
+        }, cancellationToken);
+    }
+
+    private static string QuoteShellArgument(string value)
+        => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+
     private static InfrastructureCommandResponse Failure(string message, int exitStatus = -1)
         => new()
         {
