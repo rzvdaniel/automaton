@@ -128,6 +128,15 @@ public sealed class ManagedRunnerBootstrapService
             return ManagedRunnerBootstrapResult.Ready(runnerId);
         }
 
+        if (hostedRunner?.Status == HostedRunnerStatuses.Running &&
+            hostedRunner.Runner is { } incompatibleRunner &&
+            RunnerCapabilities.CanExecuteApplications(incompatibleRunner.CapabilitiesJson, incompatibleRunner.Purpose) &&
+            !SupportsContainerApplicationExecution(incompatibleRunner))
+        {
+            const string message = "No compatible application Runner is currently available. The assigned Hosted Runner requires an upgrade for the current Generic Runtime deployment protocol.";
+            return ManagedRunnerBootstrapResult.Unavailable(message);
+        }
+
         if (hostedRunner?.Status == HostedRunnerStatuses.Failed)
         {
             var result = ManagedRunnerBootstrapResult.ProvisionFailed(

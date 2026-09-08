@@ -100,13 +100,19 @@ public class ManagedRunnerBootstrapServiceTests
         runner.ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Legacy;
         SeedRunningHostedRunner(db, ownerId, planId, runner);
 
-        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
 
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
         Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.Not.EqualTo(AppDeployStates.PreparingManagedRuntime));
+        Assert.That(result.State, Is.Not.EqualTo(AppDeployStates.ManagedRunnerWaitingForConnection));
+        Assert.That(result.RequiresRetry, Is.False);
+        Assert.That(result.Message, Does.Contain("No compatible application Runner"));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
             Is.Null);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
     }
 
     [Test]

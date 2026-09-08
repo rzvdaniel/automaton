@@ -65,7 +65,12 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        HostedRunnerImageReference.EnsureImmutable(options.Value.DockerImage);
+        if (!HostedRunnerImageReference.IsImmutable(options.Value.DockerImage))
+        {
+            const string error = "Hosted Runner provisioning requires an immutable container image reference in the form repository@sha256:<digest>.";
+            await FailAsync(hostedRunner, deployment, error, message.CorrelationId, cancellationToken);
+            return;
+        }
 
         if (message.SecretGrantIds.Count == 0)
         {
