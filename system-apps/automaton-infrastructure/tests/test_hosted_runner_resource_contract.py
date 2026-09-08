@@ -129,6 +129,16 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         self.assertIn("max-size=10m", run)
         self.assertIn("max-file=3", run)
         self.assertNotIn("--privileged", run)
+        self.assertNotIn("--pid", run)
+        self.assertFalse("--pid=host" in run or "host" in run[run.index("--network") + 1:run.index("--network") + 2])
+        self.assertNotIn("/var/run/docker.sock", run)
+        self.assertFalse(any(
+            call[:2] == ("docker", "run") and any(
+                argument.startswith("/host:") or argument.startswith("/var/run/docker.sock:")
+                for argument in call
+            )
+            for call in calls
+        ))
         network_index = run.index("--network")
         self.assertEqual(run[network_index + 1], "automaton")
         self.assertNotEqual(run[network_index + 1], "host")
@@ -154,6 +164,12 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             4,
         )
         self.assert_resource_contract(calls)
+
+    def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls, _ = self.run_provision_action(action_key)
+                self.assert_resource_contract(calls)
 
     def test_missing_volume_responses_are_recognized_case_insensitively_by_both_actions(self):
         missing_volume_errors = [

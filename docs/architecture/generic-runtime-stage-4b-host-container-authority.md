@@ -26,10 +26,15 @@ resource identities. It does not accept Docker argument arrays, arbitrary host
 paths, arbitrary volume names, or arbitrary networks. The Stage 4B1 executor
 fails closed until the Stage 4B2 server-side workspace/resource mapping exists.
 
-The future operations are image resolution, build, application-container
-creation/start, inspection, bounded logs, and removal. They must create and
-validate Automaton ownership labels and derive networks and host paths from
-trusted server state.
+Stage 4B1 implements image resolution through the trusted host Docker boundary:
+the Infrastructure Runner pulls the requested image and returns its repository
+`RepoDigest`, never the image config ID. Other lifecycle operations are
+validated as typed requests but fail closed until Stage 4B2 supplies the
+trusted workspace/resource mapping.
+
+The future operations are build, application-container creation/start,
+inspection, bounded logs, and removal. They must create and validate Automaton
+ownership labels and derive networks and host paths from trusted server state.
 
 ## Ownership and lifecycle
 
@@ -45,6 +50,7 @@ distributed affinity changes are outside this stage.
 ## Deferred to Stage 4B2
 
 - server-derived per-Hosted-Runner workspace, artifact, and data mappings;
+- build execution and application-container lifecycle;
 - secure sibling build/runtime container mounts;
 - private-network and host-port mapping for brokered operations;
 - API/Hosted Runner dispatch wiring;

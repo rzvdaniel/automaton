@@ -17,8 +17,6 @@ public sealed record HostContainerScope(
     Guid AppId,
     Guid DeploymentTargetId);
 
-public sealed record HostedRunnerWorkspaceRef(string Id, string RelativePath);
-
 public sealed record HostContainerResourceRef(
     string WorkspaceId,
     string ArtifactId,

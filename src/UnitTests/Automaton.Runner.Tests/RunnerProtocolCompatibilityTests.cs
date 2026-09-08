@@ -1,5 +1,6 @@
 using System.Reflection;
 using Automaton.Core.Constants;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;

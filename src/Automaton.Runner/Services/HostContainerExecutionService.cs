@@ -14,7 +14,7 @@ public sealed class HostContainerExecutionService
     private readonly Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> executor;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
-        : this((arguments, cancellationToken) => infrastructureCommandService.ExecuteDockerAsync(arguments, cancellationToken))
+        : this((arguments, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, cancellationToken))
     {
     }
 
@@ -44,9 +44,6 @@ public sealed class HostContainerExecutionService
             || request.Scope.AppId == Guid.Empty || request.Scope.DeploymentTargetId == Guid.Empty)
             return Failure("scope", "A complete host-container scope is required.");
 
-        if (request.Resources is null)
-            return Failure("storage", "Trusted managed storage references are required.");
-
         if (request.Operation is not (HostContainerOperationKinds.ResolveImage
             or HostContainerOperationKinds.RunBuild
             or HostContainerOperationKinds.CreateApplicationContainer
@@ -56,15 +53,49 @@ public sealed class HostContainerExecutionService
             or HostContainerOperationKinds.RemoveContainer))
             return Failure("operation", "The host-container operation is not supported.");
 
-        if ((request.Operation is HostContainerOperationKinds.ResolveImage
-            or HostContainerOperationKinds.RunBuild
-            or HostContainerOperationKinds.CreateApplicationContainer)
-            && string.IsNullOrWhiteSpace(request.RequestedImage))
+        if (string.IsNullOrWhiteSpace(request.RequestedImage)
+            && (request.Operation is HostContainerOperationKinds.ResolveImage
+                or HostContainerOperationKinds.RunBuild
+                or HostContainerOperationKinds.CreateApplicationContainer))
             return Failure("image", "An image reference is required.");
+
+        if (request.Operation == HostContainerOperationKinds.ResolveImage)
+            return await ResolveImageAsync(request, cancellationToken);
+
+        if (request.Resources is null)
+            return Failure("trusted_mapping_unavailable", "The trusted workspace/resource mapping is not enabled yet.");
 
         // Stage 4B1 intentionally has no workspace mapping. Rejecting an
         // unresolved identity is safer than accepting a caller-controlled path.
         return Failure("storage", "The trusted workspace/resource mapping is not enabled yet.");
+    }
+
+    private async Task<HostContainerExecutionResponse> ResolveImageAsync(
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var image = request.RequestedImage!;
+        if (image.Any(char.IsWhiteSpace) || image.Contains('\0'))
+            return Failure("image", "The image reference is invalid.");
+
+        var pull = await executor(["docker", "pull", image], cancellationToken);
+        if (!pull.Success)
+            return Failure("image_pull", pull.Error);
+
+        var inspect = await executor(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image], cancellationToken);
+        if (!inspect.Success)
+            return Failure("image_inspect", inspect.Error);
+
+        var resolved = inspect.Output.Trim();
+        if (string.IsNullOrWhiteSpace(resolved) || !resolved.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+            return Failure("image_digest", "Docker did not return a repository RepoDigest.");
+
+        return new HostContainerExecutionResponse
+        {
+            Success = true,
+            RequestedImage = image,
+            ResolvedImage = resolved
+        };
     }
 
     private static HostContainerExecutionResponse Failure(string code, string error)

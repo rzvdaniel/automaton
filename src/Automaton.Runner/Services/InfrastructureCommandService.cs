@@ -82,7 +82,7 @@ public sealed class InfrastructureCommandService
         }
     }
 
-    internal Task<InfrastructureCommandResponse> ExecuteDockerAsync(
+    internal Task<InfrastructureCommandResponse> ExecuteTypedDockerAsync(
         IReadOnlyList<string> arguments,
         CancellationToken cancellationToken)
     {
