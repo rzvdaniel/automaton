@@ -2,6 +2,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
@@ -79,6 +80,8 @@ public sealed class ManagedRunnerBootstrapService
                     return ManagedRunnerBootstrapResult.Unavailable(
                         "The assigned Hosted Runner is not available for App execution.");
                 }
+
+                RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(assignedRunner);
             }
 
             return RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow)
@@ -114,6 +117,7 @@ public sealed class ManagedRunnerBootstrapService
         if (hostedRunner?.RunnerId is Guid runnerId &&
             hostedRunner.Runner is { } runner &&
             RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose) &&
+            SupportsContainerApplicationExecution(runner) &&
             RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
             var app = await dbContext.WebApps
@@ -185,6 +189,10 @@ public sealed class ManagedRunnerBootstrapService
         return ManagedRunnerBootstrapResult.Preparing(
             "Managed runtime is being prepared. Try deploying again in a moment.");
     }
+
+    private static bool SupportsContainerApplicationExecution(Runner runner)
+        => int.TryParse(runner.ApiCompatibilityVersion, out var version)
+            && version >= int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution);
 
     private async Task<ManagedRunnerBootstrapResult> GetInProgressResultAsync(
         Guid appId,

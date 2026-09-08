@@ -6,6 +6,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
+using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Http;
@@ -85,6 +86,27 @@ public class ManagedRunnerBootstrapServiceTests
 
         var refreshedTarget = await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault);
         Assert.That(refreshedTarget.ExecutionRunnerId, Is.EqualTo(runner.Id));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_DoesNotSelectProtocolOneHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        var runner = SeedConnectedRunner(db);
+        runner.ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Legacy;
+        SeedRunningHostedRunner(db, ownerId, planId, runner);
+
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
+            Is.Null);
     }
 
     [Test]
@@ -214,7 +236,8 @@ public class ManagedRunnerBootstrapServiceTests
             ConnectionId = "infrastructure-connection",
             LastHeartbeatAtUtc = DateTime.UtcNow,
             LastConnectedAtUtc = DateTime.UtcNow,
-            Status = "online"
+            Status = "online",
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.ContainerApplicationExecution
         };
         db.Runners.Add(infrastructureRunner);
         db.HostedRunners.Add(new HostedRunner
@@ -261,7 +284,8 @@ public class ManagedRunnerBootstrapServiceTests
             ConnectionId = "infrastructure-connection",
             LastHeartbeatAtUtc = DateTime.UtcNow,
             LastConnectedAtUtc = DateTime.UtcNow,
-            Status = "online"
+            Status = "online",
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.ContainerApplicationExecution
         };
         db.Runners.Add(infrastructureRunner);
         db.RunnerUsers.Add(new RunnerUser { RunnerId = infrastructureRunner.Id, UserId = ownerId });
@@ -464,10 +488,16 @@ public class ManagedRunnerBootstrapServiceTests
         {
             Id = Guid.NewGuid(),
             Name = "managed-runner",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                RunnerPurposes.Managed),
             ConnectionId = "conn-1",
             LastHeartbeatAtUtc = DateTime.UtcNow,
             LastConnectedAtUtc = DateTime.UtcNow,
-            Status = "online"
+            Status = "online",
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.ContainerApplicationExecution
         };
 
         db.Runners.Add(runner);
@@ -489,7 +519,8 @@ public class ManagedRunnerBootstrapServiceTests
             ConnectionId = "self-hosted-connection",
             LastHeartbeatAtUtc = DateTime.UtcNow,
             LastConnectedAtUtc = DateTime.UtcNow,
-            Status = "online"
+            Status = "online",
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.ContainerApplicationExecution
         };
 
         db.Runners.Add(runner);

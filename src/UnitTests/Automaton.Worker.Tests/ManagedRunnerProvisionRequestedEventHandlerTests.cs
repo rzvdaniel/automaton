@@ -74,7 +74,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             db, publisher, new RollbackTransactionalEventExecutor(db),
             new OptionsSnapshot(new HostedRunnerOptions
             {
-                Enabled = true, DockerImage = "automaton/runner:test",
+                Enabled = true, DockerImage = "automaton/runner@sha256:" + new string('a', 64),
                 DockerNetwork = "automaton-runtime", ServerUrl = "https://api.example.test"
             }),
             NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);

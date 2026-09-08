@@ -2,6 +2,7 @@ using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Automaton.Worker.Config;
@@ -63,6 +64,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             logger.LogInformation("Managed runner provisioning skipped for hosted runner {HostedRunnerId} because HostedRunners:Enabled=false", hostedRunner.Id);
             return;
         }
+
+        HostedRunnerImageReference.EnsureImmutable(options.Value.DockerImage);
 
         if (message.SecretGrantIds.Count == 0)
         {
