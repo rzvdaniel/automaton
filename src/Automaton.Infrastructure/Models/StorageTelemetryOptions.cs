@@ -9,7 +9,7 @@ public sealed class StorageTelemetryOptions
     public int CriticalStaleAfterMinutes { get; set; } = 240;
     public int AuthoritativeValidityMinutes { get; set; } = 240;
     public int ObservationRetentionDays { get; set; } = 30;
-    public long MinimumHostReserveBytes { get; set; } = 15L * 1024 * 1024 * 1024;
+    public long MinimumHostReserveBytes { get; set; } = 5L * 1024 * 1024 * 1024;
     public decimal HostReservePercent { get; set; } = 15m;
     public int InitialTelemetryGraceMinutes { get; set; } = 30;
     public int ReconciliationIntervalMinutes { get; set; } = 20;

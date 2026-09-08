@@ -23,14 +23,32 @@ public class StorageTelemetryPolicyTests
     }
 
     [Test]
-    public void RequiredHostReserve_UsesGreaterOfFifteenGiBAndFifteenPercent()
+    public void RequiredHostReserve_UsesGreaterOfFiveGiBAndFifteenPercent()
     {
         Assert.Multiple(() =>
         {
+            Assert.That(StorageTelemetryPolicy.RequiredHostReserve(20L * 1024 * 1024 * 1024),
+                Is.EqualTo(5L * 1024 * 1024 * 1024));
             Assert.That(StorageTelemetryPolicy.RequiredHostReserve(50L * 1024 * 1024 * 1024),
-                Is.EqualTo(15L * 1024 * 1024 * 1024));
+                Is.EqualTo(7.5m * 1024 * 1024 * 1024));
             Assert.That(StorageTelemetryPolicy.RequiredHostReserve(200L * 1024 * 1024 * 1024),
                 Is.EqualTo(30L * 1024 * 1024 * 1024));
+        });
+    }
+
+    [Test]
+    public void CanScheduleHostedRunners_SubtractsRequestedStorageBeforeApplyingReserve()
+    {
+        var reserve = 5L * 1024 * 1024 * 1024;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(
+                RunnerHostStorageStates.Healthy, reserve + 2L * 1024 * 1024 * 1024 - 1,
+                reserve, 2L * 1024 * 1024 * 1024), Is.False);
+            Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(
+                RunnerHostStorageStates.Healthy, reserve + 2L * 1024 * 1024 * 1024,
+                reserve, 2L * 1024 * 1024 * 1024), Is.True);
         });
     }
 
