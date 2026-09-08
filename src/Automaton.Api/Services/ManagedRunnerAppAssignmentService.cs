@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Core.Models;
+using Automaton.Core.Constants;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -86,10 +87,19 @@ public sealed class ManagedRunnerAppAssignmentService
             .ToListAsync(cancellationToken);
 
         var assignedCount = 0;
+        var runner = await dbContext.Runners.AsNoTracking()
+            .SingleAsync(x => x.Id == runnerId, cancellationToken);
+        var supportsContainerApplicationExecution = int.TryParse(runner.ApiCompatibilityVersion, out var protocol)
+            && protocol >= int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution);
         foreach (var app in apps)
         {
             var application = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
             if (application.Runtime.Command is null)
+            {
+                continue;
+            }
+
+            if (!supportsContainerApplicationExecution)
             {
                 continue;
             }

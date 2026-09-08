@@ -74,7 +74,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             db, publisher, new RollbackTransactionalEventExecutor(db),
             new OptionsSnapshot(new HostedRunnerOptions
             {
-                Enabled = true, DockerImage = "automaton/runner:test",
+                Enabled = true, DockerImage = "automaton/runner@sha256:" + new string('a', 64),
                 DockerNetwork = "automaton-runtime", ServerUrl = "https://api.example.test"
             }),
             NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
@@ -142,6 +142,70 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
 
         Assert.That(disabledDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
         Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task InvalidImageReferenceFailsProvisioningWithoutPublishingInfrastructureAction()
+    {
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(), Name = "host-1", Provider = "test",
+            InfrastructureRunnerId = Guid.NewGuid(),
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner
+        };
+        var runner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerHostId = host.Id, RunnerHost = host,
+            Name = "managed-test", ContainerName = "automaton-managed-test",
+            Status = HostedRunnerStatuses.Provisioning,
+            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                Resources = new HostedRunnerResources()
+            },
+            HostedRunnerSpecificationId = Guid.NewGuid()
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = runner.Id,
+            Action = HostedRunnerDeploymentActions.Provision,
+            Status = HostedRunnerDeploymentStatuses.Queued
+        };
+        runner.Deployments.Add(deployment);
+        db.RunnerHosts.Add(host);
+        db.HostedRunners.Add(runner);
+        await db.SaveChangesAsync();
+
+        var publisher = new RecordingPublisher();
+        var handler = new ManagedRunnerProvisionRequestedEventHandler(
+            db, publisher, new RollbackTransactionalEventExecutor(db),
+            new OptionsSnapshot(new HostedRunnerOptions
+            {
+                Enabled = true, DockerImage = "automaton/runner:latest",
+                DockerNetwork = "automaton-runtime", ServerUrl = "https://api.example.test"
+            }),
+            NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
+
+        await handler.HandleAsync(new ManagedRunnerProvisionRequestedEvent
+        {
+            OperationId = deployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = host.Id,
+            CorrelationId = "correlation"
+        });
+
+        var savedRunner = await db.HostedRunners.SingleAsync();
+        var savedDeployment = await db.HostedRunnerDeployments.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(savedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+            Assert.That(savedRunner.LastError, Does.Contain("immutable"));
+            Assert.That(savedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+            Assert.That(savedDeployment.Error, Does.Contain("immutable"));
+            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
+        });
     }
 
     private sealed class RecordingPublisher : IEventPublisher

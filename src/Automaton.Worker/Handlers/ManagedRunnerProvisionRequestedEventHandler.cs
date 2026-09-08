@@ -2,6 +2,7 @@ using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Automaton.Worker.Config;
@@ -61,6 +62,13 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         if (!options.Value.Enabled)
         {
             logger.LogInformation("Managed runner provisioning skipped for hosted runner {HostedRunnerId} because HostedRunners:Enabled=false", hostedRunner.Id);
+            return;
+        }
+
+        if (!HostedRunnerImageReference.IsImmutable(options.Value.DockerImage))
+        {
+            const string error = "Hosted Runner provisioning requires an immutable container image reference in the form repository@sha256:<digest>.";
+            await FailAsync(hostedRunner, deployment, error, message.CorrelationId, cancellationToken);
             return;
         }
 
