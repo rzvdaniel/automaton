@@ -64,6 +64,8 @@ public class HubService
     private const string HeartbeatMethod = "Heartbeat";
     private const string ReportHostedRunnerStorageMethod = "ReportHostedRunnerStorage";
     private const string ReportRunnerHostStorageMethod = "ReportRunnerHostStorage";
+    private const string RequestHostContainerExecutionMethod = "RequestHostContainerExecution";
+    private const string ExecuteHostContainerMethod = "ExecuteHostContainer";
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
     private HubConnection? connection;
@@ -77,6 +79,7 @@ public class HubService
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly RunnerDeploymentService runnerDeploymentService;
     private readonly InfrastructureCommandService infrastructureCommandService;
+    private readonly HostContainerExecutionService? hostContainerExecutionService;
     private readonly AppActionExecutionService appActionExecutionService;
     private readonly AppActionDeploymentService actionDeploymentService;
     private bool isReconnecting = false;
@@ -93,6 +96,16 @@ public class HubService
 
     public Task ReportRunnerHostStorageAsync(RunnerHostStorageTelemetry report, CancellationToken cancellationToken) =>
         InvokeTelemetryAsync(ReportRunnerHostStorageMethod, report, cancellationToken);
+
+    public async Task<HostContainerExecutionResponse> RequestHostContainerExecutionAsync(
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (connection?.State != HubConnectionState.Connected)
+            throw new InvalidOperationException("Runner is not connected to the API.");
+        return await connection.InvokeAsync<HostContainerExecutionResponse>(
+            RequestHostContainerExecutionMethod, request, cancellationToken);
+    }
 
     private async Task InvokeTelemetryAsync(string method, object report, CancellationToken cancellationToken)
     {
@@ -112,7 +125,8 @@ public class HubService
         RunnerDeploymentService runnerDeploymentService,
         InfrastructureCommandService infrastructureCommandService,
         AppActionExecutionService appActionExecutionService,
-        AppActionDeploymentService actionDeploymentService)
+        AppActionDeploymentService actionDeploymentService,
+        HostContainerExecutionService? hostContainerExecutionService = null)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -124,6 +138,7 @@ public class HubService
         this.infrastructureCommandService = infrastructureCommandService;
         this.appActionExecutionService = appActionExecutionService;
         this.actionDeploymentService = actionDeploymentService;
+        this.hostContainerExecutionService = hostContainerExecutionService;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -358,6 +373,12 @@ public class HubService
             connection.On<InfrastructureCommandRequest, InfrastructureCommandResponse>(
                 RunInfrastructureCommandMethod,
                 request => infrastructureCommandService.ExecuteAsync(request, CancellationToken.None));
+
+            connection.On<HostContainerExecutionRequest, HostContainerExecutionResponse>(
+                ExecuteHostContainerMethod,
+                request => hostContainerExecutionService is null
+                    ? Task.FromResult(new HostContainerExecutionResponse { ErrorCode = "unsupported_operation", Error = "Host-container execution is not enabled in this Runner instance." })
+                    : hostContainerExecutionService.ExecuteAsync(request, CancellationToken.None));
 
             connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
                 SynchronizeApplicationManagedArtifactsMethod,

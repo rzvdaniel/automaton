@@ -1,4 +1,6 @@
-# Generic Runtime Stage 4B1: host-container authority
+# Generic Runtime Stage 4B: host-container authority
+
+## Stage 4B1
 
 Stage 4B1 defines an additive protocol boundary for future Standard Hosted
 Runner Generic Runtime execution. It does not switch production deployments,
@@ -47,12 +49,43 @@ creation, restart/adoption, and the existing private runtime network.
 The current API-instance/SignalR ownership model remains unchanged in 4B1;
 distributed affinity changes are outside this stage.
 
-## Deferred to Stage 4B2
+## Stage 4B2a: authenticated ResolveImage relay
+
+Stage 4B2a adds a narrow authenticated request path for image resolution only:
+
+```text
+Standard Hosted Runner
+        | authenticated SignalR request
+        v
+API: bind caller, app/target, Hosted Runner and Runner Host
+        | server-derived scope
+        v
+same-host Infrastructure Runner
+        | HostContainerExecution
+        v
+host Docker daemon
+```
+
+The API selects the Infrastructure Runner from the persisted Runner Host
+association. The Hosted Runner cannot select that Runner or supply an
+authorization scope. The Infrastructure Runner must be online, protocol 4,
+and advertise `HostContainerExecution`. Only `ResolveImage` is enabled; the
+result is a Docker repository `RepoDigest`.
+
+The relay does not provide a generic Runner-to-Runner RPC mechanism, does not
+use `RunInfrastructureCommand`, and does not switch Standard Hosted runtime
+execution. The current deployment path still uses its existing runtime
+selection. The production SignalR/CAP topology continues to require one
+active `automaton.api.v1` consumer until distributed affinity is implemented.
+
+## Deferred to Stage 4B2b/4B2c
 
 - server-derived per-Hosted-Runner workspace, artifact, and data mappings;
 - build execution and application-container lifecycle;
 - secure sibling build/runtime container mounts;
 - private-network and host-port mapping for brokered operations;
-- API/Hosted Runner dispatch wiring;
+- trusted storage/workspace mapping and `RunBuild` (4B2b);
+- application-container lifecycle and `BrokeredApplicationContainerRuntime` (4B2c);
+- Standard Hosted Runner Generic Runtime switch and production rollout (4B2c);
 - migration and acceptance of Standard Hosted Runner protocol 4;
 - retirement of direct Docker execution where it is no longer needed.
