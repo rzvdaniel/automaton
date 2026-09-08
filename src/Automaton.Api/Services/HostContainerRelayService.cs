@@ -13,25 +13,30 @@ namespace Automaton.Api.Services;
 public sealed class HostContainerRelayService(
     ApplicationDbContext db,
     IHubContext<AutomatonHub> hub,
-    ILogger<HostContainerRelayService> logger)
+    ILogger<HostContainerRelayService> logger,
+    ApiInstanceIdentityService apiInstanceIdentityService)
 {
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
         RunnerDetails caller,
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken)
     {
+        if (request is null || request.Scope is null)
+            return Failure("invalid_request", "A host-container request and scope are required.");
         if (caller.Purpose != RunnerPurposes.Managed || caller.HostedRunnerId is null)
             return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
 
         var persistedRunner = await db.Runners.SingleOrDefaultAsync(x => x.Id == caller.Id, cancellationToken);
-        if (persistedRunner is null || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal))
+        if (persistedRunner is null || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal)
+            || persistedRunner.Purpose != RunnerPurposes.Managed
+            || !string.Equals(RunnerApplicationProfiles.Normalize(persistedRunner.ApplicationProfile), RunnerApplicationProfiles.Standard, StringComparison.Ordinal))
             return Failure("caller_not_managed_runner", "The caller connection is not the persisted Runner connection.");
 
         var hosted = await db.HostedRunners.Include(x => x.RunnerHost)
             .SingleOrDefaultAsync(x => x.Id == caller.HostedRunnerId && x.RunnerId == caller.Id && x.DeletedAt == null, cancellationToken);
         if (hosted?.RunnerHostId is not Guid hostId || hosted.RunnerHost is null)
             return Failure("hosted_runner_binding_mismatch", "The Hosted Runner is not bound to a Runner Host.");
-        if (caller.RunnerHostId is Guid callerHostId && callerHostId != hostId)
+        if (caller.RunnerHostId is not Guid callerHostId || callerHostId != hostId)
             return Failure("runner_host_binding_mismatch", "The caller Runner Host does not match persisted state.");
         if (request.Scope.HostedRunnerId != Guid.Empty && request.Scope.HostedRunnerId != hosted.Id)
             return Failure("hosted_runner_binding_mismatch", "The requested Hosted Runner does not match persisted state.");
@@ -39,8 +44,10 @@ public sealed class HostContainerRelayService(
             return Failure("runner_host_binding_mismatch", "The requested Runner Host does not match persisted state.");
         if (request.Operation != HostContainerOperationKinds.ResolveImage)
             return Failure("unsupported_operation", "Stage 4B2a supports ResolveImage only.");
+        if (string.IsNullOrWhiteSpace(request.RequestedImage))
+            return Failure("invalid_request", "ResolveImage requires an image reference.");
         if (request.Resources is not null || request.ContainerId is not null || request.Command is not null
-            || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment.Count != 0)
+            || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment is null || request.Environment.Count != 0)
             return Failure("unsupported_operation", "ResolveImage does not accept container execution inputs.");
 
         var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
@@ -63,6 +70,8 @@ public sealed class HostContainerRelayService(
             return Failure("host_container_protocol_unsupported", "The Infrastructure Runner does not support protocol 4.");
         if (!RunnerCapabilities.Includes(infrastructure.CapabilitiesJson, RunnerCapabilities.HostContainerExecution, infrastructure.Purpose))
             return Failure("host_container_capability_missing", "The Infrastructure Runner lacks HostContainerExecution capability.");
+        if (!RuntimeTunnelService.IsCurrentApiInstance(infrastructure.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId))
+            return Failure("infrastructure_runner_wrong_api_instance", "The Infrastructure Runner is connected to another API instance.");
 
         var forwarded = request with
         {
