@@ -193,7 +193,7 @@ public sealed class HostContainerRelayServiceTests
 
         var wrongOperation = fixture.Request() with { Operation = HostContainerOperationKinds.RunBuild };
         Assert.That((await fixture.Service.ExecuteAsync(fixture.Caller(), wrongOperation, CancellationToken.None)).ErrorCode,
-            Is.EqualTo("unsupported_operation"));
+            Is.EqualTo("invalid_request"));
 
         var emptyImage = fixture.Request() with { RequestedImage = " " };
         Assert.That((await fixture.Service.ExecuteAsync(fixture.Caller(), emptyImage, CancellationToken.None)).ErrorCode,
@@ -219,6 +219,31 @@ public sealed class HostContainerRelayServiceTests
         var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
         Assert.That(result.ErrorCode, Is.EqualTo("host_container_protocol_unsupported"));
         Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task RunBuildDerivesTrustedResourceKindsAndPreservesBuildSemantics()
+    {
+        using var fixture = RelayFixture.Create();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), new HostContainerExecutionRequest
+        {
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "dotnet/sdk:9.0",
+            Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
+            Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id)
+        }, CancellationToken.None);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(fixture.Transport.Request, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Transport.Request!.Resources!.SourceKind, Is.EqualTo(HostContainerResourceKinds.Source));
+            Assert.That(fixture.Transport.Request.Resources.ArtifactKind, Is.EqualTo(HostContainerResourceKinds.Artifact));
+            Assert.That(fixture.Transport.Request.Resources.DataKind, Is.EqualTo(HostContainerResourceKinds.ApplicationData));
+            Assert.That(fixture.Transport.Request.Command!.Executable, Is.EqualTo("dotnet"));
+            Assert.That(fixture.Transport.Request.Environment["BUILD_MODE"], Is.EqualTo("release"));
+        });
     }
 
     private sealed class RelayFixture : IDisposable
