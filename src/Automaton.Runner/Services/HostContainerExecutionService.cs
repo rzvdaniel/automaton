@@ -114,7 +114,10 @@ public sealed class HostContainerExecutionService
             || !ContainsLabel(labels.Output, "automaton.storage-scope", "user"))
             return Failure("trusted_storage", "The Hosted Runner user volume is missing or has invalid ownership labels.");
 
-        var relativeTarget = $"generic-runtime/apps/{scope.AppId:N}/targets/{scope.DeploymentTargetId:N}";
+        var attempt = scope.DeploymentAttemptId;
+        if (attempt == Guid.Empty)
+            return Failure("trusted_mapping_unavailable", "A server-issued deployment attempt is required.");
+        var relativeTarget = $"workspace/runner/deployments/{scope.AppId:N}/{scope.DeploymentTargetId:N}/{attempt:N}";
         var source = $"{relativeTarget}/source";
         var artifact = $"{relativeTarget}/artifact";
         var operationId = Guid.NewGuid().ToString("N");
@@ -136,21 +139,51 @@ public sealed class HostContainerExecutionService
         if (!image.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
             return Failure("image_digest", "Docker did not return a repository RepoDigest.");
 
-        var args = new List<string> { "run", "--rm", "--name", container, "--network", "bridge",
+        var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "none",
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
             "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
             "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}",
             "--label", $"automaton.app-id={scope.AppId:N}",
             "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",
+            // This is the isolated incoming attempt workspace, not the
+            // durable accepted source. Build tools may write generated files
+            // here; promotion remains owned by RunnerDeploymentService.
             "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}",
             "--mount", $"type=volume,source={volume},target=/automaton/artifact,volume-subpath={artifact}" };
+        var command = request.Command!;
+        if (!string.IsNullOrWhiteSpace(command.WorkingDirectory))
+        {
+            var workingDirectory = command.WorkingDirectory.Replace('\\', '/').Trim('/');
+            if (workingDirectory.Contains("..", StringComparison.Ordinal) || workingDirectory.StartsWith('/'))
+                return Failure("command", "The build working directory must remain inside the source workspace.");
+            args.Add("--workdir");
+            args.Add(string.IsNullOrEmpty(workingDirectory) || workingDirectory == "."
+                ? "/automaton/source"
+                : $"/automaton/source/{workingDirectory}");
+        }
+        var environment = new Dictionary<string, string>(command.Environment, StringComparer.Ordinal);
         foreach (var pair in request.Environment)
+            environment[pair.Key] = pair.Value;
+        foreach (var pair in environment)
         { args.Add("--env"); args.Add($"{pair.Key}={pair.Value}"); }
         args.Add(image);
-        args.Add(request.Command!.Executable);
-        args.AddRange(request.Command.Arguments);
-        var result = await executor(args, cancellationToken);
+        if (string.IsNullOrWhiteSpace(command.Executable))
+            return Failure("command", "The build executable is required.");
+        if (command.UseShell)
+        {
+            args.Add("/bin/sh");
+            args.Add("-lc");
+            args.Add(string.Join(" ", new[] { command.Executable }.Concat(command.Arguments).Select(ShellQuote)));
+        }
+        else
+        {
+            args.Add(command.Executable);
+            args.AddRange(command.Arguments);
+        }
+        using var buildTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        buildTimeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(request.TimeoutSeconds, 1, 86_400)));
+        var result = await executor(args, buildTimeout.Token);
         return result.Success
             ? new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container }
             : Failure("build_failed", result.Error);
@@ -165,6 +198,9 @@ public sealed class HostContainerExecutionService
     private static bool ContainsLabel(string json, string key, string value)
         => json.Contains($"\"{key}\":\"{value}\"", StringComparison.Ordinal)
             || json.Contains($"\"{key}\": \"{value}\"", StringComparison.Ordinal);
+
+    private static string ShellQuote(string value)
+        => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
     private static HostContainerExecutionResponse Failure(string code, string error)
         => new() { ErrorCode = code, Error = error };

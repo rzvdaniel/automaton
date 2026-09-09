@@ -163,7 +163,7 @@ public sealed class HostContainerExecutionTests
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
         try
         {
-            var scope = new HostContainerScope(hostedId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+            var scope = new HostContainerScope(hostedId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
@@ -179,10 +179,48 @@ public sealed class HostContainerExecutionTests
             Assert.That(result.Success, Is.True);
             Assert.That(commands.Any(x => x.Contains("volume") && x.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")), Is.True);
             var build = string.Join(' ', commands.Single(x => string.Join(' ', x).Contains("runtime-kind=build")));
-            Assert.That(build, Does.Contain("volume-subpath=generic-runtime/apps/"));
+            Assert.That(build, Does.Contain("volume-subpath=workspace/runner/deployments/"));
             Assert.That(build, Does.Contain("--cap-drop"));
+            Assert.That(build, Does.Not.Contain("readonly"));
             Assert.That(build, Does.Not.Contain("/var/run/docker.sock"));
             Assert.That(build, Does.Not.Contain("/host"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    [Test]
+    public async Task ProductionTypedDockerPathReceivesDockerPrefixedRunBuild()
+    {
+        var calls = new List<IReadOnlyList<string>>();
+        var infrastructure = new InfrastructureCommandService((arguments, _, _) =>
+        {
+            calls.Add(arguments);
+            var output = arguments.Contains("volume")
+                ? "{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"00000000-0000-0000-0000-000000000001\",\"automaton.storage-scope\":\"user\"}"
+                : arguments.Contains("image") ? "example/build:1@sha256:abc" : "";
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
+        });
+        var service = new HostContainerExecutionService(infrastructure);
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            await service.ExecuteAsync(new HostContainerExecutionRequest
+            {
+                Scope = new(Guid.Parse("00000000-0000-0000-0000-000000000001"), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Operation = HostContainerOperationKinds.RunBuild,
+                RequestedImage = "example/build:1",
+                Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+                Command = new() { Executable = "build" }
+            });
+
+            Assert.That(calls.Any(call => call.Count > 1 && call[0] == "docker" && call[1] == "run"), Is.True);
         }
         finally
         {

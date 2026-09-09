@@ -22,7 +22,8 @@ public sealed record HostContainerScope(
     Guid HostedRunnerId,
     Guid RunnerHostId,
     Guid AppId,
-    Guid DeploymentTargetId);
+    Guid DeploymentTargetId,
+    Guid DeploymentAttemptId = default);
 
 public sealed record HostContainerResourceRef(
     string SourceKind,

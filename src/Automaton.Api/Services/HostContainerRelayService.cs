@@ -53,6 +53,9 @@ public sealed class HostContainerRelayService(
             && (request.Command is null || request.Resources is not null || request.ContainerId is not null
                 || request.HostPort != 0 || request.ContainerPort != 0))
             return Failure("invalid_request", "RunBuild requires a command and server-derived resources.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && request.Scope.DeploymentAttemptId == Guid.Empty)
+            return Failure("invalid_request", "RunBuild requires a server-issued deployment attempt.");
 
         var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
             x => x.Id == request.Scope.DeploymentTargetId && x.WebAppId == request.Scope.AppId,
@@ -61,6 +64,9 @@ public sealed class HostContainerRelayService(
             return Failure("deployment_target_mismatch", "The deployment target was not found for the application.");
         if (target.ExecutionRunnerId != caller.Id)
             return Failure("app_assignment_mismatch", "The target is not assigned to the authenticated Hosted Runner.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && target.ActiveDeploymentExecutionAttemptId != request.Scope.DeploymentAttemptId)
+            return Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt.");
 
         var infrastructure = await db.Runners.SingleOrDefaultAsync(
             x => x.Id == hosted.RunnerHost.InfrastructureRunnerId,
@@ -79,7 +85,7 @@ public sealed class HostContainerRelayService(
 
         var forwarded = request with
         {
-            Scope = new HostContainerScope(hosted.Id, hostId, target.WebAppId, target.Id),
+            Scope = new HostContainerScope(hosted.Id, hostId, target.WebAppId, target.Id, request.Scope.DeploymentAttemptId),
             Resources = request.Operation == HostContainerOperationKinds.RunBuild
                 ? new HostContainerResourceRef(
                     HostContainerResourceKinds.Source,

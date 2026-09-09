@@ -79,7 +79,7 @@ public class RunnerDeploymentService
         var appId = request.AppId;
         var deploymentTargetId = request.DeploymentTargetId;
         var tempExtractRoot = runnerWorkspaceService.GetDeploymentStagingDirectory(
-            appId, deploymentTargetId, Guid.NewGuid());
+            appId, deploymentTargetId, request.ExecutionAttemptId ?? Guid.NewGuid());
         string? snapshotPath = null;
         string? candidateRuntimeRoot = null;
         var candidatePromoted = false;

@@ -96,8 +96,10 @@ and uses the deterministic layout:
   data/
 ```
 
-The build container receives only the source subpath read-only and artifact
-subpath read-write through Docker volume mounts. It has `no-new-privileges`,
+The build container receives only the per-attempt incoming source subpath
+read-write and the artifact subpath read-write through Docker volume mounts.
+The incoming source is isolated by the trusted execution-attempt directory; it
+is not the accepted durable source. It has `no-new-privileges`,
 all capabilities dropped, no Docker socket, no `/host`, and no access to the
 entire Hosted Runner volume. Build containers are labeled with the trusted
 scope and are ephemeral; cleanup never removes source, artifact, data, or the

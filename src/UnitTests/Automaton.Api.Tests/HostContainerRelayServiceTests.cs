@@ -225,13 +225,15 @@ public sealed class HostContainerRelayServiceTests
     public async Task RunBuildDerivesTrustedResourceKindsAndPreservesBuildSemantics()
     {
         using var fixture = RelayFixture.Create();
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
         var result = await fixture.Service.ExecuteAsync(fixture.Caller(), new HostContainerExecutionRequest
         {
             Operation = HostContainerOperationKinds.RunBuild,
             RequestedImage = "dotnet/sdk:9.0",
             Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
             Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
-            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id)
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
         }, CancellationToken.None);
 
         Assert.That(result.Success, Is.True);
