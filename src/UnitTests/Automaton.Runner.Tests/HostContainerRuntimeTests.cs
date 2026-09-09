@@ -196,6 +196,8 @@ public sealed class HostContainerRuntimeTests
         }).ExecuteAsync(Operation(HostContainerOperationKinds.StartContainer));
         Assert.That(result.Success, Is.True, result.Error);
         Assert.That(calls.Select(call => call[1]), Is.EqualTo(new[] { "container", "start", "container" }));
+        Assert.That(calls[2].Last(), Is.EqualTo(ContainerId));
+        Assert.That(calls[2], Does.Not.Contain("candidate-name"));
         Assert.That(result.Running, Is.True);
         Assert.That(result.HostPort, Is.EqualTo(49152));
     }

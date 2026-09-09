@@ -114,7 +114,7 @@ public sealed partial class HostContainerExecutionService
         }
         if (request.Operation == HostContainerOperationKinds.RemoveContainer)
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
-        var postStart = await InspectOwnedContainerAsync(request.ContainerId!, request.Scope, cancellationToken, discoverEndpoint: true);
+        var postStart = await InspectOwnedContainerAsync(inspection.ContainerId, request.Scope, cancellationToken, discoverEndpoint: true);
         if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)
             return Failure("container_start_endpoint", "The application container started without a valid running private endpoint.") with
             {
