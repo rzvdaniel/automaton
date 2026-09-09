@@ -1,5 +1,4 @@
 using Automaton.Api.Data;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
@@ -12,7 +11,7 @@ namespace Automaton.Api.Services;
 /// <summary>Authenticated Stage 4B2a relay; ResolveImage is the only enabled operation.</summary>
 public sealed class HostContainerRelayService(
     ApplicationDbContext db,
-    IHubContext<AutomatonHub> hub,
+    IHostContainerTransport transport,
     ILogger<HostContainerRelayService> logger,
     ApiInstanceIdentityService apiInstanceIdentityService)
 {
@@ -29,7 +28,7 @@ public sealed class HostContainerRelayService(
         var persistedRunner = await db.Runners.SingleOrDefaultAsync(x => x.Id == caller.Id, cancellationToken);
         if (persistedRunner is null || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal)
             || persistedRunner.Purpose != RunnerPurposes.Managed
-            || !string.Equals(RunnerApplicationProfiles.Normalize(persistedRunner.ApplicationProfile), RunnerApplicationProfiles.Standard, StringComparison.Ordinal))
+            || !string.Equals(persistedRunner.ApplicationProfile, RunnerApplicationProfiles.Standard, StringComparison.OrdinalIgnoreCase))
             return Failure("caller_not_managed_runner", "The caller connection is not the persisted Runner connection.");
 
         var hosted = await db.HostedRunners.Include(x => x.RunnerHost)
@@ -85,8 +84,7 @@ public sealed class HostContainerRelayService(
         };
         try
         {
-            return await hub.Clients.Client(infrastructure.ConnectionId!)
-                .InvokeAsync<HostContainerExecutionResponse>(AutomatonHubMethods.ExecuteHostContainer, forwarded, cancellationToken);
+            return await transport.ExecuteAsync(infrastructure.ConnectionId!, forwarded, cancellationToken);
         }
         catch (Exception ex)
         {

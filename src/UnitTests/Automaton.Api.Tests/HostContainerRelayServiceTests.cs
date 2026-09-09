@@ -1,0 +1,173 @@
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Hubs;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Core.Constants;
+using Automaton.Core.Enums;
+using Automaton.Core.Models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using NUnit.Framework;
+
+namespace Automaton.Api.Tests;
+
+[TestFixture]
+public sealed class HostContainerRelayServiceTests
+{
+    [Test]
+    public async Task ResolveImage_BindsPersistedStandardHostedRunnerAndForwardsTrustedScope()
+    {
+        using var fixture = RelayFixture.Create();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+
+        Assert.That(result.Success, Is.True, $"{result.ErrorCode}: {result.Error}");
+        Assert.That(fixture.Transport.ConnectionId, Is.EqualTo("infra-connection"));
+        Assert.That(fixture.Transport.Method, Is.EqualTo(AutomatonHubMethods.ExecuteHostContainer));
+        Assert.That(fixture.Transport.Request!.Scope, Is.EqualTo(new HostContainerScope(
+            fixture.HostedRunner.Id, fixture.Host.Id, fixture.App.Id, fixture.Target.Id)));
+        Assert.That(fixture.Transport.Request.RequestedImage, Is.EqualTo("python:3.13-slim"));
+        Assert.That(fixture.Transport.Request.Resources, Is.Null);
+        Assert.That(fixture.Transport.Request.Command, Is.Null);
+        Assert.That(fixture.Transport.Request.ContainerId, Is.Null);
+        Assert.That(fixture.Transport.Request.HostPort, Is.Zero);
+        Assert.That(fixture.Transport.Request.ContainerPort, Is.Zero);
+        Assert.That(fixture.Transport.Request.Environment, Is.Empty);
+    }
+
+    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard, "caller_not_managed_runner")]
+    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, "caller_not_managed_runner")]
+    [TestCase(RunnerPurposes.Managed, null, "caller_not_managed_runner")]
+    public async Task ResolveImage_UsesPersistedCallerProfile(string purpose, string? profile, string code)
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.HostedRunner.Runner!.Purpose = purpose;
+        fixture.HostedRunner.Runner.ApplicationProfile = profile;
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo(code));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsMissingOrWrongRunnerHostIdentity()
+    {
+        using var fixture = RelayFixture.Create();
+        var missing = fixture.Caller();
+        missing.RunnerHostId = null;
+        Assert.That((await fixture.Service.ExecuteAsync(missing, fixture.Request(), CancellationToken.None)).ErrorCode,
+            Is.EqualTo("runner_host_binding_mismatch"));
+
+        var wrong = fixture.Caller();
+        wrong.RunnerHostId = Guid.NewGuid();
+        Assert.That((await fixture.Service.ExecuteAsync(wrong, fixture.Request(), CancellationToken.None)).ErrorCode,
+            Is.EqualTo("runner_host_binding_mismatch"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsWrongScopeAndMalformedShape()
+    {
+        using var fixture = RelayFixture.Create();
+        var wrongHost = fixture.Request() with { Scope = new HostContainerScope(Guid.NewGuid(), fixture.Host.Id, fixture.App.Id, fixture.Target.Id) };
+        Assert.That((await fixture.Service.ExecuteAsync(fixture.Caller(), wrongHost, CancellationToken.None)).ErrorCode,
+            Is.EqualTo("hosted_runner_binding_mismatch"));
+
+        var wrongOperation = fixture.Request() with { Operation = HostContainerOperationKinds.RunBuild };
+        Assert.That((await fixture.Service.ExecuteAsync(fixture.Caller(), wrongOperation, CancellationToken.None)).ErrorCode,
+            Is.EqualTo("unsupported_operation"));
+
+        var emptyImage = fixture.Request() with { RequestedImage = " " };
+        Assert.That((await fixture.Service.ExecuteAsync(fixture.Caller(), emptyImage, CancellationToken.None)).ErrorCode,
+            Is.EqualTo("invalid_request"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsNonCurrentInfrastructureApiInstance()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.Infrastructure.ApiInstanceId = "other-api";
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("infrastructure_runner_wrong_api_instance"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsUnsupportedInfrastructureRunner()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.Infrastructure.ApiCompatibilityVersion = "3";
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("host_container_protocol_unsupported"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    private sealed class RelayFixture : IDisposable
+    {
+        public ApplicationDbContext Db { get; }
+        public HostContainerRelayService Service { get; }
+        public RecordingTransport Transport { get; } = new();
+        public Runner HostedRunnerEntity { get; }
+        public HostedRunner HostedRunner { get; }
+        public RunnerHost Host { get; }
+        public Runner Infrastructure { get; }
+        public WebApp App { get; }
+        public AppDeploymentTarget Target { get; }
+        public Guid CallerRunnerId { get; } = Guid.NewGuid();
+
+        private RelayFixture()
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID", "api-current");
+            Db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+            Host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() };
+            Infrastructure = new Runner
+            {
+                Id = Host.InfrastructureRunnerId.Value, Name = "infra", Purpose = RunnerPurposes.Infrastructure,
+                ConnectionId = "infra-connection", LastHeartbeatAtUtc = DateTime.UtcNow,
+                ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
+                CapabilitiesJson = "[\"HostContainerExecution\"]", ApiInstanceId = "api-current"
+            };
+            HostedRunnerEntity = new Runner
+            {
+                Id = CallerRunnerId, Name = "hosted", Purpose = RunnerPurposes.Managed,
+                ApplicationProfile = RunnerApplicationProfiles.Standard, ConnectionId = "hosted-connection",
+                LastHeartbeatAtUtc = DateTime.UtcNow
+            };
+            HostedRunner = new HostedRunner { Id = Guid.NewGuid(), RunnerId = CallerRunnerId, Runner = HostedRunnerEntity, RunnerHostId = Host.Id, RunnerHost = Host, Name = "hosted", ContainerName = "hosted", UserId = Guid.NewGuid() };
+            App = new WebApp { Id = Guid.NewGuid(), Name = "app", Summary = "", Description = "", Definition = "" };
+            Target = AppDeploymentTarget.CreateLive(App.Id, CallerRunnerId);
+            Db.RunnerHosts.Add(Host);
+            Db.Runners.AddRange(HostedRunnerEntity, Infrastructure);
+            Db.HostedRunners.Add(HostedRunner);
+            Db.WebApps.Add(App);
+            Db.AppDeploymentTargets.Add(Target);
+            Db.SaveChanges();
+            Transport.Result = new HostContainerExecutionResponse { Success = true, ResolvedImage = "python@sha256:test" };
+            Service = new HostContainerRelayService(Db, Transport, NullLogger<HostContainerRelayService>.Instance, new ApiInstanceIdentityService());
+        }
+
+        public static RelayFixture Create() => new();
+        public RunnerDetails Caller() => new() { Id = CallerRunnerId, ConnectionId = "hosted-connection", Purpose = RunnerPurposes.Managed, HostedRunnerId = HostedRunner.Id, RunnerHostId = Host.Id };
+        public HostContainerExecutionRequest Request() => new() { Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "python:3.13-slim", Scope = new HostContainerScope(Guid.Empty, Guid.Empty, App.Id, Target.Id) };
+        public void Dispose() => Db.Dispose();
+    }
+
+    private sealed class RecordingTransport : IHostContainerTransport
+    {
+        public string? ConnectionId { get; private set; }
+        public string? Method { get; private set; }
+        public HostContainerExecutionRequest? Request { get; private set; }
+        public int Invocations { get; private set; }
+        public HostContainerExecutionResponse Result { get; set; } = new();
+        public Task<HostContainerExecutionResponse> ExecuteAsync(string connectionId, HostContainerExecutionRequest request, CancellationToken cancellationToken)
+        {
+            ConnectionId = connectionId;
+            Method = AutomatonHubMethods.ExecuteHostContainer;
+            Request = request;
+            Invocations++;
+            return Task.FromResult(Result);
+        }
+    }
+}

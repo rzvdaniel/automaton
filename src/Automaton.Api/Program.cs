@@ -465,6 +465,7 @@ services.AddScoped<AdminDocumentationService>();
 services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
 services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
 services.AddScoped<HostContainerRelayService>();
+services.AddScoped<IHostContainerTransport, SignalRHostContainerTransport>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
 services.AddScoped<HostedRunnerManagementService>();
