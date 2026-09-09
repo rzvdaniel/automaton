@@ -121,7 +121,7 @@ public sealed class HostContainerExecutionService
         var attempt = scope.DeploymentAttemptId;
         if (attempt == Guid.Empty)
             return Failure("trusted_mapping_unavailable", "A server-issued deployment attempt is required.");
-        var relativeTarget = RunnerWorkspaceService.GetDeploymentStagingRelativePath(scope.AppId, scope.DeploymentTargetId, attempt);
+        var relativeTarget = RunnerWorkspaceService.GetDeploymentStagingVolumeSubpath(scope.AppId, scope.DeploymentTargetId, attempt);
         var source = $"{relativeTarget}/source";
         var operationId = Guid.NewGuid().ToString("N");
         var container = $"automaton-build-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{operationId}";

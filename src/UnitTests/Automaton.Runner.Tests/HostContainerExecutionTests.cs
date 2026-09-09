@@ -179,7 +179,9 @@ public sealed class HostContainerExecutionTests
             Assert.That(result.Success, Is.True);
             Assert.That(commands.Any(x => x.Contains("volume") && x.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")), Is.True);
             var build = string.Join(' ', commands.Single(x => string.Join(' ', x).Contains("runtime-kind=build")));
-            Assert.That(build, Does.Contain("volume-subpath=runner/deployments/"));
+            Assert.That(build, Does.Contain("volume-subpath=workspace/runner/deployments/"));
+            Assert.That(build, Does.Contain(
+                $"volume-subpath=workspace/runner/deployments/{scope.AppId:D}/{scope.DeploymentTargetId:D}/{scope.DeploymentAttemptId:D}/source"));
             Assert.That(build, Does.Contain("--cap-drop"));
             Assert.That(build, Does.Not.Contain("readonly"));
             Assert.That(build, Does.Not.Contain("/var/run/docker.sock"));
@@ -300,6 +302,8 @@ public sealed class HostContainerExecutionTests
             var relative = Path.GetRelativePath(workspace.WorkspaceRoot, Path.Combine(staging, "source"));
             Assert.That(relative.Replace('\\', '/'), Is.EqualTo(
                 $"runner/deployments/{appId:D}/{targetId:D}/{attemptId:D}/source"));
+            Assert.That(RunnerWorkspaceService.GetDeploymentStagingVolumeSubpath(appId, targetId, attemptId), Is.EqualTo(
+                $"workspace/runner/deployments/{appId:D}/{targetId:D}/{attemptId:D}"));
         }
         finally
         {
