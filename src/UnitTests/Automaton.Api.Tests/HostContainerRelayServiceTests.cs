@@ -66,6 +66,124 @@ public sealed class HostContainerRelayServiceTests
     }
 
     [Test]
+    public async Task ResolveImage_RejectsStaleCallerConnection()
+    {
+        using var fixture = RelayFixture.Create();
+        var caller = fixture.Caller();
+        caller.ConnectionId = "stale-connection";
+        var result = await fixture.Service.ExecuteAsync(caller, fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("caller_not_managed_runner"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public async Task ResolveImage_RejectsInvalidHostedRunnerAssociation(bool missing, bool deleted, bool pointsElsewhere)
+    {
+        using var fixture = RelayFixture.Create();
+        if (missing) fixture.Db.HostedRunners.Remove(fixture.HostedRunner);
+        if (deleted) fixture.HostedRunner.DeletedAt = DateTime.UtcNow;
+        if (pointsElsewhere) fixture.HostedRunner.RunnerId = Guid.NewGuid();
+        await fixture.Db.SaveChangesAsync();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("hosted_runner_binding_mismatch"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [TestCase(false, "deployment_target_mismatch")]
+    [TestCase(true, "app_assignment_mismatch")]
+    public async Task ResolveImage_RejectsMissingOrUnassignedTarget(bool unassigned, string expectedCode)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.Request() with
+        {
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id,
+                unassigned ? fixture.Target.Id : Guid.NewGuid())
+        };
+        if (unassigned)
+        {
+            fixture.Target.ExecutionRunnerId = null;
+            await fixture.Db.SaveChangesAsync();
+        }
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), request, CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo(expectedCode));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsTargetBelongingToAnotherApp()
+    {
+        using var fixture = RelayFixture.Create();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request() with
+        {
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, Guid.NewGuid(), fixture.Target.Id)
+        }, CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("deployment_target_mismatch"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [TestCase(false, "infrastructure_runner_missing")]
+    [TestCase(true, "infrastructure_runner_offline")]
+    [TestCase(true, "host_container_capability_missing")]
+    public async Task ResolveImage_RejectsUnavailableInfrastructureRunner(bool configured, string expectedCode)
+    {
+        using var fixture = RelayFixture.Create();
+        if (!configured) fixture.Host.InfrastructureRunnerId = null;
+        else if (expectedCode == "infrastructure_runner_offline") fixture.Infrastructure.LastHeartbeatAtUtc = DateTime.UtcNow.AddMinutes(-10);
+        else fixture.Infrastructure.CapabilitiesJson = "[\"ApplicationHosting\"]";
+        await fixture.Db.SaveChangesAsync();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo(expectedCode));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_ReturnsStableFailureWhenTransportThrows()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.Transport.Throw = true;
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("infrastructure_transport_failure"));
+        Assert.That(fixture.Transport.Invocations, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsCallerSuppliedRunnerHostScope()
+    {
+        using var fixture = RelayFixture.Create();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request() with
+        {
+            Scope = new HostContainerScope(Guid.Empty, Guid.NewGuid(), fixture.App.Id, fixture.Target.Id)
+        }, CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("runner_host_binding_mismatch"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [TestCase("resources")]
+    [TestCase("container")]
+    [TestCase("command")]
+    [TestCase("host-port")]
+    [TestCase("container-port")]
+    [TestCase("environment")]
+    public async Task ResolveImage_RejectsExecutionOnlyInputs(string shape)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.Request();
+        request = shape switch
+        {
+            "resources" => request with { Resources = new HostContainerResourceRef("w", "a", "d") },
+            "container" => request with { ContainerId = "container" },
+            "command" => request with { Command = new ApplicationCommandSpec { Executable = "run" } },
+            "host-port" => request with { HostPort = 8080 },
+            "container-port" => request with { ContainerPort = 8080 },
+            _ => request with { Environment = new Dictionary<string, string> { ["X"] = "Y" } }
+        };
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), request, CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("unsupported_operation"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
     public async Task ResolveImage_RejectsWrongScopeAndMalformedShape()
     {
         using var fixture = RelayFixture.Create();
@@ -115,9 +233,11 @@ public sealed class HostContainerRelayServiceTests
         public WebApp App { get; }
         public AppDeploymentTarget Target { get; }
         public Guid CallerRunnerId { get; } = Guid.NewGuid();
+        private readonly string? previousApiInstanceId;
 
         private RelayFixture()
         {
+            previousApiInstanceId = Environment.GetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID");
             Environment.SetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID", "api-current");
             Db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
@@ -151,7 +271,11 @@ public sealed class HostContainerRelayServiceTests
         public static RelayFixture Create() => new();
         public RunnerDetails Caller() => new() { Id = CallerRunnerId, ConnectionId = "hosted-connection", Purpose = RunnerPurposes.Managed, HostedRunnerId = HostedRunner.Id, RunnerHostId = Host.Id };
         public HostContainerExecutionRequest Request() => new() { Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "python:3.13-slim", Scope = new HostContainerScope(Guid.Empty, Guid.Empty, App.Id, Target.Id) };
-        public void Dispose() => Db.Dispose();
+        public void Dispose()
+        {
+            Db.Dispose();
+            Environment.SetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID", previousApiInstanceId);
+        }
     }
 
     private sealed class RecordingTransport : IHostContainerTransport
@@ -161,12 +285,14 @@ public sealed class HostContainerRelayServiceTests
         public HostContainerExecutionRequest? Request { get; private set; }
         public int Invocations { get; private set; }
         public HostContainerExecutionResponse Result { get; set; } = new();
+        public bool Throw { get; set; }
         public Task<HostContainerExecutionResponse> ExecuteAsync(string connectionId, HostContainerExecutionRequest request, CancellationToken cancellationToken)
         {
             ConnectionId = connectionId;
             Method = AutomatonHubMethods.ExecuteHostContainer;
             Request = request;
             Invocations++;
+            if (Throw) throw new InvalidOperationException("test transport failure");
             return Task.FromResult(Result);
         }
     }
