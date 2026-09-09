@@ -36,6 +36,7 @@ public class AutomatonHub : Hub
     private readonly ILogger<AutomatonHub> logger;
     private readonly RunnerStorageTelemetryService storageTelemetryService;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
+    private readonly HostContainerRelayService hostContainerRelayService;
 
     public AutomatonHub(
         RunnerService runnerService,
@@ -46,7 +47,8 @@ public class AutomatonHub : Hub
         FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger,
         RunnerStorageTelemetryService storageTelemetryService,
-        IAppDeploymentTargetResolver deploymentTargetResolver)
+        IAppDeploymentTargetResolver deploymentTargetResolver,
+        HostContainerRelayService hostContainerRelayService)
     {
         this.runnerService = runnerService;
         this.appsService = appsService;
@@ -57,6 +59,7 @@ public class AutomatonHub : Hub
         this.logger = logger;
         this.storageTelemetryService = storageTelemetryService;
         this.deploymentTargetResolver = deploymentTargetResolver;
+        this.hostContainerRelayService = hostContainerRelayService;
     }
 
     public Task ReportHostedRunnerStorage(HostedRunnerStorageTelemetry report) =>
@@ -64,6 +67,9 @@ public class AutomatonHub : Hub
 
     public Task ReportRunnerHostStorage(RunnerHostStorageTelemetry report) =>
         storageTelemetryService.ReportRunnerHostAsync(GetRunner(), report, Context.ConnectionAborted);
+
+    public Task<HostContainerExecutionResponse> RequestHostContainerExecution(HostContainerExecutionRequest request) =>
+        hostContainerRelayService.ExecuteAsync(GetRunner(), request, Context.ConnectionAborted);
 
     public override async Task OnConnectedAsync()
     {
