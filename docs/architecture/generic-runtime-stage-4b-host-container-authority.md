@@ -90,20 +90,20 @@ The Infrastructure Runner derives the existing user volume
 and uses the deterministic layout:
 
 ```text
-/automaton/storage/generic-runtime/apps/<AppId:N>/targets/<DeploymentTargetId:N>/
+workspace/runner/deployments/<AppId:D>/<DeploymentTargetId:D>/<ExecutionAttemptId:D>/
   source/
-  artifact/
-  data/
 ```
 
 The build container receives only the per-attempt incoming source subpath
-read-write and the artifact subpath read-write through Docker volume mounts.
+read-write through a Docker volume mount.
 The incoming source is isolated by the trusted execution-attempt directory; it
-is not the accepted durable source. It has `no-new-privileges`,
+is not the accepted durable source. Build output remains in that attempt
+workspace until the existing artifact selector and candidate-promotion flow
+consumes it. It has `no-new-privileges`,
 all capabilities dropped, no Docker socket, no `/host`, and no access to the
 entire Hosted Runner volume. Build containers are labeled with the trusted
-scope and are ephemeral; cleanup never removes source, artifact, data, or the
-user volume. Application code never receives Docker authority.
+scope and are ephemeral; cleanup never removes source, data, or the user
+volume. Application code never receives Docker authority.
 
 The existing `/automaton/storage` user volume remains the persistence boundary,
 including the Hosted Runner workspace. No host bind path or future Hetzner
@@ -112,9 +112,8 @@ and switching ordinary Standard Hosted deployment remain deferred to 4B2c.
 
 ## Deferred to Stage 4B2c
 
-- server-derived per-Hosted-Runner workspace, artifact, and data mappings;
-- build execution and application-container lifecycle;
-- secure sibling build/runtime container mounts;
+- application-container lifecycle;
+- secure runtime container mounts;
 - private-network and host-port mapping for brokered operations;
 - application-container lifecycle and `BrokeredApplicationContainerRuntime` (4B2c);
 - Standard Hosted Runner Generic Runtime switch and production rollout (4B2c);

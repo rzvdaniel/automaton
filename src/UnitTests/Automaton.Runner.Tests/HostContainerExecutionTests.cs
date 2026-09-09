@@ -179,7 +179,7 @@ public sealed class HostContainerExecutionTests
             Assert.That(result.Success, Is.True);
             Assert.That(commands.Any(x => x.Contains("volume") && x.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")), Is.True);
             var build = string.Join(' ', commands.Single(x => string.Join(' ', x).Contains("runtime-kind=build")));
-            Assert.That(build, Does.Contain("volume-subpath=workspace/runner/deployments/"));
+            Assert.That(build, Does.Contain("volume-subpath=runner/deployments/"));
             Assert.That(build, Does.Contain("--cap-drop"));
             Assert.That(build, Does.Not.Contain("readonly"));
             Assert.That(build, Does.Not.Contain("/var/run/docker.sock"));
@@ -226,6 +226,28 @@ public sealed class HostContainerExecutionTests
         {
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    [Test]
+    public void BrokerStagingSubpathMatchesRunnerWorkspaceStagingSource()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var attemptId = Guid.NewGuid();
+        var priorRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", Path.Combine(Path.GetTempPath(), "automaton-broker-parity"));
+            var workspace = new RunnerWorkspaceService();
+            var staging = workspace.GetDeploymentStagingDirectory(appId, targetId, attemptId);
+            var relative = Path.GetRelativePath(workspace.WorkspaceRoot, Path.Combine(staging, "source"));
+            Assert.That(relative.Replace('\\', '/'), Is.EqualTo(
+                $"runner/deployments/{appId:D}/{targetId:D}/{attemptId:D}/source"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", priorRoot);
         }
     }
 

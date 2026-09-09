@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
@@ -107,29 +108,16 @@ public sealed class HostContainerExecutionService
         var scope = request.Scope;
         var volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
         var labels = await executor(["docker", "volume", "inspect", "--format", "{{json .Labels}}", volume], cancellationToken);
-        if (!labels.Success
-            || !ContainsLabel(labels.Output, "automaton.managed", "true")
-            || !ContainsLabel(labels.Output, "automaton.resource", "hosted-runner-volume")
-            || !ContainsLabel(labels.Output, "automaton.hosted-runner-id", scope.HostedRunnerId.ToString())
-            || !ContainsLabel(labels.Output, "automaton.storage-scope", "user"))
+        if (!labels.Success || !HasExpectedVolumeLabels(labels.Output, scope.HostedRunnerId))
             return Failure("trusted_storage", "The Hosted Runner user volume is missing or has invalid ownership labels.");
 
         var attempt = scope.DeploymentAttemptId;
         if (attempt == Guid.Empty)
             return Failure("trusted_mapping_unavailable", "A server-issued deployment attempt is required.");
-        var relativeTarget = $"workspace/runner/deployments/{scope.AppId:N}/{scope.DeploymentTargetId:N}/{attempt:N}";
+        var relativeTarget = RunnerWorkspaceService.GetDeploymentStagingRelativePath(scope.AppId, scope.DeploymentTargetId, attempt);
         var source = $"{relativeTarget}/source";
-        var artifact = $"{relativeTarget}/artifact";
         var operationId = Guid.NewGuid().ToString("N");
         var container = $"automaton-build-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{operationId}";
-
-        var ensure = await executor([
-            "docker", "run", "--rm", "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
-            "--mount", $"type=volume,source={volume},target=/volume",
-            "--entrypoint", "/bin/sh", "busybox:1.36", "-c",
-            $"mkdir -p /volume/{source} /volume/{artifact}"], cancellationToken);
-        if (!ensure.Success)
-            return Failure("trusted_storage", ensure.Error);
 
         var pull = await executor(["docker", "pull", request.RequestedImage!], cancellationToken);
         if (!pull.Success) return Failure("image_pull", pull.Error);
@@ -139,7 +127,7 @@ public sealed class HostContainerExecutionService
         if (!image.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
             return Failure("image_digest", "Docker did not return a repository RepoDigest.");
 
-        var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "none",
+        var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "bridge",
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
             "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
@@ -149,44 +137,40 @@ public sealed class HostContainerExecutionService
             // This is the isolated incoming attempt workspace, not the
             // durable accepted source. Build tools may write generated files
             // here; promotion remains owned by RunnerDeploymentService.
-            "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}",
-            "--mount", $"type=volume,source={volume},target=/automaton/artifact,volume-subpath={artifact}" };
+            "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
         var command = request.Command!;
-        if (!string.IsNullOrWhiteSpace(command.WorkingDirectory))
-        {
-            var workingDirectory = command.WorkingDirectory.Replace('\\', '/').Trim('/');
-            if (workingDirectory.Contains("..", StringComparison.Ordinal) || workingDirectory.StartsWith('/'))
-                return Failure("command", "The build working directory must remain inside the source workspace.");
-            args.Add("--workdir");
-            args.Add(string.IsNullOrEmpty(workingDirectory) || workingDirectory == "."
-                ? "/automaton/source"
-                : $"/automaton/source/{workingDirectory}");
-        }
+        args.Add("--workdir");
+        try { args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(command.WorkingDirectory)); }
+        catch (InvalidOperationException ex) { return Failure("command", ex.Message); }
         var environment = new Dictionary<string, string>(command.Environment, StringComparer.Ordinal);
         foreach (var pair in request.Environment)
             environment[pair.Key] = pair.Value;
-        foreach (var pair in environment)
-        { args.Add("--env"); args.Add($"{pair.Key}={pair.Value}"); }
-        args.Add(image);
+        try { DockerContainerRuntime.AddEnvironment(args, environment); }
+        catch (InvalidOperationException ex) { return Failure("command", ex.Message); }
         if (string.IsNullOrWhiteSpace(command.Executable))
             return Failure("command", "The build executable is required.");
-        if (command.UseShell)
-        {
-            args.Add("/bin/sh");
-            args.Add("-lc");
-            args.Add(string.Join(" ", new[] { command.Executable }.Concat(command.Arguments).Select(ShellQuote)));
-        }
-        else
-        {
-            args.Add(command.Executable);
-            args.AddRange(command.Arguments);
-        }
+        if (command.Executable.Contains('/')
+            && (Path.IsPathRooted(command.Executable)
+                || command.Executable.Replace('\\', '/').Split('/').Any(part => part is "." or "..")))
+            return Failure("command", "The build executable must remain inside the managed source workspace.");
+        DockerContainerRuntime.AddEntrypoint(args, command, "/automaton/source");
+        DockerContainerRuntime.AddCommandArguments(args, command);
+        // Docker options and the explicit entrypoint must precede the image;
+        // command arguments follow the image.
+        var entrypointArguments = args.Skip(args.IndexOf("--entrypoint") + 2).ToList();
+        args.RemoveRange(args.IndexOf("--entrypoint"), args.Count - args.IndexOf("--entrypoint"));
+        args.Add(image);
+        args.AddRange(entrypointArguments);
         using var buildTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         buildTimeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(request.TimeoutSeconds, 1, 86_400)));
         var result = await executor(args, buildTimeout.Token);
-        return result.Success
-            ? new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container }
-            : Failure("build_failed", result.Error);
+        if (result.Success)
+            return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
+        if (cancellationToken.IsCancellationRequested)
+            return Failure("build_canceled", "The build was canceled.");
+        if (buildTimeout.IsCancellationRequested)
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        return Failure("build_failed", result.Error);
     }
 
     private static bool HasTrustedResources(HostContainerResourceRef? resources)
@@ -195,12 +179,20 @@ public sealed class HostContainerExecutionService
             && resources.ArtifactKind == HostContainerResourceKinds.Artifact
             && resources.DataKind == HostContainerResourceKinds.ApplicationData;
 
-    private static bool ContainsLabel(string json, string key, string value)
-        => json.Contains($"\"{key}\":\"{value}\"", StringComparison.Ordinal)
-            || json.Contains($"\"{key}\": \"{value}\"", StringComparison.Ordinal);
-
-    private static string ShellQuote(string value)
-        => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+    private static bool HasExpectedVolumeLabels(string json, Guid hostedRunnerId)
+    {
+        try
+        {
+            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return labels is not null
+                && labels.Count == 4
+                && labels.TryGetValue("automaton.managed", out var managed) && managed == "true"
+                && labels.TryGetValue("automaton.resource", out var resource) && resource == "hosted-runner-volume"
+                && labels.TryGetValue("automaton.hosted-runner-id", out var runner) && runner == hostedRunnerId.ToString()
+                && labels.TryGetValue("automaton.storage-scope", out var scope) && scope == "user";
+        }
+        catch (JsonException) { return false; }
+    }
 
     private static HostContainerExecutionResponse Failure(string code, string error)
         => new() { ErrorCode = code, Error = error };
