@@ -39,6 +39,7 @@ public sealed class HostContainerRuntimeDockerTests
                 ["AUTOMATON_RUNNER_PURPOSE"] = RunnerPurposes.Infrastructure,
                 ["AUTOMATON_RUNNER_CAPABILITIES"] = RunnerCapabilities.HostContainerExecution,
                 ["AUTOMATON_RUNTIME_HOST_ADDRESS"] = "127.0.0.1"
+                , ["AUTOMATON_LOCAL_DOCKER_TEST"] = "true"
             })
             {
                 environment[pair.Key] = Environment.GetEnvironmentVariable(pair.Key);
@@ -73,6 +74,8 @@ public sealed class HostContainerRuntimeDockerTests
             }
             var starts = await Task.WhenAll(containers.Select(id => service.ExecuteAsync(Operation(HostContainerOperationKinds.StartContainer, id))));
             Assert.That(starts.All(result => result.Success), Is.True);
+            Assert.That(starts.All(result => result.Running && result.HostAddress == "127.0.0.1" && result.HostPort > 0), Is.True);
+            Assert.That(starts.Select(result => result.HostPort).Distinct().Count(), Is.EqualTo(2));
             var inspections = await Task.WhenAll(containers.Select(id => service.ExecuteAsync(Operation(HostContainerOperationKinds.InspectContainer, id))));
             Assert.That(inspections.All(result => result.Success && result.Running && result.HostAddress == "127.0.0.1" && result.HostPort > 0), Is.True);
             Assert.That(inspections.Select(result => result.HostPort).Distinct().Count(), Is.EqualTo(2));

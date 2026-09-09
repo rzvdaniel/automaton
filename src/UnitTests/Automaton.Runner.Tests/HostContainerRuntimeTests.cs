@@ -184,6 +184,22 @@ public sealed class HostContainerRuntimeTests
         Assert.That(calls[1].Last(), Is.EqualTo(ContainerId));
     }
 
+    [Test]
+    public async Task StartInspectsBeforeAndAfterStartAndReturnsSecondEndpoint()
+    {
+        var inspectionCount = 0;
+        var result = await Service(args =>
+        {
+            if (args.Contains("inspect"))
+                return new() { Success = true, Output = Inspection(inspectionCount++ == 1, inspectionCount == 1 ? null : "49152").ToJsonString() };
+            return new() { Success = true };
+        }).ExecuteAsync(Operation(HostContainerOperationKinds.StartContainer));
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(calls.Select(call => call[1]), Is.EqualTo(new[] { "container", "start", "container" }));
+        Assert.That(result.Running, Is.True);
+        Assert.That(result.HostPort, Is.EqualTo(49152));
+    }
+
     [TestCase(true, "49152")]
     [TestCase(false, "49152")]
     [TestCase(false, null)]

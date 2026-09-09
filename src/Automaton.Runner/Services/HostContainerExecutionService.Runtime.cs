@@ -114,7 +114,17 @@ public sealed partial class HostContainerExecutionService
         }
         if (request.Operation == HostContainerOperationKinds.RemoveContainer)
             return new HostContainerExecutionResponse { Success = true, ContainerId = inspection.ContainerId };
-        return new HostContainerExecutionResponse { Success = true, Exists = true, ContainerId = inspection.ContainerId };
+        var postStart = await InspectOwnedContainerAsync(request.ContainerId!, request.Scope, cancellationToken, discoverEndpoint: true);
+        if (!postStart.Success || !postStart.Exists || !postStart.Running || !postStart.HostPort.HasValue)
+            return Failure("container_start_endpoint", "The application container started without a valid running private endpoint.") with
+            {
+                ContainerId = inspection.ContainerId,
+                ContainerName = inspection.ContainerName,
+                Exists = postStart.Exists,
+                Running = postStart.Running,
+                Labels = postStart.Labels
+            };
+        return postStart;
     }
 
     private async Task<HostContainerExecutionResponse> InspectOwnedContainerAsync(
@@ -205,9 +215,14 @@ public sealed partial class HostContainerExecutionService
 
     private static string GetPrivateRuntimeHostAddress()
     {
-        var address = IPAddress.Parse(RunnerRuntimeEndpointConfiguration.HostAddress);
+        var configured = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable)?.Trim();
+        if (string.IsNullOrWhiteSpace(configured))
+            throw new InvalidOperationException("Application publication requires an explicitly configured runtime host address.");
+        if (!IPAddress.TryParse(configured, out var address))
+            throw new InvalidOperationException("Application publication requires a concrete runtime host address.");
         var bytes = address.GetAddressBytes();
-        if (IPAddress.IsLoopback(address) || address.IsIPv6UniqueLocal
+        if ((IPAddress.IsLoopback(address) && string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_LOCAL_DOCKER_TEST"), "true", StringComparison.Ordinal))
+            || address.IsIPv6UniqueLocal
             || bytes.Length == 4 && (bytes[0] == 10 || bytes[0] == 172 && bytes[1] is >= 16 and <= 31
                 || bytes[0] == 192 && bytes[1] == 168))
             return address.ToString();
