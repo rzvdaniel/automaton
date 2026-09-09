@@ -35,7 +35,16 @@ public class RunnerWorkspaceService
     public string RunnerRoot => GetFullPath(WorkspaceRoot, "runner");
 
     public string GetDeploymentStagingDirectory(Guid appId, Guid deploymentTargetId, Guid operationId)
-        => GetFullPath(RunnerRoot, "deployments", appId.ToString(), deploymentTargetId.ToString(), operationId.ToString());
+        => GetFullPath(WorkspaceRoot, GetDeploymentStagingRelativePath(appId, deploymentTargetId, operationId));
+
+    internal static string GetDeploymentStagingRelativePath(Guid appId, Guid deploymentTargetId, Guid operationId)
+        => $"runner/deployments/{appId:D}/{deploymentTargetId:D}/{operationId:D}";
+
+    // The workspace root is mounted at /automaton/storage/workspace inside the
+    // Hosted Runner user volume. Docker volume-subpath is relative to the
+    // volume root, so it needs this explicit mount-root translation.
+    internal static string GetDeploymentStagingVolumeSubpath(Guid appId, Guid deploymentTargetId, Guid operationId)
+        => $"workspace/{GetDeploymentStagingRelativePath(appId, deploymentTargetId, operationId)}";
 
     public string GetFastApiScriptsRoot()
     {

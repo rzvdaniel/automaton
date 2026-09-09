@@ -24,9 +24,9 @@ Infrastructure Runner; purpose and capability checks remain mandatory.
 
 The `HostContainerExecutionRequest` model accepts a fixed operation kind,
 four-part resource scope, structured application command data, and trusted
-resource identities. It does not accept Docker argument arrays, arbitrary host
-paths, arbitrary volume names, or arbitrary networks. The Stage 4B1 executor
-fails closed until the Stage 4B2 server-side workspace/resource mapping exists.
+resource kinds. It does not accept Docker argument arrays, arbitrary host
+paths, arbitrary volume names, or arbitrary networks. The API supplies resource
+kinds only after binding the request to persisted server state.
 
 Stage 4B1 implements image resolution through the trusted host Docker boundary:
 the Infrastructure Runner pulls the requested image and returns its repository
@@ -34,7 +34,7 @@ the Infrastructure Runner pulls the requested image and returns its repository
 validated as typed requests but fail closed until Stage 4B2 supplies the
 trusted workspace/resource mapping.
 
-The future operations are build, application-container creation/start,
+The build operation is implemented in 4B2b. The future operations are application-container creation/start,
 inspection, bounded logs, and removal. They must create and validate Automaton
 ownership labels and derive networks and host paths from trusted server state.
 
@@ -78,13 +78,43 @@ execution. The current deployment path still uses its existing runtime
 selection. The production SignalR/CAP topology continues to require one
 active `automaton.api.v1` consumer until distributed affinity is implemented.
 
-## Deferred to Stage 4B2b/4B2c
+## Stage 4B2b: trusted Hosted build storage and RunBuild
 
-- server-derived per-Hosted-Runner workspace, artifact, and data mappings;
-- build execution and application-container lifecycle;
-- secure sibling build/runtime container mounts;
+Stage 4B2b extends the same authenticated relay for `RunBuild`. The API binds
+the request to persisted Hosted Runner/app/target state and supplies resource
+kinds (`source`, `artifact`, and `data`); the Hosted Runner cannot supply paths,
+volume names, or filesystem identities.
+
+The Infrastructure Runner derives the existing user volume
+`automaton-hosted-runner-<HostedRunnerId:N>-user`, verifies its ownership labels,
+and uses the deterministic layout:
+
+```text
+workspace/runner/deployments/<AppId:D>/<DeploymentTargetId:D>/<ExecutionAttemptId:D>/
+  source/
+```
+
+The build container receives only the per-attempt incoming source subpath
+read-write through a Docker volume mount.
+The incoming source is isolated by the trusted execution-attempt directory; it
+is not the accepted durable source. Build output remains in that attempt
+workspace until the existing artifact selector and candidate-promotion flow
+consumes it. It has `no-new-privileges`,
+all capabilities dropped, no Docker socket, no `/host`, and no access to the
+entire Hosted Runner volume. Build containers are labeled with the trusted
+scope and are ephemeral; cleanup never removes source, data, or the user
+volume. Application code never receives Docker authority.
+
+The existing `/automaton/storage` user volume remains the persistence boundary,
+including the Hosted Runner workspace. No host bind path or future Hetzner
+Volume is introduced here. Application-container lifecycle, runtime adoption,
+and switching ordinary Standard Hosted deployment remain deferred to 4B2c.
+
+## Deferred to Stage 4B2c
+
+- application-container lifecycle;
+- secure runtime container mounts;
 - private-network and host-port mapping for brokered operations;
-- trusted storage/workspace mapping and `RunBuild` (4B2b);
 - application-container lifecycle and `BrokeredApplicationContainerRuntime` (4B2c);
 - Standard Hosted Runner Generic Runtime switch and production rollout (4B2c);
 - migration and acceptance of Standard Hosted Runner protocol 4;

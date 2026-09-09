@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
@@ -11,15 +12,15 @@ namespace Automaton.Runner.Console.Services;
 /// </summary>
 public sealed class HostContainerExecutionService
 {
-    private readonly Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> executor;
+    private readonly Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
-        : this((arguments, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, cancellationToken))
+        : this((arguments, timeout, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, timeout, cancellationToken))
     {
     }
 
     internal HostContainerExecutionService(
-        Func<IReadOnlyList<string>, CancellationToken, Task<InfrastructureCommandResponse>> executor)
+        Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor)
     {
         this.executor = executor;
     }
@@ -62,9 +63,10 @@ public sealed class HostContainerExecutionService
         if (request.Operation == HostContainerOperationKinds.ResolveImage)
             return await ResolveImageAsync(request, cancellationToken);
 
-        // Stage 4B1 intentionally has no trusted resource resolver. Caller
-        // supplied identities do not establish a host mapping.
-        return Failure("trusted_mapping_unavailable", "The trusted workspace/resource mapping is not enabled yet.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild)
+            return await RunBuildAsync(request, cancellationToken);
+
+        return Failure("trusted_mapping_unavailable", "The requested host-container operation is not enabled yet.");
 
     }
 
@@ -76,11 +78,11 @@ public sealed class HostContainerExecutionService
         if (image.Any(char.IsWhiteSpace) || image.Contains('\0'))
             return Failure("image", "The image reference is invalid.");
 
-        var pull = await executor(["docker", "pull", image], cancellationToken);
+        var pull = await executor(["docker", "pull", image], TimeSpan.FromSeconds(900), cancellationToken);
         if (!pull.Success)
             return Failure("image_pull", pull.Error);
 
-        var inspect = await executor(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image], cancellationToken);
+        var inspect = await executor(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image], TimeSpan.FromSeconds(900), cancellationToken);
         if (!inspect.Success)
             return Failure("image_inspect", inspect.Error);
 
@@ -94,6 +96,118 @@ public sealed class HostContainerExecutionService
             RequestedImage = image,
             ResolvedImage = resolved
         };
+    }
+
+    private async Task<HostContainerExecutionResponse> RunBuildAsync(
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!HasTrustedResources(request.Resources))
+            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
+        if (request.Command is null || request.Environment is null || request.Command.Arguments is null
+            || request.Command.Environment is null || string.IsNullOrWhiteSpace(request.Command.Executable))
+            return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
+        if (request.TimeoutSeconds is < 1 or > 86_400)
+            return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
+        if (string.IsNullOrWhiteSpace(request.RequestedImage) || request.RequestedImage.Any(char.IsWhiteSpace)
+            || request.RequestedImage.Contains('\0') || request.RequestedImage.StartsWith("-", StringComparison.Ordinal))
+            return Failure("invalid_request", "RunBuild contains an invalid image reference.");
+        var scope = request.Scope;
+        var volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
+        var labels = await executor(["docker", "volume", "inspect", "--format", "{{json .Labels}}", volume], TimeSpan.FromSeconds(900), cancellationToken);
+        if (!labels.Success || !HasExpectedVolumeLabels(labels.Output, scope.HostedRunnerId))
+            return Failure("trusted_storage", "The Hosted Runner user volume is missing or has invalid ownership labels.");
+
+        var attempt = scope.DeploymentAttemptId;
+        if (attempt == Guid.Empty)
+            return Failure("trusted_mapping_unavailable", "A server-issued deployment attempt is required.");
+        var relativeTarget = RunnerWorkspaceService.GetDeploymentStagingVolumeSubpath(scope.AppId, scope.DeploymentTargetId, attempt);
+        var source = $"{relativeTarget}/source";
+        var operationId = Guid.NewGuid().ToString("N");
+        var container = $"automaton-build-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{operationId}";
+
+        var pull = await executor(["docker", "pull", request.RequestedImage!], TimeSpan.FromSeconds(900), cancellationToken);
+        if (!pull.Success) return Failure("image_pull", pull.Error);
+        var inspect = await executor(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", request.RequestedImage!], TimeSpan.FromSeconds(900), cancellationToken);
+        if (!inspect.Success) return Failure("image_inspect", inspect.Error);
+        var image = inspect.Output.Trim();
+        if (!image.Contains("@sha256:", StringComparison.OrdinalIgnoreCase))
+            return Failure("image_digest", "Docker did not return a repository RepoDigest.");
+
+        var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "bridge",
+            "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
+            "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
+            "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
+            "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}",
+            "--label", $"automaton.app-id={scope.AppId:N}",
+            "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",
+            // This is the isolated incoming attempt workspace, not the
+            // durable accepted source. Build tools may write generated files
+            // here; promotion remains owned by RunnerDeploymentService.
+            "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
+        var command = request.Command;
+        args.Add("--workdir");
+        try { args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(command.WorkingDirectory)); }
+        catch (InvalidOperationException ex) { return Failure("command", ex.Message); }
+        var environment = new Dictionary<string, string>(command.Environment, StringComparer.Ordinal);
+        foreach (var pair in request.Environment)
+            environment[pair.Key] = pair.Value;
+        try { DockerContainerRuntime.AddEnvironment(args, environment); }
+        catch (InvalidOperationException ex) { return Failure("command", ex.Message); }
+        if (string.IsNullOrWhiteSpace(command.Executable))
+            return Failure("command", "The build executable is required.");
+        if (command.Executable.Contains('/')
+            && (Path.IsPathRooted(command.Executable)
+                || command.Executable.Replace('\\', '/').Split('/').Any(part => part is "." or "..")))
+            return Failure("command", "The build executable must remain inside the managed source workspace.");
+        DockerContainerRuntime.AddEntrypoint(args, command, "/automaton/source");
+        args.Add(image);
+        DockerContainerRuntime.AddCommandArguments(args, command);
+        using var buildTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var timeout = TimeSpan.FromSeconds(request.TimeoutSeconds);
+        buildTimeout.CancelAfter(timeout);
+        var result = await executor(args, timeout, buildTimeout.Token);
+        if (result.Success)
+            return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
+        await TryCleanupBuildContainerAsync(container);
+        if (cancellationToken.IsCancellationRequested)
+            return Failure("build_canceled", "The build was canceled.");
+        if (buildTimeout.IsCancellationRequested)
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        return Failure("build_failed", result.Error);
+    }
+
+    private async Task TryCleanupBuildContainerAsync(string container)
+    {
+        try
+        {
+            await executor(["docker", "rm", "-f", container], TimeSpan.FromSeconds(30), CancellationToken.None);
+        }
+        catch
+        {
+            // Cleanup is best effort and must not replace the build outcome.
+        }
+    }
+
+    private static bool HasTrustedResources(HostContainerResourceRef? resources)
+        => resources is not null
+            && resources.SourceKind == HostContainerResourceKinds.Source
+            && resources.ArtifactKind == HostContainerResourceKinds.Artifact
+            && resources.DataKind == HostContainerResourceKinds.ApplicationData;
+
+    private static bool HasExpectedVolumeLabels(string json, Guid hostedRunnerId)
+    {
+        try
+        {
+            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return labels is not null
+                && labels.Count == 4
+                && labels.TryGetValue("automaton.managed", out var managed) && managed == "true"
+                && labels.TryGetValue("automaton.resource", out var resource) && resource == "hosted-runner-volume"
+                && labels.TryGetValue("automaton.hosted-runner-id", out var runner) && runner == hostedRunnerId.ToString()
+                && labels.TryGetValue("automaton.storage-scope", out var scope) && scope == "user";
+        }
+        catch (JsonException) { return false; }
     }
 
     private static HostContainerExecutionResponse Failure(string code, string error)

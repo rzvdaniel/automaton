@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-/// <summary>Authenticated Stage 4B2a relay; ResolveImage is the only enabled operation.</summary>
+/// <summary>Authenticated Stage 4B2 relay for trusted Hosted build operations.</summary>
 public sealed class HostContainerRelayService(
     ApplicationDbContext db,
     IHostContainerTransport transport,
@@ -41,13 +41,46 @@ public sealed class HostContainerRelayService(
             return Failure("hosted_runner_binding_mismatch", "The requested Hosted Runner does not match persisted state.");
         if (request.Scope.RunnerHostId != Guid.Empty && request.Scope.RunnerHostId != hostId)
             return Failure("runner_host_binding_mismatch", "The requested Runner Host does not match persisted state.");
-        if (request.Operation != HostContainerOperationKinds.ResolveImage)
-            return Failure("unsupported_operation", "Stage 4B2a supports ResolveImage only.");
+        if (request.Operation is not (HostContainerOperationKinds.ResolveImage or HostContainerOperationKinds.RunBuild))
+            return Failure("unsupported_operation", "Stage 4B2b supports ResolveImage and RunBuild only.");
         if (string.IsNullOrWhiteSpace(request.RequestedImage))
             return Failure("invalid_request", "ResolveImage requires an image reference.");
-        if (request.Resources is not null || request.ContainerId is not null || request.Command is not null
-            || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment is null || request.Environment.Count != 0)
+        if (request.Operation == HostContainerOperationKinds.ResolveImage
+            && (request.Resources is not null || request.ContainerId is not null || request.Command is not null
+                || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment is null || request.Environment.Count != 0))
             return Failure("unsupported_operation", "ResolveImage does not accept container execution inputs.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.Command is null || request.Resources is not null || request.ContainerId is not null
+                || request.HostPort != 0 || request.ContainerPort != 0))
+            return Failure("invalid_request", "RunBuild requires a command and server-derived resources.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.TimeoutSeconds is < 1 or > 86_400))
+            return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.Environment is null || request.Command!.Arguments is null || request.Command.Environment is null
+                || string.IsNullOrWhiteSpace(request.Command.Executable)))
+            return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild)
+        {
+            var contractErrors = ApplicationContractValidator.Validate(new ApplicationContract
+            {
+                Build = new ApplicationBuildSpec
+                {
+                    Image = request.RequestedImage,
+                    Command = request.Command,
+                    TimeoutSeconds = request.TimeoutSeconds
+                }
+            });
+            if (contractErrors.Count > 0)
+                return Failure("invalid_request", string.Join("; ", contractErrors));
+        }
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.RequestedImage!.Any(char.IsWhiteSpace) || request.RequestedImage.Contains('\0')
+                || request.RequestedImage.StartsWith("-", StringComparison.Ordinal)))
+            return Failure("invalid_request", "RunBuild contains an invalid image reference.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && request.Scope.DeploymentAttemptId == Guid.Empty)
+            return Failure("invalid_request", "RunBuild requires a server-issued deployment attempt.");
 
         var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
             x => x.Id == request.Scope.DeploymentTargetId && x.WebAppId == request.Scope.AppId,
@@ -56,6 +89,9 @@ public sealed class HostContainerRelayService(
             return Failure("deployment_target_mismatch", "The deployment target was not found for the application.");
         if (target.ExecutionRunnerId != caller.Id)
             return Failure("app_assignment_mismatch", "The target is not assigned to the authenticated Hosted Runner.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && target.ActiveDeploymentExecutionAttemptId != request.Scope.DeploymentAttemptId)
+            return Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt.");
 
         var infrastructure = await db.Runners.SingleOrDefaultAsync(
             x => x.Id == hosted.RunnerHost.InfrastructureRunnerId,
@@ -74,13 +110,20 @@ public sealed class HostContainerRelayService(
 
         var forwarded = request with
         {
-            Scope = new HostContainerScope(hosted.Id, hostId, target.WebAppId, target.Id),
-            Resources = null,
+            Scope = new HostContainerScope(hosted.Id, hostId, target.WebAppId, target.Id, request.Scope.DeploymentAttemptId),
+            Resources = request.Operation == HostContainerOperationKinds.RunBuild
+                ? new HostContainerResourceRef(
+                    HostContainerResourceKinds.Source,
+                    HostContainerResourceKinds.Artifact,
+                    HostContainerResourceKinds.ApplicationData)
+                : null,
             ContainerId = null,
-            Command = null,
+            Command = request.Operation == HostContainerOperationKinds.RunBuild ? request.Command : null,
             HostPort = 0,
             ContainerPort = 0,
-            Environment = new Dictionary<string, string>()
+            Environment = request.Operation == HostContainerOperationKinds.RunBuild
+                ? new Dictionary<string, string>(request.Environment, StringComparer.Ordinal)
+                : new Dictionary<string, string>()
         };
         try
         {

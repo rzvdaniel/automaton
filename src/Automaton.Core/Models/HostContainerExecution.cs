@@ -11,16 +11,24 @@ public static class HostContainerOperationKinds
     public const string RemoveContainer = "remove-container";
 }
 
+public static class HostContainerResourceKinds
+{
+    public const string Source = "source";
+    public const string Artifact = "artifact";
+    public const string ApplicationData = "data";
+}
+
 public sealed record HostContainerScope(
     Guid HostedRunnerId,
     Guid RunnerHostId,
     Guid AppId,
-    Guid DeploymentTargetId);
+    Guid DeploymentTargetId,
+    Guid DeploymentAttemptId = default);
 
 public sealed record HostContainerResourceRef(
-    string WorkspaceId,
-    string ArtifactId,
-    string DataId);
+    string SourceKind,
+    string ArtifactKind,
+    string DataKind);
 
 public sealed record HostContainerExecutionRequest
 {

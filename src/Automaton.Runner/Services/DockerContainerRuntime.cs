@@ -352,7 +352,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         }
     }
 
-    private static void AddEnvironment(List<string> args, IReadOnlyDictionary<string, string> environment)
+    internal static void AddEnvironment(List<string> args, IReadOnlyDictionary<string, string> environment)
     {
         foreach (var pair in environment)
         {
@@ -389,8 +389,15 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         args.AddRange(command.Arguments);
     }
 
-    private static string ResolveContainerWorkingDirectory(string path, string root = "/automaton/source")
-        => path == "." ? root : $"{root}/{path.Replace('\\', '/').TrimStart('/')}";
+    internal static string ResolveContainerWorkingDirectory(string path, string root = "/automaton/source")
+    {
+        if (string.IsNullOrWhiteSpace(path) || path == ".") return root;
+        if (Path.IsPathRooted(path)) throw new InvalidOperationException("Container working directory must be relative.");
+        var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Any(part => part is "." or ".."))
+            throw new InvalidOperationException("Container working directory escapes its managed root.");
+        return $"{root}/{string.Join('/', parts)}";
+    }
 
     private static string MapHostPath(string path)
     {
@@ -436,7 +443,7 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
             throw new ArgumentException("OCI image reference is invalid.", nameof(image));
     }
 
-    private static string QuoteShellArgument(string value)
+    internal static string QuoteShellArgument(string value)
         => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
     internal delegate Task<CommandResult> DockerCommandExecutor(
