@@ -36,6 +36,8 @@ public sealed record HostContainerExecutionRequest
     public string Operation { get; init; } = string.Empty;
     public string? RequestedImage { get; init; }
     public string? ContainerId { get; init; }
+    public Guid CandidateId { get; init; }
+    public ApplicationStorageSpec? Storage { get; init; }
     public ApplicationCommandSpec? Command { get; init; }
     public int ContainerPort { get; init; }
     public int HostPort { get; init; }
@@ -54,5 +56,10 @@ public sealed record HostContainerExecutionResponse
     public string ContainerId { get; init; } = string.Empty;
     public string ContainerName { get; init; } = string.Empty;
     public bool Running { get; init; }
+    public bool Exists { get; init; }
+    public string? HostAddress { get; init; }
+    public int? HostPort { get; init; }
+    public int? ContainerPort { get; init; }
+    public IReadOnlyDictionary<string, string> Labels { get; init; } = new Dictionary<string, string>();
     public string Logs { get; init; } = string.Empty;
 }

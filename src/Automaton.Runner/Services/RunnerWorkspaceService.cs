@@ -46,6 +46,18 @@ public class RunnerWorkspaceService
     internal static string GetDeploymentStagingVolumeSubpath(Guid appId, Guid deploymentTargetId, Guid operationId)
         => $"workspace/{GetDeploymentStagingRelativePath(appId, deploymentTargetId, operationId)}";
 
+    internal static string GetRuntimeCandidateVolumeSubpath(Guid appId, Guid targetId, Guid candidateId)
+        => $"workspace/apps/{appId:D}/targets/{targetId:D}/artifacts/candidates/{candidateId:D}/application";
+
+    internal static string GetApplicationDataVolumeSubpath(Guid appId, string relativePath)
+    {
+        if (!ManagedPathBoundary.IsSafeRelative(relativePath))
+            throw new InvalidOperationException("Application data must remain inside its managed root.");
+        var parts = relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Where(part => part != ".");
+        return string.Join('/', new[] { $"workspace/data/{appId:D}" }.Concat(parts));
+    }
+
     public string GetFastApiScriptsRoot()
     {
         return UseLegacyScriptsLayout

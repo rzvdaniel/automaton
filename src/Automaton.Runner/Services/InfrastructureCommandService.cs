@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
@@ -149,8 +150,13 @@ public sealed class InfrastructureCommandService
         {
             if (!process.Start())
                 return Failure("Failed to start the typed Docker process.");
-            var outputTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            var errorTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            var boundedLogs = arguments.Count > 1 && arguments[1] == "logs";
+            var outputTask = boundedLogs
+                ? ReadLogTailAsync(process.StandardOutput, timeoutCts.Token)
+                : process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var errorTask = boundedLogs
+                ? ReadLogTailAsync(process.StandardError, timeoutCts.Token)
+                : process.StandardError.ReadToEndAsync(timeoutCts.Token);
             await process.WaitForExitAsync(timeoutCts.Token);
             var output = await outputTask;
             var error = await errorTask;
@@ -172,6 +178,20 @@ public sealed class InfrastructureCommandService
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
             return Failure(exception.Message);
         }
+    }
+
+    internal static async Task<string> ReadLogTailAsync(TextReader reader, CancellationToken cancellationToken)
+    {
+        var tail = new StringBuilder();
+        var buffer = new char[4096];
+        int count;
+        while ((count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken)) != 0)
+        {
+            tail.Append(buffer, 0, count);
+            if (tail.Length > HostContainerExecutionService.MaximumLogCharacters)
+                tail.Remove(0, tail.Length - HostContainerExecutionService.MaximumLogCharacters);
+        }
+        return tail.ToString();
     }
 
     private static InfrastructureCommandResponse Failure(string message, int exitStatus = -1)

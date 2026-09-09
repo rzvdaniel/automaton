@@ -8,9 +8,9 @@ namespace Automaton.Runner.Console.Services;
 /// <summary>
 /// Typed host-container boundary for the trusted Infrastructure Runner.
 /// This service deliberately does not accept Docker arguments, host paths, or
-/// network names from a caller. Stage 4B2 supplies the trusted resource map.
+/// network names from a caller.
 /// </summary>
-public sealed class HostContainerExecutionService
+public sealed partial class HostContainerExecutionService
 {
     private readonly Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor;
 
@@ -66,7 +66,15 @@ public sealed class HostContainerExecutionService
         if (request.Operation == HostContainerOperationKinds.RunBuild)
             return await RunBuildAsync(request, cancellationToken);
 
-        return Failure("trusted_mapping_unavailable", "The requested host-container operation is not enabled yet.");
+        if (request.Operation == HostContainerOperationKinds.CreateApplicationContainer
+            && !HasTrustedResources(request.Resources))
+            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
+        var error = HostContainerRuntimeValidation.Validate(request);
+        if (error is not null)
+            return Failure("invalid_request", error);
+        return request.Operation == HostContainerOperationKinds.CreateApplicationContainer
+            ? await CreateApplicationContainerAsync(request, cancellationToken)
+            : await ExecuteContainerOperationAsync(request, cancellationToken);
 
     }
 
@@ -199,7 +207,9 @@ public sealed class HostContainerExecutionService
     {
         try
         {
-            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            using var document = JsonDocument.Parse(json);
+            RejectDuplicateProperties(document.RootElement);
+            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(document.RootElement);
             return labels is not null
                 && labels.Count == 4
                 && labels.TryGetValue("automaton.managed", out var managed) && managed == "true"
