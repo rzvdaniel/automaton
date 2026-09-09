@@ -23,9 +23,9 @@ public sealed class HostContainerRuntimeDockerTests
         var image = (await Docker("image", "inspect", "--format", "{{index .RepoDigests 0}}", "debian:bookworm-slim")).Trim();
         Assert.That(HostContainerRuntimeValidation.IsRepoDigest(image), Is.True);
         var scope = new HostContainerScope(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        var candidate = Guid.NewGuid();
+        var candidates = new[] { Guid.NewGuid(), Guid.NewGuid() };
         var volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
-        var artifact = RunnerWorkspaceService.GetRuntimeCandidateVolumeSubpath(scope.AppId, scope.DeploymentTargetId, candidate);
+        var artifacts = candidates.Select(candidate => RunnerWorkspaceService.GetRuntimeCandidateVolumeSubpath(scope.AppId, scope.DeploymentTargetId, candidate)).ToArray();
         var data = RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, "store,quoted");
         var environment = new Dictionary<string, string?>();
         var containers = new List<string>();
@@ -50,9 +50,9 @@ public sealed class HostContainerRuntimeDockerTests
                 "--label", "automaton.storage-scope=user", volume);
             volumeCreated = true;
             await Docker("run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed",
-                "--entrypoint", "mkdir", image, "-p", $"/seed/{artifact}", $"/seed/{data}");
+                "--entrypoint", "mkdir", image, "-p", $"/seed/{artifacts[0]}", $"/seed/{artifacts[1]}", $"/seed/{data}");
 
-            var request = new HostContainerExecutionRequest
+            HostContainerExecutionRequest Request(Guid candidate) => new()
             {
                 Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
                 CandidateId = candidate, RequestedImage = image, Resources = new("source", "artifact", "data"),
@@ -62,20 +62,25 @@ public sealed class HostContainerRuntimeDockerTests
                     Executable = "sh", Arguments = ["-c", "echo stdout-ok; echo stderr-ok >&2; echo data-ok > /automaton/data/value; if touch /automaton/app/forbidden 2>/dev/null; then echo artifact-writable; else echo artifact-readonly; fi; sleep 120"]
                 }
             };
-            for (var index = 0; index < 2; index++)
+            var createdResults = new List<HostContainerExecutionResponse>();
+            foreach (var candidate in candidates)
             {
-                var created = await service.ExecuteAsync(request);
+                var created = await service.ExecuteAsync(Request(candidate));
                 Assert.That(created.Success, Is.True, $"{created.ErrorCode}: {created.Error}");
+                createdResults.Add(created);
                 containers.Add(created.ContainerId);
                 var before = await service.ExecuteAsync(Operation(HostContainerOperationKinds.InspectContainer, created.ContainerId));
                 Assert.That(before.Success, Is.True, before.Error);
                 Assert.That(before.Running, Is.False);
                 TestContext.Out.WriteLine($"Before start effective port: {before.HostPort?.ToString() ?? "unknown"}");
             }
+            Assert.That(createdResults[0].ContainerId, Is.Not.EqualTo(createdResults[1].ContainerId));
+            Assert.That(createdResults[0].ContainerName, Is.Not.EqualTo(createdResults[1].ContainerName));
             var starts = await Task.WhenAll(containers.Select(id => service.ExecuteAsync(Operation(HostContainerOperationKinds.StartContainer, id))));
             Assert.That(starts.All(result => result.Success), Is.True);
             Assert.That(starts.All(result => result.Running && result.HostAddress == "127.0.0.1" && result.HostPort > 0), Is.True);
             Assert.That(starts.Select(result => result.HostPort).Distinct().Count(), Is.EqualTo(2));
+            TestContext.Out.WriteLine($"Start effective ports: {string.Join(", ", starts.Select(result => result.HostPort))}");
             var inspections = await Task.WhenAll(containers.Select(id => service.ExecuteAsync(Operation(HostContainerOperationKinds.InspectContainer, id))));
             Assert.That(inspections.All(result => result.Success && result.Running && result.HostAddress == "127.0.0.1" && result.HostPort > 0), Is.True);
             Assert.That(inspections.Select(result => result.HostPort).Distinct().Count(), Is.EqualTo(2));
