@@ -98,6 +98,12 @@ public sealed class InfrastructureCommandService
     internal Task<InfrastructureCommandResponse> ExecuteTypedDockerAsync(
         IReadOnlyList<string> arguments,
         CancellationToken cancellationToken)
+        => ExecuteTypedDockerAsync(arguments, TimeSpan.FromSeconds(900), cancellationToken);
+
+    internal Task<InfrastructureCommandResponse> ExecuteTypedDockerAsync(
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         if (arguments.Count == 0 || !string.Equals(arguments[0], "docker", StringComparison.Ordinal))
             return Task.FromResult(Failure("Only typed Docker operations are supported."));
@@ -113,7 +119,9 @@ public sealed class InfrastructureCommandService
         if (!capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase))
             return Task.FromResult(Failure("Host container execution capability is not enabled."));
 
-        return typedDockerExecutor(arguments, TimeSpan.FromSeconds(900), cancellationToken);
+        if (timeout < TimeSpan.FromSeconds(1) || timeout > TimeSpan.FromSeconds(86_400))
+            return Task.FromResult(Failure("Typed Docker timeout must be between 1 and 86400 seconds."));
+        return typedDockerExecutor(arguments, timeout, cancellationToken);
     }
 
     private static async Task<InfrastructureCommandResponse> RunTypedDockerProcessAsync(

@@ -12,7 +12,7 @@ public sealed class HostContainerExecutionTests
     public async Task ResolveImageWorksWithDedicatedCapabilityWithoutHostExecution()
     {
         var commands = new List<string>();
-        var service = new HostContainerExecutionService((arguments, _) =>
+        var service = new HostContainerExecutionService((arguments, _, _) =>
         {
             commands.Add(string.Join(' ', arguments));
             return Task.FromResult(new InfrastructureCommandResponse
@@ -51,7 +51,7 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task HostExecutionAloneDoesNotAuthorizeHostContainerExecution()
     {
-        var service = new HostContainerExecutionService((_, _) =>
+        var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
@@ -119,7 +119,7 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task StorageDependentOperationFailsWithMappingError()
     {
-        var service = new HostContainerExecutionService((_, _) =>
+        var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
@@ -149,7 +149,7 @@ public sealed class HostContainerExecutionTests
     {
         var commands = new List<IReadOnlyList<string>>();
         var hostedId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var service = new HostContainerExecutionService((arguments, _) =>
+        var service = new HostContainerExecutionService((arguments, _, _) =>
         {
             commands.Add(arguments);
             var output = arguments.Contains("inspect") && arguments.Contains("image")
@@ -184,6 +184,62 @@ public sealed class HostContainerExecutionTests
             Assert.That(build, Does.Not.Contain("readonly"));
             Assert.That(build, Does.Not.Contain("/var/run/docker.sock"));
             Assert.That(build, Does.Not.Contain("/host"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    [Test]
+    public async Task RunBuildPlacesEntrypointBeforeImageForPathShellAndSourceRelativeCommands()
+    {
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+
+            async Task<IReadOnlyList<string>> Execute(ApplicationCommandSpec command)
+            {
+                var commands = new List<IReadOnlyList<string>>();
+                var hostedId = Guid.NewGuid();
+                var service = new HostContainerExecutionService((arguments, _, _) =>
+                {
+                    commands.Add(arguments);
+                    var output = arguments.Contains("volume")
+                        ? $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedId}\",\"automaton.storage-scope\":\"user\"}}"
+                        : arguments.Contains("inspect") ? "example/build:1@sha256:abc" : "";
+                    return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
+                });
+                var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+                {
+                    Scope = new(hostedId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                    Operation = HostContainerOperationKinds.RunBuild,
+                    RequestedImage = "example/build:1",
+                    Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+                    Command = command
+                });
+                Assert.That(result.Success, Is.True);
+                return commands.Single(x => x.Count > 1 && x[1] == "run");
+            }
+
+            var path = await Execute(new() { Executable = "dotnet", Arguments = ["publish", "-c", "Release"] });
+            var pathEntryPoint = path.ToList().IndexOf("--entrypoint");
+            Assert.That(path.Skip(pathEntryPoint).Take(4), Is.EqualTo(new[] { "--entrypoint", "dotnet", "example/build:1@sha256:abc", "publish" }));
+            Assert.That(path, Does.Contain("-c"));
+            Assert.That(path, Does.Contain("Release"));
+
+            var sourceRelative = await Execute(new() { Executable = "scripts/build.sh" });
+            var sourceEntryPoint = sourceRelative.ToList().IndexOf("--entrypoint");
+            Assert.That(sourceRelative.Skip(sourceEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/automaton/source/scripts/build.sh", "example/build:1@sha256:abc" }));
+
+            var shell = await Execute(new() { Executable = "echo build", UseShell = true, Arguments = ["-x"] });
+            var shellEntryPoint = shell.ToList().IndexOf("--entrypoint");
+            Assert.That(shell.Skip(shellEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/bin/sh", "example/build:1@sha256:abc" }));
+            Assert.That(shell, Does.Contain("-c"));
         }
         finally
         {
@@ -254,7 +310,7 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task HostedRunnerCannotUseHostContainerCapability()
     {
-        var service = new HostContainerExecutionService((_, _) =>
+        var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         try
@@ -279,7 +335,7 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task SuppliedResourceIdsDoNotEstablishTrustedMapping()
     {
-        var service = new HostContainerExecutionService((_, _) =>
+        var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");

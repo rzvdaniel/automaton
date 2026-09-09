@@ -54,6 +54,31 @@ public sealed class HostContainerRelayService(
                 || request.HostPort != 0 || request.ContainerPort != 0))
             return Failure("invalid_request", "RunBuild requires a command and server-derived resources.");
         if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.TimeoutSeconds is < 1 or > 86_400))
+            return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.Environment is null || request.Command!.Arguments is null || request.Command.Environment is null
+                || string.IsNullOrWhiteSpace(request.Command.Executable)))
+            return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild)
+        {
+            var contractErrors = ApplicationContractValidator.Validate(new ApplicationContract
+            {
+                Build = new ApplicationBuildSpec
+                {
+                    Image = request.RequestedImage,
+                    Command = request.Command,
+                    TimeoutSeconds = request.TimeoutSeconds
+                }
+            });
+            if (contractErrors.Count > 0)
+                return Failure("invalid_request", string.Join("; ", contractErrors));
+        }
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && (request.RequestedImage!.Any(char.IsWhiteSpace) || request.RequestedImage.Contains('\0')
+                || request.RequestedImage.StartsWith("-", StringComparison.Ordinal)))
+            return Failure("invalid_request", "RunBuild contains an invalid image reference.");
+        if (request.Operation == HostContainerOperationKinds.RunBuild
             && request.Scope.DeploymentAttemptId == Guid.Empty)
             return Failure("invalid_request", "RunBuild requires a server-issued deployment attempt.");
 
