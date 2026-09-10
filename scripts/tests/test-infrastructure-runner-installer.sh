@@ -38,7 +38,8 @@ require 'Update failed; rollback also failed. Manual recovery is required.'
 # All successful paths preserve the canonical non-secret configuration.
 require 'container-specification.env'
 require 'save_installation_configuration'
-require 'SPECIFICATION_VERSION=2'
+require 'CANONICAL_SPECIFICATION_VERSION=2'
 require 'AUTOMATON_RUNTIME_HOST_ADDRESS=$AUTOMATON_PRIVATE_IP'
+[[ "$(grep -Fc 'CANONICAL_SPECIFICATION_VERSION=2' "$INSTALLER")" -eq 1 ]] || fail 'canonical specification version must have one literal declaration'
 
 echo 'Infrastructure Runner installer safety checks passed.'
