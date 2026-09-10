@@ -52,6 +52,21 @@ EOF
 chmod +x "$TMP/bin"/*
 PATH="$TMP/bin:$PATH"
 
+# A persisted v1 configuration cannot downgrade the executing v2 installer.
+cat >"$TMP/data/config/container-specification.env" <<'EOF'
+AUTOMATON_SERVER_URL=https://api.example.test
+AUTOMATON_RUNNER_NAME=infrastructure-test
+AUTOMATON_PRIVATE_IP=10.0.0.2
+AUTOMATON_CONTAINER_NAME=automaton-infrastructure-runner
+AUTOMATON_DATA_ROOT=/var/lib/automaton/infrastructure-runner
+AUTOMATON_ROOT=/var/lib/automaton
+AUTOMATON_RUNNER_IMAGE=example/runner@sha256:old
+SPECIFICATION_VERSION=1
+EOF
+AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test
+grep -Eq '^run -d --name automaton-infrastructure-runner .*automaton.specification-version=2.*AUTOMATON_CONTAINER_SPECIFICATION_VERSION=2.*AUTOMATON_RUNTIME_HOST_ADDRESS=10.0.0.2' "$LOG"
+grep -Fq 'SPECIFICATION_VERSION=2' "$TMP/data/config/container-specification.env"
+
 # Repair uses the installed immutable image, not the default mutable tag.
 AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test
 grep -Fq 'pull example/runner@sha256:old' "$LOG"
