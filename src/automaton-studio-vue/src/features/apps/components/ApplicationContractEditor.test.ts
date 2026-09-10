@@ -18,6 +18,8 @@ describe('ApplicationContractEditor', () => {
     expect(wrapper.text()).toContain('Persistent data directory')
     expect(wrapper.text()).not.toContain('frontend')
     expect(wrapper.text()).not.toContain('backend')
+    expect(createDefaultApplicationContract().build.image).toBeNull()
+    expect(createDefaultApplicationContract().runtime.image).toBeNull()
   })
 
   it('commits multiline command and environment input without destroying typed text', async () => {
@@ -48,6 +50,31 @@ describe('ApplicationContractEditor', () => {
     const contract = updates[updates.length - 1]?.[0] as ApplicationContract
     expect(contract.runtime.command?.arguments).toEqual(['first', 'second'])
     expect(contract.runtime.command?.environment).toEqual({ KEY: 'value=with=equals', SECOND: 'two' })
+  })
+
+  it('renders and preserves build and runtime images while editing the contract', async () => {
+    const modelValue = {
+      ...createDefaultApplicationContract(),
+      build: { ...createDefaultApplicationContract().build, image: 'builder:latest' },
+      runtime: {
+        image: 'python:3.13-slim',
+        command: { executable: 'python', arguments: ['app.py'], workingDirectory: '.', environment: {}, useShell: false },
+        port: 8080,
+      },
+    }
+    const wrapper = mount(ApplicationContractEditor, {
+      props: { modelValue },
+      global: { plugins: [PrimeVue] },
+    })
+
+    expect((wrapper.find('#build-image').element as HTMLInputElement).value).toBe('builder:latest')
+    expect((wrapper.find('#runtime-image').element as HTMLInputElement).value).toBe('python:3.13-slim')
+    await wrapper.find('#runtime-image').setValue('python:3.13-slim')
+
+    const updates = wrapper.emitted('update:modelValue') ?? []
+    const contract = updates[updates.length - 1]?.[0] as ApplicationContract
+    expect(contract.build.image).toBe('builder:latest')
+    expect(contract.runtime.image).toBe('python:3.13-slim')
   })
 
   it('preserves shell mode and storage mounts while editing visible fields', async () => {
