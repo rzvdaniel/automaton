@@ -344,7 +344,6 @@ public sealed class HostContainerRelayServiceTests
         {
             request with { Resources = new HostContainerResourceRef("source", "artifact", "data") },
             request with { HostPort = 8080 },
-            request with { RequestedImage = "mutable:tag" },
             request with { ContainerId = "--unsafe" }
         })
         {
@@ -352,6 +351,14 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(result.ErrorCode, Is.EqualTo("invalid_request"));
         }
         Assert.That(fixture.Transport.Invocations, Is.Zero);
+
+        if (operation == HostContainerOperationKinds.CreateApplicationContainer)
+        {
+            var mutable = request with { RequestedImage = "example/runtime:latest" };
+            var accepted = await fixture.Service.ExecuteAsync(fixture.Caller(), mutable, CancellationToken.None);
+            Assert.That(accepted.Success, Is.True, accepted.Error);
+            Assert.That(fixture.Transport.Invocations, Is.EqualTo(1));
+        }
     }
 
     [TestCaseSource(nameof(RuntimeOperations))]

@@ -39,9 +39,6 @@ public static class HostContainerRuntimeValidation
         if (request.ContainerId is not null || request.CandidateId == Guid.Empty
             || request.Command is null || request.Storage is null)
             return "Create requires a candidate ID, command, and storage semantics, without a container ID.";
-        if (!IsRepoDigest(request.RequestedImage))
-            return "Create requires an immutable sha256 repository digest.";
-
         var errors = ApplicationContractValidator.Validate(new ApplicationContract
         {
             Runtime = new ApplicationRuntimeSpec
