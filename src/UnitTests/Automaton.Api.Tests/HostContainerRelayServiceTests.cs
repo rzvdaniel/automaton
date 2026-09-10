@@ -248,6 +248,138 @@ public sealed class HostContainerRelayServiceTests
         });
     }
 
+    private static readonly string[] RuntimeOperations =
+    [
+        HostContainerOperationKinds.CreateApplicationContainer, HostContainerOperationKinds.StartContainer,
+        HostContainerOperationKinds.InspectContainer, HostContainerOperationKinds.GetContainerLogs,
+        HostContainerOperationKinds.RemoveContainer
+    ];
+
+    [TestCaseSource(nameof(RuntimeOperations))]
+    public async Task RuntimeOperations_ForwardValidatedInputsAndResponse(string operation)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.RuntimeRequest(operation);
+        fixture.Target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
+        fixture.Transport.Result = new HostContainerExecutionResponse
+        {
+            Success = true, Exists = true, Running = true, ContainerId = "container",
+            HostAddress = "10.0.0.2", HostPort = 32001, ContainerPort = 8080, Logs = "ready"
+        };
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), request, CancellationToken.None);
+        Assert.That(result, Is.SameAs(fixture.Transport.Result));
+        var forwarded = fixture.Transport.Request!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(forwarded.Scope, Is.EqualTo(request.Scope with
+            { HostedRunnerId = fixture.HostedRunner.Id, RunnerHostId = fixture.Host.Id }));
+            Assert.That(forwarded.Operation, Is.EqualTo(operation));
+            Assert.That(forwarded.ContainerId, Is.EqualTo(request.ContainerId));
+            Assert.That(forwarded.CandidateId, Is.EqualTo(request.CandidateId));
+            Assert.That(forwarded.Storage, Is.SameAs(request.Storage));
+            Assert.That(forwarded.Command, Is.SameAs(request.Command));
+            Assert.That(forwarded.Environment, Is.EquivalentTo(request.Environment));
+            Assert.That(forwarded.RequestedImage, Is.EqualTo(request.RequestedImage));
+            Assert.That(forwarded.ContainerPort, Is.EqualTo(request.ContainerPort));
+            Assert.That(forwarded.HostPort, Is.Zero);
+            Assert.That(forwarded.Resources, Is.EqualTo(operation == HostContainerOperationKinds.CreateApplicationContainer
+                ? new HostContainerResourceRef("source", "artifact", "data") : null));
+        });
+    }
+
+    [TestCaseSource(nameof(RuntimeOperations))]
+    public async Task RuntimeOperations_PreserveAuthorizationMatrix(string operation)
+    {
+        string[] failures = ["stale", "profile", "purpose", "hosted", "host", "scope-hosted", "scope-host",
+            "target", "app", "assignment", "infra", "offline", "protocol", "capability", "api"];
+        foreach (var failure in failures)
+        {
+            using var fixture = RelayFixture.Create();
+            var caller = fixture.Caller();
+            var request = fixture.RuntimeRequest(operation);
+            var expected = failure switch
+            {
+                "stale" or "profile" or "purpose" => "caller_not_managed_runner",
+                "hosted" or "scope-hosted" => "hosted_runner_binding_mismatch",
+                "host" or "scope-host" => "runner_host_binding_mismatch",
+                "target" or "app" => "deployment_target_mismatch",
+                "assignment" => "app_assignment_mismatch",
+                "infra" => "infrastructure_runner_missing",
+                "offline" => "infrastructure_runner_offline",
+                "protocol" => "host_container_protocol_unsupported",
+                "capability" => "host_container_capability_missing",
+                _ => "infrastructure_runner_wrong_api_instance"
+            };
+            switch (failure)
+            {
+                case "stale": caller.ConnectionId = "stale"; break;
+                case "profile": fixture.HostedRunnerEntity.ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost; break;
+                case "purpose": caller.Purpose = RunnerPurposes.Infrastructure; break;
+                case "hosted": fixture.HostedRunner.DeletedAt = DateTime.UtcNow; break;
+                case "host": caller.RunnerHostId = Guid.NewGuid(); break;
+                case "scope-hosted": request = request with { Scope = request.Scope with { HostedRunnerId = Guid.NewGuid() } }; break;
+                case "scope-host": request = request with { Scope = request.Scope with { RunnerHostId = Guid.NewGuid() } }; break;
+                case "target": request = request with { Scope = request.Scope with { DeploymentTargetId = Guid.NewGuid() } }; break;
+                case "app": request = request with { Scope = request.Scope with { AppId = Guid.NewGuid() } }; break;
+                case "assignment": fixture.Target.ExecutionRunnerId = null; break;
+                case "infra": fixture.Host.InfrastructureRunnerId = null; break;
+                case "offline": fixture.Infrastructure.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-1); break;
+                case "protocol": fixture.Infrastructure.ApiCompatibilityVersion = "3"; break;
+                case "capability": fixture.Infrastructure.CapabilitiesJson = "[\"ApplicationHosting\"]"; break;
+                case "api": fixture.Infrastructure.ApiInstanceId = "other"; break;
+            }
+            await fixture.Db.SaveChangesAsync();
+            var result = await fixture.Service.ExecuteAsync(caller, request, CancellationToken.None);
+            Assert.That(result.ErrorCode, Is.EqualTo(expected), failure);
+            Assert.That(fixture.Transport.Invocations, Is.Zero, failure);
+        }
+    }
+
+    [TestCaseSource(nameof(RuntimeOperations))]
+    public async Task RuntimeOperations_RejectCallerResourcesAndHostPort(string operation)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.RuntimeRequest(operation);
+        foreach (var invalid in new[]
+        {
+            request with { Resources = new HostContainerResourceRef("source", "artifact", "data") },
+            request with { HostPort = 8080 },
+            request with { RequestedImage = "mutable:tag" },
+            request with { ContainerId = "--unsafe" }
+        })
+        {
+            var result = await fixture.Service.ExecuteAsync(fixture.Caller(), invalid, CancellationToken.None);
+            Assert.That(result.ErrorCode, Is.EqualTo("invalid_request"));
+        }
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [TestCaseSource(nameof(RuntimeOperations))]
+    public async Task RuntimeOperations_DoNotRequireDeploymentAttempt(string operation)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.RuntimeRequest(operation);
+        request = request with { Scope = request.Scope with { DeploymentAttemptId = Guid.Empty } };
+        fixture.Target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), request, CancellationToken.None);
+        Assert.That(result.Success, Is.True, result.Error);
+    }
+
+    [TestCase(HostContainerOperationKinds.ResolveImage)]
+    [TestCase(HostContainerOperationKinds.RunBuild)]
+    public async Task BuildOperations_RejectRuntimeFields(string operation)
+    {
+        using var fixture = RelayFixture.Create();
+        var request = fixture.Request() with { Operation = operation,
+            Command = operation == HostContainerOperationKinds.RunBuild ? new ApplicationCommandSpec { Executable = "build" } : null };
+        foreach (var invalid in new[] { request with { CandidateId = Guid.NewGuid() }, request with { Storage = new ApplicationStorageSpec() } })
+        {
+            var result = await fixture.Service.ExecuteAsync(fixture.Caller(), invalid, CancellationToken.None);
+            Assert.That(result.Success, Is.False);
+        }
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
     private sealed class RelayFixture : IDisposable
     {
         public ApplicationDbContext Db { get; }
@@ -298,6 +430,19 @@ public sealed class HostContainerRelayServiceTests
         public static RelayFixture Create() => new();
         public RunnerDetails Caller() => new() { Id = CallerRunnerId, ConnectionId = "hosted-connection", Purpose = RunnerPurposes.Managed, HostedRunnerId = HostedRunner.Id, RunnerHostId = Host.Id };
         public HostContainerExecutionRequest Request() => new() { Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "python:3.13-slim", Scope = new HostContainerScope(Guid.Empty, Guid.Empty, App.Id, Target.Id) };
+        public HostContainerExecutionRequest RuntimeRequest(string operation) => new()
+        {
+            Operation = operation,
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, App.Id, Target.Id, Guid.NewGuid()),
+            ContainerId = operation == HostContainerOperationKinds.CreateApplicationContainer ? null : "container",
+            CandidateId = operation == HostContainerOperationKinds.CreateApplicationContainer ? Guid.NewGuid() : Guid.Empty,
+            RequestedImage = operation == HostContainerOperationKinds.CreateApplicationContainer ? "repo@sha256:" + new string('a', 64) : null,
+            Command = operation == HostContainerOperationKinds.CreateApplicationContainer ? new ApplicationCommandSpec { Executable = "serve" } : null,
+            Storage = operation == HostContainerOperationKinds.CreateApplicationContainer ? new ApplicationStorageSpec() : null,
+            ContainerPort = operation == HostContainerOperationKinds.CreateApplicationContainer ? 8080 : 0,
+            Environment = operation == HostContainerOperationKinds.CreateApplicationContainer
+                ? new Dictionary<string, string> { ["MODE"] = "test" } : new Dictionary<string, string>()
+        };
         public void Dispose()
         {
             Db.Dispose();
