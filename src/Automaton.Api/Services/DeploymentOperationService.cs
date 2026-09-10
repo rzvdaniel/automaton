@@ -116,6 +116,14 @@ public sealed class DeploymentOperationService(
 
     public async Task ExecuteAsync(Guid operationId, CancellationToken cancellationToken)
     {
+        if (!await IsRunnerOwnedByThisInstanceAsync(operationId, cancellationToken))
+        {
+            logger.LogInformation(
+                "Deferring deployment operation {OperationId}: assigned Runner connection is owned by another API instance",
+                operationId);
+            return;
+        }
+
         var executionAttemptId = Guid.NewGuid();
         var claim = await ClaimAsync(operationId, executionAttemptId, cancellationToken);
         if (claim == DeploymentOperationClaim.LiveLease)
@@ -164,6 +172,12 @@ public sealed class DeploymentOperationService(
             // for retry/recovery rather than converting it to Failed.
             throw;
         }
+        catch (DeploymentOperationRunnerOwnershipChangedException)
+        {
+            // Leave the durable lease running until expiry so the current
+            // owner can reclaim the operation without a stale completion.
+            throw;
+        }
         catch (Exception exception)
         {
             var result = new DeployPackageResponse
@@ -206,6 +220,58 @@ public sealed class DeploymentOperationService(
             if (current is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed)
                 TryDeletePackage(operation.PackagePath);
         }
+    }
+
+    public async Task DispatchOwnedOperationsAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var operationIds = await dataContext.DeploymentOperations
+            .AsNoTracking()
+            .Where(operation =>
+                operation.Status == DeploymentOperationStatuses.Pending ||
+                (operation.Status == DeploymentOperationStatuses.Running &&
+                 operation.LeaseExpiresAtUtc != null && operation.LeaseExpiresAtUtc <= now))
+            .Where(operation => dataContext.AppDeploymentTargets.Any(target =>
+                target.WebAppId == operation.WebAppId &&
+                (operation.TargetSlug == null
+                    ? target.IsDefault
+                    : target.Slug == operation.TargetSlug) &&
+                (target.ExecutionRunner == null && operation.TargetSlug == null ||
+                 target.ExecutionRunner != null &&
+                 target.ExecutionRunner.ApiInstanceId == executorInstanceId)))
+            .Select(operation => operation.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var operationId in operationIds)
+        {
+            try
+            {
+                await ExecuteAsync(operationId, cancellationToken);
+            }
+            catch (DeploymentOperationLeaseActiveException)
+            {
+                // Another API instance still owns a live attempt.
+            }
+        }
+    }
+
+    private async Task<bool> IsRunnerOwnedByThisInstanceAsync(Guid operationId, CancellationToken cancellationToken)
+    {
+        var operation = await dataContext.DeploymentOperations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == operationId, cancellationToken);
+        if (operation is null)
+            return false;
+
+        return await dataContext.AppDeploymentTargets.AnyAsync(target =>
+            target.WebAppId == operation.WebAppId &&
+            (operation.TargetSlug == null
+                ? target.IsDefault
+                : target.Slug == operation.TargetSlug) &&
+            (target.ExecutionRunner == null && operation.TargetSlug == null ||
+             target.ExecutionRunner != null &&
+             target.ExecutionRunner.ApiInstanceId == executorInstanceId),
+            cancellationToken);
     }
 
     private async Task<DeploymentOperationClaim> ClaimAsync(
