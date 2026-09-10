@@ -104,6 +104,9 @@ public class RunnerDeploymentService
                 manifest.Application,
                 Path.Combine(tempExtractRoot, "source"),
                 tempExtractRoot,
+                request.ExecutionAttemptId is Guid buildAttemptId
+                    ? new RunnerApplicationBuildContext(appId, deploymentTargetId, buildAttemptId)
+                    : null,
                 cancellationToken: executionCancellationToken);
             logs.AddRange(buildResult.Logs);
             if (!buildResult.Succeeded)
@@ -133,9 +136,11 @@ public class RunnerDeploymentService
                 runnerWorkspaceService.GetAppSourceRoot(appId, deploymentTargetId));
             int runtimeCount;
             string? candidateArtifactRoot = null;
+            Guid? runtimeCandidateId = null;
             if (manifest.Application.Runtime.Command is not null)
             {
                 var candidateId = Guid.NewGuid();
+                runtimeCandidateId = candidateId;
                 candidateRuntimeRoot = runnerWorkspaceService.GetAppRuntimeCandidateDirectory(
                     appId,
                     deploymentTargetId,
@@ -170,7 +175,8 @@ public class RunnerDeploymentService
                 deploymentTargetId,
                 manifest.Application,
                 cancellationToken: executionCancellationToken,
-                artifactRoot: candidateArtifactRoot);
+                artifactRoot: candidateArtifactRoot,
+                candidateId: runtimeCandidateId);
             candidatePromoted = candidateArtifactRoot is not null
                 && runtimeApplyResult.PromotionIrreversible;
             if (runtimeApplyResult.Warning is not null)
@@ -263,6 +269,7 @@ public class RunnerDeploymentService
         ApplicationContract application,
         string buildWorkspace,
         string extractRoot,
+        RunnerApplicationBuildContext? context,
         CancellationToken cancellationToken)
     {
         var build = application.Build;
@@ -274,7 +281,7 @@ public class RunnerDeploymentService
 
         var result = !string.IsNullOrWhiteSpace(build.Image)
             || !string.IsNullOrWhiteSpace(application.Runtime.Image)
-            ? await buildExecutor.ExecuteAsync(build, application.Runtime, buildWorkspace, cancellationToken)
+            ? await buildExecutor.ExecuteAsync(build, application.Runtime, buildWorkspace, context, cancellationToken)
             : await ApplicationBuildExecutor.ExecuteAsync(build, buildWorkspace, cancellationToken);
 
         var artifactDirectory = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);

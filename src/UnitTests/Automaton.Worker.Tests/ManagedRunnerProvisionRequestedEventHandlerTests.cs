@@ -41,7 +41,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         {
             Id = Guid.NewGuid(), Name = "host-1", Provider = "test",
             InfrastructureRunnerId = Guid.NewGuid(),
-            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
+            PrivateIp = "10.20.30.40"
         };
         var runner = new HostedRunner
         {
@@ -101,6 +102,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         using (var input = JsonDocument.Parse(request.InputJson))
         {
             Assert.That(input.RootElement.GetProperty("runnerPort").GetInt32(), Is.EqualTo(8080));
+            Assert.That(input.RootElement.GetProperty("runtimeHostAddress").GetString(), Is.EqualTo("10.20.30.40"));
             Assert.That(input.RootElement.GetProperty("cpuLimit").GetDecimal(), Is.EqualTo(1));
             Assert.That(input.RootElement.GetProperty("memoryMb").GetInt32(), Is.EqualTo(1024));
             Assert.That(input.RootElement.GetProperty("pidsLimit").GetInt32(), Is.EqualTo(256));

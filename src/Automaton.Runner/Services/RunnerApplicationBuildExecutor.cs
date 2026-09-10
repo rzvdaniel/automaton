@@ -9,6 +9,7 @@ public interface IRunnerApplicationBuildExecutor
         ApplicationBuildSpec build,
         ApplicationRuntimeSpec runtime,
         string workspaceRoot,
+        RunnerApplicationBuildContext? context = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -25,6 +26,7 @@ public sealed class RunnerApplicationBuildExecutor : IRunnerApplicationBuildExec
         ApplicationBuildSpec build,
         ApplicationRuntimeSpec runtime,
         string workspaceRoot,
+        RunnerApplicationBuildContext? context = null,
         CancellationToken cancellationToken = default)
     {
         if (build.Command is null)
@@ -37,7 +39,7 @@ public sealed class RunnerApplicationBuildExecutor : IRunnerApplicationBuildExec
         try
         {
             await containers.RunBuildAsync(
-                new DockerBuildRequest(image, build.Command, workspaceRoot, build.TimeoutSeconds),
+                new DockerBuildRequest(image, build.Command, workspaceRoot, build.TimeoutSeconds, context),
                 build.Command.Environment,
                 cancellationToken);
             return new ApplicationBuildExecutionResult { Succeeded = true };

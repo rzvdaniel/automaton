@@ -4,7 +4,7 @@ set -euo pipefail
 # The single source of truth for an Infrastructure Runner container.  Install,
 # repair, update and rollback all invoke the same builder so recovery never
 # requires an administrator to reconstruct privileged docker arguments.
-SPECIFICATION_VERSION=1
+SPECIFICATION_VERSION=2
 OPERATION=install
 AUTOMATON_SERVER_URL="${AUTOMATON_SERVER_URL:-}"
 AUTOMATON_API_KEY="${AUTOMATON_API_KEY:-}"
@@ -125,7 +125,8 @@ run_canonical_container() {
     -e "AUTOMATON_RUNNER_IMAGE_DIGEST=$digest" -e "AUTOMATON_CONTAINER_SPECIFICATION_VERSION=$SPECIFICATION_VERSION")
   [[ -n "$AUTOMATON_RUNNER_NAME" ]] && args+=(-e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME")
   [[ -n "$AUTOMATON_PUBLIC_IP" ]] && args+=(-e "AUTOMATON_PUBLIC_IP=$AUTOMATON_PUBLIC_IP")
-  [[ -n "$AUTOMATON_PRIVATE_IP" ]] && args+=(-e "AUTOMATON_PRIVATE_IP=$AUTOMATON_PRIVATE_IP")
+    [[ -n "$AUTOMATON_PRIVATE_IP" ]] && args+=(-e "AUTOMATON_PRIVATE_IP=$AUTOMATON_PRIVATE_IP")
+    [[ -n "$AUTOMATON_PRIVATE_IP" ]] && args+=(-e "AUTOMATON_RUNTIME_HOST_ADDRESS=$AUTOMATON_PRIVATE_IP")
   [[ -n "$AUTOMATON_API_KEY" ]] && args+=(-e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY")
   [[ -n "$AUTOMATON_ENROLLMENT_TOKEN" ]] && args+=(-e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN")
   args+=("$image"); docker "${args[@]}"

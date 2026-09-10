@@ -362,7 +362,15 @@ public class Program
                 services.AddHostedService<AppActionArtifactCleanupService>();
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerRuntimeRegistry>();
-                services.AddSingleton<IApplicationContainerRuntime, DockerContainerRuntime>();
+                services.AddSingleton<IApplicationContainerRuntime>(sp =>
+                    RunnerApplicationContainerRuntimeSelection.UsesBroker(
+                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
+                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
+                        Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"))
+                        ? new BrokeredApplicationContainerRuntime(
+                            sp.GetRequiredService<HubService>(),
+                            sp.GetRequiredService<FileStorageService>())
+                        : new DockerContainerRuntime());
                 services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
                 services.AddSingleton<RunnerRuntimeContainerManager>();
                 services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeContainerManager>());

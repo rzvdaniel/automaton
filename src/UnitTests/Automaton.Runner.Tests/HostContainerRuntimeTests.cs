@@ -60,7 +60,9 @@ public sealed class HostContainerRuntimeTests
             return Task.FromResult(execute?.Invoke(args) ?? new InfrastructureCommandResponse
             {
                 Success = true,
-                Output = args[1] == "volume" ? VolumeLabels() : args[1] == "create" ? ContainerId : Inspection().ToJsonString()
+                Output = args[1] == "volume" ? VolumeLabels()
+                    : args[1] == "image" ? Digest
+                    : args[1] == "create" ? ContainerId : Inspection().ToJsonString()
             });
         });
 
@@ -110,7 +112,9 @@ public sealed class HostContainerRuntimeTests
         Assert.Multiple(() =>
         {
             Assert.That(result.HostPort, Is.Null);
-            Assert.That(calls.Any(x => x[1] is "start" or "pull"), Is.False);
+            Assert.That(calls.Any(x => x[1] == "start"), Is.False);
+            Assert.That(result.RequestedImage, Is.EqualTo(Digest));
+            Assert.That(result.ResolvedImage, Is.EqualTo(Digest));
             Assert.That(args[args.IndexOf("--publish") + 1], Is.EqualTo("172.17.0.1::8080"));
             Assert.That(args, Does.Contain("no-new-privileges"));
             Assert.That(args[args.IndexOf("--cap-drop") + 1], Is.EqualTo("ALL"));
@@ -288,8 +292,7 @@ public sealed class HostContainerRuntimeTests
     }
 
     [TestCase("host-port")]
-    [TestCase("mutable-image")]
-    [TestCase("no-candidate")]
+[TestCase("no-candidate")]
     [TestCase("bad-volume")]
     public async Task CreateRejectsCallerAuthorityInputs(string kind)
     {
@@ -303,6 +306,19 @@ public sealed class HostContainerRuntimeTests
         };
         Assert.That((await Service().ExecuteAsync(request)).Success, Is.False);
         Assert.That(calls, Is.Empty);
+    }
+
+    [Test]
+    public async Task CreateAcceptsMutableImageAndResolvesImmutableDigest()
+    {
+        var request = CreateRequest() with { RequestedImage = "example/runtime:latest" };
+        var result = await Service().ExecuteAsync(request);
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(result.RequestedImage, Is.EqualTo("example/runtime:latest"));
+        Assert.That(result.ResolvedImage, Is.EqualTo(Digest));
+        var create = calls.Single(x => x[1] == "create");
+        Assert.That(create, Does.Contain(Digest));
+        Assert.That(create, Does.Not.Contain("example/runtime:latest"));
     }
 
     [Test]

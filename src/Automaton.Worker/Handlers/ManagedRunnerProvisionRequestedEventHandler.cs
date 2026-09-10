@@ -8,6 +8,7 @@ using Automaton.Messaging.Events;
 using Automaton.Worker.Config;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Automaton.Worker.Handlers;
 
@@ -79,6 +80,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         }
 
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
+        var runtimeHostAddress = RequirePrivateRuntimeHostAddress(host.PrivateIp);
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
             ?? hostedRunner.SpecificationSnapshot.SourceSpecificationId;
         var specificationId = snapshotSpecificationId == Guid.Empty
@@ -103,6 +105,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             runnerPort = options.Value.RuntimePort,
             networkName = options.Value.DockerNetwork,
             runtimeNetworkName = options.Value.RuntimeDockerNetwork,
+            runtimeHostAddress,
             systemVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-system",
             userVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-user",
             specificationId,
@@ -141,6 +144,20 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         {
             logger.LogInformation("Ignoring duplicate managed runner provisioning request for operation {OperationId} in state {Status}", deployment.Id, deployment.Status);
         }
+    }
+
+    private static string RequirePrivateRuntimeHostAddress(string? value)
+    {
+        if (!IPAddress.TryParse(value?.Trim(), out var address)
+            || address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork
+            || IPAddress.IsLoopback(address))
+            throw new InvalidOperationException("The Runner Host requires a concrete private IPv4 runtime address.");
+        var bytes = address.GetAddressBytes();
+        if (!(bytes[0] == 10
+            || bytes[0] == 172 && bytes[1] is >= 16 and <= 31
+            || bytes[0] == 192 && bytes[1] == 168))
+            throw new InvalidOperationException("The Runner Host runtime address must use a private IPv4 range.");
+        return address.ToString();
     }
 
     private async Task FailAsync(
