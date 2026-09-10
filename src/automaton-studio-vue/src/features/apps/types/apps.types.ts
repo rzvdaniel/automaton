@@ -103,12 +103,14 @@ export interface ApplicationCommandSpec {
 }
 
 export interface ApplicationBuildSpec {
+  image?: string | null
   command: ApplicationCommandSpec | null
   outputDirectory?: string | null
   timeoutSeconds: number
 }
 
 export interface ApplicationRuntimeSpec {
+  image?: string | null
   command: ApplicationCommandSpec | null
   port: number
 }
@@ -139,8 +141,8 @@ export interface ApplicationContract {
 
 export function createDefaultApplicationContract(): ApplicationContract {
   return {
-    build: { command: null, outputDirectory: null, timeoutSeconds: 900 },
-    runtime: { command: null, port: 8080 },
+    build: { image: null, command: null, outputDirectory: null, timeoutSeconds: 900 },
+    runtime: { image: null, command: null, port: 8080 },
     health: { path: null, port: null, startupTimeoutSeconds: 60 },
     storage: { dataDirectory: 'data', mounts: [] },
   }

@@ -134,6 +134,11 @@ function updateContract() {
         <InputSwitch :model-value="draft.build.command !== null" input-id="build-enabled" @update:model-value="setCommandEnabled('build', $event)" />
         <label for="build-enabled">Build before starting the runtime</label>
       </div>
+      <div class="flex flex-column gap-2 mb-3">
+        <label for="build-image">Build image</label>
+        <InputText id="build-image" v-model="draft.build.image" placeholder="optional OCI image" @update:model-value="updateContract" />
+        <small class="text-color-secondary">Optional OCI image used for the build command. When omitted, the runtime image may provide the build image.</small>
+      </div>
       <div v-if="draft.build.command" class="grid">
         <div class="col-12 md:col-6 flex flex-column gap-2">
           <label for="build-executable">Executable</label>
@@ -172,6 +177,11 @@ function updateContract() {
       <div class="flex align-items-center gap-2 mb-3">
         <InputSwitch :model-value="draft.runtime.command !== null" input-id="runtime-enabled" @update:model-value="setCommandEnabled('runtime', $event)" />
         <label for="runtime-enabled">Start a runtime process</label>
+      </div>
+      <div class="flex flex-column gap-2 mb-3">
+        <label for="runtime-image">Runtime image</label>
+        <InputText id="runtime-image" v-model="draft.runtime.image" placeholder="OCI image reference" @update:model-value="updateContract" />
+        <small class="text-color-secondary">OCI image that owns the application runtime process. Required when a runtime command is enabled for container deployment.</small>
       </div>
       <div v-if="draft.runtime.command" class="grid">
         <div class="col-12 md:col-6 flex flex-column gap-2">
