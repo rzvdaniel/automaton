@@ -26,6 +26,26 @@ namespace Automaton.Api.Tests;
 public sealed class ApplicationDeploymentServiceTests
 {
     [Test]
+    public async Task OwnershipLoss_DoesNotFinalizeDeploymentTarget()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        var operationId = Guid.NewGuid();
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ExecutionRunner!.ApiInstanceId = "another-api";
+        await fixture.Db.SaveChangesAsync();
+        var package = fixture.CreatePackage(hasRuntime: true);
+
+        Assert.ThrowsAsync<DeploymentOperationRunnerOwnershipChangedException>(async () =>
+            await fixture.Service.DeployPackageAsync(fixture.AppId, fixture.OwnerId, fixture.Target.Slug,
+                package, clean: true, CancellationToken.None, operationId, attemptId));
+
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(item => item.Id == fixture.Target.Id);
+        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Deploying));
+        Assert.That(target.ActiveDeploymentOperationId, Is.EqualTo(operationId));
+        Assert.That(target.ActiveDeploymentExecutionAttemptId, Is.EqualTo(attemptId));
+    }
+
+    [Test]
     public async Task IncompatibleRunnerFailsBeforeManagedArtifactDeployment()
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
@@ -109,7 +129,7 @@ public sealed class ApplicationDeploymentServiceTests
             publisher,
             environment,
             null!,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             null!);
 
@@ -219,7 +239,7 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             environment,
             null!,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             null!);
 
@@ -264,7 +284,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
             },
             null!,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             null!);
 
@@ -313,7 +333,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
             },
             fixture.Service,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             NullLogger<DeploymentOperationService>.Instance);
         var abandonedAttemptId = operation.ExecutionAttemptId;
@@ -361,7 +381,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
             },
             null!,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             null!);
 
@@ -401,7 +421,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
             },
             fixture.Service,
-            new ApiInstanceIdentityService(),
+            fixture.ApiIdentity,
             null!,
             NullLogger<DeploymentOperationService>.Instance);
         using var cancellation = new CancellationTokenSource();
@@ -612,6 +632,7 @@ public sealed class ApplicationDeploymentServiceTests
 
         public ApplicationDbContext Db { get; }
         public ApplicationDeploymentService Service { get; }
+        public ApiInstanceIdentityService ApiIdentity { get; }
         public Guid OwnerId { get; }
         public Guid AppId { get; }
         public AppDeploymentTarget Target { get; }
@@ -631,9 +652,11 @@ public sealed class ApplicationDeploymentServiceTests
             string rootPath,
             string packagePath,
             bool routeRootAsFile,
-            TaskCompletionSource<bool> runnerInvocationStarted)
+            TaskCompletionSource<bool> runnerInvocationStarted,
+            ApiInstanceIdentityService apiIdentity)
         {
             Db = db;
+            ApiIdentity = apiIdentity;
             Service = service;
             OwnerId = ownerId;
             AppId = appId;
@@ -668,12 +691,14 @@ public sealed class ApplicationDeploymentServiceTests
 
             var ownerId = Guid.NewGuid();
             var appId = Guid.NewGuid();
+            var apiIdentity = new ApiInstanceIdentityService();
             var runner = new Runner
             {
                 Id = Guid.NewGuid(),
                 Name = "Package deployment runner",
                 Purpose = RunnerPurposes.Managed,
                 ConnectionId = "package-deployment-connection",
+                ApiInstanceId = apiIdentity.ApiInstanceId,
                 LastHeartbeatAtUtc = DateTime.UtcNow,
                 Status = RunnerStatus.Online.ToString(),
                 ApiCompatibilityVersion = runnerApiCompatibilityVersion ?? RunnerApiCompatibilityVersions.Current,
@@ -765,7 +790,8 @@ public sealed class ApplicationDeploymentServiceTests
                 resolver,
                 new AppDeploymentTargetStateService(db),
                 routeService,
-                new ConnectedFlowArtifactService(storage, null!, hub));
+                new ConnectedFlowArtifactService(storage, null!, hub),
+                apiIdentity);
 
             return new DeploymentFixture(
                 db,
@@ -777,7 +803,8 @@ public sealed class ApplicationDeploymentServiceTests
                 rootPath,
                 packagePath,
                 routeRootAsFile,
-                runnerInvocationStarted);
+                runnerInvocationStarted,
+                apiIdentity);
         }
 
         public IFormFile CreatePackage(bool hasRuntime, IReadOnlyDictionary<string, string>? sourceFiles = null)
@@ -1028,3 +1055,5 @@ public sealed class ApplicationDeploymentServiceTests
         }
     }
 }
+
+

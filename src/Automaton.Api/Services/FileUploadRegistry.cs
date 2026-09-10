@@ -44,6 +44,13 @@ public class FileUploadRegistry
         return false;
     }
 
+    public bool TryCancel(string sessionId, string reason = "Upload cancelled")
+    {
+        if (_pending.TryRemove(sessionId, out var tcs))
+            return tcs.TrySetException(new OperationCanceledException(reason));
+        return false;
+    }
+
     private void TryFail(string sessionId, string reason)
     {
         if (_pending.TryRemove(sessionId, out var tcs))

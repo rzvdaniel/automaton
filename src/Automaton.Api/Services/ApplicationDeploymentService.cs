@@ -9,6 +9,7 @@ using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
@@ -29,6 +30,7 @@ public sealed class ApplicationDeploymentService
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly ConnectedFlowArtifactService connectedFlowArtifactService;
     private readonly Serilog.ILogger logger;
+    private readonly ApiInstanceIdentityService apiInstanceIdentityService;
 
     public ApplicationDeploymentService(
         ApplicationDbContext dataContext,
@@ -40,7 +42,8 @@ public sealed class ApplicationDeploymentService
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
         BackendRouteConfigService backendRouteConfigService,
-        ConnectedFlowArtifactService connectedFlowArtifactService)
+        ConnectedFlowArtifactService connectedFlowArtifactService,
+        ApiInstanceIdentityService apiInstanceIdentityService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -52,6 +55,7 @@ public sealed class ApplicationDeploymentService
         this.deploymentTargetStateService = deploymentTargetStateService;
         this.backendRouteConfigService = backendRouteConfigService;
         this.connectedFlowArtifactService = connectedFlowArtifactService;
+        this.apiInstanceIdentityService = apiInstanceIdentityService;
         logger = Serilog.Log.ForContext<ApplicationDeploymentService>();
     }
 
@@ -101,11 +105,13 @@ public sealed class ApplicationDeploymentService
             if (runner is null || string.IsNullOrWhiteSpace(runner.ConnectionId))
                 throw new InvalidOperationException("No connected runner is assigned to this app.");
 
+            await EnsureRunnerOwnershipAsync(runner, cancellationToken);
             RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
             if (packageApplication.Runtime.Command is not null || packageApplication.Build.Command is not null)
                 RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(runner);
 
             var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
+            await EnsureRunnerOwnershipAsync(runner, cancellationToken);
             var result = await automatonHub.Clients.Client(runner.ConnectionId)
                 .InvokeAsync<DeployAppPackageResult>(
                     AutomatonHubMethods.DeployAppPackage,
@@ -180,6 +186,12 @@ public sealed class ApplicationDeploymentService
                 Logs = result.Logs,
                 Actions = result.Actions
             };
+        }
+        catch (DeploymentOperationRunnerOwnershipChangedException)
+        {
+            // Runner topology changes are recoverable; preserve the target's
+            // Deploying markers for the durable operation retry.
+            throw;
         }
         catch (Exception deploymentException)
         {
@@ -262,6 +274,21 @@ public sealed class ApplicationDeploymentService
         }
     }
 
+    private async Task EnsureRunnerOwnershipAsync(Runner runner, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(runner.ApiInstanceId))
+            throw new DeploymentOperationRunnerOwnershipChangedException(runner.Id);
+
+        var current = await dataContext.Runners.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == runner.Id, cancellationToken);
+        if (current is null
+            || !string.Equals(current.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId, StringComparison.Ordinal)
+            || !string.Equals(current.ConnectionId, runner.ConnectionId, StringComparison.Ordinal))
+        {
+            throw new DeploymentOperationRunnerOwnershipChangedException(runner.Id);
+        }
+    }
+
     private async Task<FileUploadCompleteMessage> UploadPackageToRunnerAsync(
         Guid appId,
         Runner runner,
@@ -273,23 +300,37 @@ public sealed class ApplicationDeploymentService
         using var stream = file.OpenReadStream();
         var buffer = new byte[chunkSize];
         var chunkIndex = 0;
-        int bytesRead;
-        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        try
         {
-            var chunk = new FileUploadChunk
+            int bytesRead;
+            while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
             {
-                SessionId = sessionId,
-                ChunkIndex = chunkIndex++,
-                Data = bytesRead == chunkSize ? buffer : buffer[..bytesRead],
-                IsLast = stream.Position >= stream.Length,
-                FileName = $"{appId:N}.zip",
-                ContentType = "application/zip",
-                AppId = appId
-            };
-            await automatonHub.Clients.Client(runner.ConnectionId!)
-                .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
+                await EnsureRunnerOwnershipAsync(runner, cancellationToken);
+                var chunk = new FileUploadChunk
+                {
+                    SessionId = sessionId,
+                    ChunkIndex = chunkIndex++,
+                    Data = bytesRead == chunkSize ? buffer : buffer[..bytesRead],
+                    IsLast = stream.Position >= stream.Length,
+                    FileName = $"{appId:N}.zip",
+                    ContentType = "application/zip",
+                    AppId = appId
+                };
+                await automatonHub.Clients.Client(runner.ConnectionId!)
+                    .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
+            }
+            while (true)
+            {
+                var completed = await Task.WhenAny(completionTask, Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken));
+                if (completed == completionTask)
+                    return await completionTask;
+                await EnsureRunnerOwnershipAsync(runner, cancellationToken);
+            }
         }
-        return await completionTask;
+        finally
+        {
+            uploadRegistry.TryCancel(sessionId);
+        }
     }
 
     private static void ValidateDeploymentTargetResponse(Guid expected, Guid actual)

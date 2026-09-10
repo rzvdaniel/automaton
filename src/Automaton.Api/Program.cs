@@ -392,6 +392,7 @@ services.AddScoped<RuntimeFileProxyService>();
 services.AddScoped<ApplicationDeploymentService>();
 services.AddScoped<ConnectedFlowArtifactService>();
 services.AddScoped<DeploymentOperationService>();
+services.AddHostedService<DeploymentOperationDispatcher>();
 services.AddScoped<AppActionExecutionService>();
 services.AddScoped<ActionScheduleService>();
 services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
