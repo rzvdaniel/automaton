@@ -25,6 +25,9 @@ public sealed partial class HostContainerExecutionService
         try { hostAddress = GetPrivateRuntimeHostAddress(); }
         catch (InvalidOperationException ex) { return Failure("runtime_address", ex.Message); }
         var name = $"automaton-app-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{request.CandidateId:N}";
+        var resolved = await ResolveImageAsync(request, cancellationToken);
+        if (!resolved.Success || string.IsNullOrWhiteSpace(resolved.ResolvedImage))
+            return resolved;
         var args = new List<string>
         {
             "docker", "create", "--name", name, "--network", "bridge",
@@ -63,7 +66,7 @@ public sealed partial class HostContainerExecutionService
             args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(request.Command.WorkingDirectory, "/automaton/app"));
             DockerContainerRuntime.AddEnvironment(args, environment);
             DockerContainerRuntime.AddEntrypoint(args, request.Command, "/automaton/app");
-            args.Add(request.RequestedImage!);
+            args.Add(resolved.ResolvedImage);
             DockerContainerRuntime.AddCommandArguments(args, request.Command);
         }
         catch (InvalidOperationException ex) { return Failure("command", ex.Message); }
@@ -77,7 +80,7 @@ public sealed partial class HostContainerExecutionService
         return new HostContainerExecutionResponse
         {
             Success = true, Exists = true, ContainerId = id, ContainerName = name,
-            RequestedImage = request.RequestedImage!, ResolvedImage = request.RequestedImage!,
+            RequestedImage = request.RequestedImage!, ResolvedImage = resolved.ResolvedImage,
             Labels = RuntimeLabels(scope)
         };
     }

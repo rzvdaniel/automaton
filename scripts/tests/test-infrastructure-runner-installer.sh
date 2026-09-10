@@ -28,7 +28,7 @@ identity_line="$(grep -n 'installation-id' "$INSTALLER" | tail -n 1 | cut -d: -f
 # Update success requires both local health and the actual connected log; do
 # not accept broad, ambiguous text such as "Runner connection".
 require 'curl -fsS http://127.0.0.1:8001/health'
-require "grep -Fq 'Successfully connected to server'"
+require 'Successfully connected to server|Connected to server successfully'
 ! grep -Fq 'Runner connection' "$INSTALLER" || fail 'ambiguous connection log match remains'
 
 # Rollback has an independently verified outcome.
@@ -38,5 +38,7 @@ require 'Update failed; rollback also failed. Manual recovery is required.'
 # All successful paths preserve the canonical non-secret configuration.
 require 'container-specification.env'
 require 'save_installation_configuration'
+require 'SPECIFICATION_VERSION=2'
+require 'AUTOMATON_RUNTIME_HOST_ADDRESS=$AUTOMATON_PRIVATE_IP'
 
 echo 'Infrastructure Runner installer safety checks passed.'

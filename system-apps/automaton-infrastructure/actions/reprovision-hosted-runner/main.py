@@ -157,6 +157,8 @@ def main() -> None:
         "-e", f"AUTOMATON_ENROLLMENT_TOKEN={enrollment_token}",
         "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
         "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
+        "-e", "AUTOMATON_RUNNER_PURPOSE=Managed",
+        "-e", "AUTOMATON_RUNNER_APPLICATION_PROFILE=Standard",
         "-e", f"AUTOMATON_RUNTIME_HOST_ADDRESS={runtime_host_address}",
         "-v", f"{system_volume}:/automaton/system",
         "-v", f"{user_volume}:/automaton/storage",

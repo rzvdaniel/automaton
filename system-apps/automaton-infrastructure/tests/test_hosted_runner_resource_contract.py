@@ -149,6 +149,8 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         self.assertIn(f"{SYSTEM_VOLUME}:/automaton/system", run)
         self.assertIn(f"{USER_VOLUME}:/automaton/storage", run)
         self.assertIn("AUTOMATON_RUNTIME_HOST_ADDRESS=10.20.30.40", run)
+        self.assertIn("AUTOMATON_RUNNER_PURPOSE=Managed", run)
+        self.assertIn("AUTOMATON_RUNNER_APPLICATION_PROFILE=Standard", run)
         self.assertNotIn(f"{USER_VOLUME}:/automaton/workspace", run)
         self.assertNotIn(f"{USER_VOLUME}:/app/logs", run)
 
