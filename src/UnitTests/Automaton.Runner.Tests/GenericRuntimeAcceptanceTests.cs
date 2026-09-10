@@ -621,7 +621,8 @@ public sealed class GenericRuntimeAcceptanceTests
             Guid deploymentTargetId,
             ApplicationContract contract,
             CancellationToken cancellationToken = default,
-            string? artifactRoot = null)
+            string? artifactRoot = null,
+            Guid? candidateId = null)
         {
             ArtifactRoot = artifactRoot;
             return Task.FromResult(new RuntimeApplyResult

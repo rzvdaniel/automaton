@@ -10,7 +10,12 @@ public sealed record DockerBuildRequest(
     string Image,
     ApplicationCommandSpec Command,
     string SourceRoot,
-    int TimeoutSeconds);
+    int TimeoutSeconds,
+    RunnerApplicationBuildContext? Context = null);
+
+public sealed record RunnerApplicationBuildContext(Guid AppId, Guid DeploymentTargetId, Guid ExecutionAttemptId);
+public sealed record ApplicationContainerScope(Guid AppId, Guid DeploymentTargetId);
+public sealed record ApplicationContainerStartResult(bool Running, string HostAddress, int HostPort, int ContainerPort);
 
 public sealed record DockerApplicationContainerRequest(
     string Name,
@@ -23,7 +28,9 @@ public sealed record DockerApplicationContainerRequest(
     string DataDirectory,
     IReadOnlyDictionary<string, string> StorageMounts,
     Guid AppId,
-    Guid DeploymentTargetId);
+    Guid DeploymentTargetId,
+    Guid CandidateId = default,
+    ApplicationStorageSpec? Storage = null);
 
 public sealed record DockerApplicationContainer(
     string Id,
@@ -34,7 +41,10 @@ public sealed record DockerContainerIdentity(
     string Id,
     bool Exists,
     bool Running,
-    IReadOnlyDictionary<string, string> Labels);
+    IReadOnlyDictionary<string, string> Labels,
+    string? HostAddress = null,
+    int? HostPort = null,
+    int? ContainerPort = null);
 
 /// <summary>
 /// Translates only the explicitly configured Runner workspace mount from the
@@ -98,6 +108,15 @@ public interface IStagedApplicationContainerRuntime
 {
     Task<DockerApplicationContainer> CreateApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default);
     Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default);
+}
+
+public interface IScopedApplicationContainerRuntime
+{
+    Task<ApplicationContainerStartResult> StartApplicationAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    Task<DockerContainerIdentity> InspectAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    Task<bool> IsRunningAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    Task<string> GetLogsAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
+    Task StopAndRemoveAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
 }
 
 public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime

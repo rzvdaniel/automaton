@@ -47,6 +47,7 @@ def action_request() -> dict[str, object]:
         "systemVolumeName": SYSTEM_VOLUME,
         "userVolumeName": USER_VOLUME,
         "apiUrl": "https://automaton.example",
+        "runtimeHostAddress": "10.20.30.40",
         "memoryMb": 384,
         "memoryReservationMb": 256,
         "pidsLimit": 256,
@@ -147,6 +148,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         self.assertIn("automaton.resource=hosted-runner", run)
         self.assertIn(f"{SYSTEM_VOLUME}:/automaton/system", run)
         self.assertIn(f"{USER_VOLUME}:/automaton/storage", run)
+        self.assertIn("AUTOMATON_RUNTIME_HOST_ADDRESS=10.20.30.40", run)
         self.assertNotIn(f"{USER_VOLUME}:/automaton/workspace", run)
         self.assertNotIn(f"{USER_VOLUME}:/app/logs", run)
 

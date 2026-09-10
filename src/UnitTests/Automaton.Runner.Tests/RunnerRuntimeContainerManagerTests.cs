@@ -450,6 +450,61 @@ public sealed class RunnerRuntimeContainerManagerTests
         await fake.StopAndRemoveAsync("container-1");
     }
 
+    [Test]
+    public async Task BrokeredStartPortIsPersistedBeforeReadinessAndRecoveredOnRestart()
+    {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var assignedPort = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        var runtime = new ScopedContainerRuntime(assignedPort);
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var candidateId = Guid.NewGuid();
+        var manager = new RunnerRuntimeContainerManager(workspace, registry, runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
+        await manager.StartAsync(CancellationToken.None);
+
+        var apply = manager.ApplyAsync(appId, targetId, Contract(8080), candidateId: candidateId);
+        RunnerRuntimeDeploymentMetadata? pending = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(25);
+            pending = await ReadMetadataAsync(workspace, appId, targetId);
+            if (pending.Candidate?.EffectivePort == assignedPort)
+                break;
+        }
+        Assert.That(pending!.Candidate!.EffectivePort, Is.EqualTo(assignedPort));
+        runtime.EnableReadiness();
+        await apply;
+        var ready = await ReadMetadataAsync(workspace, appId, targetId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(runtime.Created!.HostPort, Is.Zero);
+            Assert.That(runtime.Created.CandidateId, Is.EqualTo(candidateId));
+            Assert.That(ready.CandidateId, Is.EqualTo(candidateId));
+            Assert.That(runtime.Scopes, Is.All.EqualTo(new ApplicationContainerScope(appId, targetId)));
+            Assert.That(registry.IsPortRegistered(assignedPort), Is.True);
+        });
+        await manager.StopAsync(CancellationToken.None);
+
+        runtime.InspectedPort = assignedPort + 1;
+        var replacementRegistry = new RunnerRuntimeRegistry();
+        var replacement = new RunnerRuntimeContainerManager(workspace, replacementRegistry, runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
+        await replacement.StartAsync(CancellationToken.None);
+        var recovered = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(recovered.ContainerId, Is.EqualTo("brokered-container"));
+            Assert.That(recovered.EffectivePort, Is.EqualTo(assignedPort + 1));
+            Assert.That(replacementRegistry.IsPortRegistered(assignedPort + 1), Is.True);
+            Assert.That(runtime.CreateCalls, Is.EqualTo(1));
+        });
+        await replacement.StopAsync(appId, targetId);
+    }
+
     private (RunnerRuntimeContainerManager Manager, RunnerWorkspaceService Workspace, Guid AppId, Guid TargetId) CreateManager(FakeContainerRuntime fake)
     {
         var workspace = new RunnerWorkspaceService();
@@ -537,6 +592,82 @@ public sealed class RunnerRuntimeContainerManagerTests
         => System.Text.Json.JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             System.Text.Json.JsonSerializer.Serialize(metadata, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+    private sealed class ScopedContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime
+    {
+        private readonly int assignedPort;
+        private TcpListener? listener;
+        public int InspectedPort { get; set; }
+        public int CreateCalls { get; private set; }
+        public DockerApplicationContainerRequest? Created { get; private set; }
+        public List<ApplicationContainerScope> Scopes { get; } = [];
+        private bool exists;
+        private bool running;
+
+        public ScopedContainerRuntime(int assignedPort)
+            => this.assignedPort = InspectedPort = assignedPort;
+
+        public void EnableReadiness()
+        {
+            listener = new TcpListener(IPAddress.Loopback, assignedPort);
+            listener.Start();
+        }
+
+        public Task<DockerApplicationContainer> CreateApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
+        {
+            CreateCalls++;
+            Created = request;
+            exists = true;
+            return Task.FromResult(new DockerApplicationContainer("brokered-container", "brokered-name", new(request.Image, request.Image + "@sha256:" + new string('a', 64))));
+        }
+
+        public Task<ApplicationContainerStartResult> StartApplicationAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        {
+            Scopes.Add(scope);
+            running = true;
+            return Task.FromResult(new ApplicationContainerStartResult(true, "127.0.0.1", assignedPort, 8080));
+        }
+
+        public Task<DockerContainerIdentity> InspectAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        {
+            Scopes.Add(scope);
+            return Task.FromResult(new DockerContainerIdentity(id, exists, running, Labels(scope), "127.0.0.1", InspectedPort, 8080));
+        }
+
+        public async Task<bool> IsRunningAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+            => (await InspectAsync(scope, id, cancellationToken)).Running;
+
+        public Task<string> GetLogsAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        {
+            Scopes.Add(scope);
+            return Task.FromResult(string.Empty);
+        }
+
+        public Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        {
+            Scopes.Add(scope);
+            exists = running = false;
+            listener?.Stop();
+            return Task.CompletedTask;
+        }
+
+        private static IReadOnlyDictionary<string, string> Labels(ApplicationContainerScope scope) => new Dictionary<string, string>
+        {
+            ["com.automaton.managed"] = "true",
+            ["com.automaton.app-id"] = scope.AppId.ToString(),
+            ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString(),
+            ["com.automaton.runtime-kind"] = "generic"
+        };
+
+        public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task RunBuildAsync(DockerBuildRequest request, IReadOnlyDictionary<string, string> environment, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DockerApplicationContainer> StartApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task StartApplicationAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task StopAndRemoveAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> IsRunningAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DockerContainerIdentity> InspectAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> GetLogsAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
 
     private sealed class FakeContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime
     {

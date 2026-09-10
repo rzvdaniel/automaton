@@ -363,11 +363,13 @@ public class Program
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerRuntimeRegistry>();
                 services.AddSingleton<IApplicationContainerRuntime>(sp =>
-                    string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), RunnerApplicationProfiles.Standard, StringComparison.OrdinalIgnoreCase)
+                    RunnerApplicationContainerRuntimeSelection.UsesBroker(
+                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
+                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
+                        Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"))
                         ? new BrokeredApplicationContainerRuntime(
                             sp.GetRequiredService<HubService>(),
-                            sp.GetRequiredService<FileStorageService>(),
-                            sp.GetRequiredService<RunnerWorkspaceService>())
+                            sp.GetRequiredService<FileStorageService>())
                         : new DockerContainerRuntime());
                 services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
                 services.AddSingleton<RunnerRuntimeContainerManager>();

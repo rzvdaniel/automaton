@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import ipaddress
 import os
 import re
 import subprocess
@@ -103,6 +104,9 @@ def main() -> None:
     api_url = str(request["apiUrl"])
     if not api_url.startswith(("https://", "http://")):
         raise ValueError("apiUrl must be an HTTP(S) URL")
+    runtime_host_address = str(ipaddress.ip_address(str(request["runtimeHostAddress"])))
+    if not ipaddress.ip_address(runtime_host_address).is_private or ipaddress.ip_address(runtime_host_address).is_loopback:
+        raise ValueError("runtimeHostAddress must be a concrete private address")
     enrollment_token = os.environ.get("AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN", "")
     if not enrollment_token.startswith("re_"):
         raise ValueError("Runner enrollment token was not provided")
@@ -153,6 +157,7 @@ def main() -> None:
         "-e", f"AUTOMATON_ENROLLMENT_TOKEN={enrollment_token}",
         "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
         "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
+        "-e", f"AUTOMATON_RUNTIME_HOST_ADDRESS={runtime_host_address}",
         "-v", f"{system_volume}:/automaton/system",
         "-v", f"{user_volume}:/automaton/storage",
     ]

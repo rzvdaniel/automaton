@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using Automaton.Core.Models;
+using Automaton.Core.Services;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
 
@@ -217,7 +218,35 @@ public class RunnerDeploymentTargetIsolationTests
             Assert.That(result.Success, Is.True);
             Assert.That(processManager.StartedTargets, Does.Contain(targetId));
             Assert.That(processManager.StartedContracts[targetId].Runtime.Command!.Executable, Is.EqualTo("dotnet"));
+            Assert.That(processManager.CandidateIds[targetId], Is.Not.EqualTo(Guid.Empty));
+            Assert.That(processManager.ArtifactRoots[targetId], Does.Contain(processManager.CandidateIds[targetId].ToString()));
         });
+    }
+
+    [Test]
+    public async Task ContainerBuildReceivesServerIssuedExecutionContext()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager();
+        var buildExecutor = new RecordingBuildExecutor();
+        var service = new RunnerDeploymentService(workspace, processManager, new AppActionDeploymentService(workspace), buildExecutor);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var attemptId = Guid.NewGuid();
+        var package = CreatePackage(appId, "runtime", hasRuntime: true, build: new ApplicationBuildSpec
+        {
+            Image = "build:1",
+            Command = new ApplicationCommandSpec { Executable = "build" }
+        });
+
+        var result = await service.DeployPackage(new DeployAppPackageRequest
+        {
+            AppId = appId, DeploymentTargetId = targetId, ExecutionAttemptId = attemptId,
+            PackagePath = package, Clean = true
+        });
+
+        Assert.That(result.Success, Is.True, result.Message);
+        Assert.That(buildExecutor.Context, Is.EqualTo(new RunnerApplicationBuildContext(appId, targetId, attemptId)));
     }
 
     [Test]
@@ -328,6 +357,8 @@ public class RunnerDeploymentTargetIsolationTests
         public List<Guid> StoppedTargets { get; } = [];
         public List<Guid> AppliedTargets { get; } = [];
         public Dictionary<Guid, ApplicationContract> StartedContracts { get; } = [];
+        public Dictionary<Guid, Guid> CandidateIds { get; } = [];
+        public Dictionary<Guid, string> ArtifactRoots { get; } = [];
         public Exception? StopFailure { get; set; }
 
         public Task<RuntimeApplyResult> ApplyAsync(
@@ -335,11 +366,14 @@ public class RunnerDeploymentTargetIsolationTests
             Guid deploymentTargetId,
             ApplicationContract contract,
             CancellationToken cancellationToken = default,
-            string? artifactRoot = null)
+            string? artifactRoot = null,
+            Guid? candidateId = null)
         {
             StartedTargets.Add(deploymentTargetId);
             AppliedTargets.Add(deploymentTargetId);
             StartedContracts[deploymentTargetId] = contract;
+            if (candidateId.HasValue) CandidateIds[deploymentTargetId] = candidateId.Value;
+            if (artifactRoot is not null) ArtifactRoots[deploymentTargetId] = artifactRoot;
             if (contract.Runtime.Command is null)
                 StoppedTargets.Add(deploymentTargetId);
             return Task.FromResult(new RuntimeApplyResult
@@ -353,6 +387,22 @@ public class RunnerDeploymentTargetIsolationTests
             if (StopFailure is not null) throw StopFailure;
             StoppedTargets.Add(deploymentTargetId);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingBuildExecutor : IRunnerApplicationBuildExecutor
+    {
+        public RunnerApplicationBuildContext? Context { get; private set; }
+
+        public Task<ApplicationBuildExecutionResult> ExecuteAsync(
+            ApplicationBuildSpec build,
+            ApplicationRuntimeSpec runtime,
+            string workspaceRoot,
+            RunnerApplicationBuildContext? context = null,
+            CancellationToken cancellationToken = default)
+        {
+            Context = context;
+            return Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true });
         }
     }
 }

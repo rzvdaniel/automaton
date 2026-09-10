@@ -110,12 +110,30 @@ including the Hosted Runner workspace. No host bind path or future Hetzner
 Volume is introduced here. Application-container lifecycle, runtime adoption,
 and switching ordinary Standard Hosted deployment remain deferred to 4B2c.
 
-## Deferred to Stage 4B2c
+## Stage 4B2c: brokered Standard Hosted runtime
 
-- application-container lifecycle;
-- secure runtime container mounts;
-- private-network and host-port mapping for brokered operations;
-- application-container lifecycle and `BrokeredApplicationContainerRuntime` (4B2c);
-- Standard Hosted Runner Generic Runtime switch and production rollout (4B2c);
-- migration and acceptance of Standard Hosted Runner protocol 4;
-- retirement of direct Docker execution where it is no longer needed.
+For a Managed Hosted Runner with the `Standard` application profile, the
+Runner runtime manager uses `BrokeredApplicationContainerRuntime`. A
+`PrivilegedHost` Runner and a Standard self-hosted Runner retain direct Docker
+execution. Brokered build requests carry the application, deployment target,
+and server-issued execution-attempt identifiers. Runtime lifecycle requests
+carry the application and target identifiers, while candidate identity and
+storage remain typed values instead of being inferred from workspace paths.
+
+Create establishes the candidate and may not know an effective host port.
+Start verifies ownership, starts the verified container, re-inspects it, and
+returns Docker's effective host port. The Hosted Runner persists that port
+before readiness and promotion. Reconciliation performs a scoped inspect,
+prefers the inspected port over stale metadata, and adopts the same healthy
+container ID after a Hosted Runner restart.
+
+The persisted Runner Host private IPv4 address is supplied to newly
+provisioned and reprovisioned Hosted Runner containers as
+`AUTOMATON_RUNTIME_HOST_ADDRESS`. The Infrastructure Runner uses the same
+address as Docker's explicit publication address. Loopback, wildcard, and
+public addresses are rejected by the provisioning and execution boundaries.
+
+Production rollout remains gated on the isolated Linux-host acceptance probe:
+automatic publication on the real private address, post-start discovery,
+Hosted Runner reachability, absence of unintended public exposure, and
+distinct ports for simultaneous containers.

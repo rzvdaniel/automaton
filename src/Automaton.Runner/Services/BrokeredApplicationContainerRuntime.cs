@@ -1,87 +1,123 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Automaton.Core.Models;
+using Automaton.Runner.Console.Models;
 
 namespace Automaton.Runner.Console.Services;
 
 /// <summary>Adapts the application container runtime to the typed host relay.</summary>
-public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime
+public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime
 {
-    private readonly HubService hub;
-    private readonly FileStorageService storage;
-    private readonly RunnerWorkspaceService workspace;
+    private readonly Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>> execute;
+    private readonly Func<Task<RunnerInstallationProfile?>> loadProfile;
 
-    public BrokeredApplicationContainerRuntime(HubService hub, FileStorageService storage, RunnerWorkspaceService workspace)
-        => (this.hub, this.storage, this.workspace) = (hub, storage, workspace);
+    public BrokeredApplicationContainerRuntime(HubService hub, FileStorageService storage)
+        : this(hub.RequestHostContainerExecutionAsync, storage.LoadInstallationProfileAsync)
+    {
+    }
+
+    internal BrokeredApplicationContainerRuntime(
+        Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>> execute,
+        Func<Task<RunnerInstallationProfile?>> loadProfile)
+        => (this.execute, this.loadProfile) = (execute, loadProfile);
 
     public async Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
     {
-        var scope = await ScopeAsync(Guid.Empty, Guid.Empty, Guid.Empty, cancellationToken);
-        var result = await hub.RequestHostContainerExecutionAsync(new() { Scope = scope, Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = image }, cancellationToken);
-        EnsureSuccess(result);
-        return new DockerImageIdentity(image, result.ResolvedImage);
+        throw new InvalidOperationException("Brokered image resolution requires deployment context.");
     }
 
     public async Task RunBuildAsync(DockerBuildRequest request, IReadOnlyDictionary<string, string> environment, CancellationToken cancellationToken = default)
-        => throw new InvalidOperationException("Brokered builds require deployment execution context and are wired by RunnerDeploymentService.");
+    {
+        var context = request.Context ?? throw new InvalidOperationException("Brokered builds require deployment execution context.");
+        var result = await execute(new()
+        {
+            Scope = await ScopeAsync(context.AppId, context.DeploymentTargetId, context.ExecutionAttemptId, cancellationToken),
+            Operation = HostContainerOperationKinds.RunBuild, RequestedImage = request.Image, Command = request.Command,
+            TimeoutSeconds = request.TimeoutSeconds, Environment = environment
+        }, cancellationToken);
+        EnsureSuccess(result);
+    }
 
     public async Task<DockerApplicationContainer> CreateApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
     {
-        var candidate = ParseCandidateId(request.ArtifactRoot);
+        if (request.CandidateId == Guid.Empty)
+            throw new InvalidOperationException("Brokered application creation requires a candidate identity.");
+        if (request.Storage is null)
+            throw new InvalidOperationException("Brokered application creation requires the declared storage semantics.");
         var scope = await ScopeAsync(request.AppId, request.DeploymentTargetId, Guid.Empty, cancellationToken);
-        var result = await hub.RequestHostContainerExecutionAsync(new()
+        var result = await execute(new()
         {
             Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
-            CandidateId = candidate, RequestedImage = request.Image, ContainerPort = request.ContainerPort,
-            Command = request.Command, Storage = new ApplicationStorageSpec { DataDirectory = request.DataDirectory },
-            Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData)
+            CandidateId = request.CandidateId, RequestedImage = request.Image, ContainerPort = request.ContainerPort,
+            Command = request.Command, Storage = request.Storage
         }, cancellationToken);
         EnsureSuccess(result);
         return new DockerApplicationContainer(result.ContainerId, result.ContainerName, new(request.Image, result.ResolvedImage));
     }
 
     public async Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-    {
-        var result = await ExecuteExistingAsync(HostContainerOperationKinds.StartContainer, containerIdOrName, cancellationToken);
-        EnsureSuccess(result);
-    }
+        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
 
     public async Task<DockerApplicationContainer> StartApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
     {
         var created = await CreateApplicationAsync(request, cancellationToken);
-        await StartApplicationAsync(created.Id, cancellationToken);
+        await StartApplicationAsync(new(request.AppId, request.DeploymentTargetId), created.Id, cancellationToken);
         return created;
     }
 
     public async Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-        => EnsureSuccess(await ExecuteExistingAsync(HostContainerOperationKinds.RemoveContainer, containerIdOrName, cancellationToken));
+        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
 
     public async Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-        => (await ExecuteExistingAsync(HostContainerOperationKinds.InspectContainer, containerIdOrName, cancellationToken)).Running;
+        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
 
     public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
-        var result = await ExecuteExistingAsync(HostContainerOperationKinds.InspectContainer, containerIdOrName, cancellationToken);
-        EnsureSuccess(result);
-        return new(result.ContainerId, result.Exists, result.Running, result.Labels);
+        throw new InvalidOperationException("Brokered existing-container operations require application scope.");
     }
 
     public async Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
-        var result = await ExecuteExistingAsync(HostContainerOperationKinds.GetContainerLogs, containerIdOrName, cancellationToken);
-        EnsureSuccess(result);
-        return result.Logs;
+        throw new InvalidOperationException("Brokered existing-container operations require application scope.");
     }
 
-    private async Task<HostContainerExecutionResponse> ExecuteExistingAsync(string operation, string id, CancellationToken cancellationToken)
+    public async Task<ApplicationContainerStartResult> StartApplicationAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
     {
-        var scope = await ScopeAsync(Guid.Empty, Guid.Empty, Guid.Empty, cancellationToken);
-        return await hub.RequestHostContainerExecutionAsync(new() { Scope = scope, Operation = operation, ContainerId = id }, cancellationToken);
+        var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.StartContainer, id, cancellationToken);
+        EnsureSuccess(result);
+        return new(result.Running, result.HostAddress!, result.HostPort!.Value, result.ContainerPort!.Value);
+    }
+
+    public async Task<DockerContainerIdentity> InspectAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+    {
+        var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.InspectContainer, id, cancellationToken);
+        EnsureSuccess(result);
+        return new(result.ContainerId, result.Exists, result.Running, result.Labels, result.HostAddress, result.HostPort, result.ContainerPort);
+    }
+
+    public async Task<bool> IsRunningAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+    {
+        var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.InspectContainer, id, cancellationToken);
+        EnsureSuccess(result);
+        return result.Running;
+    }
+
+    public async Task<string> GetLogsAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+    {
+        var result = await ExecuteExistingAsync(scope, HostContainerOperationKinds.GetContainerLogs, id, cancellationToken);
+        EnsureSuccess(result); return result.Logs;
+    }
+
+    public async Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
+        => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.RemoveContainer, id, cancellationToken));
+
+    private async Task<HostContainerExecutionResponse> ExecuteExistingAsync(ApplicationContainerScope application, string operation, string id, CancellationToken cancellationToken)
+    {
+        var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty, cancellationToken);
+        return await execute(new() { Scope = scope, Operation = operation, ContainerId = id }, cancellationToken);
     }
 
     private async Task<HostContainerScope> ScopeAsync(Guid appId, Guid targetId, Guid attemptId, CancellationToken cancellationToken)
     {
-        var profile = await storage.LoadInstallationProfileAsync()
+        var profile = await loadProfile()
             ?? throw new InvalidOperationException("Runner installation profile is required for brokered runtime operations.");
         if (profile.RunnerHostId is not Guid hostId || hostId == Guid.Empty)
             throw new InvalidOperationException("Runner Host identity is required for brokered runtime operations.");
@@ -89,13 +125,6 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         if (!Guid.TryParse(hosted, out var hostedId))
             throw new InvalidOperationException("Hosted Runner identity is required for brokered runtime operations.");
         return new(hostedId, hostId, appId, targetId, attemptId);
-    }
-
-    private static Guid ParseCandidateId(string artifactRoot)
-    {
-        var match = Regex.Match(artifactRoot.Replace('\\', '/'), @"/candidates/(?<id>[0-9a-fA-F-]{36})/application\z", RegexOptions.CultureInvariant);
-        return match.Success && Guid.TryParse(match.Groups["id"].Value, out var candidate)
-            ? candidate : throw new InvalidOperationException("Brokered runtime requires a candidate artifact identity.");
     }
 
     private static void EnsureSuccess(HostContainerExecutionResponse result)
