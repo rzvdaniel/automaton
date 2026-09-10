@@ -4,7 +4,8 @@ set -euo pipefail
 # The single source of truth for an Infrastructure Runner container.  Install,
 # repair, update and rollback all invoke the same builder so recovery never
 # requires an administrator to reconstruct privileged docker arguments.
-SPECIFICATION_VERSION=2
+CANONICAL_SPECIFICATION_VERSION=2
+SPECIFICATION_VERSION="$CANONICAL_SPECIFICATION_VERSION"
 OPERATION=install
 AUTOMATON_SERVER_URL="${AUTOMATON_SERVER_URL:-}"
 AUTOMATON_API_KEY="${AUTOMATON_API_KEY:-}"
@@ -78,6 +79,10 @@ save_installation_configuration() {
 }
 CLI_SERVER_URL="$AUTOMATON_SERVER_URL"; CLI_RUNNER_NAME="$AUTOMATON_RUNNER_NAME"; CLI_PUBLIC_IP="$AUTOMATON_PUBLIC_IP"; CLI_PRIVATE_IP="$AUTOMATON_PRIVATE_IP"; CLI_IMAGE="$AUTOMATON_RUNNER_IMAGE"
 load_installation_configuration
+# The executing installer owns the container specification. Persisted
+# configuration may restore operational values, but can never downgrade the
+# canonical version declared by this script.
+SPECIFICATION_VERSION="$CANONICAL_SPECIFICATION_VERSION"
 [[ "$SERVER_URL_WAS_EXPLICIT" == true ]] && AUTOMATON_SERVER_URL="$CLI_SERVER_URL"
 [[ "$RUNNER_NAME_WAS_EXPLICIT" == true ]] && AUTOMATON_RUNNER_NAME="$CLI_RUNNER_NAME"
 [[ "$PUBLIC_IP_WAS_EXPLICIT" == true ]] && AUTOMATON_PUBLIC_IP="$CLI_PUBLIC_IP"
