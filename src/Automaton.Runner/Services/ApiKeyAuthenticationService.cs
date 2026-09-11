@@ -197,6 +197,35 @@ public class ApiKeyAuthenticationService
         return null;
     }
 
+    public async Task<RunnerCredentialValidationResult> ValidateRunnerCredentialWithServerAsync(string apiKey)
+    {
+        if (!IsValidApiKeyFormat(apiKey))
+        {
+            return RunnerCredentialValidationResult.Unavailable;
+        }
+
+        try
+        {
+            httpClient.DefaultRequestHeaders.Clear();
+            var json = System.Text.Json.JsonSerializer.Serialize(new { ApiKey = apiKey });
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await httpClient.PostAsync($"{configService.BaseUrl}/api/apikeys/validate", content);
+            return MapCredentialValidationStatus(response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Runner credential validation request failed");
+            return RunnerCredentialValidationResult.Unavailable;
+        }
+    }
+
+    internal static RunnerCredentialValidationResult MapCredentialValidationStatus(System.Net.HttpStatusCode statusCode)
+        => (int)statusCode is >= 200 and <= 299
+            ? RunnerCredentialValidationResult.Valid
+            : statusCode == System.Net.HttpStatusCode.Unauthorized
+                ? RunnerCredentialValidationResult.Rejected
+                : RunnerCredentialValidationResult.Unavailable;
+
     public Task SetEnrolledApiKeyAsync(string apiKey)
     {
         _cachedApiKey = apiKey;
