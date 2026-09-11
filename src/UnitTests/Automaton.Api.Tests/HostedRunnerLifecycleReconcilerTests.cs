@@ -33,6 +33,34 @@ public sealed class HostedRunnerLifecycleReconcilerTests
     }
 
     [Test]
+    public async Task QueuedReprovisionWithoutExecutionIsReclaimedOnceAndRemainsRecoverable()
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var (runner, operation) = SeedOperation(db, HostedRunnerDeploymentActions.Reprovision,
+            HostedRunnerDeploymentStatuses.Queued, now);
+        var grant = new ExecutionSecretGrant
+        {
+            Id = Guid.NewGuid(), OperationId = operation.Id, SecretVersionId = Guid.NewGuid(),
+            AppId = Guid.NewGuid(), ActionKey = "reprovision-hosted-runner", RunnerId = Guid.NewGuid(),
+            DeliveryType = "environmentVariable", TargetName = "TOKEN", ExpiresAtUtc = now.AddMinutes(10)
+        };
+        db.ExecutionSecretGrants.Add(grant);
+        await db.SaveChangesAsync();
+        var publisher = new RecordingPublisher();
+        var reconciler = CreateReconciler(db, publisher);
+
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+        var recovered = await db.HostedRunnerDeployments.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
+        Assert.That(recovered.Status, Is.Not.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
+    }
+
+    [Test]
     public async Task StaleExecutingProvisionWithoutExecutionReturnsToQueueAndReusesItsGrant()
     {
         await using var db = CreateDb();
