@@ -494,7 +494,16 @@ public sealed class RunnerRuntimeContainerManagerTests
         var replacementRegistry = new RunnerRuntimeRegistry();
         var replacement = new RunnerRuntimeContainerManager(workspace, replacementRegistry, runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
         await replacement.StartAsync(CancellationToken.None);
-        var recovered = await ReadMetadataAsync(workspace, appId, targetId);
+        RunnerRuntimeDeploymentMetadata recovered = await ReadMetadataAsync(workspace, appId, targetId);
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            recovered = await ReadMetadataAsync(workspace, appId, targetId);
+            if (recovered.ContainerId == "brokered-container"
+                && recovered.EffectivePort == assignedPort + 1
+                && replacementRegistry.IsPortRegistered(assignedPort + 1))
+                break;
+            await Task.Delay(100);
+        }
         Assert.Multiple(() =>
         {
             Assert.That(recovered.ContainerId, Is.EqualTo("brokered-container"));
@@ -503,6 +512,27 @@ public sealed class RunnerRuntimeContainerManagerTests
             Assert.That(runtime.CreateCalls, Is.EqualTo(1));
         });
         await replacement.StopAsync(appId, targetId);
+    }
+
+    [Test]
+    public async Task BrokeredStartupReturnsBeforeReconciliationInspection()
+    {
+        var runtime = new ScopedContainerRuntime(19080) { InspectGate = new TaskCompletionSource<bool>() };
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        await WriteMetadataAsync(workspace, new RunnerRuntimeDeploymentMetadata
+        {
+            AppId = appId.ToString(), DeploymentTargetId = targetId.ToString(),
+            ContainerId = "existing", ContainerName = "existing", State = RuntimeReadinessState.Ready,
+            Runtime = Contract(19080).Runtime, Health = Contract(19080).Health, Storage = Contract(19080).Storage
+        });
+        var manager = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
+        var startup = manager.StartAsync(CancellationToken.None);
+        Assert.That(await Task.WhenAny(startup, Task.Delay(500)), Is.SameAs(startup));
+        Assert.That(runtime.Scopes, Is.Empty);
+        runtime.InspectGate.SetResult(true);
+        await manager.StopAsync(CancellationToken.None);
     }
 
     private (RunnerRuntimeContainerManager Manager, RunnerWorkspaceService Workspace, Guid AppId, Guid TargetId) CreateManager(FakeContainerRuntime fake)
@@ -598,6 +628,7 @@ public sealed class RunnerRuntimeContainerManagerTests
         private readonly int assignedPort;
         private TcpListener? listener;
         public int InspectedPort { get; set; }
+        public TaskCompletionSource<bool>? InspectGate { get; set; }
         public int CreateCalls { get; private set; }
         public DockerApplicationContainerRequest? Created { get; private set; }
         public List<ApplicationContainerScope> Scopes { get; } = [];
@@ -631,7 +662,13 @@ public sealed class RunnerRuntimeContainerManagerTests
         public Task<DockerContainerIdentity> InspectAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         {
             Scopes.Add(scope);
-            return Task.FromResult(new DockerContainerIdentity(id, exists, running, Labels(scope), "127.0.0.1", InspectedPort, 8080));
+            return InspectCoreAsync(scope, id, cancellationToken);
+        }
+
+        private async Task<DockerContainerIdentity> InspectCoreAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken)
+        {
+            if (InspectGate is not null) await InspectGate.Task.WaitAsync(cancellationToken);
+            return new DockerContainerIdentity(id, exists, running, Labels(scope), "127.0.0.1", InspectedPort, 8080);
         }
 
         public async Task<bool> IsRunningAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
