@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Messaging.Events;
 using Automaton.Core.Models;
@@ -13,7 +14,7 @@ public sealed class ScheduledActionExecutionHandler(
     ApplicationDbContext db,
     ActionScheduleService schedules,
     AppActionExecutionService executions,
-    TrustedInfrastructureActionDeploymentService infrastructureActions,
+    ITrustedInfrastructureActionDeploymentService infrastructureActions,
     ILogger<ScheduledActionExecutionHandler> logger)
 {
     public async Task HandleAsync(ScheduledActionExecutionRequestedEvent message, CancellationToken cancellationToken)
