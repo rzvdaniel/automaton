@@ -589,6 +589,44 @@ public class HostedRunnerAuditTests
         Assert.That(operation.ReconnectDeadlineUtc, Is.LessThanOrEqualTo(DateTime.UtcNow.AddSeconds(61)));
     }
 
+    [TestCase("{\"success\":true,\"containerName\":\"replacement\"}")]
+    [TestCase("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"\"}")]
+    public void HostedRunnerProvisioningRejectsMissingContainerIdentity(string json)
+    {
+        using var db = CreateDbContext();
+        var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = HostedRunnerStatuses.Provisioning };
+        var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id, Status = HostedRunnerDeploymentStatuses.Executing };
+        var handler = new InfrastructureActionProvisioningHandler(
+            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
+            Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()),
+            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+        using var document = JsonDocument.Parse(json);
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => handler.ApplySuccessfulOperationAsync(
+            hostedRunner, deployment, "reprovision-hosted-runner", document.RootElement, CancellationToken.None));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Executing));
+        Assert.That(hostedRunner.ContainerId, Is.Null);
+    }
+
+    [Test]
+    public async Task HostedRunnerProvisioningWithContainerIdentityWaitsForRegistration()
+    {
+        using var db = CreateDbContext();
+        var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = HostedRunnerStatuses.Provisioning };
+        var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id, Status = HostedRunnerDeploymentStatuses.Executing };
+        var handler = new InfrastructureActionProvisioningHandler(
+            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
+            Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()),
+            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+        using var document = JsonDocument.Parse("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\"}");
+
+        await handler.ApplySuccessfulOperationAsync(
+            hostedRunner, deployment, "reprovision-hosted-runner", document.RootElement, CancellationToken.None);
+
+        Assert.That(hostedRunner.ContainerId, Is.EqualTo("replacement-id"));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForRegistration));
+    }
+
     [Test]
     public async Task RestartReconnectTimeoutFailsOnceWithDistinctReason()
     {
