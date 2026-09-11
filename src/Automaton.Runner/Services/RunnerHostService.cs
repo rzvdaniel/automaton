@@ -137,12 +137,13 @@ public class RunnerHostService
     private async Task<string?> ResolveManagedHostedRunnerCredentialAsync(string? persistedApiKey)
     {
         var hasPersistedCredential = !string.IsNullOrWhiteSpace(persistedApiKey);
-        var credentialValid = hasPersistedCredential
-            && await apiKeyAuthService.ValidateRunnerCredentialWithServerAsync(persistedApiKey!);
+        var validationResult = hasPersistedCredential
+            ? await apiKeyAuthService.ValidateRunnerCredentialWithServerAsync(persistedApiKey!)
+            : RunnerCredentialValidationResult.Unavailable;
         var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
         var decision = DecideManagedHostedRunnerCredential(
             hasPersistedCredential,
-            credentialValid,
+            validationResult,
             !string.IsNullOrWhiteSpace(enrollmentToken));
 
         if (decision == ManagedHostedRunnerCredentialDecision.ReusePersistedCredential)
@@ -848,15 +849,16 @@ public class RunnerHostService
 
     internal static ManagedHostedRunnerCredentialDecision DecideManagedHostedRunnerCredential(
         bool hasPersistedCredential,
-        bool credentialValid,
+        RunnerCredentialValidationResult validationResult,
         bool hasEnrollmentToken)
     {
-        if (hasPersistedCredential && credentialValid)
+        if (hasPersistedCredential && validationResult == RunnerCredentialValidationResult.Valid)
         {
             return ManagedHostedRunnerCredentialDecision.ReusePersistedCredential;
         }
 
-        return hasEnrollmentToken
+        return validationResult == RunnerCredentialValidationResult.Rejected && hasEnrollmentToken
+            || !hasPersistedCredential && hasEnrollmentToken
             ? ManagedHostedRunnerCredentialDecision.Enroll
             : ManagedHostedRunnerCredentialDecision.FailClosed;
     }
