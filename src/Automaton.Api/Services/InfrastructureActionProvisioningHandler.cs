@@ -348,7 +348,16 @@ public sealed class InfrastructureActionProvisioningHandler(
         deployment.Error = null;
         if (actionKey is "provision-hosted-runner" or "reprovision-hosted-runner")
         {
-            hostedRunner.ContainerId = result.TryGetProperty("containerId", out var containerId) ? containerId.GetString() : null;
+            if (!result.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True
+                || !result.TryGetProperty("containerId", out var containerId)
+                || containerId.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(containerId.GetString())
+                || !result.TryGetProperty("containerName", out var containerName)
+                || containerName.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(containerName.GetString()))
+                throw new InvalidOperationException("Infrastructure Action returned an invalid Hosted Runner container identity.");
+
+            hostedRunner.ContainerId = containerId.GetString();
             hostedRunner.Status = HostedRunnerStatuses.Provisioning;
             deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
             deployment.Logs = WaitingForRegistrationLog;
