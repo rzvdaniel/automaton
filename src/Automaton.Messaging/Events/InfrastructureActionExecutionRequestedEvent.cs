@@ -10,4 +10,15 @@ public sealed class InfrastructureActionExecutionRequestedEvent
     public string InputJson { get; init; } = "{}";
     public IReadOnlyList<Guid> SecretGrantIds { get; init; } = Array.Empty<Guid>();
     public string CorrelationId { get; init; } = string.Empty;
+
+    public InfrastructureCommandRequestedEvent ToInfrastructureCommand(Guid infrastructureRunnerId, DateTime createdAtUtc)
+        => new(
+            CommandId: OperationId,
+            OperationId,
+            RunnerHostId,
+            infrastructureRunnerId,
+            ActionKey,
+            InputJson,
+            SecretGrantIds.ToArray(),
+            createdAtUtc);
 }
