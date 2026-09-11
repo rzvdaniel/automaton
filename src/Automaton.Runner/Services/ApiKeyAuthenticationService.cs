@@ -197,6 +197,28 @@ public class ApiKeyAuthenticationService
         return null;
     }
 
+    public async Task<bool> ValidateRunnerCredentialWithServerAsync(string apiKey)
+    {
+        if (!IsValidApiKeyFormat(apiKey))
+        {
+            return false;
+        }
+
+        try
+        {
+            httpClient.DefaultRequestHeaders.Clear();
+            var json = System.Text.Json.JsonSerializer.Serialize(new { ApiKey = apiKey });
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await httpClient.PostAsync($"{configService.BaseUrl}/api/apikeys/validate", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Runner credential validation request failed");
+            return false;
+        }
+    }
+
     public Task SetEnrolledApiKeyAsync(string apiKey)
     {
         _cachedApiKey = apiKey;

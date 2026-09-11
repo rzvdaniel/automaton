@@ -45,4 +45,36 @@ public sealed class RunnerIdentityPolicyTests
     {
         Assert.That(RunnerHostService.ShouldRunGenericIdentityReconciliation("SelfHosted", Guid.NewGuid().ToString()), Is.True);
     }
+
+    [Test]
+    public void ManagedHostedRunner_ValidPersistedCredentialWinsOverEnrollmentToken()
+    {
+        Assert.That(
+            RunnerHostService.DecideManagedHostedRunnerCredential(true, true, true),
+            Is.EqualTo(ManagedHostedRunnerCredentialDecision.ReusePersistedCredential));
+    }
+
+    [Test]
+    public void ManagedHostedRunner_RevokedCredentialFallsBackToEnrollment()
+    {
+        Assert.That(
+            RunnerHostService.DecideManagedHostedRunnerCredential(true, false, true),
+            Is.EqualTo(ManagedHostedRunnerCredentialDecision.Enroll));
+    }
+
+    [Test]
+    public void ManagedHostedRunner_RevokedCredentialWithoutTokenFailsClosed()
+    {
+        Assert.That(
+            RunnerHostService.DecideManagedHostedRunnerCredential(true, false, false),
+            Is.EqualTo(ManagedHostedRunnerCredentialDecision.FailClosed));
+    }
+
+    [Test]
+    public void ManagedHostedRunner_WithoutCredentialUsesEnrollment()
+    {
+        Assert.That(
+            RunnerHostService.DecideManagedHostedRunnerCredential(false, false, true),
+            Is.EqualTo(ManagedHostedRunnerCredentialDecision.Enroll));
+    }
 }
