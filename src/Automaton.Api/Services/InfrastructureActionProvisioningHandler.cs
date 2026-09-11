@@ -24,7 +24,7 @@ public sealed class InfrastructureActionProvisioningHandler(
     IEventPublisher eventPublisher,
     IAuditEventService auditEventService,
     IExecutionSecretGrantService secretGrantService,
-    TrustedInfrastructureActionDeploymentService actionDeploymentService,
+    ITrustedInfrastructureActionDeploymentService actionDeploymentService,
     IOptions<HostedRunnerOptions> hostedRunnerOptions,
     IOptions<StorageTelemetryOptions> storageTelemetryOptions,
     ILogger<InfrastructureActionProvisioningHandler> logger)
@@ -91,8 +91,23 @@ public sealed class InfrastructureActionProvisioningHandler(
             if (!RunnerPresenceEvaluator.IsOnline(infrastructureRunner.ConnectionId, infrastructureRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
                 throw new InvalidOperationException("The Infrastructure Runner is not online.");
 
-            var module = await actionDeploymentService.EnsureDeployedAsync(
-                infrastructureRunner.ConnectionId!, message.ActionKey, cancellationToken);
+            AppActionModuleInfo module;
+            try
+            {
+                module = await actionDeploymentService.EnsureDeployedAsync(
+                    infrastructureRunner.ConnectionId!, message.ActionKey, cancellationToken);
+            }
+            catch (Exception ex) when (IsMissingSignalRConnection(ex))
+            {
+                // No execution has been claimed yet. Let CAP retry this delivery after
+                // the Runner reconnects instead of turning a stale connection into a
+                // terminal provisioning failure. Never switch connections in-flight.
+                db.ChangeTracker.Clear();
+                throw new InfrastructureActionConnectionUnavailableException(
+                    message.OperationId,
+                    infrastructureRunner.ConnectionId!,
+                    ex);
+            }
             var deploymentTargetId = await db.AppDeploymentTargets
                 .Where(target =>
                     target.WebAppId == InfrastructureAppTrust.PlatformAppId &&
@@ -238,6 +253,12 @@ public sealed class InfrastructureActionProvisioningHandler(
                 "Infrastructure Action claim persistence failed for operation {OperationId}; CAP will retry. {ExceptionType}",
                 message.OperationId,
                 ex.InnerException?.GetType().Name ?? ex.GetType().Name);
+            throw;
+        }
+        catch (InfrastructureActionConnectionUnavailableException)
+        {
+            // CAP must redeliver after the Runner reconnects. The operation has no
+            // execution claim yet, so do not persist a terminal lifecycle outcome.
             throw;
         }
         catch (Exception ex)
@@ -521,6 +542,18 @@ public sealed class InfrastructureActionProvisioningHandler(
     }
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
+
+    internal static bool IsMissingSignalRConnection(Exception exception)
+    {
+        for (var current = exception; current != null; current = current.InnerException)
+        {
+            if (current.Message.Contains("Connection '", StringComparison.OrdinalIgnoreCase)
+                && current.Message.Contains("' does not exist", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool IsTerminalExecution(string status) => status is
         AppModuleExecutionStatuses.Succeeded or

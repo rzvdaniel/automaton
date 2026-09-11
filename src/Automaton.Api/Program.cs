@@ -218,6 +218,7 @@ services.AddScoped<InfrastructureActionProvisioningHandler>();
 services.AddScoped<HostedRunnerRestartReconciler>();
 services.AddScoped<HostedRunnerLifecycleReconciler>();
 services.AddScoped<TrustedInfrastructureActionDeploymentService>();
+services.AddScoped<ITrustedInfrastructureActionDeploymentService>(sp => sp.GetRequiredService<TrustedInfrastructureActionDeploymentService>());
 services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
 services.AddScoped<ISecretStore, SecretStore>();
 services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();

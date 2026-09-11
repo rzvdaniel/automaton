@@ -6,12 +6,14 @@ using Automaton.Api.Data;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Services.Interfaces;
 
 namespace Automaton.Api.Services;
 
 public sealed class TrustedInfrastructureActionDeploymentService(
     IHubContext<AutomatonHub> hub,
     ApplicationDbContext db)
+    : ITrustedInfrastructureActionDeploymentService
 {
     private static readonly IReadOnlySet<string> AllowedActions = new HashSet<string>(StringComparer.Ordinal)
     {

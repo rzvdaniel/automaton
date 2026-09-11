@@ -23,7 +23,7 @@ using Microsoft.Extensions.Options;
 namespace Automaton.Api.Tests;
 
 [TestFixture]
-public class HostedRunnerAuditTests
+public partial class HostedRunnerAuditTests
 {
     [Test]
     public async Task RegistrationDoesNotPersistSelfReportedApplicationProfile()
