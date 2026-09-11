@@ -102,7 +102,6 @@ public sealed class InfrastructureActionProvisioningHandler(
                 // No execution has been claimed yet. Let CAP retry this delivery after
                 // the Runner reconnects instead of turning a stale connection into a
                 // terminal provisioning failure. Never switch connections in-flight.
-                db.ChangeTracker.Clear();
                 throw new InfrastructureActionConnectionUnavailableException(
                     message.OperationId,
                     infrastructureRunner.ConnectionId!,
@@ -255,11 +254,21 @@ public sealed class InfrastructureActionProvisioningHandler(
                 ex.InnerException?.GetType().Name ?? ex.GetType().Name);
             throw;
         }
-        catch (InfrastructureActionConnectionUnavailableException)
+        catch (InfrastructureActionConnectionUnavailableException ex)
         {
-            // CAP must redeliver after the Runner reconnects. The operation has no
-            // execution claim yet, so do not persist a terminal lifecycle outcome.
-            throw;
+            // CAP acknowledgement is not a durable retry contract. Keep the
+            // unclaimed operation queued for HostedRunnerLifecycleReconciler,
+            // which reloads the Runner connection on its next bounded reclaim.
+            deployment.Status = HostedRunnerDeploymentStatuses.Queued;
+            deployment.Error = null;
+            deployment.FinishedAt = null;
+            deployment.Logs = "Waiting for Infrastructure Runner connection.";
+            hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+            hostedRunner.LastError = null;
+            hostedRunner.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(CancellationToken.None);
+            logger.LogWarning(ex, "Infrastructure Action operation {OperationId} queued for connection recovery", message.OperationId);
+            return;
         }
         catch (Exception ex)
         {

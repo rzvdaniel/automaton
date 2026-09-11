@@ -19,7 +19,7 @@ public partial class HostedRunnerAuditTests
     [Test]
     public async Task InfrastructureActionHandler_StaleConnectionIsRetryableBeforeExecutionClaim()
     {
-        await using var db = CreateDbContext();
+        using var db = CreateDbContext();
         var userId = Guid.NewGuid();
         var host = SeedRunnerHost(db);
         var infrastructure = new Runner { Id = Guid.NewGuid(), Name = "infra", Purpose = RunnerPurposes.Infrastructure, CapabilitiesJson = "[\"HostedRunnerProvisioning\"]", ConnectionId = "stale-connection", ApiInstanceId = "api", LastHeartbeatAtUtc = DateTime.UtcNow, Status = "online" };
@@ -34,7 +34,7 @@ public partial class HostedRunnerAuditTests
         var publisher = new RecordingPublisher();
         var handler = new InfrastructureActionProvisioningHandler(db, null!, publisher, new RecordingAudit(), null!, new FailingDeploymentService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()), NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
-        Assert.ThrowsAsync<InfrastructureActionConnectionUnavailableException>(() => handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent { OperationId = deployment.Id, HostedRunnerId = hosted.Id, UserId = userId, RunnerHostId = host.Id, ActionKey = "reprovision-hosted-runner", InputJson = "{}", SecretGrantIds = [Guid.NewGuid()] }, CancellationToken.None));
+        await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent { OperationId = deployment.Id, HostedRunnerId = hosted.Id, UserId = userId, RunnerHostId = host.Id, ActionKey = "reprovision-hosted-runner", InputJson = "{}", SecretGrantIds = [Guid.NewGuid()] }, CancellationToken.None);
         Assert.That(deployment.Status, Is.Not.EqualTo(HostedRunnerDeploymentStatuses.Failed));
         Assert.That(hosted.Status, Is.Not.EqualTo(HostedRunnerStatuses.Failed));
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
