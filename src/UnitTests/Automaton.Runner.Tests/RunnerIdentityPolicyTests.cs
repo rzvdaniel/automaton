@@ -24,4 +24,25 @@ public sealed class RunnerIdentityPolicyTests
     {
         Assert.That(RunnerIdentityPolicy.IsManagedHostedRunner("SelfHosted", Guid.NewGuid().ToString()), Is.False);
     }
+
+    [Test]
+    public void ManagedHostedRunnerWithPersistedIdentity_SkipsGenericReconciliation()
+    {
+        Assert.That(RunnerHostService.ShouldRunGenericIdentityReconciliation("Managed", Guid.NewGuid().ToString()), Is.False);
+    }
+
+    [Test]
+    public void ManagedHostedRunnerWithoutPersistedIdentity_FailsClosedAtStartupBoundary()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            RunnerHostService.EnsureManagedHostedRunnerIdentity("Managed", Guid.NewGuid().ToString()));
+
+        Assert.That(exception!.Message, Does.Contain("identity is unavailable"));
+    }
+
+    [Test]
+    public void SelfHostedRunner_RemainsEligibleForGenericReconciliation()
+    {
+        Assert.That(RunnerHostService.ShouldRunGenericIdentityReconciliation("SelfHosted", Guid.NewGuid().ToString()), Is.True);
+    }
 }

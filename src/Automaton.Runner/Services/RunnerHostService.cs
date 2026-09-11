@@ -94,11 +94,7 @@ public class RunnerHostService
             // Check if runner is registered - if not, use environment variable or default name
             if (!configService.IsRunnerRegistered())
             {
-                if (RunnerIdentityPolicy.IsManagedHostedRunner(runnerPurpose, Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID")))
-                {
-                    logger.Error("Managed Hosted Runner enrollment identity is not persisted; refusing generic runner registration");
-                    throw new InvalidOperationException("Managed Hosted Runner identity is unavailable. Re-enroll or reprovision the Hosted Runner.");
-                }
+                EnsureManagedHostedRunnerIdentity(runnerPurpose, Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"));
 
                 logger.Warning("Runner not registered - will register with default name");
                 
@@ -753,7 +749,7 @@ public class RunnerHostService
 
     private async Task EnsureRunnerRegistrationConsistencyAsync()
     {
-        if (RunnerIdentityPolicy.IsManagedHostedRunner(
+        if (!ShouldRunGenericIdentityReconciliation(
                 Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
                 Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID")))
         {
@@ -805,6 +801,17 @@ public class RunnerHostService
             logger.Warning(ex, "Failed to reconcile runner identity before hub connect for {RunnerName}", runnerName);
         }
     }
+
+    internal static void EnsureManagedHostedRunnerIdentity(string? purpose, string? hostedRunnerId)
+    {
+        if (RunnerIdentityPolicy.IsManagedHostedRunner(purpose, hostedRunnerId))
+        {
+            throw new InvalidOperationException("Managed Hosted Runner identity is unavailable. Re-enroll or reprovision the Hosted Runner.");
+        }
+    }
+
+    internal static bool ShouldRunGenericIdentityReconciliation(string? purpose, string? hostedRunnerId)
+        => !RunnerIdentityPolicy.IsManagedHostedRunner(purpose, hostedRunnerId);
 
     private async Task<bool> RegisterRunnerAsync(string runnerName, bool ignoreStoredRunnerId = false)
     {
