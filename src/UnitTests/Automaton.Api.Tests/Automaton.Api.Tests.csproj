@@ -28,5 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Api\Automaton.Api.csproj" />
+    <Compile Include="..\Shared\RecordingCapPublisher.cs" Link="RecordingCapPublisher.cs" />
   </ItemGroup>
 </Project>
