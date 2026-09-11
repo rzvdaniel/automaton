@@ -387,9 +387,6 @@ public class Program
                 // Register runner settings service for loading script engine configuration
                 services.AddScoped<RunnerSettingsService>();
 
-                // Register script engine settings reporter (replaces old manager)
-                services.AddSingleton<ScriptEngineSettingsReporter>();
-
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
                 services.AddSingleton<InfrastructureCommandService>();
@@ -419,27 +416,10 @@ public class Program
                 services.AddHttpClient<RunnerHostService>();
 
                 // Add HTTP client for RunnerSettingsService
-                services.AddHttpClient<RunnerSettingsService>((sp, client) =>
-                {
-                    // Add authentication header if API key is available
-                    var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
-                    var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
-                    if (!string.IsNullOrEmpty(apiKey))
-                    {
-                        client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
-                    }
-                });
+                services.AddHttpClient<RunnerSettingsService>();
 
                 // Add HTTP client for ScriptEngineSettingsReporter
-                services.AddHttpClient<ScriptEngineSettingsReporter>((sp, client) =>
-                {
-                    var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
-                    var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
-                    if (!string.IsNullOrEmpty(apiKey))
-                    {
-                        client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
-                    }
-                });
+                services.AddHttpClient<ScriptEngineSettingsReporter>();
 
                 // Add default HTTP client
                 services.AddHttpClient();
