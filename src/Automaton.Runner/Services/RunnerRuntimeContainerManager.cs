@@ -47,10 +47,19 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         acceptingLifecycleWork = true;
+        // Brokered runtimes depend on the authenticated Hub connection. Defer
+        // their recovery until supervision is running so host startup can
+        // complete and establish that connection first.
+        var deferReconciliation = containers is IScopedApplicationContainerRuntime;
         foreach (var metadataPath in Directory.Exists(workspace.AppsRoot)
             ? Directory.EnumerateFiles(workspace.AppsRoot, MetadataFileName, SearchOption.AllDirectories)
             : [])
         {
+            if (deferReconciliation)
+            {
+                lock (gate) pendingReconciliation.Add(metadataPath);
+                continue;
+            }
             try
             {
                 await ReconcileMetadataAsync(metadataPath, cancellationToken);
