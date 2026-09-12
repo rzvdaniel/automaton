@@ -202,6 +202,22 @@ public sealed class AppActionDeploymentService
         return new(true, $"Deleted Action version '{version}'.");
     }
 
+    public Task<AppActionDeploymentResult> PrepareBundledInfrastructureAsync(
+        Guid runnerHostId,
+        string actionKey,
+        CancellationToken cancellationToken)
+    {
+        TrustedInfrastructureActions.EnsureAllowed(actionKey);
+        if (Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
+            != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
+            throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
+        var actionRoot = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure", "actions", actionKey);
+        var manifestPath = Path.Combine(actionRoot, "action.yaml");
+        var manifest = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
+        return PrepareAsync(InfrastructureAppTrust.PlatformAppId, runnerHostId,
+            new DiscoveredAppAction(actionKey, actionRoot, manifestPath, manifest), cancellationToken);
+    }
+
     private async Task<AppActionDeploymentResult> PrepareAsync(
         Guid appId,
         Guid deploymentTargetId,

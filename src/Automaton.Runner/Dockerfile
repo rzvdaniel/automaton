@@ -3,7 +3,6 @@
 # Multi-stage build for both development and production deployments.
 # Environment mode is controlled via DOTNET_ENVIRONMENT (Production or Development)
 #
-# Build: docker build -t automaton-runner .
 # Run:   docker run -e AUTOMATON_SERVER_URL=... -e AUTOMATON_API_KEY=... automaton-runner
 
 # =============================================================================
@@ -14,28 +13,31 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy solution and project files for restore
-COPY *.sln ./
-COPY Automaton.Core/*.csproj ./Automaton.Core/
-COPY Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
-COPY Automaton.Steps/*.csproj ./Automaton.Steps/
-COPY Automaton.Ai/*.csproj ./Automaton.Ai/
-COPY Automaton.AiGuidance/*.csproj ./Automaton.AiGuidance/
-COPY Automaton.Mcp/*.csproj ./Automaton.Mcp/
-COPY Automaton.Runner/*.csproj ./Automaton.Runner/
-COPY UnitTests/Automaton.Core.Tests/*.csproj ./UnitTests/Automaton.Core.Tests/
-COPY UnitTests/Automaton.Runner.Tests/*.csproj ./UnitTests/Automaton.Runner.Tests/
+COPY src/*.sln ./
+COPY src/Automaton.Core/*.csproj ./Automaton.Core/
+COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
+COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
+COPY src/Automaton.Ai/*.csproj ./Automaton.Ai/
+COPY src/Automaton.AiGuidance/*.csproj ./Automaton.AiGuidance/
+COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
+COPY src/Automaton.Messaging/*.csproj ./Automaton.Messaging/
+COPY src/Automaton.Runner/*.csproj ./Automaton.Runner/
+COPY src/UnitTests/Automaton.Core.Tests/*.csproj ./UnitTests/Automaton.Core.Tests/
+COPY src/UnitTests/Automaton.Runner.Tests/*.csproj ./UnitTests/Automaton.Runner.Tests/
 
 # Restore dependencies
 RUN dotnet restore Automaton.Runner/Automaton.Runner.csproj
 
 # Copy all source code
-COPY Automaton.Core/ ./Automaton.Core/
-COPY Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
-COPY Automaton.Steps/ ./Automaton.Steps/
-COPY Automaton.Ai/ ./Automaton.Ai/
-COPY Automaton.AiGuidance/ ./Automaton.AiGuidance/
-COPY Automaton.Mcp/ ./Automaton.Mcp/
-COPY Automaton.Runner/ ./Automaton.Runner/
+COPY src/Automaton.Core/ ./Automaton.Core/
+COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
+COPY src/Automaton.Steps/ ./Automaton.Steps/
+COPY src/Automaton.Ai/ ./Automaton.Ai/
+COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
+COPY src/Automaton.Mcp/ ./Automaton.Mcp/
+COPY src/Automaton.Messaging/ ./Automaton.Messaging/
+COPY src/Automaton.Runner/ ./Automaton.Runner/
+COPY system-apps/automaton-infrastructure/actions/ /system-apps/automaton-infrastructure/actions/
 
 # Build and publish
 RUN dotnet publish Automaton.Runner/Automaton.Runner.csproj \
@@ -124,8 +126,8 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Copy FastAPI server
-COPY Automaton.Runner/fastapi_server /app/fastapi_server
-COPY Automaton.Runner/automaton-host-exec /usr/local/bin/automaton-host-exec
+COPY src/Automaton.Runner/fastapi_server /app/fastapi_server
+COPY src/Automaton.Runner/automaton-host-exec /usr/local/bin/automaton-host-exec
 RUN chmod +x /usr/local/bin/automaton-host-exec
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 
@@ -168,7 +170,7 @@ ENV PATH="/usr/local/bin:/usr/share/dotnet:$PATH"
 USER automaton
 
 # Default: run in service mode via entrypoint that starts FastAPI + .NET runner
-COPY --chown=automaton:automaton Automaton.Runner/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=automaton:automaton src/Automaton.Runner/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN sed -i 's/\r//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 CMD ["/app/docker-entrypoint.sh"]

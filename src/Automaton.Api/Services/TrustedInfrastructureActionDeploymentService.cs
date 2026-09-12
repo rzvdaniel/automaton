@@ -15,24 +15,12 @@ public sealed class TrustedInfrastructureActionDeploymentService(
     ApplicationDbContext db)
     : ITrustedInfrastructureActionDeploymentService
 {
-    private static readonly IReadOnlySet<string> AllowedActions = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "provision-hosted-runner",
-        "reprovision-hosted-runner",
-        "restart-hosted-runner",
-        "suspend-hosted-runner",
-        "resume-hosted-runner",
-        "delete-hosted-runner",
-        Automaton.Api.Models.StorageTelemetryActions.MeasureHostedRunnerStorage
-    };
-
     public async Task<AppActionModuleInfo> EnsureDeployedAsync(
         string connectionId,
         string actionKey,
         CancellationToken cancellationToken)
     {
-        if (!AllowedActions.Contains(actionKey))
-            throw new UnauthorizedAccessException("The requested trusted infrastructure Action is not allowlisted.");
+        TrustedInfrastructureActions.EnsureAllowed(actionKey);
 
         var actionRoot = Path.Combine(
             AppContext.BaseDirectory,

@@ -70,6 +70,18 @@ After revocation, the runner cannot reconnect or perform host operations. Revoca
 
 ## Troubleshooting
 
+### Durable command development probe
+
+The Runner includes `automaton-runner infrastructure-command-probe` for isolated
+development checks. It requires `DOTNET_ENVIRONMENT=Development` and is not started
+by the normal Runner service. Production Hosted Runner operations still use the
+existing SignalR path.
+
+The probe consumes one RabbitMQ command and leaves it unacknowledged, including
+after successful execution. Closing the probe returns the command to its queue.
+Do not run it against a production broker or use it to retry a live host operation.
+Commands with secret grants and provision/reprovision stop before secret retrieval.
+
 ### The command fails to download
 
 Confirm HTTPS and DNS access to the Automaton API, copy a fresh command from Studio, and run it again.

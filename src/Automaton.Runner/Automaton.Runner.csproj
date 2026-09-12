@@ -35,6 +35,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.10" />
     <PackageReference Include="Polly" Version="8.5.0" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
     <PackageReference Include="Serilog" Version="4.1.0" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
@@ -52,6 +53,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
+    <ProjectReference Include="..\Automaton.Messaging\Automaton.Messaging.csproj" />
     <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
   </ItemGroup>
 
@@ -63,6 +65,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="README-NUGET.md" Pack="true" PackagePath="\" />
+    <Content Include="..\..\system-apps\automaton-infrastructure\actions\**\action.yaml;..\..\system-apps\automaton-infrastructure\actions\**\main.py"
+             Link="SystemApps\automaton-infrastructure\actions\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Pack="false"
+             ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>
