@@ -12,6 +12,15 @@ existing grant scope. `ExecutionSecretGrantService` remains the only secret
 resolver. Secret values never travel in RabbitMQ and the Runner has no database
 access.
 
+The callback also binds the supplied Action key to the persisted
+`HostedRunnerDeployment.Action`; an unknown deployment action or mismatched
+trusted Action key is rejected before either endpoint can read grants or mutate
+lifecycle state. The current mapping is `provision` → `provision-hosted-runner`,
+`reprovision` → `reprovision-hosted-runner`, `restart` → `restart-hosted-runner`,
+`suspend` → `suspend-hosted-runner`, `resume` → `resume-hosted-runner`,
+`deprovision` → `delete-hosted-runner`, and storage measurement →
+`measure-hosted-runner-storage`.
+
 The Runner posts its terminal execution and existing result artifact to
 `POST /api/infrastructure-commands/{commandId}/result`. The API repeats the same
 caller and command authorization. It stores a SHA-256 fingerprint on the command

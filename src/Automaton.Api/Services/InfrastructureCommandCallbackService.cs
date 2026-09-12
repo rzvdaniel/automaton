@@ -101,9 +101,25 @@ public sealed class InfrastructureCommandCallbackService(
             ?? throw new UnauthorizedAccessException("The infrastructure command operation was not found.");
         if (deployment.HostedRunner.RunnerHostId != runnerHostId)
             throw new UnauthorizedAccessException("The infrastructure command operation is not assigned to this Runner Host.");
+        var expectedActionKey = TrustedActionKeyForDeployment(deployment.Action)
+            ?? throw new UnauthorizedAccessException("The infrastructure command operation has an unknown deployment action.");
+        if (!string.Equals(expectedActionKey, actionKey, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("The infrastructure command Action does not match the persisted operation action.");
         return new SecretGrantScope(operationId, InfrastructureAppTrust.PlatformAppId, actionKey, runnerId,
             runnerHostId, SecretOwnerTypes.HostedRunner, deployment.HostedRunnerId);
     }
+
+    internal static string? TrustedActionKeyForDeployment(string action) => action switch
+    {
+        HostedRunnerDeploymentActions.Provision => "provision-hosted-runner",
+        HostedRunnerDeploymentActions.Reprovision => "reprovision-hosted-runner",
+        HostedRunnerDeploymentActions.Restart => "restart-hosted-runner",
+        HostedRunnerDeploymentActions.Suspend => StorageEnforcementActions.SuspendHostedRunner,
+        HostedRunnerDeploymentActions.Resume => StorageEnforcementActions.ResumeHostedRunner,
+        HostedRunnerDeploymentActions.Deprovision => "delete-hosted-runner",
+        "measure-hosted-runner-storage" => StorageTelemetryActions.MeasureHostedRunnerStorage,
+        _ => null
+    };
 
     private static void ApplyExecution(AppModuleExecution target, AppActionExecutionResult source)
     {
