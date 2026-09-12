@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Messaging.Events;
 using Automaton.Runner.Console.Services;
@@ -81,6 +82,13 @@ public sealed class InfrastructureCommandConsumerTests
             constructor.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[]
             { typeof(InfrastructureCommandIdentity), typeof(IInfrastructureActionExecutor), typeof(IInfrastructureCommandResultClient) })), Is.True);
     }
+
+    [TestCase(RunnerPurposes.Infrastructure, "11111111-1111-1111-1111-111111111111", true)]
+    [TestCase(RunnerPurposes.Managed, "11111111-1111-1111-1111-111111111111", false)]
+    [TestCase("Standard", "11111111-1111-1111-1111-111111111111", false)]
+    [TestCase(RunnerPurposes.Infrastructure, "", false)]
+    public void InfrastructureServiceStartIsLimitedToValidInfrastructureIdentity(string purpose, string runnerId, bool expected)
+        => Assert.That(InfrastructureCommandHostedService.ShouldStart(purpose, runnerId, Guid.NewGuid()), Is.EqualTo(expected));
 
     [Test]
     public async Task LocalRabbitMqLeavesDeliveryUnacknowledgedWhenCallbackFails()
@@ -167,6 +175,47 @@ public sealed class InfrastructureCommandConsumerTests
             Assert.That(result.Execution.ExecutionId, Is.EqualTo(command.CommandId));
             Assert.That(callbacks.Commands.Single().CommandId, Is.EqualTo(command.CommandId));
             Assert.That(await channel.BasicGetAsync(consumer.QueueName, autoAck: true, timeout.Token), Is.Null);
+        }
+        finally
+        {
+            await channel.QueueDeleteAsync(consumer.QueueName, ifUnused: false, ifEmpty: false);
+        }
+    }
+
+    [Test]
+    public async Task LocalRabbitMqLongLivedConsumerConnectsAndConsumes()
+    {
+        var portText = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PORT");
+        if (!int.TryParse(portText, out var port))
+            Assert.Ignore("Set AUTOMATON_TEST_RABBITMQ_PORT for an isolated local RabbitMQ instance.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var username = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_USER") ?? "guest";
+        var password = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PASSWORD") ?? "guest";
+        var factory = new ConnectionFactory { HostName = "127.0.0.1", Port = port, UserName = username, Password = password, AutomaticRecoveryEnabled = false };
+        await using var connection = await factory.CreateConnectionAsync(timeout.Token);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: timeout.Token);
+        var executor = new RecordingExecutor();
+        var callbacks = new RecordingResultClient();
+        var consumer = new InfrastructureCommandConsumer(identity, executor, callbacks);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RabbitMq:Host"] = "127.0.0.1", ["RabbitMq:Port"] = port.ToString(),
+            ["RabbitMq:Username"] = username, ["RabbitMq:Password"] = password
+        }).Build();
+        await channel.QueueDeclareAsync(consumer.QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: timeout.Token);
+        try
+        {
+            var running = consumer.ConsumeAsync(configuration, timeout.Token);
+            while ((await channel.QueueDeclarePassiveAsync(consumer.QueueName, timeout.Token)).ConsumerCount == 0)
+                await Task.Delay(25, timeout.Token);
+            var command = Command();
+            await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
+                new BasicProperties { Persistent = true }, await SerializeWithCap(command), timeout.Token);
+            while (callbacks.Commands.Count == 0)
+                await Task.Delay(25, timeout.Token);
+            Assert.That(callbacks.Commands.Single().CommandId, Is.EqualTo(command.CommandId));
+            timeout.Cancel();
+            Assert.ThrowsAsync<TaskCanceledException>(async () => await running);
         }
         finally
         {

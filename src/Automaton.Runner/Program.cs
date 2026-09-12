@@ -414,6 +414,7 @@ public class Program
                 services.AddSingleton<InfrastructureCommandService>();
                 services.AddSingleton<HostContainerExecutionService>();
                 services.AddSingleton<TunnelForwarderService>();
+                services.AddHostedService<InfrastructureCommandHostedService>();
 
                 // Configure HTTP client factory with SSL bypass for development
                 var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||

@@ -112,19 +112,17 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             runnerName = hostedRunner.Name
         });
 
-        var infrastructureRequest = new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = deployment.Id,
-            HostedRunnerId = hostedRunner.Id,
-            UserId = hostedRunner.UserId,
-            RunnerHostId = host.Id,
-            ActionKey = deployment.Action == HostedRunnerDeploymentActions.Reprovision
+        var infrastructureRequest = new InfrastructureCommandRequestedEvent(
+            CommandId: deployment.Id,
+            OperationId: deployment.Id,
+            RunnerHostId: host.Id,
+            InfrastructureRunnerId: host.InfrastructureRunnerId.Value,
+            ActionKey: deployment.Action == HostedRunnerDeploymentActions.Reprovision
                 ? "reprovision-hosted-runner"
                 : ProvisionActionKey,
-            InputJson = input,
-            SecretGrantIds = message.SecretGrantIds,
-            CorrelationId = message.CorrelationId
-        };
+            InputJson: input,
+            SecretGrantIds: message.SecretGrantIds,
+            CreatedAtUtc: DateTime.UtcNow);
 
         var claimed = false;
         await transactionalEventExecutor.ExecuteAsync(async transactionCancellationToken =>

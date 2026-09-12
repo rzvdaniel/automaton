@@ -40,6 +40,33 @@ public class RunnerHostCloudInitTests
             Throws.ArgumentException);
     }
 
+    [Test]
+    public void Generate_InjectsPrivilegedRunnerRabbitMqConfigurationIntoProtectedEnvFile()
+    {
+        var cloudInit = RunnerHostCloudInit.Generate(new RunnerHostCloudInitRequest(
+            new Uri("https://api.example.test"), Guid.NewGuid(), "re_test-token", "runner:latest",
+            RabbitMq: new RunnerRabbitMqConfiguration("rabbitmq.internal", 5672, "infra", "secret", "/", "cap.default.router")));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cloudInit, Does.Contain("RabbitMq__Host=rabbitmq.internal"));
+            Assert.That(cloudInit, Does.Contain("RabbitMq__Port=5672"));
+            Assert.That(cloudInit, Does.Contain("RabbitMq__Username=infra"));
+            Assert.That(cloudInit, Does.Contain("RabbitMq__Password=secret"));
+            Assert.That(cloudInit, Does.Contain("RabbitMq__VirtualHost=/"));
+            Assert.That(cloudInit, Does.Contain("RabbitMq__ExchangeName=cap.default.router"));
+            Assert.That(cloudInit, Does.Contain("permissions: \"0600\""));
+            Assert.That(cloudInit, Does.Contain("shred -u /etc/automaton/infrastructure-runner.env"));
+        });
+    }
+
+    [Test]
+    public void ManagedRunnerInstallDoesNotReceiveInfrastructureRabbitMqConfiguration()
+    {
+        var managedInstall = "AUTOMATON_RUNNER_PURPOSE=Managed\nAUTOMATON_SERVER_URL=https://api.example.test";
+        Assert.That(managedInstall, Does.Not.Contain("RabbitMq__Password"));
+    }
+
     private static int CountOccurrences(string value, string fragment)
         => value.Split(fragment, StringSplitOptions.None).Length - 1;
 }

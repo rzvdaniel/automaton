@@ -92,9 +92,12 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
 
         await handler.HandleAsync(durableRequest);
 
-        var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
+        var request = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
         Assert.That(request.ActionKey, Is.EqualTo("provision-hosted-runner"));
+        Assert.That(request.CommandId, Is.EqualTo(deployment.Id));
         Assert.That(request.OperationId, Is.EqualTo(deployment.Id));
+        Assert.That(request.RunnerHostId, Is.EqualTo(host.Id));
+        Assert.That(request.InfrastructureRunnerId, Is.EqualTo(host.InfrastructureRunnerId));
         Assert.That(request.SecretGrantIds, Is.EqualTo(new[] { grantId }));
         Assert.That(JsonSerializer.Serialize(durableRequest), Does.Not.Contain("ak_runner_"));
         Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("ak_runner_"));
@@ -118,7 +121,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));
 
         await handler.HandleAsync(durableRequest);
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
 
         var disabledDeployment = new HostedRunnerDeployment
         {
@@ -143,7 +147,25 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         });
 
         Assert.That(disabledDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Count(), Is.EqualTo(1));
+
+        var reprovisionHandler = new ManagedRunnerProvisionRequestedEventHandler(
+            db, publisher, new RollbackTransactionalEventExecutor(db),
+            new OptionsSnapshot(new HostedRunnerOptions
+            {
+                Enabled = true, DockerImage = "automaton/runner@sha256:" + new string('b', 64),
+                DockerNetwork = "automaton-runtime", ServerUrl = "https://api.example.test"
+            }),
+            NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
+        await reprovisionHandler.HandleAsync(new ManagedRunnerProvisionRequestedEvent
+        {
+            OperationId = disabledDeployment.Id, HostedRunnerId = runner.Id,
+            UserId = runner.UserId, RunnerHostId = host.Id, SecretGrantIds = [Guid.NewGuid()]
+        });
+        var reprovision = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single(x => x.OperationId == disabledDeployment.Id);
+        Assert.That(reprovision.ActionKey, Is.EqualTo("reprovision-hosted-runner"));
+        Assert.That(reprovision.CommandId, Is.EqualTo(reprovision.OperationId));
+        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
     }
 
     [Test]
@@ -206,6 +228,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             Assert.That(savedRunner.LastError, Does.Contain("immutable"));
             Assert.That(savedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
             Assert.That(savedDeployment.Error, Does.Contain("immutable"));
+            Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>(), Is.Empty);
             Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
         });
     }

@@ -7,7 +7,16 @@ public sealed record RunnerHostCloudInitRequest(
     Guid RunnerHostId,
     string EnrollmentToken,
     string RunnerImage,
-    string DataRoot = "/opt/automaton/infrastructure-runner");
+    string DataRoot = "/opt/automaton/infrastructure-runner",
+    RunnerRabbitMqConfiguration? RabbitMq = null);
+
+public sealed record RunnerRabbitMqConfiguration(
+    string Host,
+    int Port,
+    string Username,
+    string Password,
+    string VirtualHost = "/",
+    string ExchangeName = "cap.default.router");
 
 public static class RunnerHostCloudInit
 {
@@ -34,6 +43,12 @@ public static class RunnerHostCloudInit
             "AUTOMATON_RUNNER_PURPOSE=Infrastructure",
             $"AUTOMATON_RUNNER_HOST_ID={request.RunnerHostId}",
             $"AUTOMATON_ENROLLMENT_TOKEN={request.EnrollmentToken}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__Host={request.RabbitMq.Host}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__Port={request.RabbitMq.Port}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__Username={request.RabbitMq.Username}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__Password={request.RabbitMq.Password}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__VirtualHost={request.RabbitMq.VirtualHost}",
+            request.RabbitMq is null ? string.Empty : $"RabbitMq__ExchangeName={request.RabbitMq.ExchangeName}",
             string.Empty);
 
         var builder = new StringBuilder();
