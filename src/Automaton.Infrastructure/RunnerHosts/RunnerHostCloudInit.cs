@@ -16,7 +16,17 @@ public sealed record RunnerRabbitMqConfiguration(
     string Username,
     string Password,
     string VirtualHost = "/",
-    string ExchangeName = "cap.default.router");
+    string ExchangeName = "cap.default.router")
+{
+    public string ToEnvironmentFile() => string.Join('\n',
+        $"RabbitMq__Host={Host}",
+        $"RabbitMq__Port={Port}",
+        $"RabbitMq__Username={Username}",
+        $"RabbitMq__Password={Password}",
+        $"RabbitMq__VirtualHost={VirtualHost}",
+        $"RabbitMq__ExchangeName={ExchangeName}",
+        string.Empty);
+}
 
 public static class RunnerHostCloudInit
 {
@@ -38,6 +48,8 @@ public static class RunnerHostCloudInit
         var workspacePath = $"{root}/workspace";
         var artifactsPath = $"{root}/artifacts";
         var logsPath = $"{root}/logs";
+        var rabbitMqEnvPath = "/etc/automaton/infrastructure-runner-rabbitmq.env";
+        var rabbitMqEnv = request.RabbitMq?.ToEnvironmentFile() ?? string.Empty;
         var env = string.Join('\n',
             $"AUTOMATON_SERVER_URL={request.ApiUrl.ToString().TrimEnd('/')}",
             "AUTOMATON_RUNNER_PURPOSE=Infrastructure",
@@ -63,6 +75,18 @@ public static class RunnerHostCloudInit
             builder.AppendLine($"      {line}");
         }
 
+        if (request.RabbitMq is not null)
+        {
+            builder.AppendLine("  - path: /etc/automaton/infrastructure-runner-rabbitmq.env");
+            builder.AppendLine("    owner: root:root");
+            builder.AppendLine("    permissions: \"0600\"");
+            builder.AppendLine("    content: |");
+            foreach (var line in rabbitMqEnv.Split('\n'))
+            {
+                builder.AppendLine($"      {line}");
+            }
+        }
+
         builder.AppendLine("runcmd:");
         builder.AppendLine($"  - mkdir -p {ShellQuote(configPath)} {ShellQuote(workspacePath)} {ShellQuote(artifactsPath)} {ShellQuote(logsPath)}");
         builder.AppendLine($"  - chmod 700 {ShellQuote(root)}");
@@ -71,6 +95,8 @@ public static class RunnerHostCloudInit
         builder.AppendLine("    docker run -d --name automaton-infrastructure-runner");
         builder.AppendLine($"    --restart unless-stopped {RunnerDockerArguments.InfrastructureHost}");
         builder.AppendLine("    --env-file /etc/automaton/infrastructure-runner.env");
+        if (request.RabbitMq is not null)
+            builder.AppendLine($"    --env-file {ShellQuote(rabbitMqEnvPath)}");
         builder.AppendLine($"    -v {ShellQuote(configPath)}:/app/config");
         builder.AppendLine($"    -v {ShellQuote(workspacePath)}:/automaton/workspace");
         builder.AppendLine($"    -v {ShellQuote(artifactsPath)}:/automaton/artifacts");

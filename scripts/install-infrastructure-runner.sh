@@ -20,6 +20,7 @@ AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-$AUTOMATON_ROOT/infrastructure-runne
 ROLLBACK_IMAGE=""
 IMAGE_WAS_EXPLICIT=false
 INSTALLATION_CONFIG_FILE=""
+RABBITMQ_CONFIG_FILE=""
 SERVER_URL_WAS_EXPLICIT=false
 RUNNER_NAME_WAS_EXPLICIT=false
 PUBLIC_IP_WAS_EXPLICIT=false
@@ -53,6 +54,7 @@ fi
 systemctl enable --now docker
 mkdir -p "$AUTOMATON_DATA_ROOT"/{config,logs,workflows,artifacts} "$AUTOMATON_ROOT"/{hosted-runners,gateway,certificates}
 INSTALLATION_CONFIG_FILE="$AUTOMATON_DATA_ROOT/config/container-specification.env"
+RABBITMQ_CONFIG_FILE="$AUTOMATON_DATA_ROOT/config/rabbitmq.env"
 exec 9>"$AUTOMATON_DATA_ROOT/update.lock"
 flock -n 9 || { echo "Another Infrastructure Runner lifecycle operation is already running on this host." >&2; exit 75; }
 
@@ -62,6 +64,46 @@ load_installation_configuration() {
   # This file is written by this installer with shell-escaped values and contains no credentials.
   # shellcheck disable=SC1090
   source "$INSTALLATION_CONFIG_FILE"
+}
+load_rabbitmq_configuration() {
+  local api_key="" fetched_file="" required
+  if [[ -r "$RABBITMQ_CONFIG_FILE" ]]; then
+    chmod 600 "$RABBITMQ_CONFIG_FILE"
+  elif [[ -r /etc/automaton/infrastructure-runner-rabbitmq.env ]]; then
+    cp /etc/automaton/infrastructure-runner-rabbitmq.env "$RABBITMQ_CONFIG_FILE"
+    chmod 600 "$RABBITMQ_CONFIG_FILE"
+  fi
+
+  # The enrollment key is available on first install. Repair/update reuses the
+  # durable Runner key written by the Runner into the mounted config volume.
+  api_key="$AUTOMATON_API_KEY"
+  if [[ -z "$api_key" && -r "$AUTOMATON_DATA_ROOT/config/api-key" ]]; then
+    api_key="$(<"$AUTOMATON_DATA_ROOT/config/api-key")"
+  fi
+
+  if [[ -n "$api_key" ]]; then
+    fetched_file="$(mktemp "$AUTOMATON_DATA_ROOT/config/.rabbitmq.XXXXXX")"
+    chmod 600 "$fetched_file"
+    if curl -fsSL -H "X-API-Key: $api_key" \
+      "$AUTOMATON_SERVER_URL/api/infrastructure-runners/configuration.env" \
+      -o "$fetched_file"; then
+      mv -f "$fetched_file" "$RABBITMQ_CONFIG_FILE"
+      chmod 600 "$RABBITMQ_CONFIG_FILE"
+    else
+      shred -u "$fetched_file" 2>/dev/null || rm -f "$fetched_file"
+    fi
+  fi
+
+  [[ -r "$RABBITMQ_CONFIG_FILE" ]] || {
+    echo "Infrastructure Runner RabbitMQ configuration could not be resolved." >&2
+    return 1
+  }
+  for required in RabbitMq__Host RabbitMq__Port RabbitMq__Username RabbitMq__Password RabbitMq__VirtualHost RabbitMq__ExchangeName; do
+    grep -Eq "^${required}=.+$" "$RABBITMQ_CONFIG_FILE" || {
+      echo "Infrastructure Runner RabbitMQ configuration is incomplete (${required})." >&2
+      return 1
+    }
+  done
 }
 save_installation_configuration() {
   umask 077
@@ -104,6 +146,8 @@ if [[ "$OPERATION" == replace && -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROL
   echo "replace requires a fresh enrollment key or token." >&2; exit 1
 fi
 
+load_rabbitmq_configuration
+
 resolve_image() {
   docker pull "$AUTOMATON_RUNNER_IMAGE" >&2
   local digest
@@ -118,14 +162,18 @@ installation_id() {
 }
 
 run_canonical_container() {
-  local image="$1" digest="$2" id
+  local image="$1" digest="$2" id runtime_env_file run_status
   id="$(installation_id)"
+  runtime_env_file="$(mktemp "$AUTOMATON_DATA_ROOT/config/.runtime-env.XXXXXX")"
+  chmod 600 "$runtime_env_file"
+  cp "$RABBITMQ_CONFIG_FILE" "$runtime_env_file"
   local args=(run -d --name "$AUTOMATON_CONTAINER_NAME" --restart unless-stopped --privileged --user 0:0 --pid host --network host
     --label "automaton.installation-id=$id" --label "automaton.runner-version=${image#*:}" --label "automaton.image-digest=$digest" --label "automaton.specification-version=$SPECIFICATION_VERSION"
     -v /var/run/docker.sock:/var/run/docker.sock -v /:/host
     -v "$AUTOMATON_DATA_ROOT/config:/app/config" -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace" \
     -e AUTOMATON_HOST_WORKSPACE_ROOT="$AUTOMATON_DATA_ROOT/workflows"
     -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts" -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
+    --env-file "$runtime_env_file"
     -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL" -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure" -e "AUTOMATON_RUNNER_IMAGE=$image"
     -e "AUTOMATON_RUNNER_IMAGE_DIGEST=$digest" -e "AUTOMATON_CONTAINER_SPECIFICATION_VERSION=$SPECIFICATION_VERSION")
   [[ -n "$AUTOMATON_RUNNER_NAME" ]] && args+=(-e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME")
@@ -134,7 +182,13 @@ run_canonical_container() {
     [[ -n "$AUTOMATON_PRIVATE_IP" ]] && args+=(-e "AUTOMATON_RUNTIME_HOST_ADDRESS=$AUTOMATON_PRIVATE_IP")
   [[ -n "$AUTOMATON_API_KEY" ]] && args+=(-e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY")
   [[ -n "$AUTOMATON_ENROLLMENT_TOKEN" ]] && args+=(-e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN")
-  args+=("$image"); docker "${args[@]}"
+  args+=("$image")
+  set +e
+  docker "${args[@]}"
+  run_status=$?
+  set -e
+  shred -u "$runtime_env_file" 2>/dev/null || rm -f "$runtime_env_file"
+  return "$run_status"
 }
 
 wait_for_healthy() {

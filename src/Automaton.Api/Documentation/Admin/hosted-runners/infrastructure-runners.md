@@ -24,7 +24,7 @@ Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, 
 
 Use **Repair** to reinstall or recover the Infrastructure Runner container without changing its identity or configuration. The current repair command reuses the container's installed immutable image; it does not select or deploy a newer image and does not provide update rollback.
 
-It preserves the installation ID, API credential, `runner.json`, `installation-profile.json`, and other persisted configuration.
+It preserves the installation ID, API credential, `runner.json`, `installation-profile.json`, and other persisted configuration. The installer also refreshes the privileged Infrastructure Runner RabbitMQ settings from the API and stores them in protected host-only configuration so the durable command consumer is available after repair. These settings are never shown in Studio or passed to Hosted Runner containers.
 
 1. Open **Admin → Runners → Runner Hosts**.
 2. Select **Repair** for the server, review the installed image digest, and select **Copy command**.
