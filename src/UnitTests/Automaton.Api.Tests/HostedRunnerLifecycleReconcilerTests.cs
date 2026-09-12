@@ -33,7 +33,7 @@ public sealed class HostedRunnerLifecycleReconcilerTests
     }
 
     [Test]
-    public async Task QueuedReprovisionWithoutExecutionIsReclaimedOnceAndRemainsRecoverable()
+    public async Task QueuedReprovisionWithoutExecutionIsNotRepublished()
     {
         await using var db = CreateDb();
         var now = DateTime.UtcNow;
@@ -50,18 +50,18 @@ public sealed class HostedRunnerLifecycleReconcilerTests
         var publisher = new RecordingPublisher();
         var reconciler = CreateReconciler(db, publisher);
 
-        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.EqualTo(1));
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
         var recovered = await db.HostedRunnerDeployments.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
-        Assert.That(recovered.Status, Is.Not.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+        Assert.That(recovered.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
         Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
         Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
     }
 
     [Test]
-    public async Task StaleExecutingProvisionWithoutExecutionReturnsToQueueAndReusesItsGrant()
+    public async Task StaleExecutingProvisionWithoutExecutionIsNotRepublished()
     {
         await using var db = CreateDb();
         var now = DateTime.UtcNow;
@@ -76,12 +76,10 @@ public sealed class HostedRunnerLifecycleReconcilerTests
         await db.SaveChangesAsync();
         var publisher = new RecordingPublisher();
 
-        Assert.That(await CreateReconciler(db, publisher).ReconcileAsync(now, CancellationToken.None), Is.EqualTo(1));
+        Assert.That(await CreateReconciler(db, publisher).ReconcileAsync(now, CancellationToken.None), Is.Zero);
         var recovered = await db.HostedRunnerDeployments.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
-        Assert.That(recovered.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
-        var message = publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Single();
-        Assert.That(message.SecretGrantIds, Is.EqualTo(new[] { grant.Id }));
-        Assert.That(message.HostedRunnerId, Is.EqualTo(runner.Id));
+        Assert.That(recovered.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Executing));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
     }
 
     [Test]

@@ -81,6 +81,51 @@ public sealed class InfrastructureCommandConsumer(
         return await completion.Task.WaitAsync(cancellationToken);
     }
 
+    public async Task ConsumeAsync(IConfiguration configuration, CancellationToken cancellationToken)
+    {
+        var factory = new ConnectionFactory
+        {
+            HostName = Require(configuration, "RabbitMq:Host"),
+            Port = configuration.GetValue("RabbitMq:Port", 5672),
+            UserName = Require(configuration, "RabbitMq:Username"),
+            Password = Require(configuration, "RabbitMq:Password"),
+            VirtualHost = configuration["RabbitMq:VirtualHost"] ?? "/",
+            AutomaticRecoveryEnabled = true,
+            TopologyRecoveryEnabled = true
+        };
+        await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        var exchange = configuration["RabbitMq:ExchangeName"] ?? "cap.default.router";
+        await channel.ExchangeDeclareAsync(exchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+        await channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await channel.QueueBindAsync(QueueName, exchange, EventTopics.InfrastructureCommandRequested, cancellationToken: cancellationToken);
+        await channel.BasicQosAsync(0, 1, global: false, cancellationToken);
+        var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += async (_, delivery) =>
+        {
+            try
+            {
+                var result = await HandleAsync(delivery.Body, cancellationToken);
+                var command = JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(delivery.Body.Span, JsonOptions)!;
+                await results.SubmitAsync(command, result.Execution, result.Result, cancellationToken);
+                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+            }
+            catch (UnauthorizedAccessException exception) when (IsWrongAddress(exception))
+            {
+                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+            }
+            catch
+            {
+                // Leave the delivery unacknowledged; closing the channel makes RabbitMQ redeliver it.
+                stopped.TrySetException(new InvalidOperationException("Infrastructure command callback failed; the delivery was left unacknowledged."));
+                await channel.CloseAsync(cancellationToken);
+            }
+        };
+        await channel.BasicConsumeAsync(QueueName, autoAck: false, consumer, cancellationToken);
+        await stopped.Task.WaitAsync(cancellationToken);
+    }
+
     private static string Require(IConfiguration configuration, string key)
         => !string.IsNullOrWhiteSpace(configuration[key]) ? configuration[key]!
             : throw new InvalidOperationException($"{key} is required for the Infrastructure Runner consumer.");

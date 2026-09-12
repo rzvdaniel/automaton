@@ -64,6 +64,12 @@ public sealed class HostedRunnerLifecycleReconciler(
                 continue;
             }
 
+            // Provision and reprovision are durably published to RabbitMQ by the
+            // worker. Absence of an API-side execution record is expected while
+            // the command is queued or being consumed; do not republish it.
+            if (operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)
+                continue;
+
             if (await RepublishAsync(operation, now, recoveryCutoff, cancellationToken)) reconciled++;
         }
 
