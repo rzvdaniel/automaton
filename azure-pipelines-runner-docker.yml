@@ -30,6 +30,8 @@ trigger:
       - src/Automaton.Core.Scripting/**
       - src/Automaton.Steps/**
       - src/Automaton.Mcp/**
+      - src/Automaton.Messaging/**
+      - system-apps/automaton-infrastructure/actions/**
 
 pr: none  # Don't run on PRs
 
@@ -37,7 +39,7 @@ variables:
   dockerRegistryServiceConnection: 'DockerHub'
   imageRepository: 'rzvdaniel/automaton-runner'
   dockerfilePath: 'src/Automaton.Runner/Dockerfile'
-  buildContext: 'src'
+  buildContext: '.'
   
   # Tag with version from git tag, or 'latest' for main branch
   ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
@@ -80,6 +82,15 @@ stages:
               set -eu
               docker run --rm --entrypoint /bin/sh $(imageRepository):$(imageTag) -c 'command -v docker && docker --version'
             displayName: 'Smoke test Docker CLI'
+
+          - script: |
+              set -eu
+              docker run --rm --entrypoint /bin/sh $(imageRepository):$(imageTag) -c '
+                for action in provision-hosted-runner reprovision-hosted-runner restart-hosted-runner suspend-hosted-runner resume-hosted-runner delete-hosted-runner measure-hosted-runner-storage; do
+                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/action.yaml"
+                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/main.py"
+                done'
+            displayName: 'Smoke test bundled trusted Actions'
 
           - task: Docker@2
             displayName: 'Push Docker Image'

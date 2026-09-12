@@ -51,6 +51,7 @@ public class Program
                 CreateServerCommand(),
                 CreateServiceCommand(),
                 CreateCleanupCommand(),
+                CreateInfrastructureCommandProbe(),
                 CreateExecuteAppFlowCommand()
             };
 
@@ -81,6 +82,26 @@ public class Program
         {
             await Log.CloseAndFlushAsync();
         }
+    }
+
+    private static Command CreateInfrastructureCommandProbe()
+    {
+        var command = new Command("infrastructure-command-probe", "Consume one local infrastructure command without acknowledging it. Development only.");
+        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            if (!string.Equals(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Development", StringComparison.Ordinal))
+                throw new InvalidOperationException("The infrastructure command probe requires DOTNET_ENVIRONMENT=Development.");
+            var identity = await InfrastructureCommandIdentity.LoadAsync(new FileStorageService());
+            var workspace = new RunnerWorkspaceService();
+            var coordinator = new AppActionExecutionCoordinator();
+            var executor = new TrustedInfrastructureActionExecutor(
+                new AppActionDeploymentService(workspace, coordinator),
+                new AppActionExecutionService(workspace, coordinator));
+            var consumer = new InfrastructureCommandConsumer(identity, executor);
+            var result = await consumer.ConsumeOneAsync(GetConfiguration(Array.Empty<string>()), context.GetCancellationToken());
+            WriteLine(System.Text.Json.JsonSerializer.Serialize(new { result.Execution, result.Result }, jsonSerializerOptions));
+        });
+        return command;
     }
 
     private static Command CreateAuthCommand()
