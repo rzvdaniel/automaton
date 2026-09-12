@@ -25,4 +25,5 @@ public class AppModuleExecution
     public DateTime? LogsAvailableUntilUtc { get; set; }
     public DateTime? ResultAvailableUntilUtc { get; set; }
     public string? CorrelationId { get; set; }
+    public string? ResultFingerprint { get; set; }
 }

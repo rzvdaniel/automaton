@@ -94,11 +94,12 @@ public class Program
             var identity = await InfrastructureCommandIdentity.LoadAsync(new FileStorageService());
             var workspace = new RunnerWorkspaceService();
             var coordinator = new AppActionExecutionCoordinator();
+            var configuration = GetConfiguration(Array.Empty<string>());
+            var api = new InfrastructureCommandApiClient(configuration, new FileStorageService());
             var executor = new TrustedInfrastructureActionExecutor(
-                new AppActionDeploymentService(workspace, coordinator),
-                new AppActionExecutionService(workspace, coordinator));
-            var consumer = new InfrastructureCommandConsumer(identity, executor);
-            var result = await consumer.ConsumeOneAsync(GetConfiguration(Array.Empty<string>()), context.GetCancellationToken());
+                new AppActionDeploymentService(workspace, coordinator), new AppActionExecutionService(workspace, coordinator), api);
+            var consumer = new InfrastructureCommandConsumer(identity, executor, api);
+            var result = await consumer.ConsumeOneAsync(configuration, context.GetCancellationToken());
             WriteLine(System.Text.Json.JsonSerializer.Serialize(new { result.Execution, result.Result }, jsonSerializerOptions));
         });
         return command;

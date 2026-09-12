@@ -262,6 +262,14 @@ public sealed class AppActionExecutionService
     public AppModuleExecutionArtifactResponse ReadResult(ReadAppModuleExecutionArtifactRequest request)
         => ReadArtifact(request, "result.json");
 
+    public AppActionExecutionResult? ReadPersistedResult(ReadAppModuleExecutionArtifactRequest request)
+    {
+        var statePath = Path.Combine(
+            workspace.GetAppActionExecutionsDirectory(request.AppId, request.DeploymentTargetId, request.ActionKey),
+            request.ExecutionId.ToString("N"), ".automaton-execution.json");
+        return ReadExecutionState(statePath)?.Result;
+    }
+
     private AppModuleExecutionArtifactResponse ReadArtifact(ReadAppModuleExecutionArtifactRequest request, string fileName)
     {
         AppActionManifestParser.ValidateKey(request.ActionKey);

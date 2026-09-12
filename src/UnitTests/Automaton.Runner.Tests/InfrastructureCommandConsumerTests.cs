@@ -77,12 +77,13 @@ public sealed class InfrastructureCommandConsumerTests
         var references = typeof(InfrastructureCommandConsumer).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.That(references, Does.Contain("RabbitMQ.Client"));
         Assert.That(references.Any(name => name!.Contains("CAP") || name.Contains("MySql") || name.Contains("EntityFramework")), Is.False);
-        Assert.That(typeof(InfrastructureCommandConsumer).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType),
-            Is.EqualTo(new[] { typeof(InfrastructureCommandIdentity), typeof(IInfrastructureActionExecutor) }));
+        Assert.That(typeof(InfrastructureCommandConsumer).GetConstructors().Any(constructor =>
+            constructor.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[]
+            { typeof(InfrastructureCommandIdentity), typeof(IInfrastructureActionExecutor), typeof(IInfrastructureCommandResultClient) })), Is.True);
     }
 
     [Test]
-    public async Task LocalRabbitMqBindsTopicAndLeavesDeliveryUnacknowledged()
+    public async Task LocalRabbitMqLeavesDeliveryUnacknowledgedWhenCallbackFails()
     {
         var portText = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PORT");
         if (!int.TryParse(portText, out var port))

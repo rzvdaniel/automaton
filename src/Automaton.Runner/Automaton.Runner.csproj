@@ -71,6 +71,15 @@
              CopyToPublishDirectory="PreserveNewest"
              Pack="false"
              ExcludeFromSingleFile="true" />
+    <Content Remove="..\..\system-apps\automaton-infrastructure\actions\enforce-hosted-runner-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\infrastructure-runner-info\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\inspect-runner-host-storage-devices\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\migrate-hosted-runner-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\prepare-hosted-runner-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\prepare-runner-host-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\reconcile-hosted-runner-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\reconcile-runner-host-storage\action.yaml;
+                    ..\..\system-apps\automaton-infrastructure\actions\reset-legacy-hosted-runner\action.yaml" />
   </ItemGroup>
 
   <ItemGroup>
