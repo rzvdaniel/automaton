@@ -928,6 +928,10 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("ResultAvailableUntilUtc")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("ResultFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("char(36)");
 

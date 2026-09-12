@@ -77,18 +77,25 @@ public sealed class InfrastructureCommandConsumerTests
         var references = typeof(InfrastructureCommandConsumer).Assembly.GetReferencedAssemblies().Select(reference => reference.Name).ToArray();
         Assert.That(references, Does.Contain("RabbitMQ.Client"));
         Assert.That(references.Any(name => name!.Contains("CAP") || name.Contains("MySql") || name.Contains("EntityFramework")), Is.False);
-        Assert.That(typeof(InfrastructureCommandConsumer).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType),
-            Is.EqualTo(new[] { typeof(InfrastructureCommandIdentity), typeof(IInfrastructureActionExecutor) }));
+        Assert.That(typeof(InfrastructureCommandConsumer).GetConstructors().Any(constructor =>
+            constructor.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[]
+            { typeof(InfrastructureCommandIdentity), typeof(IInfrastructureActionExecutor), typeof(IInfrastructureCommandResultClient) })), Is.True);
     }
 
     [Test]
-    public async Task LocalRabbitMqBindsTopicAndLeavesDeliveryUnacknowledged()
+    public async Task LocalRabbitMqLeavesDeliveryUnacknowledgedWhenCallbackFails()
     {
         var portText = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PORT");
         if (!int.TryParse(portText, out var port))
             Assert.Ignore("Set AUTOMATON_TEST_RABBITMQ_PORT for an isolated local RabbitMQ instance with guest credentials.");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var factory = new ConnectionFactory { HostName = "127.0.0.1", Port = port, AutomaticRecoveryEnabled = false };
+        var factory = new ConnectionFactory
+        {
+            HostName = "127.0.0.1", Port = port,
+            UserName = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_USER") ?? "guest",
+            Password = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PASSWORD") ?? "guest",
+            AutomaticRecoveryEnabled = false
+        };
         await using var connection = await factory.CreateConnectionAsync(timeout.Token);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: timeout.Token);
         var executor = new RecordingExecutor();
@@ -96,7 +103,8 @@ public sealed class InfrastructureCommandConsumerTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["RabbitMq:Host"] = "127.0.0.1", ["RabbitMq:Port"] = port.ToString(),
-            ["RabbitMq:Username"] = "guest", ["RabbitMq:Password"] = "guest"
+            ["RabbitMq:Username"] = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_USER") ?? "guest",
+            ["RabbitMq:Password"] = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PASSWORD") ?? "guest"
         }).Build();
         await channel.QueueDeclareAsync(consumer.QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: timeout.Token);
         try
@@ -110,8 +118,8 @@ public sealed class InfrastructureCommandConsumerTests
             var command = Command();
             await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
                 new BasicProperties { Persistent = true }, await SerializeWithCap(command), timeout.Token);
-            var result = await consumed;
-            Assert.That(result.Execution.ExecutionId, Is.EqualTo(command.CommandId));
+            var callbackFailure = Assert.ThrowsAsync<InvalidOperationException>(async () => await consumed);
+            Assert.That(callbackFailure!.Message, Does.Contain("result delivery is required"));
             Assert.That(executor.Commands.Count, Is.EqualTo(1));
 
             BasicGetResult? redelivered;
@@ -119,6 +127,46 @@ public sealed class InfrastructureCommandConsumerTests
                 await Task.Delay(25, timeout.Token);
             Assert.That(redelivered.Redelivered, Is.True);
             Assert.That(JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(redelivered.Body.Span)!.CommandId, Is.EqualTo(command.CommandId));
+        }
+        finally
+        {
+            await channel.QueueDeleteAsync(consumer.QueueName, ifUnused: false, ifEmpty: false);
+        }
+    }
+
+    [Test]
+    public async Task LocalRabbitMqAcknowledgesOnlyAfterCallbackSucceeds()
+    {
+        var portText = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PORT");
+        if (!int.TryParse(portText, out var port))
+            Assert.Ignore("Set AUTOMATON_TEST_RABBITMQ_PORT for an isolated local RabbitMQ instance.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var username = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_USER") ?? "guest";
+        var password = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PASSWORD") ?? "guest";
+        var factory = new ConnectionFactory { HostName = "127.0.0.1", Port = port, UserName = username, Password = password, AutomaticRecoveryEnabled = false };
+        await using var connection = await factory.CreateConnectionAsync(timeout.Token);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: timeout.Token);
+        var executor = new RecordingExecutor();
+        var callbacks = new RecordingResultClient();
+        var consumer = new InfrastructureCommandConsumer(identity, executor, callbacks);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RabbitMq:Host"] = "127.0.0.1", ["RabbitMq:Port"] = port.ToString(),
+            ["RabbitMq:Username"] = username, ["RabbitMq:Password"] = password
+        }).Build();
+        await channel.QueueDeclareAsync(consumer.QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: timeout.Token);
+        try
+        {
+            var consumed = consumer.ConsumeOneAsync(configuration, timeout.Token);
+            while ((await channel.QueueDeclarePassiveAsync(consumer.QueueName, timeout.Token)).ConsumerCount == 0)
+                await Task.Delay(25, timeout.Token);
+            var command = Command();
+            await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
+                new BasicProperties { Persistent = true }, await SerializeWithCap(command), timeout.Token);
+            var result = await consumed;
+            Assert.That(result.Execution.ExecutionId, Is.EqualTo(command.CommandId));
+            Assert.That(callbacks.Commands.Single().CommandId, Is.EqualTo(command.CommandId));
+            Assert.That(await channel.BasicGetAsync(consumer.QueueName, autoAck: true, timeout.Token), Is.Null);
         }
         finally
         {
@@ -148,6 +196,17 @@ public sealed class InfrastructureCommandConsumerTests
             Commands.Add(command);
             return Task.FromResult((new AppActionExecutionResult { ExecutionId = command.CommandId, Status = AppModuleExecutionStatuses.Succeeded },
                 new AppModuleExecutionArtifactResponse(true, "{\"success\":true}", null, null)));
+        }
+    }
+
+    private sealed class RecordingResultClient : IInfrastructureCommandResultClient
+    {
+        public List<InfrastructureCommandRequestedEvent> Commands { get; } = [];
+        public Task SubmitAsync(InfrastructureCommandRequestedEvent command, AppActionExecutionResult execution,
+            AppModuleExecutionArtifactResponse result, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            return Task.CompletedTask;
         }
     }
 }

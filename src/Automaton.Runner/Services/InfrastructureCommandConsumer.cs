@@ -10,8 +10,13 @@ namespace Automaton.Runner.Console.Services;
 
 public sealed class InfrastructureCommandConsumer(
     InfrastructureCommandIdentity identity,
-    IInfrastructureActionExecutor executor)
+    IInfrastructureActionExecutor executor,
+    IInfrastructureCommandResultClient results)
 {
+    public InfrastructureCommandConsumer(InfrastructureCommandIdentity identity, IInfrastructureActionExecutor executor)
+        : this(identity, executor, new MissingInfrastructureCommandResultClient())
+    {
+    }
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     public string QueueName => $"automaton.infrastructure.{identity.RunnerHostId:N}";
 
@@ -56,7 +61,16 @@ public sealed class InfrastructureCommandConsumer(
         {
             try
             {
-                completion.TrySetResult(await HandleAsync(delivery.Body, cancellationToken));
+                var result = await HandleAsync(delivery.Body, cancellationToken);
+                var command = JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(delivery.Body.Span, JsonOptions)!;
+                await results.SubmitAsync(command, result.Execution, result.Result, cancellationToken);
+                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+                completion.TrySetResult(result);
+            }
+            catch (UnauthorizedAccessException exception) when (IsWrongAddress(exception))
+            {
+                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+                completion.TrySetException(exception);
             }
             catch (Exception exception)
             {
@@ -70,4 +84,14 @@ public sealed class InfrastructureCommandConsumer(
     private static string Require(IConfiguration configuration, string key)
         => !string.IsNullOrWhiteSpace(configuration[key]) ? configuration[key]!
             : throw new InvalidOperationException($"{key} is required for the Infrastructure Runner consumer.");
+
+    private static bool IsWrongAddress(UnauthorizedAccessException exception) =>
+        exception.Message.Contains("does not match this Runner", StringComparison.Ordinal);
+
+    private sealed class MissingInfrastructureCommandResultClient : IInfrastructureCommandResultClient
+    {
+        public Task SubmitAsync(InfrastructureCommandRequestedEvent command, AppActionExecutionResult execution,
+            AppModuleExecutionArtifactResponse result, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Infrastructure command result delivery is required before acknowledgement.");
+    }
 }

@@ -20,18 +20,6 @@ public sealed class TrustedInfrastructureActionExecutorTests
         }
     }
 
-    [TestCase("provision-hosted-runner", false)]
-    [TestCase("reprovision-hosted-runner", true)]
-    [TestCase("restart-hosted-runner", true)]
-    public void StopsBeforeSecretRetrievalOrActionPreparation(string actionKey, bool hasGrants)
-    {
-        var executor = new TrustedInfrastructureActionExecutor(null!, null!);
-        Assert.ThrowsAsync<NotSupportedException>(() => executor.ExecuteAsync(Command(actionKey) with
-        {
-            SecretGrantIds = hasGrants ? [Guid.NewGuid()] : []
-        }, CancellationToken.None));
-    }
-
     [Test]
     public async Task ExistingPythonActionGuardRunsThroughLocalPreparationAndExecution()
     {

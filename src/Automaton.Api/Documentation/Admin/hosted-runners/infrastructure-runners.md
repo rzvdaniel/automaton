@@ -77,10 +77,12 @@ development checks. It requires `DOTNET_ENVIRONMENT=Development` and is not star
 by the normal Runner service. Production Hosted Runner operations still use the
 existing SignalR path.
 
-The probe consumes one RabbitMQ command and leaves it unacknowledged, including
-after successful execution. Closing the probe returns the command to its queue.
-Do not run it against a production broker or use it to retry a live host operation.
-Commands with secret grants and provision/reprovision stop before secret retrieval.
+The probe consumes one RabbitMQ command and acknowledges it only after the API
+accepts the terminal Action result. It retrieves command-scoped secret grants and
+posts results through the Runner's existing API-key credential. It is not started
+by the normal Runner service, and production Hosted Runner operations still use
+SignalR. Do not run it against a production broker or use it to retry a live host
+operation.
 
 ### The command fails to download
 

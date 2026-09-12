@@ -215,6 +215,7 @@ services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
 services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
 services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
 services.AddScoped<InfrastructureActionProvisioningHandler>();
+services.AddScoped<InfrastructureCommandCallbackService>();
 services.AddScoped<HostedRunnerRestartReconciler>();
 services.AddScoped<HostedRunnerLifecycleReconciler>();
 services.AddScoped<TrustedInfrastructureActionDeploymentService>();

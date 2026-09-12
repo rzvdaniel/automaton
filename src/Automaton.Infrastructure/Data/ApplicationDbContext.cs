@@ -244,6 +244,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ErrorCode).HasMaxLength(80);
                 entity.Property(e => e.FailureSummary).HasMaxLength(1000);
                 entity.Property(e => e.CorrelationId).HasMaxLength(128);
+                entity.Property(e => e.ResultFingerprint).HasMaxLength(64);
                 entity.HasIndex(e => new { e.AppId, e.DeploymentTargetId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.AppId, e.DeploymentTargetId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
                 entity.HasIndex(e => e.HostedRunnerOperationId).IsUnique();
