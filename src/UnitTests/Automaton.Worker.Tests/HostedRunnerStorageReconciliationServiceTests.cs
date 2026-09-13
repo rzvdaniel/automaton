@@ -2,6 +2,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
 using Automaton.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,7 +111,7 @@ public class HostedRunnerStorageReconciliationServiceTests
         await using (var seedScope = provider.CreateAsyncScope())
         {
             var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test" });
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() });
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
@@ -120,8 +121,9 @@ public class HostedRunnerStorageReconciliationServiceTests
             });
             await db.SaveChangesAsync();
         }
+        var publisher = new RecordingPublisher();
         var service = new HostedRunnerStorageReconciliationService(
-            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), new NoOpTransactionalEventExecutor(),
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
             Options.Create(new StorageTelemetryOptions { OverLimitGracePeriodHours = 1 }));
         await service.EnforceAsync(default);
         await using (var verifyScope = provider.CreateAsyncScope())
@@ -139,6 +141,59 @@ public class HostedRunnerStorageReconciliationServiceTests
         {
             Assert.That(finalDb.HostedRunners.Single().EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.SuspensionPending));
             Assert.That(finalDb.HostedRunnerDeployments.Count(x => x.Action == HostedRunnerDeploymentActions.Suspend), Is.EqualTo(1));
+            var command = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
+            Assert.That(command.ActionKey, Is.EqualTo(StorageEnforcementActions.SuspendHostedRunner));
+            Assert.That(command.RunnerHostId, Is.EqualTo(hostId));
+            Assert.That(command.InfrastructureRunnerId, Is.EqualTo(finalDb.RunnerHosts.Single().InfrastructureRunnerId));
+        });
+    }
+
+    [Test]
+    public async Task PendingVerification_PublishesDurableMeasurementCommand()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var infrastructureRunnerId = Guid.NewGuid();
+        var hostedRunnerId = Guid.NewGuid();
+        var verificationId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = infrastructureRunnerId });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = hostedRunnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner",
+                RunnerHostId = hostId, StorageState = HostedRunnerStorageStates.Healthy,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasuredAtUtc = DateTime.UtcNow.AddHours(-3)
+            });
+            db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+            {
+                Id = verificationId, HostedRunnerId = hostedRunnerId, IdempotencyKey = "verification",
+                Status = StorageVerificationStatuses.Pending, RequestedAtUtc = DateTime.UtcNow.AddMinutes(-1), Reason = "Stale"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions()));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        var command = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single(x => x.CommandId == verificationId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(command.CommandId, Is.EqualTo(verificationId));
+            Assert.That(command.OperationId, Is.EqualTo(verificationId));
+            Assert.That(command.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
+            Assert.That(command.RunnerHostId, Is.EqualTo(hostId));
+            Assert.That(command.InfrastructureRunnerId, Is.EqualTo(infrastructureRunnerId));
+            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
         });
     }
 
@@ -168,6 +223,16 @@ public class HostedRunnerStorageReconciliationServiceTests
     {
         public Task PublishAsync<TEvent>(TEvent message, CancellationToken cancellationToken = default) where TEvent : class =>
             Task.CompletedTask;
+    }
+
+    private sealed class RecordingPublisher : IEventPublisher
+    {
+        public List<object> Messages { get; } = [];
+        public Task PublishAsync<TEvent>(TEvent message, CancellationToken cancellationToken = default) where TEvent : class
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoOpTransactionalEventExecutor : ITransactionalEventExecutor

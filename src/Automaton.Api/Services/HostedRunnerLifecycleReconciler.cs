@@ -64,10 +64,13 @@ public sealed class HostedRunnerLifecycleReconciler(
                 continue;
             }
 
-            // Provision and reprovision are durably published to RabbitMQ by the
-            // worker. Absence of an API-side execution record is expected while
-            // the command is queued or being consumed; do not republish it.
-            if (operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)
+            // All hosted Runner infrastructure actions are durably handed off to
+            // RabbitMQ. Absence of an API-side execution record is expected while
+            // the command is queued or being consumed; do not redispatch it.
+            if (operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision
+                or HostedRunnerDeploymentActions.Restart or HostedRunnerDeploymentActions.Deprovision
+                or HostedRunnerDeploymentActions.Suspend or HostedRunnerDeploymentActions.Resume
+                or HostedRunnerDeploymentActions.VerifyStorage)
                 continue;
 
             if (await RepublishAsync(operation, now, recoveryCutoff, cancellationToken)) reconciled++;
@@ -87,6 +90,8 @@ public sealed class HostedRunnerLifecycleReconciler(
         var hostedRunner = operation.HostedRunner;
         var host = hostedRunner.RunnerHost;
         if (host == null) return await FailAsync(operation, "The hosted Runner no longer has an assigned host.", now, cancellationToken);
+        if (!host.InfrastructureRunnerId.HasValue)
+            return await FailAsync(operation, "The hosted Runner host has no assigned Infrastructure Runner.", now, cancellationToken);
 
         var isProvision = operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision;
         IReadOnlyList<Guid> grantIds = isProvision
@@ -134,7 +139,7 @@ public sealed class HostedRunnerLifecycleReconciler(
             if (message is ManagedRunnerProvisionRequestedEvent managed)
                 await eventPublisher.PublishAsync(managed, token);
             else
-                await eventPublisher.PublishAsync((InfrastructureActionExecutionRequestedEvent)message, token);
+                await eventPublisher.PublishAsync((InfrastructureCommandRequestedEvent)message, token);
         }, cancellationToken);
         return claimed;
     }
@@ -201,7 +206,7 @@ public sealed class HostedRunnerLifecycleReconciler(
         return failed;
     }
 
-    private InfrastructureActionExecutionRequestedEvent BuildInfrastructureRequest(
+    private InfrastructureCommandRequestedEvent BuildInfrastructureRequest(
         HostedRunnerDeployment operation,
         HostedRunner hostedRunner,
         RunnerHost host)
@@ -214,16 +219,18 @@ public sealed class HostedRunnerLifecycleReconciler(
             HostedRunnerDeploymentActions.Resume => StorageEnforcementActions.ResumeHostedRunner,
             _ => throw new InvalidOperationException($"Unsupported lifecycle recovery action '{operation.Action}'.")
         };
-        return new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = operation.Id, HostedRunnerId = hostedRunner.Id, UserId = hostedRunner.UserId,
-            RunnerHostId = host.Id, ActionKey = actionKey,
-            InputJson = JsonSerializer.Serialize(new
+        return new InfrastructureCommandRequestedEvent(
+            CommandId: operation.Id,
+            OperationId: operation.Id,
+            RunnerHostId: host.Id,
+            InfrastructureRunnerId: host.InfrastructureRunnerId!.Value,
+            ActionKey: actionKey,
+            InputJson: JsonSerializer.Serialize(new
             {
                 operationId = operation.Id, hostedRunnerId = hostedRunner.Id, expectedContainerName = hostedRunner.ContainerName
             }),
-            CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
-        };
+            SecretGrantIds: [],
+            CreatedAtUtc: DateTime.UtcNow);
     }
 
     private static bool IsTerminal(string status) => status is

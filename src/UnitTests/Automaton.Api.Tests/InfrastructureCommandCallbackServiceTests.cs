@@ -54,6 +54,11 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
     [TestCase(HostedRunnerDeploymentActions.Restart, "restart-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Provision, "provision-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.Reprovision, "reprovision-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.Suspend, "suspend-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.Resume, "resume-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.Deprovision, "delete-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.VerifyStorage, "measure-hosted-runner-storage")]
     public void DeploymentActionMapsOnlyToItsTrustedAction(string deploymentAction, string actionKey)
         => Assert.That(InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction), Is.EqualTo(actionKey));
 

@@ -85,7 +85,7 @@ public sealed class HostedRunnerStorageReconciliationService(
             (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
         if (active) return false;
         var host = runner.RunnerHost;
-        if (host == null) return false;
+        if (host == null || !host.InfrastructureRunnerId.HasValue) return false;
         var operation = new HostedRunnerDeployment
         {
             Id = Guid.NewGuid(), HostedRunnerId = runner.Id,
@@ -97,13 +97,15 @@ public sealed class HostedRunnerStorageReconciliationService(
         {
             db.HostedRunnerDeployments.Add(operation);
             await db.SaveChangesAsync(token);
-            await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
-            {
-                OperationId = operation.Id, HostedRunnerId = runner.Id, UserId = runner.UserId,
-                RunnerHostId = host.Id, ActionKey = actionKey,
-                InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, expectedContainerName = runner.ContainerName }),
-                CorrelationId = $"storage-enforcement:{operation.Id:N}"
-            }, token);
+            await eventPublisher.PublishAsync(new InfrastructureCommandRequestedEvent(
+                CommandId: operation.Id,
+                OperationId: operation.Id,
+                RunnerHostId: host.Id,
+                InfrastructureRunnerId: host.InfrastructureRunnerId.Value,
+                ActionKey: actionKey,
+                InputJson: JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, expectedContainerName = runner.ContainerName }),
+                SecretGrantIds: [],
+                CreatedAtUtc: DateTime.UtcNow), token);
         }, cancellationToken);
         return true;
     }
@@ -253,6 +255,7 @@ public sealed class HostedRunnerStorageReconciliationService(
 
         var pending = includeHostedRunners ? await db.HostedRunnerStorageVerifications
             .Include(x => x.HostedRunner)
+                .ThenInclude(x => x.RunnerHost)
             .Where(x => x.Status == StorageVerificationStatuses.Pending &&
                 x.HostedRunner.RunnerHostId != null && x.HostedRunner.DeletedAt == null)
             .ToListAsync(cancellationToken) : [];
@@ -265,6 +268,8 @@ public sealed class HostedRunnerStorageReconciliationService(
         foreach (var verification in candidatesByHost)
         {
             var hostId = verification.HostedRunner.RunnerHostId!.Value;
+            var infrastructureRunnerId = verification.HostedRunner.RunnerHost?.InfrastructureRunnerId;
+            if (!infrastructureRunnerId.HasValue) continue;
             if (!await TryClaimDispatchAsync(db, hostId, verification.Id, maxPerHost, now, cancellationToken)) continue;
             var runner = verification.HostedRunner;
             var deployment = await db.HostedRunnerDeployments.FindAsync([verification.Id], cancellationToken);
@@ -273,21 +278,20 @@ public sealed class HostedRunnerStorageReconciliationService(
                 deployment = new HostedRunnerDeployment
                 {
                     Id = verification.Id, HostedRunnerId = runner.Id,
-                    Action = "VerifyStorage", Status = HostedRunnerDeploymentStatuses.Pending,
+                    Action = HostedRunnerDeploymentActions.VerifyStorage, Status = HostedRunnerDeploymentStatuses.Pending,
                     StartedAt = verification.RequestedAtUtc,
                     Logs = "Trusted host-side storage verification queued."
                 };
                 db.HostedRunnerDeployments.Add(deployment);
                 await db.SaveChangesAsync(cancellationToken);
             }
-            await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
-            {
-                OperationId = verification.Id,
-                HostedRunnerId = runner.Id,
-                UserId = runner.UserId,
-                RunnerHostId = hostId,
-                ActionKey = StorageTelemetryActions.MeasureHostedRunnerStorage,
-                InputJson = JsonSerializer.Serialize(new
+            await eventPublisher.PublishAsync(new InfrastructureCommandRequestedEvent(
+                CommandId: verification.Id,
+                OperationId: verification.Id,
+                RunnerHostId: hostId,
+                InfrastructureRunnerId: infrastructureRunnerId.Value,
+                ActionKey: StorageTelemetryActions.MeasureHostedRunnerStorage,
+                InputJson: JsonSerializer.Serialize(new
                 {
                     operationId = verification.Id,
                     hostedRunnerId = runner.Id,
@@ -295,8 +299,8 @@ public sealed class HostedRunnerStorageReconciliationService(
                     expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                     expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
                 }),
-                CorrelationId = $"storage-verification:{verification.Id:N}"
-            }, cancellationToken);
+                SecretGrantIds: [],
+                CreatedAtUtc: DateTime.UtcNow), cancellationToken);
         }
         return created;
     }

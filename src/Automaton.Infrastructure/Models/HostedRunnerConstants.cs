@@ -92,6 +92,7 @@ public static class HostedRunnerDeploymentActions
     public const string Reprovision = "reprovision";
     public const string Suspend = "suspend";
     public const string Resume = "resume";
+    public const string VerifyStorage = "VerifyStorage";
 }
 
 public static class HostedRunnerDataDispositions
