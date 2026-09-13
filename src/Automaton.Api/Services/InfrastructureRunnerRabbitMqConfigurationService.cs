@@ -15,28 +15,40 @@ namespace Automaton.Api.Services;
 public sealed class InfrastructureRunnerRabbitMqConfigurationService(
     ApiKeyService apiKeyService,
     ApplicationDbContext db,
-    IOptions<RabbitMqOptions> options)
+    IOptions<RabbitMqOptions> options,
+    RunnerEnrollmentService runnerEnrollmentService)
 {
     public async Task<string?> ResolveEnvironmentAsync(
-        string apiKey,
+        string? apiKey,
+        string? enrollmentToken = null,
         CancellationToken cancellationToken = default)
     {
-        var key = await apiKeyService.ValidateApiKeyAsync(apiKey);
-        if (key == null || key.Scope is not (ApiKeyScope.InfrastructureRunnerEnroll or ApiKeyScope.Runner))
-            return null;
-
-        if (key.Scope == ApiKeyScope.Runner)
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            var isInfrastructureRunner = await db.Runners.AnyAsync(
-                runner => runner.ApiKeyId == key.Id
-                    && runner.Purpose == RunnerPurposes.Infrastructure,
-                cancellationToken);
-            if (!isInfrastructureRunner)
-                return null;
+            var key = await apiKeyService.ValidateApiKeyAsync(apiKey);
+            if (key != null && key.Scope is (ApiKeyScope.InfrastructureRunnerEnroll or ApiKeyScope.Runner))
+            {
+                if (key.Scope != ApiKeyScope.Runner || await db.Runners.AnyAsync(
+                        runner => runner.ApiKeyId == key.Id
+                            && runner.Purpose == RunnerPurposes.Infrastructure,
+                        cancellationToken))
+                {
+                    return TryBuildEnvironment(options.Value, out var environment)
+                        ? environment
+                        : null;
+                }
+            }
         }
 
-        return TryBuildEnvironment(options.Value, out var environment)
-            ? environment
+        if (!await runnerEnrollmentService.IsInfrastructureEnrollmentTokenValidAsync(
+                enrollmentToken ?? string.Empty,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        return TryBuildEnvironment(options.Value, out var enrollmentEnvironment)
+            ? enrollmentEnvironment
             : null;
     }
 

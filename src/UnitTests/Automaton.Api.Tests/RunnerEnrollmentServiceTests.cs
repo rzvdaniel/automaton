@@ -63,6 +63,36 @@ public class RunnerEnrollmentServiceTests
     }
 
     [Test]
+    public async Task InfrastructureEnrollmentTokenValidation_IsReadOnlyAndRequiresAvailableHost()
+    {
+        await using var db = CreateDbContext();
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hetzner token bootstrap",
+            Provider = RunnerHostProviders.Hetzner
+        };
+        db.RunnerHosts.Add(host);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var created = await service.CreateAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.That(await service.IsInfrastructureEnrollmentTokenValidAsync(
+            created.EnrollmentToken,
+            CancellationToken.None), Is.True);
+        Assert.That(await db.RunnerEnrollments.SingleAsync(), Has.Property(nameof(RunnerEnrollment.Status))
+            .EqualTo(RunnerEnrollmentStatuses.Pending));
+
+        host.InfrastructureRunnerId = Guid.NewGuid();
+        await db.SaveChangesAsync();
+
+        Assert.That(await service.IsInfrastructureEnrollmentTokenValidAsync(
+            created.EnrollmentToken,
+            CancellationToken.None), Is.False);
+    }
+
+    [Test]
     public async Task Create_RevokesPreviousPendingEnrollment()
     {
         await using var db = CreateDbContext();

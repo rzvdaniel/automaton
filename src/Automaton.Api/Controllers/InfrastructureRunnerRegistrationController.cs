@@ -54,10 +54,14 @@ public sealed class InfrastructureRunnerRegistrationController(
     public async Task<IActionResult> GetConfiguration(CancellationToken cancellationToken)
     {
         var apiKey = Request.Headers["X-API-Key"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(apiKey))
+        var enrollmentToken = Request.Headers["X-Runner-Enrollment-Token"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(enrollmentToken))
             return Unauthorized();
 
-        var environment = await rabbitMqConfigurationService.ResolveEnvironmentAsync(apiKey, cancellationToken);
+        var environment = await rabbitMqConfigurationService.ResolveEnvironmentAsync(
+            apiKey,
+            enrollmentToken,
+            cancellationToken);
         Response.Headers.CacheControl = "no-store";
         Response.Headers.Pragma = "no-cache";
         return environment == null

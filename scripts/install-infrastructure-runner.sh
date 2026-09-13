@@ -66,7 +66,7 @@ load_installation_configuration() {
   source "$INSTALLATION_CONFIG_FILE"
 }
 load_rabbitmq_configuration() {
-  local api_key="" fetched_file="" required
+  local api_key="" enrollment_token="" fetched_file="" required
   if [[ -r "$RABBITMQ_CONFIG_FILE" ]]; then
     chmod 600 "$RABBITMQ_CONFIG_FILE"
   elif [[ -r /etc/automaton/infrastructure-runner-rabbitmq.env ]]; then
@@ -80,11 +80,15 @@ load_rabbitmq_configuration() {
   if [[ -z "$api_key" && -r "$AUTOMATON_DATA_ROOT/config/api-key" ]]; then
     api_key="$(<"$AUTOMATON_DATA_ROOT/config/api-key")"
   fi
+  enrollment_token="$AUTOMATON_ENROLLMENT_TOKEN"
 
-  if [[ -n "$api_key" ]]; then
+  if [[ -n "$api_key" || -n "$enrollment_token" ]]; then
     fetched_file="$(mktemp "$AUTOMATON_DATA_ROOT/config/.rabbitmq.XXXXXX")"
     chmod 600 "$fetched_file"
-    if curl -fsSL -H "X-API-Key: $api_key" \
+    local -a auth_args=()
+    [[ -n "$api_key" ]] && auth_args+=( -H "X-API-Key: $api_key" )
+    [[ -n "$enrollment_token" ]] && auth_args+=( -H "X-Runner-Enrollment-Token: $enrollment_token" )
+    if curl -fsSL "${auth_args[@]}" \
       "$AUTOMATON_SERVER_URL/api/infrastructure-runners/configuration.env" \
       -o "$fetched_file"; then
       mv -f "$fetched_file" "$RABBITMQ_CONFIG_FILE"

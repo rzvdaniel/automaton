@@ -127,6 +127,43 @@ public sealed class RunnerEnrollmentService(
         return await ExchangeCoreAsync(request, cancellationToken);
     }
 
+    /// <summary>
+    /// Validates a fresh Infrastructure Runner enrollment token without consuming it.
+    /// This is used only for pre-enrollment bootstrap material; the normal exchange
+    /// path remains responsible for creating the Runner and completing the enrollment.
+    /// </summary>
+    public async Task<bool> IsInfrastructureEnrollmentTokenValidAsync(
+        string enrollmentToken,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(enrollmentToken))
+        {
+            return false;
+        }
+
+        var tokenHash = HashToken(enrollmentToken.Trim());
+        var enrollment = await db.RunnerEnrollments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EnrollmentTokenHash == tokenHash,
+                cancellationToken);
+
+        if (enrollment == null
+            || enrollment.Status != RunnerEnrollmentStatuses.Pending
+            || enrollment.ExpectedPurpose != RunnerPurposes.Infrastructure
+            || enrollment.HostedRunnerId.HasValue
+            || enrollment.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            return false;
+        }
+
+        var host = await db.RunnerHosts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == enrollment.RunnerHostId,
+                cancellationToken);
+
+        return host != null && !host.InfrastructureRunnerId.HasValue;
+    }
+
     public async Task<HostedRunnerEnrollmentMaterial> CreateHostedRunnerAsync(
         Guid hostedRunnerId,
         Guid operationId,
