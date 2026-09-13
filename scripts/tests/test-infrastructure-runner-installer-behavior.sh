@@ -6,6 +6,7 @@ INSTALLER="$ROOT/scripts/install-infrastructure-runner.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/bin" "$TMP/data/config"
 LOG="$TMP/docker.log"; export LOG
+CURL_LOG="$TMP/curl.log"; export CURL_LOG
 
 cat >"$TMP/bin/id" <<'EOF'
 #!/usr/bin/env bash
@@ -49,6 +50,26 @@ fi
 if [[ "$1" == logs ]]; then echo 'Successfully connected to server'; exit 0; fi
 exit 0
 EOF
+cat >"$TMP/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+set -e
+printf '%s\n' "$*" >>"$CURL_LOG"
+[[ "${MOCK_CURL_FAIL:-}" != 1 ]] || exit 1
+output=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == -o ]]; then output="$2"; shift 2; continue; fi
+  shift
+done
+[[ -n "$output" ]] || exit 1
+cat >"$output" <<'CONFIG'
+RabbitMq__Host=rabbitmq.test
+RabbitMq__Port=5672
+RabbitMq__Username=infra
+RabbitMq__Password=test-only
+RabbitMq__VirtualHost=/
+RabbitMq__ExchangeName=cap.default.router
+CONFIG
+EOF
 chmod +x "$TMP/bin"/*
 PATH="$TMP/bin:$PATH"
 
@@ -63,9 +84,30 @@ AUTOMATON_ROOT=/var/lib/automaton
 AUTOMATON_RUNNER_IMAGE=example/runner@sha256:old
 SPECIFICATION_VERSION=1
 EOF
-AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test
+sed -i "s#/var/lib/automaton/infrastructure-runner#$TMP/data#g; s#/var/lib/automaton#$TMP/root#g" "$TMP/data/config/container-specification.env"
+AUTOMATON_API_KEY=test-key AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test
 grep -Eq '^run -d --name automaton-infrastructure-runner .*automaton.specification-version=2.*AUTOMATON_CONTAINER_SPECIFICATION_VERSION=2.*AUTOMATON_RUNTIME_HOST_ADDRESS=10.0.0.2' "$LOG"
 grep -Fq 'SPECIFICATION_VERSION=2' "$TMP/data/config/container-specification.env"
+
+# Missing broker configuration fails before a container is started.
+mkdir -p "$TMP/missing/config"
+if MOCK_CURL_FAIL=1 AUTOMATON_API_KEY=test-key AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/missing" --server-url https://api.example.test --version example/runner:latest >"$TMP/missing.out" 2>&1; then
+  echo 'expected missing RabbitMQ configuration failure' >&2; exit 1
+fi
+grep -Fq 'RabbitMQ configuration could not be resolved' "$TMP/missing.out"
+
+# A fresh installation using only the supported enrollment token can bootstrap
+# broker configuration before the Runner has exchanged the token for its
+# durable API key, and reaches container launch.
+mkdir -p "$TMP/token-data/config"
+: >"$LOG"
+: >"$CURL_LOG"
+AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" install --data-root "$TMP/token-data" \
+  --server-url https://api.example.test --enrollment-token test-token \
+  --version example/runner:latest
+grep -Fq 'X-Runner-Enrollment-Token: test-token' "$CURL_LOG"
+! grep -Fq 'X-API-Key:' "$CURL_LOG"
+grep -Eq '^run -d --name automaton-infrastructure-runner .* example/runner@sha256:new$' "$LOG"
 
 # Repair uses the installed immutable image, not the default mutable tag.
 AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test

@@ -9,7 +9,8 @@ namespace Automaton.Api.Controllers;
 [ApiController]
 [Route("api/infrastructure-runners")]
 public sealed class InfrastructureRunnerRegistrationController(
-    InfrastructureRunnerRegistrationService registrationService) : ControllerBase
+    InfrastructureRunnerRegistrationService registrationService,
+    InfrastructureRunnerRabbitMqConfigurationService rabbitMqConfigurationService) : ControllerBase
 {
     [HttpPost("register")]
     [Authorize(
@@ -45,5 +46,26 @@ public sealed class InfrastructureRunnerRegistrationController(
         {
             return Conflict(new { message = ex.Message });
         }
+    }
+
+    [HttpGet("configuration.env")]
+    [AllowAnonymous]
+    [Produces("text/plain")]
+    public async Task<IActionResult> GetConfiguration(CancellationToken cancellationToken)
+    {
+        var apiKey = Request.Headers["X-API-Key"].FirstOrDefault();
+        var enrollmentToken = Request.Headers["X-Runner-Enrollment-Token"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(enrollmentToken))
+            return Unauthorized();
+
+        var environment = await rabbitMqConfigurationService.ResolveEnvironmentAsync(
+            apiKey,
+            enrollmentToken,
+            cancellationToken);
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+        return environment == null
+            ? Unauthorized()
+            : Content(environment, "text/plain");
     }
 }

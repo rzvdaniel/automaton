@@ -55,6 +55,8 @@ public class RunnerHostCloudInitTests
             Assert.That(cloudInit, Does.Contain("RabbitMq__Password=secret"));
             Assert.That(cloudInit, Does.Contain("RabbitMq__VirtualHost=/"));
             Assert.That(cloudInit, Does.Contain("RabbitMq__ExchangeName=cap.default.router"));
+            Assert.That(cloudInit, Does.Contain("path: /etc/automaton/infrastructure-runner-rabbitmq.env"));
+            Assert.That(cloudInit, Does.Contain("--env-file '/etc/automaton/infrastructure-runner-rabbitmq.env'"));
             Assert.That(cloudInit, Does.Contain("permissions: \"0600\""));
             Assert.That(cloudInit, Does.Contain("shred -u /etc/automaton/infrastructure-runner.env"));
         });

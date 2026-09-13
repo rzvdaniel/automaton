@@ -16,6 +16,8 @@ Use this page when adding a new Runner Host or maintaining an existing Infrastru
 5. Return to **Admin → Runners → Runner Hosts** and select **Validate** for the host.
 6. Correct any reported problems and validate again. When validation succeeds, select **Approve**.
 
+The initial installer may authenticate with either the generated enrollment token or an Infrastructure Runner API key. Enrollment-token installs use the one-time token only to fetch the protected broker bootstrap configuration; the Runner still exchanges that token through the normal enrollment endpoint and persists its durable API key.
+
 Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, **Ready**, successfully validated, and shows the expected image digest. The server is then ready to host managed Runners. For the canonical host onboarding details, see **Add a Runner Host**.
 
 [![Install an Infrastructure Runner on a new server](./assets/infrastructure-runner-installation.png)](./assets/infrastructure-runner-installation.png)
@@ -24,7 +26,7 @@ Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, 
 
 Use **Repair** to reinstall or recover the Infrastructure Runner container without changing its identity or configuration. The current repair command reuses the container's installed immutable image; it does not select or deploy a newer image and does not provide update rollback.
 
-It preserves the installation ID, API credential, `runner.json`, `installation-profile.json`, and other persisted configuration.
+It preserves the installation ID, API credential, `runner.json`, `installation-profile.json`, and other persisted configuration. The installer also refreshes the privileged Infrastructure Runner RabbitMQ settings from the API and stores them in protected host-only configuration so the durable command consumer is available after repair. These settings are never shown in Studio or passed to Hosted Runner containers.
 
 1. Open **Admin → Runners → Runner Hosts**.
 2. Select **Repair** for the server, review the installed image digest, and select **Copy command**.

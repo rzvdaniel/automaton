@@ -414,6 +414,7 @@ services.Configure<StorageTelemetryOptions>(applicationBuilder.Configuration.Get
 services.AddScoped<RunnerEnrollmentService>();
 services.AddScoped<SelfHostedRunnerInstallationService>();
 services.AddScoped<InfrastructureRunnerRegistrationService>();
+services.AddScoped<InfrastructureRunnerRabbitMqConfigurationService>();
 services.AddScoped<InfrastructureRunnerHostApprovalService>();
 services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
