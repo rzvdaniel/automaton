@@ -1,6 +1,8 @@
 using Automaton.Runner.Console.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Interfaces;
+using Automaton.Core.Models;
+using Automaton.Runner.Console.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -364,7 +366,7 @@ public class Program
             .Build();
     }
 
-    private static IHostBuilder CreateHostBuilder(string[] args) =>
+    internal static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .UseSerilog()
             .ConfigureServices((context, services) =>
@@ -389,8 +391,12 @@ public class Program
                         Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
                         Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"))
                         ? new BrokeredApplicationContainerRuntime(
-                            sp.GetRequiredService<HubService>(),
-                            sp.GetRequiredService<FileStorageService>())
+                            // Keep the Hub relay lazy: resolving it while the hosted
+                            // runtime manager starts would cycle through RunnerDeploymentService.
+                            (Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>>)((request, cancellationToken) =>
+                                sp.GetRequiredService<HubService>().RequestHostContainerExecutionAsync(request, cancellationToken)),
+                            (Func<Task<RunnerInstallationProfile?>>)(() =>
+                                sp.GetRequiredService<FileStorageService>().LoadInstallationProfileAsync()))
                         : new DockerContainerRuntime());
                 services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
                 services.AddSingleton<RunnerRuntimeContainerManager>();
