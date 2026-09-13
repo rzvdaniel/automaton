@@ -69,6 +69,7 @@ services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
 services.Configure<RunnerEnrollmentOptions>(applicationBuilder.Configuration.GetSection(RunnerEnrollmentOptions.SectionName));
 services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
+services.Configure<InfrastructureRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(InfrastructureRunnerRabbitMqOptions.SectionName));
 services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
 services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();

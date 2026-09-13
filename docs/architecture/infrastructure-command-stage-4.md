@@ -22,6 +22,15 @@ Runners do not start it. Repair/reinstall regenerates the same env payload from
 the persisted provisioning configuration, preserving the identity/configuration
 reconnect invariant.
 
+The API and Worker continue to use the Docker-internal `RabbitMq:Host=rabbitmq`
+coordinate. Remote Infrastructure Runners use the separate, explicitly
+configured `InfrastructureRunnerRabbitMq:Host` and `Port` values, which must
+refer to a trusted private broker endpoint. Production Compose publishes AMQP
+only on that private host address; it does not publish AMQP or management on
+the public interface. The endpoint resolver fails closed when the runner-facing
+host is not configured and reuses the canonical RabbitMQ credentials, virtual
+host, and exchange settings.
+
 The lifecycle reconciler does not republish provision or reprovision merely
 because the API-side execution record is not present; RabbitMQ is the durable
 handoff. Other lifecycle actions retain their existing recovery and SignalR path.
