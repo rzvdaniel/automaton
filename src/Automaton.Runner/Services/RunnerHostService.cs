@@ -1035,7 +1035,7 @@ public class RunnerHostService
         }
     }
 
-    private async Task<bool> EnrollAsync()
+    internal async Task<bool> EnrollAsync()
     {
         var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
         if (string.IsNullOrWhiteSpace(enrollmentToken))
