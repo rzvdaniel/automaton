@@ -14,20 +14,25 @@ namespace Automaton.Api.Tests;
 public class InfrastructureRunnerRabbitMqConfigurationTests
 {
     [Test]
-    public void TryBuildEnvironment_UsesCanonicalRabbitMqSettings()
+    public void TryBuildEnvironment_UsesRunnerEndpointAndCanonicalCredentials()
     {
-        var options = new RabbitMqOptions
+        var rabbitMq = new RabbitMqOptions
         {
-            Host = "rabbitmq.internal",
+            Host = "rabbitmq",
             Port = 5672,
             Username = "infra",
             Password = "secret",
             VirtualHost = "/",
             ExchangeName = "cap.default.router"
         };
+        var runnerRabbitMq = new InfrastructureRunnerRabbitMqOptions
+        {
+            Host = "10.0.0.3",
+            Port = 5672
+        };
 
-        Assert.That(InfrastructureRunnerRabbitMqConfigurationService.TryBuildEnvironment(options, out var environment), Is.True);
-        Assert.That(environment, Does.Contain("RabbitMq__Host=rabbitmq.internal"));
+        Assert.That(InfrastructureRunnerRabbitMqConfigurationService.TryBuildEnvironment(rabbitMq, runnerRabbitMq, out var environment), Is.True);
+        Assert.That(environment, Does.Contain("RabbitMq__Host=10.0.0.3"));
         Assert.That(environment, Does.Contain("RabbitMq__Port=5672"));
         Assert.That(environment, Does.Contain("RabbitMq__Username=infra"));
         Assert.That(environment, Does.Contain("RabbitMq__Password=secret"));
@@ -37,17 +42,18 @@ public class InfrastructureRunnerRabbitMqConfigurationTests
 
     [TestCase("")]
     [TestCase("line\nbreak")]
-    public void TryBuildEnvironment_FailsClosedForInvalidBrokerSettings(string host)
+    public void TryBuildEnvironment_FailsClosedForInvalidRunnerEndpoint(string host)
     {
-        var options = new RabbitMqOptions
+        var rabbitMq = new RabbitMqOptions
         {
-            Host = host,
+            Host = "rabbitmq",
             Port = 5672,
             Username = "infra",
             Password = "secret"
         };
+        var runnerRabbitMq = new InfrastructureRunnerRabbitMqOptions { Host = host };
 
-        Assert.That(InfrastructureRunnerRabbitMqConfigurationService.TryBuildEnvironment(options, out _), Is.False);
+        Assert.That(InfrastructureRunnerRabbitMqConfigurationService.TryBuildEnvironment(rabbitMq, runnerRabbitMq, out _), Is.False);
     }
 
     [Test]
@@ -76,13 +82,14 @@ public class InfrastructureRunnerRabbitMqConfigurationTests
             db,
             Options.Create(new RabbitMqOptions
             {
-                Host = "rabbitmq.internal",
+                Host = "rabbitmq",
                 Port = 5672,
                 Username = "infra",
                 Password = "secret",
                 VirtualHost = "/",
                 ExchangeName = "cap.default.router"
             }),
+            Options.Create(new InfrastructureRunnerRabbitMqOptions { Host = "10.0.0.3" }),
             enrollmentService);
 
         var environment = await configurationService.ResolveEnvironmentAsync(
@@ -90,7 +97,7 @@ public class InfrastructureRunnerRabbitMqConfigurationTests
             enrollmentToken: created.EnrollmentToken,
             CancellationToken.None);
 
-        Assert.That(environment, Does.Contain("RabbitMq__Host=rabbitmq.internal"));
+        Assert.That(environment, Does.Contain("RabbitMq__Host=10.0.0.3"));
         Assert.That(await db.RunnerEnrollments.SingleAsync(), Has.Property(nameof(RunnerEnrollment.Status))
             .EqualTo(RunnerEnrollmentStatuses.Pending));
     }
@@ -111,11 +118,12 @@ public class InfrastructureRunnerRabbitMqConfigurationTests
             db,
             Options.Create(new RabbitMqOptions
             {
-                Host = "rabbitmq.internal",
+                Host = "rabbitmq",
                 Port = 5672,
                 Username = "infra",
                 Password = "secret"
             }),
+            Options.Create(new InfrastructureRunnerRabbitMqOptions { Host = "10.0.0.3" }),
             enrollmentService);
 
         Assert.That(await configurationService.ResolveEnvironmentAsync(null), Is.Null);

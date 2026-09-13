@@ -15,7 +15,8 @@ namespace Automaton.Api.Services;
 public sealed class InfrastructureRunnerRabbitMqConfigurationService(
     ApiKeyService apiKeyService,
     ApplicationDbContext db,
-    IOptions<RabbitMqOptions> options,
+    IOptions<RabbitMqOptions> rabbitMqOptions,
+    IOptions<InfrastructureRunnerRabbitMqOptions> infrastructureRunnerRabbitMqOptions,
     RunnerEnrollmentService runnerEnrollmentService)
 {
     public async Task<string?> ResolveEnvironmentAsync(
@@ -33,7 +34,10 @@ public sealed class InfrastructureRunnerRabbitMqConfigurationService(
                             && runner.Purpose == RunnerPurposes.Infrastructure,
                         cancellationToken))
                 {
-                    return TryBuildEnvironment(options.Value, out var environment)
+                    return TryBuildEnvironment(
+                        rabbitMqOptions.Value,
+                        infrastructureRunnerRabbitMqOptions.Value,
+                        out var environment)
                         ? environment
                         : null;
                 }
@@ -47,18 +51,24 @@ public sealed class InfrastructureRunnerRabbitMqConfigurationService(
             return null;
         }
 
-        return TryBuildEnvironment(options.Value, out var enrollmentEnvironment)
+        return TryBuildEnvironment(
+            rabbitMqOptions.Value,
+            infrastructureRunnerRabbitMqOptions.Value,
+            out var enrollmentEnvironment)
             ? enrollmentEnvironment
             : null;
     }
 
-    internal static bool TryBuildEnvironment(RabbitMqOptions rabbitMq, out string environment)
+    internal static bool TryBuildEnvironment(
+        RabbitMqOptions rabbitMq,
+        InfrastructureRunnerRabbitMqOptions infrastructureRunnerRabbitMq,
+        out string environment)
     {
-        if (string.IsNullOrWhiteSpace(rabbitMq.Host)
+        if (string.IsNullOrWhiteSpace(infrastructureRunnerRabbitMq.Host)
             || string.IsNullOrWhiteSpace(rabbitMq.Username)
             || string.IsNullOrWhiteSpace(rabbitMq.Password)
-            || rabbitMq.Port <= 0
-            || ContainsLineBreak(rabbitMq.Host)
+            || infrastructureRunnerRabbitMq.Port <= 0
+            || ContainsLineBreak(infrastructureRunnerRabbitMq.Host)
             || ContainsLineBreak(rabbitMq.Username)
             || ContainsLineBreak(rabbitMq.Password)
             || ContainsLineBreak(rabbitMq.VirtualHost)
@@ -69,8 +79,8 @@ public sealed class InfrastructureRunnerRabbitMqConfigurationService(
         }
 
         environment = new RunnerRabbitMqConfiguration(
-            rabbitMq.Host,
-            rabbitMq.Port,
+            infrastructureRunnerRabbitMq.Host,
+            infrastructureRunnerRabbitMq.Port,
             rabbitMq.Username,
             rabbitMq.Password,
             rabbitMq.VirtualHost,
