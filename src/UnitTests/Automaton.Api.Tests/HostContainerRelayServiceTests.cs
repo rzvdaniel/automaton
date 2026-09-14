@@ -38,7 +38,7 @@ public sealed class HostContainerRelayServiceTests
 
     [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard, "caller_not_managed_runner")]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, "caller_not_managed_runner")]
-    [TestCase(RunnerPurposes.Managed, null, "caller_not_managed_runner")]
+    [TestCase(RunnerPurposes.Managed, "Unknown", "caller_not_managed_runner")]
     public async Task ResolveImage_UsesPersistedCallerProfile(string purpose, string? profile, string code)
     {
         using var fixture = RelayFixture.Create();
@@ -72,6 +72,51 @@ public sealed class HostContainerRelayServiceTests
         var caller = fixture.Caller();
         caller.ConnectionId = "stale-connection";
         var result = await fixture.Service.ExecuteAsync(caller, fixture.Request(), CancellationToken.None);
+        Assert.That(result.ErrorCode, Is.EqualTo("caller_not_managed_runner"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task ResolveImage_AcceptsLegacyNullProfileAsStandard()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.HostedRunnerEntity.ApplicationProfile = null;
+        await fixture.Db.SaveChangesAsync();
+
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), fixture.Request(), CancellationToken.None);
+
+        Assert.That(result.Success, Is.True, $"{result.ErrorCode}: {result.Error}");
+        Assert.That(fixture.Transport.Invocations, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ResolveImage_AcceptsNewAuthoritativeConnectionAfterReconnect_AndRejectsOldOne()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.HostedRunnerEntity.ConnectionId = "new-connection";
+        await fixture.Db.SaveChangesAsync();
+
+        var stale = fixture.Caller();
+        stale.ConnectionId = "old-connection";
+        var staleResult = await fixture.Service.ExecuteAsync(stale, fixture.Request(), CancellationToken.None);
+        Assert.That(staleResult.ErrorCode, Is.EqualTo("caller_not_managed_runner"));
+
+        var current = fixture.Caller();
+        current.ConnectionId = "new-connection";
+        var currentResult = await fixture.Service.ExecuteAsync(current, fixture.Request(), CancellationToken.None);
+        Assert.That(currentResult.Success, Is.True, $"{currentResult.ErrorCode}: {currentResult.Error}");
+        Assert.That(fixture.Transport.Invocations, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ResolveImage_RejectsDifferentManagedRunner()
+    {
+        using var fixture = RelayFixture.Create();
+        var caller = fixture.Caller();
+        caller.Id = Guid.NewGuid();
+
+        var result = await fixture.Service.ExecuteAsync(caller, fixture.Request(), CancellationToken.None);
+
         Assert.That(result.ErrorCode, Is.EqualTo("caller_not_managed_runner"));
         Assert.That(fixture.Transport.Invocations, Is.Zero);
     }

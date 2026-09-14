@@ -26,10 +26,17 @@ public sealed class HostContainerRelayService(
             return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
 
         var persistedRunner = await db.Runners.SingleOrDefaultAsync(x => x.Id == caller.Id, cancellationToken);
-        if (persistedRunner is null || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal)
-            || persistedRunner.Purpose != RunnerPurposes.Managed
-            || !string.Equals(persistedRunner.ApplicationProfile, RunnerApplicationProfiles.Standard, StringComparison.OrdinalIgnoreCase))
+        if (persistedRunner is null
+            || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal))
             return Failure("caller_not_managed_runner", "The caller connection is not the persisted Runner connection.");
+        if (persistedRunner.Purpose != RunnerPurposes.Managed)
+            return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
+        // A null persisted profile is the legacy representation of Standard.
+        // Normalize it here rather than rejecting existing Managed Hosted Runners
+        // that predate the application-profile field.
+        if (!RunnerApplicationProfiles.TryNormalize(persistedRunner.ApplicationProfile, out var profile)
+            || !string.Equals(profile, RunnerApplicationProfiles.Standard, StringComparison.Ordinal))
+            return Failure("caller_not_managed_runner", "The persisted Runner application profile is not Standard.");
 
         var hosted = await db.HostedRunners.Include(x => x.RunnerHost)
             .SingleOrDefaultAsync(x => x.Id == caller.HostedRunnerId && x.RunnerId == caller.Id && x.DeletedAt == null, cancellationToken);

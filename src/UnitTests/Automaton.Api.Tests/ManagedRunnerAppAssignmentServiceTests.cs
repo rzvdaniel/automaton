@@ -168,6 +168,33 @@ public class ManagedRunnerAppAssignmentServiceTests
     }
 
     [Test]
+    public async Task DisconnectOfSupersededConnection_CannotClobberCurrentConnection()
+    {
+        var runners = new RunnerService(db, userContext, null!, authorization,
+            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, new HttpContextAccessor()),
+            new ApplicationEventService(db), service);
+
+        await runners.UpdateConnection(hosted.RunnerId!.Value, hosted.UserId, new RunnerDetails
+        {
+            ConnectionId = "connection-a", HostedRunnerId = hosted.Id
+        }, CancellationToken.None);
+        await runners.UpdateConnection(hosted.RunnerId.Value, hosted.UserId, new RunnerDetails
+        {
+            ConnectionId = "connection-b", HostedRunnerId = hosted.Id
+        }, CancellationToken.None);
+
+        await runners.MarkDisconnectedAsync(hosted.RunnerId.Value, "connection-a", CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var persisted = await db.Runners.SingleAsync(x => x.Id == hosted.RunnerId.Value);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.ConnectionId, Is.EqualTo("connection-b"));
+            Assert.That(persisted.Status, Is.EqualTo(RunnerConnectivityStatuses.Online));
+        });
+    }
+
+    [Test]
     public async Task UpdateConnection_CompletesDespiteRouteFailure_AndLaterReconciliationRepairsRoute()
     {
         var target = AddTarget(previousRunnerId);
