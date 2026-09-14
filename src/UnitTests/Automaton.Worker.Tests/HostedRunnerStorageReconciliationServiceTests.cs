@@ -84,8 +84,8 @@ public class HostedRunnerStorageReconciliationServiceTests
             };
             db.HostedRunners.Add(runner);
             db.HostedRunnerStorageVerifications.AddRange(
-                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "running-1", Status = StorageVerificationStatuses.Running, StartedAtUtc = DateTime.UtcNow },
-                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "running-2", Status = StorageVerificationStatuses.Running, StartedAtUtc = DateTime.UtcNow },
+                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "dispatching", Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow },
+                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "running", Status = StorageVerificationStatuses.Running, StartedAtUtc = DateTime.UtcNow },
                 new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "pending", Status = StorageVerificationStatuses.Pending, RequestedAtUtc = DateTime.UtcNow });
             await db.SaveChangesAsync();
         }
@@ -98,6 +98,72 @@ public class HostedRunnerStorageReconciliationServiceTests
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.That((await verifyDb.HostedRunnerStorageVerifications.SingleAsync(x => x.IdempotencyKey == "pending")).Status,
             Is.EqualTo(StorageVerificationStatuses.Pending));
+    }
+
+    [Test]
+    public async Task DispatchBound_IgnoresStalePendingDeploymentMirrors()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var infrastructureRunnerId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var verificationId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost
+            {
+                Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = infrastructureRunnerId
+            });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageMeasuredAtUtc = DateTime.UtcNow, StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageState = HostedRunnerStorageStates.Healthy
+            });
+            db.HostedRunnerDeployments.AddRange(
+                new HostedRunnerDeployment
+                {
+                    Id = Guid.NewGuid(), HostedRunnerId = runnerId, Action = HostedRunnerDeploymentActions.VerifyStorage,
+                    Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow.AddDays(-50)
+                },
+                new HostedRunnerDeployment
+                {
+                    Id = Guid.NewGuid(), HostedRunnerId = runnerId, Action = HostedRunnerDeploymentActions.VerifyStorage,
+                    Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow.AddDays(-49)
+                });
+            db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+            {
+                Id = verificationId, HostedRunnerId = runnerId, IdempotencyKey = "fresh-verification",
+                Status = StorageVerificationStatuses.Pending, RequestedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions { MaxVerificationDispatchesPerHost = 2 }));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var verification = await verifyDb.HostedRunnerStorageVerifications.SingleAsync(x => x.Id == verificationId);
+        var command = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Dispatching));
+            Assert.That(verifyDb.HostedRunnerDeployments.Count(x => x.Action == HostedRunnerDeploymentActions.VerifyStorage), Is.EqualTo(3));
+            Assert.That(command.CommandId, Is.EqualTo(verificationId));
+            Assert.That(command.OperationId, Is.EqualTo(verificationId));
+            Assert.That(command.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
+            Assert.That(command.RunnerHostId, Is.EqualTo(hostId));
+            Assert.That(command.InfrastructureRunnerId, Is.EqualTo(infrastructureRunnerId));
+        });
     }
 
     [Test]
