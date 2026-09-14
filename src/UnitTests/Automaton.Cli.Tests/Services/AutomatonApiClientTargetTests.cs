@@ -116,6 +116,38 @@ public class AutomatonApiClientTargetTests
         }
     }
 
+    [TestCase("backend/server.py", "api/apps/app-1/filesystem/source/backend/server.py")]
+    [TestCase("folder with space/file#.txt", "api/apps/app-1/filesystem/source/folder%20with%20space/file%23.txt")]
+    public async Task ReadScopedFileAsync_PreservesCatchAllPathHierarchy(
+        string path,
+        string expectedPath)
+    {
+        Uri? requestUri = null;
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requestUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "{\"success\":true,\"content\":\"file\"}",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.test/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "ak_test");
+
+        var content = await client.ReadScopedFileAsync("app-1", "source", path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Is.EqualTo("file"));
+            Assert.That(requestUri!.PathAndQuery.TrimStart('/'), Is.EqualTo(expectedPath));
+        });
+    }
+
     [Test]
     public async Task CreateDeploymentTargetAsync_AllowsAnUnassignedTarget()
     {

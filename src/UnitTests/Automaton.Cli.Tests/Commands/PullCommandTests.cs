@@ -123,4 +123,140 @@ public class PullCommandTests
         Assert.Throws<InvalidOperationException>(
             () => PullCommand.PrepareDownloads(["shared/file.txt"], targetDirectory));
     }
+
+    [Test]
+    public async Task StagedPull_DoesNotExposePartialProjectWhenLaterDownloadFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+
+        try
+        {
+            var downloads = PullCommand.PrepareDownloads(
+                ["automaton.json", "frontend/index.html"],
+                stagingDirectory);
+            var readCount = 0;
+
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await PullCommand.DownloadFilesAsync(
+                    downloads,
+                    _ =>
+                    {
+                        readCount++;
+                        return readCount == 1
+                            ? Task.FromResult("{\"name\":\"partial\"}")
+                            : Task.FromException<string>(new InvalidOperationException("404 File not found"));
+                    },
+                    nonInteractive: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Directory.Exists(targetDirectory), Is.False);
+                Assert.That(File.Exists(Path.Combine(targetDirectory, "automaton.json")), Is.False);
+                Assert.That(File.Exists(Path.Combine(stagingDirectory, "automaton.json")), Is.True);
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public async Task StagedPull_CommitsCompleteNestedProjectAfterAllDownloadsSucceed()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+
+        try
+        {
+            var downloads = PullCommand.PrepareDownloads(
+                ["automaton.json", "frontend/src/App.ts"],
+                stagingDirectory);
+
+            await PullCommand.DownloadFilesAsync(
+                downloads,
+                path => Task.FromResult(path.EndsWith("App.ts", StringComparison.Ordinal)
+                    ? "export const app = true;"
+                    : "{}"),
+                nonInteractive: true);
+            PullCommand.CommitStagedProject(stagingDirectory, targetDirectory, targetExisted: false);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(Path.Combine(targetDirectory, "automaton.json")), Is.EqualTo("{}"));
+                Assert.That(File.ReadAllText(Path.Combine(targetDirectory, "frontend", "src", "App.ts")), Is.EqualTo("export const app = true;"));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void CommitStagedProject_ReplacesAnExistingEmptyTargetAsOneDirectoryTransition()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+        File.WriteAllText(Path.Combine(stagingDirectory, "automaton.json"), "{}");
+
+        try
+        {
+            PullCommand.CommitStagedProject(stagingDirectory, targetDirectory, targetExisted: true);
+
+            Assert.That(File.ReadAllText(Path.Combine(targetDirectory, "automaton.json")), Is.EqualTo("{}"));
+            Assert.That(Directory.Exists(stagingDirectory), Is.False);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void CommitStagedProject_WhenTargetChangesBeforeCommit_LeavesExistingContentUntouched()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+        File.WriteAllText(Path.Combine(stagingDirectory, "automaton.json"), "staged");
+        var existingPath = Path.Combine(targetDirectory, "user-file.txt");
+        File.WriteAllText(existingPath, "existing");
+
+        try
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => PullCommand.CommitStagedProject(stagingDirectory, targetDirectory, targetExisted: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exception!.Message, Does.Contain("remain empty"));
+                Assert.That(File.ReadAllText(existingPath), Is.EqualTo("existing"));
+                Assert.That(File.Exists(Path.Combine(targetDirectory, "automaton.json")), Is.False);
+                Assert.That(File.ReadAllText(Path.Combine(stagingDirectory, "automaton.json")), Is.EqualTo("staged"));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }
