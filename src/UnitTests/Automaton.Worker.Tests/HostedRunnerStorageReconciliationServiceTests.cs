@@ -167,6 +167,146 @@ public class HostedRunnerStorageReconciliationServiceTests
     }
 
     [Test]
+    public async Task AdministratorRequestedVerification_OutranksRoutineBacklog()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var administratorVerificationId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasuredAtUtc = DateTime.UtcNow
+            });
+            db.HostedRunnerStorageVerifications.AddRange(
+                new HostedRunnerStorageVerification
+                {
+                    Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "old-stale", Status = StorageVerificationStatuses.Pending,
+                    Reason = "Stale", RequestedAtUtc = DateTime.UtcNow.AddDays(-2)
+                },
+                new HostedRunnerStorageVerification
+                {
+                    Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "old-never-measured", Status = StorageVerificationStatuses.Pending,
+                    Reason = "NeverMeasured", RequestedAtUtc = DateTime.UtcNow.AddDays(-1)
+                },
+                new HostedRunnerStorageVerification
+                {
+                    Id = administratorVerificationId, HostedRunnerId = runnerId, IdempotencyKey = "administrator", Status = StorageVerificationStatuses.Pending,
+                    Reason = "AdministratorRequested", RequestedAtUtc = DateTime.UtcNow
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions { MaxVerificationDispatchesPerHost = 1 }));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(verifyDb.HostedRunnerStorageVerifications.Single(x => x.Id == administratorVerificationId).Status,
+                Is.EqualTo(StorageVerificationStatuses.Dispatching));
+            Assert.That(verifyDb.HostedRunnerStorageVerifications.Count(x => x.Status == StorageVerificationStatuses.Pending), Is.EqualTo(2));
+            Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single().CommandId, Is.EqualTo(administratorVerificationId));
+        });
+    }
+
+    [Test]
+    public void AdministratorRequestedVerification_OnStaleRunnerRetainsInteractivePriority()
+    {
+        var verification = new HostedRunnerStorageVerification
+        {
+            Reason = "AdministratorRequested",
+            HostedRunner = new HostedRunner
+            {
+                StorageState = HostedRunnerStorageStates.Stale,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Stale
+            }
+        };
+
+        Assert.That(HostedRunnerStorageReconciliationService.VerificationPriority(verification), Is.EqualTo(4));
+    }
+
+    [Test]
+    public void CriticalStorageStateRemainsAheadOfAdministratorRequest()
+    {
+        var verification = new HostedRunnerStorageVerification
+        {
+            Reason = "AdministratorRequested",
+            HostedRunner = new HostedRunner { StorageState = HostedRunnerStorageStates.OverLimit }
+        };
+
+        Assert.That(HostedRunnerStorageReconciliationService.VerificationPriority(verification), Is.LessThan(4));
+    }
+
+    [Test]
+    public async Task EqualPriorityAdministratorRequestsRemainFifo()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var olderId = Guid.NewGuid();
+        var newerId = Guid.NewGuid();
+        var requestedAt = DateTime.UtcNow.AddMinutes(-2);
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasuredAtUtc = DateTime.UtcNow
+            });
+            db.HostedRunnerStorageVerifications.AddRange(
+                new HostedRunnerStorageVerification
+                {
+                    Id = olderId, HostedRunnerId = runnerId, IdempotencyKey = "older-administrator", Status = StorageVerificationStatuses.Pending,
+                    Reason = "AdministratorRequested", RequestedAtUtc = requestedAt
+                },
+                new HostedRunnerStorageVerification
+                {
+                    Id = newerId, HostedRunnerId = runnerId, IdempotencyKey = "newer-administrator", Status = StorageVerificationStatuses.Pending,
+                    Reason = "AdministratorRequested", RequestedAtUtc = requestedAt.AddMinutes(1)
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions { MaxVerificationDispatchesPerHost = 1 }));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(verifyDb.HostedRunnerStorageVerifications.Single(x => x.Id == olderId).Status,
+                Is.EqualTo(StorageVerificationStatuses.Dispatching));
+            Assert.That(verifyDb.HostedRunnerStorageVerifications.Single(x => x.Id == newerId).Status,
+                Is.EqualTo(StorageVerificationStatuses.Pending));
+            Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single().CommandId, Is.EqualTo(olderId));
+        });
+    }
+
+    [Test]
     public async Task AuthoritativeOverLimit_StartsGraceThenQueuesOneSuspension()
     {
         var services = new ServiceCollection();
