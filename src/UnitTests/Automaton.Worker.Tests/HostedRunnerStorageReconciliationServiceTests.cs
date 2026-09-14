@@ -399,7 +399,6 @@ public class HostedRunnerStorageReconciliationServiceTests
             Assert.That(command.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
             Assert.That(command.RunnerHostId, Is.EqualTo(hostId));
             Assert.That(command.InfrastructureRunnerId, Is.EqualTo(infrastructureRunnerId));
-            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
         });
     }
 

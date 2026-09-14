@@ -122,7 +122,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
 
         await handler.HandleAsync(durableRequest);
         Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Count(), Is.EqualTo(1));
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
 
         var disabledDeployment = new HostedRunnerDeployment
         {
@@ -165,7 +164,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         var reprovision = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single(x => x.OperationId == disabledDeployment.Id);
         Assert.That(reprovision.ActionKey, Is.EqualTo("reprovision-hosted-runner"));
         Assert.That(reprovision.CommandId, Is.EqualTo(reprovision.OperationId));
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
     }
 
     [Test]
@@ -229,7 +227,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             Assert.That(savedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
             Assert.That(savedDeployment.Error, Does.Contain("immutable"));
             Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>(), Is.Empty);
-            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
         });
     }
 

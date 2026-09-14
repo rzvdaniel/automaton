@@ -212,7 +212,6 @@ services.AddAuthorization(options =>
 services.AddHttpClient();
 services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
 services.AddSingleton<IEventPublisher, CapEventPublisher>();
-services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
 services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
 services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
 services.AddScoped<InfrastructureActionProvisioningHandler>();

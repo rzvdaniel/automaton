@@ -1,8 +1,7 @@
 # Infrastructure command completion, Stage 3
 
-Stage 3 completes the opt-in Infrastructure Runner command path. Normal Runner
-startup still does not start the RabbitMQ consumer, and production Hosted Runner
-operations still use SignalR.
+Stage 3 completed the Infrastructure Runner command path. Hosted Runner
+infrastructure lifecycle operations now use it exclusively.
 
 The Runner uses its enrolled API key to request only the `SecretGrantIds` named in
 the command from `POST /api/infrastructure-commands/{commandId}/secrets`. The API

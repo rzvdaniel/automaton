@@ -3,9 +3,8 @@
 Provision and reprovision now publish exactly one `InfrastructureCommandRequestedEvent`
 with `CommandId == OperationId`, the persisted `RunnerHostId`, its assigned
 `InfrastructureRunnerId`, and the trusted `provision-hosted-runner` or
-`reprovision-hosted-runner` Action key. They no longer publish
-`InfrastructureActionExecutionRequestedEvent`; that subscriber remains for the
-unmigrated lifecycle actions.
+`reprovision-hosted-runner` Action key. No legacy lifecycle event is published;
+all Hosted Runner lifecycle actions use the durable command topic.
 
 An enrolled Infrastructure Runner starts the durable consumer as part of normal
 host lifetime. The canonical Infrastructure Runner cloud-init/install payload
@@ -33,7 +32,8 @@ host, and exchange settings.
 
 The lifecycle reconciler does not republish provision or reprovision merely
 because the API-side execution record is not present; RabbitMQ is the durable
-handoff. Other lifecycle actions retain their existing recovery and SignalR path.
+handoff. Scheduled Actions and generic app Actions retain their separate
+SignalR-based execution support.
 
-Stage 4 is implementation-only. It does not deploy production, migrate other
-actions, or remove broad SignalR infrastructure.
+Stage 4 was implementation-only. The later cleanup removed the retired Hosted
+Runner SignalR transport without changing Generic Runtime behavior.

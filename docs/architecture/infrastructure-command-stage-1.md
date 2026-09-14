@@ -1,9 +1,10 @@
 # Infrastructure command publication, Stage 1
 
-Stage 1 adds a command contract and CAP publication support in the API and Worker.
-Only tests convert and publish the new command. Existing callers continue to
-publish `InfrastructureActionExecutionRequestedEvent` for execution by the API's
-SignalR handler. No production code publishes both messages.
+Stage 1 added a command contract and CAP publication support in the API and Worker.
+The legacy SignalR execution path described by the original implementation has
+since been removed; Hosted Runner infrastructure operations now use the durable
+command path exclusively. Generic Action execution and scheduled Actions retain
+their existing SignalR support.
 
 ## Contract and addressing
 
@@ -33,10 +34,10 @@ Hosted Runner identity needed by an Action remains in its existing `InputJson`.
 
 ## Publication seam
 
-`InfrastructureActionExecutionRequestedEvent.ToInfrastructureCommand` converts
-the current request into the new contract. Existing `IEventPublisher.PublishAsync`
-then dispatches it through either the API or Worker `CapEventPublisher` to
-`infrastructure-command.requested`. All Actions share that topic.
+The original lifecycle request conversion populated this contract. Existing
+`IEventPublisher.PublishAsync` then dispatches it through either the API or
+Worker `CapEventPublisher` to `infrastructure-command.requested`. All lifecycle
+Actions share that topic.
 
 The new type separates the Runner payload from the old API request. Reusing the
 old type for both topics would make the existing publisher's type-based dispatch
@@ -56,26 +57,11 @@ no runtime switch to enable parallel publication accidentally.
 
 ## Deletion after cutover
 
-Once every Infrastructure Action caller uses the durable path, remove:
-
-- `InfrastructureActionExecutionRequestedEvent`, including its temporary conversion method.
-- `EventTopics.InfrastructureActionExecutionRequested` and its old-type switch arms
-  in both `CapEventPublisher` implementations. Keep the publishers themselves.
-- `InfrastructureActionExecutionRequestedCapSubscriber` and its API registration.
-- Old-event construction in `ManagedRunnerProvisionRequestedEventHandler`,
-  `HostedRunnerManagementService`, `AdminHostedRunnersController`,
-  `HostedRunnerStorageReconciliationService`, and `HostedRunnerLifecycleReconciler`.
-- The SignalR dispatch and result-fetching portions of
-  `InfrastructureActionProvisioningHandler`, after moving its lifecycle result
-  application and preserving authorization and secret-grant handling.
-- `InfrastructureActionConnectionUnavailableException`, its stale-connection
-  classifier, and lifecycle republishing used only to recover SignalR delivery.
-- `TrustedInfrastructureActionDeploymentService` and its interface only after
-  migrating their `ScheduledActionExecutionHandler` caller too.
-
-Keep generic Action SignalR methods while non-Infrastructure callers use them.
-Keep Hosted Runner registration and reconnect completion. Stage 1 deletes none
-of these components and changes no Generic Runtime behavior.
+The legacy Hosted Runner SignalR event, subscriber, connection-affine lifecycle
+dispatch, and delivery-recovery code were removed after cutover. Lifecycle result
+application remains behind the durable callback boundary. The trusted Action
+deployment service remains because scheduled Infrastructure Runner Actions still
+use the generic SignalR Action API.
 
 ## Verification boundary
 
