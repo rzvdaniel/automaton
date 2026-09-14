@@ -39,3 +39,16 @@ Confirm:
 - no pending specification snapshot remains.
 
 If the container is provisioned but the Runner does not connect, inspect the deployment status, container logs, Runner registration, and API connectivity before retrying.
+
+## Operate an existing Runner Container
+
+In **Administration → Hosted Runners → Runner Containers**, select the existing container to inspect its current lifecycle and storage state.
+
+- **Restart** requests a canonical restart and waits for the Runner to reconnect.
+- **Verify storage** queues a host-side storage measurement. Refresh the container details to see the verification status and result.
+- **Suspend** is available when the enforcement state is not already suspended or transitioning. Confirm the action before submitting it.
+- **Resume** is available only when the enforcement state is **Suspended**.
+- **Reprovision** replaces the managed container through the Hosted Runner lifecycle.
+- **Delete hosted runner** removes the managed container and lets you choose whether its persistent data is preserved or permanently deleted. The permanent-delete option requires typing the Runner name and cannot be undone.
+
+These controls require administrator access. The API validates the current lifecycle state and remains authoritative if the state changes between refreshes. While an action is pending, its control is disabled to prevent duplicate requests.
