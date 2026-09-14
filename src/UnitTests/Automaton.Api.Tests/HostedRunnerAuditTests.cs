@@ -444,6 +444,33 @@ public partial class HostedRunnerAuditTests
         Assert.That(operation.ReconnectDeadlineUtc, Is.LessThanOrEqualTo(DateTime.UtcNow.AddSeconds(61)));
     }
 
+    [Test]
+    public async Task SuccessfulHostedRunnerDeleteReleasesRuntimePort()
+    {
+        using var db = CreateDbContext();
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "delete-port",
+            ContainerName = "delete-port", RuntimePort = 20000, Status = HostedRunnerStatuses.Deleting
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Deprovision,
+            Status = HostedRunnerDeploymentStatuses.Executing
+        };
+        var handler = new InfrastructureActionProvisioningHandler(
+            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()));
+        using var document = JsonDocument.Parse("{\"success\":true}");
+
+        await handler.ApplySuccessfulOperationAsync(
+            hostedRunner, deployment, "delete-hosted-runner", document.RootElement, CancellationToken.None);
+
+        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Deleted));
+        Assert.That(hostedRunner.RuntimePort, Is.Null);
+    }
+
     [TestCase("{\"success\":true,\"containerName\":\"replacement\"}")]
     [TestCase("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"\"}")]
     public void HostedRunnerProvisioningRejectsMissingContainerIdentity(string json)
@@ -731,6 +758,8 @@ public partial class HostedRunnerAuditTests
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
         var hostedRunner = SeedManagedHostedRunner(db, userId);
+        hostedRunner.RuntimePort = 20000;
+        await db.SaveChangesAsync();
         var publisher = new RecordingEventPublisher();
         var managementService = CreateManagementService(
             db,
@@ -754,6 +783,7 @@ public partial class HostedRunnerAuditTests
                 Is.EqualTo($"automaton-hosted-runner-{hostedRunner.Id:N}-system"));
             Assert.That(input.RootElement.GetProperty("userVolumeName").GetString(),
                 Is.EqualTo($"automaton-hosted-runner-{hostedRunner.Id:N}-user"));
+            Assert.That(hostedRunner.RuntimePort, Is.EqualTo(20000));
         });
     }
 

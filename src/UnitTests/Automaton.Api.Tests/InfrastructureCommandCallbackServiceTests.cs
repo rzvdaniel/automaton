@@ -52,6 +52,28 @@ public sealed class InfrastructureCommandCallbackServiceTests
             Request(deployment.Id, host.Id, runner.Id, "failed"), CancellationToken.None));
     }
 
+    [Test]
+    public async Task FailedHostedRunnerDeleteRetainsRuntimePort()
+    {
+        await using var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Deleting, RuntimePort = 20000 };
+        var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Deprovision, Status = HostedRunnerDeploymentStatuses.Executing };
+        db.AddRange(runner, host, hosted, deployment);
+        await db.SaveChangesAsync();
+
+        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "delete failed") with { ActionKey = "delete-hosted-runner" },
+            CancellationToken.None);
+
+        Assert.That((await db.HostedRunners.SingleAsync()).RuntimePort, Is.EqualTo(20000));
+        Assert.That((await db.HostedRunners.SingleAsync()).Status, Is.EqualTo(HostedRunnerStatuses.DeleteFailed));
+    }
+
+
     [TestCase(HostedRunnerDeploymentActions.Restart, "restart-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Provision, "provision-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Reprovision, "reprovision-hosted-runner")]
@@ -125,4 +147,5 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+
 }
