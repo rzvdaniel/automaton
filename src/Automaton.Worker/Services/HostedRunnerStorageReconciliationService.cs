@@ -307,16 +307,14 @@ public sealed class HostedRunnerStorageReconciliationService(
 
     private static async Task<int> CountInFlightForHostAsync(ApplicationDbContext db, Guid hostId, CancellationToken cancellationToken)
     {
-        var verificationIds = await db.HostedRunnerStorageVerifications
-            .Where(x => x.HostedRunner.RunnerHostId == hostId &&
-                (x.Status == StorageVerificationStatuses.Dispatching || x.Status == StorageVerificationStatuses.Running))
-            .Select(x => x.Id).ToListAsync(cancellationToken);
-        var deploymentIds = await db.HostedRunnerDeployments
-            .Where(x => x.HostedRunner.RunnerHostId == hostId &&
-                (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Dispatching ||
-                    x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running))
-            .Select(x => x.Id).ToListAsync(cancellationToken);
-        return verificationIds.Concat(deploymentIds).Distinct().Count();
+        // Verification admission is bounded by the canonical verification lifecycle.
+        // HostedRunnerDeployment rows are execution mirrors and can remain pending after
+        // an interrupted or historical dispatch; counting them would permanently consume
+        // a slot and would double-count a verification once it is genuinely in flight.
+        return await db.HostedRunnerStorageVerifications
+            .CountAsync(x => x.HostedRunner.RunnerHostId == hostId &&
+                (x.Status == StorageVerificationStatuses.Dispatching || x.Status == StorageVerificationStatuses.Running),
+                cancellationToken);
     }
 
     private static async Task<bool> TryClaimDispatchAsync(ApplicationDbContext db, Guid hostId, Guid verificationId,
