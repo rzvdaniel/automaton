@@ -939,11 +939,10 @@ public class RunnerHostService
                 Version = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
                 Purpose = purpose,
-                Capabilities = RunnerCapabilities.ForRunnerProtocol(
+                Capabilities = RunnerCapabilities.ForInstallationProfile(
                     Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                    purpose,
-                    HubService.CurrentRunnerApiCompatibilityVersion),
+                    purpose),
                 RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
                     ? (Guid?)runnerHostId
                     : null,
@@ -1113,11 +1112,10 @@ public class RunnerHostService
     {
         var installationId = await storageService.GetOrCreateInstallationIdAsync();
         var purpose = RunnerPurposes.Infrastructure;
-        var capabilities = RunnerCapabilities.ForRunnerProtocol(
+        var capabilities = RunnerCapabilities.ForInstallationProfile(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            purpose,
-            HubService.CurrentRunnerApiCompatibilityVersion);
+            purpose);
         var configuredRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
         var request = new InfrastructureRunnerRegistrationRequest
         {
@@ -1219,7 +1217,15 @@ public class RunnerHostService
             return;
         }
 
-        ApplyInstallationProfile(profile.Purpose, profile.Capabilities, profile.RunnerHostId);
+        var capabilities = RunnerCapabilities.ForInstallationProfile(profile.Capabilities, profile.Purpose);
+        if (!(profile.Capabilities ?? Array.Empty<string>())
+            .SequenceEqual(capabilities, StringComparer.OrdinalIgnoreCase))
+        {
+            profile.Capabilities = capabilities;
+            await storageService.SaveInstallationProfileAsync(profile);
+        }
+
+        ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
     }
 
     private static void ApplyInstallationProfile(
@@ -1230,10 +1236,9 @@ public class RunnerHostService
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
         Environment.SetEnvironmentVariable(
             "AUTOMATON_RUNNER_CAPABILITIES",
-            string.Join(',', RunnerCapabilities.ForRunnerProtocol(
+            string.Join(',', RunnerCapabilities.ForInstallationProfile(
                 capabilities,
-                purpose,
-                HubService.CurrentRunnerApiCompatibilityVersion)));
+                purpose)));
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
     }
 

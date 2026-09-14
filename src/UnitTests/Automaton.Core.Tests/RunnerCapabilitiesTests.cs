@@ -1,5 +1,4 @@
 using Automaton.Core.Enums;
-using Automaton.Core.Constants;
 
 namespace Automaton.Core.Tests;
 
@@ -65,31 +64,28 @@ public class RunnerCapabilitiesTests
     }
 
     [Test]
-    public void ForRunnerProtocol_RefreshesCurrentInfrastructureDefaults()
+    public void ForInstallationProfile_RefreshesHistoricalInfrastructureDefaults()
     {
-        var capabilities = RunnerCapabilities.ForRunnerProtocol(
+        var capabilities = RunnerCapabilities.ForInstallationProfile(
             [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
-            RunnerPurposes.Infrastructure,
-            RunnerApiCompatibilityVersions.HostContainerExecution);
+            RunnerPurposes.Infrastructure);
 
         Assert.That(capabilities, Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)));
     }
 
     [Test]
-    public void ForRunnerProtocol_DoesNotGrantHostContainerToOlderOrManagedRunners()
+    public void InstallationProfile_UsesCanonicalInfrastructureAndManagedProfiles()
     {
-        var incompleteInfrastructure = RunnerCapabilities.ForRunnerProtocol(
+        var canonicalInfrastructure = RunnerCapabilities.ForInstallationProfile(
             [RunnerCapabilities.ApplicationHosting],
-            RunnerPurposes.Infrastructure,
-            RunnerApiCompatibilityVersions.ContainerApplicationExecution);
-        var managed = RunnerCapabilities.ForRunnerProtocol(
+            RunnerPurposes.Infrastructure);
+        var managed = RunnerCapabilities.ForInstallationProfile(
             [RunnerCapabilities.ApplicationHosting],
-            RunnerPurposes.Managed,
-            RunnerApiCompatibilityVersions.HostContainerExecution);
+            RunnerPurposes.Managed);
 
         Assert.Multiple(() =>
         {
-            Assert.That(incompleteInfrastructure, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+            Assert.That(canonicalInfrastructure, Does.Contain(RunnerCapabilities.HostContainerExecution));
             Assert.That(managed, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
         });
     }

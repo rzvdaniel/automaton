@@ -65,21 +65,18 @@ public static class RunnerCapabilities
     }
 
     /// <summary>
-    /// Resolves the capabilities advertised by a Runner installation. A current
-    /// Infrastructure Runner advertises the complete platform set when it
-    /// speaks the host-container protocol; an older protocol keeps its
-    /// explicitly reported capabilities so API authorization remains strict.
+    /// Resolves the capabilities for a canonical installation profile. The
+    /// supported Infrastructure Runner installation flow has one server-issued
+    /// profile; it does not expose a capability restriction override. Managed
+    /// profiles retain their explicit capabilities.
     /// </summary>
-    public static IReadOnlyList<string> ForRunnerProtocol(
+    public static IReadOnlyList<string> ForInstallationProfile(
         IEnumerable<string>? capabilities,
-        string? purpose,
-        string? apiCompatibilityVersion)
+        string? purpose)
     {
         var normalizedPurpose = RunnerPurposes.Normalize(purpose);
         var normalized = Normalize(capabilities, normalizedPurpose);
         return normalizedPurpose == RunnerPurposes.Infrastructure
-            && int.TryParse(apiCompatibilityVersion, out var protocol)
-            && protocol >= int.Parse(Automaton.Core.Constants.RunnerApiCompatibilityVersions.HostContainerExecution)
             ? DefaultsForPurpose(normalizedPurpose)
             : normalized;
     }

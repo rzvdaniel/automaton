@@ -129,6 +129,31 @@ public partial class HostedRunnerAuditTests
     }
 
     [Test]
+    public void InfrastructureReconnectDoesNotInferCapabilitiesFromProtocol()
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-restricted-report",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure)
+        };
+
+        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
+        {
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
+            Capabilities = [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution]
+        });
+
+        Assert.That(
+            RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
+            Is.EquivalentTo(new[] { RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution }));
+    }
+
+    [Test]
     public void SanitizeMetadataJson_RedactsExpandedSensitiveKeys()
     {
         var json = AuditEventService.SanitizeMetadataJson(new
