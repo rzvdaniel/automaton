@@ -657,6 +657,7 @@ public class RunnerService
     public async Task MarkDisconnectedAsync(Guid runnerId, string connectionId, CancellationToken cancellationToken)
     {
         var runner = await dbContext.Runners
+            .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == runnerId, cancellationToken);
 
         if (runner == null)
@@ -669,9 +670,21 @@ public class RunnerService
             return;
         }
 
-        runner.ConnectionId = null;
-        runner.LastDisconnectedAtUtc = DateTime.UtcNow;
-        runner.Status = RunnerConnectivityStatuses.Offline;
+        var disconnectedAtUtc = DateTime.UtcNow;
+        // Disconnect callbacks can race with a replacement connection. Make
+        // the compare-and-clear atomic so an old callback cannot clear the
+        // newer authoritative connection after it has been persisted.
+        var disconnected = await dbContext.Runners
+            .Where(x => x.Id == runnerId && x.ConnectionId == connectionId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.ConnectionId, (string?)null)
+                .SetProperty(x => x.LastDisconnectedAtUtc, disconnectedAtUtc)
+                .SetProperty(x => x.Status, RunnerConnectivityStatuses.Offline),
+                cancellationToken);
+        if (disconnected != 1)
+        {
+            return;
+        }
 
         var lostExecutions = await dbContext.AppModuleExecutions
             .Where(execution => execution.RunnerId == runner.Id
@@ -682,14 +695,13 @@ public class RunnerService
             execution.Status = AppModuleExecutionStatuses.Lost;
             execution.ErrorCode = AppModuleExecutionErrorCodes.RunnerUnavailable;
             execution.FailureSummary = "Runner disconnected before execution completion was confirmed.";
-            execution.CompletedAtUtc = DateTime.UtcNow;
+            execution.CompletedAtUtc = disconnectedAtUtc;
         }
 
-        dbContext.Entry(runner).State = EntityState.Modified;
         await CloseMatchingOpenSessionAsync(
             runner.Id,
             connectionId,
-            runner.LastDisconnectedAtUtc.Value,
+            disconnectedAtUtc,
             RunnerSessionDisconnectReasons.GracefulDisconnect,
             cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
