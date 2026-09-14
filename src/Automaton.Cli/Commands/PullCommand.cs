@@ -239,20 +239,18 @@ public static class PullCommand
             return;
         }
 
-        foreach (var entry in Directory.EnumerateFileSystemEntries(stagingDirectory))
+        if (!Directory.Exists(fullTargetDirectory))
         {
-            var destination = Path.Combine(fullTargetDirectory, Path.GetFileName(entry));
-            if (Directory.Exists(entry))
-            {
-                Directory.Move(entry, destination);
-            }
-            else
-            {
-                File.Move(entry, destination);
-            }
+            throw new InvalidOperationException("The pull target changed before commit.");
         }
 
-        Directory.Delete(stagingDirectory);
+        if (Directory.EnumerateFileSystemEntries(fullTargetDirectory).Any())
+        {
+            throw new InvalidOperationException("The pull target must remain empty until commit.");
+        }
+
+        Directory.Delete(fullTargetDirectory);
+        Directory.Move(stagingDirectory, fullTargetDirectory);
     }
 
     private static ApplicationContract ReadApplicationContract(JsonElement app)

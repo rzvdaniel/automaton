@@ -201,4 +201,62 @@ public class PullCommandTests
             }
         }
     }
+
+    [Test]
+    public void CommitStagedProject_ReplacesAnExistingEmptyTargetAsOneDirectoryTransition()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+        File.WriteAllText(Path.Combine(stagingDirectory, "automaton.json"), "{}");
+
+        try
+        {
+            PullCommand.CommitStagedProject(stagingDirectory, targetDirectory, targetExisted: true);
+
+            Assert.That(File.ReadAllText(Path.Combine(targetDirectory, "automaton.json")), Is.EqualTo("{}"));
+            Assert.That(Directory.Exists(stagingDirectory), Is.False);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void CommitStagedProject_WhenTargetChangesBeforeCommit_LeavesExistingContentUntouched()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var stagingDirectory = PullCommand.CreateStagingDirectory(targetDirectory);
+        File.WriteAllText(Path.Combine(stagingDirectory, "automaton.json"), "staged");
+        var existingPath = Path.Combine(targetDirectory, "user-file.txt");
+        File.WriteAllText(existingPath, "existing");
+
+        try
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => PullCommand.CommitStagedProject(stagingDirectory, targetDirectory, targetExisted: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exception!.Message, Does.Contain("remain empty"));
+                Assert.That(File.ReadAllText(existingPath), Is.EqualTo("existing"));
+                Assert.That(File.Exists(Path.Combine(targetDirectory, "automaton.json")), Is.False);
+                Assert.That(File.ReadAllText(Path.Combine(stagingDirectory, "automaton.json")), Is.EqualTo("staged"));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }
