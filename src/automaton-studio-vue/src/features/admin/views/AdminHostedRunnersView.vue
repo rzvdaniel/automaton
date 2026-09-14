@@ -18,6 +18,12 @@ import { adminHostedRunnersService } from '../services/adminHostedRunnersService
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
+import {
+  canResumeHostedRunner,
+  canSuspendHostedRunner,
+  executeHostedRunnerAction,
+  isHostedRunnerActionPending,
+} from '../utils/hostedRunnerActions'
 import type {
   HostedRunner,
   RunnerEnrollment,
@@ -43,6 +49,8 @@ const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
 const verifyingStorageRunnerId = ref<string | null>(null)
+const suspendingRunnerId = ref<string | null>(null)
+const resumingRunnerId = ref<string | null>(null)
 const deleteConfirmationRunnerId = ref<string | null>(null)
 
 const formatStorage = (bytes?: number) => {
@@ -52,15 +60,44 @@ const formatStorage = (bytes?: number) => {
 }
 
 const verifyStorage = async (runner: HostedRunner) => {
+  if (isHostedRunnerActionPending(runner.id, verifyingStorageRunnerId.value)) return
   verifyingStorageRunnerId.value = runner.id
   try {
-    await adminHostedRunnersService.verifyHostedRunnerStorage(runner.id)
+    await executeHostedRunnerAction('verifyStorage', runner.id, adminHostedRunnersService)
     toast.add({ severity: 'info', summary: 'Verification requested', detail: 'Host-side storage verification has been queued.', life: 5000 })
     await loadHostedRunners()
   } catch (error) {
     toast.add({ severity: 'error', summary: 'Verification failed', detail: error instanceof Error ? error.message : 'Unable to request storage verification.', life: 6000 })
   } finally {
     verifyingStorageRunnerId.value = null
+  }
+}
+
+const suspendHostedRunner = async (runner: HostedRunner) => {
+  if (!canSuspendHostedRunner(runner) || !window.confirm(`Suspend ${runner.name}? Existing workloads will be paused.`)) return
+  suspendingRunnerId.value = runner.id
+  try {
+    await executeHostedRunnerAction('suspend', runner.id, adminHostedRunnersService)
+    toast.add({ severity: 'info', summary: 'Suspension requested', detail: `Suspension requested for ${runner.name}.`, life: 3500 })
+    await loadHostedRunners()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Suspension failed', detail: error instanceof Error ? error.message : 'Unable to suspend hosted runner.', life: 5000 })
+  } finally {
+    suspendingRunnerId.value = null
+  }
+}
+
+const resumeHostedRunner = async (runner: HostedRunner) => {
+  if (!canResumeHostedRunner(runner)) return
+  resumingRunnerId.value = runner.id
+  try {
+    await executeHostedRunnerAction('resume', runner.id, adminHostedRunnersService)
+    toast.add({ severity: 'info', summary: 'Resume requested', detail: `Resume requested for ${runner.name}.`, life: 3500 })
+    await loadHostedRunners()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Resume failed', detail: error instanceof Error ? error.message : 'Unable to resume hosted runner.', life: 5000 })
+  } finally {
+    resumingRunnerId.value = null
   }
 }
 const deleteDataConfirmation = ref('')
@@ -1007,6 +1044,28 @@ watch(() => route.path, refreshAll)
                   @click="reprovisionHostedRunner(data)"
                 />
                 <Button
+                  v-if="canSuspendHostedRunner(data)"
+                  label="Suspend"
+                  icon="pi pi-pause"
+                  size="small"
+                  severity="warn"
+                  outlined
+                  :loading="suspendingRunnerId === data.id"
+                  :disabled="isHostedRunnerActionPending(data.id, suspendingRunnerId)"
+                  @click="suspendHostedRunner(data)"
+                />
+                <Button
+                  v-if="canResumeHostedRunner(data)"
+                  label="Resume"
+                  icon="pi pi-play"
+                  size="small"
+                  severity="success"
+                  outlined
+                  :loading="resumingRunnerId === data.id"
+                  :disabled="isHostedRunnerActionPending(data.id, resumingRunnerId)"
+                  @click="resumeHostedRunner(data)"
+                />
+                <Button
                   v-if="!isDeletedRunner(data) && data.status !== 'running'"
                   label="Retry"
                   icon="pi pi-play"
@@ -1390,6 +1449,7 @@ watch(() => route.path, refreshAll)
               icon="pi pi-refresh"
               size="small"
               :loading="verifyingStorageRunnerId === selectedRunner.id"
+              :disabled="isHostedRunnerActionPending(selectedRunner.id, verifyingStorageRunnerId)"
               @click="verifyStorage(selectedRunner)"
             />
           </div>
