@@ -367,7 +367,7 @@ public sealed class HostedRunnerStorageReconciliationService(
         return bucket < samplePercent * 100;
     }
 
-    private static int VerificationPriority(HostedRunnerStorageVerification verification)
+    internal static int VerificationPriority(HostedRunnerStorageVerification verification)
     {
         var runner = verification.HostedRunner;
         if (runner.StorageState == HostedRunnerStorageStates.OverLimit) return 0;
@@ -376,9 +376,10 @@ public sealed class HostedRunnerStorageReconciliationService(
         if (runner.StorageMeasurementStatus == StorageMeasurementStatuses.Failed ||
             runner.StorageSelfReportedStatus == StorageMeasurementStatuses.Failed ||
             runner.StorageState == HostedRunnerStorageStates.MeasurementFailed) return 3;
+        if (verification.Reason == "AdministratorRequested") return 4;
         if (runner.StorageMeasurementStatus == StorageMeasurementStatuses.Stale ||
-            runner.StorageState == HostedRunnerStorageStates.Stale) return 4;
-        if (verification.Reason is "Offline" or "Disconnected") return 5;
-        return verification.Reason == "LowFrequencyAudit" ? 6 : 5;
+            runner.StorageState == HostedRunnerStorageStates.Stale) return 5;
+        if (verification.Reason is "Offline" or "Disconnected") return 6;
+        return verification.Reason == "LowFrequencyAudit" ? 7 : 5;
     }
 }
