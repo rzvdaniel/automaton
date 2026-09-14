@@ -64,6 +64,23 @@ public static class RunnerCapabilities
         return values;
     }
 
+    /// <summary>
+    /// Resolves the capabilities for a canonical installation profile. The
+    /// supported Infrastructure Runner installation flow has one server-issued
+    /// profile; it does not expose a capability restriction override. Managed
+    /// profiles retain their explicit capabilities.
+    /// </summary>
+    public static IReadOnlyList<string> ForInstallationProfile(
+        IEnumerable<string>? capabilities,
+        string? purpose)
+    {
+        var normalizedPurpose = RunnerPurposes.Normalize(purpose);
+        var normalized = Normalize(capabilities, normalizedPurpose);
+        return normalizedPurpose == RunnerPurposes.Infrastructure
+            ? DefaultsForPurpose(normalizedPurpose)
+            : normalized;
+    }
+
     public static string Serialize(IEnumerable<string>? capabilities, string? purpose)
         => JsonSerializer.Serialize(Normalize(capabilities, purpose));
 

@@ -20,6 +20,8 @@ The initial installer may authenticate with either the generated enrollment toke
 
 Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, **Ready**, successfully validated, and shows the expected image digest. The server is then ready to host managed Runners. For the canonical host onboarding details, see **Add a Runner Host**.
 
+Infrastructure capability profiles are issued by the enrollment flow; the installer and Repair command do not expose an operator capability override. `AUTOMATON_RUNNER_CAPABILITIES` is a generated runtime projection of that profile. When an existing installation reconnects or is repaired, the current canonical Infrastructure profile is written back before advertisement. The API still authorizes privileged host operations only when the connected Runner explicitly reports the capability and meets the required protocol version.
+
 [![Install an Infrastructure Runner on a new server](./assets/infrastructure-runner-installation.png)](./assets/infrastructure-runner-installation.png)
 
 ## Repair an existing Infrastructure Runner

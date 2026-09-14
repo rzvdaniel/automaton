@@ -62,4 +62,31 @@ public class RunnerCapabilitiesTests
                 RunnerPurposes.Managed),
             Is.False);
     }
+
+    [Test]
+    public void ForInstallationProfile_RefreshesHistoricalInfrastructureDefaults()
+    {
+        var capabilities = RunnerCapabilities.ForInstallationProfile(
+            [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
+            RunnerPurposes.Infrastructure);
+
+        Assert.That(capabilities, Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)));
+    }
+
+    [Test]
+    public void InstallationProfile_UsesCanonicalInfrastructureAndManagedProfiles()
+    {
+        var canonicalInfrastructure = RunnerCapabilities.ForInstallationProfile(
+            [RunnerCapabilities.ApplicationHosting],
+            RunnerPurposes.Infrastructure);
+        var managed = RunnerCapabilities.ForInstallationProfile(
+            [RunnerCapabilities.ApplicationHosting],
+            RunnerPurposes.Managed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canonicalInfrastructure, Does.Contain(RunnerCapabilities.HostContainerExecution));
+            Assert.That(managed, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+        });
+    }
 }

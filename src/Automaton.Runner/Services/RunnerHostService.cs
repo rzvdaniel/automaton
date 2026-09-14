@@ -939,7 +939,7 @@ public class RunnerHostService
                 Version = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
                 Purpose = purpose,
-                Capabilities = RunnerCapabilities.Normalize(
+                Capabilities = RunnerCapabilities.ForInstallationProfile(
                     Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                     purpose),
@@ -1112,7 +1112,7 @@ public class RunnerHostService
     {
         var installationId = await storageService.GetOrCreateInstallationIdAsync();
         var purpose = RunnerPurposes.Infrastructure;
-        var capabilities = RunnerCapabilities.Normalize(
+        var capabilities = RunnerCapabilities.ForInstallationProfile(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             purpose);
@@ -1217,7 +1217,15 @@ public class RunnerHostService
             return;
         }
 
-        ApplyInstallationProfile(profile.Purpose, profile.Capabilities, profile.RunnerHostId);
+        var capabilities = RunnerCapabilities.ForInstallationProfile(profile.Capabilities, profile.Purpose);
+        if (!(profile.Capabilities ?? Array.Empty<string>())
+            .SequenceEqual(capabilities, StringComparer.OrdinalIgnoreCase))
+        {
+            profile.Capabilities = capabilities;
+            await storageService.SaveInstallationProfileAsync(profile);
+        }
+
+        ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
     }
 
     private static void ApplyInstallationProfile(
@@ -1226,7 +1234,11 @@ public class RunnerHostService
         Guid? runnerHostId)
     {
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", string.Join(',', capabilities));
+        Environment.SetEnvironmentVariable(
+            "AUTOMATON_RUNNER_CAPABILITIES",
+            string.Join(',', RunnerCapabilities.ForInstallationProfile(
+                capabilities,
+                purpose)));
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
     }
 
