@@ -10,6 +10,7 @@ using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Core.Enums;
+using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 
@@ -75,6 +76,56 @@ public partial class HostedRunnerAuditTests
 
         Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
         Assert.That(runner.ImageDigest, Is.EqualTo("new"));
+    }
+
+    [Test]
+    public void InfrastructureReconnectRefreshesAdvertisedCapabilities()
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-capability-refresh",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
+                RunnerPurposes.Infrastructure)
+        };
+
+        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
+        {
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
+            Capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)
+        });
+
+        Assert.That(
+            RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
+            Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)));
+    }
+
+    [Test]
+    public void ManagedReconnectCannotGrantPrivilegedCapabilities()
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "managed-capability-boundary",
+            Purpose = RunnerPurposes.Managed,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                RunnerPurposes.Managed)
+        };
+
+        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
+        {
+            Purpose = RunnerPurposes.Managed,
+            Capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution
+        });
+
+        Assert.That(
+            RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
+            Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed)));
     }
 
     [Test]

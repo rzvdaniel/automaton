@@ -64,6 +64,26 @@ public static class RunnerCapabilities
         return values;
     }
 
+    /// <summary>
+    /// Resolves the capabilities advertised by a Runner installation. A current
+    /// Infrastructure Runner advertises the complete platform set when it
+    /// speaks the host-container protocol; an older protocol keeps its
+    /// explicitly reported capabilities so API authorization remains strict.
+    /// </summary>
+    public static IReadOnlyList<string> ForRunnerProtocol(
+        IEnumerable<string>? capabilities,
+        string? purpose,
+        string? apiCompatibilityVersion)
+    {
+        var normalizedPurpose = RunnerPurposes.Normalize(purpose);
+        var normalized = Normalize(capabilities, normalizedPurpose);
+        return normalizedPurpose == RunnerPurposes.Infrastructure
+            && int.TryParse(apiCompatibilityVersion, out var protocol)
+            && protocol >= int.Parse(Automaton.Core.Constants.RunnerApiCompatibilityVersions.HostContainerExecution)
+            ? DefaultsForPurpose(normalizedPurpose)
+            : normalized;
+    }
+
     public static string Serialize(IEnumerable<string>? capabilities, string? purpose)
         => JsonSerializer.Serialize(Normalize(capabilities, purpose));
 

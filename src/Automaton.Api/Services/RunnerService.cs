@@ -539,6 +539,17 @@ public class RunnerService
         runner.OperatingSystem = TrimOrNull(report.OperatingSystem, 256);
         runner.Architecture = TrimOrNull(report.Architecture, 40);
         runner.ContainerHealth = TrimOrNull(report.ContainerHealth, 40);
+
+        // Capabilities are refreshed only for authoritative Infrastructure
+        // Runner self-reports. Managed Runner capabilities stay server-bound so
+        // a self-report cannot grant privileged host capabilities.
+        if (RunnerPurposes.Normalize(runner.Purpose) == RunnerPurposes.Infrastructure
+            && RunnerPurposes.Normalize(report.Purpose) == RunnerPurposes.Infrastructure)
+        {
+            runner.CapabilitiesJson = RunnerCapabilities.Serialize(
+                report.Capabilities,
+                RunnerPurposes.Infrastructure);
+        }
     }
 
     private static string? TrimOrNull(string? value, int maximumLength)

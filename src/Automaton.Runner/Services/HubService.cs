@@ -317,10 +317,11 @@ public class HubService
                     options.Headers.Add(RunnerPurposeHeader, purpose);
                     options.Headers.Add(
                         RunnerCapabilitiesHeader,
-                        string.Join(',', RunnerCapabilities.Normalize(
+                        string.Join(',', RunnerCapabilities.ForRunnerProtocol(
                             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                            purpose)));
+                            purpose,
+                            CurrentRunnerApiCompatibilityVersion)));
                     var runnerHostId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID");
                     if (!string.IsNullOrWhiteSpace(runnerHostId))
                     {

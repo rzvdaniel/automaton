@@ -939,10 +939,11 @@ public class RunnerHostService
                 Version = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
                 Purpose = purpose,
-                Capabilities = RunnerCapabilities.Normalize(
+                Capabilities = RunnerCapabilities.ForRunnerProtocol(
                     Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                    purpose),
+                    purpose,
+                    HubService.CurrentRunnerApiCompatibilityVersion),
                 RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
                     ? (Guid?)runnerHostId
                     : null,
@@ -1112,10 +1113,11 @@ public class RunnerHostService
     {
         var installationId = await storageService.GetOrCreateInstallationIdAsync();
         var purpose = RunnerPurposes.Infrastructure;
-        var capabilities = RunnerCapabilities.Normalize(
+        var capabilities = RunnerCapabilities.ForRunnerProtocol(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            purpose);
+            purpose,
+            HubService.CurrentRunnerApiCompatibilityVersion);
         var configuredRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
         var request = new InfrastructureRunnerRegistrationRequest
         {
@@ -1226,7 +1228,12 @@ public class RunnerHostService
         Guid? runnerHostId)
     {
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", string.Join(',', capabilities));
+        Environment.SetEnvironmentVariable(
+            "AUTOMATON_RUNNER_CAPABILITIES",
+            string.Join(',', RunnerCapabilities.ForRunnerProtocol(
+                capabilities,
+                purpose,
+                HubService.CurrentRunnerApiCompatibilityVersion)));
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
     }
 

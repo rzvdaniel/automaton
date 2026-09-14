@@ -1,4 +1,5 @@
 using Automaton.Core.Enums;
+using Automaton.Core.Constants;
 
 namespace Automaton.Core.Tests;
 
@@ -61,5 +62,35 @@ public class RunnerCapabilitiesTests
                 [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.DockerManagement],
                 RunnerPurposes.Managed),
             Is.False);
+    }
+
+    [Test]
+    public void ForRunnerProtocol_RefreshesCurrentInfrastructureDefaults()
+    {
+        var capabilities = RunnerCapabilities.ForRunnerProtocol(
+            [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
+            RunnerPurposes.Infrastructure,
+            RunnerApiCompatibilityVersions.HostContainerExecution);
+
+        Assert.That(capabilities, Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)));
+    }
+
+    [Test]
+    public void ForRunnerProtocol_DoesNotGrantHostContainerToOlderOrManagedRunners()
+    {
+        var incompleteInfrastructure = RunnerCapabilities.ForRunnerProtocol(
+            [RunnerCapabilities.ApplicationHosting],
+            RunnerPurposes.Infrastructure,
+            RunnerApiCompatibilityVersions.ContainerApplicationExecution);
+        var managed = RunnerCapabilities.ForRunnerProtocol(
+            [RunnerCapabilities.ApplicationHosting],
+            RunnerPurposes.Managed,
+            RunnerApiCompatibilityVersions.HostContainerExecution);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(incompleteInfrastructure, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+            Assert.That(managed, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+        });
     }
 }
