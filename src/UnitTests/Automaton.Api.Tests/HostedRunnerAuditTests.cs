@@ -860,8 +860,12 @@ public partial class HostedRunnerAuditTests
 
         await managementService.RestartAsAdminAsync(hostedRunner.Id, CancellationToken.None);
 
-        var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
+        var request = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
         Assert.That(request.ActionKey, Is.EqualTo("restart-hosted-runner"));
+        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
+        Assert.That(request.CommandId, Is.EqualTo(request.OperationId));
+        Assert.That(request.RunnerHostId, Is.EqualTo(hostedRunner.RunnerHostId));
+        Assert.That(request.InfrastructureRunnerId, Is.EqualTo(hostedRunner.RunnerHost!.InfrastructureRunnerId));
         Assert.That(request.InputJson, Does.Not.Contain("preserveVolumes"));
         Assert.That(request.InputJson, Does.Not.Contain("VolumeName"));
     }
@@ -887,11 +891,12 @@ public partial class HostedRunnerAuditTests
             disposition,
             CancellationToken.None);
 
-        var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
+        var request = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
         using var input = JsonDocument.Parse(request.InputJson);
         Assert.Multiple(() =>
         {
             Assert.That(request.ActionKey, Is.EqualTo("delete-hosted-runner"));
+            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
             Assert.That(input.RootElement.GetProperty("preserveVolumes").GetBoolean(),
                 Is.EqualTo(expectedPreserveVolumes));
             Assert.That(input.RootElement.GetProperty("systemVolumeName").GetString(),

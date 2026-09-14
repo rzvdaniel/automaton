@@ -66,6 +66,10 @@ public class HostedRunnerManagementService
         }
 
         var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
+        if (hostedRunner.RunnerHost == null)
+            throw new InvalidOperationException("Hosted runner has no assigned host.");
+        if (!hostedRunner.RunnerHost.InfrastructureRunnerId.HasValue)
+            throw new InvalidOperationException("Hosted runner host has no assigned Infrastructure Runner.");
         hostedRunner.Status = HostedRunnerStatuses.Deleting;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         var appAssignments = await db.AppDeploymentTargets
@@ -115,6 +119,10 @@ public class HostedRunnerManagementService
         if (host == null)
         {
             throw new InvalidOperationException("Hosted runner has no assigned host.");
+        }
+        if (!host.InfrastructureRunnerId.HasValue)
+        {
+            throw new InvalidOperationException("Hosted runner host has no assigned Infrastructure Runner.");
         }
         if (!hostedRunner.RunnerId.HasValue)
         {
@@ -274,21 +282,22 @@ public class HostedRunnerManagementService
         CancellationToken cancellationToken)
     {
         var hostId = runner.RunnerHostId ?? throw new InvalidOperationException("Hosted runner has no assigned host.");
-        return eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = deployment.Id,
-            HostedRunnerId = runner.Id,
-            UserId = runner.UserId,
-            RunnerHostId = hostId,
-            ActionKey = "restart-hosted-runner",
-            InputJson = JsonSerializer.Serialize(new
+        var infrastructureRunnerId = runner.RunnerHost?.InfrastructureRunnerId
+            ?? throw new InvalidOperationException("Hosted runner host has no assigned Infrastructure Runner.");
+        return eventPublisher.PublishAsync(new InfrastructureCommandRequestedEvent(
+            CommandId: deployment.Id,
+            OperationId: deployment.Id,
+            RunnerHostId: hostId,
+            InfrastructureRunnerId: infrastructureRunnerId,
+            ActionKey: "restart-hosted-runner",
+            InputJson: JsonSerializer.Serialize(new
             {
                 operationId = deployment.Id,
                 hostedRunnerId = runner.Id,
                 containerName = runner.ContainerName
             }),
-            CorrelationId = Guid.NewGuid().ToString("N")
-        }, cancellationToken);
+            SecretGrantIds: [],
+            CreatedAtUtc: DateTime.UtcNow), cancellationToken);
     }
 
     private Task PublishDeleteActionAsync(
@@ -298,14 +307,15 @@ public class HostedRunnerManagementService
         CancellationToken cancellationToken)
     {
         var hostId = runner.RunnerHostId ?? throw new InvalidOperationException("Hosted runner has no assigned host.");
-        return eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = deployment.Id,
-            HostedRunnerId = runner.Id,
-            UserId = runner.UserId,
-            RunnerHostId = hostId,
-            ActionKey = "delete-hosted-runner",
-            InputJson = JsonSerializer.Serialize(new
+        var infrastructureRunnerId = runner.RunnerHost?.InfrastructureRunnerId
+            ?? throw new InvalidOperationException("Hosted runner host has no assigned Infrastructure Runner.");
+        return eventPublisher.PublishAsync(new InfrastructureCommandRequestedEvent(
+            CommandId: deployment.Id,
+            OperationId: deployment.Id,
+            RunnerHostId: hostId,
+            InfrastructureRunnerId: infrastructureRunnerId,
+            ActionKey: "delete-hosted-runner",
+            InputJson: JsonSerializer.Serialize(new
             {
                 operationId = deployment.Id,
                 hostedRunnerId = runner.Id,
@@ -314,7 +324,7 @@ public class HostedRunnerManagementService
                 systemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                 userVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
             }),
-            CorrelationId = Guid.NewGuid().ToString("N")
-        }, cancellationToken);
+            SecretGrantIds: [],
+            CreatedAtUtc: DateTime.UtcNow), cancellationToken);
     }
 }

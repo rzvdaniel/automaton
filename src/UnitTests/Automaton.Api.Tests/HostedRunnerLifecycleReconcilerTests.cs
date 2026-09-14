@@ -16,7 +16,7 @@ namespace Automaton.Api.Tests;
 public sealed class HostedRunnerLifecycleReconcilerTests
 {
     [Test]
-    public async Task StaleQueuedRestartIsRepublishedOncePerRecoveryInterval()
+    public async Task StaleQueuedRestartIsNotRedispatchedWithoutExecutionRecord()
     {
         await using var db = CreateDb();
         var now = DateTime.UtcNow;
@@ -25,11 +25,26 @@ public sealed class HostedRunnerLifecycleReconcilerTests
         var publisher = new RecordingPublisher();
         var reconciler = CreateReconciler(db, publisher);
 
-        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.EqualTo(1));
         Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        Assert.That(publisher.Messages, Is.Empty);
         var recovered = await db.HostedRunnerDeployments.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
-        Assert.That(recovered.LastRecoveryAttemptUtc, Is.EqualTo(now));
+        Assert.That(recovered.LastRecoveryAttemptUtc, Is.Null);
+    }
+
+    [Test]
+    public async Task StaleStorageVerificationIsLeftToStorageReconciliation()
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var (_, operation) = SeedOperation(db, HostedRunnerDeploymentActions.VerifyStorage, HostedRunnerDeploymentStatuses.Pending, now);
+        await db.SaveChangesAsync();
+        var publisher = new RecordingPublisher();
+
+        Assert.That(await CreateReconciler(db, publisher).ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        Assert.That(publisher.Messages, Is.Empty);
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync(x => x.Id == operation.Id)).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.Pending));
     }
 
     [Test]
@@ -140,7 +155,7 @@ public sealed class HostedRunnerLifecycleReconcilerTests
     private static (HostedRunner Runner, HostedRunnerDeployment Operation) SeedOperation(
         ApplicationDbContext db, string action, string status, DateTime now)
     {
-        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test" };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() };
         var runner = new HostedRunner
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerHostId = host.Id, RunnerHost = host,

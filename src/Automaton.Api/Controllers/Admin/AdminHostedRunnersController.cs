@@ -135,18 +135,22 @@ public class AdminHostedRunnersController : ControllerBase
             (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
         if (existing != null) return Accepted(new { existing.Id, existing.Status });
         if (runner.RunnerHostId == null) return BadRequest(new { message = "The hosted Runner has no assigned Runner Host." });
+        if (!runner.RunnerHost!.InfrastructureRunnerId.HasValue)
+            return BadRequest(new { message = "The hosted Runner host has no assigned Infrastructure Runner." });
         if (action == HostedRunnerDeploymentActions.Resume && runner.EnforcementState != HostedRunnerEnforcementStates.Suspended)
             return Conflict(new { message = "Resume is only available for a suspended Runner." });
         if (action == HostedRunnerDeploymentActions.Suspend && (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended || runner.EnforcementState == HostedRunnerEnforcementStates.ResumePending || runner.EnforcementState == HostedRunnerEnforcementStates.SuspensionPending))
             return Conflict(new { message = "The Runner is already suspended or has a suspension operation in progress." });
         var operation = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = id, Action = action, Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow, Logs = "Administrator requested storage enforcement action." };
-        var message = new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = operation.Id, HostedRunnerId = id, UserId = runner.UserId, RunnerHostId = runner.RunnerHostId.Value,
-            ActionKey = actionKey,
-            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
-            CorrelationId = $"admin-storage-enforcement:{operation.Id:N}"
-        };
+        var message = new InfrastructureCommandRequestedEvent(
+            CommandId: operation.Id,
+            OperationId: operation.Id,
+            RunnerHostId: runner.RunnerHostId.Value,
+            InfrastructureRunnerId: runner.RunnerHost.InfrastructureRunnerId.Value,
+            ActionKey: actionKey,
+            InputJson: JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
+            SecretGrantIds: [],
+            CreatedAtUtc: DateTime.UtcNow);
         await transactionalEventExecutor.ExecuteAsync(async token =>
         {
             db.HostedRunnerDeployments.Add(operation);
