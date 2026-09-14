@@ -267,59 +267,6 @@ public partial class HostedRunnerAuditTests
     }
 
     [Test]
-    public async Task InfrastructureActionHandler_DoesNotReplayProvisioningAfterHostMutationCompleted()
-    {
-        using var db = CreateDbContext();
-        var runner = new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            RunnerHostId = Guid.NewGuid(),
-            Name = "hosted-runner",
-            ContainerName = "automaton-hosted-runner",
-            Status = HostedRunnerStatuses.Provisioning,
-            CreatedAt = DateTime.UtcNow
-        };
-        var deployment = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(),
-            HostedRunnerId = runner.Id,
-            Action = HostedRunnerDeploymentActions.Provision,
-            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
-            Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.",
-            StartedAt = DateTime.UtcNow
-        };
-        runner.Deployments.Add(deployment);
-        db.HostedRunners.Add(runner);
-        db.HostedRunnerDeployments.Add(deployment);
-        db.SaveChanges();
-
-        var handler = new InfrastructureActionProvisioningHandler(
-            db,
-            hub: null!,
-            new NoOpEventPublisher(),
-            new NoOpAuditEventService(),
-            secretGrantService: null!,
-            actionDeploymentService: null!,
-            hostedRunnerOptions: Options.Create(new HostedRunnerOptions()),
-            storageTelemetryOptions: Options.Create(new StorageTelemetryOptions()),
-            logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
-
-        await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
-        {
-            OperationId = deployment.Id,
-            HostedRunnerId = runner.Id,
-            UserId = runner.UserId,
-            RunnerHostId = runner.RunnerHostId!.Value,
-            ActionKey = "provision-hosted-runner",
-            InputJson = "{}"
-        }, CancellationToken.None);
-
-        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
-        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForRegistration));
-    }
-
-    [Test]
     public void AppModuleExecution_HasUniqueHostedRunnerOperationIndex()
     {
         using var db = CreateDbContext();
@@ -328,97 +275,6 @@ public partial class HostedRunnerAuditTests
             x.Properties.Select(p => p.Name).SequenceEqual(new[] { nameof(AppModuleExecution.HostedRunnerOperationId) }));
 
         Assert.That(index.IsUnique, Is.True);
-    }
-
-    [Test]
-    public async Task InfrastructureActionClaim_RollsBackWhenExecutionInsertFailsAndRetrySucceeds()
-    {
-        await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
-        await connection.OpenAsync();
-        var interceptor = new FailExecutionInsertOnceInterceptor();
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlite(connection)
-            .AddInterceptors(interceptor)
-            .Options;
-        await using var db = new ApplicationDbContext(options);
-        await db.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE HostedRunnerDeployments (
-                Id TEXT NOT NULL PRIMARY KEY,
-                HostedRunnerId TEXT NOT NULL,
-                Action TEXT NOT NULL,
-                Status TEXT NOT NULL,
-                CommandPreview TEXT NULL,
-                Logs TEXT NULL,
-                Error TEXT NULL,
-                StartedAt TEXT NOT NULL,
-                RegistrationDeadlineUtc TEXT NULL,
-                ExpectedRunnerId TEXT NULL,
-                PreviousConnectionId TEXT NULL,
-                ReconnectAfterUtc TEXT NULL,
-                ReconnectDeadlineUtc TEXT NULL,
-                LastRecoveryAttemptUtc TEXT NULL,
-                FinishedAt TEXT NULL
-            );
-            CREATE TABLE AppModuleExecutions (
-                Id TEXT NOT NULL PRIMARY KEY,
-                HostedRunnerOperationId TEXT NULL,
-                ScheduleOccurrenceId TEXT NULL,
-                AppId TEXT NOT NULL,
-                DeploymentTargetId TEXT NOT NULL,
-                ModuleType TEXT NOT NULL,
-                ModuleKey TEXT NOT NULL,
-                RunnerId TEXT NULL,
-                TriggerType TEXT NOT NULL,
-                RequestedByUserId TEXT NULL,
-                Status TEXT NOT NULL,
-                DeploymentHash TEXT NULL,
-                ExitCode INTEGER NULL,
-                ErrorCode TEXT NULL,
-                FailureSummary TEXT NULL,
-                CreatedAtUtc TEXT NOT NULL,
-                StartedAtUtc TEXT NULL,
-                ExecutionDeadlineUtc TEXT NULL,
-                CompletedAtUtc TEXT NULL,
-                LogsAvailableUntilUtc TEXT NULL,
-                ResultAvailableUntilUtc TEXT NULL,
-                CorrelationId TEXT NULL
-            );
-            CREATE UNIQUE INDEX IX_AppModuleExecutions_HostedRunnerOperationId
-                ON AppModuleExecutions (HostedRunnerOperationId);
-            """);
-        var deployment = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(),
-            HostedRunnerId = Guid.NewGuid(),
-            Action = HostedRunnerDeploymentActions.Restart,
-            Status = HostedRunnerDeploymentStatuses.Queued,
-            StartedAt = DateTime.UtcNow
-        };
-        db.HostedRunnerDeployments.Add(deployment);
-        await db.SaveChangesAsync();
-        var handler = new InfrastructureActionProvisioningHandler(
-            db, null!, null!, null!, null!, null!, Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()),
-            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
-
-        Assert.ThrowsAsync<LifecycleClaimPersistenceException>(() =>
-            handler.TryClaimAndCreateExecutionAsync(
-                deployment,
-                CreateInfrastructureExecution(deployment.Id),
-                CancellationToken.None));
-
-        db.ChangeTracker.Clear();
-        var retryDeployment = await db.HostedRunnerDeployments.SingleAsync(x => x.Id == deployment.Id);
-        Assert.That(retryDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
-
-        var claimed = await handler.TryClaimAndCreateExecutionAsync(
-            retryDeployment,
-            CreateInfrastructureExecution(deployment.Id),
-            CancellationToken.None);
-
-        Assert.That(claimed, Is.True);
-        Assert.That(retryDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Executing));
-        Assert.That(await db.AppModuleExecutions.CountAsync(x => x.HostedRunnerOperationId == deployment.Id), Is.EqualTo(1));
     }
 
     [Test]
@@ -573,10 +429,9 @@ public partial class HostedRunnerAuditTests
             ExpectedRunnerId = runnerId
         };
         var handler = new InfrastructureActionProvisioningHandler(
-            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
+            db, new NoOpAuditEventService(),
             Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
-            Options.Create(new StorageTelemetryOptions()),
-            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+            Options.Create(new StorageTelemetryOptions()));
         using var result = JsonDocument.Parse("{}");
 
         await handler.ApplySuccessfulOperationAsync(
@@ -597,9 +452,8 @@ public partial class HostedRunnerAuditTests
         var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = HostedRunnerStatuses.Provisioning };
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id, Status = HostedRunnerDeploymentStatuses.Executing };
         var handler = new InfrastructureActionProvisioningHandler(
-            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
-            Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()),
-            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()));
         using var document = JsonDocument.Parse(json);
 
         Assert.ThrowsAsync<InvalidOperationException>(() => handler.ApplySuccessfulOperationAsync(
@@ -615,9 +469,8 @@ public partial class HostedRunnerAuditTests
         var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = HostedRunnerStatuses.Provisioning };
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id, Status = HostedRunnerDeploymentStatuses.Executing };
         var handler = new InfrastructureActionProvisioningHandler(
-            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
-            Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()),
-            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()));
         using var document = JsonDocument.Parse("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\"}");
 
         await handler.ApplySuccessfulOperationAsync(
@@ -862,7 +715,6 @@ public partial class HostedRunnerAuditTests
 
         var request = publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
         Assert.That(request.ActionKey, Is.EqualTo("restart-hosted-runner"));
-        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
         Assert.That(request.CommandId, Is.EqualTo(request.OperationId));
         Assert.That(request.RunnerHostId, Is.EqualTo(hostedRunner.RunnerHostId));
         Assert.That(request.InfrastructureRunnerId, Is.EqualTo(hostedRunner.RunnerHost!.InfrastructureRunnerId));
@@ -896,7 +748,6 @@ public partial class HostedRunnerAuditTests
         Assert.Multiple(() =>
         {
             Assert.That(request.ActionKey, Is.EqualTo("delete-hosted-runner"));
-            Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>(), Is.Empty);
             Assert.That(input.RootElement.GetProperty("preserveVolumes").GetBoolean(),
                 Is.EqualTo(expectedPreserveVolumes));
             Assert.That(input.RootElement.GetProperty("systemVolumeName").GetString(),
