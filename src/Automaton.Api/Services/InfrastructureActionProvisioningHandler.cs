@@ -152,6 +152,7 @@ public sealed class InfrastructureActionProvisioningHandler(
             hostedRunner.RunnerId = null;
             hostedRunner.ContainerId = null;
             hostedRunner.RuntimeEndpoint = null;
+            hostedRunner.RuntimePort = null;
             hostedRunner.Status = HostedRunnerStatuses.Deleted;
             hostedRunner.DeletedAt = DateTime.UtcNow;
         }
