@@ -130,72 +130,129 @@ public static class PullCommand
         }
 
         var downloads = PrepareDownloads(sourceFiles, targetDir);
-        Directory.CreateDirectory(targetDir);
         WriteStart(nonInteractive, appName, targetDir);
 
-        await DownloadFilesAsync(client, appId, downloads, nonInteractive);
-
-        var pulledConfig = config.TryLoadProjectConfig(targetDir);
-        if (pulledConfig == null)
-        {
-            pulledConfig = new AutomatonConfig
-            {
-                Name = appName,
-                Slug = slug,
-                Application = application
-            };
-        }
-        else
-        {
-            pulledConfig.Name = appName;
-            pulledConfig.Slug = slug;
-            pulledConfig.Application = application;
-        }
-
-        config.SaveProjectConfig(targetDir, pulledConfig);
-        var selectedEnvironmentName = resolved.EnvironmentName ?? ConfigService.DefaultEnvironmentName;
-        var environment = config.LoadNamedEnvironmentConfig(targetDir, selectedEnvironmentName) ?? new GlobalConfig();
-        environment.Server = server;
-        environment.ApiKey = apiKey;
-        environment.AppId = appId;
-        config.SaveNamedEnvironmentConfig(targetDir, selectedEnvironmentName, environment);
-        config.SaveProjectEnvironmentSelection(
-            targetDir,
-            new ProjectEnvironmentSelection { Default = selectedEnvironmentName });
-
-        string? guidanceWarning = null;
-        AiGuidanceSyncResult? guidance = null;
+        var targetExisted = Directory.Exists(targetDir);
+        var stagingDirectory = CreateStagingDirectory(targetDir);
         try
         {
-            var guidanceReferences = await client.GetAiGuidanceExportAsync();
-            guidance = new AiGuidancePackService().Sync(targetDir, guidanceReferences);
+            var stagedDownloads = downloads
+                .Select(download => download with
+                {
+                    LocalPath = Path.Combine(stagingDirectory, Path.GetRelativePath(targetDir, download.LocalPath))
+                })
+                .ToList();
+
+            await DownloadFilesAsync(client, appId, stagedDownloads, nonInteractive);
+
+            var pulledConfig = config.TryLoadProjectConfig(stagingDirectory);
+            if (pulledConfig == null)
+            {
+                pulledConfig = new AutomatonConfig
+                {
+                    Name = appName,
+                    Slug = slug,
+                    Application = application
+                };
+            }
+            else
+            {
+                pulledConfig.Name = appName;
+                pulledConfig.Slug = slug;
+                pulledConfig.Application = application;
+            }
+
+            config.SaveProjectConfig(stagingDirectory, pulledConfig);
+            var selectedEnvironmentName = resolved.EnvironmentName ?? ConfigService.DefaultEnvironmentName;
+            var environment = config.LoadNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName) ?? new GlobalConfig();
+            environment.Server = server;
+            environment.ApiKey = apiKey;
+            environment.AppId = appId;
+            config.SaveNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName, environment);
+            config.SaveProjectEnvironmentSelection(
+                stagingDirectory,
+                new ProjectEnvironmentSelection { Default = selectedEnvironmentName });
+
+            string? guidanceWarning = null;
+            AiGuidanceSyncResult? guidance = null;
+            try
+            {
+                var guidanceReferences = await client.GetAiGuidanceExportAsync();
+                guidance = new AiGuidancePackService().Sync(stagingDirectory, guidanceReferences);
+            }
+            catch (Exception ex)
+            {
+                guidanceWarning = $"Latest AI guidance unavailable: {ex.Message}";
+            }
+
+            CommitStagedProject(stagingDirectory, targetDir, targetExisted);
+
+            if (nonInteractive)
+            {
+                Console.WriteLine(guidance is null ? "Wrote automaton.json" : $"Wrote automaton.json ({guidance.Mode})");
+                Console.WriteLine($"Linked app: {appId}");
+                if (!string.IsNullOrWhiteSpace(guidanceWarning))
+                {
+                    Console.WriteLine($"Warning: {guidanceWarning}");
+                }
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Wrote [bold]automaton.json[/] and linked app [cyan]{appId}[/]");
+                if (guidance is not null)
+                {
+                    AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
+                }
+                else if (!string.IsNullOrWhiteSpace(guidanceWarning))
+                {
+                    AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
+                }
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            guidanceWarning = $"Latest AI guidance unavailable: {ex.Message}";
+            if (Directory.Exists(stagingDirectory))
+            {
+                Directory.Delete(stagingDirectory, recursive: true);
+            }
+        }
+    }
+
+    internal static string CreateStagingDirectory(string targetDirectory)
+    {
+        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+        var parent = Directory.GetParent(fullTargetDirectory)?.FullName
+            ?? throw new InvalidOperationException("The pull target must have a parent directory.");
+        Directory.CreateDirectory(parent);
+
+        var stagingDirectory = Path.Combine(parent, $".{Path.GetFileName(fullTargetDirectory)}.pulling-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(stagingDirectory);
+        return stagingDirectory;
+    }
+
+    internal static void CommitStagedProject(string stagingDirectory, string targetDirectory, bool targetExisted)
+    {
+        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+        if (!targetExisted)
+        {
+            Directory.Move(stagingDirectory, fullTargetDirectory);
+            return;
         }
 
-        if (nonInteractive)
+        foreach (var entry in Directory.EnumerateFileSystemEntries(stagingDirectory))
         {
-            Console.WriteLine(guidance is null ? "Wrote automaton.json" : $"Wrote automaton.json ({guidance.Mode})");
-            Console.WriteLine($"Linked app: {appId}");
-            if (!string.IsNullOrWhiteSpace(guidanceWarning))
+            var destination = Path.Combine(fullTargetDirectory, Path.GetFileName(entry));
+            if (Directory.Exists(entry))
             {
-                Console.WriteLine($"Warning: {guidanceWarning}");
+                Directory.Move(entry, destination);
+            }
+            else
+            {
+                File.Move(entry, destination);
             }
         }
-        else
-        {
-            AnsiConsole.MarkupLine($"[green]✓[/] Wrote [bold]automaton.json[/] and linked app [cyan]{appId}[/]");
-            if (guidance is not null)
-            {
-                AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
-            }
-            else if (!string.IsNullOrWhiteSpace(guidanceWarning))
-            {
-                AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
-            }
-        }
+
+        Directory.Delete(stagingDirectory);
     }
 
     private static ApplicationContract ReadApplicationContract(JsonElement app)
@@ -256,13 +313,24 @@ public static class PullCommand
         IReadOnlyList<SourceDownload> downloads,
         bool nonInteractive)
     {
+        await DownloadFilesAsync(
+            downloads,
+            remotePath => client.ReadScopedFileAsync(appId, "source", remotePath),
+            nonInteractive);
+    }
+
+    internal static async Task DownloadFilesAsync(
+        IReadOnlyList<SourceDownload> downloads,
+        Func<string, Task<string>> readFile,
+        bool nonInteractive)
+    {
         var written = 0;
 
         if (nonInteractive)
         {
             foreach (var download in downloads)
             {
-                await DownloadFileAsync(client, appId, download);
+                await DownloadFileAsync(download, readFile);
                 written++;
             }
 
@@ -276,7 +344,7 @@ public static class PullCommand
                 var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: downloads.Count);
                 foreach (var download in downloads)
                 {
-                    await DownloadFileAsync(client, appId, download);
+                    await DownloadFileAsync(download, readFile);
                     written++;
                     task.Increment(1);
                 }
@@ -285,9 +353,9 @@ public static class PullCommand
         AnsiConsole.MarkupLine($"[green]✓[/] Downloaded [bold]{written}[/] file(s)");
     }
 
-    private static async Task DownloadFileAsync(AutomatonApiClient client, string appId, SourceDownload download)
+    private static async Task DownloadFileAsync(SourceDownload download, Func<string, Task<string>> readFile)
     {
-        var content = await client.ReadScopedFileAsync(appId, "source", download.RemotePath);
+        var content = await readFile(download.RemotePath);
         Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
         await File.WriteAllTextAsync(download.LocalPath, content, Encoding.UTF8);
     }

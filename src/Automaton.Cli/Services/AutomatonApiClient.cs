@@ -483,7 +483,7 @@ public class AutomatonApiClient : IDisposable
 
     public async Task<string> ReadFileAsync(string appId, string path, CancellationToken ct = default)
     {
-        var encoded = Uri.EscapeDataString(path);
+        var encoded = EncodeCatchAllPath(path);
         using var resp = await _http.GetAsync($"api/apps/{appId}/files/{encoded}", ct);
         await EnsureSuccessAsync(resp);
         var body = await resp.Content.ReadAsStringAsync(ct);
@@ -493,11 +493,17 @@ public class AutomatonApiClient : IDisposable
     public async Task<string> ReadScopedFileAsync(string appId, string scope, string path, CancellationToken ct = default)
     {
         var encodedScope = Uri.EscapeDataString(scope);
-        var encodedPath = Uri.EscapeDataString(path);
+        var encodedPath = EncodeCatchAllPath(path);
         using var resp = await _http.GetAsync($"api/apps/{appId}/filesystem/{encodedScope}/{encodedPath}", ct);
         await EnsureSuccessAsync(resp);
         var body = await resp.Content.ReadAsStringAsync(ct);
         return UnwrapFileContent(body);
+    }
+
+    internal static string EncodeCatchAllPath(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        return string.Join('/', normalized.Split('/', StringSplitOptions.None).Select(Uri.EscapeDataString));
     }
 
     public async Task<IReadOnlyList<GuidanceSource>> GetAiGuidanceExportAsync(CancellationToken ct = default)
