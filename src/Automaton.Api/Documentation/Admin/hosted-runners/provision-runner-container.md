@@ -49,6 +49,6 @@ In **Administration → Hosted Runners → Runner Containers**, select the exist
 - **Suspend** is available when the enforcement state is not already suspended or transitioning. Confirm the action before submitting it.
 - **Resume** is available only when the enforcement state is **Suspended**.
 - **Reprovision** replaces the managed container through the Hosted Runner lifecycle.
-- **Delete hosted runner** removes the managed container and lets you choose whether its persistent data is preserved or permanently deleted. The permanent-delete option requires typing the Runner name and cannot be undone.
+- **Delete hosted runner** stops the managed Runner and any Automaton app/build runtime containers that use its storage volumes, then lets you choose whether the persistent data is preserved or permanently deleted. The permanent-delete option requires typing the Runner name and cannot be undone. If a volume is still in use by a container that cannot be verified as owned by this Hosted Runner, deletion fails safely and can be retried through the canonical lifecycle after the conflict is resolved.
 
 These controls require administrator access. The API validates the current lifecycle state and remains authoritative if the state changes between refreshes. While an action is pending, its control is disabled to prevent duplicate requests.
