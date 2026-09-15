@@ -27,7 +27,7 @@ PUBLIC_IP_WAS_EXPLICIT=false
 PRIVATE_IP_WAS_EXPLICIT=false
 
 usage() {
-  echo "Usage: $0 [install|update|repair|replace] [--version IMAGE] [installer options]" >&2
+  echo "Usage: $0 [install|update|repair|replace] [--version IMAGE_REFERENCE] [installer options]" >&2
 }
 
 if [[ $# -gt 0 && "$1" != --* ]]; then OPERATION="$1"; shift; fi
@@ -59,6 +59,23 @@ exec 9>"$AUTOMATON_DATA_ROOT/update.lock"
 flock -n 9 || { echo "Another Infrastructure Runner lifecycle operation is already running on this host." >&2; exit 75; }
 
 existing_env() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null | sed -n "s/^$1=//p" | head -n 1; }
+is_valid_runner_image_reference() {
+  local image="$1"
+  local component='[a-z0-9]+(([.]|__|_|-+)[a-z0-9]+)*'
+  local remote_name="${component}(/${component})*"
+  local domain_component='[A-Za-z0-9]+([.-][A-Za-z0-9]+)*'
+  local domain="(${domain_component}|\\[[A-Fa-f0-9:]+\\])(:[0-9]+)?"
+  local tag='[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}'
+  local pattern="^(${domain}/)?${remote_name}(:${tag}|@sha256:[a-f0-9]{64})$"
+  [[ ! "$image" =~ ^sha256:[a-f0-9]{64}$ ]] || return 1
+  [[ "$image" =~ $pattern ]]
+}
+validate_runner_image_reference() {
+  if ! is_valid_runner_image_reference "$1"; then
+    echo "Invalid Infrastructure Runner image reference. Use repository:tag or repository@sha256:<64 lowercase hex characters>." >&2
+    return 1
+  fi
+}
 load_installation_configuration() {
   [[ -r "$INSTALLATION_CONFIG_FILE" ]] || return 0
   # This file is written by this installer with shell-escaped values and contains no credentials.
@@ -150,13 +167,17 @@ if [[ "$OPERATION" == replace && -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROL
   echo "replace requires a fresh enrollment key or token." >&2; exit 1
 fi
 
+validate_runner_image_reference "$AUTOMATON_RUNNER_IMAGE"
 load_rabbitmq_configuration
 
 resolve_image() {
   docker pull "$AUTOMATON_RUNNER_IMAGE" >&2
   local digest
   digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$AUTOMATON_RUNNER_IMAGE" 2>/dev/null || true)"
-  [[ "$digest" == *@sha256:* ]] || { echo "Unable to resolve an immutable digest for $AUTOMATON_RUNNER_IMAGE." >&2; exit 1; }
+  if ! is_valid_runner_image_reference "$digest" || [[ "$digest" != *@sha256:* ]]; then
+    echo "Unable to resolve an immutable digest for $AUTOMATON_RUNNER_IMAGE." >&2
+    exit 1
+  fi
   AUTOMATON_RUNNER_IMAGE="$digest"
 }
 
@@ -172,7 +193,7 @@ run_canonical_container() {
   chmod 600 "$runtime_env_file"
   cp "$RABBITMQ_CONFIG_FILE" "$runtime_env_file"
   local args=(run -d --name "$AUTOMATON_CONTAINER_NAME" --restart unless-stopped --privileged --user 0:0 --pid host --network host
-    --label "automaton.installation-id=$id" --label "automaton.runner-version=${image#*:}" --label "automaton.image-digest=$digest" --label "automaton.specification-version=$SPECIFICATION_VERSION"
+    --label "automaton.installation-id=$id" --label "automaton.runner-version=${digest##*@sha256:}" --label "automaton.image-digest=$digest" --label "automaton.specification-version=$SPECIFICATION_VERSION"
     -v /var/run/docker.sock:/var/run/docker.sock -v /:/host
     -v "$AUTOMATON_DATA_ROOT/config:/app/config" -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace" \
     -e AUTOMATON_HOST_WORKSPACE_ROOT="$AUTOMATON_DATA_ROOT/workflows"
