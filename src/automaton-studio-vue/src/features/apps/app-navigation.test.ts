@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   APP_NAVIGATION_GROUPS,
   DEFAULT_APP_VIEW,
+  resolveAppView,
+  withoutAuthoringQuery,
 } from './app-navigation'
 
 describe('app operations navigation', () => {
-  it('opens on Overview and puts operational destinations before legacy authoring', () => {
+  it('opens on Overview and exposes only operational destinations', () => {
     expect(DEFAULT_APP_VIEW).toBe('overview')
     expect(APP_NAVIGATION_GROUPS.map((group) => group.label)).toEqual([
       'Operate',
       'Manage',
-      'Legacy authoring',
     ])
     expect(APP_NAVIGATION_GROUPS[0]?.items.map((item) => item.label)).toEqual([
       'Overview',
@@ -21,13 +22,21 @@ describe('app operations navigation', () => {
     ])
   })
 
-  it('keeps source authoring reachable only in the transitional group', () => {
-    const legacyGroup = APP_NAVIGATION_GROUPS.find((group) => group.label === 'Legacy authoring')
+  it('falls back to Overview for removed authoring views and unknown values', () => {
+    expect(resolveAppView('runtime')).toBe('runtime')
+    expect(resolveAppView('build')).toBe('overview')
+    expect(resolveAppView('files')).toBe('overview')
+    expect(resolveAppView('unknown')).toBe('overview')
+  })
 
-    expect(legacyGroup?.description).toBe('Temporary access before Stage 2')
-    expect(legacyGroup?.items.map((item) => item.label)).toEqual([
-      'AI workspace',
-      'Source editor',
-    ])
+  it('removes prompt and authoring-view deep links without dropping operational context', () => {
+    expect(withoutAuthoringQuery({
+      prompt: 'build an app',
+      mode: 'agent',
+      model: 'legacy',
+      tab: 'files',
+      view: 'build',
+      target: 'live',
+    })).toEqual({ target: 'live' })
   })
 })

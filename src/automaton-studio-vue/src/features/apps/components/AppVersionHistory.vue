@@ -1,12 +1,10 @@
 <script setup lang="ts">
 /**
  * AppVersionHistory.vue
- * Displays app restore history and allows restoration from previous snapshots
- * Shows timeline of snapshots with triggers and summaries
+ * Displays read-only source snapshot history.
  */
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Divider from 'primevue/divider'
@@ -26,23 +24,13 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{
-  versionRestored: [versionNumber: number]
-  versionCreated: []
-}>()
-
 const toast = useToast()
-const confirm = useConfirm()
 
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
-const isCreatingSnapshot = ref(false)
-const isRestoringVersion = ref(false)
 const versionList = ref<AppVersionList | null>(null)
 const selectedVersion = ref<AppVersionDetail | null>(null)
 const showVersionDetail = ref(false)
-const showSnapshotDialog = ref(false)
-const snapshotSummary = ref('')
 const searchQuery = ref('')
 const versionsPageSize = 20
 
@@ -228,73 +216,6 @@ const parsedFileChanges = computed(() => {
 })
 
 /**
- * Open the snapshot dialog to let the user enter a summary
- */
-function openSnapshotDialog() {
-  snapshotSummary.value = ''
-  showSnapshotDialog.value = true
-}
-
-/**
- * Create a manual version snapshot
- */
-async function createSnapshot() {
-  showSnapshotDialog.value = false
-  isCreatingSnapshot.value = true
-  try {
-    await appsService.createVersionSnapshot(props.appId, 'ManualSave', snapshotSummary.value || undefined, 'Studio', 'Manual')
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Source snapshot created',
-      life: 3000,
-    })
-    emit('versionCreated')
-    await loadVersions()
-  } catch (error: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to create source snapshot',
-      life: 5000,
-    })
-  } finally {
-    isCreatingSnapshot.value = false
-  }
-}
-
-/**
- * Restore app to a previous version
- */
-async function restoreVersion(versionNumber: number) {
-  confirm.require({
-    message: `Restore source snapshot ${versionNumber}? This replaces Studio's server-side source copy. It does not deploy the source or roll back the running application.`,
-    header: 'Restore source snapshot?',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Restore source',
-    rejectLabel: 'Cancel',
-    accept: async () => {
-      isRestoringVersion.value = true
-      try {
-        await appsService.restoreVersion(props.appId, versionNumber)
-        emit('versionRestored', versionNumber)
-        showVersionDetail.value = false
-        await loadVersions()
-      } catch (error: unknown) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: error instanceof Error ? error.message : 'Failed to restore app to this point',
-          life: 5000,
-        })
-      } finally {
-        isRestoringVersion.value = false
-      }
-    },
-  })
-}
-
-/**
  * Get trigger label for display
  */
 function getTriggerLabel(trigger: string): string {
@@ -434,15 +355,6 @@ defineExpose({
         <i class="pi pi-history text-lg"></i>
         <h3>{{ title || 'Source snapshots' }}</h3>
       </div>
-      <Button
-        v-tooltip.left="'Create manual source snapshot'"
-        icon="pi pi-camera"
-        size="small"
-        rounded
-        text
-        :loading="isCreatingSnapshot"
-        @click="openSnapshotDialog"
-      />
     </div>
 
     <Divider />
@@ -476,13 +388,6 @@ defineExpose({
       <p class="text-sm text-color-secondary mb-3">
         Source snapshots record Studio's server-side source copy. They do not represent deployed runtime versions.
       </p>
-      <Button
-        label="Create source snapshot"
-        icon="pi pi-camera"
-        size="small"
-        :loading="isCreatingSnapshot"
-        @click="openSnapshotDialog"
-      />
     </div>
 
     <!-- Version list -->
@@ -513,14 +418,6 @@ defineExpose({
                   size="small"
                   text
                   @click="viewVersionDetail(version)"
-                />
-                <Button
-                  v-tooltip.top="'Restore this source snapshot'"
-                  icon="pi pi-refresh"
-                  size="small"
-                  text
-                  severity="warn"
-                  @click="restoreVersion(version.versionNumber)"
                 />
               </div>
             </div>
@@ -708,51 +605,6 @@ defineExpose({
           icon="pi pi-times"
           text
           @click="showVersionDetail = false"
-        />
-        <Button
-          label="Restore source"
-          icon="pi pi-refresh"
-          severity="warn"
-          :loading="isRestoringVersion"
-          @click="selectedVersion && restoreVersion(selectedVersion.versionNumber)"
-        />
-      </template>
-    </Dialog>
-
-    <!-- Create Snapshot Dialog -->
-    <Dialog
-      v-model:visible="showSnapshotDialog"
-      modal
-      header="Create source snapshot"
-      :style="{ width: '420px' }"
-    >
-      <div class="snapshot-dialog">
-        <p class="text-color-secondary mb-3">
-          Capture Studio's current server-side source copy. This does not deploy the source or create a runtime rollback point.
-        </p>
-        <div class="field">
-          <label for="snapshotSummary" class="block font-semibold mb-2">Summary (optional)</label>
-          <InputText
-            id="snapshotSummary"
-            v-model="snapshotSummary"
-            placeholder="e.g. Added login form and navigation"
-            class="w-full"
-            autofocus
-            @keyup.enter="createSnapshot"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <Button
-          label="Cancel"
-          text
-          @click="showSnapshotDialog = false"
-        />
-        <Button
-          label="Create source snapshot"
-          icon="pi pi-camera"
-          :loading="isCreatingSnapshot"
-          @click="createSnapshot"
         />
       </template>
     </Dialog>

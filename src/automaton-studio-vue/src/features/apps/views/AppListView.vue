@@ -9,7 +9,6 @@ import Tag from 'primevue/tag'
 import Dropdown from 'primevue/dropdown'
 import MultiSelect from 'primevue/multiselect'
 import Skeleton from 'primevue/skeleton'
-import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
@@ -26,8 +25,6 @@ import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
-const apiBase = import.meta.env.VITE_API_BASE_URL || ''
-
 const router = useRouter()
 const toast = useToast()
 const appsStore = useAppsStore()
@@ -70,56 +67,8 @@ const viewOptions = ref([
 const activeTabIndex = ref(0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
-  { label: 'Templates', icon: 'pi pi-star' },
   { label: 'How to Build', icon: 'pi pi-book' },
 ])
-
-// Templates state
-const templates = ref<App[]>([])
-const isLoadingTemplates = ref(false)
-const isForkingId = ref<string | null>(null)
-
-const fetchTemplates = async () => {
-  isLoadingTemplates.value = true
-  try {
-    templates.value = await appsService.getTemplates()
-  } catch {
-    // silence — templates just won't show
-  } finally {
-    isLoadingTemplates.value = false
-  }
-}
-
-const handleUseTemplate = async (template: App) => {
-  isForkingId.value = template.id
-  try {
-    const newApp = await appsStore.forkTemplate(template.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Template Remixed',
-      detail: `"${newApp.name}" has been added to your apps`,
-      life: 4000,
-    })
-    activeTabIndex.value = 0
-    router.push(`/apps/${newApp.id}`)
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to use template'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    })
-  } finally {
-    isForkingId.value = null
-  }
-}
-
-watch(activeTabIndex, (index) => {
-  if (index === 1 && templates.value.length === 0) {
-    fetchTemplates()
-  }
-})
 
 // Local state
 const searchQuery = ref('')
@@ -154,16 +103,6 @@ const tagOptions = computed(() => {
     .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
     .map((tag) => ({ label: tag, value: tag }))
 })
-
-// Quick-start how-to tab
-
-// Create dialog state
-const showCreateDialog = ref(false)
-const newAppName = ref('')
-const selectedRunnerId = ref<string | null>(null)
-const isCreating = ref(false)
-const importInput = ref<HTMLInputElement | null>(null)
-const isImporting = ref(false)
 
 // Publish dialog state
 const showPublishDialog = ref(false)
@@ -233,61 +172,6 @@ onUnmounted(() => {
 })
 
 // Handlers
-const openCreateDialog = () => {
-  newAppName.value = ''
-  selectedRunnerId.value = null
-  showCreateDialog.value = true
-}
-
-const handleCreateApp = async () => {
-  if (!newAppName.value.trim()) return
-  isCreating.value = true
-  try {
-    const app = await appsStore.createApp({ name: newAppName.value.trim(), executionRunnerId: selectedRunnerId.value ?? undefined })
-    showCreateDialog.value = false
-    router.push(`/apps/${app.id}`)
-  } finally {
-    isCreating.value = false
-  }
-}
-
-const openImportDialog = () => {
-  importInput.value?.click()
-}
-
-const handleImportSelected = async (event: Event) => {
-  const input = event.target as HTMLInputElement | null
-  const file = input?.files?.[0]
-  if (!file) {
-    return
-  }
-
-  isImporting.value = true
-  try {
-    const app = await appsStore.importApp(file)
-    toast.add({
-      severity: 'success',
-      summary: 'Imported',
-      detail: `App "${app.name}" imported successfully`,
-      life: 4000,
-    })
-    router.push(`/apps/${app.id}`)
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to import app'
-    toast.add({
-      severity: 'error',
-      summary: 'Import Failed',
-      detail: message,
-      life: 5000,
-    })
-  } finally {
-    isImporting.value = false
-    if (input) {
-      input.value = ''
-    }
-  }
-}
-
 const viewPublicApps = () => {
   if (authStore.publicUsername) {
     window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
@@ -347,29 +231,13 @@ const handleRetry = async () => {
 
 <template>
   <div class="apps-view">
-    <input
-      ref="importInput"
-      type="file"
-      accept=".zip,application/zip"
-      class="hidden"
-      @change="handleImportSelected"
-    />
-
     <!-- Page Header -->
     <div class="flex align-items-center justify-content-between mb-5">
       <div>
         <h1 class="text-3xl font-bold m-0">Apps</h1>
-        <p class="text-color-secondary mt-1 mb-0">Build and publish web applications</p>
+        <p class="text-color-secondary mt-1 mb-0">Operate and publish your applications</p>
       </div>
       <div class="flex gap-2">
-        <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
-        <Button
-          label="Import App"
-          icon="pi pi-upload"
-          outlined
-          :loading="isImporting"
-          @click="openImportDialog"
-        />
         <Button
           label="View Public Apps"
           icon="pi pi-external-link"
@@ -379,7 +247,7 @@ const handleRetry = async () => {
       </div>
     </div>
 
-    <!-- Tabs: My Apps / Templates -->
+    <!-- Apps and local build guidance -->
     <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
@@ -498,7 +366,7 @@ const handleRetry = async () => {
               </div>
             </div>
             <div class="text-sm text-color-secondary">{{ getDeploymentSummary(app) }}</div>
-            <Button label="Edit" icon="pi pi-pencil" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
+            <Button label="Manage" icon="pi pi-cog" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
           </div>
         </div>
       </div>
@@ -534,9 +402,9 @@ const handleRetry = async () => {
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
             <p class="text-color-secondary mb-4">
-              Create an app from scratch, import an existing project, or start from a template.
+              Create and deploy an app from your local project with Automaton CLI.
             </p>
-            <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
+            <Button label="View build instructions" icon="pi pi-book" @click="activeTabIndex = 1" />
           </div>
         </template>
       </Card>
@@ -545,7 +413,7 @@ const handleRetry = async () => {
     </template><!-- /v-if="activeTabIndex === 0" -->
 
     <!-- ─── HOW TO BUILD TAB ─────────────────────────────────────────── -->
-    <template v-if="activeTabIndex === 2">
+    <template v-if="activeTabIndex === 1">
       <Card class="quick-start-card">
         <template #content>
           <div class="quick-start-header mb-3">
@@ -597,123 +465,7 @@ const handleRetry = async () => {
 
         </template>
       </Card>
-    </template><!-- /v-if="activeTabIndex === 2" -->
-
-    <!-- ─── TEMPLATES TAB ────────────────────────────────────────────── -->
-    <template v-if="activeTabIndex === 1">
-      <!-- Loading -->
-      <div v-if="isLoadingTemplates" class="grid">
-        <div v-for="i in 6" :key="i" class="col-12 md:col-6 lg:col-4">
-          <Card class="h-full">
-            <template #content>
-              <div class="flex flex-column gap-3">
-                <Skeleton width="70%" height="1.5rem" />
-                <Skeleton width="100%" height="3rem" />
-                <Skeleton width="5rem" height="1.5rem" border-radius="1rem" />
-                <Skeleton width="100%" height="2.5rem" />
-              </div>
-            </template>
-          </Card>
-        </div>
-      </div>
-
-      <!-- Empty -->
-      <Card v-else-if="templates.length === 0">
-        <template #content>
-          <div class="text-center py-5">
-            <i class="pi pi-star text-6xl text-color-secondary mb-4"></i>
-            <h3 class="text-xl font-semibold mb-2">No templates yet</h3>
-            <p class="text-color-secondary mb-0">
-              Published template apps will appear here so you can remix them into your account.
-            </p>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Template Cards -->
-      <div v-else class="grid">
-        <div
-          v-for="template in templates"
-          :key="template.id"
-          class="col-12 md:col-6 lg:col-4"
-        >
-          <Card class="template-card h-full">
-            <template #header>
-              <div class="template-thumbnail">
-                <img
-                  v-if="template.thumbnailUrl"
-                  :src="template.thumbnailUrl.startsWith('http') ? template.thumbnailUrl : `${apiBase}${template.thumbnailUrl}`"
-                  :alt="template.name"
-                  loading="lazy"
-                />
-                <div v-else class="template-thumbnail-placeholder flex align-items-center justify-content-center">
-                  <i class="pi pi-globe text-4xl text-color-secondary"></i>
-                </div>
-                <Tag v-if="template.isFeatured" value="Featured" severity="warn" class="featured-badge" />
-              </div>
-            </template>
-            <template #title>{{ template.name }}</template>
-            <template #subtitle>
-              <Tag v-if="template.category" :value="template.category" severity="secondary" class="text-xs mr-1" />
-              <span class="text-color-secondary text-sm">{{ template.viewCount }} views</span>
-            </template>
-            <template #content>
-              <p v-if="template.description" class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-                {{ template.description }}
-              </p>
-              <p v-else-if="template.summary" class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-                {{ template.summary }}
-              </p>
-              <Button
-                label="Use Template"
-                icon="pi pi-copy"
-                class="w-full"
-                :loading="isForkingId === template.id"
-                :disabled="isForkingId !== null"
-                @click="handleUseTemplate(template)"
-              />
-            </template>
-          </Card>
-        </div>
-      </div>
     </template><!-- /v-if="activeTabIndex === 1" -->
-
-    <!-- Create App Dialog -->
-    <Dialog
-      v-model:visible="showCreateDialog"
-      modal
-      header="Create New App"
-      :style="{ width: '450px' }"
-      :closable="!isCreating"
-      :close-on-escape="!isCreating"
-    >
-      <div class="flex flex-column gap-3">
-        <div class="flex flex-column gap-2">
-          <label for="app-name" class="font-semibold">App Name</label>
-          <InputText
-            id="app-name"
-            v-model="newAppName"
-            placeholder="Enter app name"
-            class="w-full"
-            :disabled="isCreating"
-            autofocus
-            @keyup.enter="handleCreateApp"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-content-end gap-2">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            outlined
-            :disabled="isCreating"
-            @click="showCreateDialog = false"
-          />
-          <Button label="Create" icon="pi pi-plus" :loading="isCreating" @click="handleCreateApp" />
-        </div>
-      </template>
-    </Dialog>
 
     <PublishDialog
       v-model:visible="showPublishDialog"

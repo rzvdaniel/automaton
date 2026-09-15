@@ -9,8 +9,6 @@ import type {
   AppListItem,
   AppTagSettings,
   AppScreenshot,
-  AppDeployCapabilities,
-  CreateAppRequest,
   PublishAppRequest,
   ExportAppResponse,
   LinkedStepInfo,
@@ -20,8 +18,6 @@ import type {
   ScopedFilesResponse,
   FileNode,
   CreateAppStepRequest,
-  ForkAppRequest,
-  ForkAppSource,
   ApplicationContract,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
@@ -163,15 +159,6 @@ class AppsService {
   }
 
   /**
-   * Create a new app
-   * POST /api/apps
-   */
-  async create(request: CreateAppRequest): Promise<App> {
-    const { data } = await apiClient.post<App>('/api/apps', request)
-    return data
-  }
-
-  /**
    * Export an app as a portable zip archive.
    * GET /api/apps/{id}/export
    */
@@ -187,21 +174,6 @@ class AppsService {
       blob: response.data,
       fileName,
     }
-  }
-
-  /**
-   * Import an exported app bundle into the current user's account.
-   * POST /api/apps/import
-   */
-  async importApp(zipFile: File): Promise<App> {
-    const form = new FormData()
-    form.append('file', zipFile)
-
-    const { data } = await apiClient.post<App>('/api/apps/import', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-
-    return data
   }
 
   /**
@@ -234,11 +206,6 @@ class AppsService {
    */
   async unpublish(id: string): Promise<void> {
     await apiClient.post(`/api/apps/${id}/unpublish`)
-  }
-
-  async getDeployCapabilities(id: string): Promise<AppDeployCapabilities> {
-    const { data } = await apiClient.get<AppDeployCapabilities>(`/api/apps/${id}/deploy-capabilities`)
-    return data
   }
 
   async listDeploymentTargets(id: string): Promise<AppDeploymentTarget[]> {
@@ -564,73 +531,6 @@ class AppsService {
     return data
   }
 
-  async writeScopedFile(
-    id: string,
-    scope: AppFileSystemScope,
-    path: string,
-    content: string,
-  ): Promise<void> {
-    const encodedPath = this.encodePath(path)
-    await apiClient.put(`/api/apps/${id}/filesystem/${scope}/${encodedPath}`, { content })
-  }
-
-  async deleteScopedFile(id: string, scope: AppFileSystemScope, path: string): Promise<void> {
-    const encodedPath = this.encodePath(path)
-    await apiClient.delete(`/api/apps/${id}/filesystem/${scope}/${encodedPath}`)
-  }
-
-  async deleteScopedDirectory(id: string, scope: AppFileSystemScope, path: string): Promise<void> {
-    const encodedPath = this.encodePath(path)
-    await apiClient.delete(`/api/apps/${id}/filesystem/${scope}/directory/${encodedPath}`)
-  }
-
-  /**
-   * Write file content
-   * PUT /api/apps/{id}/files/{path}
-   */
-  async writeFile(id: string, path: string, content: string): Promise<void> {
-    await apiClient.put(`/api/apps/${id}/files/${path}`, { content })
-  }
-
-  /**
-   * Delete a file
-   * DELETE /api/apps/{id}/files/{path}
-   */
-  async deleteFile(id: string, path: string): Promise<void> {
-    await apiClient.delete(`/api/apps/${id}/files/${path}`)
-  }
-
-  /**
-   * Create a new file
-   * PUT /api/apps/{id}/files/{path}
-   */
-  async createFile(id: string, path: string, content: string = ''): Promise<void> {
-    await apiClient.put(`/api/apps/${id}/files/${path}`, { content })
-  }
-
-  /**
-   * Upload a zip archive of app files.
-   * Files are merged into the app (clean=false) or the app is fully replaced (clean=true).
-   * POST /api/apps/{id}/upload
-   */
-  async uploadZip(
-    id: string,
-    zipFile: File,
-    clean = false,
-  ): Promise<{
-    success: boolean
-    written: string[]
-    skipped: { path: string; reason: string; ruleSource: string }[]
-    errors: { path: string; reason: string }[]
-  }> {
-    const form = new FormData()
-    form.append('file', zipFile)
-    const { data } = await apiClient.post(`/api/apps/${id}/upload?clean=${clean}`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return data
-  }
-
   /**
    * Build file tree from flat list of file paths
    */
@@ -833,32 +733,6 @@ class AppsService {
   }
 
   /**
-   * Create a manual version snapshot for an app
-   * POST /api/apps/{appId}/versions/snapshot
-   */
-  async createVersionSnapshot(appId: string, trigger?: string, summary?: string, source?: string, reason?: string) {
-    const { data } = await apiClient.post(`/api/apps/${appId}/versions/snapshot`, {
-      trigger: trigger || 'ManualSave',
-      summary: summary?.trim() || undefined,
-      source,
-      reason,
-    })
-    return data
-  }
-
-  /**
-   * Restore an app to a previous version
-   * POST /api/apps/{appId}/versions/{versionNumber}/restore
-   */
-  async restoreVersion(appId: string, versionNumber: number) {
-    const { data } = await apiClient.post(
-      `/api/apps/${appId}/versions/${versionNumber}/restore`,
-      {}
-    )
-    return data
-  }
-
-  /**
    * Generate slug from app name
    */
   generateSlug(name: string): string {
@@ -866,42 +740,6 @@ class AppsService {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
-  }
-
-  /**
-   * Get all published template apps (public)
-   * GET /api/apps/templates
-   */
-  async getTemplates(): Promise<App[]> {
-    const { data } = await apiClient.get<App[]>('/api/apps/templates')
-    return data
-  }
-
-  /**
-   * Duplicate an owned app (copies files + metadata)
-   * POST /api/apps/{id}/duplicate
-   */
-  async duplicate(id: string): Promise<App> {
-    const { data } = await apiClient.post<App>(`/api/apps/${id}/duplicate`)
-    return data
-  }
-
-  /**
-   * Get published source metadata for the guided fork flow.
-   * GET /api/apps/{id}/fork-source
-   */
-  async getForkSource(id: string): Promise<ForkAppSource> {
-    const { data } = await apiClient.get<ForkAppSource>(`/api/apps/${id}/fork-source`)
-    return data
-  }
-
-  /**
-   * Fork a published marketplace app into the current user's account.
-   * POST /api/apps/{id}/fork
-   */
-  async fork(id: string, request: ForkAppRequest = {}): Promise<App> {
-    const { data } = await apiClient.post<App>(`/api/apps/${id}/fork`, request)
-    return data
   }
 
   /**

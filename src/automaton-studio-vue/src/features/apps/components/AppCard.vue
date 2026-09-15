@@ -181,27 +181,6 @@ const handleUnpublish = async () => {
   })
 }
 
-const handleDuplicate = async () => {
-  try {
-    const newApp = await appsStore.duplicateApp(props.app.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Duplicated',
-      detail: `Created "${newApp.name}"`,
-      life: 3000,
-    })
-    router.push(`/apps/${newApp.id}`)
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to duplicate app'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    })
-  }
-}
-
 const handleExport = async () => {
   isExporting.value = true
 
@@ -279,11 +258,6 @@ const menuItems = computed(() => {
       icon: 'pi pi-download',
       command: handleExport,
       disabled: isExporting.value,
-    },
-    {
-      label: 'Duplicate',
-      icon: 'pi pi-copy',
-      command: handleDuplicate,
     },
   ]
 
@@ -385,8 +359,8 @@ const menuItems = computed(() => {
             @click="handlePrimaryAction"
           />
           <Button
-            label="Edit"
-            icon="pi pi-pencil"
+            label="Manage"
+            icon="pi pi-cog"
             size="small"
             outlined
             class="secondary-action"

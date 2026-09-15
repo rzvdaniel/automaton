@@ -17,7 +17,6 @@ import { markdown } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
 import { xml } from '@codemirror/lang-xml'
 import { yaml } from '@codemirror/lang-yaml'
-import { useAppEditorStore } from '../stores/app-editor.store'
 
 const props = defineProps<{
   filePath: string
@@ -36,19 +35,13 @@ interface EditorPosition {
   column: number
 }
 
-const editorStore = useAppEditorStore()
 const editorContainer = ref<HTMLElement>()
 let editorInstance: EditorView | null = null
 const readOnlyCompartment = new Compartment()
 const languageCompartment = new Compartment()
 const themeCompartment = new Compartment()
 
-// Get the file from the store
-const file = computed(() => {
-  return editorStore.openFiles.find((f) => f.path === props.filePath)
-})
-
-const editorContent = computed(() => props.content ?? file.value?.content ?? '')
+const editorContent = computed(() => props.content ?? '')
 const supportedLanguages = new Set([
   'css',
   'html',
@@ -64,10 +57,10 @@ const supportedLanguages = new Set([
 ])
 
 const editorLanguage = computed(() => {
-  const requestedLanguage = props.language ?? file.value?.language ?? 'plaintext'
+  const requestedLanguage = props.language ?? 'plaintext'
   return supportedLanguages.has(requestedLanguage) ? requestedLanguage : 'plaintext'
 })
-const isReadOnly = computed(() => props.readOnly ?? file.value?.isReadOnly ?? false)
+const isReadOnly = computed(() => props.readOnly ?? false)
 
 // Detect if dark mode is enabled
 const isDarkMode = computed(() => {
@@ -238,7 +231,6 @@ onMounted(() => {
         EditorView.updateListener.of((update) => {
           if (!update.docChanged || isReadOnly.value) return
           const content = update.state.doc.toString()
-          editorStore.updateFileContent(props.filePath, content)
           emit('change', content)
         }),
       ],

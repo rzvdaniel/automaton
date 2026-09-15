@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
-import type { App, AppListItem, AppListFilters, CreateAppRequest, PublishAppRequest } from '../types/apps.types'
+import type { App, AppListItem, AppListFilters, PublishAppRequest } from '../types/apps.types'
 
 export const useAppsStore = defineStore('apps', () => {
   // State
@@ -86,17 +86,6 @@ export const useAppsStore = defineStore('apps', () => {
       throw new Error(errorMessage)
     } finally {
       isLoading.value = false
-    }
-  }
-
-  async function createApp(request: CreateAppRequest): Promise<App> {
-    try {
-      const newApp = await appsService.create(request)
-      apps.value.push(newApp)
-      return newApp
-    } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err)
-      throw new Error(errorMessage)
     }
   }
 
@@ -226,39 +215,6 @@ export const useAppsStore = defineStore('apps', () => {
     clearFilters()
   }
 
-  async function duplicateApp(id: string): Promise<App> {
-    try {
-      const newApp = await appsService.duplicate(id)
-      apps.value.push(newApp)
-      return newApp
-    } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err)
-      throw new Error(errorMessage)
-    }
-  }
-
-  async function forkTemplate(id: string): Promise<App> {
-    try {
-      const newApp = await appsService.fork(id)
-      apps.value.push(newApp)
-      return newApp
-    } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err)
-      throw new Error(errorMessage)
-    }
-  }
-
-  async function importApp(file: File): Promise<App> {
-    try {
-      const importedApp = await appsService.importApp(file)
-      apps.value.unshift(importedApp)
-      return importedApp
-    } catch (err: unknown) {
-      const errorMessage = getErrorMessage(err)
-      throw new Error(errorMessage)
-    }
-  }
-
   // Helper to extract error message
   function getErrorMessage(err: unknown): string {
     if (err && typeof err === 'object') {
@@ -310,14 +266,10 @@ export const useAppsStore = defineStore('apps', () => {
     // Actions
     fetchApps,
     fetchApp,
-    createApp,
     updateApp,
     deleteApp,
     publishApp,
     unpublishApp,
-    duplicateApp,
-    forkTemplate,
-    importApp,
     setSearchFilter,
     setStatusFilter,
     setProjectFilter,

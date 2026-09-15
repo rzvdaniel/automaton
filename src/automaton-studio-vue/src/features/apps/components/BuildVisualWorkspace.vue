@@ -299,7 +299,6 @@ async function refreshApplication(): Promise<void> {
         <button
           class="application-shell-action"
           type="button"
-          :disabled="editorStore.isLoadingApplication"
           @click="refreshApplication"
         >
           <i class="pi pi-refresh"></i>
@@ -329,10 +328,6 @@ async function refreshApplication(): Promise<void> {
               <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
               <p class="mt-2 text-color-secondary">Resizing application...</p>
             </div>
-          </div>
-          <div v-else-if="editorStore.isLoadingApplication" class="application-loading">
-            <i class="pi pi-spin pi-spinner text-3xl"></i>
-            <p class="mt-2">Loading application...</p>
           </div>
           <div v-else-if="!iframePreviewUrl" class="application-empty">
             <i class="pi pi-desktop text-3xl text-color-secondary"></i>
@@ -425,10 +420,6 @@ async function refreshApplication(): Promise<void> {
                 <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
                 <p class="mt-2 text-color-secondary">Resizing application...</p>
               </div>
-            </div>
-            <div v-else-if="editorStore.isLoadingApplication" class="application-loading">
-              <i class="pi pi-spin pi-spinner text-3xl"></i>
-              <p class="mt-2">Loading application...</p>
             </div>
             <div v-else-if="!iframePreviewUrl" class="application-empty">
             <i class="pi pi-desktop text-3xl text-color-secondary"></i>
