@@ -288,6 +288,12 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     json.dumps([{"Name": name, "Labels": labels}]),
                     "",
                 )
+            if arguments[:3] == ("docker", "container", "inspect"):
+                return subprocess.CompletedProcess(arguments, 1, "", "No such container")
+            if arguments[:4] == ("docker", "container", "ls", "--all"):
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+            if arguments[:3] == ("docker", "volume", "rm"):
+                return subprocess.CompletedProcess(arguments, 0, arguments[3], "")
             return subprocess.CompletedProcess(arguments, 0, "", "")
 
         with (
@@ -310,7 +316,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                 USER_VOLUME: volume_labels("user"),
             },
         )
-        self.assertEqual(sum(call[:3] == ("docker", "volume", "inspect") for call in calls), 2)
+        self.assertEqual(sum(call[:3] == ("docker", "volume", "inspect") for call in calls), 4)
         self.assertEqual(sum(call[:3] == ("docker", "volume", "rm") for call in calls), 2)
         inspection_indexes = [
             index
@@ -322,7 +328,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             for index, call in enumerate(calls)
             if call[:3] in (("docker", "rm", "-f"), ("docker", "volume", "rm"))
         ]
-        self.assertLess(max(inspection_indexes), min(mutation_indexes))
+        self.assertEqual(sum(index < min(mutation_indexes) for index in inspection_indexes), 3)
 
     def test_delete_refuses_unlabeled_or_mismatched_volume(self):
         invalid_labels = [

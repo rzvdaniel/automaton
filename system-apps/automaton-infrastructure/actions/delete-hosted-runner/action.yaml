@@ -3,7 +3,7 @@ kind: Action
 metadata:
   name: Delete Hosted Runner
   key: delete-hosted-runner
-  description: Removes a managed Runner container from an approved Runner Host.
+  description: Removes a managed Runner and its owned app runtimes from an approved Runner Host, then applies the requested storage disposition.
 spec:
   runtime: python
   entrypoint: main.py
