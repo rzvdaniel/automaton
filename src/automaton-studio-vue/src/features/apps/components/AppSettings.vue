@@ -620,7 +620,7 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'basic'"
               />
               <Button
-                label="Application"
+                label="Runtime contract (transition)"
                 icon="pi pi-code"
                 text
                 :class="{ 'surface-hover': activeSection === 'application' }"
@@ -664,7 +664,7 @@ async function handleSaveTemplateStatus() {
 
               <div class="border-top-1 surface-border my-2" />
               <Button
-                label="Connect to IDE"
+                label="Local project"
                 icon="pi pi-link"
                 text
                 :class="{ 'surface-hover': activeSection === 'connect' }"
@@ -775,16 +775,16 @@ async function handleSaveTemplateStatus() {
 
         <!-- Generic application contract -->
         <Card v-if="activeSection === 'application'">
-          <template #title>Application contract</template>
+          <template #title>Runtime contract (transition)</template>
           <template #content>
             <div class="flex flex-column gap-4">
               <Message severity="info" :closable="false">
-                This contract is the canonical description of how Automaton builds, starts, checks, and stores this application. It is intentionally independent of any language or framework.
+                Your local <code>automaton.json</code> is authoritative for the next deployment. This transitional Studio form updates the server-side contract copy, not your local project.
               </Message>
               <ApplicationContractEditor v-model="applicationContract" />
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
                 <Button
-                  label="Save application contract"
+                  label="Save server-side contract copy"
                   icon="pi pi-save"
                   :loading="isSaving"
                   :disabled="!hasChanges"
@@ -1143,9 +1143,9 @@ async function handleSaveTemplateStatus() {
           </template>
         </Card>
 
-        <!-- Connect to IDE -->
+        <!-- Local project -->
         <Card v-if="activeSection === 'connect'">
-          <template #title>Connect to IDE</template>
+          <template #title>Local project</template>
           <template #content>
             <div class="flex flex-column gap-5">
               <p class="text-color-secondary mt-0 mb-0">

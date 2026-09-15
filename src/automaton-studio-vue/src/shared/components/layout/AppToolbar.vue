@@ -30,7 +30,7 @@ const pageTitle = computed(() => {
     'flow-list': 'Flows',
     'flow-generation': 'New Flow',
     'app-list': 'Apps',
-    'app-editor': 'App Editor',
+    'app-editor': 'App Operations',
     'step-list': 'Steps',
     'step-editor': 'Step Editor',
     runners: 'Runners',

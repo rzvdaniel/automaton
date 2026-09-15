@@ -66,7 +66,7 @@ const loadVersions = async (search?: string) => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load restore points',
+      detail: error instanceof Error ? error.message : 'Failed to load source snapshots',
       life: 5000,
     })
   } finally {
@@ -92,7 +92,7 @@ async function loadMoreVersions() {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load more restore points',
+      detail: error instanceof Error ? error.message : 'Failed to load more source snapshots',
       life: 5000,
     })
   } finally {
@@ -148,7 +148,7 @@ async function viewVersionDetail(version: AppVersion) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load restore point details',
+      detail: error instanceof Error ? error.message : 'Failed to load source snapshot details',
       life: 5000,
     })
   }
@@ -246,7 +246,7 @@ async function createSnapshot() {
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: 'Restore point created',
+      detail: 'Source snapshot created',
       life: 3000,
     })
     emit('versionCreated')
@@ -255,7 +255,7 @@ async function createSnapshot() {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to create restore point',
+      detail: error instanceof Error ? error.message : 'Failed to create source snapshot',
       life: 5000,
     })
   } finally {
@@ -268,10 +268,10 @@ async function createSnapshot() {
  */
 async function restoreVersion(versionNumber: number) {
   confirm.require({
-    message: `Restore app to restore point ${versionNumber}? Current files will be replaced.`,
-    header: 'Confirm Restore',
+    message: `Restore source snapshot ${versionNumber}? This replaces Studio's server-side source copy. It does not deploy the source or roll back the running application.`,
+    header: 'Restore source snapshot?',
     icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Restore',
+    acceptLabel: 'Restore source',
     rejectLabel: 'Cancel',
     accept: async () => {
       isRestoringVersion.value = true
@@ -432,10 +432,10 @@ defineExpose({
     <div class="panel-header">
       <div class="header-title">
         <i class="pi pi-history text-lg"></i>
-        <h3>{{ title || 'Restore Points' }}</h3>
+        <h3>{{ title || 'Source snapshots' }}</h3>
       </div>
       <Button
-        v-tooltip.left="'Create manual restore point'"
+        v-tooltip.left="'Create manual source snapshot'"
         icon="pi pi-camera"
         size="small"
         rounded
@@ -456,7 +456,7 @@ defineExpose({
         />
         <InputText
           v-model="searchQuery"
-          placeholder="Search restore points..."
+          placeholder="Search source snapshots..."
           size="small"
           class="w-full"
         />
@@ -466,18 +466,18 @@ defineExpose({
     <!-- Loading state -->
     <div v-if="isLoading" class="loading-state">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" stroke-width="4" />
-      <p class="mt-2 text-sm text-color-secondary">Loading restore points...</p>
+      <p class="mt-2 text-sm text-color-secondary">Loading source snapshots...</p>
     </div>
 
     <!-- Empty state -->
     <div v-else-if="!versionList || versionList.versions.length === 0" class="empty-state">
       <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
-      <p>No restore points yet</p>
+      <p>No source snapshots yet</p>
       <p class="text-sm text-color-secondary mb-3">
-        Restore points are created after AI sessions, before CLI deployments, or manually in Studio
+        Source snapshots record Studio's server-side source copy. They do not represent deployed runtime versions.
       </p>
       <Button
-        label="Create Restore Point"
+        label="Create source snapshot"
         icon="pi pi-camera"
         size="small"
         :loading="isCreatingSnapshot"
@@ -498,7 +498,7 @@ defineExpose({
             <!-- Header -->
             <div class="version-card-header">
               <div class="version-title-row">
-                <span class="version-number">Version {{ version.versionNumber }}</span>
+                <span class="version-number">Snapshot {{ version.versionNumber }}</span>
                 <Tag
                   :value="getTriggerLabel(version.trigger)"
                   :severity="getTriggerSeverity(version.trigger)"
@@ -515,7 +515,7 @@ defineExpose({
                   @click="viewVersionDetail(version)"
                 />
                 <Button
-                  v-tooltip.top="'Restore this point'"
+                  v-tooltip.top="'Restore this source snapshot'"
                   icon="pi pi-refresh"
                   size="small"
                   text
@@ -574,7 +574,7 @@ defineExpose({
     <Dialog
       v-model:visible="showVersionDetail"
       modal
-      :header="`Restore Point ${selectedVersion?.versionNumber} Details`"
+      :header="`Source snapshot ${selectedVersion?.versionNumber}`"
       :style="{ width: '90vw', maxWidth: '800px' }"
     >
       <div v-if="selectedVersion" class="version-detail">
@@ -604,10 +604,10 @@ defineExpose({
 
         <!-- Metadata -->
         <div class="detail-section">
-          <h4>Restore Point Info</h4>
+          <h4>Source snapshot information</h4>
           <div class="detail-grid">
             <div class="detail-row">
-              <span class="detail-label">Restore Point:</span>
+              <span class="detail-label">Snapshot:</span>
               <span class="detail-value">{{ selectedVersion.versionNumber }}</span>
             </div>
             <div class="detail-row">
@@ -710,7 +710,7 @@ defineExpose({
           @click="showVersionDetail = false"
         />
         <Button
-          label="Restore This Point"
+          label="Restore source"
           icon="pi pi-refresh"
           severity="warn"
           :loading="isRestoringVersion"
@@ -723,12 +723,12 @@ defineExpose({
     <Dialog
       v-model:visible="showSnapshotDialog"
       modal
-      header="Create Restore Point"
+      header="Create source snapshot"
       :style="{ width: '420px' }"
     >
       <div class="snapshot-dialog">
         <p class="text-color-secondary mb-3">
-          Create a manual restore point for the current app state. Optionally add a summary to describe what changed.
+          Capture Studio's current server-side source copy. This does not deploy the source or create a runtime rollback point.
         </p>
         <div class="field">
           <label for="snapshotSummary" class="block font-semibold mb-2">Summary (optional)</label>
@@ -749,7 +749,7 @@ defineExpose({
           @click="showSnapshotDialog = false"
         />
         <Button
-          label="Create Restore Point"
+          label="Create source snapshot"
           icon="pi pi-camera"
           :loading="isCreatingSnapshot"
           @click="createSnapshot"

@@ -23,7 +23,16 @@ import {
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 
-const props = defineProps<{ appId: string; projectId?: string | null; refreshRevision?: number }>()
+const props = withDefaults(defineProps<{
+  appId: string
+  projectId?: string | null
+  refreshRevision?: number
+  showDeployAction?: boolean
+}>(), {
+  projectId: null,
+  refreshRevision: 0,
+  showDeployAction: true,
+})
 const emit = defineEmits<{
   deploy: [target: AppDeploymentTarget]
   viewLogs: [target: AppDeploymentTarget]
@@ -527,6 +536,7 @@ watch(() => props.refreshRevision, load)
           </div>
           <div class="target-actions">
             <Button
+              v-if="showDeployAction"
               label="Deploy"
               icon="pi pi-cloud-upload"
               size="small"
@@ -617,6 +627,7 @@ watch(() => props.refreshRevision, load)
             </div>
             <div class="target-actions">
               <Button
+                v-if="showDeployAction"
                 label="Deploy"
                 icon="pi pi-cloud-upload"
                 size="small"
