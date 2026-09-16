@@ -62,5 +62,15 @@ describe('AppSettings', () => {
     expect(wrapper.text()).not.toContain('Runtime contract')
     expect(wrapper.find('[id="app-name"]').exists()).toBe(true)
     expect(wrapper.find('[id="runtime-port"]').exists()).toBe(false)
+
+    const localProjectButton = wrapper.findAll('button').find((button) => button.text().includes('Local project'))
+    if (!localProjectButton) throw new Error('Local project navigation button not found')
+    await localProjectButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('automaton pull app-id')
+    expect(wrapper.text()).toContain('automaton link app-id')
+    expect(wrapper.text()).toContain('automaton deploy')
+    expect(wrapper.text()).toContain('does not download source')
   })
 })

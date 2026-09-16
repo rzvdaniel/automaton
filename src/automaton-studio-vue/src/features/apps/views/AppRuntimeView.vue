@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
+import CopyCommand from '../components/CopyCommand.vue'
 import { appsService } from '../services/apps.service'
 import type { App } from '../types/apps.types'
 import { getOpenAppUrl } from '../utils/public-app-url'
@@ -14,6 +15,7 @@ const app = ref<App | null>(null)
 const applicationUrl = ref('')
 const isLoading = ref(true)
 const error = ref('')
+const isNotDeployed = ref(false)
 
 async function loadRuntimeView() {
   if (!appId.value) {
@@ -24,6 +26,7 @@ async function loadRuntimeView() {
 
   isLoading.value = true
   error.value = ''
+  isNotDeployed.value = false
 
   try {
     app.value = await appsService.get(appId.value)
@@ -32,6 +35,7 @@ async function loadRuntimeView() {
     const liveTarget = targets.find((target) => target.isDefault)
     if (!liveTarget?.genericRuntimeDeployed) {
       error.value = 'This app has not been deployed yet.'
+      isNotDeployed.value = true
       return
     }
 
@@ -62,6 +66,10 @@ onMounted(() => {
     <div v-else-if="error" class="runtime-state">
       <i class="pi pi-exclamation-triangle runtime-state__icon"></i>
       <p>{{ error }}</p>
+      <div v-if="isNotDeployed" class="runtime-state__source-guidance">
+        <p>Edit and deploy from your local project with Automaton CLI.</p>
+        <CopyCommand command="automaton deploy" button-label="Copy automaton deploy" />
+      </div>
       <div class="runtime-state__actions">
         <button class="runtime-action" type="button" @click="router.push(`/apps/${appId}`)">Back to Studio</button>
         <button class="runtime-action runtime-action--primary" type="button" @click="loadRuntimeView">Retry</button>
@@ -92,6 +100,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.runtime-state__source-guidance p {
+  margin: 0 0 0.75rem;
+  color: var(--p-text-muted-color);
 }
 
 .runtime-iframe {

@@ -10,11 +10,13 @@ import Message from 'primevue/message'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
+import CopyCommand from './CopyCommand.vue'
 import { appsService } from '../services/apps.service'
 import type { AppVersion, AppVersionDetail, AppVersionList } from '../types/apps.types'
 
 interface Props {
   appId: string
+  sourceAvailable: boolean
   title?: string
   fullPage?: boolean
 }
@@ -355,6 +357,18 @@ defineExpose({
 
     <Divider />
 
+    <Message severity="info" :closable="false" class="snapshot-source-guidance">
+      <p>
+        Source snapshots are server-side records, not deployed versions. Automaton CLI can pull the current app source, not a historical snapshot.
+      </p>
+      <CopyCommand
+        v-if="sourceAvailable"
+        :command="`automaton pull ${appId}`"
+        button-label="Copy pull command"
+      />
+      <p v-else>The current source is not available to pull from the CLI.</p>
+    </Message>
+
     <!-- Search -->
     <div class="px-2 pb-2">
       <IconField class="w-full">
@@ -381,9 +395,6 @@ defineExpose({
     <div v-else-if="!versionList || versionList.versions.length === 0" class="empty-state">
       <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
       <p>No source snapshots yet</p>
-      <p class="text-sm text-color-secondary mb-3">
-        Source snapshots record Studio's server-side source copy. They do not represent deployed runtime versions.
-      </p>
     </div>
 
     <!-- Version list -->
