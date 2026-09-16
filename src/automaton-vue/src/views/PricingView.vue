@@ -33,14 +33,13 @@ import { publicAppConfig } from '@/config/publicAppConfig'
             </div>
 
             <p class="plan-copy">
-              Build, deploy, publish, fork, and share apps for free when you bring your own AI tools
+              Build, deploy, publish, and share apps for free when you bring your own AI tools
               and your own backend Runner infrastructure.
             </p>
 
             <ul class="feature-list">
               <li>Build and publish frontend apps</li>
               <li>Public frontend app hosting</li>
-              <li>Fork public apps</li>
               <li>CLI + Studio access</li>
               <li>Bring your own AI tools and providers</li>
               <li>Use your own Runner containers for backend apps</li>

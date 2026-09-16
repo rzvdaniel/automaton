@@ -75,10 +75,6 @@ const launchUrl = computed(() =>
   app.value?.canLaunch && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
 )
 
-const forkUrl = computed(() =>
-  app.value ? `${publicAppConfig.studioUrl}apps/fork/${app.value.id}` : publicAppConfig.studioUrl,
-)
-
 const creatorName = computed(() =>
   app.value?.creatorDisplayName || app.value?.creatorPublicUsername || 'Automaton creator',
 )
@@ -367,7 +363,6 @@ onBeforeUnmount(() => {
               <div class="badge-row">
                 <span class="badge">{{ app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                 <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
-                <span v-if="app.canRemix" class="badge badge-forkable">Forkable</span>
                 <span class="badge badge-static">Application</span>
               </div>
 
@@ -408,12 +403,6 @@ onBeforeUnmount(() => {
                       <i class="pi pi-external-link" />
                   </button>
                   <p v-else class="private-runtime-note">Private runtime — preview available through media.</p>
-                  <a v-if="app.canRemix" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
-                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                      <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
-                    </svg>
-                    Fork app
-                  </a>
                   <button class="detail-button" type="button" @click="shareApp">
                     Share
                     <i class="pi pi-share-alt" />
@@ -424,7 +413,6 @@ onBeforeUnmount(() => {
                 <div class="hero-pills" aria-label="App metadata">
                   <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
                   <span class="hero-pill">Application</span>
-                  <span v-if="app.canRemix" class="hero-pill hero-pill-forkable">Free to fork</span>
                   <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
                 </div>
               </div>
@@ -573,35 +561,17 @@ onBeforeUnmount(() => {
                   </RouterLink>
                 </div>
 
-                <p v-else-if="app.canRemix" class="empty-copy">
-                  No public remixes yet. Fork this app to create a private editable copy, modify it, then publish your version when ready.
-                </p>
-                <p v-else class="empty-copy">This app is published for use. Remixing is not currently available for this app.</p>
+                <p v-else class="empty-copy">No public remixes yet.</p>
               </section>
             </article>
 
             <aside id="runtime" class="side-stack">
-              <section v-if="app.canRemix" class="detail-card fork-panel">
-                <h3>Fork this app</h3>
-                <p>Create your own private editable copy, modify it with your AI coding tools, then publish your version when ready.</p>
-                <a :href="forkUrl" class="detail-button fork-action side-action" target="_blank" rel="noopener">
-                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                    <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
-                  </svg>
-                  Fork app
-                </a>
-              </section>
-
               <section class="detail-card">
                 <h3>Runtime</h3>
                 <div class="runtime-list">
                   <div class="runtime-item">
                     <span>Application runtime</span>
                     <span>Defined by the application contract</span>
-                  </div>
-                  <div class="runtime-item">
-                    <span>Fork & publish</span>
-                    <span>Configure a runtime after remixing</span>
                   </div>
                 </div>
               </section>
@@ -745,11 +715,6 @@ onBeforeUnmount(() => {
   color: #d6dbe7;
 }
 
-.badge-forkable {
-  background: rgba(69, 230, 138, 0.14);
-  color: #45e68a;
-}
-
 .badge-hot {
   background: rgba(255, 203, 87, 0.13);
   color: #ffcb57;
@@ -884,23 +849,6 @@ onBeforeUnmount(() => {
   color: #041008;
 }
 
-.fork-action {
-  border-color: rgba(69, 230, 138, 0.38);
-  background: rgba(69, 230, 138, 0.14);
-  color: #45e68a;
-}
-
-.fork-action:hover {
-  border-color: rgba(69, 230, 138, 0.5);
-  background: rgba(69, 230, 138, 0.18);
-  color: #8affb7;
-}
-
-.fork-action svg {
-  width: 16px;
-  height: 16px;
-}
-
 .share-message {
   margin: -4px 0 0;
   color: #9ba3b4;
@@ -925,12 +873,6 @@ onBeforeUnmount(() => {
   color: #aeb8c8;
   font-size: 0.82rem;
   font-weight: 800;
-}
-
-.hero-pill-forkable {
-  border-color: rgba(69, 230, 138, 0.24);
-  background: rgba(69, 230, 138, 0.1);
-  color: #bdfbd2;
 }
 
 .detail-gallery {
@@ -1341,18 +1283,6 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 18px;
   align-content: start;
-}
-
-.fork-panel {
-  border-color: rgba(69, 230, 138, 0.24);
-  background:
-    linear-gradient(135deg, rgba(69, 230, 138, 0.07), rgba(80, 215, 255, 0.035)),
-    rgba(255, 255, 255, 0.04);
-}
-
-.side-action {
-  width: 100%;
-  margin-top: 16px;
 }
 
 .runtime-list {

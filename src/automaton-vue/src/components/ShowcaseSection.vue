@@ -21,7 +21,7 @@ const heading = computed(() => (props.fullPage ? 'Discover Apps' : 'Explore apps
 
 const subtitle = computed(() =>
   props.fullPage
-    ? 'Play, fork, and build from real Automaton projects.'
+    ? 'Discover and launch apps built with Automaton.'
     : 'A rotating shelf of polished public apps, featured by category and ranked by community momentum.',
 )
 
@@ -43,7 +43,7 @@ const directoryApps = computed(() => {
 })
 
 const categoryPills = computed(() => {
-  const base = ['Featured', 'Live Apps', 'Forkable Apps']
+  const base = ['Featured', 'Live Apps']
   const dynamic = displayedCategories.value.filter((category) => !base.includes(category)).slice(0, 7)
   return [...base, ...dynamic]
 })
@@ -107,7 +107,7 @@ function refreshApps() {
 }
 
 function normalizeCategory(category: string) {
-  if (category === 'Featured' || category === 'Live Apps' || category === 'Forkable Apps') {
+  if (category === 'Featured' || category === 'Live Apps') {
     return ''
   }
 
@@ -263,7 +263,7 @@ watch(
         <article class="activity-panel">
           <div class="section-head compact">
             <h2>Creator activity</h2>
-            <p>New apps, forks, and updates give visitors a reason to come back.</p>
+            <p>New apps and updates give visitors a reason to come back.</p>
           </div>
           <div class="feed">
             <div v-for="app in directoryApps.slice(0, 4)" :key="`activity-${app.id}`" class="feed-item">

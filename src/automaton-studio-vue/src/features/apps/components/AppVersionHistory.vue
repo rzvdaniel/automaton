@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * AppVersionHistory.vue
- * Displays read-only source snapshot history.
- */
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'

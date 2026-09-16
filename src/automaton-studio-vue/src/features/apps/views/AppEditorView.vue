@@ -118,7 +118,7 @@ async function handleTokenRequest(event: MessageEvent) {
         token = data.accessToken
       }
     } catch {
-      // The iframe can retry authentication if refresh is temporarily unavailable.
+      // Keep using the current token if refresh fails.
     }
   }
 

@@ -247,7 +247,6 @@ const handleRetry = async () => {
       </div>
     </div>
 
-    <!-- Apps and local build guidance -->
     <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
