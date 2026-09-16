@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { App, AppDeploymentTarget } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
+import CopyCommand from './CopyCommand.vue'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 
@@ -15,7 +16,6 @@ const emit = defineEmits<{
   navigate: [view: AppViewKey]
 }>()
 
-const copied = ref(false)
 const liveTarget = computed(() => props.targets.find((target) => target.isDefault) ?? null)
 const publishedUrl = computed(() =>
   props.app.isPublished && props.app.publicUrl
@@ -45,13 +45,6 @@ const lastDeploymentLabel = computed(() => {
   return `Last successful deployment: ${new Date(value).toLocaleString()}`
 })
 
-async function copyDeployCommand() {
-  await navigator.clipboard.writeText('automaton deploy')
-  copied.value = true
-  window.setTimeout(() => {
-    copied.value = false
-  }, 2000)
-}
 </script>
 
 <template>
@@ -102,16 +95,10 @@ async function copyDeployCommand() {
 
     <aside class="local-source-card">
       <div>
-        <h2>Your local Automaton project is the source of truth</h2>
-        <p>Pull and edit the project locally with your AI. Deploy source changes with Automaton CLI.</p>
+        <h2>Local source workflow</h2>
+        <p>Your local Automaton project is the source of truth. Use Automaton CLI to pull, edit, and deploy.</p>
       </div>
-      <div class="command-row">
-        <code>automaton deploy</code>
-        <button type="button" @click="copyDeployCommand">
-          <i :class="copied ? 'pi pi-check' : 'pi pi-copy'" aria-hidden="true"></i>
-          {{ copied ? 'Copied' : 'Copy command' }}
-        </button>
-      </div>
+      <CopyCommand class="command-row" command="automaton deploy" button-label="Copy automaton deploy" />
     </aside>
   </section>
 </template>
@@ -157,8 +144,7 @@ h1 {
 }
 
 .public-link,
-.status-card button,
-.command-row button {
+.status-card button {
   color: var(--p-primary-color);
   font: inherit;
   font-weight: 600;
@@ -205,13 +191,6 @@ h1 {
 }
 
 .status-card button,
-.command-row button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
 .local-source-card {
   display: flex;
   align-items: center;
@@ -234,12 +213,6 @@ h1 {
   border-radius: 0.7rem;
   background: var(--p-surface-ground);
   white-space: nowrap;
-}
-
-.command-row button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
 }
 
 @media (max-width: 720px) {

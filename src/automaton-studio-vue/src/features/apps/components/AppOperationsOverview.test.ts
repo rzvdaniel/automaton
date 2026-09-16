@@ -79,7 +79,7 @@ describe('AppOperationsOverview', () => {
     expect(wrapper.text()).toContain('Running')
     expect(wrapper.text()).toContain('Deployed')
     expect(wrapper.text()).toContain('Unpublished')
-    expect(wrapper.text()).toContain('Your local Automaton project is the source of truth')
+    expect(wrapper.text()).toContain('Your local Automaton project is the source of truth. Use Automaton CLI to pull, edit, and deploy.')
     expect(wrapper.text()).toContain('automaton deploy')
     expect(wrapper.text()).not.toContain('Create File')
   })
@@ -115,7 +115,7 @@ describe('AppOperationsOverview', () => {
       props: { app: app(), targets: [], applicationState: 'Not deployed' },
     })
 
-    const copyButton = wrapper.findAll('button').find((button) => button.text().includes('Copy command'))
+    const copyButton = wrapper.findAll('button').find((button) => button.text().includes('Copy automaton deploy'))
     if (!copyButton) throw new Error('Copy command button not found')
     await copyButton.trigger('click')
 

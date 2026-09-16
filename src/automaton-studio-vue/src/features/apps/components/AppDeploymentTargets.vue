@@ -10,6 +10,7 @@ import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
+import CopyCommand from './CopyCommand.vue'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { type Runner } from '@/features/runners/types/runners.types'
 import { appsService } from '../services/apps.service'
@@ -483,6 +484,9 @@ watch(() => props.refreshRevision, load)
       <i class="pi pi-spin pi-spinner"></i> Loading environments…
     </div>
     <template v-else>
+      <p class="source-deploy-guidance">
+        Deploy source changes from your local project with Automaton CLI. Studio manages environments and runtime operations here.
+      </p>
       <section class="target-group">
         <div class="target-group__heading">
           <h3>Live environment</h3>
@@ -511,6 +515,11 @@ watch(() => props.refreshRevision, load)
               ><span v-if="deploymentState(liveTarget)">·</span
               ><span>{{ formatDeploymentTime(liveTarget) }}</span>
             </div>
+            <CopyCommand
+              :command="`automaton deploy ${liveTarget.slug}`"
+              button-label="Copy deploy command"
+              class="target-cli-command"
+            />
             <Message v-if="liveTarget.cleanupPending" severity="warn" :closable="false"
               >Runtime cleanup needs retry.
               {{ liveTarget.lastCleanupError || 'The previous cleanup did not complete.' }}</Message
@@ -568,6 +577,9 @@ watch(() => props.refreshRevision, load)
             />
           </div>
         </article>
+        <Message v-else severity="secondary" :closable="false">
+          Create and assign a Live environment in Studio before deploying source from your local project.
+        </Message>
       </section>
 
       <section class="target-group">
@@ -602,6 +614,11 @@ watch(() => props.refreshRevision, load)
                 ><span v-if="deploymentState(target)">·</span
                 ><span>{{ formatDeploymentTime(target) }}</span>
               </div>
+              <CopyCommand
+                :command="`automaton deploy ${target.slug}`"
+                button-label="Copy deploy command"
+                class="target-cli-command"
+              />
               <Message v-if="target.cleanupPending" severity="warn" :closable="false">
                 Runtime cleanup needs retry.
                 {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
@@ -796,6 +813,10 @@ watch(() => props.refreshRevision, load)
   margin: 0;
   color: var(--p-text-muted-color);
 }
+.source-deploy-guidance {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
 .target-group {
   display: flex;
   flex-direction: column;
@@ -883,6 +904,12 @@ watch(() => props.refreshRevision, load)
 .target-meta {
   color: var(--p-text-muted-color);
   font-size: 0.875rem;
+}
+.target-cli-command {
+  align-self: flex-start;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-ground);
 }
 .target-actions {
   justify-content: flex-end;

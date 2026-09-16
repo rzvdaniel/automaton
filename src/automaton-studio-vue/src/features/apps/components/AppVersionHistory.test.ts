@@ -40,7 +40,7 @@ beforeAll(() => {
 describe('AppVersionHistory', () => {
   it('shows source snapshot history without source mutation controls', async () => {
     const wrapper = mount(AppVersionHistory, {
-      props: { appId: 'app-id', fullPage: true },
+      props: { appId: 'app-id', sourceAvailable: true, fullPage: true },
       global: {
         plugins: [PrimeVue],
         directives: { tooltip: Tooltip },
@@ -50,6 +50,8 @@ describe('AppVersionHistory', () => {
 
     expect(wrapper.text()).toContain('Source snapshots')
     expect(wrapper.text()).toContain('Snapshot 3')
+    expect(wrapper.text()).toContain('automaton pull app-id')
+    expect(wrapper.text()).toContain('current app source, not a historical snapshot')
     expect(wrapper.text()).not.toContain('Restore source')
     expect(wrapper.text()).not.toContain('Create source snapshot')
   })

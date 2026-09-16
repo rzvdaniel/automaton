@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
+import CopyCommand from '@/features/apps/components/CopyCommand.vue'
 import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -129,12 +130,6 @@ const heroState = computed(() => {
   return 'setup'
 })
 
-const cliQuickStartCommand = computed(() =>
-  hasApiKeys.value
-    ? 'dotnet tool install -g Automaton.Cli\nautomaton login\nautomaton deploy'
-    : 'Create an API key first\ndotnet tool install -g Automaton.Cli\nautomaton login',
-)
-
 // Retry fetch on error
 const handleRetry = () => {
   dashboardStore.clearError()
@@ -237,8 +232,7 @@ const resendConfirmation = async () => {
         <template v-if="heroState === 'setup'">
           <h2>Start by connecting the Automaton CLI</h2>
           <p>
-            Create a Studio API key, install the CLI, then deploy frontend and backend apps from
-            your machine or CI.
+            Create a Studio API key and install the CLI. Run <code>automaton new</code> from a local project, build source with your AI, then deploy with the CLI. Studio manages runtime and publishing.
           </p>
           <div class="dashboard-hero-actions">
             <span v-tooltip.bottom="isSensitiveActionsLocked ? lockedFeatureHint : undefined">
@@ -253,13 +247,12 @@ const resendConfirmation = async () => {
           </div>
         </template>
         <template v-else-if="heroState === 'ready'">
-          <h2>You're ready to deploy</h2>
+          <h2>Build and deploy from a local project</h2>
           <p>
-            Your API key is in place. Create an app locally, deploy with the CLI, and connect a
-            runner when you need backend execution.
+            Your API key is in place. Create and build an app locally, then deploy with the CLI. Studio manages the app. Connect a runner when you need backend execution.
           </p>
           <div class="dashboard-hero-actions">
-            <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
+            <Button label="Open Apps" icon="pi pi-th-large" @click="handleCreateApp" />
             <Button label="Open Documentation" severity="secondary" outlined @click="handleOpenDocumentation" />
           </div>
         </template>
@@ -270,7 +263,7 @@ const resendConfirmation = async () => {
             iterating on published deployments.
           </p>
           <div class="dashboard-hero-actions">
-            <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
+            <Button label="Open Apps" icon="pi pi-th-large" @click="handleCreateApp" />
             <Button
               label="Open Documentation"
               severity="secondary"
@@ -308,8 +301,15 @@ const resendConfirmation = async () => {
         <div class="hero-step">
           <div class="hero-step-num">3</div>
           <div>
-            <div class="hero-step-title">Deploy your app</div>
-            <div class="hero-step-desc"><code>automaton deploy</code></div>
+            <div class="hero-step-title">Create a local app</div>
+            <div class="hero-step-desc"><code>automaton new "My App"</code></div>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="hero-step-num">4</div>
+          <div>
+            <div class="hero-step-title">Build locally, then deploy</div>
+            <div class="hero-step-desc">Use your AI to build source locally, then run <code>automaton deploy</code></div>
           </div>
         </div>
       </div>
@@ -317,9 +317,11 @@ const resendConfirmation = async () => {
         <div class="hero-panel-title">
           {{ heroState === 'ready' ? 'CLI Quick Start' : 'Workspace Status' }}
         </div>
-        <pre v-if="heroState === 'ready'" class="quickstart-code dashboard-hero-code">
-{{ cliQuickStartCommand }}</pre
-        >
+        <div v-if="heroState === 'ready'" class="quickstart-commands dashboard-hero-code">
+          <CopyCommand class="quickstart-command" command='automaton new "My App"' />
+          <p class="dashboard-hero-code__hint">Build source locally with your AI, then deploy it.</p>
+          <CopyCommand class="quickstart-command" command="automaton deploy" />
+        </div>
         <div v-else class="hero-status-list">
           <div class="hero-status-item">
             <span class="hero-status-label">Recent deployments</span>
@@ -501,10 +503,10 @@ const resendConfirmation = async () => {
             >
               <i class="pi pi-globe text-color-secondary" style="font-size: 3rem"></i>
               <p class="text-color-secondary mt-3 mb-2">No apps yet</p>
-              <p class="text-color-secondary text-sm m-0">Create your first app to get started</p>
+              <p class="text-color-secondary text-sm m-0">Create your first app with Automaton CLI, then manage its deployment and runtime in Studio.</p>
               <Button
-                label="Create Your First App"
-                icon="pi pi-plus"
+                label="View local setup"
+                icon="pi pi-book"
                 class="mt-4"
                 @click="handleCreateApp"
               />
@@ -552,9 +554,14 @@ const resendConfirmation = async () => {
           </template>
           <template #content>
             <div class="quickstart-copy mb-3">
-              Connect the CLI, authenticate with a Studio API key, then deploy from your machine.
+              Create an API key in Studio first if you do not have one. From your local project, install and sign in to the CLI. Run <code>automaton new</code>, build source with your AI, then run <code>automaton deploy</code>. Studio manages runtime and publishing.
             </div>
-            <pre class="quickstart-code">{{ cliQuickStartCommand }}</pre>
+            <div class="quickstart-commands">
+              <CopyCommand class="quickstart-command" command="dotnet tool install -g Automaton.Cli" />
+              <CopyCommand class="quickstart-command" command="automaton login" />
+              <CopyCommand class="quickstart-command" command='automaton new "My App"' />
+              <CopyCommand class="quickstart-command" command="automaton deploy" />
+            </div>
           </template>
         </Card>
       </div>
@@ -780,6 +787,12 @@ const resendConfirmation = async () => {
   background: rgba(6, 19, 26, 0.92);
 }
 
+.dashboard-hero-code__hint {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+
 .hero-status-list {
   display: flex;
   flex-direction: column;
@@ -884,6 +897,28 @@ const resendConfirmation = async () => {
   font-size: 0.9rem;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+.quickstart-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quickstart-command {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  background: #06131a;
+  color: #d1fae5;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.8rem;
+}
+
+.quickstart-command :deep(.copy-command__button) {
+  color: #d1fae5;
 }
 
 @media (max-width: 1100px) {

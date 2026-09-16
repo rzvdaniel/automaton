@@ -89,6 +89,17 @@ describe('AppDeploymentTargets', () => {
 
     expect(wrapper.text()).toContain('Live environment')
     expect(wrapper.findAll('button').some((button) => button.text() === 'Deploy')).toBe(false)
+    expect(wrapper.text()).toContain('automaton deploy live')
+    expect(wrapper.text()).toContain('Copy deploy command')
+  })
+
+  it('shows the verified target-specific command for each additional environment', async () => {
+    const wrapper = await mountTargets([
+      target(),
+      target({ id: 'canary-id', name: 'Canary', slug: 'canary', isDefault: false }),
+    ], false)
+
+    expect(wrapper.text()).toContain('automaton deploy canary')
   })
 
   it('confirms promotion without redeployment and does not render Live deletion', async () => {

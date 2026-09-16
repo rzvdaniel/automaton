@@ -98,7 +98,7 @@ const canOpenPublicApp = computed(() => props.app.canLaunchPublicly === true && 
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
 const primaryAction = computed(() => canOpenApp.value
   ? { label: 'Open', icon: 'pi pi-external-link' }
-  : { label: 'Deploy', icon: 'pi pi-cloud-upload' })
+  : { label: 'View local setup', icon: 'pi pi-terminal' })
 const openAppUrl = computed(() => {
   if (canOpenPublicApp.value) {
     return getPublishedAppUrl(props.app.publicUrl)

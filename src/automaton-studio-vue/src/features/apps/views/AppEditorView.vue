@@ -13,6 +13,7 @@ import AppOperationsOverview from '../components/AppOperationsOverview.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
+import CopyCommand from '../components/CopyCommand.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
@@ -47,7 +48,6 @@ const selectedRunnerId = ref<string | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
 const targetsRevision = ref(0)
 const showPublishDialog = ref(false)
-const copiedDeployCommand = ref(false)
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
 
@@ -190,14 +190,6 @@ async function handleViewTargetLogs(target: AppDeploymentTarget) {
   activeView.value = 'logs'
 }
 
-async function copyDeployCommand() {
-  await navigator.clipboard.writeText('automaton deploy')
-  copiedDeployCommand.value = true
-  window.setTimeout(() => {
-    copiedDeployCommand.value = false
-  }, 2000)
-}
-
 async function handlePublish(request: PublishAppRequest) {
   if (!getLiveTarget(deploymentTargets.value)) {
     toast.add({ severity: 'error', summary: 'Publish Live unavailable', detail: 'This app has no Live environment.', life: 5000 })
@@ -269,11 +261,10 @@ function handleUnpublish() {
           </div>
         </div>
         <div class="header-actions">
-          <Button
-            :label="copiedDeployCommand ? 'Copied' : 'Deploy from CLI'"
-            :icon="copiedDeployCommand ? 'pi pi-check' : 'pi pi-copy'"
-            outlined
-            @click="copyDeployCommand"
+          <CopyCommand
+            command="automaton deploy"
+            button-label="Copy automaton deploy"
+            :show-command="false"
           />
           <Button
             v-if="editorStore.isPublished"
@@ -332,6 +323,7 @@ function handleUnpublish() {
           <AppVersionHistory
             v-else-if="activeView === 'snapshots'"
             :app-id="appId"
+            :source-available="editorStore.currentApp.sourceAvailable"
             title="Source snapshots"
             full-page
           />

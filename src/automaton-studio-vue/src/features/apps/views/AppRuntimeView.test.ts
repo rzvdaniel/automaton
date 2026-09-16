@@ -4,6 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import AppRuntimeView from './AppRuntimeView.vue'
 
+const writeText = vi.fn().mockResolvedValue(undefined)
+Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   listDeploymentTargets: vi.fn(),
@@ -61,5 +64,21 @@ describe('AppRuntimeView runtime bootstrap', () => {
 
     expect(wrapper.text()).toContain('bootstrap failed')
     expect(wrapper.find('iframe').exists()).toBe(false)
+  })
+
+  it('guides an undeployed app to the local CLI without changing Studio operations', async () => {
+    mocks.get.mockResolvedValue(app(false))
+    mocks.listDeploymentTargets.mockResolvedValue([{ isDefault: true, genericRuntimeDeployed: false }])
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/apps/:id/application', component: AppRuntimeView }] })
+    await router.push('/apps/app-id/application')
+    await router.isReady()
+    const wrapper = mount(AppRuntimeView, { global: { plugins: [router], stubs: { ProgressSpinner: true } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('This app has not been deployed yet.')
+    expect(wrapper.text()).toContain('automaton deploy')
+    expect(wrapper.text()).toContain('Back to Studio')
+    await wrapper.get('.copy-command__button').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('automaton deploy')
   })
 })

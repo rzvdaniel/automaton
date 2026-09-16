@@ -14,6 +14,7 @@ import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import CopyCommand from './CopyCommand.vue'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
@@ -71,8 +72,12 @@ const cliLoginCommand = computed(() =>
   `automaton login --server ${serverBase.value} --key your-api-key`
 )
 
+const linkAndDeployCommand = computed(() =>
+  `automaton link ${app.value?.id ?? ''}\nautomaton deploy`
+)
+
 const starterPrompt = computed(() =>
-  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow the generic application contract as the source of truth. Choose the simplest suitable technology, declare structured build and runtime commands in automaton.json, set working directories, listening port, optional health path, environment, and persistent data directory explicitly. Do not assume a particular language, framework, package manager, or internal source layout.'
+  'Build [APP IDEA] in this local Automaton project.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nUse the application contract in automaton.json to declare structured build and runtime commands, working directories, listening port, optional health path, environment, and persistent data directory. Choose a suitable technology without assuming a particular language, framework, package manager, or internal source layout. Keep the project source local and deploy it with Automaton CLI.'
 )
 
 // Local form state
@@ -1108,75 +1113,82 @@ async function handleSaveTemplateStatus() {
           <template #content>
             <div class="flex flex-column gap-5">
               <p class="text-color-secondary mt-0 mb-0">
-                Build this app locally with your own tools, then push updates with
-                <code class="connect-code">automaton deploy</code>.
-                The CLI is the path for creating or linking the local project and deploying it.
+                Your local project owns this app's source. Use Automaton CLI to pull, edit, link, and deploy. Use Studio to manage its runtime and publishing.
               </p>
 
-              <!-- automaton.json -->
+              <!-- CLI setup -->
               <div>
-                <div class="font-semibold mb-1">1. Your app identity (<code class="connect-code">automaton.json</code>)</div>
+                <div class="font-semibold mb-1">1. Set up the CLI</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  The CLI can write this for you with <code class="connect-code">automaton link</code>.
-                  If you create it manually, place it at the root of your local project.
-                </p>
-                <div class="connect-snippet">
-                  <pre>{{ JSON.stringify({ appId: app?.id, name: app?.name, server: serverBase }, null, 2) }}</pre>
-                  <Button
-                    :icon="copiedItem === 'json' ? 'pi pi-check' : 'pi pi-copy'"
-                    text
-                    rounded
-                    size="small"
-                    class="connect-copy-btn"
-                    @click="copyText(JSON.stringify({ appId: app?.id, name: app?.name, server: serverBase }, null, 2), 'json')"
-                  />
-                </div>
-              </div>
-
-              <!-- CLI -->
-              <div>
-                <div class="font-semibold mb-1">2. Deploy with the CLI</div>
-                <p class="text-color-secondary text-sm mb-2">
-                  Install once, run login with an execute-scope API key, then create or link the
-                  app from the same project folder. This keeps the CLI account and deploy target aligned.
+                  Install the CLI once, then sign in with an API key that can deploy apps.
                 </p>
                 <div class="connect-snippet">
                   <pre>dotnet tool install -g Automaton.Cli</pre>
-                  <Button
-                    :icon="copiedItem === 'cli' ? 'pi pi-check' : 'pi pi-copy'"
-                    text rounded size="small" class="connect-copy-btn"
-                    @click="copyText('dotnet tool install -g Automaton.Cli', 'cli')"
+                  <CopyCommand
+                    command="dotnet tool install -g Automaton.Cli"
+                    button-label="Copy"
+                    :show-command="false"
+                    class="connect-copy-command"
                   />
                 </div>
                 <div class="connect-snippet mt-2">
                   <pre>{{ cliLoginCommand }}</pre>
-                  <Button
-                    :icon="copiedItem === 'login' ? 'pi pi-check' : 'pi pi-copy'"
-                    text rounded size="small" class="connect-copy-btn"
-                    @click="copyText(cliLoginCommand, 'login')"
+                  <CopyCommand
+                    :command="cliLoginCommand"
+                    button-label="Copy"
+                    :show-command="false"
+                    class="connect-copy-command"
                   />
                 </div>
+              </div>
+
+              <div v-if="app?.sourceAvailable">
+                <div class="font-semibold mb-1">2. Pull this app's current source</div>
+                <p class="text-color-secondary text-sm mb-2">
+                  Run this from a folder where the CLI can create a new project directory. It pulls the current source and contract, not a historical source snapshot.
+                </p>
                 <div class="connect-snippet mt-2">
-                  <pre>automaton link {{ app?.id }}
-automaton deploy</pre>
-                  <Button
-                    :icon="copiedItem === 'deploy' ? 'pi pi-check' : 'pi pi-copy'"
-                    text rounded size="small" class="connect-copy-btn"
-                    @click="copyText(`automaton link ${app?.id ?? '<app-id>'}\nautomaton deploy`, 'deploy')"
+                  <pre>automaton pull {{ app?.id }}</pre>
+                  <CopyCommand
+                    :command="`automaton pull ${app?.id ?? ''}`"
+                    button-label="Copy"
+                    :show-command="false"
+                    class="connect-copy-command"
+                  />
+                </div>
+              </div>
+              <p v-else class="text-color-secondary text-sm m-0">
+                This app has no current source available to pull. Link a local project that already has source below.
+              </p>
+
+              <div>
+                <div class="font-semibold mb-1">
+                  {{ app?.sourceAvailable ? '3. Link a project that already has source' : '2. Link a project that already has source' }}
+                </div>
+                <p class="text-color-secondary text-sm mb-2">
+                  Run these commands from a local project folder that already contains this app's source. Linking records the app connection. It does not download source files.
+                </p>
+                <div class="connect-snippet">
+                  <pre>{{ linkAndDeployCommand }}</pre>
+                  <CopyCommand
+                    :command="linkAndDeployCommand"
+                    button-label="Copy"
+                    :show-command="false"
+                    class="connect-copy-command"
                   />
                 </div>
               </div>
 
               <div>
-                <div class="font-semibold mb-1">3. Starter prompt</div>
+                <div class="font-semibold mb-1">Optional prompt for your local AI</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  Paste this prompt into your AI tool. It intentionally keeps the CLI as the source
-                  of truth for app creation, linking, deploy preflight, and deploy.
+                  Use this prompt in an AI tool while working in your local project. Studio does not create or edit app source.
                 </p>
                 <div class="connect-snippet">
                   <pre>{{ starterPrompt }}</pre>
                   <Button
                     :icon="copiedItem === 'prompt' ? 'pi pi-check' : 'pi pi-copy'"
+                    aria-label="Copy local AI prompt"
                     text rounded size="small" class="connect-copy-btn"
                     @click="copyText(starterPrompt, 'prompt')"
                   />
@@ -1187,7 +1199,7 @@ automaton deploy</pre>
               <div>
                 <div class="font-semibold mb-1">Generic application contract</div>
                 <div class="connect-tree">
-                  <div><span class="ct-file">automaton.json</span> <span class="ct-comment">← app link written by CLI</span></div>
+                  <div><span class="ct-file">automaton.json</span> <span class="ct-comment">← application contract</span></div>
                   <div><span class="ct-dir">application</span> <span class="ct-comment">← build/runtime/health/storage contract</span></div>
                   <div class="pl-3"><span class="ct-file">build.command</span> <span class="ct-comment">← executable, arguments, working directory</span></div>
                   <div class="pl-3"><span class="ct-file">runtime.command</span> <span class="ct-comment">← process that serves the application</span></div>
@@ -1529,19 +1541,7 @@ automaton deploy</pre>
   background: color-mix(in srgb, var(--p-red-900) 20%, var(--p-surface-ground));
 }
 
-/* ── Connect to IDE section ── */
-.connect-code {
-  background: var(--p-surface-100);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.83em;
-}
-
-:global(.app-dark) .connect-code {
-  background: var(--p-surface-700);
-}
-
+/* ── Local project guidance ── */
 .connect-snippet {
   position: relative;
   background: var(--p-surface-900, #111);
@@ -1573,6 +1573,17 @@ automaton deploy</pre>
 
 .connect-copy-btn:hover {
   opacity: 1;
+}
+
+.connect-copy-command {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.connect-copy-command :deep(.copy-command__button) {
+  color: #8ef0a1;
+  font-size: 0.75rem;
 }
 
 .connect-tree {

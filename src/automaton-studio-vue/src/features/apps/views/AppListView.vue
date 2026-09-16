@@ -14,6 +14,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
+import CopyCommand from '../components/CopyCommand.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -67,7 +68,7 @@ const viewOptions = ref([
 const activeTabIndex = ref(0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
-  { label: 'How to Build', icon: 'pi pi-book' },
+  { label: 'Local setup', icon: 'pi pi-book' },
 ])
 
 // Local state
@@ -401,9 +402,9 @@ const handleRetry = async () => {
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
             <p class="text-color-secondary mb-4">
-              Create and deploy an app from your local project with Automaton CLI.
+              Create an app in a local project with Automaton CLI, then manage its deployment and runtime in Studio.
             </p>
-            <Button label="View build instructions" icon="pi pi-book" @click="activeTabIndex = 1" />
+            <Button label="View local setup" icon="pi pi-book" @click="activeTabIndex = 1" />
           </div>
         </template>
       </Card>
@@ -411,25 +412,24 @@ const handleRetry = async () => {
     </template><!-- /v-else -->
     </template><!-- /v-if="activeTabIndex === 0" -->
 
-    <!-- ─── HOW TO BUILD TAB ─────────────────────────────────────────── -->
+    <!-- ─── LOCAL SETUP TAB ──────────────────────────────────────────── -->
     <template v-if="activeTabIndex === 1">
       <Card class="quick-start-card">
         <template #content>
           <div class="quick-start-header mb-3">
             <i class="pi pi-book text-xl" style="color: var(--p-primary-500)" />
-            <span class="font-semibold ml-2">How to build an app</span>
+            <span class="font-semibold ml-2">Start a local project</span>
           </div>
 
           <div class="qs-content">
             <p class="text-color-secondary text-sm mt-0 mb-3">
-              Build locally with any editor (Cursor, VS Code…), keep the project in Git,
-              and deploy with the CLI. Let the CLI create or link the project that it will deploy.
+              Work in a local project with the editor and AI of your choice. Run the CLI from that project folder. <code>automaton new</code> creates the local app contract and links a new app. Use <code>automaton deploy</code> to deploy source changes. Studio manages deployments, runtime, logs, and publishing.
             </p>
-            <div class="qs-code mb-2">dotnet tool install -g Automaton.Cli</div>
-            <div class="qs-code mb-2">automaton login</div>
-            <div class="qs-code mb-2">automaton new "My App"</div>
-            <div class="qs-code mb-2">automaton validate</div>
-            <div class="qs-code mb-3">automaton deploy</div>
+            <CopyCommand class="qs-code mb-2" command="dotnet tool install -g Automaton.Cli" />
+            <CopyCommand class="qs-code mb-2" command="automaton login" />
+            <CopyCommand class="qs-code mb-2" command='automaton new "My App"' />
+            <CopyCommand class="qs-code mb-2" command="automaton validate" />
+            <CopyCommand class="qs-code mb-3" command="automaton deploy" />
             <p class="text-color-secondary text-sm mb-2">
               Automaton apps use a generic application contract for build, runtime, health, storage,
               and environment settings. Point your AI tool to
@@ -556,8 +556,12 @@ const handleRetry = async () => {
 
 .qs-steps li { margin-bottom: 4px; }
 
-/* Code blocks are always dark regardless of theme — same as every IDE/terminal */
+/* CLI command blocks use the same colors in both themes. */
 .qs-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   background: #161b22;
   border: 1px solid #30363d;
   border-radius: 6px;
@@ -566,6 +570,10 @@ const handleRetry = async () => {
   font-size: 0.8rem;
   color: #8ef0a1;
   overflow-x: auto;
+}
+
+.qs-code :deep(.copy-command__button) {
+  color: #8ef0a1;
 }
 
 .qs-code--block {
