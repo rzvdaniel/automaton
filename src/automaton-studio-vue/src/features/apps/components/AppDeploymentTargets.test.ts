@@ -47,11 +47,11 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
   }
 }
 
-async function mountTargets(items: AppDeploymentTarget[]) {
+async function mountTargets(items: AppDeploymentTarget[], showDeployAction = true) {
   mocks.listTargets.mockResolvedValue(items)
   mocks.listRunners.mockResolvedValue([])
   const wrapper = mount(AppDeploymentTargets, {
-    props: { appId: 'app-id' },
+    props: { appId: 'app-id', showDeployAction },
     global: {
       plugins: [createPinia(), PrimeVue, ToastService],
       stubs: { Dialog: true, Select: true, Checkbox: true },
@@ -82,6 +82,13 @@ describe('AppDeploymentTargets', () => {
     expect(wrapper.text()).not.toContain('hidden-hosted-runner')
     expect(wrapper.text()).toContain('Canary')
     expect(wrapper.findAll('.p-tag').filter((tag) => tag.text() === 'LIVE')).toHaveLength(1)
+  })
+
+  it('can present deployment state without adding a browser deployment action', async () => {
+    const wrapper = await mountTargets([target()], false)
+
+    expect(wrapper.text()).toContain('Live environment')
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Deploy')).toBe(false)
   })
 
   it('confirms promotion without redeployment and does not render Live deletion', async () => {

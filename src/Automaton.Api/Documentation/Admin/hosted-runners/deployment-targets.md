@@ -51,6 +51,8 @@ Promoting asks for confirmation because it changes which deployed target is serv
 
 Most users can ignore additional targets and continue using Live.
 
+Studio's app Overview reports the current Live runtime separately from deployment history. Its **Last successful deployment** timestamp can remain after runtime cleanup or Runner reassignment and does not, by itself, mean the app is currently deployed.
+
 ## Environment rollout and migration checklist
 
 Normal users work with **Environments**; administrators may use the underlying

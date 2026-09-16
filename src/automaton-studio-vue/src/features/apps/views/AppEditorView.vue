@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * AppEditorView.vue
- * Main Visual IDE for editing apps
- * Editor-first layout with on-demand AI assistant
+ * Operations-first application workspace with transitional authoring access.
  */
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -23,11 +22,18 @@ import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
+import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
+import AppOperationsOverview from '../components/AppOperationsOverview.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 import AppActionContextBar from '../components/AppActionContextBar.vue'
 import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
+import {
+  APP_NAVIGATION_GROUPS,
+  DEFAULT_APP_VIEW,
+  type AppViewKey,
+} from '../app-navigation'
 
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
@@ -97,40 +103,8 @@ const deployableTargets = computed(() => getDeployableTargets(deploymentTargets.
 const selectedDeployTarget = computed(() => deployableTargets.value.find((target) => target.slug === selectedDeployTargetSlug.value) ?? null)
 
 // Active view tab
-const activeTab = ref<'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'>('build')
-const appEditorNavGroups = [
-  {
-    label: 'Develop',
-    items: [
-      { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
-      { key: 'files', label: 'Files', icon: 'pi pi-file-edit' },
-    ],
-  },
-  {
-    label: 'Deploy',
-    items: [
-      { key: 'deployments', label: 'Deployments', icon: 'pi pi-cloud-upload', disabled: true },
-      { key: 'published-app', label: 'Published App', icon: 'pi pi-globe', disabled: true },
-      { key: 'domains', label: 'Domains', icon: 'pi pi-link', disabled: true },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { key: 'versions', label: 'Restore Points', icon: 'pi pi-history' },
-      { key: 'actions', label: 'Actions', icon: 'pi pi-bolt' },
-      { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
-      { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
-      { key: 'services', label: 'Services', icon: 'pi pi-server', disabled: true },
-      { key: 'logs', label: 'Activity', icon: 'pi pi-list' },
-    ],
-  },
-  {
-    items: [
-      { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
-    ],
-  },
-] as const
+const activeTab = ref<AppViewKey>(DEFAULT_APP_VIEW)
+const appEditorNavGroups = APP_NAVIGATION_GROUPS
 
 const activeNavItem = computed(() => {
   return activeTab.value
@@ -140,7 +114,7 @@ watch(
   () => route.query.settings,
   (section) => {
     if (section === 'publishing') {
-      activeTab.value = 'settings'
+      activeTab.value = 'publishing'
     }
   },
   { immediate: true },
@@ -236,7 +210,7 @@ function handleRightPanelSplitterResize(event: any) {
 }
 
 function toggleAssistantPanel() {
-  if (activeTab.value === 'services') {
+  if (activeTab.value !== 'build' && activeTab.value !== 'files') {
     return
   }
 
@@ -248,21 +222,17 @@ function toggleAssistantPanel() {
   saveRightPanelOpen(isRightPanelOpen.value)
 }
 
-function handleSideNavSelect(target: string) {
-  switch (target) {
-    case 'build':
-    case 'files':
-    case 'versions':
-    case 'actions':
-    case 'services':
-    case 'logs':
-    case 'settings':
-      activeTab.value = target
-      rightPanelMode.value = 'aiAssistant'
-      return
-    default:
-      return
+function handleSideNavSelect(target: AppViewKey) {
+  activeTab.value = target
+  rightPanelMode.value = 'aiAssistant'
+
+  const query = { ...route.query }
+  if (target === 'publishing') {
+    query.settings = 'publishing'
+  } else {
+    delete query.settings
   }
+  void router.replace({ query })
 }
 
 // Load sizes from localStorage or use defaults
@@ -474,8 +444,8 @@ function handleSelectViewingTarget(target: AppDeploymentTarget) {
 
 async function handleViewTargetLogs(target: AppDeploymentTarget) {
   await selectViewingTarget(target)
-  activeTab.value = 'build'
-  toast.add({ severity: 'info', summary: `${target.name} logs`, detail: `Backend logs now show ${target.slug}.`, life: 2500 })
+  activeTab.value = 'logs'
+  toast.add({ severity: 'info', summary: `${target.name} logs`, detail: `Showing application activity for ${target.slug}.`, life: 2500 })
 }
 
 watch(() => route.query.target, () => {
@@ -657,7 +627,7 @@ function handleBack() {
 }
 
 function openAssistantPanel(): void {
-  if (activeTab.value === 'services') {
+  if (activeTab.value !== 'build' && activeTab.value !== 'files') {
     return
   }
 
@@ -762,7 +732,7 @@ async function handlePublish(request: PublishAppRequest) {
 }
 
 function openPublishingSettings() {
-  activeTab.value = 'settings'
+  activeTab.value = 'publishing'
   void router.replace({ query: { ...route.query, settings: 'publishing' } })
 }
 
@@ -957,27 +927,27 @@ async function handleVersionCreated() {
 // Handle version restored
 async function handleVersionRestored(versionNumber: number) {
   try {
-    // Reload app files from the restored version
+    // Reload Studio's source copy from the restored snapshot.
     await editorStore.loadApp(appId.value)
     toast.add({
       severity: 'success',
       summary: 'Restored',
-      detail: `App restored to version ${versionNumber}. Files have been reloaded.`,
+      detail: `Source snapshot ${versionNumber} restored in Studio. The running deployment was not changed.`,
       life: 5000,
     })
   } catch (err: unknown) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: err instanceof Error ? err.message : 'Failed to reload app after restoration',
+      detail: err instanceof Error ? err.message : 'Failed to reload Studio source after restoration',
       life: 5000,
     })
   }
 }
 
-// Reload versions when the dedicated page becomes visible
+// Reload source snapshots when the dedicated page becomes visible.
 watch(activeTab, async (tab) => {
-  if (tab === 'versions' && versionHistoryRef.value?.loadVersions) {
+  if (tab === 'snapshots' && versionHistoryRef.value?.loadVersions) {
     await versionHistoryRef.value.loadVersions()
   }
 })
@@ -1149,7 +1119,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @unpublish="handleUnpublish"
       />
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
-        This app was deployed from local files. Source files are not available in Studio, so the Files tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
+        Your local Automaton project is the source of truth. Run <code>automaton pull</code>, edit locally with your AI, then run <code>automaton deploy</code>. Studio authoring tools remain available temporarily during this transition.
       </div>
 
       <div class="app-editor-shell">
@@ -1160,6 +1130,37 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         />
 
         <div class="app-editor-content">
+          <div v-if="activeTab === 'overview'" class="panel-view">
+            <AppOperationsOverview
+              :app="editorStore.currentApp"
+              :targets="deploymentTargets"
+              :application-state="editorStore.applicationState"
+              @navigate="handleSideNavSelect"
+            />
+          </div>
+
+          <div v-if="activeTab === 'deployments'" class="panel-view">
+            <AppDeploymentTargets
+              :app-id="resolvedAppId"
+              :project-id="editorStore.currentApp.projectId"
+              :refresh-revision="targetsRevision"
+              :show-deploy-action="false"
+              @deploy="handleDeployTarget"
+              @view-logs="handleViewTargetLogs"
+              @targets-changed="handleTargetsChanged"
+            />
+          </div>
+
+          <div v-show="activeTab === 'runtime'" class="panel-view runtime-view">
+            <BuildVisualWorkspace
+              :suspend-heavy-rendering="isVisualResizing"
+              :runner-id="selectedRunnerId"
+              :targets="deploymentTargets"
+              :selected-target="selectedViewingTarget"
+              @select-target="handleSelectViewingTarget"
+            />
+          </div>
+
           <div v-show="activeTab === 'logs'" class="panel-view">
             <AppRuntimeLogs
               ref="runtimeLogsRef"
@@ -1167,11 +1168,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             />
           </div>
 
-          <div v-show="activeTab === 'versions'" class="panel-view">
+          <div v-show="activeTab === 'snapshots'" class="panel-view">
             <AppVersionHistory
               ref="versionHistoryRef"
               :app-id="resolvedAppId"
-              title="Restore Points"
+              title="Source snapshots"
               full-page
               @version-restored="handleVersionRestored"
               @version-created="handleVersionCreated"
@@ -1182,8 +1183,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
           </div>
 
           <!-- Settings View -->
-          <div v-show="activeTab === 'settings'" class="settings-view">
+          <div v-show="activeTab === 'publishing' || activeTab === 'settings'" class="settings-view">
             <AppSettings
+              :key="activeTab"
               :targets-revision="targetsRevision"
               @deploy-target="handleDeployTarget"
               @view-target-logs="handleViewTargetLogs"

@@ -6,11 +6,12 @@ import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
+import type { AppViewKey } from '../app-navigation'
 
 const { isDark } = useUserSettings()
 
 const props = defineProps<{
-  activeTab: 'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'
+  activeTab: AppViewKey
   appName: string
   isEditingName: boolean
   editingName: string
@@ -42,7 +43,7 @@ const isStatusDetailsOpen = ref(false)
 let statusAutoCollapseTimer: number | null = null
 
 const showsEditorActions = computed(() =>
-  props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
+  props.activeTab === 'build' || props.activeTab === 'files',
 )
 
 const isPrimaryActionDisabled = computed(() => {
@@ -222,7 +223,7 @@ const statusPrimaryAction = computed(() => {
   }
 
   return {
-    label: props.canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI',
+    label: 'Deploy from CLI',
     icon: 'pi pi-cloud-upload',
     loading: props.isDeployingApp,
     disabled: props.isDeployingApp,
@@ -352,9 +353,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="workspace-actions">
-      <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
+      <div v-if="showsEditorActions" class="deploy-actions">
         <Button
-          :label="canDeployFromStudio ? 'Deploy application' : 'Deploy with CLI'"
+          label="Deploy from CLI"
           icon="pi pi-cloud-upload"
           class="deploy-main-button"
           severity="success"

@@ -1,23 +1,13 @@
 <script setup lang="ts">
-interface NavItem {
-  key: string
-  label: string
-  icon: string
-  disabled?: boolean
-}
-
-interface NavGroup {
-  label?: string
-  items: ReadonlyArray<NavItem>
-}
+import type { AppNavigationGroup, AppViewKey } from '../app-navigation'
 
 defineProps<{
-  activeItem: 'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'
-  groups: ReadonlyArray<NavGroup>
+  activeItem: AppViewKey
+  groups: ReadonlyArray<AppNavigationGroup>
 }>()
 
 const emit = defineEmits<{
-  select: [value: string]
+  select: [value: AppViewKey]
 }>()
 </script>
 
@@ -29,13 +19,13 @@ const emit = defineEmits<{
       class="side-nav-group"
     >
       <div v-if="group.label" class="side-nav-group-label">{{ group.label }}</div>
+      <div v-if="group.description" class="side-nav-group-description">{{ group.description }}</div>
       <button
         v-for="item in group.items"
         :key="item.key"
         type="button"
         class="side-nav-item"
         :class="{ active: activeItem === item.key }"
-        :disabled="item.disabled"
         @click="emit('select', item.key)"
       >
         <i :class="item.icon"></i>
@@ -68,6 +58,12 @@ const emit = defineEmits<{
   text-transform: uppercase;
 }
 
+.side-nav-group-description {
+  padding: 0 0.75rem 0.45rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.72rem;
+}
+
 .side-nav-item {
   display: flex;
   align-items: center;
@@ -84,7 +80,7 @@ const emit = defineEmits<{
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.side-nav-item:hover:not(:disabled) {
+.side-nav-item:hover {
   background: var(--p-surface-100);
 }
 
@@ -92,11 +88,6 @@ const emit = defineEmits<{
   background: var(--p-primary-100);
   color: var(--p-primary-700);
   font-weight: 600;
-}
-
-.side-nav-item:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
 }
 
 .side-nav-item i {
@@ -110,7 +101,7 @@ const emit = defineEmits<{
   background: var(--p-surface-900);
 }
 
-:global(.app-dark) .side-nav-item:hover:not(:disabled) {
+:global(.app-dark) .side-nav-item:hover {
   background: var(--p-surface-800);
 }
 
