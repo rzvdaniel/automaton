@@ -36,13 +36,13 @@ const deploymentLabel = computed(() => {
   if (!liveTarget.value) return 'No deployment target'
   if (props.applicationState === 'Source changed') return 'Local changes not deployed'
   if (props.applicationState === 'Build failed') return 'Last deployment failed'
-  return liveTarget.value.lastSuccessfulDeploymentAt ? 'Deployed' : 'Not deployed'
+  return liveTarget.value.genericRuntimeDeployed ? 'Deployed' : 'Not deployed'
 })
 
 const lastDeploymentLabel = computed(() => {
   const value = liveTarget.value?.lastSuccessfulDeploymentAt
   if (!value) return 'No successful deployment'
-  return new Date(value).toLocaleString()
+  return `Last successful deployment: ${new Date(value).toLocaleString()}`
 })
 
 async function copyDeployCommand() {

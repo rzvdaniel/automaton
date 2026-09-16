@@ -84,6 +84,22 @@ describe('AppOperationsOverview', () => {
     expect(wrapper.text()).not.toContain('Create File')
   })
 
+  it('keeps historical deployment time separate from current deployment state', () => {
+    const wrapper = mount(AppOperationsOverview, {
+      props: {
+        app: app(),
+        targets: [liveTarget({ genericRuntimeDeployed: false })],
+        applicationState: 'Not deployed',
+      },
+    })
+    const deploymentCard = wrapper
+      .findAll('.status-card')
+      .find((card) => card.find('.status-label').text() === 'Deployment')
+
+    expect(deploymentCard?.find('strong').text()).toBe('Not deployed')
+    expect(deploymentCard?.text()).toContain('Last successful deployment:')
+  })
+
   it('navigates to operational destinations', async () => {
     const wrapper = mount(AppOperationsOverview, {
       props: { app: app(), targets: [liveTarget()], applicationState: 'Deployed' },
