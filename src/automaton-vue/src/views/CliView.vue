@@ -134,8 +134,8 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           <div class="flow">
             <div class="flow-item"><strong>AI Agent</strong><span>Generates and edits the app locally.</span></div>
             <div class="flow-item"><strong>Automaton CLI</strong><span>Applies structure, metadata, and deployment commands.</span></div>
-            <div class="flow-item"><strong>Automaton Studio</strong><span>Manages apps, publishing, visibility, and remixes.</span></div>
-            <div class="flow-item"><strong>Published App</strong><span>Goes live as public, private, or forkable.</span></div>
+            <div class="flow-item"><strong>Automaton Studio</strong><span>Manages apps, deployments, publishing, and visibility.</span></div>
+            <div class="flow-item"><strong>Published App</strong><span>Goes live as public or private.</span></div>
             <div class="flow-item"><strong>Runner</strong><span>Executes configured server logic locally or in Docker.</span></div>
           </div>
         </div>

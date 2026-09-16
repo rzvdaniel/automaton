@@ -35,7 +35,7 @@ const activeAppCopy = computed(() => {
   const app = activeApp.value
   if (!app) return ''
 
-  return app.summary || app.description || 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.'
+  return app.summary || app.description || 'Live apps show what one person can ship with an AI agent.'
 })
 const sideApps = computed(() =>
   heroApps.value
@@ -483,7 +483,7 @@ watch(
                 <div class="studio-feature">Create and rotate API keys</div>
                 <div class="studio-feature">Monitor runner status</div>
                 <div class="studio-feature">Edit summaries and descriptions</div>
-                <div class="studio-feature">Publish, fork, and organize apps</div>
+                <div class="studio-feature">Publish and organize apps</div>
               </div>
 
               <div class="studio-actions">
@@ -503,14 +503,14 @@ watch(
               <div class="studio-screenshot-slot">
                 <img
                   :src="studioScreenshotUrl"
-                  alt="Automaton Studio apps dashboard showing app creation, app list, and publishing controls"
+                  alt="Automaton Studio apps dashboard for deployments, metadata, and publishing"
                 />
               </div>
 
               <div class="studio-caption">
                 <div class="caption-card">
                   <strong>Apps</strong>
-                  <span>Manage metadata, screenshots, covers, publishing, and forks.</span>
+                  <span>Manage metadata, screenshots, covers, publishing, and deployments.</span>
                 </div>
                 <div class="caption-card">
                   <strong>Runners</strong>

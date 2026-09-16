@@ -139,15 +139,6 @@ export interface ApplicationContract {
   storage: ApplicationStorageSpec
 }
 
-export function createDefaultApplicationContract(): ApplicationContract {
-  return {
-    build: { image: null, command: null, outputDirectory: null, timeoutSeconds: 900 },
-    runtime: { image: null, command: null, port: 8080 },
-    health: { path: null, port: null, startupTimeoutSeconds: 60 },
-    storage: { dataDirectory: 'data', mounts: [] },
-  }
-}
-
 export interface AppListItem {
   id: string
   name: string
@@ -232,19 +223,6 @@ export const AppRuntimeSource = {
 
 export type AppRuntimeSource = (typeof AppRuntimeSource)[keyof typeof AppRuntimeSource]
 
-export interface AppDeployCapabilities {
-  canDeployApplicationFromStudio: boolean
-}
-
-/**
- * Request to create a new app
- * Matches src/Automaton.Api/Models/NewApp.cs
- */
-export interface CreateAppRequest {
-  name: string
-  executionRunnerId?: string
-}
-
 /**
  * Request to publish an app
  */
@@ -258,24 +236,6 @@ export interface PublishAppRequest {
   runtimeVisibility?: 'private' | 'public'
   catalogVisibility?: 'unlisted' | 'listed'
   marketplacePreviewMode?: 'launchable' | 'mediaOnly'
-}
-
-export interface ForkAppRequest {
-  name?: string
-}
-
-export interface ForkAppSource {
-  id: string
-  name: string
-  publicUrl?: string | null
-  summary?: string | null
-  description?: string | null
-  thumbnailUrl?: string | null
-  creatorPublicUsername?: string | null
-  creatorDisplayName: string
-  hasApplicationSource: boolean
-  runtimeLabel: string
-  application?: ApplicationContract | null
 }
 
 export interface ExportAppResponse {
@@ -370,30 +330,6 @@ export interface FileNode {
   icon?: string
   children?: FileNode[]
   isOpen?: boolean
-}
-
-export const PendingFileChangeType = {
-  Modified: 'modified',
-  Added: 'added',
-  Deleted: 'deleted',
-} as const
-
-export type PendingFileChangeType = (typeof PendingFileChangeType)[keyof typeof PendingFileChangeType]
-
-/**
- * Open file in editor with content and state
- */
-export interface OpenFile {
-  path: string
-  content: string
-  language: string // 'html', 'css', 'javascript', 'json', etc.
-  isDirty: boolean // Has unsaved changes
-  originalContent: string // For detecting changes
-  scope?: AppFileSystemScope
-  isReadOnly?: boolean
-  isBackendStep?: boolean // True if this is a backend step file
-  stepId?: string // Backend step ID if isBackendStep is true
-  stepName?: string // Backend step name for display
 }
 
 /**

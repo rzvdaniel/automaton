@@ -7,8 +7,6 @@ export const APP_VIEW_KEYS = [
   'snapshots',
   'publishing',
   'settings',
-  'build',
-  'files',
 ] as const
 
 export type AppViewKey = (typeof APP_VIEW_KEYS)[number]
@@ -46,12 +44,31 @@ export const APP_NAVIGATION_GROUPS: ReadonlyArray<AppNavigationGroup> = [
       { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
     ],
   },
-  {
-    label: 'Legacy authoring',
-    description: 'Temporary access before Stage 2',
-    items: [
-      { key: 'build', label: 'AI workspace', icon: 'pi pi-sparkles' },
-      { key: 'files', label: 'Source editor', icon: 'pi pi-file-edit' },
-    ],
-  },
 ]
+
+export function resolveAppView(value: unknown): AppViewKey {
+  switch (value) {
+    case 'overview':
+    case 'deployments':
+    case 'runtime':
+    case 'logs':
+    case 'actions':
+    case 'snapshots':
+    case 'publishing':
+    case 'settings':
+      return value
+    default:
+      return DEFAULT_APP_VIEW
+  }
+}
+
+export function withoutAuthoringQuery(query: LocationQuery): LocationQueryRaw {
+  const result: LocationQueryRaw = { ...query }
+  delete result.prompt
+  delete result.mode
+  delete result.model
+  delete result.tab
+  if (resolveAppView(query.view) === DEFAULT_APP_VIEW) delete result.view
+  return result
+}
+import type { LocationQuery, LocationQueryRaw } from 'vue-router'

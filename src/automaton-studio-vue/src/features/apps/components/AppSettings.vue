@@ -15,12 +15,11 @@ import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
-import ApplicationContractEditor from './ApplicationContractEditor.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
-import { AccessScope, createDefaultApplicationContract, type AppDeploymentTarget, type AppScreenshot, type ApplicationContract } from '../types/apps.types'
+import { AccessScope, type AppDeploymentTarget, type AppScreenshot } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
 import { resolveMediaUrl } from '../utils/media-url'
 
@@ -33,7 +32,6 @@ const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const props = defineProps<{ targetsRevision?: number }>()
 const emit = defineEmits<{
-  deployTarget: [target: AppDeploymentTarget]
   viewTargetLogs: [target: AppDeploymentTarget]
   targetsChanged: [targets: AppDeploymentTarget[]]
 }>()
@@ -45,7 +43,7 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'application' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
@@ -86,7 +84,6 @@ const requiresAuthentication = ref(false)
 const isForkable = ref(false)
 const isProfileFeatured = ref(false)
 const thumbnailUrl = ref<string | undefined>(undefined)
-const applicationContract = ref<ApplicationContract>(createDefaultApplicationContract())
 const tags = ref<string[]>([])
 const originalTags = ref<string[]>([])
 const tagInput = ref('')
@@ -164,14 +161,9 @@ const hasChanges = computed(() => {
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
     !sameTags(tags.value, originalTags.value) ||
-    pendingTags.value.length > 0 ||
-    JSON.stringify(applicationContract.value) !== JSON.stringify(app.value.application)
+    pendingTags.value.length > 0
   )
 })
-
-function cloneApplicationContract(value: ApplicationContract): ApplicationContract {
-  return JSON.parse(JSON.stringify(value)) as ApplicationContract
-}
 
 const fullPublicUrl = computed(() => {
   if (!publicUrl.value) return ''
@@ -258,7 +250,6 @@ watch(
       isForkable.value = newApp.isForkable ?? false
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
-      applicationContract.value = cloneApplicationContract(newApp.application ?? createDefaultApplicationContract())
       isSample.value = newApp.isSample ?? false
       isFeatured.value = newApp.isFeatured ?? false
       const fallbackTags = parseLegacyTags(newApp.tags)
@@ -365,7 +356,6 @@ async function saveSettings() {
       requiresAuthentication: requiresAuthentication.value,
       isForkable: isForkable.value,
       isProfileFeatured: isProfileFeatured.value,
-      application: cloneApplicationContract(applicationContract.value),
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
     originalTags.value = [...tags.value]
@@ -379,7 +369,6 @@ async function saveSettings() {
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
       editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
-      editorStore.currentApp.application = cloneApplicationContract(applicationContract.value)
       editorStore.currentApp.tags = tags.value.join(',') || null
     }
 
@@ -620,14 +609,6 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'basic'"
               />
               <Button
-                label="Runtime contract (transition)"
-                icon="pi pi-code"
-                text
-                :class="{ 'surface-hover': activeSection === 'application' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'application'"
-              />
-              <Button
                 label="Publishing"
                 icon="pi pi-globe"
                 text
@@ -763,28 +744,6 @@ async function handleSaveTemplateStatus() {
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
                 <Button
                   label="Save Changes"
-                  icon="pi pi-save"
-                  :loading="isSaving"
-                  :disabled="!hasChanges"
-                  @click="saveSettings"
-                />
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <!-- Generic application contract -->
-        <Card v-if="activeSection === 'application'">
-          <template #title>Runtime contract (transition)</template>
-          <template #content>
-            <div class="flex flex-column gap-4">
-              <Message severity="info" :closable="false">
-                Your local <code>automaton.json</code> is authoritative for the next deployment. This transitional Studio form updates the server-side contract copy, not your local project.
-              </Message>
-              <ApplicationContractEditor v-model="applicationContract" />
-              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
-                <Button
-                  label="Save server-side contract copy"
                   icon="pi pi-save"
                   :loading="isSaving"
                   :disabled="!hasChanges"
@@ -999,7 +958,7 @@ async function handleSaveTemplateStatus() {
               :app-id="app.id"
               :project-id="app.projectId"
               :refresh-revision="props.targetsRevision"
-              @deploy="emit('deployTarget', $event)"
+              :show-deploy-action="false"
               @view-logs="emit('viewTargetLogs', $event)"
               @targets-changed="emit('targetsChanged', $event)"
             />

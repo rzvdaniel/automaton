@@ -365,8 +365,6 @@ onMounted(() => {
                       title="Stored Files"
                       :nodes="fileTree"
                       :active-path="activePath"
-                      :show-create="false"
-                      :allow-delete="false"
                       empty-message="No files available for this app."
                       @open-file="openFile"
                     />

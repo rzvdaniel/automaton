@@ -5,14 +5,8 @@ import PrimeVue from 'primevue/config'
 import Tooltip from 'primevue/tooltip'
 import AppVersionHistory from './AppVersionHistory.vue'
 
-const confirmRequire = vi.fn()
-
 vi.mock('primevue/usetoast', () => ({
   useToast: () => ({ add: vi.fn() }),
-}))
-
-vi.mock('primevue/useconfirm', () => ({
-  useConfirm: () => ({ require: confirmRequire }),
 }))
 
 vi.mock('../services/apps.service', () => ({
@@ -33,8 +27,6 @@ vi.mock('../services/apps.service', () => ({
       pageSize: 20,
     }),
     getVersionDetail: vi.fn(),
-    createVersionSnapshot: vi.fn(),
-    restoreVersion: vi.fn(),
   },
 }))
 
@@ -46,7 +38,7 @@ beforeAll(() => {
 })
 
 describe('AppVersionHistory', () => {
-  it('describes restore history as source snapshots, not deployed versions', async () => {
+  it('shows source snapshot history without source mutation controls', async () => {
     const wrapper = mount(AppVersionHistory, {
       props: { appId: 'app-id', fullPage: true },
       global: {
@@ -58,16 +50,7 @@ describe('AppVersionHistory', () => {
 
     expect(wrapper.text()).toContain('Source snapshots')
     expect(wrapper.text()).toContain('Snapshot 3')
-
-    const restoreButton = wrapper.findAll('button').find((button) =>
-      button.attributes('class')?.includes('p-button-warn'),
-    )
-    if (!restoreButton) throw new Error('Restore source snapshot button not found')
-    await restoreButton.trigger('click')
-
-    expect(confirmRequire).toHaveBeenCalledWith(expect.objectContaining({
-      message: expect.stringContaining('does not deploy the source or roll back the running application'),
-      acceptLabel: 'Restore source',
-    }))
+    expect(wrapper.text()).not.toContain('Restore source')
+    expect(wrapper.text()).not.toContain('Create source snapshot')
   })
 })
