@@ -29,7 +29,7 @@ public static class PullCommand
             "Target directory (defaults to current directory for refresh mode, or a new subfolder in the current directory for app mode)");
         var forceOption = new Option<bool>("--force", "Overwrite matching local files without prompting");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable progress rendering and use plain output");
-        var environmentOption = new Option<string?>("--env", "Environment name to use and retain in a newly pulled project");
+        var environmentOption = new Option<string?>("--env", "Local project profile to link, for example local or live");
 
         var cmd = new Command("pull", "Download editable app source files from the server")
         {
@@ -84,7 +84,7 @@ public static class PullCommand
         }
 
         var (server, apiKey) = config.RequireCredentials(appConfig, cwd, environmentName);
-        var targetDir = dir ?? cwd;
+        var targetDir = dir ?? config.FindNearestProjectRoot(cwd) ?? cwd;
 
         WriteStart(nonInteractive, appConfig.Name, targetDir);
 
@@ -101,13 +101,21 @@ public static class PullCommand
         var overwritePaths = GetOverwritePaths(downloads);
         EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
 
-        await DownloadFilesAsync(client, resolved.AppId, downloads, nonInteractive);
+        await StageAndCommitRefreshAsync(
+            targetDir,
+            downloads,
+            remotePath => client.ReadScopedFileAsync(resolved.AppId, "source", remotePath),
+            nonInteractive);
+
+        WritePulledApp(nonInteractive, appConfig.Name, resolved.AppId, targetDir);
     }
 
     private static async Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive, string? environmentName)
     {
-        var resolved = config.ResolveContext(directory: cwd, environmentName: environmentName);
-        var (server, apiKey) = config.RequireCredentials(directory: cwd, environmentName: environmentName);
+        var (server, apiKey) = config.RequireCredentials(
+            directory: cwd,
+            environmentName: environmentName,
+            allowMissingEnvironment: true);
         using var client = new AutomatonApiClient(server, apiKey);
 
         var app = await ResolveAppAsync(client, appIdentifier);
@@ -163,10 +171,9 @@ public static class PullCommand
             }
 
             config.SaveProjectConfig(stagingDirectory, pulledConfig);
-            var selectedEnvironmentName = resolved.EnvironmentName ?? ConfigService.DefaultEnvironmentName;
+            var selectedEnvironmentName = config.ResolveAppBindingEnvironmentName(cwd, environmentName);
             var environment = config.LoadNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName) ?? new GlobalConfig();
             environment.Server = server;
-            environment.ApiKey = apiKey;
             environment.AppId = appId;
             config.SaveNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName, environment);
             config.SaveProjectEnvironmentSelection(
@@ -187,26 +194,16 @@ public static class PullCommand
 
             CommitStagedProject(stagingDirectory, targetDir, targetExisted);
 
-            if (nonInteractive)
+            WritePulledApp(nonInteractive, appName, appId, targetDir);
+            if (guidance is not null)
             {
-                Console.WriteLine(guidance is null ? "Wrote automaton.json" : $"Wrote automaton.json ({guidance.Mode})");
-                Console.WriteLine($"Linked app: {appId}");
-                if (!string.IsNullOrWhiteSpace(guidanceWarning))
-                {
-                    Console.WriteLine($"Warning: {guidanceWarning}");
-                }
+                if (nonInteractive) Console.WriteLine($"Local AI guidance synced ({guidance.Mode}).");
+                else AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
             }
-            else
+            else if (!string.IsNullOrWhiteSpace(guidanceWarning))
             {
-                AnsiConsole.MarkupLine($"[green]✓[/] Wrote [bold]automaton.json[/] and linked app [cyan]{appId}[/]");
-                if (guidance is not null)
-                {
-                    AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
-                }
-                else if (!string.IsNullOrWhiteSpace(guidanceWarning))
-                {
-                    AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
-                }
+                if (nonInteractive) Console.WriteLine($"Warning: {guidanceWarning}");
+                else AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
             }
         }
         finally
@@ -251,6 +248,116 @@ public static class PullCommand
 
         Directory.Delete(fullTargetDirectory);
         Directory.Move(stagingDirectory, fullTargetDirectory);
+    }
+
+    internal static void CommitStagedRefresh(
+        string stagingDirectory,
+        string targetDirectory,
+        IReadOnlyList<SourceDownload> downloads)
+    {
+        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+        var backupDirectory = stagingDirectory + ".rollback";
+        var changedFiles = new List<(string Target, string? Backup)>();
+        var preserveBackups = false;
+
+        try
+        {
+            foreach (var download in downloads)
+            {
+                var relativePath = Path.GetRelativePath(fullTargetDirectory, download.LocalPath);
+                var stagedPath = ResolveTargetPath(stagingDirectory, relativePath);
+                if (!File.Exists(stagedPath))
+                {
+                    throw new InvalidOperationException($"Staged pull file is missing: {download.RemotePath}");
+                }
+
+                EnsureNoReparsePoints(download.LocalPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
+
+                string? backupPath = null;
+                if (File.Exists(download.LocalPath))
+                {
+                    backupPath = ResolveTargetPath(backupDirectory, relativePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
+                    File.Copy(download.LocalPath, backupPath);
+                }
+
+                changedFiles.Add((download.LocalPath, backupPath));
+                File.Move(stagedPath, download.LocalPath, overwrite: true);
+            }
+        }
+        catch (Exception commitError)
+        {
+            Exception? rollbackError = null;
+            foreach (var changedFile in changedFiles.AsEnumerable().Reverse())
+            {
+                try
+                {
+                    if (changedFile.Backup is null)
+                    {
+                        if (File.Exists(changedFile.Target))
+                        {
+                            File.Delete(changedFile.Target);
+                        }
+                    }
+                    else
+                    {
+                        File.Copy(changedFile.Backup, changedFile.Target, overwrite: true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    rollbackError ??= ex;
+                }
+            }
+
+            if (rollbackError is not null)
+            {
+                preserveBackups = true;
+                throw new InvalidOperationException(
+                    $"Pull could not finish and local rollback also failed: {rollbackError.Message}. Recovery copies are in '{backupDirectory}'.",
+                    commitError);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (!preserveBackups && Directory.Exists(backupDirectory))
+            {
+                Directory.Delete(backupDirectory, recursive: true);
+            }
+        }
+    }
+
+    internal static async Task StageAndCommitRefreshAsync(
+        string targetDirectory,
+        IReadOnlyList<SourceDownload> downloads,
+        Func<string, Task<string>> readFile,
+        bool nonInteractive)
+    {
+        var stagingDirectory = CreateStagingDirectory(targetDirectory);
+        try
+        {
+            var stagedDownloads = downloads
+                .Select(download => download with
+                {
+                    LocalPath = ResolveTargetPath(
+                        stagingDirectory,
+                        Path.GetRelativePath(targetDirectory, download.LocalPath))
+                })
+                .ToList();
+
+            await DownloadFilesAsync(stagedDownloads, readFile, nonInteractive);
+            CommitStagedRefresh(stagingDirectory, targetDirectory, downloads);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingDirectory))
+            {
+                Directory.Delete(stagingDirectory, recursive: true);
+            }
+        }
     }
 
     private static ApplicationContract ReadApplicationContract(JsonElement app)
@@ -447,29 +554,9 @@ public static class PullCommand
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static async Task<JsonElement> ResolveAppAsync(AutomatonApiClient client, string appIdentifier)
+    internal static async Task<JsonElement> ResolveAppAsync(AutomatonApiClient client, string appIdentifier)
     {
-        if (Guid.TryParse(appIdentifier, out _))
-        {
-            return await client.GetAppAsync(appIdentifier);
-        }
-
-        var apps = await client.ListAppsAsync();
-        if (apps.ValueKind != JsonValueKind.Array)
-        {
-            throw new InvalidOperationException("Unexpected app list response while resolving the app slug.");
-        }
-
-        foreach (var app in apps.EnumerateArray())
-        {
-            var publicUrl = TryReadString(app, "publicUrl");
-            if (string.Equals(publicUrl, appIdentifier, StringComparison.OrdinalIgnoreCase))
-            {
-                return app.Clone();
-            }
-        }
-
-        throw new InvalidOperationException($"No accessible app matched slug '{appIdentifier}'.");
+        return await client.GetAppByIdOrSlugAsync(appIdentifier);
     }
 
     internal static string ResolveTargetPath(string targetDirectory, string relativePath)
@@ -600,5 +687,22 @@ public static class PullCommand
         {
             AnsiConsole.MarkupLine("[yellow]No source files found on the server.[/]");
         }
+    }
+
+    private static void WritePulledApp(bool nonInteractive, string appName, string appId, string targetDirectory)
+    {
+        if (nonInteractive)
+        {
+            Console.WriteLine($"Pulled app: {appName}");
+            Console.WriteLine($"App ID: {appId}");
+            Console.WriteLine($"Local project: {targetDirectory}");
+            Console.WriteLine("Edit locally, then run 'automaton deploy'.");
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Pulled app [bold]{Markup.Escape(appName)}[/]");
+        AnsiConsole.MarkupLine($"[grey]App ID:[/] {Markup.Escape(appId)}");
+        AnsiConsole.MarkupLine($"[grey]Local project:[/] {Markup.Escape(targetDirectory)}");
+        AnsiConsole.MarkupLine("[grey]Edit locally, then run 'automaton deploy'.[/]");
     }
 }

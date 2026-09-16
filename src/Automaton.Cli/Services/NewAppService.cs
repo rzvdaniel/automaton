@@ -33,9 +33,7 @@ public sealed class NewAppService
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var resolvedEnvironmentName = string.IsNullOrWhiteSpace(environmentName)
-            ? ConfigService.DefaultEnvironmentName
-            : environmentName.Trim();
+        var resolvedEnvironmentName = _config.ResolveAppBindingEnvironmentName(directory, environmentName);
 
         var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
         checks.Add(credentialsCheck);
@@ -65,9 +63,71 @@ public sealed class NewAppService
             };
         }
 
+        var currentDirectory = Path.GetFullPath(directory);
+        var nearestProjectRoot = _config.FindNearestProjectRoot(directory);
+        if (nearestProjectRoot is not null
+            && !string.Equals(Path.GetFullPath(nearestProjectRoot), currentDirectory, OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal))
+        {
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.LocalScaffold,
+                false,
+                $"an Automaton project already exists at '{nearestProjectRoot}'; run automaton new from that project root or a separate folder"));
+            nextSteps.Add("Run automaton new from the existing project root or choose a separate local folder");
+            return new NewAppResult
+            {
+                Success = false,
+                Summary = "New failed",
+                Checks = checks,
+                NextSteps = nextSteps.ToList(),
+                Name = name.Trim(),
+                Server = server
+            };
+        }
+
+        var configPath = Path.Combine(directory, "automaton.json");
+        var existingConfig = _config.TryLoadProjectConfig(directory);
+        if (File.Exists(configPath) && existingConfig is null)
+        {
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.LocalScaffold,
+                false,
+                "automaton.json exists but is invalid or unreadable; fix it before creating an app"));
+            nextSteps.Add("Fix automaton.json and rerun automaton new, or use automaton validate for contract diagnostics");
+            return new NewAppResult
+            {
+                Success = false,
+                Summary = "New failed",
+                Checks = checks,
+                NextSteps = nextSteps.ToList(),
+                Name = name.Trim(),
+                Server = server
+            };
+        }
+
+        var existingEnvironment = _config.LoadNamedEnvironmentConfig(directory, resolvedEnvironmentName);
+        var existingAppId = existingEnvironment?.AppId ?? existingConfig?.AppId;
+        if (!string.IsNullOrWhiteSpace(existingAppId))
+        {
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.CreateApp,
+                false,
+                $"this project is already linked to app {existingAppId}"));
+            nextSteps.Add($"Run automaton deploy to deploy this project, or select another profile with --env <name>");
+            return new NewAppResult
+            {
+                Success = false,
+                Summary = "New failed",
+                Checks = checks,
+                NextSteps = nextSteps.ToList(),
+                Name = name.Trim(),
+                Server = server
+            };
+        }
+
         try
         {
-            var existingConfig = _config.TryLoadProjectConfig(directory);
             _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, name.Trim()));
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.LocalScaffold,
@@ -95,7 +155,6 @@ public sealed class NewAppService
 
             var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, resolvedEnvironmentName) ?? new GlobalConfig();
             namedEnvironment.Server = server;
-            namedEnvironment.ApiKey = apiKey;
             namedEnvironment.AppId = appId;
             _config.SaveNamedEnvironmentConfig(directory, resolvedEnvironmentName, namedEnvironment);
             _config.SaveProjectEnvironmentSelection(directory, new ProjectEnvironmentSelection { Default = resolvedEnvironmentName });

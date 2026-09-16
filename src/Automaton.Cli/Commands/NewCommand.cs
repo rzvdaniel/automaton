@@ -15,7 +15,7 @@ public static class NewCommand
         };
         var nameOption = new Option<string?>(["--name", "-n"], "App name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
-        var environmentOption = new Option<string?>("--env", "Environment name to create and link, for example local or live");
+        var environmentOption = new Option<string?>("--env", "Local project profile to link, for example local or live");
 
         var cmd = new Command("new", "Create a new Automaton app and link this directory")
         {
@@ -28,7 +28,10 @@ public static class NewCommand
         cmd.SetHandler(async (string? nameArgumentValue, string? nameOptionValue, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd, environmentName: environmentName);
+            var (server, apiKey) = config.ResolveCredentials(
+                directory: cwd,
+                environmentName: environmentName,
+                allowMissingEnvironment: true);
 
             var resolvedName = string.IsNullOrWhiteSpace(nameOptionValue)
                 ? nameArgumentValue
@@ -85,8 +88,8 @@ public static class NewCommand
 
             AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{result.Name}[/]");
             AnsiConsole.MarkupLine($"[grey]App ID:[/] {result.AppId}");
-            AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
-            AnsiConsole.MarkupLine("[grey]Run 'automaton deploy' when the app is ready to upload.[/]");
+            AnsiConsole.MarkupLine($"[grey]Local project:[/] {Spectre.Console.Markup.Escape(cwd)}");
+            AnsiConsole.MarkupLine("[grey]automaton.json written. Build or edit the app locally, then run 'automaton deploy'.[/]");
             Environment.ExitCode = 0;
         }, nameArgument, nameOption, jsonOption, environmentOption);
 

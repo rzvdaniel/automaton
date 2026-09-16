@@ -7,6 +7,16 @@ namespace Automaton.Cli.Services;
 
 public sealed class DeployService
 {
+    private sealed record LocalDeployPreflight(
+        Models.AutomatonConfig? ProjectConfig,
+        string? Server,
+        string? ApiKey,
+        string? AppId,
+        string? DeployDirectory,
+        List<DeployCheckResult> Checks,
+        HashSet<string> NextSteps,
+        bool IsValid);
+
     private const string AutomatonConfigFileName = "automaton.json";
     private const string DeployStatePreparingManagedRuntime = "preparingManagedRuntime";
     private const string DeployStateManagedRunnerProvisionFailed = "managedRunnerProvisionFailed";
@@ -66,63 +76,34 @@ public sealed class DeployService
         DeploymentTargetInfo? target = null,
         CancellationToken cancellationToken = default)
     {
-        var checks = new List<DeployCheckResult>();
-        var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var preflight = CreateLocalPreflight(directory, directoryOverride, environmentName);
+        var checks = preflight.Checks;
+        var nextSteps = preflight.NextSteps;
         DeployUploadResult? uploadResult = null;
         DeployRuntimeResult? runtimeResult = null;
 
-        var configPath = Path.Combine(directory, AutomatonConfigFileName);
-        var configFileExists = File.Exists(configPath);
-        var projectConfig = config.TryLoadProjectConfig(directory);
-        var resolved = config.ResolveContext(projectConfig, directory, environmentName);
-        var server = resolved.Server;
-        var apiKey = resolved.ApiKey;
-        var appId = resolved.AppId;
+        foreach (var check in checks)
+        {
+            checkReported?.Invoke(check);
+        }
 
-        var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, appId, nextSteps);
-        AddCheck(checks, appLinkCheck);
+        var projectConfig = preflight.ProjectConfig;
+        var server = preflight.Server;
+        var apiKey = preflight.ApiKey;
+        var appId = preflight.AppId;
+        var deployDirectory = preflight.DeployDirectory;
 
-        var credentialsCheck = ValidateCredentials(server, apiKey, nextSteps);
-        AddCheck(checks, credentialsCheck);
-
-        if (!appLinkCheck.Success || !credentialsCheck.Success || projectConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+        if (!preflight.IsValid)
         {
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
         }
 
-        var deploymentApplication = ResolveDeploymentApplication(projectConfig.Application, directoryOverride);
-        var buildCheck = ValidateBuildForRunner(deploymentApplication.Build, directory, nextSteps);
-        AddCheck(checks, buildCheck);
-        if (!buildCheck.Success)
-        {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
-        }
-
-        var actionsCheck = ValidateActions(directory, nextSteps, out var actionCount);
-        AddCheck(checks, actionsCheck);
-        if (!actionsCheck.Success)
-        {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
-        }
-
-        var applicationCheck = ValidateApplicationPackage(
-            directory,
-            ApplicationBuildArtifactSelector.GetRelativeDirectory(deploymentApplication),
-            actionCount > 0,
-            deploymentApplication.Runtime.Command is not null,
-            deploymentApplication.Build.Command is not null,
-            nextSteps,
-            out var deployDirectory);
-        AddCheck(checks, applicationCheck);
-        if (!applicationCheck.Success)
-        {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
-        }
+        var deploymentApplication = ResolveDeploymentApplication(projectConfig!.Application, directoryOverride);
 
         try
         {
             ReportProgress("Creating restore point before deployment...");
-            var snapshotResult = await createSnapshotAsync(server, apiKey, appId!, cancellationToken);
+            var snapshotResult = await createSnapshotAsync(server!, apiKey!, appId!, cancellationToken);
             AddCheck(checks, new DeployCheckResult("restore_point", snapshotResult.Created, snapshotResult.Message, IsWarning: !snapshotResult.Created));
             ReportProgress(snapshotResult.Message);
         }
@@ -167,7 +148,7 @@ public sealed class DeployService
                 deployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
             var result = await deployPackageAsync(
-                server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
+                server!, apiKey!, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
             runtimeResult = result.Deploy;
             ReportDeploymentLogs(runtimeResult.Logs);
@@ -199,6 +180,91 @@ public sealed class DeployService
         return CreateResult(
             true, checks, nextSteps, projectConfig, appId, server, clean,
             deployDirectory, uploadResult, runtimeResult, target);
+    }
+
+    public DeployResult? ValidateLocalProject(
+        string directory,
+        bool clean,
+        string? directoryOverride,
+        string? environmentName = null)
+    {
+        var preflight = CreateLocalPreflight(directory, directoryOverride, environmentName);
+        return preflight.IsValid
+            ? null
+            : CreateResult(
+                false,
+                preflight.Checks,
+                preflight.NextSteps,
+                preflight.ProjectConfig,
+                preflight.AppId,
+                preflight.Server,
+                clean,
+                directoryOverride,
+                uploadResult: null,
+                runtimeResult: null);
+    }
+
+    private LocalDeployPreflight CreateLocalPreflight(
+        string directory,
+        string? directoryOverride,
+        string? environmentName)
+    {
+        var checks = new List<DeployCheckResult>();
+        var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var configPath = Path.Combine(directory, AutomatonConfigFileName);
+        var projectConfig = config.TryLoadProjectConfig(directory);
+        var resolved = config.ResolveContext(projectConfig, directory, environmentName);
+        var server = resolved.Server;
+        var apiKey = resolved.ApiKey;
+        var appId = resolved.AppId;
+
+        var appLinkCheck = ValidateAppLink(File.Exists(configPath), projectConfig, appId, nextSteps);
+        checks.Add(appLinkCheck);
+        var credentialsCheck = ValidateCredentials(server, apiKey, nextSteps);
+        checks.Add(credentialsCheck);
+        if (!appLinkCheck.Success
+            || !credentialsCheck.Success
+            || projectConfig is null
+            || string.IsNullOrWhiteSpace(server)
+            || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
+        }
+
+        var deploymentApplication = ResolveDeploymentApplication(projectConfig.Application, directoryOverride);
+        var buildCheck = ValidateBuildForRunner(deploymentApplication.Build, directory, nextSteps);
+        checks.Add(buildCheck);
+        if (!buildCheck.Success)
+        {
+            return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
+        }
+
+        var actionsCheck = ValidateActions(directory, nextSteps, out var actionCount);
+        checks.Add(actionsCheck);
+        if (!actionsCheck.Success)
+        {
+            return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
+        }
+
+        var applicationCheck = ValidateApplicationPackage(
+            directory,
+            ApplicationBuildArtifactSelector.GetRelativeDirectory(deploymentApplication),
+            actionCount > 0,
+            deploymentApplication.Runtime.Command is not null,
+            deploymentApplication.Build.Command is not null,
+            nextSteps,
+            out var deployDirectory);
+        if (!applicationCheck.Success && deploymentApplication.Runtime.Command is null && actionCount == 0)
+        {
+            nextSteps.Add("Add application.runtime.command.executable to automaton.json, or define at least one Action for an Actions-only app");
+        }
+        checks.Add(applicationCheck);
+        if (!applicationCheck.Success)
+        {
+            return new LocalDeployPreflight(projectConfig, server, apiKey, appId, deployDirectory, checks, nextSteps, false);
+        }
+
+        return new LocalDeployPreflight(projectConfig, server, apiKey, appId, deployDirectory, checks, nextSteps, true);
     }
 
     private async Task<(bool Ready, string Message, string NextStep, string State)> WaitForManagedRuntimeAsync(

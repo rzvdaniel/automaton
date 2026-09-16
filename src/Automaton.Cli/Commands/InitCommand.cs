@@ -7,7 +7,7 @@ namespace Automaton.Cli.Commands;
 
 /// <summary>
 /// automaton init              — create a new app and write automaton.json
-/// automaton init --app &lt;id&gt;  — link the current directory to an existing app
+/// automaton init --app &lt;id-or-slug&gt; — link the current local project to an existing app
 /// </summary>
 public static class InitCommand
 {
@@ -15,7 +15,7 @@ public static class InitCommand
     {
         var appOption = new Option<string?>(
             ["--app", "-a"],
-            "Link to an existing app ID instead of creating a new one");
+            "Link to an existing app ID or exact slug instead of creating a new one");
 
         var nameOption = new Option<string?>(
             ["--name", "-n"],
@@ -32,7 +32,7 @@ public static class InitCommand
         cmd.SetHandler(async (string? appId, string? name, bool asJson) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+            var (server, apiKey) = config.ResolveCredentials(directory: cwd, allowMissingEnvironment: true);
 
             if (!string.IsNullOrWhiteSpace(appId))
             {
@@ -76,8 +76,8 @@ public static class InitCommand
                     return;
                 }
 
-                AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{linkResult.Name}[/] ({linkResult.AppId})");
-                AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
+                AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{linkResult.Name}[/] ({linkResult.AppId})");
+                AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
                 Environment.ExitCode = 0;
                 return;
             }

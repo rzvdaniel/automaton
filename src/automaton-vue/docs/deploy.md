@@ -45,9 +45,15 @@ Most users do not need to think about infrastructure details first. Just run dep
 ```bash
 automaton deploy
 automaton deploy --publish
-automaton deploy --publish --yes
+automaton deploy --publish --non-interactive
 automaton deploy --runner my-runner
 ```
+
+Use `automaton deploy <target-slug>` to select a remote deployment target. The
+`--env <name>` option selects the local project profile that contains the app
+link and credentials; it is not a remote target selector. Use
+`automaton deploy --publish` to publish after deployment, or standalone
+`automaton publish --yes` as the explicit non-interactive publish confirmation.
 
 ## Recommended mental model
 

@@ -1,11 +1,103 @@
 using Automaton.Cli.Commands;
+using Automaton.Cli.Services;
 using NUnit.Framework;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 
 namespace Automaton.Cli.Tests.Commands;
 
 [TestFixture]
 public class PullCommandTests
 {
+    [Test]
+    public async Task ResolveAppAsync_WhenGivenExactSlugLoadsTheAccessibleAppById()
+    {
+        const string appId = "11111111-1111-1111-1111-111111111111";
+        var requestedPaths = new List<string>();
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            requestedPaths.Add(request.RequestUri!.PathAndQuery);
+            var body = request.RequestUri.PathAndQuery switch
+            {
+                "/api/apps" => JsonSerializer.Serialize(new[] { new { id = appId, name = "My App", publicUrl = "my-app" } }),
+                $"/api/apps/{appId}" => JsonSerializer.Serialize(new
+                {
+                    id = appId,
+                    name = "My App",
+                    publicUrl = "my-app",
+                    application = new { runtime = new { port = 8080 } }
+                }),
+                _ => throw new AssertionException($"Unexpected request path {request.RequestUri.PathAndQuery}")
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.com/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "test-key");
+
+        var app = await PullCommand.ResolveAppAsync(client, "MY-APP");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.GetProperty("id").GetString(), Is.EqualTo(appId));
+            Assert.That(app.GetProperty("application").GetProperty("runtime").GetProperty("port").GetInt32(), Is.EqualTo(8080));
+            Assert.That(requestedPaths, Is.EqualTo(new[] { "/api/apps", $"/api/apps/{appId}" }));
+        });
+    }
+
+    [Test]
+    public async Task ResolveAppAsync_WhenGivenAppIdLoadsDetailsDirectly()
+    {
+        const string appId = "22222222-2222-2222-2222-222222222222";
+        var requestedPaths = new List<string>();
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            requestedPaths.Add(request.RequestUri!.PathAndQuery);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new { id = appId, name = "My App" }),
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.com/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "test-key");
+
+        var app = await PullCommand.ResolveAppAsync(client, appId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.GetProperty("id").GetString(), Is.EqualTo(appId));
+            Assert.That(requestedPaths, Is.EqualTo(new[] { $"/api/apps/{appId}" }));
+        });
+    }
+
+    [Test]
+    public async Task ResolveAppAsync_WhenSlugIsNotAccessibleExplainsAcceptedIdentifiers()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("[]", Encoding.UTF8, "application/json")
+        }))
+        {
+            BaseAddress = new Uri("https://api.example.com/")
+        };
+        using var client = new AutomatonApiClient(httpClient, "test-key");
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await PullCommand.ResolveAppAsync(client, "not-accessible"));
+
+        Assert.That(exception!.Message, Does.Contain("Use an app ID or exact slug"));
+    }
+
     [Test]
     public void SelectSourceFiles_PreservesCompleteAiDefinedLayout()
     {
@@ -203,6 +295,85 @@ public class PullCommandTests
     }
 
     [Test]
+    public async Task RefreshPull_WhenLaterDownloadFails_LeavesExistingProjectUnchanged()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var existingPath = Path.Combine(targetDirectory, "source", "main.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(existingPath)!);
+        await File.WriteAllTextAsync(existingPath, "old source");
+        var localOnlyPath = Path.Combine(targetDirectory, "notes.txt");
+        await File.WriteAllTextAsync(localOnlyPath, "local only");
+        var downloads = PullCommand.PrepareDownloads(["source/main.txt", "source/extra.txt"], targetDirectory);
+        var readCount = 0;
+
+        try
+        {
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await PullCommand.StageAndCommitRefreshAsync(
+                    targetDirectory,
+                    downloads,
+                    _ => ++readCount == 1
+                        ? Task.FromResult("new source")
+                        : Task.FromException<string>(new InvalidOperationException("404 File not found")),
+                    nonInteractive: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(existingPath), Is.EqualTo("old source"));
+                Assert.That(File.ReadAllText(localOnlyPath), Is.EqualTo("local only"));
+                Assert.That(File.Exists(Path.Combine(targetDirectory, "source", "extra.txt")), Is.False);
+                Assert.That(Directory.GetDirectories(root, "*.pulling-*"), Is.Empty);
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public async Task RefreshPull_WhenDownloadsSucceed_UpdatesMatchingFilesAndPreservesLocalOnlyFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var existingPath = Path.Combine(targetDirectory, "source", "main.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(existingPath)!);
+        await File.WriteAllTextAsync(existingPath, "old source");
+        var localOnlyPath = Path.Combine(targetDirectory, "notes.txt");
+        await File.WriteAllTextAsync(localOnlyPath, "local only");
+        var downloads = PullCommand.PrepareDownloads(["source/main.txt", "source/extra.txt"], targetDirectory);
+
+        try
+        {
+            await PullCommand.StageAndCommitRefreshAsync(
+                targetDirectory,
+                downloads,
+                path => Task.FromResult(path.EndsWith("main.txt", StringComparison.Ordinal) ? "new source" : "new remote file"),
+                nonInteractive: true);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(existingPath), Is.EqualTo("new source"));
+                Assert.That(File.ReadAllText(localOnlyPath), Is.EqualTo("local only"));
+                Assert.That(File.ReadAllText(Path.Combine(targetDirectory, "source", "extra.txt")), Is.EqualTo("new remote file"));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void CommitStagedProject_ReplacesAnExistingEmptyTargetAsOneDirectoryTransition()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
@@ -258,5 +429,13 @@ public class PullCommandTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) => Task.FromResult(respond(request));
     }
 }

@@ -598,6 +598,48 @@ public class ConfigServiceTests
         Assert.That(ex.Message, Does.Contain(".automaton"));
     }
 
+    [Test]
+    public void ResolveContext_WhenMissingEnvironmentIsAllowed_UsesFallbackCredentialsWithoutInventingAppLink()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://api.example.com",
+            ApiKey = "ak_local"
+        });
+
+        var resolved = configService.ResolveContext(
+            directory: projectRoot,
+            environmentName: "preview",
+            allowMissingEnvironment: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved.EnvironmentName, Is.EqualTo("preview"));
+            Assert.That(resolved.Server, Is.EqualTo("https://api.example.com"));
+            Assert.That(resolved.ApiKey, Is.EqualTo("ak_local"));
+            Assert.That(resolved.AppId, Is.Null);
+        });
+    }
+
+    [Test]
+    public void ResolveAppBindingEnvironmentName_UsesExplicitThenSelectedThenLive()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        configService.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection { Default = "staging" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configService.ResolveAppBindingEnvironmentName(projectRoot, "preview"), Is.EqualTo("preview"));
+            Assert.That(configService.ResolveAppBindingEnvironmentName(projectRoot), Is.EqualTo("staging"));
+        });
+
+        configService.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection());
+        Assert.That(configService.ResolveAppBindingEnvironmentName(projectRoot), Is.EqualTo(ConfigService.DefaultEnvironmentName));
+    }
+
     private string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "automaton-cli-tests", Guid.NewGuid().ToString("N"));

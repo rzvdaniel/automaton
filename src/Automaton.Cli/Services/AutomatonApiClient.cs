@@ -67,6 +67,45 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> GetAppByIdOrSlugAsync(string identifier, CancellationToken ct = default)
+    {
+        var value = identifier.Trim();
+        if (Guid.TryParse(value, out _))
+        {
+            return await GetAppAsync(value, ct);
+        }
+
+        var apps = await ListAppsAsync(ct);
+        if (apps.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var app in apps.EnumerateArray())
+            {
+                var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty)
+                    && publicUrlProperty.ValueKind == JsonValueKind.String
+                    ? publicUrlProperty.GetString()
+                    : null;
+                if (!string.Equals(publicUrl, value, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var appId = app.TryGetProperty("id", out var idProperty)
+                    && idProperty.ValueKind == JsonValueKind.String
+                    ? idProperty.GetString()
+                    : null;
+                if (!Guid.TryParse(appId, out _))
+                {
+                    throw new InvalidOperationException($"The app list returned an invalid ID for slug '{value}'.");
+                }
+
+                return await GetAppAsync(appId!, ct);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"App '{value}' was not found. Use an app ID or exact slug for an app you can access; project apps may require an app ID.");
+    }
+
     public async Task<IReadOnlyList<DeploymentTargetInfo>> ListDeploymentTargetsAsync(
         string appId,
         CancellationToken ct = default)
