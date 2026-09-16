@@ -1,6 +1,7 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Automaton.AiGuidance;
+using Automaton.Core.Models;
 using NUnit.Framework;
 
 namespace Automaton.Cli.Tests.Services;
@@ -57,11 +58,14 @@ public class NewAppServiceTests
         var config = configService.LoadProjectConfig(projectRoot);
         Assert.That(config.Name, Is.EqualTo("My App"));
         Assert.That(config.Application, Is.Not.Null);
+        Assert.That(ApplicationContractValidator.Validate(config.Application), Is.Empty);
+        Assert.That(config.AppId, Is.Null);
         Assert.That(config.Application.Storage.DataDirectory, Is.EqualTo("data"));
         Assert.That(config.Application.Build.Command, Is.Null);
         var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-123"));
         Assert.That(env.Server, Is.EqualTo("https://automaton.monster"));
+        Assert.That(env.ApiKey, Is.Null);
     }
 
     [Test]
@@ -162,6 +166,56 @@ public class NewAppServiceTests
 
         Assert.That(result.Success, Is.False);
         Assert.That(result.Checks.Any(check => check.Name == "createApp" && !check.Success && check.Message.Contains("app name is required")), Is.True);
+    }
+
+    [Test]
+    public async Task CreateAsync_WhenAutomatonJsonIsInvalid_DoesNotOverwriteItOrCreateRemoteApp()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configPath = Path.Combine(projectRoot, "automaton.json");
+        const string invalidJson = "{ invalid";
+        await File.WriteAllTextAsync(configPath, invalidJson);
+        var createCalls = 0;
+        var service = new NewAppService(
+            new ConfigService(),
+            (_, _, _, _) =>
+            {
+                createCalls++;
+                return Task.FromResult(((string)"app-123", "My App"));
+            });
+
+        var result = await service.CreateAsync(projectRoot, "My App", "https://api.example.com", "ak_test");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.Checks.Any(check => check.Message.Contains("automaton.json exists but is invalid")), Is.True);
+            Assert.That(createCalls, Is.Zero);
+            Assert.That(File.ReadAllText(configPath), Is.EqualTo(invalidJson));
+        });
+    }
+
+    [Test]
+    public async Task CreateAsync_WhenSelectedProfileExists_UsesItInsteadOfLive()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveNamedEnvironmentConfig(projectRoot, "staging", new GlobalConfig
+        {
+            Server = "https://staging.example.com",
+            ApiKey = "ak_staging"
+        });
+        configService.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection { Default = "staging" });
+        var service = new NewAppService(
+            configService,
+            (_, _, name, _) => Task.FromResult(((string)"app-staging", name)));
+
+        var result = await service.CreateAsync(projectRoot, "My App", "https://api.example.com", "ak_cli");
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(configService.LoadNamedEnvironmentConfig(projectRoot, "staging")?.AppId, Is.EqualTo("app-staging"));
+        Assert.That(configService.LoadNamedEnvironmentConfig(projectRoot, "live"), Is.Null);
+        Assert.That(configService.LoadProjectEnvironmentSelection(projectRoot).Default, Is.EqualTo("staging"));
     }
 
     private string CreateProjectRoot()

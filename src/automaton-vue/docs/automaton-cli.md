@@ -24,11 +24,21 @@ an AI conversation.
 
 ```bash
 automaton new "My App"
-automaton link <app-id>
+automaton link <app-id-or-slug>
 ```
 
-`automaton new` creates and links a remote app. `automaton link` connects the
-current project to an existing app. Both commands refresh the two local AI files.
+`automaton new` creates a valid local `automaton.json`, creates a remote app,
+and records its ID in the selected local profile. It also syncs the generated
+AI guidance. `automaton link` requires an existing valid `automaton.json` and
+records the remote app ID in the selected profile without downloading or
+changing local source or guidance files. After linking, deploy the local source
+with `automaton deploy`.
+
+`automaton pull <app-id-or-slug>` creates a new local project from portable
+remote source. App IDs work for accessible apps; exact public slugs are resolved
+from the apps visible to your account, so project apps may require an app ID.
+Pulling into an existing linked project warns before overwriting matching files
+and stages downloads before exposing them locally.
 
 If remote creation fails after the local file is written, run:
 
@@ -62,8 +72,12 @@ automaton runners
 automaton publish
 ```
 
-`sync-ai` restores the canonical local guidance files. `pull` downloads editable
-app source. `runners` lists available Runners. `publish` makes the latest
-deployment public and requires explicit user approval.
+`sync-ai` restores the canonical local guidance files. `pull` downloads app
+source. `runners` lists available Runners. `publish` makes the latest deployment
+public and requires explicit user approval.
+
+The optional positional argument to `automaton deploy` selects a remote
+deployment target. Its `--env <name>` option instead selects a local project
+profile for credentials and app linkage.
 
 Use `automaton publish` only after deployment and approval.

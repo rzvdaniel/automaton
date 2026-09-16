@@ -11,9 +11,9 @@ public static class CreateCommand
     {
         var nameOption = new Option<string?>(["--name", "-n"], "App name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
-        var environmentOption = new Option<string?>("--env", "Environment name to create and link, for example local or live");
+        var environmentOption = new Option<string?>("--env", "Local project profile to link, for example local or live");
 
-        var cmd = new Command("create", "Create a remote Automaton app for the current folder and write appId into automaton.json")
+        var cmd = new Command("create", "Create a remote Automaton app for the current folder and link the selected local profile")
         {
             nameOption,
             jsonOption,
@@ -23,7 +23,10 @@ public static class CreateCommand
         cmd.SetHandler(async (string? name, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd, environmentName: environmentName);
+            var (server, apiKey) = config.ResolveCredentials(
+                directory: cwd,
+                environmentName: environmentName,
+                allowMissingEnvironment: true);
             var existingConfig = config.TryLoadProjectConfig(cwd);
 
             if (string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(existingConfig?.Name))

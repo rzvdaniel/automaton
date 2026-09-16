@@ -9,12 +9,12 @@ public static class LinkCommand
 {
     public static Command Build(ConfigService config)
     {
-        var appIdArgument = new Argument<string?>("app-id", () => null, "Existing Automaton app ID to link to this directory")
+        var appIdArgument = new Argument<string?>("app-id-or-slug", () => null, "Existing Automaton app ID or exact app slug to link to this directory")
         {
             Arity = ArgumentArity.ZeroOrOne
         };
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
-        var environmentOption = new Option<string?>("--env", "Environment name to link, for example local or live");
+        var environmentOption = new Option<string?>("--env", "Local project profile to link, for example local or live");
 
         var cmd = new Command("link", "Link this directory to an existing Automaton app")
         {
@@ -26,7 +26,10 @@ public static class LinkCommand
         cmd.SetHandler(async (string? appId, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd, environmentName: environmentName);
+            var (server, apiKey) = config.ResolveCredentials(
+                directory: cwd,
+                environmentName: environmentName,
+                allowMissingEnvironment: true);
 
             var resolvedAppId = appId;
             if (!asJson && string.IsNullOrWhiteSpace(resolvedAppId))
@@ -68,8 +71,8 @@ public static class LinkCommand
                 return;
             }
 
-            AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{result.Name}[/] ({result.AppId})");
-            AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
+            AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{result.Name}[/] ({result.AppId})");
+            AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
             Environment.ExitCode = 0;
         }, appIdArgument, jsonOption, environmentOption);
 

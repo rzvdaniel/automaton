@@ -18,7 +18,7 @@ automaton new "My App"
 automaton pull
 automaton pull my-remixed-app
 automaton deploy --non-interactive
-automaton deploy --publish --yes --non-interactive
+automaton deploy --publish --non-interactive
 automaton publish --yes --non-interactive
 automaton --version
 ```
@@ -56,12 +56,23 @@ my-app/
 The CLI pulls portable source files only. It does not pull disposable runtime
 output or runner state.
 
+An app ID works for any app you can access. An exact public slug is resolved
+against the apps visible to your account; project apps may need their app ID.
+For an existing local source tree, use `automaton link <app-id-or-slug>` instead:
+it requires a valid `automaton.json` and updates only local linkage metadata.
+It does not download or replace source files.
+
+`--env` selects a local project profile in `.automaton/environments/` for app
+linkage and credentials. The optional positional argument to `automaton deploy`
+selects a remote deployment target; these are separate choices.
+
 Refresh mode safety rules:
 
 - `automaton pull` checks whether matching local source files already exist.
 - In interactive mode, pull warns before overwriting those matching files and asks for confirmation.
 - In non-interactive mode, pull refuses to overwrite matching files unless you pass `--force`.
 - Local-only files are kept. Pull is not a clean mirror and does not delete extra local files.
+- Refresh downloads stage beside the project first; existing files are replaced only after all remote downloads succeed.
 
 ## Learn more
 

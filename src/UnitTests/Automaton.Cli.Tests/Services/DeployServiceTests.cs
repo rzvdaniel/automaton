@@ -81,6 +81,47 @@ public class DeployServiceTests
     }
 
     [Test]
+    public async Task DeployAsync_WhenRuntimeCommandIsMissing_FailsBeforeRemoteOperations()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        var application = ApplicationContractTestFactory.Create();
+        application.Runtime.Command = null;
+        application.Build.Command = null;
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Application = application
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        var snapshotCalls = 0;
+        var deployCalls = 0;
+        var service = new DeployService(
+            configService,
+            deployPackageAsync: (_, _, _, _, _, _, _) =>
+            {
+                deployCalls++;
+                throw new AssertionException("deploy callback should not run");
+            },
+            createSnapshotAsync: (_, _, _, _) =>
+            {
+                snapshotCalls++;
+                return Task.FromResult((true, "snapshot created"));
+            });
+
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.False);
+            AssertCheck(result, DeployCheckNames.ApplicationPackage, false, "runtime command is required");
+            Assert.That(result.NextSteps, Has.Some.Contains("application.runtime.command.executable"));
+            Assert.That(snapshotCalls, Is.Zero);
+            Assert.That(deployCalls, Is.Zero);
+        });
+    }
+
+    [Test]
     public async Task DeployAsync_WhenBuildIsConfigured_DefersExecutionToRunner()
     {
         var projectRoot = CreateProjectRoot();
@@ -353,7 +394,6 @@ public class DeployServiceTests
             "server-eu",
             false,
             "Running",
-            true,
             null,
             new DeploymentTargetRunnerInfo("runner-eu", "Runner EU", true));
         var service = new DeployService(

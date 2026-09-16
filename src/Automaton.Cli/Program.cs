@@ -46,12 +46,22 @@ installAlias.AddCommand(RunnerCommand.Build(config));
 root.AddCommand(installAlias);
 
 root.Name = "automaton";
+ConfigureUnmatchedTokenErrors(root);
 
 var authorizationCompletion = new CliAuthorizationCompletionService(config);
 var builder = new CommandLineBuilder(root)
     .UseHelp()
+    .UseParseErrorReporting()
     .AddMiddleware(async (context, next) =>
     {
+        if (context.ParseResult.UnmatchedTokens.Count > 0
+            || CliOptionValidator.HasUnsupportedOptions(args, context.ParseResult.CommandResult.Command))
+        {
+            Console.Error.WriteLine("Unrecognized argument or option. Run 'automaton <command> --help' to see supported inputs.");
+            context.ExitCode = 2;
+            return;
+        }
+
         var commandName = context.ParseResult.CommandResult.Command.Name;
         if (commandName is not ("login" or "logout" or "config" or "help")
             && !await authorizationCompletion.TryCompletePendingAsync(
@@ -66,3 +76,12 @@ var builder = new CommandLineBuilder(root)
     .Build();
 
 return await builder.InvokeAsync(args);
+
+static void ConfigureUnmatchedTokenErrors(Command command)
+{
+    command.TreatUnmatchedTokensAsErrors = true;
+    foreach (var subcommand in command.Subcommands)
+    {
+        ConfigureUnmatchedTokenErrors(subcommand);
+    }
+}

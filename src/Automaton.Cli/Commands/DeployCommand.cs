@@ -26,7 +26,7 @@ public static class DeployCommand
         var targetArgument = new Argument<string?>(
             "target",
             () => null,
-            "Environment slug; omit to deploy the only environment or choose interactively")
+            "Remote deployment target slug; omit to deploy the only target or choose interactively")
         {
             Arity = ArgumentArity.ZeroOrOne
         };
@@ -44,7 +44,7 @@ public static class DeployCommand
         var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
         var openOption = new Option<bool>("--open", "Open the deployed app in the browser after success");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
-        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
+        var environmentOption = new Option<string?>("--env", "Use a local project linkage/credential profile from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -83,6 +83,21 @@ public static class DeployCommand
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
+                if (!string.IsNullOrWhiteSpace(runner))
+                {
+                    var localValidation = deployService.ValidateLocalProject(
+                        cwd,
+                        clean,
+                        dir,
+                        environmentName);
+                    if (localValidation is not null)
+                    {
+                        WriteResult(localValidation, asJson, verbose, nonInteractive);
+                        context.ExitCode = 1;
+                        return;
+                    }
+                }
+
                 var projectConfig = config.TryLoadProjectConfig(cwd);
                 var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
                 var targetService = new DeploymentTargetService(config);
@@ -115,7 +130,7 @@ public static class DeployCommand
                     throw new InvalidOperationException(
                         "--publish and --open apply only to the Live target.");
                 }
-                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
+                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, target, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
                 var preparation = new DeployPreparationResult
                 {
                     Success = true,
@@ -399,7 +414,7 @@ public static class DeployCommand
         if (result.Success)
         {
             AnsiConsole.MarkupLine(
-                $"[bold]Environment:[/] {Markup.Escape(result.TargetName ?? result.TargetSlug ?? "Live")} " +
+                $"[bold]Deployment target:[/] {Markup.Escape(result.TargetName ?? result.TargetSlug ?? "Live")} " +
                 $"([grey]{Markup.Escape(result.DeploymentMode ?? "default")}[/])");
             AnsiConsole.MarkupLine(
                 $"[bold]Runner:[/] {Markup.Escape(result.RunnerName ?? "managed/default assignment")}");
@@ -513,7 +528,15 @@ public static class DeployCommand
         AnsiConsole.MarkupLine($"[bold]{Markup.Escape(check.Name)}[/] {markupStatus} {Markup.Escape(check.Message)}");
     }
 
-    private static void WriteDeployHeading(string? appName, string? appId, string? environmentName, string? server, bool asJson, bool nonInteractive, ref bool headingWritten)
+    private static void WriteDeployHeading(
+        string? appName,
+        string? appId,
+        string? profileName,
+        DeploymentTargetInfo target,
+        string? server,
+        bool asJson,
+        bool nonInteractive,
+        ref bool headingWritten)
     {
         if (asJson || headingWritten || string.IsNullOrWhiteSpace(appName) || string.IsNullOrWhiteSpace(appId))
         {
@@ -523,7 +546,8 @@ public static class DeployCommand
         if (nonInteractive)
         {
             Console.WriteLine($"Deploying {appName} ({appId})");
-            Console.WriteLine($"Environment: {environmentName ?? "default"}");
+            Console.WriteLine($"Local profile: {profileName ?? "default credentials"}");
+            Console.WriteLine($"Deployment target: {target.Name} ({target.Slug})");
             if (!string.IsNullOrWhiteSpace(server))
             {
                 Console.WriteLine($"Server: {server}");
@@ -532,7 +556,8 @@ public static class DeployCommand
         else
         {
             AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
-            AnsiConsole.MarkupLine($"[bold]Environment:[/] {Markup.Escape(environmentName ?? "default")}");
+            AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName ?? "default credentials")}");
+            AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(target.Name)} ({Markup.Escape(target.Slug)})");
             if (!string.IsNullOrWhiteSpace(server))
             {
                 AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
@@ -570,7 +595,7 @@ public static class DeployCommand
         if (result.Success)
         {
             Console.WriteLine(
-                $"Environment: {result.TargetName ?? result.TargetSlug ?? "Live"} ({result.DeploymentMode ?? "Live"})");
+                $"Deployment target: {result.TargetName ?? result.TargetSlug ?? "Live"} ({result.DeploymentMode ?? "Live"})");
             Console.WriteLine(
                 $"Runner: {result.RunnerName ?? "managed/default assignment"}");
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
