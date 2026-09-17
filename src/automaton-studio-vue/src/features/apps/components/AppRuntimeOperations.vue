@@ -5,11 +5,15 @@ import Card from 'primevue/card'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import type { App, AppDeploymentTarget, DeploymentTargetStatus } from '../types/apps.types'
+import type { App, AppDeploymentTarget } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
 import CopyCommand from './CopyCommand.vue'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
-import { getAppOperationalSummary } from '../utils/app-operational-summary'
+import {
+  getAppOperationalSummary,
+  getDeploymentTargetStatusLabel,
+  hasContradictoryDeploymentTargetState,
+} from '../utils/app-operational-summary'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
 
@@ -64,29 +68,7 @@ const availabilitySeverity = computed<Severity>(() => {
   return isRuntimeOnline.value ? 'success' : 'warn'
 })
 
-const hasContradictoryState = computed(() => {
-  const current = target.value
-  if (!current) return false
-
-  return (
-    (!!current.runner && current.status === 'Unassigned') ||
-    (current.status === 'Running' && (!hasAssignment.value || !current.genericRuntimeDeployed || !current.runner?.isOnline)) ||
-    (current.status === 'RunnerOffline' && (!hasAssignment.value || current.runner?.isOnline === true)) ||
-    (current.genericRuntimeDeployed && !hasAssignment.value) ||
-    (current.genericRuntimeDeployed && current.status === 'NotDeployed')
-  )
-})
-
-function targetStatusLabel(status: DeploymentTargetStatus): string {
-  switch (status) {
-    case 'NotDeployed': return 'Not deployed'
-    case 'Deploying': return 'Deployment in progress'
-    case 'Running': return 'Running'
-    case 'Failed': return 'Deployment failed'
-    case 'RunnerOffline': return 'Runtime offline'
-    case 'Unassigned': return 'Unassigned'
-  }
-}
+const hasContradictoryState = computed(() => hasContradictoryDeploymentTargetState(target.value))
 
 const targetStatusSeverity = computed<Severity>(() => {
   if (hasContradictoryState.value) return 'warn'
@@ -126,7 +108,7 @@ const runtimeNotice = computed<RuntimeNotice | null>(() => {
 
     return {
       title: 'Runtime state needs review',
-      detail: `The deployment target reports ${targetStatusLabel(current.status)}, while ${runtimeFact} and ${deployedFact}. Review the target in Deployments.`,
+      detail: `The deployment target reports ${getDeploymentTargetStatusLabel(current.status)}, while ${runtimeFact} and ${deployedFact}. Review the target in Deployments.`,
       severity: 'warn',
     }
   }
@@ -175,7 +157,7 @@ const runtimeNotice = computed<RuntimeNotice | null>(() => {
 })
 
 const targetOptions = computed(() => props.targets.map((deploymentTarget) => ({
-  label: `${getEnvironmentDisplayName(deploymentTarget)} · ${targetStatusLabel(deploymentTarget.status)}`,
+  label: `${getEnvironmentDisplayName(deploymentTarget)} · ${getDeploymentTargetStatusLabel(deploymentTarget.status)}`,
   value: deploymentTarget.slug,
   target: deploymentTarget,
 })))
@@ -290,7 +272,7 @@ function navigate(view: AppViewKey): void {
               <dt>Deployment target status</dt>
               <dd>
                 <Tag
-                  :value="`${targetStatusLabel(selectedTarget.status)}${hasContradictoryState ? ' · needs review' : ''}`"
+                  :value="`${getDeploymentTargetStatusLabel(selectedTarget.status)}${hasContradictoryState ? ' · needs review' : ''}`"
                   :severity="targetStatusSeverity"
                 />
               </dd>

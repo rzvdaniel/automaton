@@ -26,6 +26,7 @@ import { appsService } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { AppDeploymentTarget, PublishAppRequest } from '../types/apps.types'
+import type { RuntimeLogConnectionState } from '../types/console.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getPublishedAppUrl } from '../utils/public-app-url'
@@ -45,10 +46,14 @@ const activeView = ref<AppViewKey>(resolveAppView(route.query.view))
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
+const runtimeLogConnectionState = ref<RuntimeLogConnectionState>(backendRuntimeLogClient.connectionState)
+const isRuntimeLogSubscribed = ref(false)
+const runtimeLogSubscriptionFailed = ref(false)
 const targetsRevision = ref(0)
 const showPublishDialog = ref(false)
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
+let unsubscribeBackendRuntimeLogState: (() => void) | null = null
 
 watch(activeView, (view) => {
   if (view === 'logs') void nextTick(() => runtimeLogsRef.value?.loadLogs())
@@ -67,6 +72,9 @@ onMounted(async () => {
     if (event.appId !== appId.value) return
     if (selectedLogTargetId.value && event.deploymentTargetId !== selectedLogTargetId.value) return
     editorStore.addBackendRuntimeLogEntry(event)
+  })
+  unsubscribeBackendRuntimeLogState = backendRuntimeLogClient.onConnectionStateChange((state) => {
+    runtimeLogConnectionState.value = state
   })
 
   window.addEventListener('message', handleApplicationMessage)
@@ -92,6 +100,7 @@ onUnmounted(() => {
   document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
   void backendRuntimeLogClient.unsubscribe(appId.value)
   unsubscribeBackendRuntimeLogs?.()
+  unsubscribeBackendRuntimeLogState?.()
   editorStore.reset()
 })
 
@@ -161,15 +170,22 @@ async function selectViewingTargetFromRoute() {
 async function selectViewingTarget(target: AppDeploymentTarget, replaceRoute = false) {
   selectedViewingTarget.value = target
   selectedLogTargetId.value = target.id
+  isRuntimeLogSubscribed.value = false
+  runtimeLogSubscriptionFailed.value = false
 
   if (replaceRoute || route.query.target !== target.slug) {
     await router.replace({ query: { ...route.query, target: target.slug } })
   }
 
   try {
-    if (target.runner) await backendRuntimeLogClient.subscribe(target.appId, target.id)
-    else await backendRuntimeLogClient.unsubscribe(target.appId)
+    if (target.runner) {
+      await backendRuntimeLogClient.subscribe(target.appId, target.id)
+      isRuntimeLogSubscribed.value = backendRuntimeLogClient.isSubscribedTo(target.appId, target.id)
+    } else {
+      await backendRuntimeLogClient.unsubscribe(target.appId)
+    }
   } catch {
+    runtimeLogSubscriptionFailed.value = true
     toast.add({
       severity: 'warn',
       summary: 'Live logs unavailable',
@@ -303,7 +319,20 @@ function handleUnpublish() {
             @navigate="handleNavigation"
           />
 
-          <AppRuntimeLogs v-else-if="activeView === 'logs'" ref="runtimeLogsRef" :app-id="appId" />
+          <AppRuntimeLogs
+            v-else-if="activeView === 'logs'"
+            ref="runtimeLogsRef"
+            :app-id="appId"
+            :app-name="editorStore.currentApp.name"
+            :targets="deploymentTargets"
+            :selected-target="selectedViewingTarget"
+            :live-logs="editorStore.consoleEntries"
+            :connection-state="runtimeLogConnectionState"
+            :is-stream-subscribed="isRuntimeLogSubscribed"
+            :stream-error="runtimeLogSubscriptionFailed"
+            @select-target="handleSelectViewingTarget"
+            @navigate="handleNavigation"
+          />
 
           <ActionSchedulingPanel
             v-else-if="activeView === 'actions'"
@@ -410,6 +439,12 @@ function handleUnpublish() {
   flex-direction: column;
   gap: 1rem;
   height: 100%;
+}
+
+@media (max-width: 960px) {
+  .operations-shell {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 760px) {
