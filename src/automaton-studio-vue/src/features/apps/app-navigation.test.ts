@@ -20,12 +20,17 @@ describe('app operations navigation', () => {
       'Logs',
       'Actions',
     ])
+    expect(APP_NAVIGATION_GROUPS[1]?.items.map((item) => item.label)).toEqual([
+      'Publishing',
+      'Settings',
+    ])
   })
 
   it('falls back to Overview for removed authoring views and unknown values', () => {
     expect(resolveAppView('runtime')).toBe('runtime')
     expect(resolveAppView('build')).toBe('overview')
     expect(resolveAppView('files')).toBe('overview')
+    expect(resolveAppView('snapshots')).toBe('overview')
     expect(resolveAppView('unknown')).toBe('overview')
   })
 
@@ -49,5 +54,11 @@ describe('app operations navigation', () => {
       view: 'build',
       target: 'live',
     })).toEqual({ target: 'live' })
+  })
+
+  it('removes legacy Source snapshots deep links without dropping the selected target', () => {
+    expect(withoutAuthoringQuery({ view: 'snapshots', target: 'staging' })).toEqual({
+      target: 'staging',
+    })
   })
 })
