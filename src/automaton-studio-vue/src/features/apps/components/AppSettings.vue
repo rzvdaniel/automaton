@@ -842,7 +842,7 @@ async function handleSaveTemplateStatus() {
               <div v-if="app?.sourceAvailable">
                 <div class="font-semibold mb-1">2. Pull this app's current source</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  Run this from a folder where the CLI can create a new project directory. It pulls the current source and contract, not a historical source snapshot.
+                  Run this from a folder where the CLI can create a new project directory. It pulls the current source and contract.
                 </p>
                 <div class="connect-snippet mt-2">
                   <pre>automaton pull {{ app?.id }}</pre>
