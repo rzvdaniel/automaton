@@ -194,13 +194,9 @@ async function copyPublishedUrl() {
               <dt>App access</dt>
               <dd>{{ accessDescription }}</dd>
             </div>
-            <div>
-              <dt>Remixing</dt>
-              <dd>{{ app.isForkable ? 'Enabled' : 'Disabled' }}</dd>
-            </div>
           </dl>
           <p class="muted access-note">
-            Update runtime visibility, marketplace discovery, and remixing here. App metadata is managed in Settings.
+            Update runtime visibility and marketplace discovery here. App metadata is managed in Settings.
           </p>
         </template>
       </Card>

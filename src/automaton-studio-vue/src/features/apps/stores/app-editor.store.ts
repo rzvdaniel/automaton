@@ -40,8 +40,12 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   async function publishApp(request: PublishAppRequest): Promise<void> {
     if (!currentApp.value) return
+    const publishRequest: PublishAppRequest = {
+      ...request,
+      isForkable: request.isForkable ?? currentApp.value.isForkable,
+    }
     try {
-      await appsService.publish(currentApp.value.id, request)
+      await appsService.publish(currentApp.value.id, publishRequest)
       currentApp.value = {
         ...currentApp.value,
         isPublished: true,
@@ -50,7 +54,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         runtimeVisibility: request.runtimeVisibility,
         catalogVisibility: request.catalogVisibility,
         marketplacePreviewMode: request.marketplacePreviewMode,
-        isForkable: request.isForkable ?? currentApp.value.isForkable,
+        isForkable: publishRequest.isForkable ?? currentApp.value.isForkable,
         canLaunchPublicly: request.runtimeVisibility === 'public' && !request.requiresAuthentication && currentApp.value.accessStatus.toLocaleLowerCase() === 'active',
         publishedAt: new Date().toISOString(),
         category: request.category ?? currentApp.value.category,

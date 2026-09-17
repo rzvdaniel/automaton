@@ -15,7 +15,6 @@ const props = defineProps<{
   currentSlug?: string
   isPublished?: boolean
   requiresAuth?: boolean
-  isForkable?: boolean
   currentRuntimeVisibility?: 'private' | 'public'
   currentCatalogVisibility?: 'unlisted' | 'listed'
   appName?: string
@@ -33,7 +32,6 @@ const emit = defineEmits<{
 
 const slug = ref('')
 const requiresAuthentication = computed(() => props.requiresAuth ?? false)
-const allowRemixing = ref(false)
 const publishRuntime = ref(true)
 const listInMarketplace = ref(true)
 const validationError = ref<string | null>(null)
@@ -73,7 +71,6 @@ watch(isVisible, (visible) => {
     slug.value = ''
   }
 
-  allowRemixing.value = props.isForkable ?? false
   const visibilityState = getPublishVisibilityState(
     props.currentRuntimeVisibility,
     props.currentCatalogVisibility,
@@ -89,7 +86,6 @@ function handlePublish() {
   emit('publish', {
     publicUrl: slug.value,
     requiresAuthentication: requiresAuthentication.value,
-    isForkable: allowRemixing.value,
     runtimeVisibility: publishRuntime.value ? 'public' : 'private',
     catalogVisibility: listInMarketplace.value ? 'listed' : 'unlisted',
     marketplacePreviewMode: publishRuntime.value ? 'launchable' : 'mediaOnly',
@@ -167,23 +163,7 @@ function close() {
           <label for="listInMarketplace">{{ listInMarketplace ? 'Listed in marketplace' : 'Unlisted' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
-          {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media and fork, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
-        </small>
-      </div>
-
-      <div class="field mb-4">
-        <label for="allowForking" class="block font-semibold mb-2">Remixing</label>
-        <div class="flex align-items-center gap-3">
-          <InputSwitch
-            id="allowForking"
-            v-model="allowRemixing"
-          />
-          <label for="allowForking">{{ allowRemixing ? 'Others can remix this app' : 'Source stays private' }}</label>
-        </div>
-        <small class="text-color-secondary block mt-1 ml-6">
-          {{ allowRemixing
-            ? 'Others can create editable remixes with attribution.'
-            : 'People can use the app, but the editable source stays private.' }}
+          {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
         </small>
       </div>
 

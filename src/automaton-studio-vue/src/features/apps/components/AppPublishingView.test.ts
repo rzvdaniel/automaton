@@ -92,7 +92,9 @@ describe('AppPublishingView', () => {
     expect(wrapper.text()).toContain('Public runtime')
     expect(wrapper.text()).toContain('Listed in marketplace')
     expect(wrapper.text()).toContain('Discoverable in the marketplace')
-    expect(wrapper.text()).toContain('Enabled')
+    expect(wrapper.text()).not.toContain('Remixing')
+    expect(wrapper.text()).not.toContain('remix')
+    expect(wrapper.text()).not.toContain('fork')
     expect(wrapper.text()).toContain('Unpublishing removes public access; it does not undeploy the Live runtime.')
 
     const updateButton = wrapper.findAll('button').find((button) => button.text().includes('Update publishing settings'))

@@ -215,6 +215,7 @@ async function handlePublish(request: PublishSettingsRequest) {
       ...request,
       category: app.category ?? null,
       tags: app.tags ?? null,
+      isForkable: app.isForkable,
     })
     showPublishDialog.value = false
     toast.add({
@@ -361,7 +362,6 @@ function handleUnpublish() {
         :current-slug="editorStore.currentApp.publicUrl"
         :is-published="editorStore.currentApp.isPublished"
         :requires-auth="editorStore.currentApp.requiresAuthentication"
-        :is-forkable="editorStore.currentApp.isForkable"
         :current-runtime-visibility="editorStore.currentApp.runtimeVisibility"
         :current-catalog-visibility="editorStore.currentApp.catalogVisibility"
         :app-name="editorStore.currentApp.name"

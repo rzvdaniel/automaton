@@ -37,6 +37,9 @@ describe('PublishDialog', () => {
     expect(wrapper.text()).not.toContain('Marketplace Category')
     expect(wrapper.text()).not.toContain('Tags')
     expect(wrapper.text()).not.toContain('Access Control')
+    expect(wrapper.text()).not.toContain('Remixing')
+    expect(wrapper.text()).not.toContain('remix')
+    expect(wrapper.text()).not.toContain('fork')
     expect(wrapper.findAll('button').some((button) => button.text().includes('Publish app'))).toBe(true)
   })
 
@@ -61,6 +64,9 @@ describe('PublishDialog', () => {
     expect(wrapper.text()).toContain('This app requires sign-in, so its runtime must remain private.')
     expect(wrapper.text()).toContain('Sign-in is currently required. This dialog preserves that setting and keeps the runtime private.')
     expect(wrapper.text()).toContain('Private runtime')
+    expect(wrapper.text()).not.toContain('Remixing')
+    expect(wrapper.text()).not.toContain('remix')
+    expect(wrapper.text()).not.toContain('fork')
 
     const publish = wrapper.findAll('button').find((button) => button.text().includes('Publish app'))
     if (!publish) throw new Error('Publish button not found')
@@ -71,5 +77,6 @@ describe('PublishDialog', () => {
     })
     expect(wrapper.emitted('publish')?.[0]?.[0]).not.toHaveProperty('category')
     expect(wrapper.emitted('publish')?.[0]?.[0]).not.toHaveProperty('tags')
+    expect(wrapper.emitted('publish')?.[0]?.[0]).not.toHaveProperty('isForkable')
   })
 })
