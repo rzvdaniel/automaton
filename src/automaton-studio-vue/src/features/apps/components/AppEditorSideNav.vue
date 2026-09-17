@@ -40,8 +40,8 @@ const emit = defineEmits<{
   width: 14rem;
   flex-shrink: 0;
   padding: 1rem 0.75rem;
-  border-right: 1px solid var(--p-surface-200);
-  background: var(--p-surface-0);
+  border-right: 1px solid var(--p-content-border-color);
+  background: var(--p-content-background);
   overflow-y: auto;
 }
 
@@ -81,12 +81,12 @@ const emit = defineEmits<{
 }
 
 .side-nav-item:hover {
-  background: var(--p-surface-100);
+  background: var(--p-content-hover-background);
 }
 
 .side-nav-item.active {
-  background: var(--p-primary-100);
-  color: var(--p-primary-700);
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
   font-weight: 600;
 }
 
@@ -96,26 +96,12 @@ const emit = defineEmits<{
   text-align: center;
 }
 
-:global(.app-dark) .app-editor-side-nav {
-  border-color: var(--p-surface-700);
-  background: var(--p-surface-900);
-}
-
-:global(.app-dark) .side-nav-item:hover {
-  background: var(--p-surface-800);
-}
-
-:global(.app-dark) .side-nav-item.active {
-  background: var(--p-primary-900);
-  color: var(--p-primary-200);
-}
-
 @media (max-width: 960px) {
   .app-editor-side-nav {
     width: 100%;
     padding: 0.75rem;
     border-right: none;
-    border-bottom: 1px solid var(--p-surface-200);
+    border-bottom: 1px solid var(--p-content-border-color);
   }
 
   .side-nav-group {
