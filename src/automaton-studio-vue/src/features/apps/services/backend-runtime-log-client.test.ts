@@ -33,8 +33,8 @@ import { BackendRuntimeLogClient } from './backend-runtime-log-client'
 describe('BackendRuntimeLogClient', () => {
   beforeEach(() => {
     signalRMock.connection.state = 'Connected'
-    signalRMock.connection.start.mockClear()
-    signalRMock.connection.invoke.mockClear()
+    signalRMock.connection.start.mockReset().mockResolvedValue(undefined)
+    signalRMock.connection.invoke.mockReset().mockResolvedValue(undefined)
     signalRMock.connection.on.mockClear()
     signalRMock.connection.onreconnected.mockClear()
     signalRMock.connection.onreconnecting.mockClear()
@@ -99,5 +99,66 @@ describe('BackendRuntimeLogClient', () => {
     const onReconnecting = calls[calls.length - 1]?.[0]
     onReconnecting?.()
     expect(client.connectionState).toBe('reconnecting')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(false)
+  })
+
+  it('retries the desired target after a reconnect group rejoin fails', async () => {
+    const client = new BackendRuntimeLogClient()
+    await client.subscribe('app-id', 'live-target-id')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(true)
+
+    const reconnectingCalls = signalRMock.connection.onreconnecting.mock.calls
+    const onReconnecting = reconnectingCalls[reconnectingCalls.length - 1]?.[0]
+    onReconnecting?.()
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(false)
+
+    signalRMock.connection.invoke.mockRejectedValueOnce(new Error('Group join rejected'))
+    const reconnectedCalls = signalRMock.connection.onreconnected.mock.calls
+    const onReconnected = reconnectedCalls[reconnectedCalls.length - 1]?.[0]
+    await onReconnected?.()
+
+    expect(client.connectionState).toBe('disconnected')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(false)
+
+    await client.subscribe('app-id', 'live-target-id')
+
+    expect(signalRMock.connection.invoke).toHaveBeenNthCalledWith(
+      1, AutomatonHubMethods.JoinAppRuntimeLogs, 'app-id', 'live-target-id',
+    )
+    expect(signalRMock.connection.invoke).toHaveBeenNthCalledWith(
+      2, AutomatonHubMethods.JoinAppRuntimeLogs, 'app-id', 'live-target-id',
+    )
+    expect(signalRMock.connection.invoke).toHaveBeenNthCalledWith(
+      3, AutomatonHubMethods.JoinAppRuntimeLogs, 'app-id', 'live-target-id',
+    )
+    expect(client.connectionState).toBe('connected')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(true)
+  })
+
+  it('rejoins the desired target when subscribe restarts a closed connection', async () => {
+    const client = new BackendRuntimeLogClient()
+    await client.subscribe('app-id', 'live-target-id')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(true)
+
+    signalRMock.connection.state = 'Disconnected'
+    const closeCalls = signalRMock.connection.onclose.mock.calls
+    const onClose = closeCalls[closeCalls.length - 1]?.[0]
+    onClose?.()
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(false)
+
+    signalRMock.connection.start.mockImplementation(async () => {
+      signalRMock.connection.state = 'Connected'
+    })
+    await client.subscribe('app-id', 'live-target-id')
+
+    expect(signalRMock.connection.start).toHaveBeenCalledTimes(2)
+    expect(signalRMock.connection.invoke).toHaveBeenNthCalledWith(
+      1, AutomatonHubMethods.JoinAppRuntimeLogs, 'app-id', 'live-target-id',
+    )
+    expect(signalRMock.connection.invoke).toHaveBeenNthCalledWith(
+      2, AutomatonHubMethods.JoinAppRuntimeLogs, 'app-id', 'live-target-id',
+    )
+    expect(client.connectionState).toBe('connected')
+    expect(client.isSubscribedTo('app-id', 'live-target-id')).toBe(true)
   })
 })
