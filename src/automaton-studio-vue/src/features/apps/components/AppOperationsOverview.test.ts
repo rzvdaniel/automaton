@@ -103,6 +103,23 @@ describe('AppOperationsOverview', () => {
     expect(wrapper.text()).not.toContain('Healthy')
     expect(wrapper.text()).not.toContain('Create File')
     expect(wrapper.find('.local-source-card--primary').exists()).toBe(false)
+    expect(wrapper.find('.live-summary').exists()).toBe(true)
+    expect(wrapper.findAll('.summary-card')).toHaveLength(2)
+    expect(wrapper.get('.summary-card').text()).toContain('Runtime')
+    expect(wrapper.findAll('.summary-card')[1]?.text()).toContain('Publishing')
+  })
+
+  it('groups a contradictory deployment in Live and keeps its diagnostic actionable', () => {
+    const wrapper = mountOverview({}, [liveTarget({
+      status: DeploymentTargetStatus.Running,
+      genericRuntimeDeployed: false,
+      lastSuccessfulDeploymentAt: null,
+    })])
+
+    expect(wrapper.get('.live-summary').text()).toContain('Not deployed')
+    expect(wrapper.findAll('.summary-card')).toHaveLength(2)
+    expect(wrapper.get('.diagnostic').text()).toContain('Needs attention')
+    expect(wrapper.get('.diagnostic__primary').text()).toContain('View deployments')
   })
 
   it('makes local CLI deployment the primary next step for a never-deployed app', () => {

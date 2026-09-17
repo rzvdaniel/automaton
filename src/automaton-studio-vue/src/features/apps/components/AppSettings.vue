@@ -2,7 +2,7 @@
 /**
  * AppSettings.vue
  * Settings panel for app configuration
- * Includes: Basic info, Publishing, Runner, Appearance
+ * Includes: App metadata, deployment targets, and appearance
  */
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -13,7 +13,6 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import CopyCommand from './CopyCommand.vue'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -21,7 +20,6 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppDeploymentTarget, type AppScreenshot } from '../types/apps.types'
-import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
 import { resolveMediaUrl } from '../utils/media-url'
 
 const toast = useToast()
@@ -44,12 +42,11 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
   (section) => {
-    if (section === 'publishing') activeSection.value = 'publishing'
     if (section === 'targets') activeSection.value = 'targets'
   },
   { immediate: true },
@@ -84,9 +81,6 @@ const starterPrompt = computed(() =>
 const name = ref('')
 const summary = ref('')
 const description = ref('')
-const publicUrl = ref('')
-const requiresAuthentication = ref(false)
-const isForkable = ref(false)
 const isProfileFeatured = ref(false)
 const thumbnailUrl = ref<string | undefined>(undefined)
 const tags = ref<string[]>([])
@@ -144,7 +138,6 @@ const isSavingTemplate = ref(false)
 
 // Computed
 const app = computed(() => editorStore.currentApp)
-const isPublished = computed(() => app.value?.isPublished ?? false)
 const isLinkedToProject = computed(() => app.value?.scope === AccessScope.Project)
 const screenshots = computed(() => app.value?.screenshots ?? [])
 const canAddMoreScreenshots = computed(() => screenshots.value.length < maxScreenshots)
@@ -160,24 +153,11 @@ const hasChanges = computed(() => {
     name.value !== app.value.name ||
     summary.value !== (app.value.summary || '') ||
     description.value !== (app.value.description || '') ||
-    publicUrl.value !== (app.value.publicUrl || '') ||
-    requiresAuthentication.value !== app.value.requiresAuthentication ||
-    isForkable.value !== (app.value.isForkable ?? false) ||
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
     !sameTags(tags.value, originalTags.value) ||
     pendingTags.value.length > 0
   )
-})
-
-const fullPublicUrl = computed(() => {
-  if (!publicUrl.value) return ''
-  return getPublishedAppUrl(publicUrl.value)
-})
-
-const studioApplicationUrl = computed(() => {
-  if (!app.value?.id) return ''
-  return getStudioApplicationUrl(app.value.id)
 })
 
 // Initialize form from app data
@@ -250,9 +230,6 @@ watch(
       name.value = newApp.name || ''
       summary.value = newApp.summary || ''
       description.value = newApp.description || ''
-      publicUrl.value = newApp.publicUrl || ''
-      requiresAuthentication.value = newApp.requiresAuthentication || false
-      isForkable.value = newApp.isForkable ?? false
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
@@ -266,86 +243,6 @@ watch(
   { immediate: true },
 )
 
-// Format last viewed date
-function formatLastViewed(date: string | null | undefined): string {
-  if (!date) return 'Never'
-  const d = new Date(date)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return d.toLocaleDateString()
-}
-
-// Generate URL slug from name
-function generateSlug() {
-  if (!name.value) return
-  publicUrl.value = name.value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-// Copy public URL to clipboard
-async function copyPublicUrl() {
-  if (!fullPublicUrl.value) return
-  try {
-    await navigator.clipboard.writeText(fullPublicUrl.value)
-    toast.add({
-      severity: 'success',
-      summary: 'Copied',
-      detail: 'Public URL copied to clipboard',
-      life: 2000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to copy URL',
-      life: 3000,
-    })
-  }
-}
-
-async function copyPrivateUrl() {
-  if (!studioApplicationUrl.value) return
-  try {
-    await navigator.clipboard.writeText(studioApplicationUrl.value)
-    toast.add({
-      severity: 'success',
-      summary: 'Copied',
-      detail: 'Authenticated application URL copied to clipboard',
-      life: 2000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to copy URL',
-      life: 3000,
-    })
-  }
-}
-
-// Open public URL in new tab
-function openPublicUrl() {
-  if (fullPublicUrl.value) {
-    window.open(fullPublicUrl.value, '_blank')
-  }
-}
-
-async function openPrivateUrl() {
-  if (studioApplicationUrl.value) {
-    window.open(studioApplicationUrl.value, '_blank')
-  }
-}
-
 // Save settings
 async function saveSettings() {
   if (!app.value) return
@@ -357,9 +254,6 @@ async function saveSettings() {
       name: name.value,
       summary: summary.value || undefined,
       description: description.value || undefined,
-      publicUrl: publicUrl.value || undefined,
-      requiresAuthentication: requiresAuthentication.value,
-      isForkable: isForkable.value,
       isProfileFeatured: isProfileFeatured.value,
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
@@ -370,9 +264,6 @@ async function saveSettings() {
       editorStore.currentApp.name = name.value
       editorStore.currentApp.summary = summary.value
       editorStore.currentApp.description = description.value
-      editorStore.currentApp.publicUrl = publicUrl.value
-      editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
-      editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
       editorStore.currentApp.tags = tags.value.join(',') || null
     }
@@ -614,14 +505,6 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'basic'"
               />
               <Button
-                label="Publishing"
-                icon="pi pi-globe"
-                text
-                :class="{ 'surface-hover': activeSection === 'publishing' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'publishing'"
-              />
-              <Button
                 label="Environments"
                 icon="pi pi-server"
                 text
@@ -746,196 +629,10 @@ async function handleSaveTemplateStatus() {
                 <small class="text-color-secondary">Choose a suggested tag or add your own. Press Enter to add it.</small>
               </div>
 
-              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
-                <Button
-                  label="Save Changes"
-                  icon="pi pi-save"
-                  :loading="isSaving"
-                  :disabled="!hasChanges"
-                  @click="saveSettings"
-                />
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <!-- Publishing Settings -->
-        <Card v-if="activeSection === 'publishing'">
-          <template #title>Publishing</template>
-          <template #content>
-            <Message v-if="isPublished" severity="success" :closable="false" class="mb-4">
-              <div class="flex align-items-center gap-2">
-                <i class="pi pi-check-circle"></i>
-                <span>This app is published and accessible to users</span>
-              </div>
-            </Message>
-
-            <!-- Public Profile Link (shown when published and public) -->
-            <Message v-if="isPublished && !requiresAuthentication" severity="info" :closable="false" class="mb-4">
-              <div class="flex flex-column gap-2">
-                <div class="flex align-items-center gap-2">
-                  <i class="pi pi-users"></i>
-                  <span>This app is visible on your public apps page</span>
-                </div>
-                <small class="text-color-secondary">
-                  Anyone can discover this app on your profile at <code>/username/apps</code>
-                </small>
-              </div>
-            </Message>
-
-            <!-- Analytics (shown when published) -->
-            <div v-if="isPublished" class="analytics-section mb-4">
-              <div class="flex align-items-center gap-2 mb-3">
-                <i class="pi pi-chart-bar text-color-secondary"></i>
-                <span class="font-medium">Analytics</span>
-              </div>
-              <div class="flex gap-4">
-                <div class="analytics-stat">
-                  <div class="stat-value">{{ app?.viewCount ?? 0 }}</div>
-                  <div class="stat-label">Total Views</div>
-                </div>
-                <div class="analytics-stat">
-                  <div class="stat-value">{{ formatLastViewed(app?.lastViewedAt) }}</div>
-                  <div class="stat-label">Last Viewed</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex flex-column gap-4">
-              <div class="flex flex-column gap-2">
-                <label for="public-url" class="font-medium">Public URL Slug</label>
-                <div class="p-inputgroup url-inputgroup">
-                  <span class="p-inputgroup-addon">{{ getPublishedAppsUrlPrefix() }}</span>
-                  <InputText
-                    id="public-url"
-                    v-model="publicUrl"
-                    placeholder="my-app"
-                  />
-                  <Button
-                    v-tooltip="'Generate from name'"
-                    icon="pi pi-sync"
-                    severity="secondary"
-                    outlined
-                    @click="generateSlug"
-                  />
-                </div>
-                <small class="text-color-secondary">
-                  URL-friendly identifier for your app
-                </small>
-              </div>
-
-              <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Authenticated Application URL</label>
-                <div class="p-inputgroup url-inputgroup">
-                  <InputText :model-value="studioApplicationUrl" readonly />
-                  <Button
-                    v-tooltip="'Copy URL'"
-                    icon="pi pi-copy"
-                    severity="secondary"
-                    outlined
-                    @click="copyPrivateUrl"
-                  />
-                  <Button
-                    v-tooltip="'Open in new tab'"
-                    icon="pi pi-external-link"
-                    severity="secondary"
-                    outlined
-                    @click="openPrivateUrl"
-                  />
-                </div>
-                <small class="text-color-secondary">
-                  Opens the running application in a clean tab using your authenticated Studio session.
-                </small>
-              </div>
-
-              <div v-else-if="studioApplicationUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Authenticated Application URL</label>
-                <div class="p-inputgroup url-inputgroup">
-                  <InputText :model-value="studioApplicationUrl" readonly />
-                  <Button
-                    v-tooltip="'Copy URL'"
-                    icon="pi pi-copy"
-                    severity="secondary"
-                    outlined
-                    @click="copyPrivateUrl"
-                  />
-                  <Button
-                    v-tooltip="'Open in new tab'"
-                    icon="pi pi-external-link"
-                    severity="secondary"
-                    outlined
-                    @click="openPrivateUrl"
-                  />
-                </div>
-                <small class="text-color-secondary">
-                  Unpublished apps open only for logged-in users with access to this app.
-                </small>
-              </div>
-
-              <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Public URL</label>
-                <div class="p-inputgroup url-inputgroup">
-                  <InputText :model-value="fullPublicUrl" readonly />
-                  <Button
-                    v-tooltip="'Copy URL'"
-                    icon="pi pi-copy"
-                    severity="secondary"
-                    outlined
-                    @click="copyPublicUrl"
-                  />
-                  <Button
-                    v-tooltip="'Open in new tab'"
-                    icon="pi pi-external-link"
-                    severity="secondary"
-                    outlined
-                    @click="openPublicUrl"
-                  />
-                </div>
-                <small class="text-color-secondary">
-                  Public production endpoint shown to external users.
-                </small>
-              </div>
-
-              <div class="flex flex-column gap-2">
-                <label for="public-access" class="font-medium">Access Control</label>
-                <div class="flex align-items-center gap-3">
-                  <InputSwitch
-                    id="public-access"
-                    :model-value="!requiresAuthentication"
-                    @update:model-value="requiresAuthentication = !$event"
-                  />
-                  <span>{{ requiresAuthentication ? 'Restricted access' : 'Public access' }}</span>
-                </div>
-                <small class="text-color-secondary">
-                  {{ requiresAuthentication
-                    ? 'Only authorized Automaton users can access this app'
-                    : 'Anyone with the link can access this app' }}
-                </small>
-              </div>
-
-              <div class="flex flex-column gap-2">
-                <label for="forkable" class="font-medium">Remixing</label>
-                <div class="flex align-items-center gap-3">
-                  <InputSwitch
-                    id="forkable"
-                    v-model="isForkable"
-                  />
-                  <span>{{ isForkable ? 'Others can remix this app' : 'Source stays private' }}</span>
-                </div>
-                <small class="text-color-secondary">
-                  {{ isForkable
-                    ? 'Published users can create editable remixes with attribution.'
-                    : 'People can use the published app, but cannot access editable source.' }}
-                </small>
-              </div>
-
               <div class="flex flex-column gap-2">
                 <label for="profile-featured" class="font-medium">Creator Store Spotlight</label>
                 <div class="flex align-items-center gap-3">
-                  <InputSwitch
-                    id="profile-featured"
-                    v-model="isProfileFeatured"
-                  />
+                  <InputSwitch id="profile-featured" v-model="isProfileFeatured" />
                   <span>{{ isProfileFeatured ? 'Featured on my creator profile' : 'Use normal profile ranking' }}</span>
                 </div>
                 <small class="text-color-secondary">

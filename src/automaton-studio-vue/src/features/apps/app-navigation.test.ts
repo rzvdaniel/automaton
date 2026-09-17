@@ -29,6 +29,17 @@ describe('app operations navigation', () => {
     expect(resolveAppView('unknown')).toBe('overview')
   })
 
+  it('keeps Publishing and Settings as distinct app destinations', () => {
+    const items = APP_NAVIGATION_GROUPS.flatMap((group) => group.items)
+    const publishing = items.find((item) => item.label === 'Publishing')
+    const settings = items.find((item) => item.label === 'Settings')
+
+    expect(publishing?.key).toBe('publishing')
+    expect(settings?.key).toBe('settings')
+    expect(resolveAppView('publishing')).toBe('publishing')
+    expect(resolveAppView('settings')).toBe('settings')
+  })
+
   it('removes prompt and authoring-view deep links without dropping operational context', () => {
     expect(withoutAuthoringQuery({
       prompt: 'build an app',

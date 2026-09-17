@@ -200,12 +200,12 @@ function navigate(action: AppOperationalAction): void {
 <style scoped>
 .operations-overview {
   height: 100%;
-  padding: 1.5rem;
+  padding: 1.25rem;
   overflow-y: auto;
 }
 
 .overview-header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.9rem;
 }
 
 .eyebrow,
@@ -250,8 +250,9 @@ h1 {
 .live-summary {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: 0.65rem;
+  padding: 1rem 1.15rem;
+  border-left: 3px solid var(--p-primary-color);
 }
 
 .live-summary__heading,
@@ -278,8 +279,8 @@ h1 {
 .live-summary__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem 2rem;
-  font-size: 0.85rem;
+  gap: 0.35rem 1.5rem;
+  font-size: 0.82rem;
 }
 
 .deployment-time time {
@@ -288,8 +289,8 @@ h1 {
 }
 
 .live-app-link {
-  align-items: flex-end;
-  padding-top: 1rem;
+  align-items: center;
+  padding-top: 0.65rem;
   border-top: 1px solid var(--p-surface-border);
 }
 
@@ -324,19 +325,22 @@ h1 {
 }
 
 .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
-  margin-top: 1rem;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .summary-card {
   display: flex;
-  flex: 1;
   min-width: 0;
-  min-height: 10rem;
   align-items: flex-start;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 1rem;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border-left: 2px solid var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 3%, var(--p-surface-card));
 }
 
 .summary-card strong {
@@ -344,7 +348,6 @@ h1 {
 }
 
 .summary-card > .muted {
-  flex: 1;
   font-size: 0.85rem;
   overflow-wrap: anywhere;
 }
@@ -357,10 +360,16 @@ h1 {
   cursor: pointer;
 }
 
+.summary-card button {
+  margin-top: 0.15rem;
+}
+
 .diagnostic {
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
+  margin-top: 0.75rem;
+  padding: 0.8rem 1rem;
   border-color: var(--p-orange-300);
+  border-left: 3px solid var(--p-orange-500);
+  background: color-mix(in srgb, var(--p-orange-300) 7%, var(--p-surface-card));
 }
 
 .diagnostic__copy .eyebrow {
@@ -387,13 +396,13 @@ h1 {
 }
 
 .local-source-card {
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
 }
 
 .local-source-card--primary {
   border-color: var(--p-primary-color);
-  padding: 1.25rem;
+  padding: 1rem 1.15rem;
 }
 
 .local-source-card h2 {
@@ -422,9 +431,9 @@ h1 {
   white-space: nowrap;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .summary-grid {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -443,6 +452,10 @@ h1 {
 
   .diagnostic__actions {
     flex-wrap: wrap;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .command-row {
