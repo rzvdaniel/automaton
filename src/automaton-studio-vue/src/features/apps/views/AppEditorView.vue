@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
@@ -10,10 +10,10 @@ import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
 import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppOperationsOverview from '../components/AppOperationsOverview.vue'
+import AppPublishingView from '../components/AppPublishingView.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
-import CopyCommand from '../components/CopyCommand.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
@@ -139,9 +139,10 @@ function isTokenExpired(token: string): boolean {
 
 function handleNavigation(view: AppViewKey) {
   activeView.value = view
-  const query = { ...route.query }
-  if (view === 'publishing') query.settings = 'publishing'
-  else delete query.settings
+  const query: LocationQueryRaw = { ...route.query }
+  delete query.settings
+  if (view === 'overview') delete query.view
+  else query.view = view
   void router.replace({ query })
 }
 
@@ -255,26 +256,10 @@ function handleUnpublish() {
           <div>
             <h1>{{ editorStore.currentApp.name }}</h1>
             <div class="header-status">
-              <Tag :value="editorStore.applicationState" severity="secondary" />
+              <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
               <Tag :value="editorStore.isPublished ? 'Published' : 'Unpublished'" :severity="editorStore.isPublished ? 'success' : 'secondary'" />
             </div>
           </div>
-        </div>
-        <div class="header-actions">
-          <CopyCommand
-            command="automaton deploy"
-            button-label="Copy automaton deploy"
-            :show-command="false"
-          />
-          <Button
-            v-if="editorStore.isPublished"
-            label="Unpublish"
-            icon="pi pi-eye-slash"
-            severity="danger"
-            outlined
-            @click="handleUnpublish"
-          />
-          <Button v-else label="Publish" icon="pi pi-globe" @click="showPublishDialog = true" />
         </div>
       </header>
 
@@ -292,6 +277,14 @@ function handleUnpublish() {
             :targets="deploymentTargets"
             :application-state="editorStore.applicationState"
             @navigate="handleNavigation"
+          />
+
+          <AppPublishingView
+            v-else-if="activeView === 'publishing'"
+            :app="editorStore.currentApp"
+            :has-live-target="!!getLiveTarget(deploymentTargets)"
+            @publish="showPublishDialog = true"
+            @unpublish="handleUnpublish"
           />
 
           <AppDeploymentTargets
@@ -329,7 +322,7 @@ function handleUnpublish() {
           />
 
           <AppSettings
-            v-else
+            v-else-if="activeView === 'settings'"
             :key="activeView"
             :targets-revision="targetsRevision"
             @view-target-logs="handleViewTargetLogs"

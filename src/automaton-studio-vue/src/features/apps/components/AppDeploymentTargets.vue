@@ -471,11 +471,12 @@ watch(() => props.refreshRevision, load)
 </script>
 
 <template>
-  <section class="targets-section">
+  <section class="targets-section" aria-labelledby="deployment-targets-title">
     <div class="targets-header">
       <div>
-        <h2>Environments</h2>
-        <p>Manage the Live environment and optional named environments separately.</p>
+        <p class="eyebrow">Application operations</p>
+        <h1 id="deployment-targets-title">Deployments</h1>
+        <p class="targets-summary">Manage the Live environment and optional named environments separately.</p>
       </div>
       <Button label="Add environment" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
     </div>
@@ -795,9 +796,14 @@ watch(() => props.refreshRevision, load)
 
 <style scoped>
 .targets-section {
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 .targets-header {
   display: flex;
@@ -805,11 +811,20 @@ watch(() => props.refreshRevision, load)
   justify-content: space-between;
   gap: 1rem;
 }
-.targets-header h2 {
+.eyebrow {
   margin: 0 0 0.35rem;
-  font-size: 1.25rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.targets-header p {
+.targets-header h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+.targets-summary {
   margin: 0;
   color: var(--p-text-muted-color);
 }
@@ -842,11 +857,7 @@ watch(() => props.refreshRevision, load)
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-border-radius-lg);
   background: var(--p-content-background);
-}
-.target-card--live {
-  border-left: 4px solid var(--p-green-500);
-  padding-left: calc(1.35rem - 3px);
-  background: color-mix(in srgb, var(--p-green-50) 35%, var(--p-content-background));
+  box-shadow: var(--p-card-shadow, 0 1px 2px rgb(0 0 0 / 8%));
 }
 .target-main {
   min-width: 0;
@@ -967,6 +978,9 @@ watch(() => props.refreshRevision, load)
   .targets-header,
   .target-card {
     flex-direction: column;
+  }
+  .targets-section {
+    padding: 1rem;
   }
   .target-actions {
     align-self: stretch;

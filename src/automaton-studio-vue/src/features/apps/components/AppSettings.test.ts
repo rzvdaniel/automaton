@@ -58,7 +58,9 @@ describe('AppSettings', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Basic Info')
-    expect(wrapper.text()).toContain('Publishing')
+    expect(wrapper.text()).toContain('App Settings')
+    expect(wrapper.text()).not.toContain('Publishing')
+    expect(wrapper.text()).not.toContain('Public URL')
     expect(wrapper.text()).not.toContain('Runtime contract')
     expect(wrapper.find('[id="app-name"]').exists()).toBe(true)
     expect(wrapper.find('[id="runtime-port"]').exists()).toBe(false)

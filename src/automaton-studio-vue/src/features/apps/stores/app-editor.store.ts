@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { appsService } from '../services/apps.service'
+import { getAppOperationalSummary } from '../utils/app-operational-summary'
 import type {
   App,
   AppDeploymentTarget,
@@ -18,12 +19,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const consoleEntries = ref<ConsoleEntry[]>([])
 
   const isPublished = computed(() => currentApp.value?.isPublished ?? false)
-  const applicationState = computed(() => {
-    if (!defaultTarget.value?.runner) return 'Not deployed'
-    if (!defaultTarget.value.runner.isOnline) return 'Runner offline'
-    if (defaultTarget.value.genericRuntimeDeployed) return 'Deployed'
-    return 'Not deployed'
-  })
+  const applicationState = computed(() => getAppOperationalSummary(defaultTarget.value))
 
   async function loadApp(appId: string): Promise<void> {
     isLoading.value = true
