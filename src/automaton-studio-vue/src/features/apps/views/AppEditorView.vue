@@ -11,10 +11,10 @@ import AppDeploymentTargets from '../components/AppDeploymentTargets.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppOperationsOverview from '../components/AppOperationsOverview.vue'
 import AppPublishingView from '../components/AppPublishingView.vue'
+import AppRuntimeOperations from '../components/AppRuntimeOperations.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
-import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
   APP_NAVIGATION_GROUPS,
@@ -44,7 +44,6 @@ const appId = computed(() => String(route.params.id ?? ''))
 const activeView = ref<AppViewKey>(resolveAppView(route.query.view))
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
-const selectedRunnerId = ref<string | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
 const targetsRevision = ref(0)
 const showPublishDialog = ref(false)
@@ -150,7 +149,6 @@ function handleTargetsChanged(targets: AppDeploymentTarget[]) {
   deploymentTargets.value = targets
   const liveTarget = getLiveTarget(targets)
   editorStore.setDefaultTarget(liveTarget)
-  selectedRunnerId.value ??= (liveTarget ?? targets[0])?.runner?.id ?? null
   void selectViewingTargetFromRoute()
 }
 
@@ -163,7 +161,6 @@ async function selectViewingTargetFromRoute() {
 async function selectViewingTarget(target: AppDeploymentTarget, replaceRoute = false) {
   selectedViewingTarget.value = target
   selectedLogTargetId.value = target.id
-  selectedRunnerId.value = target.runner?.id ?? null
 
   if (replaceRoute || route.query.target !== target.slug) {
     await router.replace({ query: { ...route.query, target: target.slug } })
@@ -297,12 +294,13 @@ function handleUnpublish() {
             @targets-changed="handleTargetsChanged"
           />
 
-          <BuildVisualWorkspace
+          <AppRuntimeOperations
             v-else-if="activeView === 'runtime'"
-            :runner-id="selectedRunnerId"
+            :app="editorStore.currentApp"
             :targets="deploymentTargets"
             :selected-target="selectedViewingTarget"
             @select-target="handleSelectViewingTarget"
+            @navigate="handleNavigation"
           />
 
           <AppRuntimeLogs v-else-if="activeView === 'logs'" ref="runtimeLogsRef" :app-id="appId" />
