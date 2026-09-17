@@ -4,7 +4,6 @@ export const APP_VIEW_KEYS = [
   'runtime',
   'logs',
   'actions',
-  'snapshots',
   'publishing',
   'settings',
 ] as const
@@ -39,7 +38,6 @@ export const APP_NAVIGATION_GROUPS: ReadonlyArray<AppNavigationGroup> = [
   {
     label: 'Manage',
     items: [
-      { key: 'snapshots', label: 'Source snapshots', icon: 'pi pi-history' },
       { key: 'publishing', label: 'Publishing', icon: 'pi pi-globe' },
       { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
     ],
@@ -53,7 +51,6 @@ export function resolveAppView(value: unknown): AppViewKey {
     case 'runtime':
     case 'logs':
     case 'actions':
-    case 'snapshots':
     case 'publishing':
     case 'settings':
       return value

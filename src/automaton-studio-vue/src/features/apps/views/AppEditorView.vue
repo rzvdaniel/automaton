@@ -14,7 +14,6 @@ import AppPublishingView from '../components/AppPublishingView.vue'
 import AppRuntimeOperations from '../components/AppRuntimeOperations.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
-import AppVersionHistory from '../components/AppVersionHistory.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
   APP_NAVIGATION_GROUPS,
@@ -338,14 +337,6 @@ function handleUnpublish() {
             v-else-if="activeView === 'actions'"
             :key="appId"
             :app-id="appId"
-          />
-
-          <AppVersionHistory
-            v-else-if="activeView === 'snapshots'"
-            :app-id="appId"
-            :source-available="editorStore.currentApp.sourceAvailable"
-            title="Source snapshots"
-            full-page
           />
 
           <AppSettings
