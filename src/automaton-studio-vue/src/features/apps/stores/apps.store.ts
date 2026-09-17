@@ -134,6 +134,11 @@ export const useAppsStore = defineStore('apps', () => {
           isPublished: true,
           publicUrl: request.publicUrl,
           requiresAuthentication: request.requiresAuthentication,
+          runtimeVisibility: request.runtimeVisibility,
+          catalogVisibility: request.catalogVisibility,
+          marketplacePreviewMode: request.marketplacePreviewMode,
+          isForkable: request.isForkable ?? apps.value[index]!.isForkable,
+          canLaunchPublicly: request.runtimeVisibility === 'public' && !request.requiresAuthentication && apps.value[index]!.accessStatus.toLocaleLowerCase() === 'active',
           publishedAt: new Date().toISOString(),
           category: request.category ?? apps.value[index]!.category,
           tags: request.tags ?? apps.value[index]!.tags,
@@ -145,6 +150,11 @@ export const useAppsStore = defineStore('apps', () => {
           isPublished: true,
           publicUrl: request.publicUrl,
           requiresAuthentication: request.requiresAuthentication,
+          runtimeVisibility: request.runtimeVisibility,
+          catalogVisibility: request.catalogVisibility,
+          marketplacePreviewMode: request.marketplacePreviewMode,
+          isForkable: request.isForkable ?? selectedApp.value.isForkable,
+          canLaunchPublicly: request.runtimeVisibility === 'public' && !request.requiresAuthentication && selectedApp.value.accessStatus.toLocaleLowerCase() === 'active',
           publishedAt: new Date().toISOString(),
           category: request.category ?? selectedApp.value.category,
           tags: request.tags ?? selectedApp.value.tags,
@@ -166,6 +176,9 @@ export const useAppsStore = defineStore('apps', () => {
         apps.value[index] = {
           ...apps.value[index]!,
           isPublished: false,
+          runtimeVisibility: 'private',
+          catalogVisibility: 'unlisted',
+          canLaunchPublicly: false,
           publishedAt: undefined,
         }
       }
@@ -173,6 +186,9 @@ export const useAppsStore = defineStore('apps', () => {
         selectedApp.value = {
           ...selectedApp.value,
           isPublished: false,
+          runtimeVisibility: 'private',
+          catalogVisibility: 'unlisted',
+          canLaunchPublicly: false,
           publishedAt: undefined,
         }
       }
