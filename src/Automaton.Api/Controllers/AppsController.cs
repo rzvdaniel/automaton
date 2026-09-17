@@ -1121,39 +1121,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get list of editable source files for an app.
-    /// </summary>
-    [HttpGet("{id}/files")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFiles(Guid id)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
-
-            return Ok(new
-            {
-                success = true,
-                files = files.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get files for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get files for a specific filesystem scope: source or versions.
+    /// Get files for a specific filesystem scope supported by the CLI.
     /// </summary>
     [HttpGet("{id}/filesystem")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1174,18 +1142,13 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var files = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
-                AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
-                _ => Enumerable.Empty<string>()
-            };
+            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
 
             return Ok(new
             {
                 success = true,
                 scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
+                editable = true,
                 files = files.ToList()
             });
         }
@@ -1197,85 +1160,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get the app editor root filesystem view: source/, versions/, and metadata files.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystem(Guid id)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetAppRootEntriesAsync(ownerId, id);
-            var visibleFiles = files.Where(path => !path.StartsWith("live/", StringComparison.OrdinalIgnoreCase));
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                files = visibleFiles.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get root filesystem for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a root-level app file such as _metadata.json.
-    /// Root files are visible in Studio but not editable.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystemFile(Guid id, string path)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedPath = path.Replace('\\', '/');
-            if (normalizedPath.StartsWith("live/", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            var content = await fileStorageService.ReadAppRootFileAsync(ownerId, id, path);
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read app root file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a file from source or versions scope.
+    /// Read content of a source file through the scoped CLI filesystem API.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1296,50 +1181,6 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var content = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
-                AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
-                _ => null
-            };
-
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a specific editable source file.
-    /// </summary>
-    [HttpGet("{id}/files/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFile(Guid id, string path)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var content = await fileStorageService.ReadSourceFileAsync(ownerId, id, path);
 
             if (content == null)
@@ -1350,18 +1191,14 @@ public class AppsController : BaseController
             return Ok(new
             {
                 success = true,
-                content = content,
-                path = path
+                scope = normalizedScope,
+                editable = true,
+                content
             });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.LogWarning(ex, "Unauthorized file access attempt for app {AppId}, path {Path}", id, path);
-            return Unauthorized(new { success = false, message = "Access denied" });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to read file {Path} for app {AppId}", path, id);
+            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
@@ -1371,7 +1208,6 @@ public class AppsController : BaseController
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
         };
     }
@@ -1571,7 +1407,6 @@ public class AppsController : BaseController
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-    public const string Versions = "versions";
 }
 
 public class GitHubPushRequest

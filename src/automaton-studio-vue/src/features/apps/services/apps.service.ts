@@ -12,10 +12,6 @@ import type {
   PublishAppRequest,
   ExportAppResponse,
   LinkedStepInfo,
-  AppFile,
-  AppFileSystemScope,
-  ScopedFileContentResponse,
-  ScopedFilesResponse,
   FileNode,
   CreateAppStepRequest,
   ApplicationContract,
@@ -52,15 +48,6 @@ export type AppActionVersion = {
 }
 
 class AppsService {
-  private readonly internalRootFilePaths = new Set([
-    'live',
-    'versions',
-    '_metadata.json',
-    'source/_metadata.json',
-  ])
-
-  private readonly internalRootFilePrefixes = ['live/', 'versions/'] as const
-
   private sortFileNodes(nodes: FileNode[]): FileNode[] {
     return [...nodes]
       .map((node) => ({
@@ -109,10 +96,6 @@ class AppsService {
     }
 
     return this.sanitizeArchiveFileName(fallbackName, extension)
-  }
-
-  private encodePath(path: string): string {
-    return path.split('/').map(encodeURIComponent).join('/')
   }
 
   /**
@@ -481,63 +464,6 @@ class AppsService {
   }
 
   /**
-   * Get files for an app
-   * GET /api/apps/{id}/files
-   */
-  async getFiles(id: string): Promise<{ success: boolean; files: AppFile[] }> {
-    const { data } = await apiClient.get<{ success: boolean; files: AppFile[] }>(
-      `/api/apps/${id}/files`,
-    )
-    return data
-  }
-
-  async getScopedFiles(id: string, scope: AppFileSystemScope): Promise<ScopedFilesResponse> {
-    const { data } = await apiClient.get<ScopedFilesResponse>(`/api/apps/${id}/filesystem`, {
-      params: { scope },
-    })
-    return data
-  }
-
-  async getRootFiles(id: string): Promise<ScopedFilesResponse> {
-    const { data } = await apiClient.get<ScopedFilesResponse>(`/api/apps/${id}/filesystem/root`)
-    return data
-  }
-
-  async readRootFile(
-    id: string,
-    path: string,
-  ): Promise<{ success: boolean; editable: boolean; content: string }> {
-    const encodedPath = this.encodePath(path)
-    const { data } = await apiClient.get<{ success: boolean; editable: boolean; content: string }>(
-      `/api/apps/${id}/filesystem/root/${encodedPath}`,
-    )
-    return data
-  }
-
-  /**
-   * Read a file content
-   * GET /api/apps/{id}/files/{path}
-   */
-  async readFile(id: string, path: string): Promise<{ success: boolean; content: string }> {
-    const { data } = await apiClient.get<{ success: boolean; content: string }>(
-      `/api/apps/${id}/files/${path}`,
-    )
-    return data
-  }
-
-  async readScopedFile(
-    id: string,
-    scope: AppFileSystemScope,
-    path: string,
-  ): Promise<ScopedFileContentResponse> {
-    const encodedPath = this.encodePath(path)
-    const { data } = await apiClient.get<ScopedFileContentResponse>(
-      `/api/apps/${id}/filesystem/${scope}/${encodedPath}`,
-    )
-    return data
-  }
-
-  /**
    * Build file tree from flat list of file paths
    */
   buildFileTree(files: string[], options?: { includeMetadata?: boolean }): FileNode[] {
@@ -599,56 +525,6 @@ class AppsService {
     }
 
     return this.sortFileNodes(root)
-  }
-
-  /**
-   * Get file tree structure
-   * GET /api/apps/{id}/files then build tree
-   */
-  async getFileTree(id: string): Promise<FileNode[]> {
-    const response = await this.getFiles(id)
-    if (response.success && response.files) {
-      // The API returns file paths as strings
-      const filePaths = response.files
-        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
-        .filter((p): p is string => Boolean(p))
-      return this.buildFileTree(filePaths)
-    }
-    return []
-  }
-
-  async getScopedFileTree(id: string, scope: AppFileSystemScope): Promise<FileNode[]> {
-    const response = await this.getScopedFiles(id, scope)
-    if (response.success && response.files) {
-      const filePaths = response.files
-        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
-        .filter((p): p is string => Boolean(p))
-      return this.buildFileTree(filePaths)
-    }
-    return []
-  }
-
-  async getRootFileTree(id: string): Promise<FileNode[]> {
-    const response = await this.getRootFiles(id)
-    if (response.success && response.files) {
-      const filePaths = response.files
-        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
-        .filter((path): path is string => Boolean(path))
-        .map((path) => path.replace(/\\/g, '/'))
-        .filter((path) => !this.isInternalRootFile(path))
-
-      return this.buildFileTree(filePaths, { includeMetadata: true })
-    }
-
-    return []
-  }
-
-  private isInternalRootFile(path: string): boolean {
-    if (this.internalRootFilePaths.has(path)) {
-      return true
-    }
-
-    return this.internalRootFilePrefixes.some((prefix) => path.startsWith(prefix))
   }
 
   /**
@@ -716,26 +592,6 @@ class AppsService {
         code,
       },
     })
-  }
-
-  /**
-   * Get version history for an app with pagination
-   * GET /api/apps/{appId}/versions
-   */
-  async getVersions(appId: string, pageNumber: number = 1, pageSize: number = 20, search?: string) {
-    const { data } = await apiClient.get(`/api/apps/${appId}/versions`, {
-      params: { pageNumber, pageSize, search: search || undefined },
-    })
-    return data
-  }
-
-  /**
-   * Get detailed information about a specific version
-   * GET /api/apps/{appId}/versions/{versionNumber}
-   */
-  async getVersionDetail(appId: string, versionNumber: number) {
-    const { data } = await apiClient.get(`/api/apps/${appId}/versions/${versionNumber}`)
-    return data
   }
 
   /**

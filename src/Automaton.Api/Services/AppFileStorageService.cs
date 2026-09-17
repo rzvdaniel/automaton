@@ -165,65 +165,6 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Restore app files from a version snapshot back to the current app folder.
-    /// </summary>
-    public async Task RestoreVersionAsync(Guid userId, Guid appId, int versionNumber)
-    {
-        try
-        {
-            var sourcePath = GetSourcePath(userId, appId);
-            if (!Directory.Exists(sourcePath))
-            {
-                throw new DirectoryNotFoundException($"App source directory not found: {sourcePath}");
-            }
-
-            var versionSnapshotPath = GetVersionSnapshotFilesPath(userId, appId, versionNumber);
-
-            if (versionSnapshotPath == null)
-            {
-                throw new DirectoryNotFoundException($"Version snapshot not found for version v{versionNumber:D3}");
-            }
-
-            foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
-            {
-                File.Delete(file);
-            }
-
-            foreach (var dir in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
-            {
-                if (!Directory.EnumerateFileSystemEntries(dir).Any())
-                {
-                    Directory.Delete(dir);
-                }
-            }
-
-            // Copy files from version snapshot to current
-            foreach (var sourceFile in Directory.EnumerateFiles(versionSnapshotPath, "*", SearchOption.AllDirectories))
-            {
-                var relativePath = Path.GetRelativePath(versionSnapshotPath, sourceFile);
-                var targetFilePath = Path.Combine(sourcePath, relativePath);
-                var targetDirectory = Path.GetDirectoryName(targetFilePath);
-
-                if (!string.IsNullOrEmpty(targetDirectory))
-                {
-                    Directory.CreateDirectory(targetDirectory);
-                }
-
-                File.Copy(sourceFile, targetFilePath, overwrite: true);
-            }
-
-            logger.Debug("Restored app {AppId} from version v{VersionNumber}", appId, versionNumber);
-
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to restore app {AppId} from version v{VersionNumber}", appId, versionNumber);
-            throw;
-        }
-    }
-
-    /// <summary>
     /// Load app definition from file system
     /// </summary>
     public async Task<AppDefinition?> LoadAppAsync(Guid userId, Guid appId)
@@ -579,24 +520,6 @@ public class AppFileStorageService
     public Task DeleteRuntimeDirectoryAsync(Guid userId, Guid appId, string relativePath)
     {
         return DeleteDirectoryAsync(GetLivePath(userId, appId), relativePath);
-    }
-
-    /// <summary>
-    /// Get all version snapshot files for an app.
-    /// Paths are relative to the versions root.
-    /// </summary>
-    public Task<IEnumerable<string>> GetVersionFilesAsync(Guid userId, Guid appId)
-    {
-        return GetFilesAsync(GetVersionsPath(userId, appId));
-    }
-
-    /// <summary>
-    /// Read a version snapshot file for an app.
-    /// Path is relative to the versions root.
-    /// </summary>
-    public Task<string?> ReadVersionFileAsync(Guid userId, Guid appId, string relativePath)
-    {
-        return ReadFileAsync(GetVersionsPath(userId, appId), relativePath);
     }
 
     /// <summary>

@@ -506,27 +506,11 @@ public class AutomatonApiClient : IDisposable
 
     // ── App files ─────────────────────────────────────────────────────────────
 
-    public async Task<JsonElement> ListFilesAsync(string appId, CancellationToken ct = default)
-    {
-        using var resp = await _http.GetAsync($"api/apps/{appId}/files", ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
-    }
-
     public async Task<JsonElement> ListScopedFilesAsync(string appId, string scope, CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}/filesystem?scope={Uri.EscapeDataString(scope)}", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
-    }
-
-    public async Task<string> ReadFileAsync(string appId, string path, CancellationToken ct = default)
-    {
-        var encoded = EncodeCatchAllPath(path);
-        using var resp = await _http.GetAsync($"api/apps/{appId}/files/{encoded}", ct);
-        await EnsureSuccessAsync(resp);
-        var body = await resp.Content.ReadAsStringAsync(ct);
-        return UnwrapFileContent(body);
     }
 
     public async Task<string> ReadScopedFileAsync(string appId, string scope, string path, CancellationToken ct = default)
