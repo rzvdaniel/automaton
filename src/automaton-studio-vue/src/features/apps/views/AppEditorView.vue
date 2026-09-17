@@ -13,7 +13,6 @@ import AppOperationsOverview from '../components/AppOperationsOverview.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
-import CopyCommand from '../components/CopyCommand.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import {
@@ -255,17 +254,12 @@ function handleUnpublish() {
           <div>
             <h1>{{ editorStore.currentApp.name }}</h1>
             <div class="header-status">
-              <Tag :value="editorStore.applicationState" severity="secondary" />
+              <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
               <Tag :value="editorStore.isPublished ? 'Published' : 'Unpublished'" :severity="editorStore.isPublished ? 'success' : 'secondary'" />
             </div>
           </div>
         </div>
         <div class="header-actions">
-          <CopyCommand
-            command="automaton deploy"
-            button-label="Copy automaton deploy"
-            :show-command="false"
-          />
           <Button
             v-if="editorStore.isPublished"
             label="Unpublish"
