@@ -16,7 +16,6 @@ public class AppsController : BaseController
     private readonly AppStepsService appStepsService;
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
-    private readonly GitHubService? githubService;
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
@@ -42,14 +41,12 @@ public class AppsController : BaseController
         PrivateAppLaunchService privateAppLaunchService,
         RuntimeCookieService runtimeCookieService,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
-        IApplicationEventService applicationEventService,
-        GitHubService? githubService = null)
+        IApplicationEventService applicationEventService)
     {
         this.appsService = appsService;
         this.appStepsService = appStepsService;
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
-        this.githubService = githubService;
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
@@ -947,180 +944,6 @@ public class AppsController : BaseController
     }
     
     /// <summary>
-    /// Push app to GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/push")]
-    public async Task<IActionResult> PushToGitHub(Guid id, [FromBody] GitHubPushRequest request)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var commitSha = await githubService.PushToGitHubAsync(app, request.CommitMessage ?? "Update app from Automaton", ownerId);
-
-            // Update app's GitHub settings
-            if (app.Definition.GitHub != null)
-            {
-                app.Definition.GitHub.LastSyncedCommitSha = commitSha;
-                app.Definition.GitHub.LastSyncedAt = DateTime.UtcNow;
-                app.Definition.GitHub.SyncStatus = GitHubSyncStatus.Synced;
-                await appsService.Update(id, app);
-            }
-
-            return Ok(new
-            {
-                success = true,
-                commitSha,
-                message = "App pushed to GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to push app {AppId} to GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Pull app from GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/pull")]
-    public async Task<IActionResult> PullFromGitHub(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || string.IsNullOrEmpty(app.Definition.GitHub.RepositoryUrl))
-            {
-                return BadRequest(new { success = false, message = "App is not connected to a GitHub repository" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var pulledDefinition = await githubService.PullFromGitHubAsync(app.Definition.GitHub, ownerId, id);
-
-            // Merge pulled definition into current app
-            app.Definition.HtmlContent = pulledDefinition.HtmlContent;
-            app.Definition.GitHub = pulledDefinition.GitHub;
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "App pulled from GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to pull app {AppId} from GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Check GitHub sync status for an app
-    /// </summary>
-    [HttpGet("{id}/github/status")]
-    public async Task<IActionResult> GetGitHubSyncStatus(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || !app.Definition.GitHub.SyncEnabled)
-            {
-                return Ok(new
-                {
-                    syncEnabled = false,
-                    status = "None"
-                });
-            }
-
-            var status = await githubService.CheckSyncStatusAsync(app.Definition.GitHub);
-
-            return Ok(new
-            {
-                syncEnabled = true,
-                status = status.ToString(),
-                repositoryUrl = app.Definition.GitHub.RepositoryUrl,
-                branch = app.Definition.GitHub.Branch,
-                lastSyncedAt = app.Definition.GitHub.LastSyncedAt
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to check GitHub sync status for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Configure GitHub settings for an app
-    /// </summary>
-    [HttpPut("{id}/github/settings")]
-    public async Task<IActionResult> UpdateGitHubSettings(Guid id, [FromBody] GitHubSettingsRequest request)
-    {
-        try
-        {
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            app.Definition.GitHub = new Models.GitHubSettings
-            {
-                RepositoryUrl = request.RepositoryUrl,
-                Branch = request.Branch ?? "main",
-                Path = request.Path,
-                SyncEnabled = request.SyncEnabled
-            };
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "GitHub settings updated successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to update GitHub settings for app {AppId}", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
     /// Get files for a specific filesystem scope supported by the CLI.
     /// </summary>
     [HttpGet("{id}/filesystem")]
@@ -1407,19 +1230,6 @@ public class AppsController : BaseController
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-}
-
-public class GitHubPushRequest
-{
-    public string? CommitMessage { get; set; }
-}
-
-public class GitHubSettingsRequest
-{
-    public string? RepositoryUrl { get; set; }
-    public string? Branch { get; set; }
-    public string? Path { get; set; }
-    public bool SyncEnabled { get; set; }
 }
 
 public class PublishAppRequest
