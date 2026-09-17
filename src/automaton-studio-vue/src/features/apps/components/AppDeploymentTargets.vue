@@ -856,7 +856,7 @@ watch(() => props.refreshRevision, load)
   padding: 1.25rem 1.35rem;
   border: 1px solid var(--p-content-border-color);
   border-radius: var(--p-border-radius-lg);
-  background: var(--p-surface-card);
+  background: var(--p-content-background);
   box-shadow: var(--p-card-shadow, 0 1px 2px rgb(0 0 0 / 8%));
 }
 .target-main {
