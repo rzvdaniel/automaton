@@ -238,6 +238,8 @@ export interface PublishAppRequest {
   marketplacePreviewMode?: 'launchable' | 'mediaOnly'
 }
 
+export type PublishSettingsRequest = Omit<PublishAppRequest, 'category' | 'tags'>
+
 export interface ExportAppResponse {
   blob: Blob
   fileName: string

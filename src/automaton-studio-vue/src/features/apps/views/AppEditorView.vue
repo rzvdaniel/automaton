@@ -24,11 +24,12 @@ import {
 import { appsService } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { AppDeploymentTarget, PublishAppRequest } from '../types/apps.types'
+import type { AppDeploymentTarget, PublishSettingsRequest } from '../types/apps.types'
 import type { RuntimeLogConnectionState } from '../types/console.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
@@ -41,6 +42,9 @@ const editorStore = useAppEditorStore()
 const { closeMobile, setHovered } = useSidebarState()
 
 const appId = computed(() => String(route.params.id ?? ''))
+const publishingStateLabel = computed(() => editorStore.currentApp && getPublishingConsistencyIssue(editorStore.currentApp)
+  ? 'Needs review'
+  : editorStore.isPublished ? 'Published' : 'Unpublished')
 const activeView = ref<AppViewKey>(resolveAppView(route.query.view))
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
@@ -203,21 +207,22 @@ async function handleViewTargetLogs(target: AppDeploymentTarget) {
   activeView.value = 'logs'
 }
 
-async function handlePublish(request: PublishAppRequest) {
-  if (!getLiveTarget(deploymentTargets.value)) {
-    toast.add({ severity: 'error', summary: 'Publish Live unavailable', detail: 'This app has no Live environment.', life: 5000 })
-    return
-  }
-
+async function handlePublish(request: PublishSettingsRequest) {
   try {
-    await editorStore.publishApp(request)
+    const app = editorStore.currentApp
+    if (!app) return
+    await editorStore.publishApp({
+      ...request,
+      category: app.category ?? null,
+      tags: app.tags ?? null,
+    })
     showPublishDialog.value = false
     toast.add({
       severity: 'success',
       summary: 'Published',
       detail: request.runtimeVisibility === 'public'
-        ? `App published at ${getPublishedAppUrl(request.publicUrl)}`
-        : 'Publishing settings updated.',
+        ? `Public access configured at ${getPublishedAppUrl(request.publicUrl)}. Publishing does not deploy or update the Live runtime.`
+        : 'Publishing settings saved. The runtime remains private.',
       life: 5000,
     })
   } catch (error: unknown) {
@@ -232,7 +237,7 @@ async function handlePublish(request: PublishAppRequest) {
 
 function handleUnpublish() {
   confirm.require({
-    message: 'Unpublish this app? Its public URL will stop working.',
+    message: 'Unpublish this app? Public access and its marketplace listing will be removed. The Live deployment and runtime will remain in place.',
     header: 'Confirm unpublish',
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Unpublish',
@@ -240,7 +245,7 @@ function handleUnpublish() {
     accept: async () => {
       try {
         await editorStore.unpublishApp()
-        toast.add({ severity: 'success', summary: 'Unpublished', detail: 'The public URL is no longer active.', life: 3000 })
+        toast.add({ severity: 'success', summary: 'Unpublished', detail: 'Public access was removed. The Live deployment and runtime were not changed.', life: 4000 })
       } catch (error: unknown) {
         toast.add({
           severity: 'error',
@@ -269,7 +274,7 @@ function handleUnpublish() {
             <h1>{{ editorStore.currentApp.name }}</h1>
             <div class="header-status">
               <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
-              <Tag :value="editorStore.isPublished ? 'Published' : 'Unpublished'" :severity="editorStore.isPublished ? 'success' : 'secondary'" />
+              <Tag :value="publishingStateLabel" :severity="publishingStateLabel === 'Needs review' ? 'warn' : editorStore.isPublished ? 'success' : 'secondary'" />
             </div>
           </div>
         </div>
@@ -295,8 +300,10 @@ function handleUnpublish() {
             v-else-if="activeView === 'publishing'"
             :app="editorStore.currentApp"
             :has-live-target="!!getLiveTarget(deploymentTargets)"
+            :operational-state="editorStore.applicationState"
             @publish="showPublishDialog = true"
             @unpublish="handleUnpublish"
+            @navigate="activeView = $event"
           />
 
           <AppDeploymentTargets
@@ -352,13 +359,13 @@ function handleUnpublish() {
       <PublishDialog
         v-model:visible="showPublishDialog"
         :current-slug="editorStore.currentApp.publicUrl"
-        :current-category="editorStore.currentApp.category"
-        :current-tags="editorStore.currentApp.tags"
+        :is-published="editorStore.currentApp.isPublished"
         :requires-auth="editorStore.currentApp.requiresAuthentication"
         :is-forkable="editorStore.currentApp.isForkable"
         :current-runtime-visibility="editorStore.currentApp.runtimeVisibility"
         :current-catalog-visibility="editorStore.currentApp.catalogVisibility"
         :app-name="editorStore.currentApp.name"
+        :has-live-target="!!getLiveTarget(deploymentTargets)"
         :live-target-name="getLiveTarget(deploymentTargets) ? getEnvironmentDisplayName(getLiveTarget(deploymentTargets)) : undefined"
         :live-target-slug="getLiveTarget(deploymentTargets)?.slug"
         :viewing-target-name="selectedViewingTarget ? getEnvironmentDisplayName(selectedViewingTarget) : undefined"

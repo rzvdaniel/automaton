@@ -334,6 +334,11 @@ class AppsService {
     await apiClient.put(`/api/apps/${id}/runner`, { executionRunnerId: runnerId })
   }
 
+  async getMarketplaceCategories(): Promise<string[]> {
+    const response = await apiClient.get<string[]>('/api/public/marketplace/categories')
+    return response.data ?? []
+  }
+
   /**
    * Update app settings (name, description, publicUrl, etc.)
    * Uses the general PUT /api/apps/{id} endpoint
@@ -349,6 +354,7 @@ class AppsService {
       executionRunnerId?: string
       isProfileFeatured?: boolean
       isForkable?: boolean
+      category?: string | null
       application?: ApplicationContract
     },
   ): Promise<void> {
@@ -375,7 +381,7 @@ class AppsService {
       definition: app.definition,
       thumbnailUrl: app.thumbnailUrl,
       screenshots: app.screenshots,
-      category: app.category,
+      category: settings.category !== undefined ? settings.category : app.category,
       tags: app.tags,
       application: settings.application ?? app.application,
     }

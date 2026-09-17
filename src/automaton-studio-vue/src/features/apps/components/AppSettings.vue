@@ -12,6 +12,7 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
+import Select from 'primevue/select'
 import Button from 'primevue/button'
 import CopyCommand from './CopyCommand.vue'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
@@ -81,6 +82,15 @@ const starterPrompt = computed(() =>
 const name = ref('')
 const summary = ref('')
 const description = ref('')
+const category = ref<string | null>(null)
+const categoryOptions = ref<string[]>([])
+const marketplaceCategoryOptions = computed(() => {
+  if (category.value && !categoryOptions.value.includes(category.value)) {
+    return [...categoryOptions.value, category.value]
+  }
+  return categoryOptions.value
+})
+const isLoadingCategories = ref(false)
 const isProfileFeatured = ref(false)
 const thumbnailUrl = ref<string | undefined>(undefined)
 const tags = ref<string[]>([])
@@ -153,6 +163,7 @@ const hasChanges = computed(() => {
     name.value !== app.value.name ||
     summary.value !== (app.value.summary || '') ||
     description.value !== (app.value.description || '') ||
+    category.value !== (app.value.category ?? null) ||
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
     !sameTags(tags.value, originalTags.value) ||
@@ -223,6 +234,17 @@ async function loadTagSettings(appId: string, projectId?: string) {
   }
 }
 
+async function loadCategories() {
+  isLoadingCategories.value = true
+  try {
+    categoryOptions.value = await appsService.getMarketplaceCategories()
+  } catch {
+    categoryOptions.value = []
+  } finally {
+    isLoadingCategories.value = false
+  }
+}
+
 watch(
   app,
   (newApp) => {
@@ -230,6 +252,7 @@ watch(
       name.value = newApp.name || ''
       summary.value = newApp.summary || ''
       description.value = newApp.description || ''
+      category.value = newApp.category ?? null
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
@@ -238,6 +261,7 @@ watch(
       tags.value = fallbackTags
       originalTags.value = [...fallbackTags]
       void loadTagSettings(newApp.id, newApp.projectId)
+      void loadCategories()
     }
   },
   { immediate: true },
@@ -255,6 +279,7 @@ async function saveSettings() {
       summary: summary.value || undefined,
       description: description.value || undefined,
       isProfileFeatured: isProfileFeatured.value,
+      category: category.value,
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
     originalTags.value = [...tags.value]
@@ -264,6 +289,7 @@ async function saveSettings() {
       editorStore.currentApp.name = name.value
       editorStore.currentApp.summary = summary.value
       editorStore.currentApp.description = description.value
+      editorStore.currentApp.category = category.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
       editorStore.currentApp.tags = tags.value.join(',') || null
     }
@@ -596,6 +622,21 @@ async function handleSaveTemplateStatus() {
                   :maxlength="500"
                 />
                 <small class="text-color-secondary">Full description shown in app details • {{ description.length }}/500 characters</small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="app-category" class="font-medium">Marketplace category</label>
+                <Select
+                  id="app-category"
+                  v-model="category"
+                  :options="marketplaceCategoryOptions"
+                  placeholder="Select a category"
+                  class="w-full"
+                  :loading="isLoadingCategories"
+                  :disabled="!marketplaceCategoryOptions.length"
+                  show-clear
+                />
+                <small class="text-color-secondary">Organizes this app in the public marketplace. Publishing and runtime visibility are managed separately.</small>
               </div>
 
               <div class="flex flex-column gap-2">

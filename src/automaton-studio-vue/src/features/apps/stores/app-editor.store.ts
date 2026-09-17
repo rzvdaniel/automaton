@@ -47,6 +47,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         isPublished: true,
         publicUrl: request.publicUrl,
         requiresAuthentication: request.requiresAuthentication,
+        runtimeVisibility: request.runtimeVisibility,
+        catalogVisibility: request.catalogVisibility,
+        marketplacePreviewMode: request.marketplacePreviewMode,
+        isForkable: request.isForkable ?? currentApp.value.isForkable,
+        canLaunchPublicly: request.runtimeVisibility === 'public' && !request.requiresAuthentication && currentApp.value.accessStatus.toLocaleLowerCase() === 'active',
         publishedAt: new Date().toISOString(),
         category: request.category ?? currentApp.value.category,
         tags: request.tags ?? currentApp.value.tags,
@@ -64,6 +69,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       currentApp.value = {
         ...currentApp.value,
         isPublished: false,
+        runtimeVisibility: 'private',
+        catalogVisibility: 'unlisted',
+        canLaunchPublicly: false,
         publishedAt: undefined,
       }
     } catch (caught: unknown) {

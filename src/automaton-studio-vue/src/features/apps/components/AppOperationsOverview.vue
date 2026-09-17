@@ -8,7 +8,8 @@ import type { App, AppDeploymentTarget } from '../types/apps.types'
 import type { AppViewKey } from '../app-navigation'
 import type { AppOperationalAction, AppOperationalSummary } from '../utils/app-operational-summary'
 import CopyCommand from './CopyCommand.vue'
-import { getPublishedAppUrl, getDeploymentTargetUrl } from '../utils/public-app-url'
+import { getDeploymentTargetUrl } from '../utils/public-app-url'
+import { getPublicRuntimeUrl, getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
 
@@ -45,11 +46,9 @@ const liveAppUnavailableReason = computed(() => {
   }
   return liveRuntimeState.value.message || 'The Live app URL is unavailable.'
 })
-const publishedUrl = computed(() =>
-  props.app.isPublished && props.app.publicUrl
-    ? getPublishedAppUrl(props.app.publicUrl)
-    : null,
-)
+const publishedUrl = computed(() => getPublicRuntimeUrl(props.app))
+const publishingIssue = computed(() => getPublishingConsistencyIssue(props.app))
+const publishingLabel = computed(() => publishingIssue.value ? 'Needs review' : props.app.isPublished ? 'Published' : 'Unpublished')
 const runtimeAssignment = computed(() => {
   const runner = liveTarget.value?.runner
   if (!runner) return 'Not assigned'
@@ -157,16 +156,20 @@ function navigate(action: AppOperationalAction): void {
         <template #title>Publishing</template>
         <template #content>
           <div class="summary-card__content">
-            <strong>{{ app.isPublished ? 'Published' : 'Unpublished' }}</strong>
+            <strong>{{ publishingLabel }}</strong>
             <template v-if="app.isPublished">
               <span class="muted">{{ publishedAccess }}</span>
               <a v-if="publishedUrl" class="published-link" :href="publishedUrl" target="_blank" rel="noopener noreferrer">
                 Open published app
                 <i class="pi pi-external-link" aria-hidden="true"></i>
               </a>
-              <span v-else class="muted">No published URL is configured.</span>
+              <span v-else class="muted">
+                {{ app.runtimeVisibility === 'private'
+                  ? 'No public runtime URL: this app has a private runtime.'
+                  : publishingIssue || 'No usable public runtime URL is configured.' }}
+              </span>
             </template>
-            <span v-else class="muted">Deployment and publishing are separate.</span>
+            <span v-else class="muted">{{ publishingIssue || 'Deployment and publishing are separate.' }}</span>
             <Button label="Manage publishing" icon="pi pi-arrow-right" icon-pos="right" text @click="emit('navigate', 'publishing')" />
           </div>
         </template>

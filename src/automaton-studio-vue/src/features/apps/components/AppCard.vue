@@ -28,8 +28,6 @@ const fullThumbnailUrl = computed(() => {
   return resolveMediaUrl(props.app.thumbnailUrl)
 })
 
-const emit = defineEmits<{ publish: [appId: string] }>()
-
 const router = useRouter()
 const confirm = useConfirm()
 const toast = useToast()
@@ -39,9 +37,9 @@ const menu = ref()
 const isExporting = ref(false)
 
 const statusBadge = computed(() => ({
-  label: props.app.isPublished ? 'Published' : 'Draft',
+  label: props.app.isPublished ? 'Published' : 'Unpublished',
   severity: props.app.isPublished ? ('success' as const) : ('secondary' as const),
-  icon: props.app.isPublished ? 'pi pi-check-circle' : 'pi pi-file-edit',
+  icon: props.app.isPublished ? 'pi pi-check-circle' : 'pi pi-eye-slash',
 }))
 
 const initials = computed(() => props.app.name
@@ -153,34 +151,6 @@ const handleOpenPrivateApp = async () => {
   window.open(studioApplicationUrl.value, '_blank', 'noopener')
 }
 
-const handleUnpublish = async () => {
-  confirm.require({
-    message: `Are you sure you want to unpublish "${props.app.name}"? It will no longer be accessible via its public URL.`,
-    header: 'Confirm Unpublish',
-    icon: 'pi pi-exclamation-triangle',
-    acceptClass: 'p-button-warning',
-    accept: async () => {
-      try {
-        await appsStore.unpublishApp(props.app.id)
-        toast.add({
-          severity: 'success',
-          summary: 'Unpublished',
-          detail: `"${props.app.name}" has been unpublished`,
-          life: 3000,
-        })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to unpublish app'
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: message,
-          life: 5000,
-        })
-      }
-    },
-  })
-}
-
 const handleExport = async () => {
   isExporting.value = true
 
@@ -250,7 +220,7 @@ const menuItems = computed(() => {
   const items: Array<{
     label: string
     icon: string
-    command: () => Promise<void>
+    command: () => Promise<void> | void
     disabled?: boolean
   }> = [
     {
@@ -275,10 +245,13 @@ const menuItems = computed(() => {
       icon: 'pi pi-globe',
       command: handleOpenPublicApp,
     })
+  }
+
+  if (props.app.isPublished) {
     items.push({
-      label: 'Unpublish',
-      icon: 'pi pi-eye-slash',
-      command: handleUnpublish,
+      label: 'Manage publishing',
+      icon: 'pi pi-globe',
+      command: async () => { await router.push(`/apps/${props.app.id}?view=publishing`) },
     })
   }
 
@@ -328,7 +301,7 @@ const menuItems = computed(() => {
           </div>
         </div>
 
-        <div class="app-card-tags" v-if="app.tags.length">
+        <div v-if="app.tags.length" class="app-card-tags">
           <Tag v-for="tag in app.tags.slice(0, 3)" :key="tag" :value="tag" severity="secondary" />
           <Tag v-if="app.tags.length > 3" :value="`+${app.tags.length - 3}`" severity="secondary" />
         </div>
