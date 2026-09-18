@@ -107,6 +107,8 @@ __pycache__/
 !.agents/skills/production-docker-maintenance/**
 !.agents/skills/admin-docs/
 !.agents/skills/admin-docs/**
+!.agents/skills/studio-design/
+!.agents/skills/studio-design/**
 .vitepress/
 !src/automaton-vue/docs/.vitepress/
 src/automaton-vue/docs/.vitepress/cache/
