@@ -42,23 +42,6 @@ $requiredServices = @('api', 'worker', 'studio', 'website', 'traefik', 'mysql', 
 $missing = @($requiredServices | Where-Object { $_ -notin $services })
 if ($missing.Count -gt 0) { throw "Required runtime services are not running: $($missing -join ', ')" }
 
-$composeConfig = docker compose -f $composeFile config --format json | ConvertFrom-Json
-$mysqlRootPassword = $composeConfig.services.mysql.environment.MYSQL_ROOT_PASSWORD
-if ([string]::IsNullOrWhiteSpace($mysqlRootPassword)) {
-    throw 'The effective runtime-local MySQL root password could not be read from Docker Compose configuration.'
-}
-$bootstrapSql = @'
-SELECT CONCAT(
-  (SELECT COUNT(*) FROM RunnerHosts WHERE Name = 'runtime-local-docker' AND Provider = 'local' AND ProvisioningTransport = 'localDocker' AND Status = 'active' AND ProvisioningStatus = 'ready' AND HostedRunnerSchedulingEnabled = 1),
-  '|', (SELECT COUNT(*) FROM SubscriptionPlans WHERE IsDefault = 1 AND IsActive = 1),
-  '|', (SELECT COUNT(*) FROM HostedRunnerSpecifications WHERE Code = 'free' AND IsActive = 1),
-  '|', (SELECT COUNT(*) FROM HostedRunnerPlatformSettings WHERE ProvisioningEnabled = 1)
-);
-'@
-$bootstrapState = ($bootstrapSql | docker compose -f $composeFile exec -T mysql mysql -uroot "-p$mysqlRootPassword" -D automaton -N -B 2>$null).Trim()
-if ($bootstrapState -ne '1|1|1|1') {
-    throw "Local API bootstrap state is incomplete. Expected host, default plan, free specification, and provisioning enabled; got '$bootstrapState'."
-}
-
 Write-Host '[OK] API, Studio, Website, Traefik, and required runtime services are ready.' -ForegroundColor Green
-Write-Host '[OK] Local runner host, seeded plan/specification, and provisioning setting are valid.' -ForegroundColor Green
+Write-Host '[INFO] Hosted Runner provisioning is not validated by this endpoint check.' -ForegroundColor Yellow
+Write-Host '[INFO] Use setup-local-development.ps1 -ProvisionTestRunner to verify the plan, image digest, and eligible Infrastructure Runner host before provisioning.'
