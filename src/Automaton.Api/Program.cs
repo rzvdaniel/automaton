@@ -487,9 +487,8 @@ services.AddSingleton<IAutomatonGuidanceProvider, EmbeddedAutomatonGuidanceProvi
 services.AddSingleton<Automaton.Mcp.SystemPrompts.IAppPromptContextSelector, Automaton.Mcp.SystemPrompts.KeywordAppPromptContextSelector>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
-// MCP Tool Providers for AI Chat
+// MCP Tool Provider for step AI conversations
 services.AddScoped<StepMcpToolProvider>();
-services.AddScoped<AppMcpToolProvider>();
 services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
                      Automaton.Mcp.Tools.UiAutomationActionAckService>();
 // File IO tool group — wired to app-scoped file system

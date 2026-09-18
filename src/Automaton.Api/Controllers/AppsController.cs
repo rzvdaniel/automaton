@@ -16,7 +16,6 @@ public class AppsController : BaseController
     private readonly AppStepsService appStepsService;
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
-    private readonly GitHubService? githubService;
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
@@ -42,14 +41,12 @@ public class AppsController : BaseController
         PrivateAppLaunchService privateAppLaunchService,
         RuntimeCookieService runtimeCookieService,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
-        IApplicationEventService applicationEventService,
-        GitHubService? githubService = null)
+        IApplicationEventService applicationEventService)
     {
         this.appsService = appsService;
         this.appStepsService = appStepsService;
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
-        this.githubService = githubService;
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
@@ -947,213 +944,7 @@ public class AppsController : BaseController
     }
     
     /// <summary>
-    /// Push app to GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/push")]
-    public async Task<IActionResult> PushToGitHub(Guid id, [FromBody] GitHubPushRequest request)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var commitSha = await githubService.PushToGitHubAsync(app, request.CommitMessage ?? "Update app from Automaton", ownerId);
-
-            // Update app's GitHub settings
-            if (app.Definition.GitHub != null)
-            {
-                app.Definition.GitHub.LastSyncedCommitSha = commitSha;
-                app.Definition.GitHub.LastSyncedAt = DateTime.UtcNow;
-                app.Definition.GitHub.SyncStatus = GitHubSyncStatus.Synced;
-                await appsService.Update(id, app);
-            }
-
-            return Ok(new
-            {
-                success = true,
-                commitSha,
-                message = "App pushed to GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to push app {AppId} to GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Pull app from GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/pull")]
-    public async Task<IActionResult> PullFromGitHub(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || string.IsNullOrEmpty(app.Definition.GitHub.RepositoryUrl))
-            {
-                return BadRequest(new { success = false, message = "App is not connected to a GitHub repository" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var pulledDefinition = await githubService.PullFromGitHubAsync(app.Definition.GitHub, ownerId, id);
-
-            // Merge pulled definition into current app
-            app.Definition.HtmlContent = pulledDefinition.HtmlContent;
-            app.Definition.GitHub = pulledDefinition.GitHub;
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "App pulled from GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to pull app {AppId} from GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Check GitHub sync status for an app
-    /// </summary>
-    [HttpGet("{id}/github/status")]
-    public async Task<IActionResult> GetGitHubSyncStatus(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || !app.Definition.GitHub.SyncEnabled)
-            {
-                return Ok(new
-                {
-                    syncEnabled = false,
-                    status = "None"
-                });
-            }
-
-            var status = await githubService.CheckSyncStatusAsync(app.Definition.GitHub);
-
-            return Ok(new
-            {
-                syncEnabled = true,
-                status = status.ToString(),
-                repositoryUrl = app.Definition.GitHub.RepositoryUrl,
-                branch = app.Definition.GitHub.Branch,
-                lastSyncedAt = app.Definition.GitHub.LastSyncedAt
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to check GitHub sync status for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Configure GitHub settings for an app
-    /// </summary>
-    [HttpPut("{id}/github/settings")]
-    public async Task<IActionResult> UpdateGitHubSettings(Guid id, [FromBody] GitHubSettingsRequest request)
-    {
-        try
-        {
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            app.Definition.GitHub = new Models.GitHubSettings
-            {
-                RepositoryUrl = request.RepositoryUrl,
-                Branch = request.Branch ?? "main",
-                Path = request.Path,
-                SyncEnabled = request.SyncEnabled
-            };
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "GitHub settings updated successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to update GitHub settings for app {AppId}", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get list of editable source files for an app.
-    /// </summary>
-    [HttpGet("{id}/files")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFiles(Guid id)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
-
-            return Ok(new
-            {
-                success = true,
-                files = files.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get files for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get files for a specific filesystem scope: source or versions.
+    /// Get files for a specific filesystem scope supported by the CLI.
     /// </summary>
     [HttpGet("{id}/filesystem")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1174,18 +965,13 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var files = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
-                AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
-                _ => Enumerable.Empty<string>()
-            };
+            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
 
             return Ok(new
             {
                 success = true,
                 scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
+                editable = true,
                 files = files.ToList()
             });
         }
@@ -1197,85 +983,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get the app editor root filesystem view: source/, versions/, and metadata files.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystem(Guid id)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetAppRootEntriesAsync(ownerId, id);
-            var visibleFiles = files.Where(path => !path.StartsWith("live/", StringComparison.OrdinalIgnoreCase));
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                files = visibleFiles.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get root filesystem for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a root-level app file such as _metadata.json.
-    /// Root files are visible in Studio but not editable.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystemFile(Guid id, string path)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedPath = path.Replace('\\', '/');
-            if (normalizedPath.StartsWith("live/", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            var content = await fileStorageService.ReadAppRootFileAsync(ownerId, id, path);
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read app root file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a file from source or versions scope.
+    /// Read content of a source file through the scoped CLI filesystem API.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1296,50 +1004,6 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var content = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
-                AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
-                _ => null
-            };
-
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a specific editable source file.
-    /// </summary>
-    [HttpGet("{id}/files/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFile(Guid id, string path)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var content = await fileStorageService.ReadSourceFileAsync(ownerId, id, path);
 
             if (content == null)
@@ -1350,18 +1014,14 @@ public class AppsController : BaseController
             return Ok(new
             {
                 success = true,
-                content = content,
-                path = path
+                scope = normalizedScope,
+                editable = true,
+                content
             });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.LogWarning(ex, "Unauthorized file access attempt for app {AppId}, path {Path}", id, path);
-            return Unauthorized(new { success = false, message = "Access denied" });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to read file {Path} for app {AppId}", path, id);
+            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
@@ -1371,7 +1031,6 @@ public class AppsController : BaseController
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
         };
     }
@@ -1571,20 +1230,6 @@ public class AppsController : BaseController
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-    public const string Versions = "versions";
-}
-
-public class GitHubPushRequest
-{
-    public string? CommitMessage { get; set; }
-}
-
-public class GitHubSettingsRequest
-{
-    public string? RepositoryUrl { get; set; }
-    public string? Branch { get; set; }
-    public string? Path { get; set; }
-    public bool SyncEnabled { get; set; }
 }
 
 public class PublishAppRequest
