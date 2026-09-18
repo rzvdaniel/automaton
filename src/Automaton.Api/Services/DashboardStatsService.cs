@@ -38,8 +38,9 @@ namespace Automaton.Api.Services
                 // Use RunnerService to get accurate runner status information
                 // This leverages the existing GetRunnersWithUpdatedStatus logic that pings runners
                 var runners = await runnerService.List(cancellationToken);
-                var totalRunners = runners.Count();
-                var onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online);
+                var runnerMetrics = GetAppOwnerRunnerMetrics(runners);
+                var totalRunners = runnerMetrics.Total;
+                var onlineRunners = runnerMetrics.Online;
 
                 // Recent executions for success rate calculation
                 var cutoffDate = DateTime.UtcNow.AddDays(-7); // Last 7 days
@@ -194,6 +195,18 @@ namespace Automaton.Api.Services
                 logger.Error(ex, "Failed to get dashboard stats for user {UserId}", userId);
                 return new Models.DashboardStats();
             }
+        }
+        internal static (int Total, int Online) GetAppOwnerRunnerMetrics(IEnumerable<RunnerDetails> runners)
+        {
+            // Keep Dashboard counts aligned with the app-owner Runners surface, which hides
+            // Infrastructure Runners because they are platform provisioning infrastructure.
+            var appOwnerRunners = runners
+                .Where(runner => !RunnerProfileRules.IsInfrastructure(runner.Purpose))
+                .ToList();
+
+            return (
+                appOwnerRunners.Count,
+                appOwnerRunners.Count(runner => runner.Status == RunnerStatus.Online));
         }
     }
 }
