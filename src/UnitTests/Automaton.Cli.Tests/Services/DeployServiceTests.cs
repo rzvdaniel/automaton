@@ -280,7 +280,7 @@ public class DeployServiceTests
     }
 
     [Test]
-    public async Task DeployAsync_WhenManagedRuntimeIsUnavailable_ReturnsEntitlementNextSteps()
+    public async Task DeployAsync_WhenManagedRunnerRequiresProtocolUpgrade_DoesNotBlamePlan()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
@@ -300,17 +300,82 @@ public class DeployServiceTests
                 new DeployRuntimeResult(
                     false,
                     0,
-                    "Managed backend runtime is not included in the current plan.",
+                    "Runner 'hosted' must be upgraded for container-based application execution before deployment.",
                     "managedRuntimeUnavailable",
                     false))));
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.NextSteps, Does.Contain("This workspace plan does not include managed application runtime."));
-        Assert.That(result.NextSteps, Does.Contain("Assign a self-hosted runner or change the workspace plan, then rerun automaton deploy."));
+        Assert.That(result.NextSteps, Does.Contain("The assigned Runner does not support the current container-based application deployment protocol."));
+        Assert.That(result.NextSteps, Does.Contain("Ask an administrator to upgrade the Hosted Runner, or assign a compatible Runner, then rerun automaton deploy."));
         Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
-        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed backend runtime is not included in the current plan.");
+        Assert.That(result.NextSteps.Any(step => step.Contains("plan", StringComparison.OrdinalIgnoreCase)), Is.False);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Runner 'hosted' must be upgraded for container-based application execution before deployment.");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenHostedRunnerPlanDoesNotIncludeCapability_ReturnsPlanSpecificNextSteps()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Application = ApplicationContractTestFactory.Create()
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        WriteBackendController(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployRuntimeResult(
+                    false,
+                    0,
+                    "Your subscription plan does not include a hosted runner.",
+                    "managedRunnerProvisionFailed",
+                    false))));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
+
+        Assert.That(result.NextSteps, Does.Contain("The active subscription plan does not have a usable Hosted Runner capability or specification."));
+        Assert.That(result.NextSteps, Does.Contain("Ask an administrator to enable Hosted Runner and map an active specification to the plan, then rerun automaton deploy."));
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Your subscription plan does not include a hosted runner.");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Application = ApplicationContractTestFactory.Create()
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        WriteBackendController(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployRuntimeResult(
+                    false,
+                    0,
+                    "Normal hosted Runner provisioning requires an Infrastructure Runner transport.",
+                    "managedRunnerProvisionFailed",
+                    false))));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
+
+        Assert.That(result.NextSteps, Does.Contain("No eligible Runner Host is available for managed Hosted Runner provisioning."));
+        Assert.That(result.NextSteps.Any(step => step.Contains("protocol-4 Infrastructure Runner with HostContainerExecution", StringComparison.Ordinal)), Is.True);
+        Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
     }
 
     [Test]

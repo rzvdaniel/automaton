@@ -69,5 +69,6 @@ Write-Host "RabbitMQ management: http://localhost:15673"
 Write-Host "smtp4dev:           http://localhost:3001"
 Write-Host "Traefik ping:       http://localhost:8082/ping"
 Write-Host ""
-Write-Host "[INFO] Managed hosted runners are enabled for runtime-local." -ForegroundColor Yellow
-Write-Host "       Deploying a backend-capable app can provision a runner container automatically."
+Write-Host "[INFO] Runtime-local does not create a schedulable Runner Host." -ForegroundColor Yellow
+Write-Host "       Hosted Runner acceptance requires a non-production eligible Runner Host with an online protocol-4 Infrastructure Runner, HostContainerExecution, and an immutable Hosted Runner image digest."
+Write-Host "       See docs/architecture/local-runtime-hosted-acceptance.md before using -ProvisionTestRunner."

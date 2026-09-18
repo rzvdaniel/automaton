@@ -132,16 +132,9 @@ services:
       PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
       HostedRunners__Enabled: "true"
       HostedRunners__ServerUrl: http://api:8080
-      HostedRunners__DockerImage: automaton-runtime-local-runner:latest
+      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-}
       HostedRunners__DockerNetwork: automaton-runtime-local-runner
       HostedRunners__RuntimeDockerNetwork: automaton-runtime-local-runner
-      HostedRunners__AutoCreateLocalRunnerHost: "true"
-      HostedRunners__LocalRunnerHostName: runtime-local-docker
-      # These values are scheduler capacity budgets for the auto-seeded local RunnerHost.
-      # They are not auto-detected hardware specs.
-      HostedRunners__LocalRunnerHostCpuCores: "8"
-      HostedRunners__LocalRunnerHostMemoryMb: "16384"
-      HostedRunners__LocalRunnerHostDiskMb: "65536"
     volumes:
       - runtime-local-api-appdata:/app/AppData
       - runtime-local-published-apps:/app/AppData/published-apps
@@ -187,7 +180,7 @@ services:
       Logging__File__Path: /app/logs
       HostedRunners__Enabled: "true"
       HostedRunners__ServerUrl: http://api:8080
-      HostedRunners__DockerImage: automaton-runtime-local-runner:latest
+      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-}
       HostedRunners__DockerNetwork: automaton-runtime-local-runner
       HostedRunners__RuntimeDockerNetwork: automaton-runtime-local-runner
     volumes:

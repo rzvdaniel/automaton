@@ -539,10 +539,47 @@ public sealed class DeployService
 
     private static void AddManagedRuntimeNextSteps(ISet<string> nextSteps, DeployRuntimeResult runtimeResult)
     {
+        var message = runtimeResult.Message;
         if (string.Equals(runtimeResult.Message, "No connected runner is assigned to this app.", StringComparison.Ordinal))
         {
             nextSteps.Add("This app is assigned to a runner, but that runner is not currently connected.");
             nextSteps.Add("Bring the assigned runner online or reassign the app to a healthy runner in Automaton Studio, then rerun automaton deploy.");
+            return;
+        }
+
+        if (ContainsAny(message,
+                "must be upgraded for container-based application execution",
+                "requires an upgrade for the current Generic Runtime deployment protocol"))
+        {
+            nextSteps.Add("The assigned Runner does not support the current container-based application deployment protocol.");
+            nextSteps.Add("Ask an administrator to upgrade the Hosted Runner, or assign a compatible Runner, then rerun automaton deploy.");
+            return;
+        }
+
+        if (ContainsAny(message,
+                "Your subscription plan does not include a hosted runner",
+                "hosted runner configuration for your subscription plan",
+                "hosted runner specification configured for your subscription plan"))
+        {
+            nextSteps.Add("The active subscription plan does not have a usable Hosted Runner capability or specification.");
+            nextSteps.Add("Ask an administrator to enable Hosted Runner and map an active specification to the plan, then rerun automaton deploy.");
+            return;
+        }
+
+        if (ContainsAny(message,
+                "No active runner host has enough available capacity",
+                "selected Runner Host has no Infrastructure Runner assigned",
+                "Normal hosted Runner provisioning requires an Infrastructure Runner transport"))
+        {
+            nextSteps.Add("No eligible Runner Host is available for managed Hosted Runner provisioning.");
+            nextSteps.Add("An administrator should check that a non-production Runner Host is online, validated, approved, has capacity, and has an online protocol-4 Infrastructure Runner with HostContainerExecution.");
+            return;
+        }
+
+        if (ContainsAny(message, "requires an immutable container image reference"))
+        {
+            nextSteps.Add("Hosted Runner provisioning requires an immutable repository@sha256 image reference.");
+            nextSteps.Add("Ask an administrator to configure the Hosted Runner image digest, then retry provisioning.");
             return;
         }
 
@@ -561,14 +598,20 @@ public sealed class DeployService
                 nextSteps.Add("Inspect worker and hosted runner logs, then rerun automaton deploy.");
                 return;
             case DeployStateManagedRuntimeUnavailable:
-                nextSteps.Add("This workspace plan does not include managed application runtime.");
-                nextSteps.Add("Assign a self-hosted runner or change the workspace plan, then rerun automaton deploy.");
+                nextSteps.Add("Managed runtime is unavailable for the assigned Runner.");
+                nextSteps.Add("Check the Runner connection and container-execution compatibility in Automaton Studio, then rerun automaton deploy.");
                 return;
             default:
                 nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
                 nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
                 return;
         }
+    }
+
+    private static bool ContainsAny(string? value, params string[] fragments)
+    {
+        return value != null && fragments.Any(fragment =>
+            value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string FormatUploadMessage(string verb, string subject, DeployUploadResult result)
