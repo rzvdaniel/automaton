@@ -105,8 +105,6 @@ validate_color "$WEBSITE_COLOR" "--website-color"
 validate_recovery_deployment_options studio "$STUDIO_RECOVERY_ARTIFACT_REFERENCE" "$EXPLICIT_REVISION"
 validate_recovery_deployment_options website "$WEBSITE_RECOVERY_ARTIFACT_REFERENCE" "$EXPLICIT_REVISION"
 
-DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
-
 CURRENT_API_COLOR="$(get_live_color api)"
 CURRENT_STUDIO_COLOR="$(get_live_color studio)"
 CURRENT_WEBSITE_COLOR="$(get_live_color website)"
@@ -138,6 +136,7 @@ if [[ -z "$CURRENT_WEBSITE_REVISION" ]]; then
 fi
 
 ensure_infrastructure
+DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
 
 if [[ -n "$CURRENT_API_REVISION" ]]; then
     preserve_current_service_image api "$CURRENT_API_COLOR"

@@ -24,10 +24,12 @@ import {
 import { appsService } from '../services/apps.service'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { AppDeploymentTarget, PublishAppRequest } from '../types/apps.types'
+import type { AppDeploymentTarget, PublishSettingsRequest } from '../types/apps.types'
+import type { RuntimeLogConnectionState } from '../types/console.types'
 import { getLiveTarget } from '../utils/deployment-target-actions'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishingConsistencyIssue } from '../utils/publishing-state'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
@@ -40,14 +42,21 @@ const editorStore = useAppEditorStore()
 const { closeMobile, setHovered } = useSidebarState()
 
 const appId = computed(() => String(route.params.id ?? ''))
+const publishingStateLabel = computed(() => editorStore.currentApp && getPublishingConsistencyIssue(editorStore.currentApp)
+  ? 'Needs review'
+  : editorStore.isPublished ? 'Published' : 'Unpublished')
 const activeView = ref<AppViewKey>(resolveAppView(route.query.view))
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
+const runtimeLogConnectionState = ref<RuntimeLogConnectionState>(backendRuntimeLogClient.connectionState)
+const isRuntimeLogSubscribed = ref(false)
+const runtimeLogSubscriptionFailed = ref(false)
 const targetsRevision = ref(0)
 const showPublishDialog = ref(false)
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 let unsubscribeBackendRuntimeLogs: (() => void) | null = null
+let unsubscribeBackendRuntimeLogState: (() => void) | null = null
 
 watch(activeView, (view) => {
   if (view === 'logs') void nextTick(() => runtimeLogsRef.value?.loadLogs())
@@ -66,6 +75,9 @@ onMounted(async () => {
     if (event.appId !== appId.value) return
     if (selectedLogTargetId.value && event.deploymentTargetId !== selectedLogTargetId.value) return
     editorStore.addBackendRuntimeLogEntry(event)
+  })
+  unsubscribeBackendRuntimeLogState = backendRuntimeLogClient.onConnectionStateChange((state) => {
+    runtimeLogConnectionState.value = state
   })
 
   window.addEventListener('message', handleApplicationMessage)
@@ -91,6 +103,7 @@ onUnmounted(() => {
   document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
   void backendRuntimeLogClient.unsubscribe(appId.value)
   unsubscribeBackendRuntimeLogs?.()
+  unsubscribeBackendRuntimeLogState?.()
   editorStore.reset()
 })
 
@@ -160,15 +173,22 @@ async function selectViewingTargetFromRoute() {
 async function selectViewingTarget(target: AppDeploymentTarget, replaceRoute = false) {
   selectedViewingTarget.value = target
   selectedLogTargetId.value = target.id
+  isRuntimeLogSubscribed.value = false
+  runtimeLogSubscriptionFailed.value = false
 
   if (replaceRoute || route.query.target !== target.slug) {
     await router.replace({ query: { ...route.query, target: target.slug } })
   }
 
   try {
-    if (target.runner) await backendRuntimeLogClient.subscribe(target.appId, target.id)
-    else await backendRuntimeLogClient.unsubscribe(target.appId)
+    if (target.runner) {
+      await backendRuntimeLogClient.subscribe(target.appId, target.id)
+      isRuntimeLogSubscribed.value = backendRuntimeLogClient.isSubscribedTo(target.appId, target.id)
+    } else {
+      await backendRuntimeLogClient.unsubscribe(target.appId)
+    }
   } catch {
+    runtimeLogSubscriptionFailed.value = true
     toast.add({
       severity: 'warn',
       summary: 'Live logs unavailable',
@@ -187,21 +207,23 @@ async function handleViewTargetLogs(target: AppDeploymentTarget) {
   activeView.value = 'logs'
 }
 
-async function handlePublish(request: PublishAppRequest) {
-  if (!getLiveTarget(deploymentTargets.value)) {
-    toast.add({ severity: 'error', summary: 'Publish Live unavailable', detail: 'This app has no Live environment.', life: 5000 })
-    return
-  }
-
+async function handlePublish(request: PublishSettingsRequest) {
   try {
-    await editorStore.publishApp(request)
+    const app = editorStore.currentApp
+    if (!app) return
+    await editorStore.publishApp({
+      ...request,
+      category: app.category ?? null,
+      tags: app.tags ?? null,
+      isForkable: app.isForkable,
+    })
     showPublishDialog.value = false
     toast.add({
       severity: 'success',
       summary: 'Published',
       detail: request.runtimeVisibility === 'public'
-        ? `App published at ${getPublishedAppUrl(request.publicUrl)}`
-        : 'Publishing settings updated.',
+        ? `Public access configured at ${getPublishedAppUrl(request.publicUrl)}. Publishing does not deploy or update the Live runtime.`
+        : 'Publishing settings saved. The runtime remains private.',
       life: 5000,
     })
   } catch (error: unknown) {
@@ -216,7 +238,7 @@ async function handlePublish(request: PublishAppRequest) {
 
 function handleUnpublish() {
   confirm.require({
-    message: 'Unpublish this app? Its public URL will stop working.',
+    message: 'Unpublish this app? Public access and its marketplace listing will be removed. The Live deployment and runtime will remain in place.',
     header: 'Confirm unpublish',
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Unpublish',
@@ -224,7 +246,7 @@ function handleUnpublish() {
     accept: async () => {
       try {
         await editorStore.unpublishApp()
-        toast.add({ severity: 'success', summary: 'Unpublished', detail: 'The public URL is no longer active.', life: 3000 })
+        toast.add({ severity: 'success', summary: 'Unpublished', detail: 'Public access was removed. The Live deployment and runtime were not changed.', life: 4000 })
       } catch (error: unknown) {
         toast.add({
           severity: 'error',
@@ -253,7 +275,7 @@ function handleUnpublish() {
             <h1>{{ editorStore.currentApp.name }}</h1>
             <div class="header-status">
               <Tag :value="editorStore.applicationState.label" :severity="editorStore.applicationState.severity" />
-              <Tag :value="editorStore.isPublished ? 'Published' : 'Unpublished'" :severity="editorStore.isPublished ? 'success' : 'secondary'" />
+              <Tag :value="publishingStateLabel" :severity="publishingStateLabel === 'Needs review' ? 'warn' : editorStore.isPublished ? 'success' : 'secondary'" />
             </div>
           </div>
         </div>
@@ -279,8 +301,10 @@ function handleUnpublish() {
             v-else-if="activeView === 'publishing'"
             :app="editorStore.currentApp"
             :has-live-target="!!getLiveTarget(deploymentTargets)"
+            :operational-state="editorStore.applicationState"
             @publish="showPublishDialog = true"
             @unpublish="handleUnpublish"
+            @navigate="activeView = $event"
           />
 
           <AppDeploymentTargets
@@ -302,7 +326,20 @@ function handleUnpublish() {
             @navigate="handleNavigation"
           />
 
-          <AppRuntimeLogs v-else-if="activeView === 'logs'" ref="runtimeLogsRef" :app-id="appId" />
+          <AppRuntimeLogs
+            v-else-if="activeView === 'logs'"
+            ref="runtimeLogsRef"
+            :app-id="appId"
+            :app-name="editorStore.currentApp.name"
+            :targets="deploymentTargets"
+            :selected-target="selectedViewingTarget"
+            :live-logs="editorStore.consoleEntries"
+            :connection-state="runtimeLogConnectionState"
+            :is-stream-subscribed="isRuntimeLogSubscribed"
+            :stream-error="runtimeLogSubscriptionFailed"
+            @select-target="handleSelectViewingTarget"
+            @navigate="handleNavigation"
+          />
 
           <ActionSchedulingPanel
             v-else-if="activeView === 'actions'"
@@ -323,13 +360,12 @@ function handleUnpublish() {
       <PublishDialog
         v-model:visible="showPublishDialog"
         :current-slug="editorStore.currentApp.publicUrl"
-        :current-category="editorStore.currentApp.category"
-        :current-tags="editorStore.currentApp.tags"
+        :is-published="editorStore.currentApp.isPublished"
         :requires-auth="editorStore.currentApp.requiresAuthentication"
-        :is-forkable="editorStore.currentApp.isForkable"
         :current-runtime-visibility="editorStore.currentApp.runtimeVisibility"
         :current-catalog-visibility="editorStore.currentApp.catalogVisibility"
         :app-name="editorStore.currentApp.name"
+        :has-live-target="!!getLiveTarget(deploymentTargets)"
         :live-target-name="getLiveTarget(deploymentTargets) ? getEnvironmentDisplayName(getLiveTarget(deploymentTargets)) : undefined"
         :live-target-slug="getLiveTarget(deploymentTargets)?.slug"
         :viewing-target-name="selectedViewingTarget ? getEnvironmentDisplayName(selectedViewingTarget) : undefined"
@@ -401,6 +437,12 @@ function handleUnpublish() {
   flex-direction: column;
   gap: 1rem;
   height: 100%;
+}
+
+@media (max-width: 960px) {
+  .operations-shell {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 760px) {

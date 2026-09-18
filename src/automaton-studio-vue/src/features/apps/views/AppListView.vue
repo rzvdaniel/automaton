@@ -15,14 +15,12 @@ import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
 import CopyCommand from '../components/CopyCommand.vue'
-import PublishDialog from '../components/PublishDialog.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import type { App, AppListItem, PublishAppRequest } from '../types/apps.types'
+import type { AppListItem } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
-import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
@@ -90,7 +88,7 @@ const runnerOptions = computed(() => [
 const statusOptions = ref([
   { label: 'All', value: 'all' },
   { label: 'Published', value: 'published' },
-  { label: 'Draft', value: 'draft' },
+  { label: 'Unpublished', value: 'draft' },
 ])
 
 const tagOptions = computed(() => {
@@ -104,10 +102,6 @@ const tagOptions = computed(() => {
     .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
     .map((tag) => ({ label: tag, value: tag }))
 })
-
-// Publish dialog state
-const showPublishDialog = ref(false)
-const publishingApp = ref<App | null>(null)
 
 // Watch for filter changes
 watch(searchQuery, (value) => {
@@ -156,7 +150,7 @@ watch(
     selectedTags.value = []
     selectedTagGroup.value = null
     try {
-      const [_, suggestions] = await Promise.all([
+      const [, suggestions] = await Promise.all([
         appsStore.fetchApps(projectId ?? undefined),
         appsService.getTagSuggestions(projectId ?? undefined),
       ])
@@ -184,39 +178,6 @@ const viewPublicApps = () => {
       life: 4000,
     })
     router.push('/settings')
-  }
-}
-
-const openPublishDialog = async (appId: string) => {
-  publishingApp.value = await appsStore.fetchApp(appId)
-  showPublishDialog.value = true
-}
-
-const handlePublishApp = async (request: PublishAppRequest) => {
-  if (!publishingApp.value) return
-
-  try {
-    await appsStore.publishApp(publishingApp.value.id, request)
-    toast.add({
-      severity: 'success',
-      summary: 'Published',
-      detail: request.runtimeVisibility === 'public'
-        ? `App is now available at ${getPublishedAppUrl(request.publicUrl)}`
-        : request.catalogVisibility === 'listed'
-          ? 'Private runtime listed with a media-only marketplace preview.'
-          : 'Private runtime published as an unlisted media preview.',
-      life: 5000,
-    })
-    showPublishDialog.value = false
-    publishingApp.value = null
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to publish app'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    })
   }
 }
 
@@ -248,7 +209,7 @@ const handleRetry = async () => {
       </div>
     </div>
 
-    <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
+    <TabMenu v-model:active-index="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
     <template v-if="activeTabIndex === 0">
@@ -352,13 +313,13 @@ const handleRetry = async () => {
           :key="app.id"
           :class="viewMode === 'grid' ? 'col-12 md:col-6 lg:col-4' : 'col-12'"
         >
-          <AppCard v-if="viewMode === 'grid'" :app="app" @publish="openPublishDialog" />
+          <AppCard v-if="viewMode === 'grid'" :app="app" />
           <div v-else class="app-list-row flex flex-column md:flex-row md:align-items-center gap-3 p-3 border-1 surface-border border-round">
             <i class="pi pi-globe text-primary text-xl" />
             <div class="flex-1 min-w-0">
               <div class="flex align-items-center gap-2">
                 <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
-                <Tag :value="app.isPublished ? 'Published' : 'Draft'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
+                <Tag :value="app.isPublished ? 'Published' : 'Unpublished'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
               </div>
               <div class="text-color-secondary text-sm">Live · {{ getLiveDestinationLabel(app) }} · {{ getLiveStatusLabel(app) }}</div>
               <div v-if="app.tags.length" class="flex flex-wrap gap-1 mt-1">
@@ -466,18 +427,6 @@ const handleRetry = async () => {
       </Card>
     </template><!-- /v-if="activeTabIndex === 1" -->
 
-    <PublishDialog
-      v-model:visible="showPublishDialog"
-      :current-slug="publishingApp?.publicUrl"
-      :current-category="publishingApp?.category"
-      :current-tags="publishingApp?.tags"
-      :requires-auth="publishingApp?.requiresAuthentication"
-      :is-forkable="publishingApp?.isForkable"
-      :current-runtime-visibility="publishingApp?.runtimeVisibility"
-      :current-catalog-visibility="publishingApp?.catalogVisibility"
-      :app-name="publishingApp?.name"
-      @publish="handlePublishApp"
-    />
   </div>
 </template>
 

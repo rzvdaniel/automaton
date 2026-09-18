@@ -28,9 +28,12 @@ export interface ConsoleEntry {
   /** Where the execution originated from */
   source: 'application' | 'ai-test'
   level?: 'info' | 'warn' | 'error'
+  stream?: 'stdout' | 'stderr'
   runnerName?: string
   deploymentTargetId?: string
 }
+
+export type RuntimeLogConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
 
 /**
  * Message sent from application iframe to parent window

@@ -1,0 +1,16 @@
+# Local Hosted Runner acceptance setup
+
+The runtime-local Compose stack provides the local API, Studio, Worker, and supporting services. It does not create a schedulable Runner Host or emulate an Infrastructure Runner. Its optional `runner` Compose profile is a regular Runner service, not an Infrastructure Runner. Do not treat the local Docker socket or the old `runtime-local-docker` record as a Hosted Runner provisioning path.
+
+Hosted Runner acceptance must exercise the normal Infrastructure Runner architecture against the local, non-production API:
+
+1. Start the runtime-local stack with `scripts/setup-local-development.ps1`.
+2. Configure `LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE` as an immutable `repository@sha256:<64-hex-digest>` reference that the selected host can pull. The local Compose stack passes this value to both API and Worker; it has no mutable `:latest` fallback.
+3. Make the local API origin reachable from the intended non-production Runner Host and ensure that host trusts its TLS certificate. The default `api.automaton.test` name is workstation-local; a separate host will not resolve or reach it without explicit development DNS/routing and certificate setup. Then, in local Studio, open **Admin → Runners → Runner Hosts** and enroll an Infrastructure Runner against the local API using the generated install command. Validate and approve its host, and enable Hosted Runner scheduling.
+4. Before provisioning, ensure every scheduling-eligible host in this local API is suitable for the test: the host uses Infrastructure Runner transport, has a private runtime address, is online/ready/validated/approved, and its Infrastructure Runner reports API protocol 4 or later with `HostContainerExecution`. The provisioning API selects for capacity; the scheduler can choose any eligible host.
+5. The test account must already have an active plan with Hosted Runner enabled and an active specification. The setup helper only verifies this entitlement; it does not assign or change a plan.
+6. Use `scripts/setup-local-development.ps1 -ProvisionTestRunner` only when that account has no Hosted Runner yet. The helper checks the plan, image digest, and host before calling the provisioning API, waits for the new Hosted Runner to be Running and Online, and refuses to reprovision an existing Hosted Runner.
+
+The Hosted Runner preflight checks are read-only until the final explicit `-ProvisionTestRunner` step. If the current account already has a Hosted Runner, inspect it in **Admin → Hosted Runners → Runner Containers**. Reprovision is a separate administrative action that replaces the managed container and clears its stored Runner identity before the replacement registers. Do not use it until an eligible host and immutable image are confirmed; a failed reprovision is not automatically rolled back to the old container.
+
+Before retrying an app deployment, confirm in local Studio that the target Hosted Runner is **Running** and its Runner is **Online**. The CLI's managed-runtime readiness check confirms that the app's assigned Runner advertises container-execution protocol 3 or later (current protocol 4). The first app deploy should use the ordinary CLI `automaton deploy` workflow; no local Docker execution bypass is involved.

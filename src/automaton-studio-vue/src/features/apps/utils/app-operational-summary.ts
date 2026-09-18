@@ -175,3 +175,29 @@ export function getAppOperationalSummary(
     diagnostic,
   }
 }
+
+export function hasContradictoryDeploymentTargetState(
+  target?: AppDeploymentTarget | null,
+): boolean {
+  if (!target) return false
+
+  const hasAssignment = !!target.runner && target.status !== DeploymentTargetStatus.Unassigned
+  return (
+    (!!target.runner && target.status === DeploymentTargetStatus.Unassigned) ||
+    (target.status === DeploymentTargetStatus.Running && (!hasAssignment || !target.genericRuntimeDeployed || !target.runner?.isOnline)) ||
+    (target.status === DeploymentTargetStatus.RunnerOffline && (!hasAssignment || target.runner?.isOnline === true)) ||
+    (target.genericRuntimeDeployed && !hasAssignment) ||
+    (target.genericRuntimeDeployed && target.status === DeploymentTargetStatus.NotDeployed)
+  )
+}
+
+export function getDeploymentTargetStatusLabel(status: AppDeploymentTarget['status']): string {
+  switch (status) {
+    case DeploymentTargetStatus.NotDeployed: return 'Not deployed'
+    case DeploymentTargetStatus.Deploying: return 'Deployment in progress'
+    case DeploymentTargetStatus.Running: return 'Running'
+    case DeploymentTargetStatus.Failed: return 'Deployment failed'
+    case DeploymentTargetStatus.RunnerOffline: return 'Runtime offline'
+    case DeploymentTargetStatus.Unassigned: return 'Unassigned'
+  }
+}

@@ -16,7 +16,6 @@ public class AppsController : BaseController
     private readonly AppStepsService appStepsService;
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
-    private readonly GitHubService? githubService;
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
@@ -42,14 +41,12 @@ public class AppsController : BaseController
         PrivateAppLaunchService privateAppLaunchService,
         RuntimeCookieService runtimeCookieService,
         IOptions<PublishedAppsConfig> publishedAppsConfig,
-        IApplicationEventService applicationEventService,
-        GitHubService? githubService = null)
+        IApplicationEventService applicationEventService)
     {
         this.appsService = appsService;
         this.appStepsService = appStepsService;
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
-        this.githubService = githubService;
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
@@ -947,213 +944,7 @@ public class AppsController : BaseController
     }
     
     /// <summary>
-    /// Push app to GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/push")]
-    public async Task<IActionResult> PushToGitHub(Guid id, [FromBody] GitHubPushRequest request)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var commitSha = await githubService.PushToGitHubAsync(app, request.CommitMessage ?? "Update app from Automaton", ownerId);
-
-            // Update app's GitHub settings
-            if (app.Definition.GitHub != null)
-            {
-                app.Definition.GitHub.LastSyncedCommitSha = commitSha;
-                app.Definition.GitHub.LastSyncedAt = DateTime.UtcNow;
-                app.Definition.GitHub.SyncStatus = GitHubSyncStatus.Synced;
-                await appsService.Update(id, app);
-            }
-
-            return Ok(new
-            {
-                success = true,
-                commitSha,
-                message = "App pushed to GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to push app {AppId} to GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Pull app from GitHub repository
-    /// </summary>
-    [HttpPost("{id}/github/pull")]
-    public async Task<IActionResult> PullFromGitHub(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || string.IsNullOrEmpty(app.Definition.GitHub.RepositoryUrl))
-            {
-                return BadRequest(new { success = false, message = "App is not connected to a GitHub repository" });
-            }
-
-            var ownerId = userContextService.GetUserId();
-            var pulledDefinition = await githubService.PullFromGitHubAsync(app.Definition.GitHub, ownerId, id);
-
-            // Merge pulled definition into current app
-            app.Definition.HtmlContent = pulledDefinition.HtmlContent;
-            app.Definition.GitHub = pulledDefinition.GitHub;
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "App pulled from GitHub successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to pull app {AppId} from GitHub", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Check GitHub sync status for an app
-    /// </summary>
-    [HttpGet("{id}/github/status")]
-    public async Task<IActionResult> GetGitHubSyncStatus(Guid id)
-    {
-        try
-        {
-            if (githubService == null)
-            {
-                return StatusCode(500, new { success = false, message = "GitHub integration not available" });
-            }
-
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            if (app.Definition.GitHub == null || !app.Definition.GitHub.SyncEnabled)
-            {
-                return Ok(new
-                {
-                    syncEnabled = false,
-                    status = "None"
-                });
-            }
-
-            var status = await githubService.CheckSyncStatusAsync(app.Definition.GitHub);
-
-            return Ok(new
-            {
-                syncEnabled = true,
-                status = status.ToString(),
-                repositoryUrl = app.Definition.GitHub.RepositoryUrl,
-                branch = app.Definition.GitHub.Branch,
-                lastSyncedAt = app.Definition.GitHub.LastSyncedAt
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to check GitHub sync status for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Configure GitHub settings for an app
-    /// </summary>
-    [HttpPut("{id}/github/settings")]
-    public async Task<IActionResult> UpdateGitHubSettings(Guid id, [FromBody] GitHubSettingsRequest request)
-    {
-        try
-        {
-            var app = appsService.Get(id);
-            if (app == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            app.Definition.GitHub = new Models.GitHubSettings
-            {
-                RepositoryUrl = request.RepositoryUrl,
-                Branch = request.Branch ?? "main",
-                Path = request.Path,
-                SyncEnabled = request.SyncEnabled
-            };
-
-            await appsService.Update(id, app);
-
-            return Ok(new
-            {
-                success = true,
-                message = "GitHub settings updated successfully"
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to update GitHub settings for app {AppId}", id);
-            return BadRequest(new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get list of editable source files for an app.
-    /// </summary>
-    [HttpGet("{id}/files")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFiles(Guid id)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
-
-            return Ok(new
-            {
-                success = true,
-                files = files.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get files for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get files for a specific filesystem scope: source or versions.
+    /// Get files for a specific filesystem scope supported by the CLI.
     /// </summary>
     [HttpGet("{id}/filesystem")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1174,18 +965,13 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var files = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
-                AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
-                _ => Enumerable.Empty<string>()
-            };
+            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
 
             return Ok(new
             {
                 success = true,
                 scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
+                editable = true,
                 files = files.ToList()
             });
         }
@@ -1197,85 +983,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get the app editor root filesystem view: source/, versions/, and metadata files.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystem(Guid id)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetAppRootEntriesAsync(ownerId, id);
-            var visibleFiles = files.Where(path => !path.StartsWith("live/", StringComparison.OrdinalIgnoreCase));
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                files = visibleFiles.ToList()
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to get root filesystem for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a root-level app file such as _metadata.json.
-    /// Root files are visible in Studio but not editable.
-    /// </summary>
-    [HttpGet("{id}/filesystem/root/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppRootFilesystemFile(Guid id, string path)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedPath = path.Replace('\\', '/');
-            if (normalizedPath.StartsWith("live/", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            var content = await fileStorageService.ReadAppRootFileAsync(ownerId, id, path);
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = "root",
-                editable = false,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read app root file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a file from source or versions scope.
+    /// Read content of a source file through the scoped CLI filesystem API.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1296,167 +1004,6 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Invalid filesystem scope" });
             }
 
-            var content = normalizedScope switch
-            {
-                AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
-                AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
-                _ => null
-            };
-
-            if (content == null)
-            {
-                return NotFound(new { success = false, message = "File not found" });
-            }
-
-            return Ok(new
-            {
-                success = true,
-                scope = normalizedScope,
-                editable = normalizedScope != AppFileSystemScopes.Versions,
-                content
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Write content to a file in source scope.
-    /// Versions are immutable and cannot be modified.
-    /// </summary>
-    [HttpPut("{id}/filesystem/{scope}/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> WriteAppFilesystemFile(Guid id, string scope, string path, [FromBody] WriteFileRequest request)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedScope = NormalizeFileSystemScope(scope);
-            if (normalizedScope == null)
-            {
-                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
-            }
-
-            if (normalizedScope == AppFileSystemScopes.Versions)
-            {
-                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
-            }
-
-            await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
-
-            return Ok(new { success = true, scope = normalizedScope, editable = true });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to write filesystem file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Delete a file in source scope.
-    /// Versions are immutable and cannot be modified.
-    /// </summary>
-    [HttpDelete("{id}/filesystem/{scope}/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> DeleteAppFilesystemFile(Guid id, string scope, string path)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedScope = NormalizeFileSystemScope(scope);
-            if (normalizedScope == null)
-            {
-                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
-            }
-
-            if (normalizedScope == AppFileSystemScopes.Versions)
-            {
-                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
-            }
-
-            await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
-
-            return Ok(new { success = true, scope = normalizedScope, editable = true });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to delete filesystem file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Delete a directory in source scope.
-    /// Versions are immutable and cannot be modified.
-    /// </summary>
-    [HttpDelete("{id}/filesystem/{scope}/directory/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> DeleteAppFilesystemDirectory(Guid id, string scope, string path)
-    {
-        try
-        {
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var normalizedScope = NormalizeFileSystemScope(scope);
-            if (normalizedScope == null)
-            {
-                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
-            }
-
-            if (normalizedScope == AppFileSystemScopes.Versions)
-            {
-                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
-            }
-
-            await fileStorageService.DeleteSourceDirectoryAsync(ownerId, id, path);
-
-            return Ok(new { success = true, scope = normalizedScope, editable = true });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to delete filesystem directory {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Read content of a specific editable source file.
-    /// </summary>
-    [HttpGet("{id}/files/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> GetAppFile(Guid id, string path)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var content = await fileStorageService.ReadSourceFileAsync(ownerId, id, path);
 
             if (content == null)
@@ -1467,18 +1014,14 @@ public class AppsController : BaseController
             return Ok(new
             {
                 success = true,
-                content = content,
-                path = path
+                scope = normalizedScope,
+                editable = true,
+                content
             });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.LogWarning(ex, "Unauthorized file access attempt for app {AppId}, path {Path}", id, path);
-            return Unauthorized(new { success = false, message = "Access denied" });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to read file {Path} for app {AppId}", path, id);
+            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
@@ -1488,101 +1031,8 @@ public class AppsController : BaseController
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
         };
-    }
-
-    /// <summary>
-    /// Write content to a specific editable source file.
-    /// </summary>
-    [HttpPut("{id}/files/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> PutAppFile(Guid id, string path, [FromBody] WriteFileRequest request)
-    {
-        try
-        {
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
-
-            // If this is index.html, also update the app definition
-            if (path == "index.html")
-            {
-                var app = appsService.Get(id);
-                if (app != null)
-                {
-                    app.Definition.HtmlContent = request.Content;
-                    await appsService.Update(id, app);
-                }
-            }
-
-            return Ok(new
-            {
-                success = true,
-                message = "File saved successfully",
-                path = path
-            });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.LogWarning(ex, "Unauthorized file write attempt for app {AppId}, path {Path}", id, path);
-            return Unauthorized(new { success = false, message = "Access denied" });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to write file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Delete a specific editable source file.
-    /// </summary>
-    [HttpDelete("{id}/files/{*path}")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> DeleteAppFile(Guid id, string path)
-    {
-        try
-        {
-            // Don't allow deleting index.html or _metadata.json
-            if (path == "index.html" || path == "_metadata.json")
-            {
-                return BadRequest(new { success = false, message = "Cannot delete system files" });
-            }
-
-            // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-            {
-                return NotFound(new { success = false, message = "App not found" });
-            }
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
-
-            return Ok(new
-            {
-                success = true,
-                message = "File deleted successfully"
-            });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            logger.LogWarning(ex, "Unauthorized file delete attempt for app {AppId}, path {Path}", id, path);
-            return Unauthorized(new { success = false, message = "Access denied" });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to delete file {Path} for app {AppId}", path, id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
     }
 
     /// <summary>
@@ -1715,117 +1165,6 @@ public class AppsController : BaseController
         }
     }
 
-    [HttpPost("{id}/source/upload")]
-    [Authorize(Policy = "AllowApiKey")]
-    [RequestSizeLimit(52_428_800)]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadSourceZip(Guid id, IFormFile file, [FromQuery] bool clean = true)
-    {
-        try
-        {
-            if (file == null || file.Length == 0)
-                return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
-
-            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
-                return BadRequest(new { success = false, message = "Only .zip archives are supported" });
-
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
-                return NotFound(new { success = false, message = "App not found" });
-
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var sourcePath = fileStorageService.GetAppSourceDirectoryPath(ownerId, id);
-
-            if (clean)
-            {
-                await fileStorageService.ClearSourceAsync(ownerId, id);
-            }
-            else
-            {
-                Directory.CreateDirectory(sourcePath);
-            }
-
-            var written = new List<string>();
-            var skipped = new List<object>();
-            var errors = new List<object>();
-            var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
-
-            using var stream = file.OpenReadStream();
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-
-            foreach (var entry in archive.Entries)
-            {
-                if (string.IsNullOrEmpty(entry.Name)) continue;
-
-                var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (ShouldSkipSourceUploadEntry(relativePath, deployRules.SourceExclude, out var sourceSkipReason))
-                {
-                    skipped.Add(CreateSkippedEntry(relativePath, sourceSkipReason, "platform"));
-                    continue;
-                }
-
-                try
-                {
-                    AppFileStorageService.ValidateFileExtensionPublic(relativePath);
-                }
-                catch
-                {
-                    skipped.Add(CreateSkippedEntry(relativePath, "Blocked by allowed source file extension policy", "platform"));
-                    continue;
-                }
-
-                var destPath = Path.GetFullPath(Path.Combine(sourcePath, relativePath));
-                var fullSourcePath = Path.GetFullPath(sourcePath);
-                if (!destPath.StartsWith(fullSourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                {
-                    errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
-                    continue;
-                }
-
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    using var entryStream = entry.Open();
-                    using var outStream = System.IO.File.Create(destPath);
-                    await entryStream.CopyToAsync(outStream);
-                    written.Add(relativePath);
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(new { path = relativePath, reason = ex.Message });
-                }
-            }
-
-            logger.LogDebug(
-                "Source zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
-                id, written.Count, skipped.Count, errors.Count, clean);
-
-            await appsService.SetLocalDevelopmentMetadataAsync(
-                id,
-                ownerId,
-                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
-                runtimeSource: AppRuntimeSources.CliBuild);
-
-            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, id, metadata =>
-            {
-                var modifiedAtUtc = DateTime.UtcNow;
-                if (metadata.SourceAvailable)
-                    metadata.SourceModifiedAtUtc = modifiedAtUtc;
-            });
-
-            return Ok(new { success = true, written, skipped, errors });
-        }
-        catch (InvalidDataException)
-        {
-            return BadRequest(new { success = false, message = "Invalid or corrupt zip archive" });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to upload source zip for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
     private static bool ShouldSkipRuntimeUploadEntry(string relativePath)
     {
         var normalized = relativePath.Replace('\\', '/').Trim('/');
@@ -1855,51 +1194,6 @@ public class AppsController : BaseController
             segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("src", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("source", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool ShouldSkipSourceUploadEntry(string relativePath, IEnumerable<string> excludeRules)
-    {
-        return ShouldSkipSourceUploadEntry(relativePath, excludeRules, out _);
-    }
-
-    private static bool ShouldSkipSourceUploadEntry(string relativePath, IEnumerable<string> excludeRules, out string reason)
-    {
-        var normalized = relativePath.Replace('\\', '/').Trim('/');
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            reason = "Empty path";
-            return true;
-        }
-
-        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var fileName = segments.LastOrDefault() ?? string.Empty;
-        if (fileName.StartsWith(".", StringComparison.Ordinal) ||
-            fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase))
-        {
-            reason = "Excluded by platform rule";
-            return true;
-        }
-
-        if (segments.Any(segment =>
-            segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase)))
-        {
-            reason = "Excluded by platform rule";
-            return true;
-        }
-
-        if (AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules))
-        {
-            reason = "Excluded by admin source deploy rule";
-            return true;
-        }
-
-        reason = string.Empty;
-        return false;
     }
 
     private static object CreateSkippedEntry(string path, string reason, string ruleSource)
@@ -1933,28 +1227,9 @@ public class AppsController : BaseController
 
 }
 
-public class WriteFileRequest
-{
-    public required string Content { get; set; }
-}
-
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-    public const string Versions = "versions";
-}
-
-public class GitHubPushRequest
-{
-    public string? CommitMessage { get; set; }
-}
-
-public class GitHubSettingsRequest
-{
-    public string? RepositoryUrl { get; set; }
-    public string? Branch { get; set; }
-    public string? Path { get; set; }
-    public bool SyncEnabled { get; set; }
 }
 
 public class PublishAppRequest

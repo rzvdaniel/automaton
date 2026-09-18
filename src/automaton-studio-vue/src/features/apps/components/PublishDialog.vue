@@ -5,23 +5,20 @@ import InputText from 'primevue/inputtext'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import Select from 'primevue/select'
-import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
-import type { PublishAppRequest } from '../types/apps.types'
+import type { PublishSettingsRequest } from '../types/apps.types'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 import { getPublishVisibilityState } from '../utils/publish-visibility'
 
 const props = defineProps<{
   visible: boolean
   currentSlug?: string
-  currentCategory?: string | null
-  currentTags?: string | null
+  isPublished?: boolean
   requiresAuth?: boolean
-  isForkable?: boolean
   currentRuntimeVisibility?: 'private' | 'public'
   currentCatalogVisibility?: 'unlisted' | 'listed'
   appName?: string
+  hasLiveTarget?: boolean
   liveTargetName?: string
   liveTargetSlug?: string
   viewingTargetName?: string
@@ -30,19 +27,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  publish: [request: PublishAppRequest]
+  publish: [request: PublishSettingsRequest]
 }>()
 
 const slug = ref('')
-const requiresAuthentication = ref(false)
-const allowRemixing = ref(false)
+const requiresAuthentication = computed(() => props.requiresAuth ?? false)
 const publishRuntime = ref(true)
 const listInMarketplace = ref(true)
-const selectedCategory = ref<string | null>(null)
-const tags = ref('')
 const validationError = ref<string | null>(null)
-const categories = ref<string[]>([])
-const isLoadingCategories = ref(false)
 
 const isVisible = computed({
   get: () => props.visible,
@@ -66,12 +58,7 @@ const validationMessage = computed(() => {
   return null
 })
 
-const categoryOptions = computed(() => categories.value.map(category => ({
-  label: category,
-  value: category,
-})))
-
-watch(isVisible, async (visible) => {
+watch(isVisible, (visible) => {
   if (!visible) {
     return
   }
@@ -84,32 +71,14 @@ watch(isVisible, async (visible) => {
     slug.value = ''
   }
 
-  requiresAuthentication.value = false
-  allowRemixing.value = props.isForkable ?? false
   const visibilityState = getPublishVisibilityState(
     props.currentRuntimeVisibility,
     props.currentCatalogVisibility,
   )
-  publishRuntime.value = visibilityState.publishRuntime
+  publishRuntime.value = requiresAuthentication.value ? false : visibilityState.publishRuntime
   listInMarketplace.value = visibilityState.listInMarketplace
-  selectedCategory.value = props.currentCategory ?? null
-  tags.value = props.currentTags ?? ''
   validationError.value = null
-
-  await loadCategories()
-})
-
-async function loadCategories() {
-  isLoadingCategories.value = true
-  try {
-    const response = await apiClient.get<string[]>('/api/public/marketplace/categories')
-    categories.value = response.data ?? []
-  } catch {
-    categories.value = []
-  } finally {
-    isLoadingCategories.value = false
-  }
-}
+}, { immediate: true })
 
 function handlePublish() {
   if (!isValidSlug.value) return
@@ -117,9 +86,6 @@ function handlePublish() {
   emit('publish', {
     publicUrl: slug.value,
     requiresAuthentication: requiresAuthentication.value,
-    category: selectedCategory.value,
-    tags: tags.value.trim() || null,
-    isForkable: allowRemixing.value,
     runtimeVisibility: publishRuntime.value ? 'public' : 'private',
     catalogVisibility: listInMarketplace.value ? 'listed' : 'unlisted',
     marketplacePreviewMode: publishRuntime.value ? 'launchable' : 'mediaOnly',
@@ -142,18 +108,21 @@ function close() {
 <template>
   <Dialog
     v-model:visible="isVisible"
-    header="Publish Live"
+    header="Publishing settings"
     :modal="true"
     :closable="true"
     :style="{ width: '540px' }"
   >
     <div class="publish-dialog">
       <p class="text-color-secondary mt-0">
-        Publishes the current Live environment. Additional environments remain private previews.
+        Publishing controls public access and marketplace visibility. It does not deploy or update the Live runtime.
       </p>
       <p v-if="liveTargetName || liveTargetSlug" class="text-color-secondary text-sm">
-        Publishing the Live environment.
+        The public runtime URL uses the Live environment. Other environments remain private previews.
       </p>
+      <Message v-if="hasLiveTarget === false" severity="info" :closable="false">
+        No Live environment exists yet. You can save publishing settings now; the public runtime URL will not serve the app until a Live runtime is deployed.
+      </Message>
       <p v-if="viewingTargetSlug && viewingTargetSlug !== liveTargetSlug" class="text-color-secondary text-sm">
         Currently viewing: {{ viewingTargetName || 'another environment' }}. Additional environments remain private previews.
       </p>
@@ -170,18 +139,20 @@ function close() {
           {{ validationMessage }}
         </small>
         <small v-else-if="isValidSlug" class="text-color-secondary block mt-1">
-          Your app will be available at: {{ publicUrl }}
+          {{ publishRuntime
+            ? `Public runtime URL: ${publicUrl}. It serves the Live environment after deployment.`
+            : 'This slug is saved with the settings, but a private runtime is not publicly launchable.' }}
         </small>
       </div>
 
       <div class="field mb-4">
         <label for="publishRuntime" class="block font-semibold mb-2">Runtime visibility</label>
         <div class="flex align-items-center gap-3">
-          <InputSwitch id="publishRuntime" v-model="publishRuntime" />
+          <InputSwitch id="publishRuntime" v-model="publishRuntime" :disabled="requiresAuthentication" />
           <label for="publishRuntime">{{ publishRuntime ? 'Public runtime' : 'Private runtime' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
-          {{ publishRuntime ? 'Visitors with the app URL can open the runtime.' : 'Only permitted Studio users can open the runtime.' }}
+          {{ requiresAuthentication ? 'This app requires sign-in, so its runtime must remain private.' : publishRuntime ? 'Visitors with the app URL can open the runtime.' : 'Only permitted Studio users can open the runtime.' }}
         </small>
       </div>
 
@@ -192,75 +163,16 @@ function close() {
           <label for="listInMarketplace">{{ listInMarketplace ? 'Listed in marketplace' : 'Unlisted' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
-          {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media and fork, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
+          {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
         </small>
       </div>
 
-      <div class="field mb-4">
-        <label for="category" class="block font-semibold mb-2">Marketplace Category</label>
-        <Select
-          id="category"
-          v-model="selectedCategory"
-          :options="categoryOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Select a category"
-          class="w-full"
-          :loading="isLoadingCategories"
-          show-clear
-        />
-        <small class="text-color-secondary block mt-1">
-          Choose the storefront section where your app belongs best. Admins can move it later if needed.
-        </small>
-      </div>
-
-      <div class="field mb-4">
-        <label for="tags" class="block font-semibold mb-2">Tags</label>
-        <InputText
-          id="tags"
-          v-model="tags"
-          placeholder="productivity, forms, crm"
-          class="w-full"
-        />
-        <small class="text-color-secondary block mt-1">
-          Add a few search-friendly tags separated by commas.
-        </small>
-      </div>
-
-      <div class="field mb-4">
-        <label for="allowForking" class="block font-semibold mb-2">Remixing</label>
-        <div class="flex align-items-center gap-3">
-          <InputSwitch
-            id="allowForking"
-            v-model="allowRemixing"
-          />
-          <label for="allowForking">{{ allowRemixing ? 'Others can remix this app' : 'Source stays private' }}</label>
-        </div>
-        <small class="text-color-secondary block mt-1 ml-6">
-          {{ allowRemixing
-            ? 'Others can create editable remixes with attribution.'
-            : 'People can use the app, but the editable source stays private.' }}
-        </small>
-      </div>
-
-      <div class="field mb-4">
-        <label for="requiresAuth" class="block font-semibold mb-2">Access Control</label>
-        <div class="flex align-items-center gap-3">
-          <InputSwitch
-            id="requiresAuth"
-            :model-value="!requiresAuthentication"
-            disabled
-            @update:model-value="requiresAuthentication = !$event"
-          />
-          <label for="requiresAuth">{{ requiresAuthentication ? 'Restricted access' : 'Public access' }}</label>
-        </div>
-        <small class="text-color-secondary block mt-1 ml-6">
-          Public app installs must run from the standalone app host. Private and organization apps stay in Studio preview for now.
-        </small>
-      </div>
+      <p v-if="requiresAuthentication" class="text-color-secondary text-sm">
+        Sign-in is currently required. This dialog preserves that setting and keeps the runtime private.
+      </p>
 
       <Message
-        v-if="!requiresAuthentication"
+        v-if="publishRuntime && !requiresAuthentication"
         severity="warn"
         :closable="false"
         class="mb-4"
@@ -279,7 +191,7 @@ function close() {
           @click="close"
         />
         <Button
-          label="Publish Live"
+          :label="isPublished ? 'Save publishing settings' : 'Publish app'"
           icon="pi pi-upload"
           :disabled="!isValidSlug"
           @click="handlePublish"

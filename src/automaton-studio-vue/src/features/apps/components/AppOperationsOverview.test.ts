@@ -157,7 +157,7 @@ describe('AppOperationsOverview', () => {
     expect(liveUrl).not.toBe(publishedUrl)
   })
 
-  it('shows restricted published access without calling it public', () => {
+  it('does not expose a public runtime URL for private published access', () => {
     const wrapper = mountOverview({
       isPublished: true,
       publicUrl: 'clock-app',
@@ -168,7 +168,8 @@ describe('AppOperationsOverview', () => {
     expect(wrapper.text()).toContain('Published')
     expect(wrapper.text()).toContain('Private runtime access')
     expect(wrapper.text()).not.toContain('Public access enabled')
-    expect(wrapper.get('a.published-link').attributes('href')).toContain('clock-app')
+    expect(wrapper.text()).toContain('No public runtime URL: this app has a private runtime.')
+    expect(wrapper.find('a.published-link').exists()).toBe(false)
   })
 
   it('shows an actionable deployment failure with Deployments and Logs destinations', async () => {

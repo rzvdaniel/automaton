@@ -2,27 +2,36 @@
 import { computed } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import type { App } from '../types/apps.types'
-import { getPublishedAppUrl } from '../utils/public-app-url'
+import type { AppOperationalSummary } from '../utils/app-operational-summary'
+import { getMarketplaceAvailability, getPublicRuntimeUrl, getPublishingConsistencyIssue } from '../utils/publishing-state'
 
 const props = defineProps<{
   app: App
   hasLiveTarget: boolean
+  operationalState: AppOperationalSummary
 }>()
 
 const emit = defineEmits<{
   publish: []
   unpublish: []
+  navigate: [view: 'deployments' | 'runtime']
 }>()
 const toast = useToast()
 
-const publishedUrl = computed(() =>
-  props.app.isPublished && props.app.publicUrl
-    ? getPublishedAppUrl(props.app.publicUrl)
-    : null,
-)
+const publishedUrl = computed(() => getPublicRuntimeUrl(props.app))
+const consistencyIssue = computed(() => getPublishingConsistencyIssue(props.app))
+const publicationLabel = computed(() => consistencyIssue.value ? 'Needs review' : props.app.isPublished ? 'Published' : 'Unpublished')
+const marketplaceAvailability = computed(() => getMarketplaceAvailability(props.app))
+const runtimeMessage = computed(() => {
+  if (!props.hasLiveTarget) return 'No Live deployment target exists. Publishing settings can still be saved, but no Live runtime URL can serve the app yet.'
+  if (props.operationalState.status === 'not-deployed') return 'Publishing does not deploy the app. Deploy from the local project with Automaton CLI, then manage the Live runtime here.'
+  if (props.operationalState.status === 'running') return null
+  return `The Live runtime is ${props.operationalState.runtimeLabel.toLocaleLowerCase()}. Runtime operations may be affected; review Runtime and Deployments.`
+})
 
 const runtimeVisibility = computed(() => {
   if (props.app.runtimeVisibility === 'public') return 'Public runtime'
@@ -79,21 +88,38 @@ async function copyPublishedUrl() {
         <h1 id="publishing-title">Publishing</h1>
         <p class="muted">Manage how this app is shared. Publishing is separate from deploying the Live runtime.</p>
       </div>
-      <Tag
-        :value="app.isPublished ? 'Published' : 'Unpublished'"
-        :severity="app.isPublished ? 'success' : 'secondary'"
-      />
+      <Tag :value="publicationLabel" :severity="consistencyIssue ? 'warn' : app.isPublished ? 'success' : 'secondary'" />
     </header>
 
+    <Message
+      v-if="consistencyIssue || runtimeMessage"
+      :severity="consistencyIssue || ['degraded', 'deployment-failed', 'runtime-unavailable'].includes(operationalState.status) ? 'warn' : 'info'"
+      :closable="false"
+      class="publishing-notice"
+    >
+      <div class="publishing-notice__body">
+        <div>
+          <strong v-if="consistencyIssue">Publishing needs review</strong>
+          <strong v-else>Live runtime status: {{ operationalState.label }}</strong>
+          <p v-if="consistencyIssue">{{ consistencyIssue }}</p>
+          <p v-if="runtimeMessage">{{ runtimeMessage }}</p>
+        </div>
+        <div class="publishing-notice__actions">
+          <Button v-if="hasLiveTarget" label="View runtime" icon="pi pi-arrow-right" icon-pos="right" text @click="emit('navigate', 'runtime')" />
+          <Button label="View deployments" icon="pi pi-arrow-right" icon-pos="right" text @click="emit('navigate', 'deployments')" />
+        </div>
+      </div>
+    </Message>
+
     <div class="publishing-grid">
-      <Card class="publishing-card publishing-card--primary">
-        <template #title>Published app</template>
+      <Card class="publishing-card">
+        <template #title>Public access</template>
         <template #content>
           <p v-if="app.isPublished" class="state-copy">
-            This app is published. Changes to the deployed runtime still require a new deployment.
+            Publishing controls public access and discovery. It does not deploy or update the Live runtime.
           </p>
           <p v-else class="state-copy">
-            This app is not published. You can deploy and operate it in Studio without making it public.
+            This app is unpublished. You can deploy and operate it in Studio without making it public.
           </p>
 
           <div v-if="publishedUrl" class="published-url">
@@ -107,7 +133,11 @@ async function copyPublishedUrl() {
             </div>
           </div>
           <p v-else class="muted url-placeholder">
-            {{ app.isPublished ? 'No public URL is configured.' : 'A public URL will be assigned when you publish this app.' }}
+            {{ app.isPublished && app.runtimeVisibility === 'private'
+              ? 'This app has a private runtime, so there is no public runtime URL. A listed app may still have a media-only marketplace preview.'
+              : app.isPublished
+                ? 'No usable public runtime URL is configured. Review the publishing settings.'
+                : 'A public runtime URL is configured when you publish the app.' }}
           </p>
 
           <dl v-if="app.isPublished" class="publishing-analytics">
@@ -130,9 +160,8 @@ async function copyPublishedUrl() {
             />
             <Button
               v-else
-              label="Publish Live"
+              label="Publish app"
               icon="pi pi-globe"
-              :disabled="!hasLiveTarget"
               @click="emit('publish')"
             />
             <Button
@@ -144,9 +173,7 @@ async function copyPublishedUrl() {
               @click="emit('unpublish')"
             />
           </div>
-          <p v-if="!hasLiveTarget && !app.isPublished" class="muted action-note">
-            Create a Live deployment target before publishing.
-          </p>
+          <p v-if="app.isPublished" class="muted action-note">Unpublishing removes public access; it does not undeploy the Live runtime.</p>
         </template>
       </Card>
 
@@ -161,18 +188,15 @@ async function copyPublishedUrl() {
             <div>
               <dt>Marketplace</dt>
               <dd>{{ marketplaceVisibility }}</dd>
+              <small class="muted">{{ marketplaceAvailability }}</small>
             </div>
             <div>
               <dt>App access</dt>
               <dd>{{ accessDescription }}</dd>
             </div>
-            <div>
-              <dt>Remixing</dt>
-              <dd>{{ app.isForkable ? 'Enabled' : 'Disabled' }}</dd>
-            </div>
           </dl>
           <p class="muted access-note">
-            Publishing controls update these options using the existing Publish Live workflow.
+            Update runtime visibility and marketplace discovery here. App metadata is managed in Settings.
           </p>
         </template>
       </Card>
@@ -197,6 +221,23 @@ async function copyPublishedUrl() {
 
 .publishing-header {
   margin-bottom: 1.25rem;
+}
+
+.publishing-notice__body,
+.publishing-notice__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.publishing-notice__body p {
+  margin: 0.3rem 0 0;
+}
+
+.publishing-notice__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .publishing-header h1 {
@@ -236,10 +277,6 @@ async function copyPublishedUrl() {
 .publishing-card {
   border: 1px solid var(--p-surface-border);
   border-radius: 0.9rem;
-}
-
-.publishing-card--primary {
-  border-top: 3px solid var(--p-primary-color);
 }
 
 .publishing-card :deep(.p-card-content) {
@@ -337,6 +374,17 @@ async function copyPublishedUrl() {
 @media (max-width: 900px) {
   .publishing-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .publishing-notice__body {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .publishing-notice__actions {
+    justify-content: flex-start;
   }
 }
 

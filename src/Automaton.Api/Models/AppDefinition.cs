@@ -5,8 +5,8 @@ namespace Automaton.Api.Models;
 public class AppDefinition
 {
     /// <summary>
-    /// HTML content for index.html
-    /// This is loaded from the file system for editing in the UI
+    /// Compatibility field mirrored from source/index.html when reading or creating an app.
+    /// Local app source remains authoritative and is managed through the CLI workflow.
     /// </summary>
     public string? HtmlContent { get; set; }
     
@@ -17,7 +17,7 @@ public class AppDefinition
 }
 
 /// <summary>
-/// GitHub integration settings for an app
+/// Legacy per-app GitHub sync metadata retained for compatibility with existing app records.
 /// </summary>
 public class GitHubSettings
 {

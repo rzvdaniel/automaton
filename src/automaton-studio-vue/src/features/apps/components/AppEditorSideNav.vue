@@ -81,12 +81,12 @@ const emit = defineEmits<{
 }
 
 .side-nav-item:hover {
-  background: var(--p-surface-100);
+  background: var(--p-content-hover-background);
 }
 
 .side-nav-item.active {
-  background: var(--p-primary-100);
-  color: var(--p-primary-700);
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
   font-weight: 600;
 }
 

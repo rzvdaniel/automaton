@@ -238,6 +238,8 @@ export interface PublishAppRequest {
   marketplacePreviewMode?: 'launchable' | 'mediaOnly'
 }
 
+export type PublishSettingsRequest = Omit<PublishAppRequest, 'category' | 'tags' | 'isForkable'>
+
 export interface ExportAppResponse {
   blob: Blob
   fileName: string
@@ -277,37 +279,6 @@ export interface LinkedStepInfo {
 }
 
 /**
- * App file info
- */
-export interface AppFile {
-  path: string
-  name: string
-  size: number
-  lastModified: string
-}
-
-export const AppFileSystemScope = {
-  Source: 'source',
-  Versions: 'versions',
-} as const
-
-export type AppFileSystemScope = (typeof AppFileSystemScope)[keyof typeof AppFileSystemScope]
-
-export interface ScopedFilesResponse {
-  success: boolean
-  scope: AppFileSystemScope
-  editable: boolean
-  files: AppFile[]
-}
-
-export interface ScopedFileContentResponse {
-  success: boolean
-  scope: AppFileSystemScope
-  editable: boolean
-  content: string
-}
-
-/**
  * App statistics for display
  */
 export interface AppStats {
@@ -315,7 +286,7 @@ export interface AppStats {
 }
 
 // ============================================
-// App Editor Types (Phase 3.3b - Visual IDE)
+// File tree types used by administrative source inspection
 // ============================================
 
 /**
@@ -458,68 +429,4 @@ export function getFileIcon(filePath: string): string {
     default:
       return 'pi pi-file'
   }
-}
-/**
- * App Version Trigger enum
- */
-export type AppVersionTrigger = 'ManualSave' | 'Publish' | 'Restore' | 'NewGeneration'
-
-export const AppVersionSource = {
-  AiChat: 'AiChat',
-  CliDeploy: 'CliDeploy',
-  Studio: 'Studio',
-} as const
-
-export type AppVersionSource = (typeof AppVersionSource)[keyof typeof AppVersionSource]
-
-/**
- * Basic version info for list view
- */
-export interface AppVersion {
-  id: string
-  appId: string
-  versionNumber: number
-  summary: string
-  trigger: AppVersionTrigger
-  source?: AppVersionSource | string
-  reason?: string
-  createdAt: string // ISO date string
-  createdBy: string
-  aiSessionId?: string
-  aiModel?: string
-  filesChangeSummary?: string
-  snapshotCreated?: boolean
-}
-
-/**
- * Detailed version info with file changes
- */
-export interface AppVersionDetail extends AppVersion {
-  snapshotPath: string
-}
-
-/**
- * Paginated list of versions
- */
-export interface AppVersionList {
-  appId: string
-  totalCount: number
-  pageNumber: number
-  pageSize: number
-  versions: AppVersion[]
-}
-
-/**
- * Request to restore a version
- */
-export interface RestoreVersionRequest {
-  versionNumber: number
-}
-
-/**
- * Response after restoring a version
- */
-export interface RestoreVersionResponse {
-  appId: string
-  message: string
 }
