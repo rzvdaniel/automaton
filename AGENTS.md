@@ -13,6 +13,7 @@ Read the matching skill before changing the related area:
 | If the task touches… | Read |
 | --- | --- |
 | App source/runtime, `source/` / `live/`, serving, archives, forks, or remixes | [Generic runtime](.agents/skills/generic-runtime/SKILL.md) |
+| Runtime placement, Infrastructure Runners, deployments, workers/messaging, persistent storage, scheduling, runtime routing, distributed state, or infrastructure providers | [Distributed platform architecture](.agents/skills/distributed-platform-architecture/SKILL.md) |
 | Production scripts, Compose, Traefik, certificates, health checks, blue-green, or rollback | [Production deployment](.agents/skills/production-deployment/SKILL.md) |
 | Docker disk space on a production host | [Production Docker maintenance](.agents/skills/production-docker-maintenance/SKILL.md) |
 | Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
