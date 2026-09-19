@@ -8,33 +8,67 @@ public sealed class DistributedPlatformArchitectureTests
 {
     [Test]
     public void CoreHasNoProjectDependencies()
-        => AssertProjectReferences("Automaton.Core", []);
+        => AssertProjectReferencesExactly("Automaton.Core", []);
 
     [Test]
     public void MessagingHasNoProjectDependencies()
-        => AssertProjectReferences("Automaton.Messaging", []);
+        => AssertProjectReferencesExactly("Automaton.Messaging", []);
 
     [Test]
-    public void InfrastructureDependsOnlyOnCore()
-        => AssertProjectReferences("Automaton.Infrastructure", ["Automaton.Core"]);
+    public void InfrastructureDoesNotDependOnHigherLevelOrHostProjects()
+        => AssertForbiddenProjectReferences(
+            "Automaton.Infrastructure",
+            ["Automaton.Api", "Automaton.Runner", "Automaton.Worker", "Automaton.Cli"]);
 
     [Test]
-    public void RunnerDependsOnlyOnSharedContractsAndSteps()
-        => AssertProjectReferences(
+    public void RunnerDoesNotDependOnControlPlaneOrInfrastructureProjects()
+        => AssertForbiddenProjectReferences(
             "Automaton.Runner",
-            ["Automaton.Core", "Automaton.Messaging", "Automaton.Steps"]);
+            ["Automaton.Api", "Automaton.Infrastructure", "Automaton.Worker", "Automaton.Cli"]);
 
     [Test]
-    public void WorkerDependsOnMessagingAndInfrastructureButNotApiOrRunner()
-        => AssertProjectReferences(
+    public void WorkerDoesNotDependOnApiRunnerOrCliProjects()
+        => AssertForbiddenProjectReferences(
             "Automaton.Worker",
-            ["Automaton.Messaging", "Automaton.Infrastructure", "Automaton.Identity"]);
+            ["Automaton.Api", "Automaton.Runner", "Automaton.Cli"]);
 
     [Test]
-    public void CliDependsOnReusableContractsRatherThanServerOrInfrastructureImplementations()
-        => AssertProjectReferences("Automaton.Cli", ["Automaton.Core", "Automaton.AiGuidance"]);
+    public void CliDoesNotDependOnServerRunnerWorkerOrInfrastructureProjects()
+        => AssertForbiddenProjectReferences(
+            "Automaton.Cli",
+            ["Automaton.Api", "Automaton.Infrastructure", "Automaton.Runner", "Automaton.Worker"]);
 
-    private static void AssertProjectReferences(string projectName, IReadOnlyCollection<string> expected)
+    [Test]
+    public void ApiDoesNotDependOnRunnerWorkerOrCliProjects()
+        => AssertForbiddenProjectReferences(
+            "Automaton.Api",
+            ["Automaton.Runner", "Automaton.Worker", "Automaton.Cli"]);
+
+    private static void AssertProjectReferencesExactly(string projectName, IReadOnlyCollection<string> expected)
+    {
+        var actual = GetProjectReferences(projectName);
+        Assert.That(actual, Is.EqualTo(expected.OrderBy(name => name, StringComparer.Ordinal).ToArray()), projectName);
+    }
+
+    private static void AssertForbiddenProjectReferences(
+        string projectName,
+        IReadOnlyCollection<string> forbidden)
+    {
+        var actual = GetProjectReferences(projectName);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var forbiddenProject in forbidden)
+            {
+                Assert.That(
+                    actual,
+                    Does.Not.Contain(forbiddenProject),
+                    $"{projectName} must not reference {forbiddenProject}.");
+            }
+        });
+    }
+
+    private static string[] GetProjectReferences(string projectName)
     {
         var projectPath = Path.Combine(
             FindRepositoryRoot(),
@@ -49,7 +83,7 @@ public sealed class DistributedPlatformArchitectureTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.That(actual, Is.EqualTo(expected.OrderBy(name => name, StringComparer.Ordinal).ToArray()), projectPath);
+        return actual!;
     }
 
     private static string FindRepositoryRoot()
