@@ -31,6 +31,7 @@ public sealed partial class HostContainerExecutionService
         var args = new List<string>
         {
             "docker", "create", "--name", name, "--network", "bridge",
+            "--cgroup-parent", HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId),
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--publish", $"{FormatPublishAddress(hostAddress)}::{request.ContainerPort}",
             "--mount", VolumeMount(volume,

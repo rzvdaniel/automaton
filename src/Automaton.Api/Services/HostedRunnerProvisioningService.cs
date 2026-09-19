@@ -8,6 +8,7 @@ using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using System.Data;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -116,12 +117,20 @@ public class HostedRunnerProvisioningService
         }
 
         var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
-        if (!forceProvision && hostedRunner is { RunnerId: not null, Status: HostedRunnerStatuses.Running })
+        hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
+        var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
+        if (hostedRunner.StorageProjectId is null)
+        {
+            hostedRunner.StorageProjectId = await AllocateStorageProjectIdAsync(hostedRunner.Id, cancellationToken);
+            if (!createdHostedRunner)
+                await db.SaveChangesAsync(cancellationToken);
+        }
+        if (!forceProvision && !storageProjectWasMissing && hostedRunner is { RunnerId: not null, Status: HostedRunnerStatuses.Running })
         {
             return new HostedRunnerPreparationResult(hostedRunner, [], false);
         }
 
-        if (!forceProvision && !createdHostedRunner && hostedRunner.Status is
+        if (!forceProvision && !storageProjectWasMissing && !createdHostedRunner && hostedRunner.Status is
             HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning)
         {
             return new HostedRunnerPreparationResult(hostedRunner, [], false);
@@ -133,11 +142,6 @@ public class HostedRunnerProvisioningService
             hostedRunner.HostedRunnerSpecificationId = specification.Id;
             hostedRunner.SpecificationRevision = specification.Revision;
             hostedRunner.SpecificationSnapshot = requestedSnapshot;
-            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
-        }
-        else if (hostedRunner.StorageAllowanceBytes <= 0)
-        {
-            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
         }
         hostedRunner.UpdatedAt = now;
 
@@ -375,6 +379,26 @@ public class HostedRunnerProvisioningService
 
     private bool IsMySqlProvider()
         => db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true;
+
+    private async Task<int> AllocateStorageProjectIdAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
+    {
+        // XFS project IDs are persisted in the control plane. The hash gives a
+        // stable first candidate, while linear probing plus the unique index
+        // makes collisions explicit instead of silently sharing a project.
+        var digest = SHA256.HashData(hostedRunnerId.ToByteArray());
+        var candidate = 1_000_000 + (int)(BitConverter.ToUInt32(digest, 0) % (uint)(int.MaxValue - 1_000_000));
+        var used = await db.HostedRunners
+            .Where(x => x.StorageProjectId != null)
+            .Select(x => x.StorageProjectId!.Value)
+            .ToListAsync(cancellationToken);
+        var usedIds = used.ToHashSet();
+        while (usedIds.Contains(candidate))
+        {
+            candidate++;
+            if (candidate == int.MaxValue) candidate = 1_000_000;
+        }
+        return candidate;
+    }
 
     private HostedRunnerDeployment AddDeployment(
         HostedRunner runner,

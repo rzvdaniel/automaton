@@ -11,18 +11,20 @@ spec:
   capabilities: [docker, host]
   input:
     type: object
-    required: [operationId, hostedRunnerId, runnerHostId, expectedSystemVolumeName, expectedUserVolumeName]
+    required: [operationId, hostedRunnerId, runnerHostId, expectedSystemVolumeName, expectedUserVolumeName, xfsProjectId]
     properties:
       operationId: { type: string }
       hostedRunnerId: { type: string }
       runnerHostId: { type: string }
       expectedSystemVolumeName: { type: string }
       expectedUserVolumeName: { type: string }
+      xfsProjectId: { type: integer }
   output:
     type: object
-    required: [success, systemBytes, userBytes, totalBytes]
+    required: [success, systemBytes, userBytes, totalBytes, usageSource]
     properties:
       success: { type: boolean }
       systemBytes: { type: integer }
       userBytes: { type: integer }
       totalBytes: { type: integer }
+      usageSource: { type: string }

@@ -179,6 +179,7 @@ public sealed class HostContainerExecutionTests
             Assert.That(result.Success, Is.True);
             Assert.That(commands.Any(x => x.Contains("volume") && x.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")), Is.True);
             var build = string.Join(' ', commands.Single(x => string.Join(' ', x).Contains("runtime-kind=build")));
+            Assert.That(build, Does.Contain($"--cgroup-parent automaton-hosted-runner-{hostedId:N}.slice"));
             Assert.That(build, Does.Contain("volume-subpath=workspace/runner/deployments/"));
             Assert.That(build, Does.Contain(
                 $"volume-subpath=workspace/runner/deployments/{scope.AppId:D}/{scope.DeploymentTargetId:D}/{scope.DeploymentAttemptId:D}/source"));

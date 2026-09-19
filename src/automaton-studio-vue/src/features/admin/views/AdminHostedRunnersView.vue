@@ -1466,7 +1466,7 @@ watch(() => route.path, refreshAll)
             <div v-if="selectedRunner.gracePeriodEndsAtUtc" class="col-12 md:col-4"><div class="text-color-secondary text-sm">Grace-period deadline</div><div>{{ formatDateTime(selectedRunner.gracePeriodEndsAtUtc) }}</div></div>
             <div v-if="selectedRunner.lastEnforcementReason" class="col-12"><Message severity="warn" :closable="false">{{ selectedRunner.lastEnforcementReason }}</Message></div>
           </div>
-          <Message severity="info" :closable="false">Storage is measured approximately hourly. The allowance is monitored by Automaton; it is not a hard filesystem quota.</Message>
+          <Message severity="info" :closable="false">On supported managed Runner Hosts, this is a hard XFS project quota for the Hosted Runner system and user volumes, including application data and build workspaces. Docker images, shared cache, Docker logs, and container writable layers are outside this quota.</Message>
           <Message v-if="selectedRunner.storageMeasurementError" severity="warn" :closable="false">{{ selectedRunner.storageMeasurementError }}</Message>
           <Message v-if="selectedRunner.storageVerificationError" severity="warn" :closable="false">{{ selectedRunner.storageVerificationError }}</Message>
         </div>
