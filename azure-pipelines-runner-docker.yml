@@ -16,6 +16,10 @@
 # Trigger: main Runner changes, manually, or on tags (e.g., v1.0.0, runner-v1.0.0)
 
 parameters:
+  - name: sourceRef
+    displayName: Source ref to build (optional)
+    type: string
+    default: ''
   - name: expectedSourceRevision
     displayName: Expected source revision (optional)
     type: string
@@ -47,10 +51,6 @@ variables:
   dockerfilePath: 'src/Automaton.Runner/Dockerfile'
   buildContext: '.'
   
-  # Every build gets a traceable immutable source-revision tag. Release and
-  # main builds additionally publish their existing human-facing aliases.
-  commitImageTag: 'sha-$(Build.SourceVersion)'
-
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -62,18 +62,51 @@ stages:
         displayName: 'Build and Push'
         steps:
           - checkout: self
+            persistCredentials: true
             fetchDepth: 1
 
           - script: |
               set -eu
-              if [[ -n "$EXPECTED_SOURCE_REVISION" && "$EXPECTED_SOURCE_REVISION" != "$BUILD_SOURCE_VERSION" ]]; then
-                echo "Expected source revision $EXPECTED_SOURCE_REVISION but checked out $BUILD_SOURCE_VERSION." >&2
+              source_ref="${SOURCE_REF:-}"
+              expected_revision="${EXPECTED_SOURCE_REVISION:-}"
+
+              if [[ -n "$source_ref" ]]; then
+                case "$source_ref" in
+                  refs/heads/*|refs/tags/*) ;;
+                  *)
+                    echo "Source ref must be a fully-qualified branch or tag ref: $source_ref" >&2
+                    exit 1
+                    ;;
+                esac
+                git fetch --no-tags --depth=1 origin "$source_ref"
+                git checkout --detach FETCH_HEAD
+              fi
+
+              source_revision="$(git rev-parse HEAD)"
+              if [[ -n "$expected_revision" && "$expected_revision" != "$source_revision" ]]; then
+                echo "Expected source revision $expected_revision but checked out $source_revision." >&2
                 exit 1
               fi
-              echo "Runner source revision: $BUILD_SOURCE_VERSION"
+              if [[ ! "$source_revision" =~ ^[0-9a-f]{40}$ ]]; then
+                echo "Resolved source revision is not a full commit SHA: $source_revision" >&2
+                exit 1
+              fi
+
+              override=false
+              if [[ -n "$source_ref" ]]; then
+                override=true
+              fi
+              echo "Runner pipeline YAML revision: $BUILD_SOURCE_VERSION"
+              echo "Runner build source ref: ${source_ref:-$BUILD_SOURCE_BRANCH}"
+              echo "Runner build source revision: $source_revision"
+              echo "##vso[task.setvariable variable=runnerSourceRevision]$source_revision"
+              echo "##vso[task.setvariable variable=commitImageTag]sha-$source_revision"
+              echo "##vso[task.setvariable variable=runnerSourceOverride]$override"
             env:
+              SOURCE_REF: ${{ parameters.sourceRef }}
               EXPECTED_SOURCE_REVISION: ${{ parameters.expectedSourceRevision }}
               BUILD_SOURCE_VERSION: $(Build.SourceVersion)
+              BUILD_SOURCE_BRANCH: $(Build.SourceBranch)
             displayName: 'Validate source revision'
 
           - task: Docker@2
@@ -120,7 +153,11 @@ stages:
               image="$(imageRepository):$(commitImageTag)"
               branch="${BUILD_SOURCE_BRANCH:?Build.SourceBranch is required}"
 
-              if [[ "$branch" == refs/tags/* ]]; then
+              override="${RUNNER_SOURCE_OVERRIDE:-false}"
+              if [[ "$override" == true ]]; then
+                echo "Source-ref override build: leaving latest and release aliases unchanged."
+                exit 0
+              elif [[ "$branch" == refs/tags/* ]]; then
                 alias="${branch##*/}"
                 alias="${alias#runner-}"
                 [[ "$alias" != "" && "$alias" != "latest" && "$alias" != *[!A-Za-z0-9_.-]* ]]
@@ -134,6 +171,7 @@ stages:
               fi
             env:
               BUILD_SOURCE_BRANCH: $(Build.SourceBranch)
+              RUNNER_SOURCE_OVERRIDE: $(runnerSourceOverride)
             displayName: 'Publish release and main aliases'
 
           - script: |
@@ -141,7 +179,7 @@ stages:
               image="$(imageRepository):$(commitImageTag)"
               digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image" | sed -n 's/.*@//p')"
               printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
-              echo "Runner source revision: $(Build.SourceVersion)"
+              echo "Runner source revision: $(runnerSourceRevision)"
               echo "Runner immutable image: $image"
               echo "Runner published digest: $digest"
               echo "##vso[task.setvariable variable=runnerPublishedDigest]$digest"

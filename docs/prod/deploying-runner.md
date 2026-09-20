@@ -33,12 +33,15 @@ acceptance must record both the full SHA tag and the resolved `sha256` digest.
 ### Publishing an exact pre-merge Runner artifact
 
 For a trusted repository branch, use Azure DevOps **Run pipeline** for
-`azure-pipelines-runner-docker.yml`, select the branch containing the desired
-commit, and enter that full SHA in the `Expected source revision` parameter.
-The build fails before registry login if the checkout does not match the
-requested revision. The pipeline then prints the immutable image tag and
-resolved published digest. Use that exact `repository@sha256:<digest>` reference
-for real-host acceptance; do not substitute `latest`.
+`azure-pipelines-runner-docker.yml` from `main`, set `Source ref` to the
+fully-qualified branch or tag containing the desired commit, and enter that
+full SHA in `Expected source revision`. The pipeline fetches and checks out the
+source ref, then fails before registry login if it does not resolve to the
+requested revision. Source-ref override builds publish only the immutable
+`sha-<full-commit-sha>` tag and leave `latest` and release aliases unchanged.
+The pipeline prints the immutable image tag and resolved published digest. Use
+that exact `repository@sha256:<digest>` reference for real-host acceptance; do
+not substitute `latest`.
 
 ---
 
