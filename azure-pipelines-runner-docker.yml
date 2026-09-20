@@ -15,6 +15,12 @@
 #
 # Trigger: main Runner changes, manually, or on tags (e.g., v1.0.0, runner-v1.0.0)
 
+parameters:
+  - name: expectedSourceRevision
+    displayName: Expected source revision (optional)
+    type: string
+    default: ''
+
 trigger:
   branches:
     include:
@@ -41,11 +47,9 @@ variables:
   dockerfilePath: 'src/Automaton.Runner/Dockerfile'
   buildContext: '.'
   
-  # Tag with version from git tag, or 'latest' for main branch
-  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
-    imageTag: ${{ replace(variables['Build.SourceBranchName'], 'runner-', '') }}
-  ${{ else }}:
-    imageTag: 'latest'
+  # Every build gets a traceable immutable source-revision tag. Release and
+  # main builds additionally publish their existing human-facing aliases.
+  commitImageTag: 'sha-$(Build.SourceVersion)'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -59,6 +63,18 @@ stages:
         steps:
           - checkout: self
             fetchDepth: 1
+
+          - script: |
+              set -eu
+              if [[ -n "$EXPECTED_SOURCE_REVISION" && "$EXPECTED_SOURCE_REVISION" != "$BUILD_SOURCE_VERSION" ]]; then
+                echo "Expected source revision $EXPECTED_SOURCE_REVISION but checked out $BUILD_SOURCE_VERSION." >&2
+                exit 1
+              fi
+              echo "Runner source revision: $BUILD_SOURCE_VERSION"
+            env:
+              EXPECTED_SOURCE_REVISION: ${{ parameters.expectedSourceRevision }}
+              BUILD_SOURCE_VERSION: $(Build.SourceVersion)
+            displayName: 'Validate source revision'
 
           - task: Docker@2
             displayName: 'Login to Docker Hub'
@@ -74,18 +90,17 @@ stages:
               dockerfile: $(dockerfilePath)
               buildContext: $(buildContext)
               tags: |
-                $(imageTag)
-                latest
+                $(commitImageTag)
               arguments: '--no-cache'
 
           - script: |
               set -eu
-              docker run --rm --entrypoint /bin/sh $(imageRepository):$(imageTag) -c 'command -v docker && docker --version'
+              docker run --rm --entrypoint /bin/sh $(imageRepository):$(commitImageTag) -c 'command -v docker && docker --version'
             displayName: 'Smoke test Docker CLI'
 
           - script: |
               set -eu
-              docker run --rm --entrypoint /bin/sh $(imageRepository):$(imageTag) -c '
+              docker run --rm --entrypoint /bin/sh $(imageRepository):$(commitImageTag) -c '
                 for action in provision-hosted-runner reprovision-hosted-runner restart-hosted-runner suspend-hosted-runner resume-hosted-runner delete-hosted-runner measure-hosted-runner-storage; do
                   test -f "/app/SystemApps/automaton-infrastructure/actions/$action/action.yaml"
                   test -f "/app/SystemApps/automaton-infrastructure/actions/$action/main.py"
@@ -93,13 +108,44 @@ stages:
             displayName: 'Smoke test bundled trusted Actions'
 
           - task: Docker@2
-            displayName: 'Push Docker Image'
+            displayName: 'Push immutable commit image'
             inputs:
               command: push
               repository: $(imageRepository)
               tags: |
-                $(imageTag)
-                latest
+                $(commitImageTag)
+
+          - script: |
+              set -eu
+              image="$(imageRepository):$(commitImageTag)"
+              branch="${BUILD_SOURCE_BRANCH:?Build.SourceBranch is required}"
+
+              if [[ "$branch" == refs/tags/* ]]; then
+                alias="${branch##*/}"
+                alias="${alias#runner-}"
+                [[ "$alias" != "" && "$alias" != "latest" && "$alias" != *[!A-Za-z0-9_.-]* ]]
+                docker tag "$image" "$(imageRepository):$alias"
+                docker tag "$image" "$(imageRepository):latest"
+                docker push "$(imageRepository):$alias"
+                docker push "$(imageRepository):latest"
+              elif [[ "$branch" == refs/heads/main ]]; then
+                docker tag "$image" "$(imageRepository):latest"
+                docker push "$(imageRepository):latest"
+              fi
+            env:
+              BUILD_SOURCE_BRANCH: $(Build.SourceBranch)
+            displayName: 'Publish release and main aliases'
+
+          - script: |
+              set -eu
+              image="$(imageRepository):$(commitImageTag)"
+              digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image" | sed -n 's/.*@//p')"
+              printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
+              echo "Runner source revision: $(Build.SourceVersion)"
+              echo "Runner immutable image: $image"
+              echo "Runner published digest: $digest"
+              echo "##vso[task.setvariable variable=runnerPublishedDigest]$digest"
+            displayName: 'Record published image digest'
 
           - task: Docker@2
             displayName: 'Logout from Docker Hub'
@@ -110,8 +156,10 @@ stages:
           - script: |
               echo "##[section]Docker Image Published Successfully!"
               echo ""
-              echo "Image: $(imageRepository):$(imageTag)"
-              echo "Image: $(imageRepository):latest"
+              echo "Source revision: $(Build.SourceVersion)"
+              echo "Immutable image: $(imageRepository):$(commitImageTag)"
+              echo "Published digest: $(runnerPublishedDigest)"
+              echo "Main and release builds also publish their configured aliases."
               echo ""
               echo "Quick start (recommended):"
               echo ""
