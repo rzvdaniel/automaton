@@ -418,6 +418,7 @@ public class Program
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
                 services.AddSingleton<InfrastructureCommandService>();
+                services.AddSingleton<InfrastructureCommandConsumerStatus>();
                 services.AddSingleton<HostContainerExecutionService>();
                 services.AddSingleton<TunnelForwarderService>();
                 services.AddHostedService<InfrastructureCommandHostedService>();

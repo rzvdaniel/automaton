@@ -7,6 +7,7 @@ using DotNetCore.CAP;
 using DotNetCore.CAP.Messages;
 using DotNetCore.CAP.Serialization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using RabbitMQ.Client;
@@ -89,6 +90,93 @@ public sealed class InfrastructureCommandConsumerTests
     [TestCase(RunnerPurposes.Infrastructure, "", false)]
     public void InfrastructureServiceStartIsLimitedToValidInfrastructureIdentity(string purpose, string runnerId, bool expected)
         => Assert.That(InfrastructureCommandHostedService.ShouldStart(purpose, runnerId, Guid.NewGuid()), Is.EqualTo(expected));
+
+    [Test]
+    public async Task SupervisorRetriesAfterChannelShutdownWithoutOverlappingAttempts()
+    {
+        using var stopping = new CancellationTokenSource();
+        var attempts = 0;
+        var activeAttempts = 0;
+        var maximumActiveAttempts = 0;
+        var secondAttemptStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task ConsumeAttempt(CancellationToken cancellationToken)
+        {
+            var active = Interlocked.Increment(ref activeAttempts);
+            InterlockedMax(ref maximumActiveAttempts, active);
+            try
+            {
+                if (Interlocked.Increment(ref attempts) == 1)
+                    throw new InfrastructureCommandConsumerStoppedException("channel shutdown");
+
+                secondAttemptStarted.SetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref activeAttempts);
+            }
+        }
+
+        var running = new InfrastructureCommandConsumerSupervisor(
+            ConsumeAttempt, TimeSpan.FromMilliseconds(1), NullLogger.Instance).RunAsync(stopping.Token);
+        await secondAttemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        stopping.Cancel();
+        await running;
+
+        Assert.That(attempts, Is.EqualTo(2));
+        Assert.That(maximumActiveAttempts, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SupervisorRetriesBasicConsumeFailureAndStopsPromptlyDuringRetryDelay()
+    {
+        using var stopping = new CancellationTokenSource();
+        var attempts = 0;
+        var firstAttemptFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task ConsumeAttempt(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref attempts);
+            firstAttemptFailed.SetResult();
+            throw new InvalidOperationException("BasicConsume failed before readiness");
+        }
+
+        var running = new InfrastructureCommandConsumerSupervisor(
+            ConsumeAttempt, TimeSpan.FromMinutes(1), NullLogger.Instance).RunAsync(stopping.Token);
+        await firstAttemptFailed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        stopping.Cancel();
+        await running;
+
+        Assert.That(attempts, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ConsumerStatusSeparatesStartingReadyAndNotReady()
+    {
+        var status = new InfrastructureCommandConsumerStatus();
+
+        Assert.That(status.Readiness, Is.EqualTo(InfrastructureCommandConsumerReadiness.NotReady));
+        status.Set(InfrastructureCommandConsumerReadiness.Starting, "connecting");
+        Assert.That(status.Readiness, Is.EqualTo(InfrastructureCommandConsumerReadiness.Starting));
+        status.Set(InfrastructureCommandConsumerReadiness.Ready, "consumer-tag");
+        Assert.That(status.Readiness, Is.EqualTo(InfrastructureCommandConsumerReadiness.Ready));
+        status.Set(InfrastructureCommandConsumerReadiness.NotReady, "channel shutdown");
+        Assert.That(status.Readiness, Is.EqualTo(InfrastructureCommandConsumerReadiness.NotReady));
+        Assert.That(status.Detail, Is.EqualTo("channel shutdown"));
+    }
+
+    private static void InterlockedMax(ref int location, int value)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref location);
+            if (current >= value || Interlocked.CompareExchange(ref location, value, current) == current)
+                return;
+        }
+    }
+
+    private sealed class InfrastructureCommandConsumerStoppedException(string message) : Exception(message);
 
     [Test]
     public async Task LocalRabbitMqLeavesDeliveryUnacknowledgedWhenCallbackFails()
@@ -215,7 +303,8 @@ public sealed class InfrastructureCommandConsumerTests
                 await Task.Delay(25, timeout.Token);
             Assert.That(callbacks.Commands.Single().CommandId, Is.EqualTo(command.CommandId));
             timeout.Cancel();
-            Assert.ThrowsAsync<TaskCanceledException>(async () => await running);
+            Assert.DoesNotThrowAsync(async () => await running);
+            Assert.That(consumer.Readiness, Is.EqualTo(InfrastructureCommandConsumerReadiness.NotReady));
         }
         finally
         {

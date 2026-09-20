@@ -11,6 +11,7 @@ public sealed class InfrastructureCommandHostedService(
     IConfiguration configuration,
     AppActionDeploymentService deployment,
     AppActionExecutionService execution,
+    InfrastructureCommandConsumerStatus consumerStatus,
     ILogger<InfrastructureCommandHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,24 +39,12 @@ public sealed class InfrastructureCommandHostedService(
         var api = new InfrastructureCommandApiClient(configuration, storage);
         var executor = new TrustedInfrastructureActionExecutor(
             deployment, execution, api);
-        var consumer = new InfrastructureCommandConsumer(identity, executor, api);
+        var consumer = new InfrastructureCommandConsumer(identity, executor, api, consumerStatus, logger);
         logger.LogInformation("Starting durable infrastructure command consumer for Runner Host {RunnerHostId}", identity.RunnerHostId);
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await consumer.ConsumeAsync(configuration, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(exception, "Infrastructure command consumer stopped; retrying with RabbitMQ recovery.");
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-            }
-        }
+        await new InfrastructureCommandConsumerSupervisor(
+            token => consumer.ConsumeAsync(configuration, token),
+            TimeSpan.FromSeconds(5),
+            logger).RunAsync(stoppingToken);
     }
 
     internal static bool ShouldStart(string? purpose, string? runnerId, Guid hostId)
