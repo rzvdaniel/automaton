@@ -68,6 +68,16 @@ App_Data/
 .env.local
 .env.*.local
 
+# Production-local state (preserve across deployment checkouts)
+/.env.before-*
+/.env.corrupt-*
+/privatekey.xml
+/publickey.xml
+/secrets/hosted_runner_ssh_key
+/secrets/hosted_runner_ssh_key.pub
+/venv/
+/backups/
+
 # AppSettings files
 appsettings*.json
 !src/Automaton.Api/appsettings.json
