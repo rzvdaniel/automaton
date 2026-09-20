@@ -7,21 +7,38 @@ This guide covers deploying an Automaton Runner on any Linux server (Hetzner, Di
 The Runner is built and published by `azure-pipelines-runner-docker.yml`.
 
 The pipeline runs for relevant Runner or shared-code changes merged to `main`,
-and also for `v*` or `runner-v*` release tags. It is the production Runner
-artifact authority. Do not manually build or push a production Runner image
-from a developer machine or production host.
+and also for `v*` or `runner-v*` release tags. Pull-request builds remain
+manual (`pr: none`) so registry credentials are not exposed to arbitrary fork
+code. It is the production Runner artifact authority. Do not manually build or
+push a production Runner image from a developer machine or production host.
 
 ```bash
 git tag runner-v1.2.0
 git push origin runner-v1.2.0
 ```
 
-This triggers a build from `src/Automaton.Runner/Dockerfile` (build context `src/`) and pushes two tags to Docker Hub:
+This triggers a build from `src/Automaton.Runner/Dockerfile` (build context `src/`) and pushes a source-revision tag plus the release aliases to Docker Hub:
 
 | Tag | Description |
 |----|-------------|
+| `rzvdaniel/automaton-runner:sha-<full-commit-sha>` | Immutable source-revision tag published for every build |
 | `rzvdaniel/automaton-runner:latest` | Always points to the most recent release |
 | `rzvdaniel/automaton-runner:v1.2.0` | Pinned version tag |
+
+Manual non-main branch builds publish only the `sha-<full-commit-sha>` tag. They
+do not move `latest`, which keeps pre-merge acceptance artifacts separate from
+the production alias. Docker build metadata also records the source revision;
+acceptance must record both the full SHA tag and the resolved `sha256` digest.
+
+### Publishing an exact pre-merge Runner artifact
+
+For a trusted repository branch, use Azure DevOps **Run pipeline** for
+`azure-pipelines-runner-docker.yml`, select the branch containing the desired
+commit, and enter that full SHA in the `Expected source revision` parameter.
+The build fails before registry login if the checkout does not match the
+requested revision. The pipeline then prints the immutable image tag and
+resolved published digest. Use that exact `repository@sha256:<digest>` reference
+for real-host acceptance; do not substitute `latest`.
 
 ---
 
