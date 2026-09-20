@@ -219,12 +219,14 @@ ufw enable
 ufw status
 ```
 
-### 9. Make the production scripts executable
+### 9. Production scripts
 
-```bash
-cd /opt/automaton
-chmod +x ./scripts/prod-*.sh
-```
+The `scripts/prod-*.sh` files are tracked with their executable bit, so a fresh
+checkout can run them directly. No post-checkout `chmod` step is required.
+
+Documented host-local state (`.env`, dated `.env` snapshots, the key XML files,
+the hosted-runner key files under `secrets/`, `venv/`, and `backups/`) is
+intentionally ignored by Git and must be preserved across checkout updates.
 
 ### 10. Start Traefik and perform the first deploy
 
@@ -456,7 +458,6 @@ git diff --stat HEAD..origin/main
 git diff --name-status HEAD..origin/main
 git merge-base --is-ancestor HEAD origin/main
 sudo git merge --ff-only origin/main
-chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-all.sh --keep-previous
 ./scripts/prod-verify.sh
 ```
@@ -477,7 +478,6 @@ gh auth status
 git fetch origin
 git merge-base --is-ancestor HEAD origin/main
 sudo git merge --ff-only origin/main
-chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-website.sh --keep-previous
 ./scripts/prod-verify.sh
 ```
@@ -494,7 +494,6 @@ gh auth status
 git fetch origin
 git merge-base --is-ancestor HEAD origin/main
 sudo git merge --ff-only origin/main
-chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-app-host.sh
 ./scripts/prod-verify.sh
 ```
@@ -511,13 +510,12 @@ Use this when reinstalling Automaton websites on a new server.
 4. Create `/opt/automaton/config/appsettings.Production.json`.
 5. Create `/opt/automaton/.env` from `.env.prod.example`.
 6. Open firewall ports `22`, `80`, and `443`.
-7. Run `chmod +x ./scripts/prod-*.sh`.
-8. Configure `CF_DNS_API_TOKEN` and `ACME_EMAIL` in `.env`.
-9. Start Traefik with `docker compose -f docker-compose.prod.yml up -d traefik`; it creates or renews the wildcard certificate in the persistent ACME volume.
-10. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
-11. Run `./scripts/prod-reset-blue-green.sh`.
-12. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
-13. Run `./scripts/prod-verify.sh`.
+7. Configure `CF_DNS_API_TOKEN` and `ACME_EMAIL` in `.env`.
+8. Start Traefik with `docker compose -f docker-compose.prod.yml up -d traefik`; it creates or renews the wildcard certificate in the persistent ACME volume.
+9. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
+10. Run `./scripts/prod-reset-blue-green.sh`.
+11. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
+12. Run `./scripts/prod-verify.sh`.
 
 If migrating an existing production instance, copy `prod-api-appdata` and the database backup as the source of truth. `prod-published-apps` is generated output and can be rebuilt from published app metadata plus `live/frontend/` once a rebuild command exists.
 
@@ -665,7 +663,6 @@ If the server is already prepared and you just need the minimal command sequence
 cd /opt/automaton
 cp .env.prod.example .env
 # edit .env and /opt/automaton/config/appsettings.Production.json
-chmod +x ./scripts/prod-*.sh
 docker compose -f docker-compose.prod.yml up -d traefik
 docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue
 ./scripts/prod-reset-blue-green.sh
