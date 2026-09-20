@@ -12,7 +12,7 @@ namespace Automaton.Api.Tests;
 public sealed class InfrastructureCommandCallbackServiceTests
 {
     [Test]
-    public async Task FailedResultIsAppliedOnceAndConflictsAreRejected()
+    public async Task FailedResultIsAppliedOnceAndConflictsBecomeTerminalStale()
     {
         await using var db = CreateDb();
         var apiKeyId = Guid.NewGuid();
@@ -28,12 +28,39 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var first = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
         var duplicate = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
 
-        Assert.That(first.AlreadyCompleted, Is.False);
-        Assert.That(duplicate.AlreadyCompleted, Is.True);
+        Assert.That(first.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+        Assert.That(duplicate.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.AlreadyApplied));
         Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
         Assert.That((await db.AppModuleExecutions.SingleAsync()).Id, Is.EqualTo(deployment.Id));
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.ApplyResultAsync(apiKeyId, deployment.Id,
-            Request(deployment.Id, host.Id, runner.Id, "different failure"), CancellationToken.None));
+        var stale = await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "different failure"), CancellationToken.None);
+        Assert.That(stale.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
+    }
+
+    [Test]
+    public async Task TerminalDeploymentWithoutExecutionIsTerminalStaleWithoutMutation()
+    {
+        await using var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Failed };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
+            Action = HostedRunnerDeploymentActions.Reprovision, Status = HostedRunnerDeploymentStatuses.Failed
+        };
+        db.AddRange(runner, host, hosted, deployment);
+        await db.SaveChangesAsync();
+
+        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
+            CancellationToken.None);
+
+        Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
     }
 
     [Test]

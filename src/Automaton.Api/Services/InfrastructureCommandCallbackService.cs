@@ -39,9 +39,11 @@ public sealed class InfrastructureCommandCallbackService(
         if (existing != null && IsTerminal(existing.Status))
         {
             if (string.Equals(existing.ResultFingerprint, fingerprint, StringComparison.Ordinal))
-                return new(true);
-            throw new InvalidOperationException("A conflicting terminal result was submitted for this infrastructure command.");
+                return new(InfrastructureCommandResultOutcomes.AlreadyApplied);
+            return new(InfrastructureCommandResultOutcomes.TerminalStale);
         }
+        if (IsTerminalDeployment(deployment.Status))
+            return new(InfrastructureCommandResultOutcomes.TerminalStale);
         var execution = existing ?? new AppModuleExecution
         {
             Id = commandId,
@@ -81,7 +83,7 @@ public sealed class InfrastructureCommandCallbackService(
         if (request.SecretGrantIds.Count > 0)
             await secretGrants.MarkConsumedAsync(request.SecretGrantIds, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return new(false);
+        return new(InfrastructureCommandResultOutcomes.Accepted);
     }
 
     private async Task<SecretGrantScope> AuthorizeAsync(Guid apiKeyId, Guid commandId, Guid operationId,
@@ -140,6 +142,10 @@ public sealed class InfrastructureCommandCallbackService(
         or AppModuleExecutionStatuses.Cancelled or AppModuleExecutionStatuses.RunnerUnavailable
         or AppModuleExecutionStatuses.Lost;
 
+    private static bool IsTerminalDeployment(string status) => status is
+        HostedRunnerDeploymentStatuses.Succeeded or HostedRunnerDeploymentStatuses.Failed
+        or HostedRunnerDeploymentStatuses.Skipped;
+
     private static string Fingerprint(InfrastructureCommandResultRequest request)
     {
         var payload = JsonSerializer.Serialize(new { request.OperationId, request.RunnerHostId,
@@ -154,4 +160,3 @@ public sealed record InfrastructureCommandSecretsResponse(IReadOnlyDictionary<st
 public sealed record InfrastructureCommandResultRequest(Guid OperationId, Guid RunnerHostId,
     Guid InfrastructureRunnerId, string ActionKey, IReadOnlyList<Guid> SecretGrantIds,
     AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result);
-public sealed record InfrastructureCommandResultResponse(bool AlreadyCompleted);

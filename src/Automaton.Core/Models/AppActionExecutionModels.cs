@@ -41,6 +41,17 @@ public static class AppModuleExecutionErrorCodes
     public const string AmbiguousDispatch = "AmbiguousDispatch";
 }
 
+public static class InfrastructureCommandResultOutcomes
+{
+    public const string Accepted = "accepted";
+    public const string AlreadyApplied = "already-applied";
+    public const string TerminalStale = "terminal-stale";
+
+    public static bool IsAckable(string? outcome) => outcome is Accepted or AlreadyApplied or TerminalStale;
+}
+
+public sealed record InfrastructureCommandResultResponse(string Outcome);
+
 public sealed class ExecuteAppActionModuleRequest
 {
     public Guid ExecutionId { get; set; }

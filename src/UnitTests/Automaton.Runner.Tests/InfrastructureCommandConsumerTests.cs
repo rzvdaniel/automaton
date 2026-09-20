@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Messaging.Events;
@@ -17,6 +18,21 @@ namespace Automaton.Runner.Console.Tests;
 public sealed class InfrastructureCommandConsumerTests
 {
     private readonly InfrastructureCommandIdentity identity = new(Guid.NewGuid(), Guid.NewGuid());
+
+    [TestCase(HttpStatusCode.OK, InfrastructureCommandResultOutcomes.Accepted, true)]
+    [TestCase(HttpStatusCode.OK, InfrastructureCommandResultOutcomes.AlreadyApplied, true)]
+    [TestCase(HttpStatusCode.OK, InfrastructureCommandResultOutcomes.TerminalStale, true)]
+    [TestCase(HttpStatusCode.Conflict, InfrastructureCommandResultOutcomes.TerminalStale, false)]
+    [TestCase(HttpStatusCode.Unauthorized, InfrastructureCommandResultOutcomes.Accepted, false)]
+    [TestCase(HttpStatusCode.InternalServerError, InfrastructureCommandResultOutcomes.Accepted, false)]
+    [TestCase(HttpStatusCode.OK, "unknown", false)]
+    public void ResultCallbackAcknowledgesOnlyAuthoritativeOutcomes(HttpStatusCode statusCode, string outcome, bool expected)
+        => Assert.That(InfrastructureCommandApiClient.IsAckableResponse(statusCode,
+            new InfrastructureCommandResultResponse(outcome)), Is.EqualTo(expected));
+
+    [Test]
+    public void ResultCallbackRejectsMissingOutcome()
+        => Assert.That(InfrastructureCommandApiClient.IsAckableResponse(HttpStatusCode.OK, null), Is.False);
 
     [Test]
     public async Task CapSerializedCommandPreservesFieldsAndInvokesExecutorOnce()
