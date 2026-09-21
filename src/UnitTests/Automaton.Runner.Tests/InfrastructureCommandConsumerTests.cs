@@ -35,6 +35,28 @@ public sealed class InfrastructureCommandConsumerTests
         => Assert.That(InfrastructureCommandApiClient.IsAckableResponse(HttpStatusCode.OK, null), Is.False);
 
     [Test]
+    public void SecretResolutionAcceptsOnlyExecutableOrTerminalDisposition()
+    {
+        var executable = InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
+            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Executable,
+                new Dictionary<string, string> { ["TOKEN"] = "value" }));
+        var terminal = InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
+            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Terminal,
+                new Dictionary<string, string>(), "AmbiguousDispatch"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(executable.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Executable));
+            Assert.That(terminal.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+        });
+        Assert.Throws<InvalidOperationException>(() => InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
+            new InfrastructureCommandSecretsResponse("unknown", new Dictionary<string, string>())));
+        Assert.Throws<InvalidOperationException>(() => InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
+            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Terminal,
+                new Dictionary<string, string>())));
+    }
+
+    [Test]
     public async Task CapSerializedCommandPreservesFieldsAndInvokesExecutorOnce()
     {
         var executor = new RecordingExecutor();
@@ -46,8 +68,8 @@ public sealed class InfrastructureCommandConsumerTests
 
         Assert.That(executor.Commands.Count, Is.EqualTo(1));
         Assert.That(JsonSerializer.Serialize(executor.Commands.Single()), Is.EqualTo(JsonSerializer.Serialize(command)));
-        Assert.That(result.Execution.ExecutionId, Is.EqualTo(command.CommandId));
-        Assert.That(result.Result.Content, Is.EqualTo("{\"success\":true}"));
+        Assert.That(result.Execution!.ExecutionId, Is.EqualTo(command.CommandId));
+        Assert.That(result.Result!.Content, Is.EqualTo("{\"success\":true}"));
     }
 
     [TestCase("host")]
@@ -188,7 +210,7 @@ public sealed class InfrastructureCommandConsumerTests
             await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
                 new BasicProperties { Persistent = true }, await SerializeWithCap(command), timeout.Token);
             var result = await consumed;
-            Assert.That(result.Execution.ExecutionId, Is.EqualTo(command.CommandId));
+            Assert.That(result.Execution!.ExecutionId, Is.EqualTo(command.CommandId));
             Assert.That(callbacks.Commands.Single().CommandId, Is.EqualTo(command.CommandId));
             Assert.That(await channel.BasicGetAsync(consumer.QueueName, autoAck: true, timeout.Token), Is.Null);
         }
@@ -239,6 +261,54 @@ public sealed class InfrastructureCommandConsumerTests
         }
     }
 
+    [Test]
+    public async Task LocalRabbitMqTerminalCommandIsAckedWithoutExecutionOrConsumerTeardown()
+    {
+        var portText = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PORT");
+        if (!int.TryParse(portText, out var port))
+            Assert.Ignore("Set AUTOMATON_TEST_RABBITMQ_PORT for an isolated local RabbitMQ instance.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var username = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_USER") ?? "guest";
+        var password = Environment.GetEnvironmentVariable("AUTOMATON_TEST_RABBITMQ_PASSWORD") ?? "guest";
+        var factory = new ConnectionFactory { HostName = "127.0.0.1", Port = port, UserName = username, Password = password, AutomaticRecoveryEnabled = false };
+        await using var connection = await factory.CreateConnectionAsync(timeout.Token);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: timeout.Token);
+        var executor = new TerminalExecutor();
+        var callbacks = new RecordingResultClient();
+        var consumer = new InfrastructureCommandConsumer(identity, executor, callbacks);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RabbitMq:Host"] = "127.0.0.1", ["RabbitMq:Port"] = port.ToString(),
+            ["RabbitMq:Username"] = username, ["RabbitMq:Password"] = password
+        }).Build();
+        await channel.QueueDeclareAsync(consumer.QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: timeout.Token);
+        try
+        {
+            var running = consumer.ConsumeAsync(configuration, timeout.Token);
+            while ((await channel.QueueDeclarePassiveAsync(consumer.QueueName, timeout.Token)).ConsumerCount == 0)
+                await Task.Delay(25, timeout.Token);
+
+            await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
+                new BasicProperties { Persistent = true }, await SerializeWithCap(Command()), timeout.Token);
+            while (executor.Commands.Count < 1)
+                await Task.Delay(25, timeout.Token);
+            Assert.That(await channel.BasicGetAsync(consumer.QueueName, autoAck: true, timeout.Token), Is.Null);
+
+            await channel.BasicPublishAsync("cap.default.router", "infrastructure-command.requested", mandatory: true,
+                new BasicProperties { Persistent = true }, await SerializeWithCap(Command()), timeout.Token);
+            while (executor.Commands.Count < 2)
+                await Task.Delay(25, timeout.Token);
+            Assert.That(callbacks.Commands, Is.Empty);
+
+            timeout.Cancel();
+            Assert.ThrowsAsync<TaskCanceledException>(async () => await running);
+        }
+        finally
+        {
+            await channel.QueueDeleteAsync(consumer.QueueName, ifUnused: false, ifEmpty: false);
+        }
+    }
+
     private InfrastructureCommandRequestedEvent Command()
     {
         var operationId = Guid.NewGuid();
@@ -255,12 +325,13 @@ public sealed class InfrastructureCommandConsumerTests
     private sealed class RecordingExecutor : IInfrastructureActionExecutor
     {
         public List<InfrastructureCommandRequestedEvent> Commands { get; } = [];
-        public Task<(AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result)> ExecuteAsync(
+        public Task<InfrastructureCommandExecutionResult> ExecuteAsync(
             InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken)
         {
             Commands.Add(command);
-            return Task.FromResult((new AppActionExecutionResult { ExecutionId = command.CommandId, Status = AppModuleExecutionStatuses.Succeeded },
-                new AppModuleExecutionArtifactResponse(true, "{\"success\":true}", null, null)));
+            return Task.FromResult(new InfrastructureCommandExecutionResult(
+                new AppActionExecutionResult { ExecutionId = command.CommandId, Status = AppModuleExecutionStatuses.Succeeded },
+                new AppModuleExecutionArtifactResponse(true, "{\"success\":true}", null, null), false, null));
         }
     }
 
@@ -272,6 +343,19 @@ public sealed class InfrastructureCommandConsumerTests
         {
             Commands.Add(command);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TerminalExecutor : IInfrastructureActionExecutor
+    {
+        public List<InfrastructureCommandRequestedEvent> Commands { get; } = [];
+
+        public Task<InfrastructureCommandExecutionResult> ExecuteAsync(
+            InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken)
+        {
+            Commands.Add(command);
+            return Task.FromResult(new InfrastructureCommandExecutionResult(
+                null, null, true, "AmbiguousDispatch"));
         }
     }
 }

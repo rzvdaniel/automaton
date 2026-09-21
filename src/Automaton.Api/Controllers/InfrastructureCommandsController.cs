@@ -14,7 +14,7 @@ public sealed class InfrastructureCommandsController(InfrastructureCommandCallba
     [HttpPost("{commandId:guid}/secrets")]
     public async Task<ActionResult<InfrastructureCommandSecretsResponse>> Secrets(Guid commandId,
         [FromBody] InfrastructureCommandSecretsRequest request, CancellationToken cancellationToken)
-        => Ok(new InfrastructureCommandSecretsResponse(await commands.ResolveSecretsAsync(ApiKeyId(), commandId, request, cancellationToken)));
+        => Ok(await commands.ResolveSecretsAsync(ApiKeyId(), commandId, request, cancellationToken));
 
     [HttpPost("{commandId:guid}/result")]
     public async Task<ActionResult<InfrastructureCommandResultResponse>> Result(Guid commandId,

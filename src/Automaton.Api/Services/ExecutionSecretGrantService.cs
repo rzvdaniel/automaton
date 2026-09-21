@@ -37,7 +37,9 @@ public sealed partial class ExecutionSecretGrantService(
             .Include(x => x.SecretDefinition)
             .FirstOrDefaultAsync(x => x.Id == secretVersionId, cancellationToken)
             ?? throw new KeyNotFoundException("The secret version was not found.");
-        ValidateVersion(version, scope, now);
+        ValidateVersionIdentity(version, scope);
+        if (IsVersionInactive(version, now))
+            throw new UnauthorizedAccessException("The secret version is inactive.");
         if (version.ExpiresAtUtc.HasValue && expiresAtUtc > version.ExpiresAtUtc.Value)
             throw new InvalidOperationException("The grant cannot outlive the secret version.");
 
@@ -62,10 +64,21 @@ public sealed partial class ExecutionSecretGrantService(
         return grant.Id;
     }
 
-    public async Task<ExecutionSecretLease> LeaseAsync(
+    public Task<ExecutionSecretLease> LeaseAsync(
         SecretGrantScope scope,
         IReadOnlyCollection<Guid> grantIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => LeaseInternalAsync(scope, grantIds, cancellationToken, classifyUnavailable: false);
+
+    public Task<ExecutionSecretLease> LeaseForInfrastructureCommandAsync(
+        SecretGrantScope scope,
+        IReadOnlyCollection<Guid> grantIds,
+        CancellationToken cancellationToken) => LeaseInternalAsync(scope, grantIds, cancellationToken, classifyUnavailable: true);
+
+    private async Task<ExecutionSecretLease> LeaseInternalAsync(
+        SecretGrantScope scope,
+        IReadOnlyCollection<Guid> grantIds,
+        CancellationToken cancellationToken,
+        bool classifyUnavailable)
     {
         ValidateScope(scope);
         var ids = grantIds.Where(x => x != Guid.Empty).Distinct().ToArray();
@@ -84,15 +97,19 @@ public sealed partial class ExecutionSecretGrantService(
                 .Where(x => ids.Contains(x.Id))
                 .ToListAsync(cancellationToken);
             if (grants.Count != ids.Length)
-                throw new UnauthorizedAccessException("One or more secret grants were not found.");
+                throw classifyUnavailable
+                    ? new SecretGrantUnavailableException(HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch, ambiguous: false)
+                    : new UnauthorizedAccessException("One or more secret grants were not found.");
 
             var now = DateTime.UtcNow;
             var targets = new HashSet<string>(StringComparer.Ordinal);
             foreach (var grant in grants)
             {
-                ValidateGrant(grant, scope, now);
+                ValidateGrant(grant, scope, now, classifyUnavailable);
                 if (!targets.Add(grant.TargetName))
-                    throw new UnauthorizedAccessException("Secret grants contain duplicate delivery targets.");
+                    throw classifyUnavailable
+                        ? new SecretGrantUnavailableException(HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch, ambiguous: HasDeliveryEvidence(grant))
+                        : new UnauthorizedAccessException("Secret grants contain duplicate delivery targets.");
             }
 
             var leaseExpiresAtUtc = now.Add(LeaseDuration);
@@ -115,7 +132,9 @@ public sealed partial class ExecutionSecretGrantService(
                             .SetProperty(x => x.ReadCount, x => x.ReadCount + 1),
                             cancellationToken);
                     if (claimed != 1)
-                        throw new UnauthorizedAccessException("A secret grant could not be leased.");
+                        throw classifyUnavailable
+                            ? new SecretGrantUnavailableException(HostedRunnerDeploymentErrors.AmbiguousDispatch, ambiguous: true)
+                            : new UnauthorizedAccessException("A secret grant could not be leased.");
                     grant.LeasedAtUtc = now;
                     grant.LeaseExpiresAtUtc = leaseExpiresAtUtc;
                     if (grant.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery)
@@ -183,7 +202,7 @@ public sealed partial class ExecutionSecretGrantService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static void ValidateGrant(ExecutionSecretGrant grant, SecretGrantScope scope, DateTime now)
+    private static void ValidateGrant(ExecutionSecretGrant grant, SecretGrantScope scope, DateTime now, bool classifyUnavailable)
     {
         if (grant.OperationId != scope.OperationId
             || grant.AppId != scope.AppId
@@ -194,27 +213,44 @@ public sealed partial class ExecutionSecretGrantService(
         if (!string.Equals(grant.DeliveryType, SecretDeliveryTypes.EnvironmentVariable, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("The secret delivery type is not supported.");
         if (grant.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery && grant.DeliveredAtUtc.HasValue)
-            throw new UnauthorizedAccessException("A single-delivery secret grant was already disclosed.");
+            throw CreateUnavailable(classifyUnavailable, HostedRunnerDeploymentErrors.AmbiguousDispatch, ambiguous: true,
+                "A single-delivery secret grant was already disclosed.");
         if (grant.ExpiresAtUtc <= now || grant.RevokedAtUtc.HasValue || grant.ConsumedAtUtc.HasValue)
-            throw new UnauthorizedAccessException("A secret grant is expired, revoked, or already consumed.");
+            throw CreateUnavailable(classifyUnavailable,
+                HasDeliveryEvidence(grant) ? HostedRunnerDeploymentErrors.AmbiguousDispatch : HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch,
+                HasDeliveryEvidence(grant), "A secret grant is expired, revoked, or already consumed.");
         if (grant.LeaseExpiresAtUtc > now)
-            throw new UnauthorizedAccessException("A secret grant is already leased.");
+            throw CreateUnavailable(classifyUnavailable, HostedRunnerDeploymentErrors.AmbiguousDispatch, ambiguous: true,
+                "A secret grant is already leased.");
         if (grant.ReadCount >= grant.MaximumReads)
-            throw new UnauthorizedAccessException("A secret grant exceeded its maximum resolution attempts.");
-        ValidateVersion(grant.SecretVersion, scope, now);
+            throw CreateUnavailable(classifyUnavailable,
+                HasDeliveryEvidence(grant) ? HostedRunnerDeploymentErrors.AmbiguousDispatch : HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch,
+                HasDeliveryEvidence(grant), "A secret grant exceeded its maximum resolution attempts.");
+        ValidateVersionIdentity(grant.SecretVersion, scope);
+        if (IsVersionInactive(grant.SecretVersion, now))
+            throw CreateUnavailable(classifyUnavailable,
+                HasDeliveryEvidence(grant) ? HostedRunnerDeploymentErrors.AmbiguousDispatch : HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch,
+                HasDeliveryEvidence(grant), "The secret version is inactive.");
     }
 
-    private static void ValidateVersion(SecretVersion version, SecretGrantScope scope, DateTime now)
+    private static Exception CreateUnavailable(bool classifyUnavailable, string reason, bool ambiguous, string message)
+        => classifyUnavailable ? new SecretGrantUnavailableException(reason, ambiguous) : new UnauthorizedAccessException(message);
+
+    private static bool HasDeliveryEvidence(ExecutionSecretGrant grant)
+        => grant.DeliveredAtUtc.HasValue || grant.LeasedAtUtc.HasValue || grant.ConsumedAtUtc.HasValue || grant.ReadCount > 0;
+
+    private static void ValidateVersionIdentity(SecretVersion version, SecretGrantScope scope)
     {
         var definition = version.SecretDefinition;
-        if (definition.DeletedAtUtc.HasValue
-            || version.RevokedAtUtc.HasValue
-            || version.ExpiresAtUtc.HasValue && version.ExpiresAtUtc.Value <= now)
-            throw new UnauthorizedAccessException("The secret version is inactive.");
         if (!string.Equals(definition.OwnerType, scope.OwnerType, StringComparison.Ordinal)
             || definition.OwnerId != scope.OwnerId)
             throw new UnauthorizedAccessException("The secret owner does not match the requested execution scope.");
     }
+
+    private static bool IsVersionInactive(SecretVersion version, DateTime now)
+        => version.SecretDefinition.DeletedAtUtc.HasValue
+            || version.RevokedAtUtc.HasValue
+            || version.ExpiresAtUtc.HasValue && version.ExpiresAtUtc.Value <= now;
 
     private static void ValidateScope(SecretGrantScope scope)
     {
@@ -226,4 +262,10 @@ public sealed partial class ExecutionSecretGrantService(
 
     [GeneratedRegex("^[A-Z_][A-Z0-9_]{0,199}$", RegexOptions.CultureInvariant)]
     private static partial Regex EnvironmentTargetRegex();
+}
+
+public sealed class SecretGrantUnavailableException(string reason, bool ambiguous) : UnauthorizedAccessException(reason)
+{
+    public string Reason { get; } = reason;
+    public bool Ambiguous { get; } = ambiguous;
 }

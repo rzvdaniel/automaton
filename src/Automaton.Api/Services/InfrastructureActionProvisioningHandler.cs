@@ -20,6 +20,99 @@ public sealed class InfrastructureActionProvisioningHandler(
     IOptions<HostedRunnerOptions> hostedRunnerOptions,
     IOptions<StorageTelemetryOptions> storageTelemetryOptions)
 {
+    private static readonly string[] ActiveDeploymentStatuses =
+    [
+        HostedRunnerDeploymentStatuses.Pending,
+        HostedRunnerDeploymentStatuses.Queued,
+        HostedRunnerDeploymentStatuses.Dispatching,
+        HostedRunnerDeploymentStatuses.Executing,
+        HostedRunnerDeploymentStatuses.Running,
+        HostedRunnerDeploymentStatuses.WaitingForRegistration,
+        HostedRunnerDeploymentStatuses.WaitingForReconnect
+    ];
+
+    internal async Task<bool> TerminalizeUnexecutableAsync(
+        Guid operationId,
+        string actionKey,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var operation = await db.HostedRunnerDeployments
+            .Include(x => x.HostedRunner)
+            .SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("The infrastructure command operation was not found.");
+
+        if (!ActiveDeploymentStatuses.Contains(operation.Status, StringComparer.Ordinal))
+        {
+            if (IsTerminalDeployment(operation.Status)) return true;
+            throw new InvalidOperationException("The infrastructure command operation is not in a terminalizable state.");
+        }
+
+        var now = DateTime.UtcNow;
+        if (db.Database.IsRelational())
+        {
+            var affected = await db.HostedRunnerDeployments
+                .Where(x => x.Id == operationId && ActiveDeploymentStatuses.Contains(x.Status))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
+                    .SetProperty(x => x.Error, reason)
+                    .SetProperty(x => x.FinishedAt, now), cancellationToken);
+            if (affected != 1)
+            {
+                db.ChangeTracker.Clear();
+                var current = await db.HostedRunnerDeployments.AsNoTracking()
+                    .SingleAsync(x => x.Id == operationId, cancellationToken);
+                if (IsTerminalDeployment(current.Status)) return true;
+                throw new InvalidOperationException("The infrastructure command operation changed state during terminalization.");
+            }
+
+            var hostedRunnerAffected = await db.HostedRunners
+                .Where(x => x.Id == operation.HostedRunnerId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, operation.Action == HostedRunnerDeploymentActions.Deprovision
+                        ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed)
+                    .SetProperty(x => x.LastError, reason)
+                    .SetProperty(x => x.UpdatedAt, now), cancellationToken);
+            if (hostedRunnerAffected != 1)
+                throw new InvalidOperationException("The hosted Runner could not be terminalized with its infrastructure command.");
+        }
+        else
+        {
+            operation.Status = HostedRunnerDeploymentStatuses.Failed;
+            operation.Error = reason;
+            operation.FinishedAt = now;
+            operation.HostedRunner.Status = operation.Action == HostedRunnerDeploymentActions.Deprovision
+                ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed;
+            operation.HostedRunner.LastError = reason;
+            operation.HostedRunner.UpdatedAt = now;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var eventType = operation.Action switch
+        {
+            HostedRunnerDeploymentActions.Restart => AuditEventTypes.RunnerRestartFailed,
+            HostedRunnerDeploymentActions.Deprovision => AuditEventTypes.HostedRunnerDeleteFailed,
+            _ => AuditEventTypes.HostedRunnerProvisioningFailed
+        };
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Failed,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = operation.HostedRunnerId,
+            EventType = eventType,
+            Outcome = AuditOutcomes.Failed,
+            Message = $"Hosted runner '{operation.HostedRunner.Name}' infrastructure command was terminalized without execution.",
+            TargetUserId = operation.HostedRunner.UserId,
+            Metadata = new { OperationId = operationId, operation.Action, ActionKey = actionKey, Reason = reason },
+            FailOnError = true
+        }, cancellationToken);
+        return true;
+    }
+
+    private static bool IsTerminalDeployment(string status) => status is
+        HostedRunnerDeploymentStatuses.Succeeded or HostedRunnerDeploymentStatuses.Failed
+        or HostedRunnerDeploymentStatuses.Skipped;
+
     internal async Task ApplySuccessfulOperationAsync(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,

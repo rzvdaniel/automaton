@@ -17,16 +17,22 @@ public sealed class InfrastructureCommandApiClient(
     IConfiguration configuration,
     FileStorageService storage) : IInfrastructureSecretProvider, IInfrastructureCommandResultClient
 {
-    public async Task<IReadOnlyDictionary<string, string>> ResolveAsync(
+    public async Task<InfrastructureCommandSecretsResponse> ResolveAsync(
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken)
     {
         using var client = await CreateClientAsync(cancellationToken);
         using var response = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(client, $"api/infrastructure-commands/{command.CommandId}/secrets",
             new InfrastructureCommandSecretsRequest(command.OperationId, command.RunnerHostId,
                 command.InfrastructureRunnerId, command.ActionKey, command.SecretGrantIds), cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            Serilog.Log.Warning(
+                "Infrastructure command secret resolution failed for {CommandId}: HTTP {StatusCode}",
+                command.CommandId, (int)response.StatusCode);
+            response.EnsureSuccessStatusCode();
+        }
         var body = await response.Content.ReadFromJsonAsync<InfrastructureCommandSecretsResponse>(cancellationToken);
-        return body?.EnvironmentVariables ?? throw new InvalidOperationException("The API returned no infrastructure command secrets.");
+        return ValidateSecretResolutionResponse(body);
     }
 
     public async Task SubmitAsync(InfrastructureCommandRequestedEvent command, AppActionExecutionResult execution,
@@ -62,9 +68,25 @@ public sealed class InfrastructureCommandApiClient(
             && response != null
             && InfrastructureCommandResultOutcomes.IsAckable(response.Outcome);
 
+    internal static InfrastructureCommandSecretsResponse ValidateSecretResolutionResponse(
+        InfrastructureCommandSecretsResponse? response)
+    {
+        if (response == null)
+            throw new InvalidOperationException("The API returned no infrastructure command secret resolution.");
+        if (response.Disposition is not (InfrastructureCommandSecretResolutionDispositions.Executable
+            or InfrastructureCommandSecretResolutionDispositions.Terminal))
+            throw new InvalidOperationException("The API returned an unknown infrastructure command secret disposition.");
+        if (response.Disposition == InfrastructureCommandSecretResolutionDispositions.Executable
+            && response.EnvironmentVariables == null)
+            throw new InvalidOperationException("The API returned no infrastructure command secrets.");
+        if (response.Disposition == InfrastructureCommandSecretResolutionDispositions.Terminal
+            && string.IsNullOrWhiteSpace(response.TerminalReason))
+            throw new InvalidOperationException("The API returned a terminal secret disposition without a reason.");
+        return response;
+    }
+
     private sealed record InfrastructureCommandSecretsRequest(Guid OperationId, Guid RunnerHostId,
         Guid InfrastructureRunnerId, string ActionKey, IReadOnlyList<Guid> SecretGrantIds);
-    private sealed record InfrastructureCommandSecretsResponse(IReadOnlyDictionary<string, string> EnvironmentVariables);
     private sealed record InfrastructureCommandResultRequest(Guid OperationId, Guid RunnerHostId,
         Guid InfrastructureRunnerId, string ActionKey, IReadOnlyList<Guid> SecretGrantIds,
         AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result);

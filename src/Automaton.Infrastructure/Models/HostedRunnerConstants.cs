@@ -139,4 +139,6 @@ public static class HostedRunnerDeploymentErrors
     public const string RestartReconnectTimedOut = "The restart command succeeded, but the hosted Runner did not reconnect and heartbeat before the deadline.";
     public const string LifecycleExecutionFailed = "The infrastructure Action execution ended before the hosted Runner lifecycle operation completed.";
     public const string LifecycleResultAmbiguous = "The infrastructure Action succeeded, but its lifecycle result was not durably applied.";
+    public const string SecretGrantUnavailableBeforeDispatch = "SecretGrantUnavailableBeforeDispatch";
+    public const string AmbiguousDispatch = "AmbiguousDispatch";
 }
