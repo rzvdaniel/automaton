@@ -95,6 +95,17 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Docker data root"):
                 ACTION.main()
 
+    def test_missing_volume_is_a_measurement_failure(self):
+        def host(*args, **kwargs):
+            if args[:3] == ("docker", "info", "--format"):
+                return subprocess.CompletedProcess(args, 0, "/var/lib/docker\n", "")
+            if args[:3] == ("docker", "volume", "inspect"):
+                return subprocess.CompletedProcess(args, 1, "", "volume not found")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        with self.assertRaisesRegex(RuntimeError, "volume not found"):
+            self.run_action(self.request(), host)
+
 
 if __name__ == "__main__":
     unittest.main()

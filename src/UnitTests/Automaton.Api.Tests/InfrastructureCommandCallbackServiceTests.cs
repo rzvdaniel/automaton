@@ -43,6 +43,103 @@ public sealed class InfrastructureCommandCallbackServiceTests
     }
 
     [Test]
+    public async Task FailedStorageMeasurementTerminalizesVerificationWithoutFailingRunnerLifecycle()
+    {
+        await using var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
+            RunnerHostId = host.Id, Status = HostedRunnerStatuses.Running, StorageState = HostedRunnerStorageStates.Healthy
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
+            Action = HostedRunnerDeploymentActions.VerifyStorage, Status = HostedRunnerDeploymentStatuses.Dispatching
+        };
+        db.AddRange(runner, host, hosted, deployment);
+        db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+        {
+            Id = deployment.Id, HostedRunnerId = hosted.Id, IdempotencyKey = "verification",
+            Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
+        });
+        await db.SaveChangesAsync();
+
+        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "expected volume is not provisioned") with
+            { ActionKey = StorageTelemetryActions.MeasureHostedRunnerStorage }, CancellationToken.None);
+
+        var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
+        var persistedRunner = await db.HostedRunners.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
+            Assert.That(verification.Error, Is.EqualTo("expected volume is not provisioned"));
+            Assert.That(persistedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Running));
+            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
+            Assert.That(persistedRunner.StorageState, Is.EqualTo(HostedRunnerStorageStates.MeasurementFailed));
+        });
+    }
+
+    [Test]
+    public async Task SuccessfulStorageMeasurementCompletesVerification()
+    {
+        await using var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
+            RunnerHostId = host.Id, Status = HostedRunnerStatuses.Running, StorageAllowanceBytes = 1_000
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
+            Action = HostedRunnerDeploymentActions.VerifyStorage, Status = HostedRunnerDeploymentStatuses.Dispatching
+        };
+        db.AddRange(runner, host, hosted, deployment);
+        db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+        {
+            Id = deployment.Id, HostedRunnerId = hosted.Id, IdempotencyKey = "verification",
+            Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
+        });
+        await db.SaveChangesAsync();
+
+        var lifecycle = new InfrastructureActionProvisioningHandler(
+            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
+        var service = new InfrastructureCommandCallbackService(db, null!, lifecycle);
+        var request = new InfrastructureCommandResultRequest(
+            deployment.Id, host.Id, runner.Id, StorageTelemetryActions.MeasureHostedRunnerStorage, [],
+            new AppActionExecutionResult
+            {
+                ExecutionId = deployment.Id, Status = AppModuleExecutionStatuses.Succeeded,
+                StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow
+            },
+            new AppModuleExecutionArtifactResponse(true,
+                "{\"success\":true,\"systemBytes\":0,\"userBytes\":100,\"totalBytes\":100,\"usageSource\":\"xfs-project-quota\"}", null, null));
+
+        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
+        var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
+        var persistedDeployment = await db.HostedRunnerDeployments.SingleAsync();
+        var persistedRunner = await db.HostedRunners.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Succeeded));
+            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
+            Assert.That(persistedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
+            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Succeeded));
+        });
+    }
+
+    [Test]
     public async Task TerminalDeploymentWithoutExecutionIsTerminalStaleWithoutMutation()
     {
         await using var db = CreateDb();

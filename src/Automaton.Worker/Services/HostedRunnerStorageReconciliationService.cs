@@ -257,7 +257,8 @@ public sealed class HostedRunnerStorageReconciliationService(
             .Include(x => x.HostedRunner)
                 .ThenInclude(x => x.RunnerHost)
             .Where(x => x.Status == StorageVerificationStatuses.Pending &&
-                x.HostedRunner.RunnerHostId != null && x.HostedRunner.DeletedAt == null)
+                x.HostedRunner.RunnerHostId != null && x.HostedRunner.DeletedAt == null &&
+                x.HostedRunner.Status == HostedRunnerStatuses.Running && x.HostedRunner.ContainerId != null)
             .ToListAsync(cancellationToken) : [];
         var maxPerHost = Math.Clamp(telemetryOptions.Value.MaxVerificationDispatchesPerHost, 1, 20);
         var candidatesByHost = pending.GroupBy(x => x.HostedRunner.RunnerHostId!.Value)

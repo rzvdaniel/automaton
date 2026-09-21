@@ -79,6 +79,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             var runner = new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                Status = HostedRunnerStatuses.Running, ContainerId = "container",
                 StorageMeasuredAtUtc = DateTime.UtcNow, StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageState = HostedRunnerStorageStates.Healthy
             };
@@ -121,6 +122,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                Status = HostedRunnerStatuses.Running, ContainerId = "container",
                 StorageProjectId = 1_234_568,
                 StorageMeasuredAtUtc = DateTime.UtcNow, StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageState = HostedRunnerStorageStates.Healthy
@@ -184,6 +186,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                Status = HostedRunnerStatuses.Running, ContainerId = "container",
                 StorageProjectId = 1_234_567,
                 StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow
@@ -272,6 +275,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                Status = HostedRunnerStatuses.Running, ContainerId = "container",
                 StorageProjectId = 1_234_569,
                 StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow
@@ -307,6 +311,92 @@ public class HostedRunnerStorageReconciliationServiceTests
                 Is.EqualTo(StorageVerificationStatuses.Pending));
             Assert.That(publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single().CommandId, Is.EqualTo(olderId));
         });
+    }
+
+    [Test]
+    public async Task ProvisioningRunner_DefersPendingVerificationUntilContainerExists()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var verificationId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                Status = HostedRunnerStatuses.Provisioning, StorageProjectId = 1_234_571,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasuredAtUtc = DateTime.UtcNow
+            });
+            db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+            {
+                Id = verificationId, HostedRunnerId = runnerId, IdempotencyKey = "provisioning",
+                Status = StorageVerificationStatuses.Pending, RequestedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions()));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(verifyDb.HostedRunnerStorageVerifications.Single(x => x.Id == verificationId).Status,
+                Is.EqualTo(StorageVerificationStatuses.Pending));
+            Assert.That(publisher.Messages, Is.Empty);
+            Assert.That(verifyDb.HostedRunnerDeployments, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task FailedVerification_IsNotRepublished()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner",
+                RunnerHostId = hostId, Status = HostedRunnerStatuses.Running, ContainerId = "container",
+                StorageProjectId = 1_234_572, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasuredAtUtc = DateTime.UtcNow
+            });
+            db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+            {
+                Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "failed",
+                Status = StorageVerificationStatuses.Failed, RequestedAtUtc = DateTime.UtcNow,
+                CompletedAtUtc = DateTime.UtcNow, Error = "volume not found", Reason = "AdministratorRequested"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = new RecordingPublisher();
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), publisher, new NoOpTransactionalEventExecutor(),
+            Options.Create(new StorageTelemetryOptions()));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        Assert.That(publisher.Messages, Is.Empty);
     }
 
     [Test]
@@ -375,7 +465,8 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = hostedRunnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner",
-                RunnerHostId = hostId, StorageProjectId = 1_234_570, StorageState = HostedRunnerStorageStates.Healthy,
+                RunnerHostId = hostId, Status = HostedRunnerStatuses.Running, ContainerId = "container",
+                StorageProjectId = 1_234_570, StorageState = HostedRunnerStorageStates.Healthy,
                 StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow.AddHours(-3)
             });
