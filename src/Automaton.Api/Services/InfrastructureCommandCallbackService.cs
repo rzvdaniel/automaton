@@ -7,23 +7,58 @@ using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Automaton.Messaging.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Automaton.Api.Services;
 
 public sealed class InfrastructureCommandCallbackService(
     ApplicationDbContext db,
     IExecutionSecretGrantService secretGrants,
-    InfrastructureActionProvisioningHandler lifecycle)
+    InfrastructureActionProvisioningHandler lifecycle,
+    ITransactionalEventExecutor? transactionalEventExecutor = null,
+    ILogger<InfrastructureCommandCallbackService>? logger = null)
 {
-    public async Task<IReadOnlyDictionary<string, string>> ResolveSecretsAsync(Guid apiKeyId,
+    public async Task<InfrastructureCommandSecretsResponse> ResolveSecretsAsync(Guid apiKeyId,
         Guid commandId, InfrastructureCommandSecretsRequest request, CancellationToken cancellationToken)
     {
         var scope = await AuthorizeAsync(apiKeyId, commandId, request.OperationId, request.RunnerHostId,
             request.InfrastructureRunnerId, request.ActionKey, cancellationToken);
-        var lease = await secretGrants.LeaseAsync(scope, request.SecretGrantIds, cancellationToken);
-        return lease.EnvironmentVariables;
+        var deployment = await db.HostedRunnerDeployments.AsNoTracking()
+            .SingleAsync(x => x.Id == request.OperationId, cancellationToken);
+        if (IsTerminalDeployment(deployment.Status))
+            return TerminalSecretResolution(deployment.Error ?? HostedRunnerDeploymentErrors.AmbiguousDispatch);
+
+        try
+        {
+            var lease = await secretGrants.LeaseForInfrastructureCommandAsync(scope, request.SecretGrantIds, cancellationToken);
+            return new(InfrastructureCommandSecretResolutionDispositions.Executable, lease.EnvironmentVariables);
+        }
+        catch (SecretGrantUnavailableException exception)
+        {
+            await TerminalizeAsync(request.OperationId, request.ActionKey, exception.Reason, cancellationToken);
+            logger?.LogWarning(
+                "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized during secret resolution: {DispositionReason}; ambiguous={Ambiguous}",
+                commandId, request.OperationId, request.ActionKey, exception.Reason, exception.Ambiguous);
+            return TerminalSecretResolution(exception.Reason);
+        }
     }
+
+    private async Task TerminalizeAsync(Guid operationId, string actionKey, string reason, CancellationToken cancellationToken)
+    {
+        if (transactionalEventExecutor != null)
+        {
+            await transactionalEventExecutor.ExecuteAsync(
+                token => lifecycle.TerminalizeUnexecutableAsync(operationId, actionKey, reason, token), cancellationToken);
+            return;
+        }
+
+        await lifecycle.TerminalizeUnexecutableAsync(operationId, actionKey, reason, cancellationToken);
+    }
+
+    private static InfrastructureCommandSecretsResponse TerminalSecretResolution(string reason)
+        => new(InfrastructureCommandSecretResolutionDispositions.Terminal, new Dictionary<string, string>(), reason);
 
     public async Task<InfrastructureCommandResultResponse> ApplyResultAsync(Guid apiKeyId,
         Guid commandId, InfrastructureCommandResultRequest request, CancellationToken cancellationToken)
@@ -156,7 +191,6 @@ public sealed class InfrastructureCommandCallbackService(
 
 public sealed record InfrastructureCommandSecretsRequest(Guid OperationId, Guid RunnerHostId,
     Guid InfrastructureRunnerId, string ActionKey, IReadOnlyList<Guid> SecretGrantIds);
-public sealed record InfrastructureCommandSecretsResponse(IReadOnlyDictionary<string, string> EnvironmentVariables);
 public sealed record InfrastructureCommandResultRequest(Guid OperationId, Guid RunnerHostId,
     Guid InfrastructureRunnerId, string ActionKey, IReadOnlyList<Guid> SecretGrantIds,
     AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result);

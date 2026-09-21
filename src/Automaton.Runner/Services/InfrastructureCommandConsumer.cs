@@ -20,7 +20,7 @@ public sealed class InfrastructureCommandConsumer(
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     public string QueueName => $"automaton.infrastructure.{identity.RunnerHostId:N}";
 
-    public async Task<(AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result)> HandleAsync(
+    public async Task<InfrastructureCommandExecutionResult> HandleAsync(
         ReadOnlyMemory<byte> body, CancellationToken cancellationToken = default)
     {
         var command = JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(body.Span, JsonOptions)
@@ -36,7 +36,7 @@ public sealed class InfrastructureCommandConsumer(
         return await executor.ExecuteAsync(command, cancellationToken);
     }
 
-    public async Task<(AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result)> ConsumeOneAsync(
+    public async Task<InfrastructureCommandExecutionResult> ConsumeOneAsync(
         IConfiguration configuration, CancellationToken cancellationToken)
     {
         var factory = new ConnectionFactory
@@ -55,7 +55,7 @@ public sealed class InfrastructureCommandConsumer(
         await channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
         await channel.QueueBindAsync(QueueName, exchange, EventTopics.InfrastructureCommandRequested, cancellationToken: cancellationToken);
         await channel.BasicQosAsync(0, 1, global: false, cancellationToken);
-        var completion = new TaskCompletionSource<(AppActionExecutionResult, AppModuleExecutionArtifactResponse)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<InfrastructureCommandExecutionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (_, delivery) =>
         {
@@ -63,7 +63,16 @@ public sealed class InfrastructureCommandConsumer(
             {
                 var result = await HandleAsync(delivery.Body, cancellationToken);
                 var command = JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(delivery.Body.Span, JsonOptions)!;
-                await results.SubmitAsync(command, result.Execution, result.Result, cancellationToken);
+                if (result.Terminal)
+                {
+                    Serilog.Log.Warning(
+                        "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized before Action execution: {TerminalReason}",
+                        command.CommandId, command.OperationId, command.ActionKey, result.TerminalReason);
+                    await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+                    completion.TrySetResult(result);
+                    return;
+                }
+                await results.SubmitAsync(command, result.Execution!, result.Result!, cancellationToken);
                 await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
                 completion.TrySetResult(result);
             }
@@ -106,9 +115,17 @@ public sealed class InfrastructureCommandConsumer(
         {
             try
             {
-                var result = await HandleAsync(delivery.Body, cancellationToken);
                 var command = JsonSerializer.Deserialize<InfrastructureCommandRequestedEvent>(delivery.Body.Span, JsonOptions)!;
-                await results.SubmitAsync(command, result.Execution, result.Result, cancellationToken);
+                var result = await HandleAsync(delivery.Body, cancellationToken);
+                if (result.Terminal)
+                {
+                    Serilog.Log.Warning(
+                        "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized before Action execution: {TerminalReason}",
+                        command.CommandId, command.OperationId, command.ActionKey, result.TerminalReason);
+                    await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+                    return;
+                }
+                await results.SubmitAsync(command, result.Execution!, result.Result!, cancellationToken);
                 await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
             }
             catch (UnauthorizedAccessException exception) when (IsWrongAddress(exception))
