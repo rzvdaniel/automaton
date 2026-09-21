@@ -6,6 +6,7 @@ using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Automaton.Messaging.Abstractions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -307,6 +308,21 @@ public sealed class InfrastructureCommandCallbackServiceTests
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
     }
 
+    [Test]
+    public async Task TerminalResponseRequiresPersistedTerminalDeployment()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Dispatching, expired: true,
+            transactionalEventExecutor: new NoOpTransactionalEventExecutor());
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ResolveSecretsAsync(
+            fixture.ApiKeyId, fixture.Deployment.Id, SecretsRequest(fixture, fixture.GrantId), CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("could not be confirmed as durably persisted"));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));
+    }
+
     private static InfrastructureCommandSecretsRequest SecretsRequest(
         ResolutionFixture fixture, Guid grantId) => new(
             fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id,
@@ -317,7 +333,8 @@ public sealed class InfrastructureCommandCallbackServiceTests
         string status = HostedRunnerDeploymentStatuses.Dispatching,
         bool expired = false,
         bool delivered = false,
-        bool consumed = false)
+        bool consumed = false,
+        ITransactionalEventExecutor? transactionalEventExecutor = null)
     {
         var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
         var store = new SecretStore(db, protector);
@@ -350,7 +367,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var lifecycle = new InfrastructureActionProvisioningHandler(
             db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
         return new(apiKeyId, runner, host, hosted, deployment, grantId,
-            new InfrastructureCommandCallbackService(db, grants, lifecycle));
+            new InfrastructureCommandCallbackService(db, grants, lifecycle, transactionalEventExecutor));
     }
 
     private static InfrastructureCommandResultRequest Request(Guid operationId, Guid hostId, Guid runnerId, string failure) => new(
@@ -376,6 +393,12 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
         public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null,
             string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoOpTransactionalEventExecutor : ITransactionalEventExecutor
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
 }

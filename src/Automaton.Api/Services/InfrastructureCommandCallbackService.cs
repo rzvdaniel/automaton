@@ -37,24 +37,37 @@ public sealed class InfrastructureCommandCallbackService(
         }
         catch (SecretGrantUnavailableException exception)
         {
-            await TerminalizeAsync(request.OperationId, request.ActionKey, exception.Reason, cancellationToken);
+            var terminalReason = await TerminalizeAsync(request.OperationId, request.ActionKey,
+                exception.Reason, cancellationToken);
             logger?.LogWarning(
                 "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized during secret resolution: {DispositionReason}; ambiguous={Ambiguous}",
-                commandId, request.OperationId, request.ActionKey, exception.Reason, exception.Ambiguous);
-            return TerminalSecretResolution(exception.Reason);
+                commandId, request.OperationId, request.ActionKey, terminalReason, exception.Ambiguous);
+            return TerminalSecretResolution(terminalReason);
         }
     }
 
-    private async Task TerminalizeAsync(Guid operationId, string actionKey, string reason, CancellationToken cancellationToken)
+    private async Task<string> TerminalizeAsync(Guid operationId, string actionKey, string reason,
+        CancellationToken cancellationToken)
     {
         if (transactionalEventExecutor != null)
         {
             await transactionalEventExecutor.ExecuteAsync(
                 token => lifecycle.TerminalizeUnexecutableAsync(operationId, actionKey, reason, token), cancellationToken);
-            return;
+        }
+        else
+        {
+            await lifecycle.TerminalizeUnexecutableAsync(operationId, actionKey, reason, cancellationToken);
         }
 
-        await lifecycle.TerminalizeUnexecutableAsync(operationId, actionKey, reason, cancellationToken);
+        db.ChangeTracker.Clear();
+        var persisted = await db.HostedRunnerDeployments.AsNoTracking()
+            .SingleAsync(x => x.Id == operationId, cancellationToken);
+        if (!IsTerminalDeployment(persisted.Status) || persisted.FinishedAt is null
+            || persisted.Status == HostedRunnerDeploymentStatuses.Failed && string.IsNullOrWhiteSpace(persisted.Error))
+            throw new InvalidOperationException(
+                "Infrastructure command terminalization could not be confirmed as durably persisted.");
+
+        return persisted.Error ?? HostedRunnerDeploymentErrors.AmbiguousDispatch;
     }
 
     private static InfrastructureCommandSecretsResponse TerminalSecretResolution(string reason)
