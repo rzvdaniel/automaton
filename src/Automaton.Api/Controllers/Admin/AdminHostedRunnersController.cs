@@ -59,6 +59,8 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
+        if (runner.Status != HostedRunnerStatuses.Running || string.IsNullOrWhiteSpace(runner.ContainerId))
+            return Conflict(new { message = "Storage verification is available only after the Hosted Runner is running and its container is provisioned." });
         var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
         var key = $"storage-verification:{id:N}:admin:{window}";
         var existing = await db.HostedRunnerStorageVerifications

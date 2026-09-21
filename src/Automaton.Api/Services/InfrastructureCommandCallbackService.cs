@@ -120,13 +120,30 @@ public sealed class InfrastructureCommandCallbackService(
         }
         else
         {
+            var isStorageMeasurement = request.ActionKey == StorageTelemetryActions.MeasureHostedRunnerStorage;
             deployment.Status = HostedRunnerDeploymentStatuses.Failed;
             deployment.Error = execution.FailureSummary ?? execution.ErrorCode ?? "Infrastructure Action failed.";
             deployment.FinishedAt = DateTime.UtcNow;
-            deployment.HostedRunner.Status = request.ActionKey == "delete-hosted-runner"
-                ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed;
-            deployment.HostedRunner.LastError = deployment.Error;
-            deployment.HostedRunner.UpdatedAt = DateTime.UtcNow;
+            if (isStorageMeasurement)
+            {
+                var verification = await db.HostedRunnerStorageVerifications
+                    .SingleOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
+                    ?? throw new InvalidOperationException("Storage verification request was not found.");
+                verification.Status = StorageVerificationStatuses.Failed;
+                verification.CompletedAtUtc = deployment.FinishedAt;
+                verification.Error = Truncate(deployment.Error, 2000);
+                deployment.HostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Failed;
+                deployment.HostedRunner.StorageMeasurementError = verification.Error;
+                deployment.HostedRunner.StorageState = HostedRunnerStorageStates.MeasurementFailed;
+                deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
+            }
+            else
+            {
+                deployment.HostedRunner.Status = request.ActionKey == "delete-hosted-runner"
+                    ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed;
+                deployment.HostedRunner.LastError = deployment.Error;
+                deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
+            }
         }
         if (request.SecretGrantIds.Count > 0)
             await secretGrants.MarkConsumedAsync(request.SecretGrantIds, cancellationToken);
@@ -200,6 +217,8 @@ public sealed class InfrastructureCommandCallbackService(
             request.InfrastructureRunnerId, request.ActionKey, request.Execution, request.Result.Content });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
     }
+
+    private static string Truncate(string value, int maximum) => value.Length <= maximum ? value : value[..maximum];
 }
 
 public sealed record InfrastructureCommandSecretsRequest(Guid OperationId, Guid RunnerHostId,
