@@ -1864,6 +1864,9 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("varchar(32)")
                         .HasDefaultValue("NeverMeasured");
 
+                    b.Property<int?>("StorageProjectId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("StorageReceivedAtUtc")
                         .HasColumnType("datetime(6)");
 
@@ -1944,6 +1947,9 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RunnerId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("StorageProjectId")
+                        .IsUnique();
 
                     b.HasIndex("UserId");
 

@@ -1114,6 +1114,7 @@ public partial class HostedRunnerAuditTests
             ContainerName = "automaton-hosted-runner-test",
             HostedRunnerSpecificationId = specificationId,
             SpecificationRevision = 1,
+            StorageProjectId = 1_000_000 + db.HostedRunners.Count(),
             CreatedAt = DateTime.UtcNow
         };
 

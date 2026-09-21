@@ -47,6 +47,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         var runner = new HostedRunner
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerHostId = host.Id, RunnerHost = host,
+            StorageProjectId = 1234567,
             Name = "managed-test", ContainerName = "automaton-managed-test",
             Status = HostedRunnerStatuses.Provisioning,
             SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
@@ -108,6 +109,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             Assert.That(input.RootElement.GetProperty("runtimeHostAddress").GetString(), Is.EqualTo("10.20.30.40"));
             Assert.That(input.RootElement.GetProperty("cpuLimit").GetDecimal(), Is.EqualTo(1));
             Assert.That(input.RootElement.GetProperty("memoryMb").GetInt32(), Is.EqualTo(1024));
+            Assert.That(input.RootElement.GetProperty("diskLimitMb").GetInt32(), Is.EqualTo(4096));
+            Assert.That(input.RootElement.GetProperty("xfsProjectId").GetInt32(), Is.EqualTo(1234567));
             Assert.That(input.RootElement.GetProperty("pidsLimit").GetInt32(), Is.EqualTo(256));
             Assert.That(input.RootElement.GetProperty("sharedMemoryMb").GetInt32(), Is.EqualTo(96));
             Assert.That(input.RootElement.GetProperty("dockerLogMaxSizeMb").GetInt32(), Is.EqualTo(20));

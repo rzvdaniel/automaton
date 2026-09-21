@@ -130,7 +130,7 @@ onMounted(load)
         <div class="col-6"><label class="block text-sm mb-1">CPU limit</label><InputNumber v-model="form.resources.cpuLimit" :min="0.1" :max="8" :min-fraction-digits="2" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Memory MB</label><InputNumber v-model="form.resources.memoryLimitMb" :min="256" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Reservation MB</label><InputNumber v-model="form.resources.memoryReservationMb" :min="64" class="w-full" /></div>
-        <div class="col-6"><label class="block text-sm mb-1">Storage allowance MB</label><InputNumber v-model="form.resources.diskLimitMb" :min="512" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Storage hard quota MB</label><InputNumber v-model="form.resources.diskLimitMb" :min="512" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">PID limit</label><InputNumber v-model="form.resources.pidsLimit" :min="32" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Shared memory MB</label><InputNumber v-model="form.resources.sharedMemoryMb" :min="16" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Docker log file MB</label><InputNumber v-model="form.resources.dockerLogMaxSizeMb" :min="1" class="w-full" /></div>

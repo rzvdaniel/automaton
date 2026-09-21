@@ -26,6 +26,7 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
             "runnerHostId": self.host_id,
             "expectedSystemVolumeName": f"automaton-hosted-runner-{compact}-system",
             "expectedUserVolumeName": f"automaton-hosted-runner-{compact}-user",
+            "xfsProjectId": 1234567,
         }
 
     def run_action(self, request, host):
@@ -72,14 +73,21 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                     "Mountpoint": f"/data/docker/volumes/{args[3]}/_data",
                 }]
                 return subprocess.CompletedProcess(args, 0, json.dumps(metadata), "")
-            value = "100" if calls.count(args) == 1 else "200"
-            return subprocess.CompletedProcess(args, 0, f"{value}\tpath\n", "")
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            if args[:2] == ("findmnt", "-no"):
+                return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
+            if args[:2] == ("xfs_quota", "-x") and "state" in args:
+                return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
+            if args[:2] == ("xfs_quota", "-x"):
+                return subprocess.CompletedProcess(args, 0, "#1234567 64 0 512\n", "")
+            return subprocess.CompletedProcess(args, 0, "", "")
 
         result = self.run_action(self.request(), host)
         self.assertTrue(result["success"])
         self.assertEqual(result["totalBytes"], result["systemBytes"] + result["userBytes"])
         self.assertEqual(sum(1 for call in calls if call[:3] == ("docker", "volume", "inspect")), 2)
-        self.assertEqual(sum(1 for call in calls if call[0] == "du"), 2)
+        self.assertEqual(sum(1 for call in calls if call[:2] == ("xfs_quota", "-x")), 3)
 
     def test_rejects_missing_docker_root(self):
         with patch.object(ACTION.sys, "stdin", io.StringIO(json.dumps(self.request()))), \
