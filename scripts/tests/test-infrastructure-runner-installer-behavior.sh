@@ -173,6 +173,8 @@ grep -Fq 'Update failed; rollback also failed. Manual recovery is required.' "$T
 TEST_REPOSITORY='localhost:5000/automaton/runner'
 TEST_PINNED_IMAGE="$TEST_REPOSITORY@sha256:$TEST_DIGEST"
 TEST_TAGGED_IMAGE='registry.example.test:5443/automaton/runner:release-2026.09'
+TEST_COMMIT_TAG='rzvdaniel/automaton-runner:sha-365e74079bd45d6400616c3bd3db7e7668c3741b'
+TEST_ACCEPTANCE_PINNED_IMAGE='rzvdaniel/automaton-runner@sha256:93b91a7a2746b1cb983c9fc9094437e8cd9ddbf2809caf24abb0c58200acb70f'
 printf '{"InstallationId":"test-installation-id"}\n' >"$TMP/data/config/installation-profile.json"
 printf '{"RunnerId":"test-runner-id","RunnerHostId":"test-runner-host-id"}\n' >"$TMP/data/config/runner.json"
 printf 'test-installation-id\n' >"$TMP/data/config/installation-id"
@@ -189,6 +191,16 @@ grep -Fq -- "--label automaton.runner-version=$TEST_DIGEST" "$LOG" || {
 : >"$LOG"
 MOCK_REPO_DIGEST="$TEST_REPOSITORY@sha256:$TEST_DIGEST" AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" update --data-root "$TMP/data" --server-url https://api.example.test --version "$TEST_TAGGED_IMAGE"
 grep -Fq "pull $TEST_TAGGED_IMAGE" "$LOG"
+
+: >"$LOG"
+MOCK_REPO_DIGEST="$TEST_PINNED_IMAGE" AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" update --data-root "$TMP/data" --server-url https://api.example.test --version "$TEST_COMMIT_TAG"
+grep -Fq "pull $TEST_COMMIT_TAG" "$LOG"
+grep -Fq "run -d --name automaton-infrastructure-runner" "$LOG"
+
+: >"$LOG"
+MOCK_REPO_DIGEST="$TEST_ACCEPTANCE_PINNED_IMAGE" AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" update --data-root "$TMP/data" --server-url https://api.example.test --version "$TEST_ACCEPTANCE_PINNED_IMAGE"
+grep -Fq "pull $TEST_ACCEPTANCE_PINNED_IMAGE" "$LOG"
+grep -Fq "run -d --name automaton-infrastructure-runner" "$LOG"
 
 expect_invalid_image_reference() {
   local image="$1" name="$2"
@@ -214,6 +226,10 @@ expect_invalid_image_reference() {
 expect_invalid_image_reference "sha256:$TEST_DIGEST" bare-digest
 expect_invalid_image_reference "$TEST_REPOSITORY@sha256:${TEST_DIGEST%?}" malformed-digest
 expect_invalid_image_reference $'example/runner@sha256:'"$TEST_DIGEST"$'\r' crlf-contaminated
+expect_invalid_image_reference "$TEST_REPOSITORY" missing-tag-or-digest
+expect_invalid_image_reference ';rm -rf /' shell-metacharacters
+expect_invalid_image_reference '$(command)' command-substitution
+expect_invalid_image_reference '' empty-reference
 
 : >"$LOG"
 if MOCK_PULL_FAIL=1 AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" update --data-root "$TMP/data" --server-url https://api.example.test --version "$TEST_TAGGED_IMAGE" >"$TMP/pull-failure.out" 2>&1; then

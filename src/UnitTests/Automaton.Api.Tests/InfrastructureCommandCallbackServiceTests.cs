@@ -1,10 +1,14 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Config;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Tests;
 
@@ -12,7 +16,7 @@ namespace Automaton.Api.Tests;
 public sealed class InfrastructureCommandCallbackServiceTests
 {
     [Test]
-    public async Task FailedResultIsAppliedOnceAndConflictsAreRejected()
+    public async Task FailedResultIsAppliedOnceAndConflictsBecomeTerminalStale()
     {
         await using var db = CreateDb();
         var apiKeyId = Guid.NewGuid();
@@ -28,12 +32,39 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var first = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
         var duplicate = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
 
-        Assert.That(first.AlreadyCompleted, Is.False);
-        Assert.That(duplicate.AlreadyCompleted, Is.True);
+        Assert.That(first.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+        Assert.That(duplicate.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.AlreadyApplied));
         Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
         Assert.That((await db.AppModuleExecutions.SingleAsync()).Id, Is.EqualTo(deployment.Id));
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.ApplyResultAsync(apiKeyId, deployment.Id,
-            Request(deployment.Id, host.Id, runner.Id, "different failure"), CancellationToken.None));
+        var stale = await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "different failure"), CancellationToken.None);
+        Assert.That(stale.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
+    }
+
+    [Test]
+    public async Task TerminalDeploymentWithoutExecutionIsTerminalStaleWithoutMutation()
+    {
+        await using var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Failed };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
+            Action = HostedRunnerDeploymentActions.Reprovision, Status = HostedRunnerDeploymentStatuses.Failed
+        };
+        db.AddRange(runner, host, hosted, deployment);
+        await db.SaveChangesAsync();
+
+        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
+            Request(deployment.Id, host.Id, runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
+            CancellationToken.None);
+
+        Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
     }
 
     [Test]
@@ -140,6 +171,188 @@ public sealed class InfrastructureCommandCallbackServiceTests
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
     }
 
+    [Test]
+    public async Task ValidGrantReturnsExecutableDispositionAndSecrets()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db);
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, fixture.GrantId), CancellationToken.None);
+
+        Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Executable));
+        Assert.That(response.EnvironmentVariables["AUTOMATON_TOKEN"], Is.EqualTo("secret-value"));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));
+    }
+
+    [Test]
+    public async Task TerminalDeploymentReturnsExistingTerminalReasonWithoutMutation()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Failed);
+        var deployment = await db.HostedRunnerDeployments.SingleAsync();
+        deployment.Error = HostedRunnerDeploymentErrors.AmbiguousDispatch;
+        deployment.FinishedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+        Assert.That(response.TerminalReason, Is.EqualTo(HostedRunnerDeploymentErrors.AmbiguousDispatch));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).FinishedAt, Is.Not.Null);
+    }
+
+    [TestCase(false, false, HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch)]
+    [TestCase(true, false, HostedRunnerDeploymentErrors.AmbiguousDispatch)]
+    [TestCase(false, true, HostedRunnerDeploymentErrors.AmbiguousDispatch)]
+    public async Task UnusableGrantTerminalizesWithEvidenceAwareReason(
+        bool delivered,
+        bool consumed,
+        string expectedReason)
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Dispatching,
+            expired: true, delivered: delivered, consumed: consumed);
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, fixture.GrantId), CancellationToken.None);
+        var deployment = await db.HostedRunnerDeployments.Include(x => x.HostedRunner).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+            Assert.That(response.TerminalReason, Is.EqualTo(expectedReason));
+            Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+            Assert.That(deployment.Error, Is.EqualTo(expectedReason));
+            Assert.That(deployment.FinishedAt, Is.Not.Null);
+            Assert.That(deployment.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+        });
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+    }
+
+    [Test]
+    public async Task MissingGrantTerminalizesBeforeDispatch()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db);
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+        Assert.That(response.TerminalReason, Is.EqualTo(HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Error,
+            Is.EqualTo(HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch));
+    }
+
+    [Test]
+    public async Task RevokedGrantBeforeDeliveryTerminalizesBeforeDispatch()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db);
+        var grant = await db.ExecutionSecretGrants.SingleAsync();
+        grant.RevokedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, fixture.GrantId), CancellationToken.None);
+
+        Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+        Assert.That(response.TerminalReason, Is.EqualTo(HostedRunnerDeploymentErrors.SecretGrantUnavailableBeforeDispatch));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+    }
+
+    [Test]
+    public async Task RepeatedResolutionAfterTerminalizationReturnsSameDispositionAndReason()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Dispatching,
+            expired: true, delivered: true);
+        var request = SecretsRequest(fixture, fixture.GrantId);
+
+        var first = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id, request, CancellationToken.None);
+        var second = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id, request, CancellationToken.None);
+
+        Assert.That(second.Disposition, Is.EqualTo(first.Disposition));
+        Assert.That(second.TerminalReason, Is.EqualTo(first.TerminalReason));
+    }
+
+    [Test]
+    public async Task DeliveredSingleDeliveryGrantWithoutReadCountTerminalizesAsAmbiguousDispatch()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Dispatching,
+            expired: true, delivered: true);
+        var grant = await db.ExecutionSecretGrants.SingleAsync();
+        grant.ReadCount = 0;
+        grant.ConsumedAtUtc = null;
+        await db.SaveChangesAsync();
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, fixture.GrantId), CancellationToken.None);
+        var deployment = await db.HostedRunnerDeployments.Include(x => x.HostedRunner).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+            Assert.That(response.TerminalReason, Is.EqualTo(HostedRunnerDeploymentErrors.AmbiguousDispatch));
+            Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+            Assert.That(deployment.Error, Is.EqualTo(HostedRunnerDeploymentErrors.AmbiguousDispatch));
+            Assert.That(deployment.FinishedAt, Is.Not.Null);
+            Assert.That(deployment.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+        });
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+    }
+
+    private static InfrastructureCommandSecretsRequest SecretsRequest(
+        ResolutionFixture fixture, Guid grantId) => new(
+            fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id,
+            "reprovision-hosted-runner", [grantId]);
+
+    private static async Task<ResolutionFixture> CreateResolutionFixture(
+        ApplicationDbContext db,
+        string status = HostedRunnerDeploymentStatuses.Dispatching,
+        bool expired = false,
+        bool delivered = false,
+        bool consumed = false)
+    {
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var store = new SecretStore(db, protector);
+        var grants = new ExecutionSecretGrantService(db, protector);
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
+        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Provisioning };
+        var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Reprovision, Status = status };
+        db.AddRange(runner, host, hosted, deployment);
+        await db.SaveChangesAsync();
+
+        var scope = new SecretGrantScope(deployment.Id, InfrastructureAppTrust.PlatformAppId,
+            "reprovision-hosted-runner", runner.Id, host.Id, SecretOwnerTypes.HostedRunner, hosted.Id);
+        var version = await store.CreateVersionAsync(new SecretOwner(SecretOwnerTypes.HostedRunner, hosted.Id),
+            "runner-secret", "secret-value", DateTime.UtcNow.AddMinutes(10), CancellationToken.None);
+        var grantId = await grants.CreateGrantAsync(version.SecretVersionId, scope, "AUTOMATON_TOKEN",
+            DateTime.UtcNow.AddMinutes(5), CancellationToken.None);
+        var grant = await db.ExecutionSecretGrants.SingleAsync();
+        if (expired) grant.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        if (delivered) grant.DeliveredAtUtc = DateTime.UtcNow.AddMinutes(-2);
+        if (delivered) grant.ReadCount = 1;
+        if (consumed)
+        {
+            grant.LeasedAtUtc = DateTime.UtcNow.AddMinutes(-2);
+            grant.ConsumedAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        }
+        await db.SaveChangesAsync();
+
+        var lifecycle = new InfrastructureActionProvisioningHandler(
+            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
+        return new(apiKeyId, runner, host, hosted, deployment, grantId,
+            new InfrastructureCommandCallbackService(db, grants, lifecycle));
+    }
+
     private static InfrastructureCommandResultRequest Request(Guid operationId, Guid hostId, Guid runnerId, string failure) => new(
         operationId, hostId, runnerId, "restart-hosted-runner", [],
         new AppActionExecutionResult { ExecutionId = operationId, Status = AppModuleExecutionStatuses.Failed, FailureSummary = failure, StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow },
@@ -147,5 +360,22 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+
+    private sealed record ResolutionFixture(
+        Guid ApiKeyId,
+        Runner Runner,
+        RunnerHost Host,
+        HostedRunner HostedRunner,
+        HostedRunnerDeployment Deployment,
+        Guid GrantId,
+        InfrastructureCommandCallbackService Service);
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null,
+            string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
 
 }

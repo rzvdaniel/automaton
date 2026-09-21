@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Automaton.Api.Services;
+using Automaton.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,21 +14,12 @@ public sealed class InfrastructureCommandsController(InfrastructureCommandCallba
     [HttpPost("{commandId:guid}/secrets")]
     public async Task<ActionResult<InfrastructureCommandSecretsResponse>> Secrets(Guid commandId,
         [FromBody] InfrastructureCommandSecretsRequest request, CancellationToken cancellationToken)
-        => Ok(new InfrastructureCommandSecretsResponse(await commands.ResolveSecretsAsync(ApiKeyId(), commandId, request, cancellationToken)));
+        => Ok(await commands.ResolveSecretsAsync(ApiKeyId(), commandId, request, cancellationToken));
 
     [HttpPost("{commandId:guid}/result")]
     public async Task<ActionResult<InfrastructureCommandResultResponse>> Result(Guid commandId,
         [FromBody] InfrastructureCommandResultRequest request, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return Ok(await commands.ApplyResultAsync(ApiKeyId(), commandId, request, cancellationToken));
-        }
-        catch (InvalidOperationException exception) when (exception.Message.Contains("conflicting terminal result", StringComparison.Ordinal))
-        {
-            return Conflict(new { message = exception.Message });
-        }
-    }
+        => Ok(await commands.ApplyResultAsync(ApiKeyId(), commandId, request, cancellationToken));
 
     private Guid ApiKeyId() => Guid.TryParse(User.FindFirst("api_key_id")?.Value, out var id)
         ? id : throw new UnauthorizedAccessException("Infrastructure commands require API-key authentication.");

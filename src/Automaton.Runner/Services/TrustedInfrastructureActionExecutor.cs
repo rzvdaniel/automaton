@@ -6,15 +6,21 @@ namespace Automaton.Runner.Console.Services;
 
 public interface IInfrastructureActionExecutor
 {
-    Task<(AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result)> ExecuteAsync(
+    Task<InfrastructureCommandExecutionResult> ExecuteAsync(
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken);
 }
 
 public interface IInfrastructureSecretProvider
 {
-    Task<IReadOnlyDictionary<string, string>> ResolveAsync(
+    Task<InfrastructureCommandSecretsResponse> ResolveAsync(
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken);
 }
+
+public sealed record InfrastructureCommandExecutionResult(
+    AppActionExecutionResult? Execution,
+    AppModuleExecutionArtifactResponse? Result,
+    bool Terminal,
+    string? TerminalReason);
 
 public sealed class TrustedInfrastructureActionExecutor(
     AppActionDeploymentService deployment,
@@ -25,28 +31,34 @@ public sealed class TrustedInfrastructureActionExecutor(
         : this(deployment, execution, new MissingInfrastructureSecretProvider())
     {
     }
-    public async Task<(AppActionExecutionResult Execution, AppModuleExecutionArtifactResponse Result)> ExecuteAsync(
+    public async Task<InfrastructureCommandExecutionResult> ExecuteAsync(
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken)
     {
         TrustedInfrastructureActions.EnsureAllowed(command.ActionKey);
-        var module = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
         var artifactRequest = new ReadAppModuleExecutionArtifactRequest(
             InfrastructureAppTrust.PlatformAppId, command.RunnerHostId, command.ActionKey, command.CommandId);
         var existing = execution.ReadPersistedResult(artifactRequest);
         if (existing != null)
         {
+            var existingModule = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
             if (existing.Status == AppModuleExecutionStatuses.Running)
-                return (await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
+                return new(await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
                 {
                     ExecutionId = command.CommandId, AppId = InfrastructureAppTrust.PlatformAppId,
                     DeploymentTargetId = command.RunnerHostId, ActionKey = command.ActionKey,
-                    ExpectedDeploymentHash = module.ContentHash, SystemInfrastructure = true
-                }, cancellationToken), execution.ReadResult(artifactRequest));
-            return (existing, execution.ReadResult(artifactRequest));
+                    ExpectedDeploymentHash = existingModule.ContentHash, SystemInfrastructure = true
+                }, cancellationToken), execution.ReadResult(artifactRequest), false, null);
+            return new(existing, execution.ReadResult(artifactRequest), false, null);
         }
-        IReadOnlyDictionary<string, string> resolvedSecrets = command.SecretGrantIds.Count == 0
-            ? new Dictionary<string, string>()
+        var secretResolution = command.SecretGrantIds.Count == 0
+            ? new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Executable,
+                new Dictionary<string, string>())
             : await secrets.ResolveAsync(command, cancellationToken);
+        if (secretResolution.Disposition == InfrastructureCommandSecretResolutionDispositions.Terminal)
+            return new(null, null, true, secretResolution.TerminalReason);
+        if (secretResolution.Disposition != InfrastructureCommandSecretResolutionDispositions.Executable)
+            throw new InvalidOperationException("The Infrastructure API returned an unknown secret resolution disposition.");
+        var preparedModule = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
         using var input = JsonDocument.Parse(command.InputJson);
         var result = await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
         {
@@ -54,17 +66,17 @@ public sealed class TrustedInfrastructureActionExecutor(
             AppId = InfrastructureAppTrust.PlatformAppId,
             DeploymentTargetId = command.RunnerHostId,
             ActionKey = command.ActionKey,
-            ExpectedDeploymentHash = module.ContentHash,
+            ExpectedDeploymentHash = preparedModule.ContentHash,
             SystemInfrastructure = true,
             Input = input.RootElement.Clone(),
-            Secrets = new Dictionary<string, string>(resolvedSecrets, StringComparer.Ordinal)
+            Secrets = new Dictionary<string, string>(secretResolution.EnvironmentVariables, StringComparer.Ordinal)
         }, cancellationToken);
-        return (result, execution.ReadResult(artifactRequest));
+        return new(result, execution.ReadResult(artifactRequest), false, null);
     }
 
     private sealed class MissingInfrastructureSecretProvider : IInfrastructureSecretProvider
     {
-        public Task<IReadOnlyDictionary<string, string>> ResolveAsync(
+        public Task<InfrastructureCommandSecretsResponse> ResolveAsync(
             InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken) =>
             throw new NotSupportedException("Infrastructure command secret delivery requires the Stage 3 API boundary.");
     }
