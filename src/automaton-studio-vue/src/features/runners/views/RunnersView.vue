@@ -626,7 +626,7 @@ onUnmounted(() => {
             </template>
           </div>
           <Message v-if="runner.isHostedRunner" severity="info" :closable="false" class="mt-3">
-            Storage is measured approximately hourly. The allowance is monitored by Automaton and is not a hard filesystem quota.
+            Hosted Runner storage uses a hard XFS project quota on supported managed Runner Hosts. It includes the Hosted Runner system and user volumes, including application data and build workspaces; Docker images, shared cache, Docker logs, and container writable layers are outside this quota.
           </Message>
           <Message v-if="runner.isHostedRunner && runner.storageMeasurementError" severity="warn" :closable="false" class="mt-2">
             {{ runner.storageMeasurementError }}

@@ -121,6 +121,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageProjectId = 1_234_568,
                 StorageMeasuredAtUtc = DateTime.UtcNow, StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageState = HostedRunnerStorageStates.Healthy
             });
@@ -183,6 +184,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageProjectId = 1_234_567,
                 StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow
             });
@@ -270,6 +272,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageProjectId = 1_234_569,
                 StorageState = HostedRunnerStorageStates.Healthy, StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow
             });
@@ -372,7 +375,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             db.HostedRunners.Add(new HostedRunner
             {
                 Id = hostedRunnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner",
-                RunnerHostId = hostId, StorageState = HostedRunnerStorageStates.Healthy,
+                RunnerHostId = hostId, StorageProjectId = 1_234_570, StorageState = HostedRunnerStorageStates.Healthy,
                 StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
                 StorageMeasuredAtUtc = DateTime.UtcNow.AddHours(-3)
             });

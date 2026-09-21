@@ -80,6 +80,11 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         }
 
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
+        if (hostedRunner.StorageProjectId is not > 0)
+        {
+            await FailAsync(hostedRunner, deployment, "The Hosted Runner has no persisted storage project identity.", message.CorrelationId, cancellationToken);
+            return;
+        }
         var runtimeHostAddress = RequirePrivateRuntimeHostAddress(host.PrivateIp);
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
             ?? hostedRunner.SpecificationSnapshot.SourceSpecificationId;
@@ -97,6 +102,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             cpuLimit = resources.CpuLimit,
             memoryMb = resources.MemoryLimitMb,
             memoryReservationMb = resources.MemoryReservationMb,
+            diskLimitMb = resources.DiskLimitMb,
+            xfsProjectId = hostedRunner.StorageProjectId.Value,
             pidsLimit = resources.PidsLimit,
             sharedMemoryMb = resources.SharedMemoryMb,
             dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,

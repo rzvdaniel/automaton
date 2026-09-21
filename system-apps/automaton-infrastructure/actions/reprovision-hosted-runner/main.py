@@ -2,6 +2,7 @@
 import json
 import ipaddress
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -46,7 +47,7 @@ def host(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str
     return result
 
 
-def inspect_volume(volume_name: str) -> dict[str, str] | None:
+def inspect_volume(volume_name: str) -> dict[str, object] | None:
     result = host("docker", "volume", "inspect", volume_name, check=False)
     if result.returncode != 0:
         if "no such volume" in result.stderr.lower():
@@ -54,30 +55,121 @@ def inspect_volume(volume_name: str) -> dict[str, str] | None:
         raise RuntimeError(result.stderr.strip() or f"Could not inspect Docker volume {volume_name}")
     try:
         payload = json.loads(result.stdout)
-        labels = payload[0]["Labels"]
+        metadata = payload[0]
+        labels = metadata["Labels"]
     except (json.JSONDecodeError, IndexError, KeyError, TypeError) as error:
         raise RuntimeError(f"Docker returned invalid metadata for volume {volume_name}") from error
-    return labels or {}
+    return {"labels": labels or {}, "mountpoint": metadata.get("Mountpoint")}
 
 
-def ensure_owned_volume(volume_name: str, runner_id: str, storage_scope: str) -> None:
+def ensure_owned_volume(volume_name: str, runner_id: str, storage_scope: str) -> str:
     expected_labels = {
         "automaton.managed": "true",
         "automaton.resource": "hosted-runner-volume",
         "automaton.hosted-runner-id": runner_id,
         "automaton.storage-scope": storage_scope,
     }
-    labels = inspect_volume(volume_name)
-    if labels is None:
+    metadata = inspect_volume(volume_name)
+    if metadata is None:
         label_arguments = [
             argument
             for key, value in expected_labels.items()
             for argument in ("--label", f"{key}={value}")
         ]
         host("docker", "volume", "create", *label_arguments, volume_name)
-        labels = inspect_volume(volume_name)
-    if labels is None or any(labels.get(key) != value for key, value in expected_labels.items()):
+        metadata = inspect_volume(volume_name)
+    labels = metadata.get("labels", {}) if metadata else {}
+    mountpoint = metadata.get("mountpoint") if metadata else None
+    if not isinstance(labels, dict) or any(labels.get(key) != value for key, value in expected_labels.items()):
         raise RuntimeError(f"Docker volume {volume_name} does not have the expected Automaton ownership labels")
+    if not isinstance(mountpoint, str) or not mountpoint.startswith("/"):
+        raise RuntimeError(f"Docker volume {volume_name} does not expose a host mountpoint")
+    return mountpoint
+
+
+def require_positive_project_id(value: object) -> int:
+    project_id = int(value)
+    if project_id <= 0 or project_id > 2_147_483_647:
+        raise ValueError("xfsProjectId must be a positive signed 32-bit integer")
+    return project_id
+
+
+def resolve_docker_root() -> str:
+    result = host("docker", "info", "--format", "{{.DockerRootDir}}")
+    root = result.stdout.strip().rstrip("/")
+    if result.returncode != 0 or not root.startswith("/") or any(char.isspace() for char in root):
+        raise RuntimeError("Could not resolve the host Docker data root")
+    return root
+
+
+def validate_mountpoint(mountpoint: str, docker_root: str) -> None:
+    expected_root = f"{docker_root}/volumes/"
+    normalized = posixpath.normpath(mountpoint)
+    if normalized != mountpoint or not normalized.startswith(expected_root) or "/../" in normalized:
+        raise RuntimeError("Managed Hosted Runner storage must remain under the Docker volume root")
+
+
+def current_project_id(mountpoint: str) -> int | None:
+    result = host("xfs_io", "-c", "stat", mountpoint)
+    output = result.stdout + result.stderr
+    match = re.search(r"projid\s*[.= :]\s*(\d+)", output, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
+    if disk_limit_mb <= 0:
+        raise ValueError("diskLimitMb must be positive")
+    docker_root = resolve_docker_root()
+    for mountpoint in mountpoints:
+        validate_mountpoint(mountpoint, docker_root)
+        filesystem = host("stat", "-f", "-c", "%T", mountpoint)
+        if filesystem.stdout.strip().lower() != "xfs":
+            raise RuntimeError("Hard Hosted Runner storage quotas require an XFS Docker volume filesystem")
+        options = host("findmnt", "-no", "OPTIONS", "-T", mountpoint)
+        quota_options = {part.strip().lower() for part in options.stdout.split(",")}
+        if not {"prjquota", "pquota"}.intersection(quota_options):
+            raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
+        existing_project = current_project_id(mountpoint)
+        if existing_project not in (None, 0, project_id):
+            raise RuntimeError(f"Managed volume {mountpoint} belongs to a different XFS project")
+
+    project = f"#{project_id}"
+    for mountpoint in mountpoints:
+        host("xfs_quota", "-x", "-c", f"project -s -p {mountpoint} {project}", mountpoint)
+
+    usage = read_project_usage(mountpoints[0], project_id)
+    limit_bytes = disk_limit_mb * 1024 * 1024
+    if usage > limit_bytes:
+        raise RuntimeError("Disk limit is below current XFS project usage; data was not deleted")
+    host("xfs_quota", "-x", "-c", f"limit -p bhard={disk_limit_mb}m {project}", mountpoints[0])
+
+
+def read_project_usage(mountpoint: str, project_id: int) -> int:
+    project = f"#{project_id}"
+    result = host("xfs_quota", "-x", "-c", f"quota -p -b -N {project}", mountpoint)
+    for line in (result.stdout + result.stderr).splitlines():
+        if project not in line and str(project_id) not in line:
+            continue
+        values = [int(value) for value in re.findall(r"(?<![A-Za-z])\d+(?![A-Za-z])", line)]
+        if len(values) >= 2:
+            # xfs_quota reports project id followed by used blocks when -b is used.
+            used_blocks = values[1] if values[0] == project_id else values[0]
+            return used_blocks * 1024
+    return 0
+
+
+def ensure_resource_group(runner_id: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> str:
+    info = host("docker", "info", "--format", "{{.CgroupVersion}}|{{.CgroupDriver}}")
+    version, _, driver = info.stdout.strip().partition("|")
+    if version != "2" or driver != "systemd":
+        raise RuntimeError("Aggregate Hosted Runner CPU, memory, and PID limits require cgroup v2 with Docker systemd cgroups")
+    slice_name = f"automaton-hosted-runner-{runner_id.replace('-', '')}.slice"
+    cpu_percent = format(cpu_limit * 100, ".6g") + "%"
+    host("systemctl", "set-property", slice_name, f"CPUQuota={cpu_percent}", f"MemoryMax={memory_mb}M", "MemorySwapMax=0", f"TasksMax={pids_limit}")
+    shown = host("systemctl", "show", slice_name, "--property=CPUQuotaPerSecUSec,MemoryMax,TasksMax", "--value")
+    if shown.returncode != 0:
+        raise RuntimeError("The Hosted Runner systemd resource group could not be verified")
+    return slice_name
 
 
 def main() -> None:
@@ -115,6 +207,8 @@ def main() -> None:
     reservation_mb = require_positive_int(request["memoryReservationMb"], "memoryReservationMb")
     pids_limit = require_positive_int(request["pidsLimit"], "pidsLimit")
     shared_memory_mb = require_positive_int(request["sharedMemoryMb"], "sharedMemoryMb")
+    disk_limit_mb = require_positive_int(request["diskLimitMb"], "diskLimitMb")
+    xfs_project_id = require_positive_project_id(request["xfsProjectId"])
     log_max_size_mb = require_positive_int(request["dockerLogMaxSizeMb"], "dockerLogMaxSizeMb")
     log_max_files = require_positive_int(request["dockerLogMaxFiles"], "dockerLogMaxFiles")
     runner_port = require_positive_int(request["runnerPort"], "runnerPort")
@@ -122,11 +216,14 @@ def main() -> None:
     if cpu_limit <= 0:
         raise ValueError("cpuLimit must be positive")
 
+    system_mountpoint = ensure_owned_volume(system_volume, runner_id, "system")
+    user_mountpoint = ensure_owned_volume(user_volume, runner_id, "user")
+    ensure_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
+    cgroup_parent = ensure_resource_group(runner_id, cpu_limit, memory_mb, pids_limit)
+
     # Refresh mutable tags before changing any existing container. A failed
     # pull must leave the current hosted Runner available for retry.
     host("docker", "pull", image)
-    ensure_owned_volume(system_volume, runner_id, "system")
-    ensure_owned_volume(user_volume, runner_id, "user")
     if host("docker", "network", "inspect", network, check=False).returncode != 0:
         host("docker", "network", "create", network)
     if runtime_network and host("docker", "network", "inspect", runtime_network, check=False).returncode != 0:
@@ -137,11 +234,8 @@ def main() -> None:
         "docker", "run", "-d",
         "--name", container_name,
         "--restart", "unless-stopped",
-        "--cpus", str(cpu_limit),
-        "--memory", f"{memory_mb}m",
-        "--memory-swap", f"{memory_mb}m",
+        "--cgroup-parent", cgroup_parent,
         "--memory-reservation", f"{reservation_mb}m",
-        "--pids-limit", str(pids_limit),
         "--shm-size", f"{shared_memory_mb}m",
         "--security-opt", "no-new-privileges=true",
         "--log-driver", "local",

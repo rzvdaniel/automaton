@@ -50,6 +50,8 @@ def action_request() -> dict[str, object]:
         "runtimeHostAddress": "10.20.30.40",
         "memoryMb": 384,
         "memoryReservationMb": 256,
+        "diskLimitMb": 512,
+        "xfsProjectId": 1234567,
         "pidsLimit": 256,
         "sharedMemoryMb": 64,
         "dockerLogMaxSizeMb": 10,
@@ -88,7 +90,11 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     arguments,
                     0,
-                    json.dumps([{"Name": name, "Labels": volumes[name]}]),
+                    json.dumps([{
+                        "Name": name,
+                        "Labels": volumes[name],
+                        "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+                    }]),
                     "",
                 )
             if arguments[:3] == ("docker", "volume", "create"):
@@ -100,7 +106,18 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                         labels[key] = value
                 volumes[name] = labels
                 return subprocess.CompletedProcess(arguments, 0, f"{name}\n", "")
-            stdout = "container-id\n" if arguments[:2] == ("docker", "run") else ""
+            if arguments[:3] == ("docker", "info", "--format"):
+                stdout = "2|systemd\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+            elif arguments[:2] == ("stat", "-f"):
+                stdout = "xfs\n"
+            elif arguments[:2] == ("findmnt", "-no"):
+                stdout = "rw,prjquota\n"
+            elif arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
+                stdout = "Project quota state: Enforcement\n"
+            elif arguments[:2] == ("systemctl", "show"):
+                stdout = "1\n1\n256\n"
+            else:
+                stdout = "container-id\n" if arguments[:2] == ("docker", "run") else ""
             return subprocess.CompletedProcess(arguments, 0, stdout, "")
 
         with (
@@ -116,10 +133,6 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
     def assert_resource_contract(self, calls):
         run = next(call for call in calls if call[:2] == ("docker", "run"))
         expected_pairs = {
-            "--cpus": "0.5",
-            "--memory": "384m",
-            "--memory-swap": "384m",
-            "--pids-limit": "256",
             "--shm-size": "64m",
             "--security-opt": "no-new-privileges=true",
             "--log-driver": "local",
@@ -130,6 +143,11 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         self.assertIn("max-size=10m", run)
         self.assertIn("max-file=3", run)
         self.assertNotIn("--privileged", run)
+        self.assertIn("--cgroup-parent", run)
+        self.assertIn(f"automaton-hosted-runner-{RUNNER_ID_COMPACT}.slice", run)
+        self.assertNotIn("--cpus", run)
+        self.assertNotIn("--memory", run)
+        self.assertNotIn("--pids-limit", run)
         self.assertNotIn("--pid", run)
         self.assertFalse("--pid=host" in run or "host" in run[run.index("--network") + 1:run.index("--network") + 2])
         self.assertNotIn("/var/run/docker.sock", run)
@@ -242,7 +260,89 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                         image_pull_error="registry unavailable",
                         calls_out=calls,
                     )
-                self.assertEqual(calls, [("docker", "pull", "automaton/runner:test")])
+                self.assertEqual(calls[-1], ("docker", "pull", "automaton/runner:test"))
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_quota_decrease_below_current_project_usage_fails_before_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        module = load_action("provision-hosted-runner")
+        calls = []
+
+        def fake_host(*arguments, check=True):
+            calls.append(arguments)
+            if arguments[:3] == ("docker", "volume", "inspect"):
+                name = arguments[3]
+                return subprocess.CompletedProcess(arguments, 0, json.dumps([{
+                    "Labels": existing[name],
+                    "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+                }]), "")
+            if arguments[:3] == ("docker", "info", "--format"):
+                stdout = "2|systemd\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+                return subprocess.CompletedProcess(arguments, 0, stdout, "")
+            if arguments[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
+            if arguments[:2] == ("findmnt", "-no"):
+                return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
+            if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
+                return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
+            if arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+                return subprocess.CompletedProcess(arguments, 0, "#1234567 600000 0 0\n", "")
+            return subprocess.CompletedProcess(arguments, 0, "", "")
+
+        with (
+            patch.object(module, "host", side_effect=fake_host),
+            patch.dict(os.environ, {"AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN": "re_test"}),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(action_request()))),
+            patch.object(sys, "stdout", io.StringIO()),
+            self.assertRaisesRegex(RuntimeError, "below current XFS project usage"),
+        ):
+            module.main()
+        self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+        self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_unsupported_cgroup_host_fails_closed_before_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                module = load_action(action_key)
+                calls = []
+
+                def fake_host(*arguments, check=True):
+                    calls.append(arguments)
+                    if arguments[:3] == ("docker", "volume", "inspect"):
+                        name = arguments[3]
+                        return subprocess.CompletedProcess(arguments, 0, json.dumps([{
+                            "Labels": existing[name],
+                            "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+                        }]), "")
+                    if arguments[:3] == ("docker", "info", "--format"):
+                        stdout = "1|cgroupfs\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+                        return subprocess.CompletedProcess(arguments, 0, stdout, "")
+                    if arguments[:2] == ("stat", "-f"):
+                        return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
+                    if arguments[:2] == ("findmnt", "-no"):
+                        return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
+                    if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
+                        return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
+                    return subprocess.CompletedProcess(arguments, 0, "", "")
+
+                with (
+                    patch.object(module, "host", side_effect=fake_host),
+                    patch.dict(os.environ, {"AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN": "re_test"}),
+                    patch.object(sys, "stdin", io.StringIO(json.dumps(action_request()))),
+                    patch.object(sys, "stdout", io.StringIO()),
+                    self.assertRaisesRegex(RuntimeError, "cgroup v2 with Docker systemd cgroups"),
+                ):
+                    module.main()
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_existing_volume_with_missing_or_conflicting_labels_is_rejected(self):
         invalid_labels = [

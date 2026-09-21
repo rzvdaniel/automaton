@@ -96,8 +96,12 @@ public sealed class InfrastructureActionProvisioningHandler(
                 ?? throw new InvalidOperationException("Storage verification request was not found.");
             var systemBytes = ReadNonNegativeInt64(result, "systemBytes");
             var userBytes = ReadNonNegativeInt64(result, "userBytes");
-            var totalBytes = checked(systemBytes + userBytes);
-            if (ReadNonNegativeInt64(result, "totalBytes") != totalBytes)
+            var totalBytes = ReadNonNegativeInt64(result, "totalBytes");
+            if (!result.TryGetProperty("usageSource", out var usageSource)
+                || usageSource.ValueKind != JsonValueKind.String
+                || !string.Equals(usageSource.GetString(), "xfs-project-quota", StringComparison.Ordinal))
+                throw new InvalidOperationException("Storage verification did not report authoritative XFS project-quota usage.");
+            if (systemBytes + userBytes != totalBytes)
                 throw new InvalidOperationException("Storage verification returned inconsistent totals.");
             var now = DateTime.UtcNow;
             db.HostedRunnerStorageObservations.Add(new HostedRunnerStorageObservation

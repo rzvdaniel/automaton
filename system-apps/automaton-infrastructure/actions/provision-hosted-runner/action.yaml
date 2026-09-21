@@ -23,6 +23,8 @@ spec:
       - cpuLimit
       - memoryMb
       - memoryReservationMb
+      - diskLimitMb
+      - xfsProjectId
       - pidsLimit
       - sharedMemoryMb
       - dockerLogMaxSizeMb
@@ -43,6 +45,8 @@ spec:
       cpuLimit: { type: number }
       memoryMb: { type: integer }
       memoryReservationMb: { type: integer }
+      diskLimitMb: { type: integer }
+      xfsProjectId: { type: integer }
       pidsLimit: { type: integer }
       sharedMemoryMb: { type: integer }
       dockerLogMaxSizeMb: { type: integer }

@@ -513,6 +513,7 @@ namespace Automaton.Api.Data
             modelBuilder.Entity<HostedRunner>(entity =>
             {
                 entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.StorageProjectId).IsUnique();
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.ContainerName).IsRequired().HasMaxLength(160);
