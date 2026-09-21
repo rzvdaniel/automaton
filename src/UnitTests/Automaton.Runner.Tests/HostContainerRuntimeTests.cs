@@ -119,6 +119,7 @@ public sealed class HostContainerRuntimeTests
             Assert.That(args, Does.Contain("no-new-privileges"));
             Assert.That(args[args.IndexOf("--cap-drop") + 1], Is.EqualTo("ALL"));
             Assert.That(args[args.IndexOf("--network") + 1], Is.EqualTo("bridge"));
+            Assert.That(args[args.IndexOf("--cgroup-parent") + 1], Is.EqualTo($"automaton-hosted-runner-{scope.HostedRunnerId:N}.slice"));
             Assert.That(args[args.IndexOf("--workdir") + 1], Is.EqualTo("/automaton/app/output"));
             Assert.That(args[args.IndexOf("--entrypoint") + 1], Is.EqualTo("/automaton/app/scripts/serve"));
             Assert.That(args.TakeLast(3), Is.EqualTo(new[] { Digest, "space separated", "--flag" }));

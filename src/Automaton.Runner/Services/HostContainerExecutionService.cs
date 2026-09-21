@@ -143,6 +143,7 @@ public sealed partial class HostContainerExecutionService
             return Failure("image_digest", "Docker did not return a repository RepoDigest.");
 
         var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "bridge",
+            "--cgroup-parent", HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId),
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
             "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",

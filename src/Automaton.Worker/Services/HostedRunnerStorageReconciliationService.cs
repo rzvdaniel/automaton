@@ -270,6 +270,13 @@ public sealed class HostedRunnerStorageReconciliationService(
             var hostId = verification.HostedRunner.RunnerHostId!.Value;
             var infrastructureRunnerId = verification.HostedRunner.RunnerHost?.InfrastructureRunnerId;
             if (!infrastructureRunnerId.HasValue) continue;
+            if (verification.HostedRunner.StorageProjectId is not > 0)
+            {
+                verification.Status = StorageVerificationStatuses.Failed;
+                verification.CompletedAtUtc = now;
+                verification.Error = "Hosted Runner storage quota identity is not initialized; reprovision is required.";
+                continue;
+            }
             if (!await TryClaimDispatchAsync(db, hostId, verification.Id, maxPerHost, now, cancellationToken)) continue;
             var runner = verification.HostedRunner;
             var deployment = await db.HostedRunnerDeployments.FindAsync([verification.Id], cancellationToken);
@@ -296,6 +303,7 @@ public sealed class HostedRunnerStorageReconciliationService(
                     operationId = verification.Id,
                     hostedRunnerId = runner.Id,
                     runnerHostId = hostId,
+                    xfsProjectId = runner.StorageProjectId,
                     expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                     expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
                 }),

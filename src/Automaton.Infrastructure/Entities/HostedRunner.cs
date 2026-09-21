@@ -60,6 +60,11 @@ public class HostedRunner
     public DateTime? DeletedAt { get; set; }
 
     public long StorageAllowanceBytes { get; set; }
+    /// <summary>
+    /// Stable XFS project identity for the Hosted Runner aggregate storage
+    /// boundary. This is host metadata, not user input.
+    /// </summary>
+    public int? StorageProjectId { get; set; }
     public DateTime? StorageMeasuredAtUtc { get; set; }
     public DateTime? StorageReceivedAtUtc { get; set; }
     [MaxLength(40)] public string StorageMeasurementSource { get; set; } = StorageMeasurementSources.RunnerSelfReported;
