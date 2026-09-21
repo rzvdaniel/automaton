@@ -280,6 +280,33 @@ public sealed class InfrastructureCommandCallbackServiceTests
         Assert.That(second.TerminalReason, Is.EqualTo(first.TerminalReason));
     }
 
+    [Test]
+    public async Task DeliveredSingleDeliveryGrantWithoutReadCountTerminalizesAsAmbiguousDispatch()
+    {
+        await using var db = CreateDb();
+        var fixture = await CreateResolutionFixture(db, HostedRunnerDeploymentStatuses.Dispatching,
+            expired: true, delivered: true);
+        var grant = await db.ExecutionSecretGrants.SingleAsync();
+        grant.ReadCount = 0;
+        grant.ConsumedAtUtc = null;
+        await db.SaveChangesAsync();
+
+        var response = await fixture.Service.ResolveSecretsAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            SecretsRequest(fixture, fixture.GrantId), CancellationToken.None);
+        var deployment = await db.HostedRunnerDeployments.Include(x => x.HostedRunner).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
+            Assert.That(response.TerminalReason, Is.EqualTo(HostedRunnerDeploymentErrors.AmbiguousDispatch));
+            Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+            Assert.That(deployment.Error, Is.EqualTo(HostedRunnerDeploymentErrors.AmbiguousDispatch));
+            Assert.That(deployment.FinishedAt, Is.Not.Null);
+            Assert.That(deployment.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+        });
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+    }
+
     private static InfrastructureCommandSecretsRequest SecretsRequest(
         ResolutionFixture fixture, Guid grantId) => new(
             fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id,
