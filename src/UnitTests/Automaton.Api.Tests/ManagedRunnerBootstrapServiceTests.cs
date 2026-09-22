@@ -364,7 +364,7 @@ public class ManagedRunnerBootstrapServiceTests
                 Enabled = true,
                 RuntimePort = 8080
             }),
-            new HostedRunnerSpecificationResolver(db),
+            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
             new NoOpAuditEventService(),
             NullLogger<HostedRunnerProvisioningService>.Instance);
         var userContextService = new UserContextService(new HttpContextAccessor());

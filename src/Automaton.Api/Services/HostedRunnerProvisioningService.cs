@@ -30,7 +30,7 @@ public class HostedRunnerProvisioningService
     private readonly RunnerEnrollmentService runnerEnrollmentService;
     private readonly IEventPublisher eventPublisher;
     private readonly HostedRunnerOptions options;
-    private readonly IHostedRunnerSpecificationResolver specificationResolver;
+    private readonly ISubscriptionResourcePolicyResolver resourcePolicyResolver;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
     private readonly StorageTelemetryOptions storageTelemetryOptions;
@@ -40,7 +40,7 @@ public class HostedRunnerProvisioningService
         RunnerEnrollmentService runnerEnrollmentService,
         IEventPublisher eventPublisher,
         IOptionsSnapshot<HostedRunnerOptions> options,
-        IHostedRunnerSpecificationResolver specificationResolver,
+        ISubscriptionResourcePolicyResolver resourcePolicyResolver,
         IAuditEventService auditEventService,
         ILogger<HostedRunnerProvisioningService> logger,
         IOptions<StorageTelemetryOptions>? storageTelemetryOptions = null)
@@ -49,7 +49,7 @@ public class HostedRunnerProvisioningService
         this.runnerEnrollmentService = runnerEnrollmentService;
         this.eventPublisher = eventPublisher;
         this.options = options.Value;
-        this.specificationResolver = specificationResolver;
+        this.resourcePolicyResolver = resourcePolicyResolver;
         this.auditEventService = auditEventService;
         this.logger = logger;
         this.storageTelemetryOptions = storageTelemetryOptions?.Value ?? new StorageTelemetryOptions();
@@ -67,26 +67,29 @@ public class HostedRunnerProvisioningService
         {
             throw new InvalidOperationException("Hosted runner provisioning is paused by platform settings.");
         }
-        var specificationResolution = await specificationResolver.ResolveAsync(
+        var policyResolution = await resourcePolicyResolver.ResolveAsync(
             userId,
             planId == Guid.Empty ? null : planId,
             cancellationToken);
-        if (!specificationResolution.Succeeded)
+        if (!policyResolution.Succeeded)
         {
-            var failure = specificationResolution.Failure ?? HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured;
+            var failure = policyResolution.Failure
+                ?? SubscriptionResourcePolicyResolutionFailure.SpecificationNotConfigured;
             var message = failure switch
             {
-                HostedRunnerSpecificationResolutionFailure.NoEffectivePlan => "Your subscription plan does not include a hosted runner.",
-                HostedRunnerSpecificationResolutionFailure.CapabilityDisabled => "Your subscription plan does not include a hosted runner.",
-                HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured => "The hosted runner configuration for your subscription plan is incomplete.",
-                HostedRunnerSpecificationResolutionFailure.SpecificationNotFound => "The hosted runner specification configured for your subscription plan no longer exists.",
-                HostedRunnerSpecificationResolutionFailure.SpecificationInactive => "The hosted runner specification configured for your subscription plan is inactive.",
+                SubscriptionResourcePolicyResolutionFailure.NoEffectivePlan => "Your subscription plan does not include a hosted runner.",
+                SubscriptionResourcePolicyResolutionFailure.CapabilityDisabled => "Your subscription plan does not include a hosted runner.",
+                SubscriptionResourcePolicyResolutionFailure.SpecificationNotConfigured => "The hosted runner configuration for your subscription plan is incomplete.",
+                SubscriptionResourcePolicyResolutionFailure.SpecificationNotFound => "The hosted runner specification configured for your subscription plan no longer exists.",
+                SubscriptionResourcePolicyResolutionFailure.SpecificationInactive => "The hosted runner specification configured for your subscription plan is inactive.",
+                SubscriptionResourcePolicyResolutionFailure.InvalidSpecificationResources => "The hosted runner specification configured for your subscription plan has invalid resource limits.",
                 _ => "The hosted runner configuration for your subscription plan is invalid."
             };
 
-            if (failure is HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured
-                or HostedRunnerSpecificationResolutionFailure.SpecificationNotFound
-                or HostedRunnerSpecificationResolutionFailure.SpecificationInactive)
+            if (failure is SubscriptionResourcePolicyResolutionFailure.SpecificationNotConfigured
+                or SubscriptionResourcePolicyResolutionFailure.SpecificationNotFound
+                or SubscriptionResourcePolicyResolutionFailure.SpecificationInactive
+                or SubscriptionResourcePolicyResolutionFailure.InvalidSpecificationResources)
             {
                 logger.LogError("Hosted runner specification resolution failed for user {UserId}: {Failure}", userId, failure);
             }
@@ -94,7 +97,7 @@ public class HostedRunnerProvisioningService
             throw new InvalidOperationException(message);
         }
 
-        var specification = specificationResolution.Specification!;
+        var specification = policyResolution.Specification!;
 
         var hostedRunner = await db.HostedRunners
             .Include(x => x.Runner)
@@ -117,6 +120,7 @@ public class HostedRunnerProvisioningService
         }
 
         var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
+        requestedSnapshot.Resources = policyResolution.Policy!.ApplyTo(requestedSnapshot.Resources);
         hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
         var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
         if (hostedRunner.StorageProjectId is null)
