@@ -62,30 +62,62 @@ def require_project_id(value: object) -> int:
     return project_id
 
 
-def require_xfs_project_quota(mountpoint: str) -> None:
+def resolve_filesystem_mountpoint(path: str) -> str:
+    result = host("findmnt", "-no", "TARGET", "-T", path)
+    filesystem_mountpoint = result.stdout.strip()
+    if not filesystem_mountpoint.startswith("/") or any(char.isspace() for char in filesystem_mountpoint):
+        raise RuntimeError("Could not resolve the XFS filesystem mountpoint")
+    return posixpath.normpath(filesystem_mountpoint)
+
+
+def project_quota_enforcement_enabled(output: str) -> bool:
+    lowered = output.lower()
+    if "project quota state: enforcement" in lowered:
+        return True
+    return re.search(r"project quota state[\s\S]*?\benforcement:\s*on\b", lowered) is not None
+
+
+def require_xfs_project_quota(mountpoint: str) -> str:
     filesystem = host("stat", "-f", "-c", "%T", mountpoint)
     if filesystem.stdout.strip().lower() != "xfs":
         raise RuntimeError("Hard Hosted Runner storage quotas require an XFS Docker volume filesystem")
     options = host("findmnt", "-no", "OPTIONS", "-T", mountpoint)
     if not {part.strip().lower() for part in options.stdout.split(",")}.intersection({"prjquota", "pquota"}):
         raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
-    state = host("xfs_quota", "-x", "-c", "state", mountpoint)
-    text = (state.stdout + state.stderr).lower()
-    if "project quota" not in text or "enforc" not in text:
+    filesystem_mountpoint = resolve_filesystem_mountpoint(mountpoint)
+    state = host("xfs_quota", "-x", "-c", "state", filesystem_mountpoint)
+    if not project_quota_enforcement_enabled(state.stdout + state.stderr):
         raise RuntimeError("XFS project quota enforcement could not be verified")
+    return filesystem_mountpoint
 
 
-def measure_project(mountpoint: str, project_id: int) -> int:
-    project = f"#{project_id}"
-    result = host("xfs_quota", "-x", "-c", f"quota -p -b -N {project}", mountpoint)
-    for line in (result.stdout + result.stderr).splitlines():
-        if project not in line and str(project_id) not in line:
+def parse_project_quota_report(output: str, project_id: int) -> tuple[int, int] | None:
+    saw_report_shape = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if lowered.startswith("project quota on") or lowered.startswith("project id"):
+            saw_report_shape = True
             continue
-        values = [int(value) for value in re.findall(r"(?<![A-Za-z])\d+(?![A-Za-z])", line)]
-        if len(values) >= 2:
-            used_blocks = values[1] if values[0] == project_id else values[0]
-            return used_blocks * 1024
-    return 0
+        match = re.match(r"^#?(\d+)\s+(.+)$", stripped)
+        if not match:
+            continue
+        saw_report_shape = True
+        row_project_id = int(match.group(1))
+        if row_project_id != project_id:
+            continue
+        columns = match.group(2).split()
+        if len(columns) < 3 or any(not re.fullmatch(r"\d+", value) for value in columns[:3]):
+            raise RuntimeError(f"XFS project quota for project {project_id} could not be verified: malformed output")
+        return int(columns[0]) * 1024, int(columns[2]) * 1024
+    if saw_report_shape:
+        return None
+    raise RuntimeError(f"XFS project quota for project {project_id} could not be verified: output could not be parsed")
+
+
+def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int, int] | None:
+    result = host("xfs_quota", "-x", "-c", "report -p -b -n", filesystem_mountpoint)
+    return parse_project_quota_report(result.stdout + result.stderr, project_id)
 
 
 def main() -> None:
@@ -112,9 +144,16 @@ def main() -> None:
         scope: validate_and_resolve(supplied[scope], runner_id, scope, docker_root)
         for scope in ("system", "user")
     }
-    for mountpoint in mountpoints.values():
-        require_xfs_project_quota(mountpoint)
-    total_bytes = measure_project(mountpoints["system"], project_id)
+    filesystem_mountpoints = {
+        scope: require_xfs_project_quota(mountpoint)
+        for scope, mountpoint in mountpoints.items()
+    }
+    if len(set(filesystem_mountpoints.values())) != 1:
+        raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
+    quota = read_project_quota(next(iter(filesystem_mountpoints.values())), project_id)
+    if quota is None:
+        raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
+    total_bytes, _ = quota
     print(json.dumps({
         "success": True,
         "systemBytes": 0,

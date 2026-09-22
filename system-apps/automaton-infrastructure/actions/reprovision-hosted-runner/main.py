@@ -116,6 +116,13 @@ def current_project_id(mountpoint: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def project_quota_enforcement_enabled(output: str) -> bool:
+    lowered = output.lower()
+    if "project quota state: enforcement" in lowered:
+        return True
+    return re.search(r"project quota state[\s\S]*?\benforcement:\s*on\b", lowered) is not None
+
+
 def resolve_filesystem_mountpoint(path: str) -> str:
     result = host("findmnt", "-no", "TARGET", "-T", path)
     mountpoint = result.stdout.strip()
@@ -169,8 +176,7 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
             raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
         filesystem_mountpoint = resolve_filesystem_mountpoint(mountpoint)
         state = host("xfs_quota", "-x", "-c", "state", filesystem_mountpoint)
-        state_text = (state.stdout + state.stderr).lower()
-        if "project quota" not in state_text or "enforc" not in state_text:
+        if not project_quota_enforcement_enabled(state.stdout + state.stderr):
             raise RuntimeError("XFS project quota enforcement could not be verified")
         existing_project = current_project_id(mountpoint)
         if existing_project not in (None, 0, project_id):
@@ -217,8 +223,7 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
             raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
         filesystem_mountpoint = resolve_filesystem_mountpoint(mountpoint)
         state = host("xfs_quota", "-x", "-c", "state", filesystem_mountpoint)
-        state_text = (state.stdout + state.stderr).lower()
-        if "project quota" not in state_text or "enforc" not in state_text:
+        if not project_quota_enforcement_enabled(state.stdout + state.stderr):
             raise RuntimeError("XFS project quota enforcement could not be verified")
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to final managed volume {mountpoint}")

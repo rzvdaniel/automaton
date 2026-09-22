@@ -75,10 +75,17 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, json.dumps(metadata), "")
             if args[:2] == ("stat", "-f"):
                 return subprocess.CompletedProcess(args, 0, "xfs\n", "")
-            if args[:2] == ("findmnt", "-no"):
+            if args[:3] == ("findmnt", "-no", "TARGET"):
+                return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("findmnt", "-no", "OPTIONS"):
                 return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
-                return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    "Project quota state: Enforcement\n",
+                    "",
+                )
             if args[:2] == ("xfs_quota", "-x"):
                 return subprocess.CompletedProcess(args, 0, "#1234567 64 0 512\n", "")
             return subprocess.CompletedProcess(args, 0, "", "")
@@ -88,6 +95,99 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
         self.assertEqual(result["totalBytes"], result["systemBytes"] + result["userBytes"])
         self.assertEqual(sum(1 for call in calls if call[:3] == ("docker", "volume", "inspect")), 2)
         self.assertEqual(sum(1 for call in calls if call[:2] == ("xfs_quota", "-x")), 3)
+
+    def test_real_xfs_project_output_is_accepted_and_uses_filesystem_mountpoint(self):
+        request = self.request()
+        request["xfsProjectId"] = 1165812734
+        calls = []
+
+        def host(*args, **kwargs):
+            calls.append(args)
+            if args[:3] == ("docker", "info", "--format"):
+                return subprocess.CompletedProcess(args, 0, "/srv/automaton-workloads/docker\n", "")
+            if args[:3] == ("docker", "volume", "inspect"):
+                scope = "system" if args[3].endswith("-system") else "user"
+                metadata = [{
+                    "Labels": {
+                        "automaton.managed": "true",
+                        "automaton.resource": "hosted-runner-volume",
+                        "automaton.hosted-runner-id": self.runner_id,
+                        "automaton.storage-scope": scope,
+                    },
+                    "Mountpoint": f"/srv/automaton-workloads/docker/volumes/{args[3]}/_data",
+                }]
+                return subprocess.CompletedProcess(args, 0, json.dumps(metadata), "")
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            if args[:3] == ("findmnt", "-no", "OPTIONS"):
+                return subprocess.CompletedProcess(args, 0, "rw,relatime,inode64,prjquota\n", "")
+            if args[:3] == ("findmnt", "-no", "TARGET"):
+                return subprocess.CompletedProcess(args, 0, "/srv/automaton-workloads\n", "")
+            if args[:2] == ("xfs_quota", "-x") and "state" in args:
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    """User quota state on /srv/automaton-workloads (/dev/sdb)
+  Accounting: OFF
+  Enforcement: OFF
+Project quota state on /srv/automaton-workloads (/dev/sdb)
+  Accounting: ON
+  Enforcement: ON
+""",
+                    "",
+                )
+            if args[:2] == ("xfs_quota", "-x"):
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    """Project quota on /srv/automaton-workloads (/dev/sdb)
+                               Blocks
+Project ID       Used       Soft       Hard    Warn/Grace
+---------- --------------------------------------------------
+#0              246172          0          0     00 [--------]
+#1165812734         36          0    2097152     00 [--------]
+""",
+                    "",
+                )
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        result = self.run_action(request, host)
+
+        self.assertEqual(result["totalBytes"], 36 * 1024)
+        state_calls = [call for call in calls if call[:2] == ("xfs_quota", "-x") and "state" in call]
+        report_calls = [call for call in calls if call[:2] == ("xfs_quota", "-x") and "report -p -b -n" in call]
+        self.assertEqual(len(state_calls), 2)
+        self.assertEqual(len(report_calls), 1)
+        self.assertTrue(all(call[-1] == "/srv/automaton-workloads" for call in state_calls + report_calls))
+
+    def test_rejects_project_quota_enforcement_off(self):
+        def host(*args, **kwargs):
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            if args[:3] == ("findmnt", "-no", "OPTIONS"):
+                return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
+            if args[:3] == ("findmnt", "-no", "TARGET"):
+                return subprocess.CompletedProcess(args, 0, "/srv/automaton-workloads\n", "")
+            return subprocess.CompletedProcess(args, 0, "Project quota state\n  Accounting: ON\n  Enforcement: OFF\n", "")
+
+        with patch.object(ACTION, "host", side_effect=host), self.assertRaisesRegex(RuntimeError, "enforcement"):
+            ACTION.require_xfs_project_quota("/srv/automaton-workloads/docker/volumes/runner/_data")
+
+    def test_rejects_project_quota_accounting_off(self):
+        def host(*args, **kwargs):
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            return subprocess.CompletedProcess(args, 0, "rw\n", "")
+
+        with patch.object(ACTION, "host", side_effect=host), self.assertRaisesRegex(RuntimeError, "accounting"):
+            ACTION.require_xfs_project_quota("/srv/automaton-workloads/docker/volumes/runner/_data")
+
+    def test_rejects_malformed_project_quota_report(self):
+        with self.assertRaisesRegex(RuntimeError, "malformed"):
+            ACTION.parse_project_quota_report(
+                "Project ID Used Soft Hard\n#1165812734 malformed\n",
+                1165812734,
+            )
 
     def test_rejects_missing_docker_root(self):
         with patch.object(ACTION.sys, "stdin", io.StringIO(json.dumps(self.request()))), \
