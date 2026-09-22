@@ -116,10 +116,29 @@ def current_project_id(mountpoint: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def resolve_filesystem_mountpoint(path: str) -> str:
+    result = host("findmnt", "-no", "TARGET", "-T", path)
+    mountpoint = result.stdout.strip()
+    if not mountpoint.startswith("/") or any(char.isspace() for char in mountpoint):
+        raise RuntimeError("Could not resolve the XFS filesystem mountpoint")
+    return posixpath.normpath(mountpoint)
+
+
+def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int, int]:
+    result = host("xfs_quota", "-x", "-c", f"quota -p -b -N {project_id}", filesystem_mountpoint)
+    for line in (result.stdout + result.stderr).splitlines():
+        values = [int(value) for value in re.findall(r"(?<![A-Za-z])\d+(?![A-Za-z])", line)]
+        if not values or values[0] != project_id or len(values) < 4:
+            continue
+        return values[1] * 1024, values[3] * 1024
+    raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
+
+
 def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
     docker_root = resolve_docker_root()
+    filesystem_mountpoints: list[str] = []
     for mountpoint in mountpoints:
         validate_mountpoint(mountpoint, docker_root)
         filesystem = host("stat", "-f", "-c", "%T", mountpoint)
@@ -129,37 +148,34 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
         quota_options = {part.strip().lower() for part in options.stdout.split(",")}
         if not {"prjquota", "pquota"}.intersection(quota_options):
             raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
-        state = host("xfs_quota", "-x", "-c", "state", mountpoint)
+        filesystem_mountpoint = resolve_filesystem_mountpoint(mountpoint)
+        state = host("xfs_quota", "-x", "-c", "state", filesystem_mountpoint)
         state_text = (state.stdout + state.stderr).lower()
         if "project quota" not in state_text or "enforc" not in state_text:
             raise RuntimeError("XFS project quota enforcement could not be verified")
         existing_project = current_project_id(mountpoint)
         if existing_project not in (None, 0, project_id):
             raise RuntimeError(f"Managed volume {mountpoint} belongs to a different XFS project")
+        filesystem_mountpoints.append(filesystem_mountpoint)
 
-    project = f"#{project_id}"
+    if len(set(filesystem_mountpoints)) != 1:
+        raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
+    filesystem_mountpoint = filesystem_mountpoints[0]
     for mountpoint in mountpoints:
-        host("xfs_quota", "-x", "-c", f"project -s -p {mountpoint} {project}", mountpoint)
+        host("xfs_quota", "-x", "-c", f"project -s -p {mountpoint} {project_id}", filesystem_mountpoint)
 
-    usage = read_project_usage(mountpoints[0], project_id)
+    for mountpoint in mountpoints:
+        if current_project_id(mountpoint) != project_id:
+            raise RuntimeError(f"XFS project {project_id} was not assigned to managed volume {mountpoint}")
+
+    usage, _ = read_project_quota(filesystem_mountpoint, project_id)
     limit_bytes = disk_limit_mb * 1024 * 1024
     if usage > limit_bytes:
         raise RuntimeError("Disk limit is below current XFS project usage; data was not deleted")
-    host("xfs_quota", "-x", "-c", f"limit -p bhard={disk_limit_mb}m {project}", mountpoints[0])
-
-
-def read_project_usage(mountpoint: str, project_id: int) -> int:
-    project = f"#{project_id}"
-    result = host("xfs_quota", "-x", "-c", f"quota -p -b -N {project}", mountpoint)
-    for line in (result.stdout + result.stderr).splitlines():
-        if project not in line and str(project_id) not in line:
-            continue
-        values = [int(value) for value in re.findall(r"(?<![A-Za-z])\d+(?![A-Za-z])", line)]
-        if len(values) >= 2:
-            # xfs_quota reports project id followed by used blocks when -b is used.
-            used_blocks = values[1] if values[0] == project_id else values[0]
-            return used_blocks * 1024
-    return 0
+    host("xfs_quota", "-x", "-c", f"limit -p bhard={disk_limit_mb}m {project_id}", filesystem_mountpoint)
+    _, hard_limit_bytes = read_project_quota(filesystem_mountpoint, project_id)
+    if hard_limit_bytes != limit_bytes:
+        raise RuntimeError("XFS project hard limit did not match diskLimitMb")
 
 
 def ensure_resource_group(runner_id: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> str:

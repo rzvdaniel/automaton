@@ -69,12 +69,21 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         missing_volume_error: str = "No such volume: {name}",
         image_pull_error: str | None = None,
         calls_out: list[tuple[str, ...]] | None = None,
+        request_override: dict[str, object] | None = None,
+        xfs_project_error: str | None = None,
+        xfs_assignment_succeeds: bool = True,
+        xfs_quota_verification_succeeds: bool = True,
     ):
         module = load_action(action_key)
         calls = calls_out if calls_out is not None else []
         volumes = dict(existing_volumes or {})
+        request = action_request()
+        if request_override:
+            request.update(request_override)
+        assigned_project = False
 
         def fake_host(*arguments, check=True):
+            nonlocal assigned_project
             calls.append(arguments)
             if arguments[:2] == ("docker", "pull") and image_pull_error is not None:
                 raise RuntimeError(image_pull_error)
@@ -110,10 +119,24 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                 stdout = "2|systemd\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
             elif arguments[:2] == ("stat", "-f"):
                 stdout = "xfs\n"
-            elif arguments[:2] == ("findmnt", "-no"):
+            elif arguments[:2] == ("findmnt", "-no") and arguments[2] == "OPTIONS":
                 stdout = "rw,prjquota\n"
+            elif arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
+                stdout = "/var/lib/docker\n"
             elif arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                 stdout = "Project quota state: Enforcement\n"
+            elif arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
+                if xfs_project_error is not None:
+                    raise RuntimeError(xfs_project_error)
+                assigned_project = True
+                stdout = ""
+            elif arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+                project_id = int(request["xfsProjectId"])
+                hard_blocks = int(request["diskLimitMb"]) * 1024
+                stdout = f"#{project_id} 0 0 {hard_blocks}\n" if xfs_quota_verification_succeeds else "quota output unavailable\n"
+            elif arguments[:2] == ("xfs_io", "-c"):
+                project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
+                stdout = f"fsxattr.projid = {project_id}\n"
             elif arguments[:2] == ("systemctl", "show"):
                 stdout = "1\n1\n256\n"
             else:
@@ -123,7 +146,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         with (
             patch.object(module, "host", side_effect=fake_host),
             patch.dict(os.environ, {"AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN": "re_test"}),
-            patch.object(sys, "stdin", io.StringIO(json.dumps(action_request()))),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(request))),
             patch.object(sys, "stdout", io.StringIO()),
         ):
             module.main()
@@ -186,6 +209,92 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             4,
         )
         self.assert_resource_contract(calls)
+
+    def test_xfs_assignment_uses_numeric_project_and_filesystem_mount_for_both_actions(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls, _ = self.run_provision_action(
+                    action_key,
+                    existing,
+                    request_override={"diskLimitMb": 2048, "xfsProjectId": 1165812734},
+                )
+                project_calls = [
+                    call for call in calls
+                    if call[:2] == ("xfs_quota", "-x")
+                    and any("project -s" in argument for argument in call)
+                ]
+                self.assertEqual(len(project_calls), 2)
+                for call in project_calls:
+                    self.assertIn("project -s -p ", call[3])
+                    self.assertIn(" 1165812734", call[3])
+                    self.assertNotIn("#1165812734", call[3])
+                    self.assertEqual(call[-1], "/var/lib/docker")
+                limit_call = next(
+                    call for call in calls
+                    if call[:2] == ("xfs_quota", "-x")
+                    and any("limit -p" in argument for argument in call)
+                )
+                self.assertEqual(limit_call[3], "limit -p bhard=2048m 1165812734")
+                self.assertEqual(limit_call[-1], "/var/lib/docker")
+
+    def test_xfs_project_command_failure_is_fatal_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                existing = {
+                    SYSTEM_VOLUME: volume_labels("system"),
+                    USER_VOLUME: volume_labels("user"),
+                }
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "xfs setup failed"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        image_pull_error=None,
+                        calls_out=calls,
+                        xfs_project_error="xfs setup failed",
+                    )
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_xfs_assignment_verification_failure_is_fatal_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                existing = {
+                    SYSTEM_VOLUME: volume_labels("system"),
+                    USER_VOLUME: volume_labels("user"),
+                }
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "was not assigned"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        xfs_assignment_succeeds=False,
+                    )
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_xfs_quota_verification_failure_is_fatal_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                existing = {
+                    SYSTEM_VOLUME: volume_labels("system"),
+                    USER_VOLUME: volume_labels("user"),
+                }
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "quota for project"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        xfs_quota_verification_succeeds=False,
+                    )
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
         for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
@@ -271,8 +380,10 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         }
         module = load_action("provision-hosted-runner")
         calls = []
+        assigned_project = False
 
         def fake_host(*arguments, check=True):
+            nonlocal assigned_project
             calls.append(arguments)
             if arguments[:3] == ("docker", "volume", "inspect"):
                 name = arguments[3]
@@ -285,12 +396,20 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                 return subprocess.CompletedProcess(arguments, 0, stdout, "")
             if arguments[:2] == ("stat", "-f"):
                 return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
-            if arguments[:2] == ("findmnt", "-no"):
+            if arguments[:2] == ("findmnt", "-no") and arguments[2] == "OPTIONS":
                 return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
+            if arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
+                return subprocess.CompletedProcess(arguments, 0, "/var/lib/docker\n", "")
             if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                 return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
+            if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
+                assigned_project = True
+                return subprocess.CompletedProcess(arguments, 0, "", "")
             if arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
                 return subprocess.CompletedProcess(arguments, 0, "#1234567 600000 0 0\n", "")
+            if arguments[:2] == ("xfs_io", "-c"):
+                project_id = 1234567 if assigned_project else 0
+                return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
             return subprocess.CompletedProcess(arguments, 0, "", "")
 
         with (
@@ -313,8 +432,10 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             with self.subTest(action_key=action_key):
                 module = load_action(action_key)
                 calls = []
+                assigned_project = False
 
                 def fake_host(*arguments, check=True):
+                    nonlocal assigned_project
                     calls.append(arguments)
                     if arguments[:3] == ("docker", "volume", "inspect"):
                         name = arguments[3]
@@ -327,10 +448,20 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                         return subprocess.CompletedProcess(arguments, 0, stdout, "")
                     if arguments[:2] == ("stat", "-f"):
                         return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
-                    if arguments[:2] == ("findmnt", "-no"):
+                    if arguments[:2] == ("findmnt", "-no") and arguments[2] == "OPTIONS":
                         return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
+                    if arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
+                        return subprocess.CompletedProcess(arguments, 0, "/var/lib/docker\n", "")
                     if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                         return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
+                    if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
+                        assigned_project = True
+                        return subprocess.CompletedProcess(arguments, 0, "", "")
+                    if arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+                        return subprocess.CompletedProcess(arguments, 0, "#1234567 0 0 524288\n", "")
+                    if arguments[:2] == ("xfs_io", "-c"):
+                        project_id = 1234567 if assigned_project else 0
+                        return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
                     return subprocess.CompletedProcess(arguments, 0, "", "")
 
                 with (
