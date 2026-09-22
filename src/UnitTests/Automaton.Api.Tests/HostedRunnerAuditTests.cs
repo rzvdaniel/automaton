@@ -248,6 +248,58 @@ public partial class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task PrepareProvisioningAsync_PersistsResolvedPolicyAndPreservesSpecificationSettings()
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db);
+        SeedUser(db, userId, planId);
+        SeedRunnerHost(db);
+
+        var specificationId = PlanCapabilitiesSerializer.Deserialize(
+            db.SubscriptionPlans.Single(x => x.Id == planId).CapabilitiesJson)
+            .HostedRunner.SpecificationId!.Value;
+        var specification = await db.HostedRunnerSpecifications.SingleAsync(x => x.Id == specificationId);
+        specification.Resources = new HostedRunnerResources
+        {
+            CpuLimit = 0.75m,
+            MemoryLimitMb = 1024,
+            MemoryReservationMb = 512,
+            DiskLimitMb = 3072,
+            PidsLimit = 192,
+            SharedMemoryMb = 96,
+            DockerLogMaxSizeMb = 20,
+            DockerLogMaxFiles = 4,
+            MaximumApps = 7
+        };
+        db.SaveChanges();
+
+        var service = CreateProvisioningService(
+            db,
+            userId,
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerOptions { Enabled = false });
+
+        var prepared = await service.PrepareProvisioningAsync(userId, Guid.Empty);
+        var snapshot = prepared.HostedRunner.SpecificationSnapshot;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.SourceSpecificationId, Is.EqualTo(specificationId));
+            Assert.That(snapshot.Resources.CpuLimit, Is.EqualTo(0.75m));
+            Assert.That(snapshot.Resources.MemoryLimitMb, Is.EqualTo(1024));
+            Assert.That(snapshot.Resources.DiskLimitMb, Is.EqualTo(3072));
+            Assert.That(snapshot.Resources.PidsLimit, Is.EqualTo(192));
+            Assert.That(snapshot.Resources.MaximumApps, Is.EqualTo(7));
+            Assert.That(snapshot.Resources.MemoryReservationMb, Is.EqualTo(512));
+            Assert.That(snapshot.Resources.SharedMemoryMb, Is.EqualTo(96));
+            Assert.That(snapshot.Resources.DockerLogMaxSizeMb, Is.EqualTo(20));
+            Assert.That(snapshot.Resources.DockerLogMaxFiles, Is.EqualTo(4));
+            Assert.That(prepared.HostedRunner.StorageProjectId, Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
     public async Task PrepareProvisioningAsync_DoesNotOverallocateHostCapacity()
     {
         using var db = CreateDbContext();
@@ -1144,7 +1196,7 @@ public partial class HostedRunnerAuditTests
             TestRunnerEnrollmentFactory.Create(db, auditEventService, options),
             new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
-            new HostedRunnerSpecificationResolver(db),
+            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
     }
