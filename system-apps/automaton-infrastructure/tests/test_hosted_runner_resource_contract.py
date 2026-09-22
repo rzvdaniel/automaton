@@ -70,7 +70,11 @@ Project ID       Used       Soft       Hard    Warn/Grace
 #0              246168          0          0     00 [--------]
 #1165812734         28          0          2097152     00 [--------]
 """
-        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+        for action_key in (
+            "provision-hosted-runner",
+            "reprovision-hosted-runner",
+            "measure-hosted-runner-storage",
+        ):
             with self.subTest(action_key=action_key):
                 module = load_action(action_key)
                 with patch.object(module, "host", return_value=subprocess.CompletedProcess(
@@ -88,11 +92,36 @@ Project ID       Used       Soft       Hard    Warn/Grace
 ---------- --------------------------------------------------
 #0              246168          0          0     00 [--------]
 """
-        module = load_action("provision-hosted-runner")
-        with patch.object(module, "host", return_value=subprocess.CompletedProcess(
-            ("xfs_quota", "-x"), 0, report, ""
-        )):
-            self.assertIsNone(module.read_project_quota("/srv/automaton-workloads", 1165812734))
+        for action_key in (
+            "provision-hosted-runner",
+            "reprovision-hosted-runner",
+            "measure-hosted-runner-storage",
+        ):
+            with self.subTest(action_key=action_key):
+                module = load_action(action_key)
+                with patch.object(module, "host", return_value=subprocess.CompletedProcess(
+                    ("xfs_quota", "-x"), 0, report, ""
+                )):
+                    self.assertIsNone(module.read_project_quota("/srv/automaton-workloads", 1165812734))
+
+    def test_project_quota_enforcement_requires_on_for_all_actions(self):
+        enabled = """Project quota state on /srv/automaton-workloads (/dev/sdb)
+  Accounting: ON
+  Enforcement: ON
+"""
+        disabled = """Project quota state on /srv/automaton-workloads (/dev/sdb)
+  Accounting: ON
+  Enforcement: OFF
+"""
+        for action_key in (
+            "provision-hosted-runner",
+            "reprovision-hosted-runner",
+            "measure-hosted-runner-storage",
+        ):
+            with self.subTest(action_key=action_key):
+                module = load_action(action_key)
+                self.assertTrue(module.project_quota_enforcement_enabled(enabled))
+                self.assertFalse(module.project_quota_enforcement_enabled(disabled))
 
     def test_read_project_quota_rejects_malformed_target_row(self):
         module = load_action("provision-hosted-runner")
