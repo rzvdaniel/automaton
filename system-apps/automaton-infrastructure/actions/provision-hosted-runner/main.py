@@ -124,14 +124,33 @@ def resolve_filesystem_mountpoint(path: str) -> str:
     return posixpath.normpath(mountpoint)
 
 
-def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int, int]:
-    result = host("xfs_quota", "-x", "-c", f"quota -p -b -N {project_id}", filesystem_mountpoint)
-    for line in (result.stdout + result.stderr).splitlines():
-        values = [int(value) for value in re.findall(r"(?<![A-Za-z])\d+(?![A-Za-z])", line)]
-        if not values or values[0] != project_id or len(values) < 4:
+def parse_project_quota_report(output: str, project_id: int) -> tuple[int, int] | None:
+    saw_report_shape = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if lowered.startswith("project quota on") or lowered.startswith("project id"):
+            saw_report_shape = True
             continue
-        return values[1] * 1024, values[3] * 1024
-    raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
+        match = re.match(r"^#?(\d+)\s+(.+)$", stripped)
+        if not match:
+            continue
+        saw_report_shape = True
+        row_project_id = int(match.group(1))
+        if row_project_id != project_id:
+            continue
+        columns = match.group(2).split()
+        if len(columns) < 3 or any(not re.fullmatch(r"\d+", value) for value in columns[:3]):
+            raise RuntimeError(f"XFS project quota for project {project_id} could not be verified: malformed output")
+        return int(columns[0]) * 1024, int(columns[2]) * 1024
+    if saw_report_shape:
+        return None
+    raise RuntimeError(f"XFS project quota for project {project_id} could not be verified: output could not be parsed")
+
+
+def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int, int] | None:
+    result = host("xfs_quota", "-x", "-c", "report -p -b -n", filesystem_mountpoint)
+    return parse_project_quota_report(result.stdout + result.stderr, project_id)
 
 
 def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
@@ -168,12 +187,15 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to managed volume {mountpoint}")
 
-    usage, _ = read_project_quota(filesystem_mountpoint, project_id)
+    existing_quota = read_project_quota(filesystem_mountpoint, project_id)
     limit_bytes = disk_limit_mb * 1024 * 1024
-    if usage > limit_bytes:
+    if existing_quota is not None and existing_quota[0] > limit_bytes:
         raise RuntimeError("Disk limit is below current XFS project usage; data was not deleted")
     host("xfs_quota", "-x", "-c", f"limit -p bhard={disk_limit_mb}m {project_id}", filesystem_mountpoint)
-    _, hard_limit_bytes = read_project_quota(filesystem_mountpoint, project_id)
+    configured_quota = read_project_quota(filesystem_mountpoint, project_id)
+    if configured_quota is None:
+        raise RuntimeError(f"XFS project quota for project {project_id} was not configured")
+    _, hard_limit_bytes = configured_quota
     if hard_limit_bytes != limit_bytes:
         raise RuntimeError("XFS project hard limit did not match diskLimitMb")
 
@@ -204,7 +226,10 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
 
     if len(set(filesystem_mountpoints)) != 1:
         raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
-    usage, hard_limit_bytes = read_project_quota(filesystem_mountpoints[0], project_id)
+    final_quota = read_project_quota(filesystem_mountpoints[0], project_id)
+    if final_quota is None:
+        raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
+    usage, hard_limit_bytes = final_quota
     limit_bytes = disk_limit_mb * 1024 * 1024
     if usage > limit_bytes:
         raise RuntimeError("XFS project usage exceeds diskLimitMb")

@@ -62,6 +62,77 @@ def action_request() -> dict[str, object]:
 
 
 class HostedRunnerResourceContractTests(unittest.TestCase):
+    def test_read_project_quota_parses_real_host_report_shape_and_units(self):
+        report = """Project quota on /srv/automaton-workloads (/dev/sdb)
+                               Blocks
+Project ID       Used       Soft       Hard    Warn/Grace
+---------- --------------------------------------------------
+#0              246168          0          0     00 [--------]
+#1165812734         28          0          2097152     00 [--------]
+"""
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                module = load_action(action_key)
+                with patch.object(module, "host", return_value=subprocess.CompletedProcess(
+                    ("xfs_quota", "-x"), 0, report, ""
+                )) as host_mock:
+                    self.assertEqual(
+                        module.read_project_quota("/srv/automaton-workloads", 1165812734),
+                        (28 * 1024, 2048 * 1024 * 1024),
+                    )
+                self.assertEqual(host_mock.call_args.args[3], "report -p -b -n")
+
+    def test_read_project_quota_returns_none_for_an_absent_project_row(self):
+        report = """Project quota on /srv/automaton-workloads (/dev/sdb)
+Project ID       Used       Soft       Hard    Warn/Grace
+---------- --------------------------------------------------
+#0              246168          0          0     00 [--------]
+"""
+        module = load_action("provision-hosted-runner")
+        with patch.object(module, "host", return_value=subprocess.CompletedProcess(
+            ("xfs_quota", "-x"), 0, report, ""
+        )):
+            self.assertIsNone(module.read_project_quota("/srv/automaton-workloads", 1165812734))
+
+    def test_read_project_quota_rejects_malformed_target_row(self):
+        module = load_action("provision-hosted-runner")
+        report = "Project ID Used Soft Hard\n#1165812734 malformed\n"
+        with patch.object(module, "host", return_value=subprocess.CompletedProcess(
+            ("xfs_quota", "-x"), 0, report, ""
+        )):
+            with self.assertRaisesRegex(RuntimeError, "malformed"):
+                module.read_project_quota("/srv/automaton-workloads", 1165812734)
+
+    def test_read_project_quota_propagates_nonzero_xfs_command_failure(self):
+        module = load_action("provision-hosted-runner")
+        with patch.object(module, "host", side_effect=RuntimeError("xfs_quota failed")):
+            with self.assertRaisesRegex(RuntimeError, "xfs_quota failed"):
+                module.read_project_quota("/srv/automaton-workloads", 1165812734)
+
+    def test_first_time_project_is_not_configured_before_limit_then_is_verified(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        calls, _ = self.run_provision_action(
+            "provision-hosted-runner",
+            existing,
+            request_override={"diskLimitMb": 2048, "xfsProjectId": 1165812734},
+        )
+        report_indices = [
+            index for index, call in enumerate(calls)
+            if call[:2] == ("xfs_quota", "-x")
+            and any("report -p -b -n" in argument for argument in call)
+        ]
+        self.assertGreaterEqual(len(report_indices), 3)
+        limit_index = next(
+            index for index, call in enumerate(calls)
+            if call[:2] == ("xfs_quota", "-x")
+            and any("limit -p bhard=2048m 1165812734" in argument for argument in call)
+        )
+        self.assertLess(report_indices[0], limit_index)
+        self.assertGreater(report_indices[1], limit_index)
+
     def run_provision_action(
         self,
         action_key: str,
@@ -140,12 +211,17 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     raise RuntimeError(xfs_limit_error)
                 quota_configured = True
                 stdout = ""
-            elif arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+            elif arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                 project_id = int(request["xfsProjectId"])
-                hard_blocks = int(request["diskLimitMb"]) * 1024 if quota_configured else 0
-                if container_replaced and not final_quota_hard_limit_matches:
-                    hard_blocks = 0
-                stdout = f"#{project_id} 0 0 {hard_blocks}\n" if xfs_quota_verification_succeeds else "quota output unavailable\n"
+                if not xfs_quota_verification_succeeds:
+                    stdout = "quota output unavailable\n"
+                elif not quota_configured:
+                    stdout = "Project quota on /var/lib/docker\n#0 0 0 0\n"
+                else:
+                    hard_blocks = int(request["diskLimitMb"]) * 1024
+                    if container_replaced and not final_quota_hard_limit_matches:
+                        hard_blocks = 0
+                    stdout = f"Project ID   Used   Soft   Hard\n#{project_id} 0 0 {hard_blocks}\n"
             elif arguments[:2] == ("xfs_io", "-c"):
                 project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
                 stdout = f"fsxattr.projid = {project_id}\n"
@@ -404,7 +480,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                         final_quota_hard_limit_matches=False,
                     )
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
-                self.assertTrue(any(index > run_index for index, call in enumerate(calls) if call[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in call)))
+                self.assertTrue(any(index > run_index for index, call in enumerate(calls) if call[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in call)))
 
     def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
         for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
@@ -515,7 +591,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
                 assigned_project = True
                 return subprocess.CompletedProcess(arguments, 0, "", "")
-            if arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+            if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                 return subprocess.CompletedProcess(arguments, 0, "#1234567 600000 0 0\n", "")
             if arguments[:2] == ("xfs_io", "-c"):
                 project_id = 1234567 if assigned_project else 0
@@ -567,7 +643,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
                         assigned_project = True
                         return subprocess.CompletedProcess(arguments, 0, "", "")
-                    if arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
+                    if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                         return subprocess.CompletedProcess(arguments, 0, "#1234567 0 0 524288\n", "")
                     if arguments[:2] == ("xfs_io", "-c"):
                         project_id = 1234567 if assigned_project else 0
