@@ -71,8 +71,11 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         calls_out: list[tuple[str, ...]] | None = None,
         request_override: dict[str, object] | None = None,
         xfs_project_error: str | None = None,
+        xfs_limit_error: str | None = None,
         xfs_assignment_succeeds: bool = True,
         xfs_quota_verification_succeeds: bool = True,
+        final_quota_hard_limit_matches: bool = True,
+        reset_storage_after_container: bool = False,
     ):
         module = load_action(action_key)
         calls = calls_out if calls_out is not None else []
@@ -81,9 +84,11 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         if request_override:
             request.update(request_override)
         assigned_project = False
+        quota_configured = False
+        container_replaced = False
 
         def fake_host(*arguments, check=True):
-            nonlocal assigned_project
+            nonlocal assigned_project, quota_configured, container_replaced
             calls.append(arguments)
             if arguments[:2] == ("docker", "pull") and image_pull_error is not None:
                 raise RuntimeError(image_pull_error)
@@ -130,9 +135,16 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     raise RuntimeError(xfs_project_error)
                 assigned_project = True
                 stdout = ""
+            elif arguments[:2] == ("xfs_quota", "-x") and any("limit -p" in argument for argument in arguments):
+                if xfs_limit_error is not None:
+                    raise RuntimeError(xfs_limit_error)
+                quota_configured = True
+                stdout = ""
             elif arguments[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in arguments):
                 project_id = int(request["xfsProjectId"])
-                hard_blocks = int(request["diskLimitMb"]) * 1024
+                hard_blocks = int(request["diskLimitMb"]) * 1024 if quota_configured else 0
+                if container_replaced and not final_quota_hard_limit_matches:
+                    hard_blocks = 0
                 stdout = f"#{project_id} 0 0 {hard_blocks}\n" if xfs_quota_verification_succeeds else "quota output unavailable\n"
             elif arguments[:2] == ("xfs_io", "-c"):
                 project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
@@ -140,6 +152,11 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             elif arguments[:2] == ("systemctl", "show"):
                 stdout = "1\n1\n256\n"
             else:
+                if arguments[:2] == ("docker", "run") and reset_storage_after_container:
+                    assigned_project = False
+                    quota_configured = False
+                if arguments[:2] == ("docker", "run"):
+                    container_replaced = True
                 stdout = "container-id\n" if arguments[:2] == ("docker", "run") else ""
             return subprocess.CompletedProcess(arguments, 0, stdout, "")
 
@@ -208,6 +225,14 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             sum(call[:3] == ("docker", "volume", "inspect") for call in calls),
             4,
         )
+        first_assignment = next(
+            index for index, call in enumerate(calls)
+            if call[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in call)
+        )
+        last_volume_create = max(
+            index for index, call in enumerate(calls) if call[:3] == ("docker", "volume", "create")
+        )
+        self.assertLess(last_volume_create, first_assignment)
         self.assert_resource_contract(calls)
 
     def test_xfs_assignment_uses_numeric_project_and_filesystem_mount_for_both_actions(self):
@@ -233,6 +258,13 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     self.assertIn(" 1165812734", call[3])
                     self.assertNotIn("#1165812734", call[3])
                     self.assertEqual(call[-1], "/var/lib/docker")
+                self.assertCountEqual(
+                    [call[3].split(" -p ", 1)[1].rsplit(" ", 1)[0] for call in project_calls],
+                    [
+                        f"/var/lib/docker/volumes/{SYSTEM_VOLUME}/_data",
+                        f"/var/lib/docker/volumes/{USER_VOLUME}/_data",
+                    ],
+                )
                 limit_call = next(
                     call for call in calls
                     if call[:2] == ("xfs_quota", "-x")
@@ -295,6 +327,84 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
                     )
                 self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
                 self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_xfs_quota_set_failure_is_fatal_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                existing = {
+                    SYSTEM_VOLUME: volume_labels("system"),
+                    USER_VOLUME: volume_labels("user"),
+                }
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "quota setup failed"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        xfs_limit_error="quota setup failed",
+                    )
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_final_storage_postconditions_are_verified_after_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "was not assigned to final managed volume"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        reset_storage_after_container=True,
+                    )
+                run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
+                final_project_check = next(
+                    index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
+                    if call[:2] == ("xfs_io", "-c")
+                )
+                self.assertGreater(final_project_check, run_index)
+                final_project_checks = [
+                    index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
+                    if call[:2] == ("xfs_io", "-c")
+                ]
+                self.assertEqual(len(final_project_checks), 1)
+
+    def test_successful_final_storage_postconditions_check_both_roots(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls, _ = self.run_provision_action(action_key, existing)
+                run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
+                final_project_checks = [
+                    index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
+                    if call[:2] == ("xfs_io", "-c")
+                ]
+                self.assertEqual(len(final_project_checks), 2)
+
+    def test_final_quota_readback_mismatch_fails_after_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "hard limit did not match diskLimitMb on final volumes"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        final_quota_hard_limit_matches=False,
+                    )
+                run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
+                self.assertTrue(any(index > run_index for index, call in enumerate(calls) if call[:2] == ("xfs_quota", "-x") and any("quota -p" in argument for argument in call)))
 
     def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
         for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
