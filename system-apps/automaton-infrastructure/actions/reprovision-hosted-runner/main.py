@@ -178,6 +178,40 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
         raise RuntimeError("XFS project hard limit did not match diskLimitMb")
 
 
+def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
+    """Verify the final Docker-backed roots after all container mutations."""
+    if disk_limit_mb <= 0:
+        raise ValueError("diskLimitMb must be positive")
+    docker_root = resolve_docker_root()
+    filesystem_mountpoints: list[str] = []
+    for mountpoint in mountpoints:
+        validate_mountpoint(mountpoint, docker_root)
+        filesystem = host("stat", "-f", "-c", "%T", mountpoint)
+        if filesystem.stdout.strip().lower() != "xfs":
+            raise RuntimeError("Hard Hosted Runner storage quotas require an XFS Docker volume filesystem")
+        options = host("findmnt", "-no", "OPTIONS", "-T", mountpoint)
+        quota_options = {part.strip().lower() for part in options.stdout.split(",")}
+        if not {"prjquota", "pquota"}.intersection(quota_options):
+            raise RuntimeError("XFS project quota accounting and enforcement are not enabled")
+        filesystem_mountpoint = resolve_filesystem_mountpoint(mountpoint)
+        state = host("xfs_quota", "-x", "-c", "state", filesystem_mountpoint)
+        state_text = (state.stdout + state.stderr).lower()
+        if "project quota" not in state_text or "enforc" not in state_text:
+            raise RuntimeError("XFS project quota enforcement could not be verified")
+        if current_project_id(mountpoint) != project_id:
+            raise RuntimeError(f"XFS project {project_id} was not assigned to final managed volume {mountpoint}")
+        filesystem_mountpoints.append(filesystem_mountpoint)
+
+    if len(set(filesystem_mountpoints)) != 1:
+        raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
+    usage, hard_limit_bytes = read_project_quota(filesystem_mountpoints[0], project_id)
+    limit_bytes = disk_limit_mb * 1024 * 1024
+    if usage > limit_bytes:
+        raise RuntimeError("XFS project usage exceeds diskLimitMb")
+    if hard_limit_bytes != limit_bytes:
+        raise RuntimeError("XFS project hard limit did not match diskLimitMb on final volumes")
+
+
 def ensure_resource_group(runner_id: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> str:
     info = host("docker", "info", "--format", "{{.CgroupVersion}}|{{.CgroupDriver}}")
     version, _, driver = info.stdout.strip().partition("|")
@@ -286,6 +320,7 @@ def main() -> None:
     container_id = host(*docker_arguments).stdout.strip()
     if runtime_network and runtime_network != network:
         host("docker", "network", "connect", runtime_network, container_name, check=False)
+    verify_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
 
     response = {
         "success": True,
