@@ -42,6 +42,6 @@ public class ExceptionHandlingMiddleware
 
         var exResult = JsonSerializer.Serialize(errorModel);
 
-        await context.Response.WriteAsync(exResult);
+        await context.Response.WriteAsync(exResult, context.RequestAborted);
     }
 }

@@ -45,6 +45,7 @@ public class AppsStepExecutionController : ControllerBase
         string appSlug,
         string stepIdentifier,
         [FromBody] AppStepExecutionRequest request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         try
@@ -79,7 +80,7 @@ public class AppsStepExecutionController : ControllerBase
             var inputs = request.Inputs != null
                 ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId);
+            ApplyTestRunIdInput(inputs, request.TestRunId, testRunIdHeaders?.FirstOrDefault());
 
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
@@ -122,6 +123,7 @@ public class AppsStepExecutionController : ControllerBase
         Guid appId,
         string stepIdentifier,
         [FromBody] AppStepExecutionRequest request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         try
@@ -149,7 +151,7 @@ public class AppsStepExecutionController : ControllerBase
             var inputs = request.Inputs != null
                 ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId);
+            ApplyTestRunIdInput(inputs, request.TestRunId, testRunIdHeaders?.FirstOrDefault());
 
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
@@ -243,6 +245,7 @@ public class AppsStepExecutionController : ControllerBase
         Guid appId,
         string stepIdentifier,
         [FromBody] AppStepExecutionRequest request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         if (User.Identity?.IsAuthenticated != true ||
@@ -252,7 +255,7 @@ public class AppsStepExecutionController : ControllerBase
             return Task.FromResult<ActionResult<AppStepExecutionResponse>>(Unauthorized(new { error = "Authentication required" }));
         }
 
-        return ExecuteStepPreview(appId, stepIdentifier, request, cancellationToken);
+        return ExecuteStepPreview(appId, stepIdentifier, request, testRunIdHeaders, cancellationToken);
     }
 
     [HttpGet("app/{appId:guid}/steps")]
@@ -269,27 +272,23 @@ public class AppsStepExecutionController : ControllerBase
         return ListStepsPreview(appId);
     }
 
-    private void ApplyTestRunIdInput(Dictionary<string, string> inputs, string? bodyTestRunId)
+    private static void ApplyTestRunIdInput(
+        Dictionary<string, string> inputs,
+        string? bodyTestRunId,
+        string? headerTestRunId)
     {
-        var testRunId = ResolveTestRunId(bodyTestRunId);
+        var testRunId = ResolveTestRunId(bodyTestRunId, headerTestRunId);
         if (string.IsNullOrWhiteSpace(testRunId))
             return;
 
         inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
     }
 
-    private string? ResolveTestRunId(string? bodyTestRunId)
+    private static string? ResolveTestRunId(string? bodyTestRunId, string? headerTestRunId)
     {
         if (!string.IsNullOrWhiteSpace(bodyTestRunId))
             return bodyTestRunId.Trim();
 
-        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
-        {
-            var headerValue = headerValues.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(headerValue))
-                return headerValue.Trim();
-        }
-
-        return null;
+        return string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
     }
 }

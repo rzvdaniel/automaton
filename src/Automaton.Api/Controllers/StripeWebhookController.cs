@@ -24,10 +24,14 @@ public class StripeWebhookController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Handle()
+    public async Task<IActionResult> Handle(
+        [FromHeader(Name = "Stripe-Signature")] string? signature,
+        CancellationToken cancellationToken)
     {
-        var payload = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
-        var signature = Request.Headers["Stripe-Signature"].ToString();
+        // Stripe signs the exact request bytes. Model-binding the payload could change
+        // its representation, so this endpoint intentionally reads the raw body.
+        using var payloadReader = new StreamReader(HttpContext.Request.Body, leaveOpen: true);
+        var payload = await payloadReader.ReadToEndAsync(cancellationToken);
 
         if (string.IsNullOrEmpty(signature))
             return BadRequest("Missing Stripe-Signature header");
@@ -36,6 +40,10 @@ public class StripeWebhookController : ControllerBase
         {
             await _stripe.HandleWebhookAsync(payload, signature);
             return Ok();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (StripeException ex)
         {

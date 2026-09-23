@@ -73,7 +73,9 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         if (!runtimeRegistry.TryGet(appId, deploymentTargetId, out var runtime))
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Application runtime is unavailable." });
+            await context.Response.WriteAsJsonAsync(
+                new { error = "Application runtime is unavailable." },
+                context.RequestAborted);
             return;
         }
 

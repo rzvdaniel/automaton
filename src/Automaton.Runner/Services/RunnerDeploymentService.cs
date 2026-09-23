@@ -166,7 +166,8 @@ public class RunnerDeploymentService
             var actionResults = await actionDeploymentService.PrepareAllAsync(
                 appId,
                 deploymentTargetId,
-                request.SystemInfrastructure);
+                request.SystemInfrastructure,
+                executionCancellationToken);
             logs.AddRange(actionResults.Select(result => $"Action {result.ActionKey}: {result.Status}."));
 
             EnsureExecutionAttemptIsCurrent(request, executionCancellationToken);

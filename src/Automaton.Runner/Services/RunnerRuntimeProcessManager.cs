@@ -290,7 +290,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (process is not null)
             {
-                await StopProcessAsync(process);
+                await StopProcessAsync(process, cancellationToken);
                 RemoveActiveRuntime(key, process);
             }
             if (active is null)
@@ -334,7 +334,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             promotionIrreversible = true;
 
             if (old is not null && !old.Process.HasExited)
-                await StopProcessAsync(old.Process);
+            await StopProcessAsync(old.Process, cancellationToken);
 
             if (old is not null)
                 DeleteArtifactDirectory(old.ArtifactRoot, candidate.ArtifactRoot);
@@ -388,7 +388,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (!IsCurrentRuntime(key, candidate))
             {
-                await StopProcessAsync(candidate.Process);
+            await StopProcessAsync(candidate.Process, cancellationToken);
                 RemoveActiveRuntime(key, candidate.Process);
             }
             throw;

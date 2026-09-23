@@ -34,7 +34,7 @@ public class AdminSubscriptionPlansControllerAuditTests
             IsActive = true,
             IsDefault = false,
             StripePriceId = "price_123"
-        });
+        }, CancellationToken.None);
 
         Assert.That(actionResult.Result, Is.TypeOf<CreatedAtActionResult>());
 
@@ -69,7 +69,7 @@ public class AdminSubscriptionPlansControllerAuditTests
         var result = await controller.AssignPlan(targetUserId, new AssignPlanRequest
         {
             PlanId = plan.Id
-        });
+        }, CancellationToken.None);
 
         Assert.That(result, Is.TypeOf<NoContentResult>());
 

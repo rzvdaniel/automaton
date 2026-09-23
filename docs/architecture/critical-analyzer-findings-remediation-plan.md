@@ -1,6 +1,6 @@
 # Critical analyzer findings remediation plan
 
-Status: batches 1–3 are implemented in [PR #302](https://github.com/rzvdaniel/automaton/pull/302), pending review and merge. The five rules `S4830`, `S5445`, `S4502`, `S2930`, and `S2190` are configured as build errors on that branch. Batch 4 (`S8949`, `S5693`, `S6932`) and the later `S6444` review remain planned. This document does not authorize a production deployment.
+Status: batches 1–3 were merged in [PR #302](https://github.com/rzvdaniel/automaton/pull/302) (merge commit `c8b5899a`). The five rules `S4830`, `S5445`, `S4502`, `S2930`, and `S2190` are build errors on `main`. Batch 4 is being handled in smaller, reviewable slices; the current slice updates request-scoped cancellation and replaces avoidable raw-header/query reads with model binding. Remaining Runner background cancellation findings and the request-size dispositions are still open. `S6444` remains planned. This document does not authorize a production deployment.
 
 Baseline: `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` on 2026-09-23, starting at commit `44b84cbf`. The build succeeded with 1,978 warning emissions. Counts below are distinct diagnostic locations after removing repeated output lines; rerun the command before each batch. The standalone analyzer reports potential defects, so each finding needs a code and behavior review before it is treated as confirmed.
 
@@ -76,6 +76,18 @@ Acceptance: cookie-authenticated state-changing POSTs have antiforgery protectio
 Acceptance: tests prove cancellation and disposal without race or resource leak, and renewal cannot continue after its owner stops. Resolve each finding where appropriate. If `S2190` is a false positive for the deliberate cancellation loop, record a narrowly scoped explanation and suppression only after the behavioral tests pass. Promote `S2930` and `S2190` to errors only after the entire solution is clear or individually justified, and after a deliberate violation is shown to fail in the standalone analyzer.
 
 ## Batch 4 — Cancellation and request boundaries (`S8949`, `S5693`, `S6932`)
+
+### Current slice — request-scoped cancellation and model binding
+
+The in-progress slice propagates request or operation cancellation through the affected admin plan operations, Runner deployment preparation and process stop paths, API response writes, and selected app-update/provider calls. The file-upload and tunnel registries cancel their timeout continuations when the associated request ends. `ApplicationBuildExecutor` keeps its bounded output-drain cleanup independent of cancellation because the reader cancellation source is only canceled after the drain timeout. The queued app-action dispatch likewise uses an explicit independent lifetime because it represents persisted work that must continue after the initiating request disconnects.
+
+Test-run IDs, runtime-auth headers, Runner enrollment credentials, MCP API-key headers, and the restricted-app runtime token are bound as action parameters. The Stripe webhook retains a raw-body read because signature validation depends on the exact payload; the read now observes request cancellation. Broader `HubService` and `RunnerHostService` findings still require lifecycle-by-lifecycle review before any token is propagated into reconnects, file transfers, or durable callbacks.
+
+`S5693` currently points at actions that already enforce explicit API request caps: 50 MiB for archive import and deployed-file ZIP upload, and 200 MiB for app-file uploads, with matching multipart parser caps on the latter. These are intentional product limits rather than missing request limits. The analyzer warnings remain pending a separate deployment-edge review; do not shrink the product caps just to clear the diagnostic.
+
+This slice does not promote `S8949`, `S5693`, or `S6932` to build errors. The remaining diagnostic inventory needs a fresh build and a documented disposition before any rule is considered for promotion.
+
+The latest focused Debug builds of the API test project and Runner project show no remaining API `S8949` or `S6932` findings in this slice. The Runner build still reports 32 `S8949` locations: 17 in `RunnerHostService` and 15 in `HubService`. The API still reports the five `S5693` locations described above. This is a partial resolution of the original 62-location cancellation inventory; do not treat the rule as cleared.
 
 For the 62 `S8949` locations, first group by operation owner: HTTP request, durable deployment/message consumer, Runner background loop, and test. Review the production paths with side effects first. Propagate cancellation when it safely stops a request-scoped operation. Use an explicit independent lifetime when work must survive request cancellation, and test retry/partial-completion behavior. Do not treat `CancellationToken.None` as a mechanical fix. Work through small feature batches, not one repository-wide edit. Promote the rule only after remaining findings have a reviewed disposition and the standalone gate is proven to fire.
 

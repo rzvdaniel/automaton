@@ -59,6 +59,7 @@ public class AppsFlowExecutionController : ControllerBase
         string appSlug,
         string flowIdentifier,
         [FromBody] WebAppFlowExecutionRequest? request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         request ??= new WebAppFlowExecutionRequest();
@@ -117,7 +118,7 @@ public class AppsFlowExecutionController : ControllerBase
             ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var testRunId = ResolveTestRunId(request.TestRunId);
+        var testRunId = ResolveTestRunId(request.TestRunId, testRunIdHeaders?.FirstOrDefault());
         if (!string.IsNullOrWhiteSpace(testRunId))
         {
             inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
@@ -194,6 +195,7 @@ public class AppsFlowExecutionController : ControllerBase
         Guid appId,
         string flowIdentifier,
         [FromBody] WebAppFlowExecutionRequest? request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         request ??= new WebAppFlowExecutionRequest();
@@ -234,7 +236,7 @@ public class AppsFlowExecutionController : ControllerBase
             ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var testRunId = ResolveTestRunId(request.TestRunId);
+        var testRunId = ResolveTestRunId(request.TestRunId, testRunIdHeaders?.FirstOrDefault());
         if (!string.IsNullOrWhiteSpace(testRunId))
             inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
 
@@ -296,6 +298,7 @@ public class AppsFlowExecutionController : ControllerBase
         Guid appId,
         string flowIdentifier,
         [FromBody] WebAppFlowExecutionRequest? request,
+        [FromHeader(Name = AppExecutionContextKeys.TestRunIdHeader)] string[]? testRunIdHeaders,
         CancellationToken cancellationToken)
     {
         if (User.Identity?.IsAuthenticated != true ||
@@ -305,7 +308,7 @@ public class AppsFlowExecutionController : ControllerBase
             return Task.FromResult<IActionResult>(Unauthorized(new { message = "Authentication required" }));
         }
 
-        return ExecuteFlowPreview(appId, flowIdentifier, request, cancellationToken);
+        return ExecuteFlowPreview(appId, flowIdentifier, request, testRunIdHeaders, cancellationToken);
     }
 
     // Helpers
@@ -361,19 +364,12 @@ public class AppsFlowExecutionController : ControllerBase
         throw new InvalidOperationException("No runner specified. Provide RunnerNames or set an execution runner on the app.");
     }
 
-    private string? ResolveTestRunId(string? bodyTestRunId)
+    private static string? ResolveTestRunId(string? bodyTestRunId, string? headerTestRunId)
     {
         if (!string.IsNullOrWhiteSpace(bodyTestRunId))
             return bodyTestRunId.Trim();
 
-        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
-        {
-            var headerValue = headerValues.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(headerValue))
-                return headerValue.Trim();
-        }
-
-        return null;
+        return string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
     }
 }
 

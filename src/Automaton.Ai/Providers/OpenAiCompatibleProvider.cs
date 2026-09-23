@@ -722,7 +722,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (message.Request.Content is null) return;
 
             using var ms = new System.IO.MemoryStream();
-            message.Request.Content.WriteTo(ms, default);
+            message.Request.Content.WriteTo(ms, message.CancellationToken);
             ms.Position = 0;
 
             try
