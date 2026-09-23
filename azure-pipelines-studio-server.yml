@@ -24,10 +24,32 @@ jobs:
 
   steps:
   - task: UseDotNet@2 
-    displayName: ".NET 9.x"
+    displayName: ".NET 9.0.318"
     inputs:
-      version: '9.x'
+      version: '9.0.318'
       packageType: sdk
+
+  - task: UsePythonVersion@0
+    displayName: "Python 3.x for repository quality checks"
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
+      architecture: 'x64'
+
+  - script: |
+      set -e
+      mkdir -p .artifacts/quality/complexity
+      python -m unittest discover -s scripts/quality -p "test_*.py"
+      python scripts/quality/complexity_gate.py --configuration Release
+    displayName: "Run all-project complexity and coupling gate"
+
+  - task: PublishPipelineArtifact@1
+    displayName: "Publish analyzer SARIF reports"
+    condition: always()
+    inputs:
+      targetPath: '.artifacts/quality/complexity'
+      artifact: 'complexity-analyzer-reports'
+      publishLocation: 'pipeline'
 
   - task: DotNetCoreCLI@2
     displayName: "Test"

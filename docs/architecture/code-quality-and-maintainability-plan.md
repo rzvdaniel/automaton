@@ -1,6 +1,6 @@
 # Code quality and maintainability implementation plan
 
-Status: proposed; implementation has not started.
+Status: Stage 0's all-project analyzer inventory and Stage 1's baseline-aware no-regression command are implemented on `codex/complexity-quality-gate`. The Studio Server pipeline now invokes the gate and publishes SARIF; Azure execution and required branch-policy enforcement are not yet verified. The Codex contract and maintainability skill are added. Existing cleanup is still open: 574 findings remain in the reviewed baseline, and the largest method hotspots are listed in [complexity-baseline.md](complexity-baseline.md).
 
 Date: 2026-09-23. Repository inspection baseline: `3eb1c2cd`.
 

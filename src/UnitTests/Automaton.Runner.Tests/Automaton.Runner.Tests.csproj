@@ -25,6 +25,7 @@
     <Compile Include="..\Shared\LoopbackTlsServer.cs" Link="LoopbackTlsServer.cs" />
     <ProjectReference Include="..\RunnerRuntimeFixture\RunnerRuntimeFixture.csproj" ReferenceOutputAssembly="false" />
     <Content Include="..\GenericRuntimeAcceptanceFixtures\**\*"
+             Exclude="..\GenericRuntimeAcceptanceFixtures\**\bin\**;..\GenericRuntimeAcceptanceFixtures\**\obj\**"
              Link="AcceptanceFixtures\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

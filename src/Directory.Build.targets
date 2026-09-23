@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup Condition="'$(AutomatonQualityReportDirectory)' != ''">
+    <ErrorLog>$(AutomatonQualityReportDirectory)/$(MSBuildProjectName)-$(TargetFramework).sarif</ErrorLog>
+  </PropertyGroup>
+
   <ItemGroup>
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" PrivateAssets="all" />
