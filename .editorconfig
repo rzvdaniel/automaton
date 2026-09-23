@@ -9,3 +9,8 @@ dotnet_diagnostic.CA1501.severity = warning
 
 # Sonar's cognitive complexity rule complements CA1502's cyclomatic metric.
 dotnet_diagnostic.S3776.severity = warning
+
+# Clear correctness defects: the full-solution baseline has no findings for
+# these rules. New violations fail ordinary Debug and Release builds.
+dotnet_diagnostic.S1764.severity = error
+dotnet_diagnostic.S2757.severity = error
