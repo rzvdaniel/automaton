@@ -76,8 +76,10 @@ public class AdminSubscriptionPlansController : ControllerBase
         var isActive = req.IsActive;
         var isDefault = isActive && req.IsDefault;
 
-        await using var transaction = isDefault && _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(
+                isDefault ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted,
+                cancellationToken)
             : null;
 
         // Only one default plan at a time
@@ -103,10 +105,6 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         _db.SubscriptionPlans.Add(plan);
         await _db.SaveChangesAsync(cancellationToken);
-        if (transaction != null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-        }
 
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -125,8 +123,14 @@ public class AdminSubscriptionPlansController : ControllerBase
                 plan.SortOrder,
                 HasStripeProductId = !string.IsNullOrWhiteSpace(plan.StripeProductId),
                 HasStripePriceId = !string.IsNullOrWhiteSpace(plan.StripePriceId)
-            }
+            },
+            FailOnError = true
         }, cancellationToken);
+
+        if (transaction != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
 
         return CreatedAtAction(nameof(GetPlan), new { id = plan.Id }, ToResponse(plan));
     }

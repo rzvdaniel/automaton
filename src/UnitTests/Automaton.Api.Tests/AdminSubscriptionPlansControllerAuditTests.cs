@@ -6,9 +6,11 @@ using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Messaging;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Tests;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +19,10 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using DotNetCore.CAP.Internal;
+using DotNetCore.CAP.Persistence;
+using DotNetCore.CAP.Transport;
 
 namespace Automaton.Api.Tests;
 
@@ -40,6 +46,43 @@ public class AdminSubscriptionPlansControllerAuditTests
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(dbContext, Guid.NewGuid());
+
+        Assert.CatchAsync<OperationCanceledException>(async () => await controller.CreatePlan(new CreateSubscriptionPlanRequest
+        {
+            Name = "Replacement default",
+            IsActive = true,
+            IsDefault = true
+        }, cancellationSource.Token));
+
+        dbContext.ChangeTracker.Clear();
+        Assert.That(await dbContext.SubscriptionPlans.CountAsync(plan => plan.IsDefault), Is.EqualTo(1));
+        Assert.That(await dbContext.SubscriptionPlans.AnyAsync(plan => plan.Name == "Existing default" && plan.IsDefault), Is.True);
+        Assert.That(await dbContext.SubscriptionPlans.AnyAsync(plan => plan.Name == "Replacement default"), Is.False);
+    }
+
+    [Test]
+    public async Task CreatePlan_CancellationDuringAudit_RollsBackPlanAndDefaultChange()
+    {
+        using var cancellationSource = new CancellationTokenSource();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateRelationalDbContextAsync(connection, cancellationSource, cancelAfterDefaultUpdate: false);
+        var existingDefault = new SubscriptionPlan
+        {
+            Id = Guid.NewGuid(),
+            Name = "Existing default",
+            IsDefault = true
+        };
+        dbContext.SubscriptionPlans.Add(existingDefault);
+        await dbContext.SaveChangesAsync();
+
+        var actorUserId = Guid.NewGuid();
+        var controller = CreateController(
+            dbContext,
+            actorUserId,
+            auditEventService: new CancelingAuditEventService(
+                CreateAuditEventService(dbContext, actorUserId),
+                cancellationSource));
 
         Assert.CatchAsync<OperationCanceledException>(async () => await controller.CreatePlan(new CreateSubscriptionPlanRequest
         {
@@ -165,6 +208,41 @@ public class AdminSubscriptionPlansControllerAuditTests
     }
 
     [Test]
+    public async Task CapTransactionalEventExecutor_CommitsDatabaseChangesWithoutPublishedEvent()
+    {
+        using var cancellationSource = new CancellationTokenSource();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateRelationalDbContextAsync(
+            connection,
+            cancellationSource,
+            cancelAfterDefaultUpdate: false);
+        var plan = new SubscriptionPlan
+        {
+            Id = Guid.NewGuid(),
+            Name = "Pro",
+            IsDefault = false
+        };
+        dbContext.SubscriptionPlans.Add(plan);
+        await dbContext.SaveChangesAsync();
+        using var capServices = new ServiceCollection()
+            .AddSingleton<IDispatcher, NoOpCapDispatcher>()
+            .BuildServiceProvider();
+        var capPublisher = new RecordingCapPublisher(capServices);
+        var executor = new CapTransactionalEventExecutor(dbContext, capPublisher);
+
+        await executor.ExecuteAsync(async token =>
+        {
+            Assert.That(capPublisher.Transaction?.AutoCommit, Is.False);
+            plan.IsDefault = true;
+            await dbContext.SaveChangesAsync(token);
+        });
+
+        dbContext.ChangeTracker.Clear();
+        Assert.That((await dbContext.SubscriptionPlans.SingleAsync(x => x.Id == plan.Id)).IsDefault, Is.True);
+    }
+
+    [Test]
     public async Task SetHostedRunnerTestAccess_WritesAuditEventWithTargetUserId()
     {
         await using var dbContext = CreateDbContext();
@@ -200,11 +278,12 @@ public class AdminSubscriptionPlansControllerAuditTests
     private static AdminSubscriptionPlansController CreateController(
         ApplicationDbContext dbContext,
         Guid actorUserId,
-        ITransactionalEventExecutor? transactionalEventExecutor = null)
+        ITransactionalEventExecutor? transactionalEventExecutor = null,
+        IAuditEventService? auditEventService = null)
     {
         var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
         var userContextService = new UserContextService(httpContextAccessor);
-        IAuditEventService auditEventService = new AuditEventService(dbContext, userContextService, httpContextAccessor);
+        auditEventService ??= new AuditEventService(dbContext, userContextService, httpContextAccessor);
         var apiKeyService = new ApiKeyService(
             dbContext,
             NullLogger<ApiKeyService>.Instance,
@@ -232,6 +311,12 @@ public class AdminSubscriptionPlansControllerAuditTests
             transactionalEventExecutor ?? new InlineTransactionalEventExecutor());
     }
 
+    private static IAuditEventService CreateAuditEventService(ApplicationDbContext dbContext, Guid actorUserId)
+    {
+        var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
+        return new AuditEventService(dbContext, new UserContextService(httpContextAccessor), httpContextAccessor);
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -243,11 +328,12 @@ public class AdminSubscriptionPlansControllerAuditTests
 
     private static async Task<ApplicationDbContext> CreateRelationalDbContextAsync(
         SqliteConnection connection,
-        CancellationTokenSource cancellationSource)
+        CancellationTokenSource cancellationSource,
+        bool cancelAfterDefaultUpdate = true)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
-            .AddInterceptors(new CancelAfterDefaultPlanUpdateInterceptor(cancellationSource))
+            .AddInterceptors(new CancelAfterDefaultPlanUpdateInterceptor(cancellationSource, cancelAfterDefaultUpdate))
             .Options;
         var dbContext = new ApplicationDbContext(options);
         await dbContext.Database.ExecuteSqlRawAsync("""
@@ -269,7 +355,9 @@ public class AdminSubscriptionPlansControllerAuditTests
         return dbContext;
     }
 
-    private sealed class CancelAfterDefaultPlanUpdateInterceptor(CancellationTokenSource cancellationSource)
+    private sealed class CancelAfterDefaultPlanUpdateInterceptor(
+        CancellationTokenSource cancellationSource,
+        bool cancelAfterDefaultUpdate)
         : DbCommandInterceptor
     {
         public override ValueTask<DbDataReader> ReaderExecutedAsync(
@@ -294,7 +382,8 @@ public class AdminSubscriptionPlansControllerAuditTests
 
         private void CancelIfPlanDefaultsUpdated(DbCommand command)
         {
-            if (command.CommandText.Contains("UPDATE \"SubscriptionPlans\"", StringComparison.OrdinalIgnoreCase))
+            if (cancelAfterDefaultUpdate
+                && command.CommandText.Contains("UPDATE \"SubscriptionPlans\"", StringComparison.OrdinalIgnoreCase))
                 cancellationSource.Cancel();
         }
     }
@@ -381,6 +470,46 @@ public class AdminSubscriptionPlansControllerAuditTests
             LastToken = cancellationToken;
             onExecute?.Invoke();
             return operation(cancellationToken);
+        }
+    }
+
+    private sealed class CancelingAuditEventService(
+        IAuditEventService inner,
+        CancellationTokenSource cancellationSource) : IAuditEventService
+    {
+        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default)
+        {
+            cancellationSource.Cancel();
+            return inner.WriteAsync(request, cancellationToken);
+        }
+
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationSource.Cancel();
+            return inner.WriteAsync(action, entityType, entityId, message, metadata, outcome, failOnError, cancellationToken);
+        }
+    }
+
+    private sealed class NoOpCapDispatcher : IDispatcher
+    {
+        public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask EnqueueToPublish(MediumMessage message) => ValueTask.CompletedTask;
+
+        public ValueTask EnqueueToExecute(MediumMessage message, ConsumerExecutorDescriptor? descriptor = null) => ValueTask.CompletedTask;
+
+        public Task EnqueueToScheduler(MediumMessage message, DateTime scheduledTime, object? context) => Task.CompletedTask;
+
+        public void Dispose()
+        {
         }
     }
 
