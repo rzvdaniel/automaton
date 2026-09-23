@@ -1,5 +1,7 @@
 # Initial analyzer priority baseline
 
+The staged remediation and verification work is described in [Critical analyzer findings remediation plan](critical-analyzer-findings-remediation-plan.md).
+
 Recorded against `336634f9` on 2026-09-23. This is a review aid for the standalone Sonar and .NET analyzers, not a SonarQube quality gate. Analyzer findings are potential defects; review the code before changing behavior.
 
 ## How the inventory was produced
