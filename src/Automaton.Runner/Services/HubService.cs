@@ -91,6 +91,7 @@ public class HubService
     private int reconnectInProgress = 0;
     private CancellationTokenSource? heartbeatTokenSource;
     private Task? heartbeatTask;
+    private readonly SemaphoreSlim heartbeatLifecycleLock = new(1, 1);
 
     public Task ReportHostedRunnerStorageAsync(HostedRunnerStorageTelemetry report, CancellationToken cancellationToken) =>
         InvokeTelemetryAsync(ReportHostedRunnerStorageMethod, report, cancellationToken);
@@ -301,7 +302,7 @@ public class HubService
             // Dispose existing connection if any
             if (connection != null)
             {
-                StopHeartbeatLoop();
+                await StopHeartbeatLoopAsync();
                 await connection.DisposeAsync();
                 connection = null;
             }
@@ -560,14 +561,14 @@ public class HubService
                         WriteLine($"⚠️ Runner re-registration after reconnect failed: {ex.Message}");
                     }
 
-                    await SendHeartbeatAsync();
+                    await SendHeartbeatAsync(cancellationToken);
                 });
                 return Task.CompletedTask;
             };
 
             await connection.StartAsync(cancellationToken);
-            StartHeartbeatLoop();
-            await SendHeartbeatAsync();
+            await StartHeartbeatLoopAsync(cancellationToken);
+            await SendHeartbeatAsync(cancellationToken);
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Debug("Connected to hub at {HubUrl}", hubUrl);
@@ -842,7 +843,7 @@ public class HubService
         retryTask = null;
         retryTokenSource?.Dispose();
         retryTokenSource = null;
-        StopHeartbeatLoop();
+        await StopHeartbeatLoopAsync();
         
         if (connection != null)
         {
@@ -956,7 +957,7 @@ public class HubService
             return;
         }
 
-        StopHeartbeatLoop();
+        await StopHeartbeatLoopAsync();
 
         try
         {
@@ -982,20 +983,62 @@ public class HubService
         }
     }
 
-    private void StartHeartbeatLoop()
+    private async Task StartHeartbeatLoopAsync(CancellationToken cancellationToken)
     {
-        StopHeartbeatLoop();
+        await heartbeatLifecycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            await StopHeartbeatLoopCoreAsync();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
 
-        heartbeatTokenSource = new CancellationTokenSource();
-        heartbeatTask = Task.Run(() => RunHeartbeatLoopAsync(heartbeatTokenSource.Token));
+            heartbeatTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            heartbeatTask = RunHeartbeatLoopAsync(heartbeatTokenSource.Token);
+        }
+        finally
+        {
+            heartbeatLifecycleLock.Release();
+        }
     }
 
-    private void StopHeartbeatLoop()
+    private async Task StopHeartbeatLoopAsync()
     {
-        heartbeatTokenSource?.Cancel();
-        heartbeatTokenSource?.Dispose();
+        await heartbeatLifecycleLock.WaitAsync(CancellationToken.None);
+        try
+        {
+            await StopHeartbeatLoopCoreAsync();
+        }
+        finally
+        {
+            heartbeatLifecycleLock.Release();
+        }
+    }
+
+    private async Task StopHeartbeatLoopCoreAsync()
+    {
+        var tokenSource = heartbeatTokenSource;
+        var task = heartbeatTask;
         heartbeatTokenSource = null;
         heartbeatTask = null;
+        if (tokenSource == null)
+        {
+            return;
+        }
+
+        tokenSource.Cancel();
+        try
+        {
+            if (task != null)
+            {
+                await task;
+            }
+        }
+        finally
+        {
+            tokenSource.Dispose();
+        }
     }
 
     private async Task RunHeartbeatLoopAsync(CancellationToken cancellationToken)
@@ -1006,7 +1049,7 @@ public class HubService
         {
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                await SendHeartbeatAsync();
+                await SendHeartbeatAsync(cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -1014,7 +1057,7 @@ public class HubService
         }
     }
 
-    private async Task SendHeartbeatAsync()
+    private async Task SendHeartbeatAsync(CancellationToken cancellationToken = default)
     {
         var currentConnection = connection;
         if (currentConnection == null || currentConnection.State != HubConnectionState.Connected)
@@ -1024,7 +1067,11 @@ public class HubService
 
         try
         {
-            await currentConnection.SendAsync(HeartbeatMethod);
+            await currentConnection.SendAsync(HeartbeatMethod, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
