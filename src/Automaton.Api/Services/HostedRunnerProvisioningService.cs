@@ -162,14 +162,17 @@ public class HostedRunnerProvisioningService
 
         try
         {
-            var host = await SelectHostAsync(
+            var hostSelection = await SelectHostAsync(
+                userId,
                 requestedSnapshot.Resources,
                 createdHostedRunner ? null : hostedRunner.Id,
+                accountStorageProjectId,
                 cancellationToken);
+            var host = hostSelection.Host;
             if (host == null)
             {
                 hostedRunner.Status = HostedRunnerStatuses.Failed;
-                hostedRunner.LastError = "No active runner host has enough available capacity.";
+                hostedRunner.LastError = hostSelection.FailureReason ?? "No active runner host has enough available capacity.";
                 AddDeployment(hostedRunner, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
                 await db.SaveChangesAsync(cancellationToken);
                 if (capacityTransaction != null)
@@ -308,11 +311,14 @@ public class HostedRunnerProvisioningService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<RunnerHost?> SelectHostAsync(
+    private async Task<(RunnerHost? Host, string? FailureReason)> SelectHostAsync(
+        Guid accountId,
         HostedRunnerResources requested,
         Guid? excludedHostedRunnerId,
+        int accountStorageProjectId,
         CancellationToken cancellationToken)
     {
+        var hasSharedProjectLimitConflict = false;
         var requestedStorageBytes = requested.DiskLimitMb * 1024L * 1024L;
         var now = DateTime.UtcNow;
         var hosts = (await db.RunnerHosts
@@ -368,6 +374,18 @@ public class HostedRunnerProvisioningService
                 continue;
             }
 
+            var hasIncompatibleSharedProjectLimit = host.HostedRunners.Any(r =>
+                r.UserId == accountId
+                && r.Id != excludedHostedRunnerId
+                && r.DeletedAt == null
+                && r.StorageProjectId == accountStorageProjectId
+                && (r.PendingSpecificationSnapshot ?? r.SpecificationSnapshot).Resources.DiskLimitMb != requested.DiskLimitMb);
+            if (hasIncompatibleSharedProjectLimit)
+            {
+                hasSharedProjectLimitConflict = true;
+                continue;
+            }
+
             var assigned = host.HostedRunners.Where(r =>
                 r.Id != excludedHostedRunnerId &&
                 (OccupyingStatuses.Contains(r.Status)
@@ -377,11 +395,18 @@ public class HostedRunnerProvisioningService
                 && host.ReservedMemoryMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb
                 && host.ReservedDiskMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.DiskLimitMb) + requested.DiskLimitMb <= host.TotalDiskMb)
             {
-                return host;
+                return (host, null);
             }
         }
 
-        return null;
+        if (hasSharedProjectLimitConflict)
+        {
+            return (null,
+                "The account already has a Hosted Runner on an eligible host using the same XFS project with a different disk-limit snapshot. " +
+                "Move or delete the co-located Hosted Runner before changing the shared project limit.");
+        }
+
+        return (null, null);
     }
 
     private bool IsMySqlProvider()
