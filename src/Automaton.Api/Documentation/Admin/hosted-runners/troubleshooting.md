@@ -17,5 +17,6 @@ order: 100
 | Inactive specification | Activate it or select another active specification. |
 | Global provisioning paused | Enable **Allow hosted runner provisioning** in the Specifications tab. |
 | Container provisioned but Runner not connected | Check deployment result, container logs, registration, and API connectivity. |
+| Runner reports an API certificate validation error | Verify the API certificate matches its configured hostname and is trusted by the Runner host or container. Install the issuing CA in that environment for development certificates; do not disable certificate validation. |
 
 This feature is still in active development. Development environments may require manual host preparation, and incomplete legacy hosted-runner configuration is not silently repaired or given a fallback specification.

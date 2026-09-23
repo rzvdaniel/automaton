@@ -85,6 +85,7 @@ public class HubService
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
+    private Task? retryTask;
     private int activeOperationCount = 0;
     private int reconnectRequested = 0;
     private int reconnectInProgress = 0;
@@ -180,8 +181,13 @@ public class HubService
             WriteLine($"🔍 Runner Name: {configService.ApplicationName}");
             
             // Start continuous retry loop in background
+            if (retryTask is { IsCompleted: false })
+                return true;
+            retryTokenSource?.Dispose();
             retryTokenSource = new CancellationTokenSource();
-            _ = Task.Run(() => ContinuousRetryLoop(apiKey, hubUrl, retryTokenSource.Token));
+            shouldKeepRetrying = true;
+            var retryToken = retryTokenSource.Token;
+            retryTask = Task.Run(() => ContinuousRetryLoop(apiKey, hubUrl, retryToken), CancellationToken.None);
             
             return true;
         }
@@ -225,7 +231,7 @@ public class HubService
                 wasDisconnected = true;
                 
                 // Try to connect using the resilient policy (which includes circuit breaker)
-                var attempts = await BuildAndConnectWithRetry(apiKey, hubUrl);
+                var attempts = await BuildAndConnectWithRetry(apiKey, hubUrl, cancellationToken);
                 
                 // If we get here, connection succeeded
                 logger.Debug("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
@@ -275,20 +281,20 @@ public class HubService
         logger.Debug("Continuous retry loop terminated");
     }
 
-    private async Task<int> BuildAndConnectWithRetry(string apiKey, string hubUrl)
+    private async Task<int> BuildAndConnectWithRetry(string apiKey, string hubUrl, CancellationToken cancellationToken)
     {
         var attempts = 0;
 
-        await resilientConnectionPolicy.GetPolicy().ExecuteAsync(async () =>
+        await resilientConnectionPolicy.GetPolicy().ExecuteAsync(async token =>
         {
             Interlocked.Increment(ref attempts);
-            await BuildAndConnect(apiKey, hubUrl);
-        });
+            await BuildAndConnect(apiKey, hubUrl, token);
+        }, cancellationToken);
 
         return attempts;
     }
 
-    private async Task BuildAndConnect(string apiKey, string hubUrl)
+    private async Task BuildAndConnect(string apiKey, string hubUrl, CancellationToken cancellationToken)
     {
         try
         {
@@ -332,21 +338,6 @@ public class HubService
                         options.Headers.Add(HostedRunnerIdHeader, hostedRunnerId);
                     }
                     
-                    // Bypass SSL validation in development mode (for self-signed certificates)
-                    var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
-                                       Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
-                    if (isDevelopment)
-                    {
-                        options.HttpMessageHandlerFactory = (handler) =>
-                        {
-                            if (handler is HttpClientHandler clientHandler)
-                            {
-                                clientHandler.ServerCertificateCustomValidationCallback = 
-                                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-                            }
-                            return handler;
-                        };
-                    }
                 })
                 .WithAutomaticReconnect(new JitteredReconnectPolicy())
                 .Build();
@@ -574,7 +565,7 @@ public class HubService
                 return Task.CompletedTask;
             };
 
-            await connection.StartAsync();
+            await connection.StartAsync(cancellationToken);
             StartHeartbeatLoop();
             await SendHeartbeatAsync();
 
@@ -846,6 +837,11 @@ public class HubService
         // Stop the retry loop
         shouldKeepRetrying = false;
         retryTokenSource?.Cancel();
+        if (retryTask is not null)
+            await retryTask;
+        retryTask = null;
+        retryTokenSource?.Dispose();
+        retryTokenSource = null;
         StopHeartbeatLoop();
         
         if (connection != null)

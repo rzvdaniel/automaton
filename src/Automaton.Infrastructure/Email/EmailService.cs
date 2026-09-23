@@ -24,7 +24,6 @@ public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfig
             var message = BuildMessage(emailDetails, subject, bodyHtml);
 
             using var client = new SmtpClient();
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
             var socketOptions = ResolveSocketOptions(_emailConfig.EmailPort, _emailConfig.EmailUseSsl);
 

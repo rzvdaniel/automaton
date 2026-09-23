@@ -809,15 +809,17 @@ WantedBy=multi-user.target
 
     private static async Task WriteElevatedFileAsync(string path, string contents, CancellationToken cancellationToken)
     {
-        var tempPath = Path.GetTempFileName();
-        await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
+        var tempDirectory = Path.Combine(Path.GetTempPath(), $"automaton-install-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var tempPath = Path.Combine(tempDirectory, "content");
         try
         {
+            await File.WriteAllTextAsync(tempPath, contents, cancellationToken);
             await RunProcessCheckedAsync("sudo", $"cp \"{tempPath}\" \"{path}\"", cancellationToken);
         }
         finally
         {
-            File.Delete(tempPath);
+            Directory.Delete(tempDirectory, recursive: true);
         }
     }
 

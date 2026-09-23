@@ -350,14 +350,6 @@ public class Program
 
     private static IConfiguration GetConfiguration(string[] args)
     {
-        // Allow self-signed certificates in development
-        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ||
-            Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development")
-        {
-            System.Net.ServicePointManager.ServerCertificateValidationCallback =
-                (sender, certificate, chain, sslPolicyErrors) => true;
-        }
-
         return new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -421,25 +413,6 @@ public class Program
                 services.AddSingleton<HostContainerExecutionService>();
                 services.AddSingleton<TunnelForwarderService>();
                 services.AddHostedService<InfrastructureCommandHostedService>();
-
-                // Configure HTTP client factory with SSL bypass for development
-                var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
-                                   Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
-
-                if (isDevelopment)
-                {
-                    // Configure all HTTP clients to bypass SSL validation in development
-                    services.ConfigureAll<HttpClientFactoryOptions>(options =>
-                    {
-                        options.HttpMessageHandlerBuilderActions.Add(builder =>
-                        {
-                            builder.PrimaryHandler = new HttpClientHandler
-                            {
-                                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                            };
-                        });
-                    });
-                }
 
                 // Add HTTP client for RunnerHostService
                 services.AddHttpClient<RunnerHostService>();

@@ -12,7 +12,7 @@ namespace Automaton.Runner.Console.Services;
 /// Supervises managed application containers. The Runner owns lifecycle and
 /// readiness; the application image owns the process and its HTTP behavior.
 /// </summary>
-public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, IHostedService
+public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, IHostedService, IDisposable
 {
     private const string MetadataFileName = "deployment.json";
     private readonly RunnerWorkspaceService workspace;
@@ -23,6 +23,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     private readonly Dictionary<DeploymentRuntimeKey, ActiveContainer> active = [];
     private readonly HashSet<string> pendingReconciliation = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource supervisionCts = new();
+    private int disposed;
     private volatile bool acceptingLifecycleWork;
     private Task? supervisionTask;
     private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
@@ -187,6 +188,14 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 registry.Remove(runtime.AppId, runtime.TargetId);
             active.Clear();
         }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
+        supervisionCts.Cancel();
+        supervisionCts.Dispose();
     }
 
     public async Task<RuntimeApplyResult> ApplyAsync(
