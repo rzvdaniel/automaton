@@ -15,7 +15,11 @@ public class TunnelRequestRegistry
         _pending[requestId] = tcs;
 
         ct.Register(() => TryFail(requestId, "Request cancelled"));
-        _ = Task.Delay(timeout).ContinueWith(_ => TryFail(requestId, "Tunnel request timed out"));
+        _ = Task.Delay(timeout, ct).ContinueWith(
+            _ => TryFail(requestId, "Tunnel request timed out"),
+            ct,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         return (requestId, tcs.Task);
     }

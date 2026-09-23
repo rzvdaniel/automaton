@@ -19,7 +19,11 @@ public class FileUploadRegistry
         _pending[sessionId] = tcs;
 
         ct.Register(() => TryFail(sessionId, "Upload cancelled"));
-        _ = Task.Delay(timeout).ContinueWith(_ => TryFail(sessionId, "File upload timed out"));
+        _ = Task.Delay(timeout, ct).ContinueWith(
+            _ => TryFail(sessionId, "File upload timed out"),
+            ct,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         return (sessionId, tcs.Task);
     }

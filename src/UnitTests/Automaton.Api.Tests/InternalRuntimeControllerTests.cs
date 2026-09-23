@@ -39,7 +39,10 @@ public class InternalRuntimeControllerTests
 
         controller.Request.Headers[RuntimeCookieConstants.AppIdHeader] = Guid.NewGuid().ToString();
 
-        var result = await controller.AuthorizeRuntimeRequest(CancellationToken.None);
+        var result = await controller.AuthorizeRuntimeRequest(
+            controller.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            proxyAuthHeaders: null,
+            cancellationToken: CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<UnauthorizedResult>());
     }
@@ -95,7 +98,10 @@ public class InternalRuntimeControllerTests
             }
         };
 
-        var result = await controller.AuthorizeRuntimeRequest(CancellationToken.None);
+        var result = await controller.AuthorizeRuntimeRequest(
+            httpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            httpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+            CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<NoContentResult>());
     }

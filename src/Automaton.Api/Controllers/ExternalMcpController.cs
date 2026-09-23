@@ -112,7 +112,11 @@ public class ExternalMcpController : ControllerBase
     /// Accepts MCP JSON-RPC 2.0 requests (single or batch).
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> Handle([FromBody] JsonElement body, CancellationToken ct)
+    public async Task<IActionResult> Handle(
+        [FromBody] JsonElement body,
+        [FromHeader(Name = "X-API-Key")] string[]? apiKeyHeaders,
+        [FromHeader(Name = "Authorization")] string[]? authorizationHeaders,
+        CancellationToken ct)
     {
         var userId = _userContext.GetUserId();
         if (userId == Guid.Empty)
@@ -124,21 +128,26 @@ public class ExternalMcpController : ControllerBase
             var results = new List<object>();
             foreach (var item in body.EnumerateArray())
             {
-                var r = await ProcessOneRequest(item, userId, ct);
+                var r = await ProcessOneRequest(item, userId, apiKeyHeaders, authorizationHeaders, ct);
                 if (r != null) results.Add(r);
             }
             return Ok(results);
         }
 
         // Single request
-        var response = await ProcessOneRequest(body, userId, ct);
+        var response = await ProcessOneRequest(body, userId, apiKeyHeaders, authorizationHeaders, ct);
         if (response == null) return NoContent(); // notification — no response required
         return Ok(response);
     }
 
     // ── JSON-RPC dispatcher ───────────────────────────────────────────────────
 
-    private async Task<object?> ProcessOneRequest(JsonElement req, Guid userId, CancellationToken ct)
+    private async Task<object?> ProcessOneRequest(
+        JsonElement req,
+        Guid userId,
+        string[]? apiKeyHeaders,
+        string[]? authorizationHeaders,
+        CancellationToken ct)
     {
         var method = req.TryGetProperty("method", out var m) ? m.GetString() : null;
         var isNotification = !req.TryGetProperty("id", out var idProp);
@@ -160,7 +169,7 @@ public class ExternalMcpController : ControllerBase
         {
             var result = method switch
             {
-                "initialize" => HandleInitialize(req),
+                "initialize" => HandleInitialize(req, apiKeyHeaders?.FirstOrDefault(), authorizationHeaders?.FirstOrDefault()),
                 "tools/list" => HandleToolsList(),
                 "tools/call" => await HandleToolCall(req, userId, ct),
                 "ping"       => new { },
@@ -181,15 +190,14 @@ public class ExternalMcpController : ControllerBase
 
     // ── Method handlers ───────────────────────────────────────────────────────
 
-    private object HandleInitialize(JsonElement req)
+    private object HandleInitialize(JsonElement req, string? apiKeyHeader, string? authorizationHeader)
     {
         var protocolVersion = "2024-11-05";
         if (req.TryGetProperty("params", out var p) && p.TryGetProperty("protocolVersion", out var pv))
             protocolVersion = pv.GetString() ?? protocolVersion;
 
         var serverUrl = $"{Request.Scheme}://{Request.Host}";
-        var apiKey    = Request.Headers["X-API-Key"].FirstOrDefault()
-                     ?? ExtractBearerApiKey(Request.Headers["Authorization"].FirstOrDefault());
+        var apiKey    = apiKeyHeader ?? ExtractBearerApiKey(authorizationHeader);
 
         return new
         {

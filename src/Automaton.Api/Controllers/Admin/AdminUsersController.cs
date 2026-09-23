@@ -98,7 +98,7 @@ public class AdminUsersController : BaseController
                 User.IsInRole(UserRole.SystemAdministrator),
                 cancellationToken);
 
-            await Mediator.Send(new RemoveUserRoleCommand(userId, roleName));
+            await Mediator.Send(new RemoveUserRoleCommand(userId, roleName), cancellationToken);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -119,7 +119,7 @@ public class AdminUsersController : BaseController
                 User.IsInRole(UserRole.SystemAdministrator),
                 cancellationToken);
 
-            await Mediator.Send(new AddUserRoleCommand(userId, roleName));
+            await Mediator.Send(new AddUserRoleCommand(userId, roleName), cancellationToken);
             return NoContent();
         }
         catch (InvalidOperationException ex)

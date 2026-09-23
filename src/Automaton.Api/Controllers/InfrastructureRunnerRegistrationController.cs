@@ -18,14 +18,16 @@ public sealed class InfrastructureRunnerRegistrationController(
         Policy = "InfrastructureRunnerEnrollment")]
     public async Task<ActionResult<InfrastructureRunnerRegistrationResponse>> Register(
         InfrastructureRunnerRegistrationRequest request,
+        [FromHeader(Name = "X-API-Key")] string[]? apiKeyHeaders,
+        [FromHeader(Name = "Authorization")] string[]? authorizationHeaders,
         CancellationToken cancellationToken)
     {
-        var apiKey = Request.Headers["X-API-Key"].FirstOrDefault();
+        var apiKey = apiKeyHeaders?.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            var authorization = Request.Headers.Authorization.FirstOrDefault();
-            if (authorization?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
-                apiKey = authorization["Bearer ".Length..].Trim();
+            var authorizationHeader = authorizationHeaders?.FirstOrDefault();
+            if (authorizationHeader?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
+                apiKey = authorizationHeader["Bearer ".Length..].Trim();
         }
 
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -51,10 +53,13 @@ public sealed class InfrastructureRunnerRegistrationController(
     [HttpGet("configuration.env")]
     [AllowAnonymous]
     [Produces("text/plain")]
-    public async Task<IActionResult> GetConfiguration(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetConfiguration(
+        [FromHeader(Name = "X-API-Key")] string[]? apiKeyHeaders,
+        [FromHeader(Name = "X-Runner-Enrollment-Token")] string[]? enrollmentTokenHeaders,
+        CancellationToken cancellationToken)
     {
-        var apiKey = Request.Headers["X-API-Key"].FirstOrDefault();
-        var enrollmentToken = Request.Headers["X-Runner-Enrollment-Token"].FirstOrDefault();
+        var apiKey = apiKeyHeaders?.FirstOrDefault();
+        var enrollmentToken = enrollmentTokenHeaders?.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(enrollmentToken))
             return Unauthorized();
 

@@ -146,7 +146,9 @@ public static class ApplicationBuildExecutor
         var outputTask = Task.WhenAll(stdoutTask, stderrTask);
         try
         {
-            var output = await outputTask.WaitAsync(OutputDrainTimeout);
+            // The process cancellation token is used to stop pipe readers only
+            // after the drain timeout; keep this bounded cleanup wait independent.
+            var output = await outputTask.WaitAsync(OutputDrainTimeout, CancellationToken.None);
             return new OutputCollectionResult(output[0], output[1], TimedOut: false);
         }
         catch (TimeoutException)
@@ -154,7 +156,8 @@ public static class ApplicationBuildExecutor
             outputCancellation.Cancel();
             try
             {
-                var output = await outputTask.WaitAsync(TimeSpan.FromMilliseconds(250));
+                var output = await outputTask.WaitAsync(
+                    TimeSpan.FromMilliseconds(250), CancellationToken.None);
                 return new OutputCollectionResult(output[0], output[1], TimedOut: true);
             }
             catch (TimeoutException)

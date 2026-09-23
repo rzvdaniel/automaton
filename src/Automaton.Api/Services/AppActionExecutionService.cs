@@ -146,7 +146,7 @@ public sealed class AppActionExecutionService
                 // The hosted reconciler marks the persisted record Lost if dispatch
                 // fails before a terminal result is saved.
             }
-        });
+        }, CancellationToken.None);
         return execution;
     }
 

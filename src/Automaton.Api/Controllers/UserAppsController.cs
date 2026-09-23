@@ -70,14 +70,17 @@ public class UserAppsController : ControllerBase
     /// </summary>
     [HttpGet("a/{appId:guid}")]
     [AllowAnonymous]
-    public async Task<IActionResult> ServeRestrictedApp(Guid appId)
+    public async Task<IActionResult> ServeRestrictedApp(Guid appId, [FromQuery(Name = "token")] string[]? runtimeTokens)
     {
-        return await ServeRestrictedAppFile(appId, "index.html");
+        return await ServeRestrictedAppFile(appId, "index.html", runtimeTokens);
     }
 
     [HttpGet("a/{appId:guid}/{*path}")]
     [AllowAnonymous]
-    public async Task<IActionResult> ServeRestrictedAppFile(Guid appId, string path = "index.html")
+    public async Task<IActionResult> ServeRestrictedAppFile(
+        Guid appId,
+        string path = "index.html",
+        [FromQuery(Name = "token")] string[]? runtimeTokens = null)
     {
         try
         {
@@ -112,6 +115,7 @@ public class UserAppsController : ControllerBase
                 app.OwnerId.Value,
                 path,
                 backendApiPath: $"/a/{app.Id}/api",
+                runtimeToken: runtimeTokens?.FirstOrDefault(),
                 useCurrentHostApiBase: true);
         }
         catch (Exception ex)
@@ -206,7 +210,13 @@ public class UserAppsController : ControllerBase
         return StatusCode(statusCode);
     }
 
-    private async Task<IActionResult> ServeRuntimeFileAsync(Guid appId, Guid ownerId, string? path, string backendApiPath, bool useCurrentHostApiBase = false)
+    private async Task<IActionResult> ServeRuntimeFileAsync(
+        Guid appId,
+        Guid ownerId,
+        string? path,
+        string backendApiPath,
+        string? runtimeToken,
+        bool useCurrentHostApiBase = false)
     {
         path = string.IsNullOrEmpty(path) ? "index.html" : path;
 
@@ -234,14 +244,19 @@ public class UserAppsController : ControllerBase
         if (contentType == "text/html")
         {
             var html = Encoding.UTF8.GetString(content);
-            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath, useCurrentHostApiBase);
+            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath, runtimeToken, useCurrentHostApiBase);
             return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
         }
 
         return File(content, contentType);
     }
 
-    private string InjectRuntimeScripts(string html, Guid appId, string backendApiPath, bool useCurrentHostApiBase = false)
+    private string InjectRuntimeScripts(
+        string html,
+        Guid appId,
+        string backendApiPath,
+        string? runtimeToken,
+        bool useCurrentHostApiBase = false)
     {
         if (html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase))
         {
@@ -264,7 +279,7 @@ public class UserAppsController : ControllerBase
             appId,
             apiBaseUrl,
             backendApiPath,
-            runtimeToken = Request.Query["token"].FirstOrDefault()
+            runtimeToken
         });
 
         var runtimeScripts = $"""

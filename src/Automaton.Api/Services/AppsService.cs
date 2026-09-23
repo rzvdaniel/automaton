@@ -184,7 +184,7 @@ public class AppsService
         IEnumerable<string>? tags,
         CancellationToken cancellationToken = default)
     {
-        if (!await authorizationService.CanUpdateAppAsync(appId))
+        if (!await authorizationService.CanUpdateAppAsync(appId, cancellationToken))
         {
             return false;
         }

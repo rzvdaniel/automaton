@@ -91,7 +91,7 @@ public class UserAppsControllerTests
             }
         };
 
-        var result = await controller.ServeRestrictedApp(appId);
+        var result = await controller.ServeRestrictedApp(appId, runtimeTokens: null);
 
         Assert.That(result, Is.InstanceOf<ContentResult>());
         var contentResult = (ContentResult)result;

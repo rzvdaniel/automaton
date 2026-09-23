@@ -37,16 +37,18 @@ public class InternalRuntimeController : ControllerBase
     }
 
     [HttpGet("auth")]
-    public async Task<IActionResult> AuthorizeRuntimeRequest(CancellationToken cancellationToken)
+    public async Task<IActionResult> AuthorizeRuntimeRequest(
+        [FromHeader(Name = RuntimeCookieConstants.AppIdHeader)] string[]? appIdHeaders,
+        [FromHeader(Name = RuntimeCookieConstants.ProxyAuthHeader)] string[]? proxyAuthHeaders,
+        CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedProxyRequest())
+        if (!IsAuthorizedProxyRequest(proxyAuthHeaders?.FirstOrDefault()))
         {
             logger.LogWarning("Rejected runtime auth request without valid proxy auth header.");
             return Unauthorized();
         }
 
-        if (!Request.Headers.TryGetValue(RuntimeCookieConstants.AppIdHeader, out var appIdHeader) ||
-            !Guid.TryParse(appIdHeader.FirstOrDefault(), out var appId))
+        if (!Guid.TryParse(appIdHeaders?.FirstOrDefault(), out var appId))
         {
             logger.LogDebug("Runtime auth failed: missing or invalid app id header.");
             return Unauthorized();
@@ -83,19 +85,13 @@ public class InternalRuntimeController : ControllerBase
         return NoContent();
     }
 
-    private bool IsAuthorizedProxyRequest()
+    private bool IsAuthorizedProxyRequest(string? providedValue)
     {
         if (string.IsNullOrWhiteSpace(publishedAppsConfig.RuntimeProxyAuthKey))
         {
             return false;
         }
 
-        if (!Request.Headers.TryGetValue(RuntimeCookieConstants.ProxyAuthHeader, out var headerValues))
-        {
-            return false;
-        }
-
-        var providedValue = headerValues.FirstOrDefault();
         if (providedValue is null)
         {
             return false;
