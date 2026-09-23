@@ -324,6 +324,44 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public async Task CurrentRuntimeExitDuringReplacementReadiness_DoesNotDisposeTheCandidate()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var registry = new RunnerRuntimeRegistry();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        using var manager = CreateManager(workspace, registry);
+        await manager.ApplyAsync(appId, targetId, CreateContract(["--tcp", "original"]));
+
+        var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
+        var original = ReadMetadata(metadataPath);
+        Assert.That(original.ProcessId, Is.Not.Null);
+        var replacement = CreateContract(["--startup-delay", "2000", "--tcp", "replacement"]);
+        var replacementTask = manager.ApplyAsync(appId, targetId, replacement);
+        var pending = await WaitForCandidateAsync(metadataPath);
+
+        Assert.That(pending.Candidate?.ProcessId, Is.Not.Null);
+        using (var oldProcess = Process.GetProcessById(original.ProcessId!.Value))
+        {
+            oldProcess.Kill(entireProcessTree: true);
+            await oldProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        await replacementTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var promoted = ReadMetadata(metadataPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(promoted.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(promoted.Candidate, Is.Null);
+            Assert.That(promoted.ProcessId, Is.Not.EqualTo(original.ProcessId));
+            Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
+        });
+
+        await manager.StopAsync(appId, targetId);
+    }
+
+    [Test]
     public async Task FailedReplacement_LeavesHealthyRuntimeRoutedAndTracked()
     {
         var workspace = new RunnerWorkspaceService();
@@ -1022,6 +1060,27 @@ public sealed class RunnerRuntimeProcessManagerTests
         => JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             File.ReadAllText(path),
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+
+    private static async Task<RunnerRuntimeDeploymentMetadata> WaitForCandidateAsync(string metadataPath)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            try
+            {
+                var metadata = ReadMetadata(metadataPath);
+                if (metadata.Candidate is not null)
+                    return metadata;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException)
+            {
+            }
+
+            await Task.Delay(50);
+        }
+
+        Assert.Fail("Replacement candidate did not enter readiness before the timeout.");
+        return null!;
+    }
 
     private static Process StartFixtureProcess(string workingDirectory, int port, string value)
     {

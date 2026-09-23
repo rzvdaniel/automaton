@@ -468,8 +468,6 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             isCandidate = candidates.TryGetValue(key, out var candidate) && ReferenceEquals(candidate, active);
             if (isCandidate)
                 candidates.Remove(key);
-            else if (candidates.Remove(key, out candidate))
-                candidate.Dispose();
         }
 
         if (isCurrent)
