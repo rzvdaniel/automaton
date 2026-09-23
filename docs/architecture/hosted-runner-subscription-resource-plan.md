@@ -63,12 +63,113 @@ The previously discussed Free shape of approximately **0.5 CPU, 768 MiB memory, 
 
 Multiple Hosted Runners for an account may carry the same project ID. Placement and Infrastructure Runner guards prevent conflicting disk-limit snapshots from overwriting a shared XFS quota on the same host filesystem. User hard deletion is blocked while the allocation exists; no storage teardown action has yet been designed. Stage 3 did not add a global quota counter, migrate other writable paths, or change the app/build container storage contract.
 
-## Next work, subject to product decisions
+## Policy target and scope
 
-1. **Define authoritative account policy.** Decide whether CPU, memory, disk, PIDs, maximum Hosted Runners, and maximum applications are account entitlements or runner-level shapes. Preserve existing operator-edited specification values during a transition. Keep normal clients unable to choose enforcement values.
-2. **Enforce admission consistently.** Apply the chosen limits at every creation, assignment, and reprovisioning path, including concurrent requests and retries. Record clear rejection reasons. A displayed policy value alone is insufficient.
-3. **Close writable-disk escapes.** Inventory account-owned persistent, build, cache, and temporary writes. Keep infrastructure-owned images, logs, and host state outside the tenant budget. Use explicit quota-backed writable paths and bounded temporary storage; make app/build root filesystems read-only where compatible.
-4. **Make `DiskLimitMb` an actual account budget.** Define how usage is measured and enforced across different hosts and filesystems, or explicitly constrain placement and storage to an enforcement domain until trusted aggregate accounting exists. A shared numeric XFS ID by itself does not aggregate usage across filesystems.
-5. **Prove operations and recovery.** Test exhaustion, quota increase/decrease, concurrent provisioning, host loss, reprovisioning, stale measurements, and cleanup. Expose trusted usage and failure reasons in API and administration surfaces before treating proposed Free values as an enforced product contract.
+The Free policy discussed for this work is a product target, not a statement of current effective settings:
 
-Do not introduce paid tiers, organization policy, separate per-app CPU budgets, or build-concurrency fields solely to complete this plan. Those require their own product decisions.
+| Resource | Proposed Free target | Current qualification |
+| --- | ---: | --- |
+| CPU | 0.5 core | Current effective value is resolved from the selected administrator-managed Hosted Runner specification. |
+| Memory | 768 MiB | Current seed default is 384 MiB; operator-edited specifications may differ. |
+| Writable disk | 2048 MiB aggregate | Current seed default is 512 MiB. A shared XFS project ID alone does not aggregate usage across hosts/filesystems or paths that have not been assigned to it. |
+| Tasks/PIDs | 128 | Current seed default is 256. |
+| Max applications | Preserve existing Free behavior pending a product decision | Current specification default is 3 and enforcement is per Hosted Runner. |
+| Max Hosted Runners | 1 in the normal reuse model | This is not currently a serialized account admission/uniqueness guarantee. |
+
+The aggregate disk objective covers Hosted Runner system and user storage, app persistent data and volumes, build workspaces and retained caches, and any disk-backed temporary workspace. Infrastructure Runner storage remains infrastructure-owned and outside the account quota. `/tmp` should become explicitly bounded tmpfs. No stage should claim account-wide aggregate enforcement until usage across the relevant hosts/filesystems is actually within one verified enforcement domain or an equivalent trusted aggregate mechanism exists.
+
+## Implementation and maintainability constraints
+
+- Keep each stage as a focused branch and PR based on canonical `main`; review and validate it before starting the next stage.
+- Use small cohesive domain/application services and value types where they clarify ownership or policy. Keep orchestration methods short; separate policy resolution, path discovery, storage preparation, quota assignment, and postcondition verification instead of growing one provisioning method with branches.
+- Keep cyclomatic complexity low by giving each class one clear responsibility and extracting decisions into named operations. Avoid generic billing frameworks, speculative abstractions, and broad refactors unrelated to the stage.
+- Put tests at the seams introduced by each stage. Preserve idempotency, retry safety, existing reprovision snapshots, and fail-closed behavior where enforcement cannot be verified.
+- Recheck the live code and host/storage topology at the start of every stage. This roadmap is the intended sequence, not evidence that a future stage is already implemented.
+
+## Remaining staged plan
+
+### Stage 4 — Put Hosted Runner storage under the account quota
+
+**Status: Next.** Make both Hosted Runner persistent system storage and user storage consume the account's existing `AccountStorageAllocation.StorageProjectId` and the effective `DiskLimitMb`.
+
+Work and acceptance:
+
+- Update provision/reprovision contracts so the trusted Infrastructure Runner receives the account project ID and effective disk limit; do not accept either from an untrusted client.
+- Assign the account project ID to both Hosted Runner volume roots, establish the exact hard quota, and verify the final project/quota postconditions before reporting provisioning success.
+- Preserve the same project on reprovision. Fail provisioning closed if project assignment or quota verification fails. Keep Infrastructure Runner-owned storage outside the tenant project.
+- Add focused infrastructure-action and Worker contract tests proving both volumes share the project, quota matches policy, reprovision is stable, failures stop provisioning, and separate accounts remain isolated.
+- Retain the real-host-verified XFS behavior from Stage 1D; do not weaken enforcement or start app-volume migration in this stage.
+
+### Stage 5 — Put app persistent volumes under the same account quota
+
+Make every account-owned persistent app volume share the account project with Hosted Runner storage. Inventory named volumes, bind mounts, and application/runtime data paths before changing them.
+
+Work and acceptance:
+
+- Resolve app ownership through trusted account/application state; materialize each final volume path and assign/verify the account project before starting or attaching the app container.
+- Do not accept project IDs or quota values from app/client input. Route privileged preparation through the existing trusted host/Infrastructure Runner mechanism; do not grant app containers host or Docker-socket privilege.
+- Fail deployment if an account-owned persistent volume cannot be shown to be quota-backed. App cleanup may delete only that app's data and must not change account quota identity.
+- Prove same-account apps and Hosted Runner storage use the same project; different accounts remain isolated; app deletion does not release or alter account identity.
+- Treat same-project assignment as aggregate only within a verified XFS accounting domain. If relevant data can live on different hosts/filesystems, resolve placement or trusted cross-domain accounting before claiming one global 2 GiB cap; numeric project-ID reuse across separate filesystems is not sufficient.
+- Do not add per-app quotas or start rootfs/`/tmp` hardening here; those are Stage 6.
+
+### Stage 6 — Close `/tmp` and writable-root disk escape paths
+
+Inventory app runtime writes first: root filesystem, `/tmp`, `/var/tmp`, `HOME`, framework/runtime caches, logs, and other paths that require writes. Move toward a read-only container root where compatible, explicit account-backed writable data mounts, and explicitly bounded tmpfs for `/tmp` (and other truly ephemeral paths only where justified).
+
+Acceptance:
+
+- App data writes go to an account quota-backed mount; arbitrary rootfs writes fail when read-only rootfs is enabled.
+- `/tmp` is tmpfs with an explicit maximum size and does not consume persistent account disk. Bound it against the existing memory/cgroup model and confirm legitimate app behavior before enforcing it.
+- Use `nodev`, `nosuid`, and `noexec` where compatible. Do not expose unnecessary host paths or blindly make the root filesystem read-only without identifying required writable paths.
+- Test data writes/quota accounting, rootfs write rejection, tmpfs exhaustion and bounded memory pressure, and normal runtime startup/operation.
+
+### Stage 7 — Put build workspace and cache under the account disk quota
+
+Inventory source checkout/workspace, outputs, temporary files, dependency/package caches, Docker/build context, artifact staging, and disk-backed logs. Make every retained account-owned disk-backed build path use the account project; bound build `/tmp` with tmpfs where appropriate.
+
+Acceptance:
+
+- Builds cannot create unbounded host workspaces. Workspace/cache project assignment happens through a trusted path; rootfs is read-only where feasible.
+- Quota exhaustion produces a controlled build failure. Cleanup reduces use when successful, while XFS remains the hard boundary if cleanup fails.
+- Test account isolation, workspace/cache charging, usage growth, exhaustion, cleanup, and the fact that Infrastructure Runner storage remains outside the tenant project.
+
+### Stage 8 — Make CPU, memory, and PIDs subscription-derived
+
+Resolve compute limits from `SubscriptionResourcePolicy` and apply them to the existing aggregate cgroup/slice boundary. The account budget covers the Hosted Runner control container, app containers, and transient/build containers; Infrastructure Runner remains outside.
+
+Acceptance:
+
+- Persist the effective policy snapshot through the existing deterministic reprovision flow; clients cannot increase limits.
+- Apps and build workloads join the same aggregate boundary. Multiple apps do not multiply the account allowance.
+- Test expected policy values, cgroup application, workload membership, Infrastructure Runner exclusion, invalid/missing policy failure, and reprovision. Verify effective values on a real host after deployment when appropriate.
+
+### Stage 9 — Add account resource usage API and Studio observability
+
+Expose effective limits and authoritative usage without changing enforcement semantics. Disk usage must use the authoritative XFS project measurement, not a sum of approximate database values. An unavailable or stale measurement must be represented explicitly.
+
+The minimal view may show plan, CPU/memory/disk/tasks limits, aggregate disk use, and application count/limit. Add Hosted Runner status or storage-verification state only if needed to explain the measurement. Keep the Studio surface simple and consistent with existing design patterns.
+
+Acceptance:
+
+- API values cannot be spoofed by callers. Tests verify policy limits, authoritative disk source, and explicit unavailable/stale state.
+- Studio distinguishes current authoritative measurements from stale estimates and handles over-quota and unavailable Runner states clearly.
+- Existing admin and Runner pages continue to work.
+
+### Stage 10 — Define subscription upgrade and downgrade semantics
+
+Prepare for future paid plans without adding one in this stage. Apply policy changes in a bounded sequence: persist the new effective policy, apply and verify disk quota, apply and verify aggregate cgroup limits, then report completion. Never briefly grant unbounded resources.
+
+For disk downgrades below current usage, preserve data and expose an explicit over-quota state. Block or restrict new disk growth and space-consuming deploy/build work as defined by product policy, while allowing cleanup; return to normal when usage falls below the new limit. Define CPU/memory downgrade behavior as well. Use the smallest account resource state needed (for example Normal, OverQuota, ApplyingPolicy, PolicyError); do not introduce a generic billing/workflow framework.
+
+Acceptance:
+
+- Test increases, decreases below current usage, quota/cgroup failures, cleanup recovery, reprovision, and visible/recoverable policy errors.
+- Never automatically delete app or user data. Subscription/client input cannot bypass transition rules. A failed transition cannot silently become unbounded.
+
+## Completion claims
+
+- Stages 1–3 are complete as described above.
+- Stage 4 is the next implementation stage. Stages 5–10 remain planned and must not be described as current enforcement.
+- The end-to-end “Free is one aggregate 2 GiB account disk limit” claim is valid only after all account-owned writable paths are covered and the enforcement domain accounts for their actual placement. Stage 5 is the intended persistent app-storage milestone; Stages 6–7 close runtime and build escape paths.
+- Do not add paid plans, organization policy, separate per-app CPU budgets, or build-concurrency fields without a separate product decision.
