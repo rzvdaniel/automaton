@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -19,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src"
 TARGET_RULES = {"CA1502", "CA1506", "S3776"}
 BASELINE_PATH = ROOT / "scripts" / "quality" / "complexity-baseline.json"
-SETTINGS_PATHS = [ROOT / ".editorconfig", ROOT / "src" / "CodeMetricsConfig.txt", ROOT / "src" / "Directory.Build.targets"]
+REQUIRED_SETTINGS_PATHS = [".editorconfig", "src/CodeMetricsConfig.txt", "src/Directory.Build.targets"]
+IGNORED_ANALYZER_CONFIG_DIRECTORIES = {".git", ".artifacts", "bin", "node_modules", "obj"}
 METRIC_PATTERNS = {
     "CA1502": re.compile(r"complexity of ['\"](?P<score>\d+)['\"]", re.IGNORECASE),
     "CA1506": re.compile(r"coupled with ['\"](?P<score>\d+)['\"]", re.IGNORECASE),
@@ -106,11 +108,26 @@ def build_reports(solution: Path, report_dir: Path, configuration: str, sdk_vers
     ]
     installed_net9_sdk(sdk_version)
     (solution.parent / "global.json").write_text(
-        json.dumps({"sdk": {"version": sdk_version, "rollForward": "latestPatch"}}, indent=2) + "\n",
+        json.dumps({"sdk": {"version": sdk_version, "rollForward": "disable"}}, indent=2) + "\n",
         encoding="utf-8",
     )
+    selected_version = selected_sdk_version(solution.parent)
+    if selected_version != sdk_version:
+        raise GateError(
+            f"The quality gate requested .NET SDK {sdk_version}, but dotnet selected {selected_version}."
+        )
     run_checked(command, cwd=solution.parent)
-    return sdk_version
+    return selected_version
+
+
+def selected_sdk_version(cwd: Path) -> str:
+    result = subprocess.run(
+        ["dotnet", "--version"], cwd=cwd, check=True, capture_output=True, text=True
+    )
+    version = result.stdout.strip()
+    if not re.fullmatch(r"9\.\d+\.\d+", version):
+        raise GateError(f"The quality gate selected an unexpected .NET SDK version: {version!r}.")
+    return version
 
 
 def reviewed_sdk_version(create_baseline_requested: bool) -> str:
@@ -249,12 +266,33 @@ def get_symbol_identity(
     return token, signature
 
 
-def settings_digest() -> str:
+def analyzer_configuration_paths(repo_root: Path = ROOT) -> list[Path]:
+    paths = [repo_root / relative_path for relative_path in REQUIRED_SETTINGS_PATHS]
+    candidates = [repo_root / ".editorconfig"]
+    candidates.extend(path for path in repo_root.glob("*.globalconfig"))
+
+    source_root = repo_root / "src"
+    for current, directories, filenames in os.walk(source_root):
+        directories[:] = sorted(
+            name for name in directories if name not in IGNORED_ANALYZER_CONFIG_DIRECTORIES
+        )
+        current_path = Path(current)
+        candidates.extend(
+            current_path / filename
+            for filename in sorted(filenames)
+            if filename == ".editorconfig" or filename.lower().endswith(".globalconfig")
+        )
+
+    unique_paths = dict.fromkeys(path.resolve() for path in [*paths, *candidates])
+    return sorted(unique_paths, key=lambda path: path.relative_to(repo_root.resolve()).as_posix())
+
+
+def settings_digest(repo_root: Path = ROOT) -> str:
     digest = hashlib.sha256()
-    for path in SETTINGS_PATHS:
+    for path in analyzer_configuration_paths(repo_root):
         if not path.is_file():
-            raise GateError(f"Required analyzer configuration file is missing: {path.relative_to(ROOT)}")
-        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+            raise GateError(f"Required analyzer configuration file is missing: {path.relative_to(repo_root)}")
+        digest.update(path.relative_to(repo_root).as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes())
         digest.update(b"\0")
@@ -308,13 +346,17 @@ def create_baseline(
 
 
 def compare_findings(
-    baseline: dict[str, object], findings: list[dict[str, object]], sdk_version: str, compiler_versions: list[str]
+    baseline: dict[str, object],
+    findings: list[dict[str, object]],
+    sdk_version: str,
+    compiler_versions: list[str],
+    current_settings_digest: str | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
     if baseline.get("schemaVersion") != 1 or not isinstance(baseline.get("findings"), list):
         raise GateError("The complexity baseline has an unsupported schema.")
     if baseline.get("rules") != sorted(TARGET_RULES):
         raise GateError("The complexity baseline rule set differs from the configured gate.")
-    if baseline.get("settingsSha256") != settings_digest():
+    if baseline.get("settingsSha256") != (current_settings_digest or settings_digest()):
         raise GateError("Analyzer settings changed; review and explicitly migrate the complexity baseline.")
     if baseline.get("dotnetSdkVersion") != sdk_version or baseline.get("compilerVersions") != compiler_versions:
         raise GateError(".NET SDK or compiler version changed; review and explicitly migrate the complexity baseline.")
@@ -406,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
             temp_path = Path(temp_dir)
             solution = temp_path / "Automaton.Quality.sln"
             create_quality_solution(solution, projects)
-            build_reports(solution, report_dir, args.configuration, sdk_version)
+            sdk_version = build_reports(solution, report_dir, args.configuration, sdk_version)
             reports = verify_reports(report_dir, projects)
             findings = read_findings(reports)
             compiler_versions = read_compiler_versions(reports)
