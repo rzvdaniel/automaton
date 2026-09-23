@@ -355,7 +355,7 @@ public sealed class DeploymentOperationService(
         Guid executionAttemptId,
         CancellationToken cancellationToken)
     {
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
             await Task.Delay(ExecutionLeaseRenewalInterval, cancellationToken);
             var leaseExpiresAt = DateTime.UtcNow.Add(ExecutionLeaseDuration);

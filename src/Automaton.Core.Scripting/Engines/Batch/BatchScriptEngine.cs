@@ -8,53 +8,61 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
 
     public IDictionary<string, string> Execute(string code, IDictionary<string, string> inputs)
     {
-        var tempFile = Path.GetTempFileName() + ".bat";
-        File.WriteAllText(tempFile, code);
-
-        var process = new Process
+        var tempDirectory = Path.Combine(Path.GetTempPath(), $"automaton-batch-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory);
+        var tempFile = Path.Combine(tempDirectory, "script.bat");
+        try
         {
-            StartInfo = new ProcessStartInfo
+            File.WriteAllText(tempFile, code);
+
+            using var process = new Process
             {
-                FileName = tempFile,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = tempFile,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+
+            var outputLines = new List<string>();
+            while (!process.StandardOutput.EndOfStream)
+            {
+                var line = process.StandardOutput.ReadLine();
+                outputLines.Add(line!);
+                OutputCallback?.Invoke(line!);
             }
-        };
 
-        process.Start();
+            var errorLines = new List<string>();
+            while (!process.StandardError.EndOfStream)
+            {
+                var line = process.StandardError.ReadLine();
+                errorLines.Add(line!);
+            }
 
-        var outputLines = new List<string>();
-        while (!process.StandardOutput.EndOfStream)
-        {
-            var line = process.StandardOutput.ReadLine();
-            outputLines.Add(line);
-            OutputCallback?.Invoke(line);
+            process.WaitForExit();
+
+            var output = string.Join("\n", outputLines);
+            var error = string.Join("\n", errorLines);
+
+            var result = new Dictionary<string, string> { { "output", output } };
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                var errorMessage = $"ERROR: {error}";
+                result["error"] = errorMessage;
+                OutputCallback?.Invoke(errorMessage);
+            }
+
+            return result;
         }
-
-        var errorLines = new List<string>();
-        while (!process.StandardError.EndOfStream)
+        finally
         {
-            var line = process.StandardError.ReadLine();
-            errorLines.Add(line);
+            Directory.Delete(tempDirectory, recursive: true);
         }
-
-        process.WaitForExit();
-        File.Delete(tempFile);
-
-        var output = string.Join("\n", outputLines);
-        var error = string.Join("\n", errorLines);
-
-        var result = new Dictionary<string, string> { { "output", output } };
-        if (!string.IsNullOrWhiteSpace(error))
-        {
-            var errorMessage = $"ERROR: {error}";
-            result["error"] = errorMessage;
-            OutputCallback?.Invoke(errorMessage);
-        }
-
-        return result;
     }
 
     public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, string> inputs)

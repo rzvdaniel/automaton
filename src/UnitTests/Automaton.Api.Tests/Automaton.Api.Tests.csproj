@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Api\Automaton.Api.csproj" />
+    <Compile Include="..\Shared\LoopbackTlsServer.cs" Link="LoopbackTlsServer.cs" />
     <Compile Include="..\Shared\RecordingCapPublisher.cs" Link="RecordingCapPublisher.cs" />
   </ItemGroup>
 </Project>
