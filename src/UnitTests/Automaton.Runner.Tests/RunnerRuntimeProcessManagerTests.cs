@@ -336,7 +336,7 @@ public sealed class RunnerRuntimeProcessManagerTests
         var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
         var original = ReadMetadata(metadataPath);
         Assert.That(original.ProcessId, Is.Not.Null);
-        var replacement = CreateContract(["--startup-delay", "2000", "--tcp", "replacement"]);
+        var replacement = CreateContract(["--startup-delay", "3000", "--tcp", "replacement"]);
         var replacementTask = manager.ApplyAsync(appId, targetId, replacement);
         var pending = await WaitForCandidateAsync(metadataPath);
 
@@ -346,6 +346,11 @@ public sealed class RunnerRuntimeProcessManagerTests
             oldProcess.Kill(entireProcessTree: true);
             await oldProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
         }
+
+        Assert.That(
+            await WaitForOldRuntimeExitCallbackAsync(registry, appId, targetId, metadataPath, replacementTask),
+            Is.True,
+            "The old runtime callback should remove its route while the replacement candidate is still pending.");
 
         await replacementTask.WaitAsync(TimeSpan.FromSeconds(10));
         var promoted = ReadMetadata(metadataPath);
@@ -1080,6 +1085,37 @@ public sealed class RunnerRuntimeProcessManagerTests
 
         Assert.Fail("Replacement candidate did not enter readiness before the timeout.");
         return null!;
+    }
+
+    private static async Task<bool> WaitForOldRuntimeExitCallbackAsync(
+        RunnerRuntimeRegistry registry,
+        Guid appId,
+        Guid targetId,
+        string metadataPath,
+        Task replacementTask)
+    {
+        for (var attempt = 0; attempt < 60; attempt++)
+        {
+            try
+            {
+                var metadata = ReadMetadata(metadataPath);
+                if (!replacementTask.IsCompleted
+                    && metadata.Candidate is not null
+                    && !registry.TryGet(appId, targetId, out _))
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or JsonException)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            await Task.Delay(50);
+        }
+
+        return false;
     }
 
     private static Process StartFixtureProcess(string workingDirectory, int port, string value)
