@@ -6,3 +6,6 @@ root = true
 dotnet_diagnostic.CA1502.severity = warning
 dotnet_diagnostic.CA1506.severity = warning
 dotnet_diagnostic.CA1501.severity = warning
+
+# Sonar's cognitive complexity rule complements CA1502's cyclomatic metric.
+dotnet_diagnostic.S3776.severity = warning
