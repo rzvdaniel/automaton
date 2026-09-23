@@ -170,8 +170,8 @@ public class RunnerHostService
 
         try
         {
-            await StartFastApiProcessAsync();
-            await WaitForFastApiAsync();
+            await StartFastApiProcessAsync(stoppingToken);
+            await WaitForFastApiAsync(cancellationToken: stoppingToken);
             await EnsureRunnerRegistrationConsistencyAsync();
 
             var connected = await hubService.ConnectAsync();
@@ -638,8 +638,8 @@ public class RunnerHostService
         WriteLine("?? Starting runner...");
         WriteLine();
 
-        await StartFastApiProcessAsync();
-        await WaitForFastApiAsync();
+        await StartFastApiProcessAsync(CancellationToken.None);
+        await WaitForFastApiAsync(cancellationToken: CancellationToken.None);
         await EnsureRunnerRegistrationConsistencyAsync();
 
         // Attempt to connect to hub with better error handling
@@ -1561,7 +1561,7 @@ public class RunnerHostService
     /// and RUNNER_SCRIPTS_DIR are standard env vars set by the operator.
     /// In Docker, this is a no-op — the entrypoint script already starts FastAPI.
     /// </summary>
-    private async Task StartFastApiProcessAsync()
+    private async Task StartFastApiProcessAsync(CancellationToken cancellationToken = default)
     {
         if (IsRunningInContainer)
         {
@@ -1575,7 +1575,7 @@ public class RunnerHostService
         try
         {
             using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            await probe.GetAsync("http://localhost:8001/shutdown");
+            await probe.GetAsync("http://localhost:8001/shutdown", cancellationToken);
 
             // Poll until the port is released (connection refused = old process exited)
             var stopDeadline = DateTime.UtcNow.AddSeconds(5);
@@ -1584,14 +1584,22 @@ public class RunnerHostService
                 try
                 {
                     using var check = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-                    await check.GetAsync("http://localhost:8001/health");
-                    await Task.Delay(200); // still bound — keep waiting
+                    using var response = await check.GetAsync("http://localhost:8001/health", cancellationToken);
+                    await Task.Delay(200, cancellationToken); // still bound — keep waiting
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch
                 {
                     break; // connection refused — port is free
                 }
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch { /* not running — fine */ }
 
@@ -1658,22 +1666,27 @@ public class RunnerHostService
     /// In Docker, FastAPI starts alongside the .NET runner; this health check ensures it's up.
     /// On bare-metal (no FastAPI), this times out gracefully and logs a warning.
     /// </summary>
-    private async Task WaitForFastApiAsync(int maxWaitSeconds = 30)
+    internal async Task WaitForFastApiAsync(int maxWaitSeconds = 30, CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         var deadline = DateTime.UtcNow.AddSeconds(maxWaitSeconds);
         var attempt = 0;
         while (DateTime.UtcNow < deadline)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var response = await client.GetAsync("http://localhost:8001/health");
+                using var response = await client.GetAsync("http://localhost:8001/health", cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     if (attempt > 0) WriteLine(); // newline after the dots
                     logger.Debug("FastAPI backend ready");
                     return;
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch { /* not ready yet */ }
 
@@ -1683,7 +1696,7 @@ public class RunnerHostService
                 Write(".");
 
             attempt++;
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
         }
 
         WriteLine(); // newline after the dots
