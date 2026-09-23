@@ -266,8 +266,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 stderr,
                 targetRoot);
             active = runtimeProcess;
-            process.Exited += (_, _) => OnProcessExited(key, runtimeProcess);
             lock (gate) candidates[key] = runtimeProcess;
+            process.Exited += (_, _) => OnProcessExited(key, runtimeProcess);
 
             candidate.EffectivePort = effectivePort;
             candidate.ProcessId = process.Id;
@@ -278,11 +278,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             await WriteMetadataAsync(metadata, cancellationToken);
 
             await WaitForReadinessAsync(
-                process,
+                runtimeProcess,
                 effectivePort,
                 candidate.Health ?? new ApplicationHealthSpec(),
                 cancellationToken);
-            if (process.HasExited)
+            if (runtimeProcess.HasExited)
                 throw new InvalidOperationException("Runtime process exited immediately after becoming ready.");
             return runtimeProcess;
         }
@@ -293,7 +293,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 await StopProcessAsync(process, cancellationToken);
                 RemoveActiveRuntime(key, process);
             }
-            if (active is null)
+            if (active is not null)
+            {
+                active.Dispose();
+            }
+            else
             {
                 stdout.Dispose();
                 stderr.Dispose();
@@ -315,6 +319,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var promotionIrreversible = false;
         try
         {
+            if (candidate.HasExited)
+                throw new InvalidOperationException(
+                    $"Runtime process exited before becoming ready (exit code {candidate.ExitCode?.ToString() ?? "unknown"}).");
+
             var candidateMetadata = metadata.Candidate
                 ?? throw new InvalidOperationException("Runtime candidate metadata is missing.");
             candidateMetadata.EffectivePort = candidate.Port;
@@ -326,6 +334,10 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             ActiveRuntime? old;
             lock (gate)
             {
+                if (candidate.HasExited)
+                    throw new InvalidOperationException(
+                        $"Runtime process exited before promotion (exit code {candidate.ExitCode?.ToString() ?? "unknown"}).");
+
                 old = runtimes.GetValueOrDefault(key);
                 runtimes[key] = candidate;
                 candidates.Remove(key);
@@ -333,7 +345,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             }
             promotionIrreversible = true;
 
-            if (old is not null && !old.Process.HasExited)
+            if (old is not null && !old.HasExited)
             await StopProcessAsync(old.Process, cancellationToken);
 
             if (old is not null)
@@ -388,8 +400,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (!IsCurrentRuntime(key, candidate))
             {
-            await StopProcessAsync(candidate.Process, cancellationToken);
+                await StopProcessAsync(candidate.Process, cancellationToken);
                 RemoveActiveRuntime(key, candidate.Process);
+                candidate.Dispose();
             }
             throw;
         }
@@ -445,14 +458,16 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
     private void OnProcessExited(DeploymentRuntimeKey key, ActiveRuntime active)
     {
+        active.MarkExited();
         var isCurrent = false;
+        var isCandidate = false;
         lock (gate)
         {
             isCurrent = runtimes.TryGetValue(key, out var current) && ReferenceEquals(current, active);
             if (isCurrent) runtimes.Remove(key);
-            candidates.Remove(key, out var candidate);
-            if (!isCurrent && candidate is not null && !ReferenceEquals(candidate, active))
-                candidate.Dispose();
+            isCandidate = candidates.TryGetValue(key, out var candidate) && ReferenceEquals(candidate, active);
+            if (isCandidate)
+                candidates.Remove(key);
         }
 
         if (isCurrent)
@@ -462,10 +477,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 "Runtime process exited unexpectedly for app {AppId}, target {DeploymentTargetId}",
                 key.AppId,
                 key.DeploymentTargetId);
-            _ = MarkStoppedAsync(key, active.Process.ExitCode);
+            _ = MarkStoppedAsync(key, active.ExitCode ?? -1);
         }
 
-        active.Dispose();
+        if (!isCandidate)
+            active.Dispose();
     }
 
     private async Task MarkStoppedAsync(DeploymentRuntimeKey key, int exitCode)
@@ -656,7 +672,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             var gatewayPort = RunnerPlatformPorts.GetRuntimeGatewayPort();
             var used = runtimes.Values.Concat(candidates.Values)
-                .Where(runtime => !runtime.Process.HasExited)
+                .Where(runtime => !runtime.HasExited)
                 .Select(runtime => runtime.Port)
                 .ToHashSet();
 
@@ -727,7 +743,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     }
 
     private async Task WaitForReadinessAsync(
-        Process process,
+        ActiveRuntime runtime,
         int effectivePort,
         ApplicationHealthSpec health,
         CancellationToken cancellationToken)
@@ -741,8 +757,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
         while (!timeout.IsCancellationRequested)
         {
-            if (process.HasExited)
-                throw new InvalidOperationException($"Runtime process exited before becoming ready (exit code {process.ExitCode}).");
+            if (runtime.HasExited)
+                throw new InvalidOperationException(
+                    $"Runtime process exited before becoming ready (exit code {runtime.ExitCode?.ToString() ?? "unknown"}).");
 
             try
             {
@@ -993,9 +1010,37 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         string artifactRoot) : IDisposable
     {
         private int disposed;
+        private int exited;
+        private int exitCode = int.MinValue;
         public Process Process { get; } = process;
         public int Port { get; } = port;
         public string ArtifactRoot { get; } = artifactRoot;
+        public bool HasExited
+        {
+            get
+            {
+                if (Volatile.Read(ref exited) != 0)
+                    return true;
+
+                try { return Process.HasExited; }
+                catch (InvalidOperationException) { return true; }
+            }
+        }
+        public int? ExitCode
+        {
+            get
+            {
+                var value = Volatile.Read(ref exitCode);
+                return value == int.MinValue ? null : value;
+            }
+        }
+
+        public void MarkExited()
+        {
+            try { Interlocked.Exchange(ref exitCode, Process.ExitCode); }
+            catch (InvalidOperationException) { }
+            Volatile.Write(ref exited, 1);
+        }
 
         public void Dispose()
         {

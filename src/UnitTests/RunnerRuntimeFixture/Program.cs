@@ -66,6 +66,10 @@ Console.Error.WriteLine("stderr:fixture");
 Console.Out.Flush();
 Console.Error.Flush();
 
+var startupDelayIndex = Array.IndexOf(args, "--startup-delay");
+if (startupDelayIndex >= 0 && startupDelayIndex + 1 < args.Length)
+    await Task.Delay(int.Parse(args[startupDelayIndex + 1]));
+
 if (childMode)
 {
     await Task.Delay(Timeout.InfiniteTimeSpan);

@@ -58,6 +58,18 @@ public sealed class RunnerStartupTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task FastApiReadinessWait_StopsWhenServiceIsStopping()
+    {
+        using var host = Program.CreateHostBuilder([]).Build();
+        var runner = host.Services.GetRequiredService<RunnerHostService>();
+        using var stopping = new CancellationTokenSource();
+        stopping.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            () => runner.WaitForFastApiAsync(maxWaitSeconds: 30, cancellationToken: stopping.Token));
+    }
+
     private sealed class EnrollmentHandler : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
