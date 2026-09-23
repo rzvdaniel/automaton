@@ -263,6 +263,23 @@ public sealed class RunnerRuntimeProcessManagerTests
     }
 
     [Test]
+    public void ProcessExitDuringStartupReportsAReadinessFailure()
+    {
+        var registry = new RunnerRuntimeRegistry();
+        using var manager = CreateManager(new RunnerWorkspaceService(), registry);
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var contract = CreateContract(["--delay", "200"]);
+        contract.Health = new ApplicationHealthSpec { Path = "/ready", StartupTimeoutSeconds = 5 };
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await manager.ApplyAsync(appId, targetId, contract));
+
+        Assert.That(exception!.Message, Does.Contain("Runtime process exited before becoming ready"));
+        Assert.That(registry.TryGet(appId, targetId, out _), Is.False);
+    }
+
+    [Test]
     public void HttpReadiness_TimesOutWhenResponsesNeverSucceed()
     {
         var registry = new RunnerRuntimeRegistry();
@@ -460,7 +477,8 @@ public sealed class RunnerRuntimeProcessManagerTests
         var deployment = new RunnerDeploymentService(
             workspace,
             processManager,
-            new AppActionDeploymentService(workspace));
+            new AppActionDeploymentService(workspace),
+            new LocalApplicationBuildExecutor());
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var originalPackage = CreateRuntimePackage(
@@ -539,7 +557,8 @@ public sealed class RunnerRuntimeProcessManagerTests
         var deployment = new RunnerDeploymentService(
             workspace,
             processManager,
-            new AppActionDeploymentService(workspace));
+            new AppActionDeploymentService(workspace),
+            new LocalApplicationBuildExecutor());
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var package = CreateRuntimePackage(

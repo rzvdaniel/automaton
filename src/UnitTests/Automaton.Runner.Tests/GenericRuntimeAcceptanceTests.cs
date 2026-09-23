@@ -234,7 +234,8 @@ public sealed class GenericRuntimeAcceptanceTests
         var deployment = new RunnerDeploymentService(
             workspace,
             processManager,
-            new AppActionDeploymentService(workspace));
+            new AppActionDeploymentService(workspace),
+            new LocalApplicationBuildExecutor());
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var packagePath = CreatePackage(AcceptanceFixture.Node, appId, "artifact", 0);
@@ -312,7 +313,8 @@ public sealed class GenericRuntimeAcceptanceTests
         => new(
             workspace,
             processManager,
-            new AppActionDeploymentService(workspace));
+            new AppActionDeploymentService(workspace),
+            new LocalApplicationBuildExecutor());
 
     private static string CreatePackage(
         AcceptanceFixture fixture,
