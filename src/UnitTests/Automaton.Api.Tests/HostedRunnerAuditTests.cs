@@ -296,6 +296,48 @@ public partial class HostedRunnerAuditTests
             Assert.That(snapshot.Resources.DockerLogMaxSizeMb, Is.EqualTo(20));
             Assert.That(snapshot.Resources.DockerLogMaxFiles, Is.EqualTo(4));
             Assert.That(prepared.HostedRunner.StorageProjectId, Is.GreaterThan(0));
+            Assert.That(db.AccountStorageAllocations.Single(x => x.AccountId == userId).StorageProjectId,
+                Is.EqualTo(prepared.HostedRunner.StorageProjectId));
+        });
+    }
+
+    [Test]
+    public async Task PrepareProvisioningAsync_ReusesAccountProjectAcrossReprovisionAndRunnerRecreation()
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db);
+        SeedUser(db, userId, planId);
+        SeedRunnerHost(db);
+        var service = CreateProvisioningService(
+            db,
+            userId,
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerOptions { Enabled = false });
+
+        var created = await service.PrepareProvisioningAsync(userId, Guid.Empty, forceProvision: true);
+        var originalProjectId = created.HostedRunner.StorageProjectId;
+        var specification = await db.HostedRunnerSpecifications
+            .SingleAsync(x => x.Id == created.HostedRunner.HostedRunnerSpecificationId);
+        specification.Resources.DiskLimitMb = 1024;
+        await db.SaveChangesAsync();
+
+        var reprovisioned = await service.PrepareProvisioningAsync(userId, Guid.Empty, forceProvision: true);
+        Assert.That(reprovisioned.HostedRunner.PendingSpecificationSnapshot!.Resources.DiskLimitMb, Is.EqualTo(1024));
+        Assert.That(reprovisioned.HostedRunner.StorageProjectId, Is.EqualTo(originalProjectId));
+
+        reprovisioned.HostedRunner.DeletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        var recreated = await service.PrepareProvisioningAsync(userId, Guid.Empty, forceProvision: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(recreated.HostedRunner.Id, Is.Not.EqualTo(reprovisioned.HostedRunner.Id));
+            Assert.That(recreated.HostedRunner.StorageProjectId, Is.EqualTo(originalProjectId));
+            Assert.That(db.HostedRunners.Count(x => x.UserId == userId), Is.EqualTo(2));
+            Assert.That(db.HostedRunners.Where(x => x.UserId == userId)
+                .Select(x => x.StorageProjectId).Distinct().Count(), Is.EqualTo(1));
+            Assert.That(db.AccountStorageAllocations.Count(x => x.AccountId == userId), Is.EqualTo(1));
         });
     }
 
@@ -1197,6 +1239,7 @@ public partial class HostedRunnerAuditTests
             new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
             new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
+            new AccountStorageProjectAllocationService(db),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
     }

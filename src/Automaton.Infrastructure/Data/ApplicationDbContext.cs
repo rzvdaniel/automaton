@@ -38,6 +38,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
+        public virtual DbSet<AccountStorageAllocation> AccountStorageAllocations { get; set; }
         public virtual DbSet<HostedRunnerSpecification> HostedRunnerSpecifications { get; set; }
         public virtual DbSet<HostedRunnerSpecificationRevision> HostedRunnerSpecificationRevisions { get; set; }
         public virtual DbSet<HostedRunnerPlatformSettings> HostedRunnerPlatformSettings { get; set; }
@@ -513,7 +514,7 @@ namespace Automaton.Api.Data
             modelBuilder.Entity<HostedRunner>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.HasIndex(e => e.StorageProjectId).IsUnique();
+                entity.HasIndex(e => e.StorageProjectId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.ContainerName).IsRequired().HasMaxLength(160);
@@ -563,6 +564,20 @@ namespace Automaton.Api.Data
                     .WithMany()
                     .HasForeignKey(e => e.ApiKeyId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<AccountStorageAllocation>(entity =>
+            {
+                entity.HasKey(e => e.AccountId);
+                entity.Property(e => e.StorageProjectId).IsRequired();
+                entity.ToTable(table => table.HasCheckConstraint(
+                    "CK_AccountStorageAllocations_StorageProjectId_Positive",
+                    "StorageProjectId > 0"));
+                entity.HasIndex(e => e.StorageProjectId).IsUnique();
+                entity.HasOne(e => e.Account)
+                    .WithMany()
+                    .HasForeignKey(e => e.AccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<HostedRunnerStorageObservation>(entity =>

@@ -51,6 +51,25 @@ namespace Automaton.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AccountStorageAllocation", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("StorageProjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AccountId");
+
+                    b.HasIndex("StorageProjectId")
+                        .IsUnique();
+
+                    b.ToTable("AccountStorageAllocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_AccountStorageAllocations_StorageProjectId_Positive", "StorageProjectId > 0");
+                        });
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.ActionSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1948,8 +1967,7 @@ namespace Automaton.Api.Migrations
 
                     b.HasIndex("Status");
 
-                    b.HasIndex("StorageProjectId")
-                        .IsUnique();
+                    b.HasIndex("StorageProjectId");
 
                     b.HasIndex("UserId");
 
@@ -4266,6 +4284,17 @@ namespace Automaton.Api.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AccountStorageAllocation", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.ActionSchedule", b =>

@@ -1,14 +1,14 @@
 # Subscription Resource Policy Audit
 
-**Status:** Stage 1 audit plus Stage 2 policy-resolution contract. The policy
-resolver is now implemented; account-wide disk ownership/migration and resource
-value changes remain future work.
+**Status:** Stage 1 audit, Stage 2 policy-resolution contract, and Stage 3
+account-level storage identity are implemented. Account-wide writable disk
+enforcement and resource value changes remain future work.
 
 ## Scope and conclusion
 
 The subscription model currently controls feature eligibility and selection of a Hosted Runner specification. It does not persist an independent account resource budget. `SubscriptionResourcePolicyResolver` now provides one authoritative control-plane resolution path, deriving CPU, memory, disk, PID/tasks, and maximum applications from the selected administrator-managed specification. Provisioning snapshots those effective values onto each `HostedRunner`, then carries them through the Worker and Infrastructure Runner to Docker/cgroup and XFS enforcement. Other Hosted Runner-specific settings (memory reservation, shared memory, Docker log rotation) remain sourced from the same specification and are preserved in the snapshot.
 
-The persisted `DiskLimitMb` is a per-Hosted-Runner limit. The current project quota aggregates the Hosted Runner's system and user Docker volumes under one XFS project. It is not account-wide across multiple Hosted Runners, Docker writable layers, image/cache data, or any storage outside those two Docker volume roots. Infrastructure Runner host resources and storage are operator-owned and remain outside tenant accounting.
+`ApplicationUser.Id` is the current account/resource-boundary identity because it owns the effective subscription link. `AccountStorageAllocation.StorageProjectId` is now the authoritative stable XFS project ID for that account. Hosted Runners copy it into `HostedRunner.StorageProjectId` for Worker and reconciliation compatibility. `DiskLimitMb` still comes from the resolved subscription policy snapshot. The unchanged XFS action applies that ID to each Hosted Runner's system and user volumes on its host; using the same numeric project ID does not yet create a single cross-host/filesystem aggregate quota. Docker writable layers, image/cache data, and storage outside the two volume roots remain outside XFS enforcement. Infrastructure Runner host resources and storage are operator-owned and remain outside tenant accounting.
 
 ## Current resource flow
 
@@ -20,12 +20,13 @@ flowchart TD
     S --> PR[SubscriptionResourcePolicyResolver]
     PR --> R[HostedRunnerProvisioningService]
     R -->|copy resource values| HS[HostedRunner.SpecificationSnapshot / PendingSpecificationSnapshot]
-    R -->|allocate per-runner id| SP[HostedRunner.StorageProjectId]
+    R -->|get or allocate once per account| A[AccountStorageAllocation.StorageProjectId]
+    A -->|compatibility copy| SP[HostedRunner.StorageProjectId]
     HS --> W[Worker ManagedRunnerProvisionRequestedEventHandler]
     SP --> W
     W -->|InfrastructureCommandRequestedEvent JSON| IR[Infrastructure Runner]
     IR -->|Docker run + cgroup parent| CG[Hosted Runner cgroup: CPU, memory, PIDs]
-    IR -->|system + user Docker volumes, one project| XFS[XFS project quota: diskLimitMb]
+    IR -->|system + user volumes use account project ID| XFS[XFS quota still local to each host filesystem]
     CG --> APP[Application and build containers share runner cgroup]
     XFS --> VOL[Runner system volume + user volume]
 ```
@@ -38,7 +39,7 @@ flowchart TD
 | --- | --- | --- | --- | --- |
 | Hosted Runner CPU | Effective `SubscriptionResourcePolicy.CpuLimitCores`, resolved from admin-managed `HostedRunnerSpecification.Resources.CpuLimit`; code model default is 0.50 | Specification and revision; copied into `HostedRunner.SpecificationSnapshot` (and pending snapshot for reprovision) | Infrastructure action creates runner cgroup with CPU quota; hosted Runner, app, and build containers join that parent cgroup | A subscription-owned resource policy independent of the Hosted Runner specification |
 | Hosted Runner memory | Effective `SubscriptionResourcePolicy.MemoryLimitMb`, resolved from admin-managed specification; model default 384 MiB | Specification/revision and runner snapshot | Runner cgroup memory limit; Docker memory reservation is also sent for the Hosted Runner container | A subscription-owned resource policy independent of the Hosted Runner specification |
-| Hosted Runner disk | Effective `SubscriptionResourcePolicy.DiskLimitMb`, resolved from admin-managed specification; model default 512 MiB | Specification/revision; runner snapshot; `HostedRunner.StorageAllowanceBytes` derived from the effective snapshot | One XFS project hard quota over the Hosted Runner system and user Docker volume roots | A subscription-owned `DiskLimitMb`, enforced once across every tenant-owned writable path for that account |
+| Hosted Runner disk | Effective `SubscriptionResourcePolicy.DiskLimitMb`, resolved from admin-managed specification; model default 512 MiB | Specification/revision; runner snapshot; `HostedRunner.StorageAllowanceBytes` derived from the effective snapshot | Existing XFS action applies the account project ID and snapshot limit to that Hosted Runner's system/user volumes on its host; no cross-host aggregate yet | `DiskLimitMb` enforced once across every tenant-owned writable path for that account |
 | Hosted Runner Tasks/PIDs | Effective `SubscriptionResourcePolicy.TasksLimit`, resolved from admin-managed `PidsLimit`; model default 256 | Specification/revision and runner snapshot (`PidsLimit`) | Hosted Runner cgroup `pids.max`; app/build containers are descendants under the same runner cgroup | A subscription-owned task/PID limit independent of the Hosted Runner specification |
 | Max Hosted Runners | `SubscriptionResourcePolicy.MaxHostedRunners` currently describes the existing normal lifecycle as one per user; no new admission check is added, and no database uniqueness constraint guarantees it under concurrent creation | No separate persisted policy; HostedRunner rows and their status/deletion state | Existing API provisioning lookup/lifecycle reuses an existing non-deleted/non-disabled runner; explicit cap enforcement remains future work | A subscription-owned `MaxHostedRunners` with separately defined enforcement semantics |
 | Max applications | Effective `SubscriptionResourcePolicy.MaxApplications`, resolved from specification `MaximumApps` (model default 3); currently remains a per-HostedRunner count | Specification/revision and HostedRunner snapshot | `HostedRunnerAppCapacityService` checks deployment target assignments per HostedRunner during assignment | A subscription-owned `MaxApplications`; account-wide semantics still require product definition |
@@ -80,20 +81,19 @@ The resolver fails explicitly when the effective plan is missing/inactive, capab
 
 Relevant implementations: `src/Automaton.Infrastructure/Models/HostedRunnerSpecifications.cs`, `src/Automaton.Api/Extensions/DataExtensions.cs`, `src/Automaton.Api/Services/HostedRunnerSpecificationResolver.cs`, `src/Automaton.Api/Services/HostedRunnerProvisioningService.cs`, `src/Automaton.Worker/Handlers/ManagedRunnerProvisionRequestedEventHandler.cs`, and `system-apps/automaton-infrastructure/actions/{provision-hosted-runner,reprovision-hosted-runner}/main.py`.
 
-## `StorageProjectId` ownership assumptions
+## `StorageProjectId` ownership and compatibility
 
-Today this is explicitly a **HostedRunner-owned XFS project identity**, not an account identity:
+The authoritative owner is `AccountStorageAllocation`, keyed by `ApplicationUser.Id`:
 
-1. `HostedRunner.StorageProjectId` is a nullable field on `HostedRunner`, with a unique database index.
-2. `HostedRunnerProvisioningService.AllocateStorageProjectIdAsync(hostedRunnerId)` chooses an unused value by hashing the HostedRunner ID and probing all other HostedRunner rows. It does not use an account ID or account disk-budget record.
-3. `ManagedRunnerProvisionRequestedEventHandler` requires that HostedRunner field and serializes it as `xfsProjectId` alongside `hostedRunnerId`, `systemVolumeName`, and `userVolumeName`.
-4. The Infrastructure Runner action validates both volume names against the HostedRunner ID, then assigns the same project ID to those two volume roots and sets one hard quota for the project.
-5. `HostedRunnerStorageReconciliationService` reads the `StorageProjectId` through the verification's HostedRunner and dispatches the same HostedRunner-scoped volume names and project ID for measurement.
-6. The telemetry fallback derives the storage allowance from the HostedRunner snapshot's `DiskLimitMb`.
-7. `HostedRunnerManagementService` derives system/user volume names from the HostedRunner ID for deletion actions.
-8. The uniqueness index is only among HostedRunner values; it does not reserve an account project shared across multiple HostedRunners or other tenant storage roots.
+1. Each account has at most one allocation row. `AccountId` is its primary key, `StorageProjectId` is constrained positive and globally unique, and a restrictive user foreign key makes account teardown explicit.
+2. `AccountStorageProjectAllocationService` first returns an existing account allocation. If none exists, it adopts exactly one distinct positive historical Hosted Runner project ID; it fails on invalid or conflicting history. With no historical ID it hashes the account ID and probes allocated and legacy Hosted Runner IDs before persisting a new value.
+3. `HostedRunner.StorageProjectId` remains temporarily as a denormalized compatibility snapshot. It is copied from the account allocation during provisioning and is not independently allocated. The old unique HostedRunner index becomes non-unique so multiple Hosted Runners for one account can carry the same ID; global uniqueness is enforced by the account allocation table.
+4. The migration preflights existing rows and adopts their IDs. Conflicting IDs for one account fail before permanent schema changes; the migration does not pick an arbitrary winner. Existing IDs are preserved where ownership is unambiguous.
+5. `ManagedRunnerProvisionRequestedEventHandler` continues reading the compatibility field and serializing it as `xfsProjectId`; the Infrastructure Runner command contract and XFS actions are unchanged.
+6. `HostedRunnerStorageReconciliationService` continues reading the compatibility field through the verified Hosted Runner. Provisioning, reprovisioning, deletion, and recreation reuse the account allocation. Soft deletion does not release it; hard deletion remains blocked while the allocation exists until explicit storage teardown is defined.
+7. The HostedRunner snapshot remains the source of the effective `DiskLimitMb`; `StorageAllowanceBytes` and current enforcement semantics remain as before.
 
-This ownership shape means the current quota cannot implement the intended one-budget-per-account model. Future account-level accounting will need a durable account-level quota identity and a controlled way to associate all account-owned writable roots/paths with it; the migration is explicitly outside this audit stage.
+This stage changes ownership and identity propagation only. Reusing the same project ID on separate hosts/filesystems does not itself merge their local XFS accounting into one global account quota. App/build root filesystem escapes and additional storage roots are not migrated here.
 
 ## Writable tenant disk paths found
 
@@ -105,7 +105,7 @@ This ownership shape means the current quota cannot implement the intended one-b
 - Brokered hosted app containers mount accepted application artifacts read-only at `/automaton/app`, and data/mount subpaths from the user volume read-write at `/automaton/data` and `/automaton/data/{mount}`.
 - Brokered build containers mount the incoming deployment source subpath in the same user volume read-write at `/automaton/source`.
 
-The XFS quota counts all blocks charged to those two volume roots under the same project ID, including user storage and app/build workspaces within the user volume. This is aggregate across these two volumes for one HostedRunner only.
+The XFS quota counts blocks charged to those volume roots under the account project ID, including user storage and app/build workspaces within the user volume. The quota operation and measurement remain host/filesystem-local; Stage 3 does not make separate hosts or filesystems share one aggregate enforcement counter.
 
 ### Tenant-writable paths currently outside that XFS project
 
@@ -120,7 +120,7 @@ The XFS quota counts all blocks charged to those two volume roots under the same
 - Docker writable layers are not under either project-tagged Hosted Runner volume.
 - `/tmp` is not explicitly mounted as tmpfs, has no configured size bound, and is not under the project quota.
 - Build dependency/cache data can be in the source workspace (quota-covered) or image/container writable layer (not quota-covered); there is no single explicit build-cache root/quota.
-- Multiple Hosted Runners for one account would each get their own project and full per-runner `DiskLimitMb`; the current model does not sum tenant storage across them.
+- Multiple Hosted Runners for one account now carry the same account `StorageProjectId`, but each host/filesystem may still enforce and measure its own quota independently. Account-wide aggregation across those filesystems remains future work.
 - App data and app declared volumes are quota-covered only when they are routed through the Hosted Runner's brokered user volume. Other/local/self-hosted execution storage is outside this Hosted Runner quota by design.
 - Host scheduling checks estimated per-runner disk reservations against host-reported capacity. That is placement admission, not account usage accounting or quota enforcement.
 
@@ -139,7 +139,7 @@ The Hosted Runner's `/automaton/system` and `/automaton/storage` are persistent 
 - **Direct/local Runner Docker runtime:** `DockerContainerRuntime` uses host bind mounts for build source, app artifacts (read-only), and app data/storage (read-write). It does not set account policy limits; it is not the Infrastructure Runner brokered Hosted Runner path.
 - **Hosted Runner system/user volumes:** provision and reprovision actions create/retain both named volumes, attach the same XFS project, and verify one `diskLimitMb` hard block quota for the project. Reconciliation measures those expected volumes by HostedRunner-scoped identity.
 
-## Future independent subscription policy
+## Future independent subscription policy and account disk enforcement
 
 Keep the contract limited to the requested account policy values and avoid product-tier or organization-specific abstractions for now:
 
@@ -157,17 +157,17 @@ public sealed record SubscriptionResourcePolicy
 
 The contract is currently resolved from the effective account subscription through the existing specification. A future transition may store policy values independently; the policy should then become the authoritative ceiling while the Hosted Runner specification describes an operator-approved runtime shape. Persisted provisioning snapshots should continue to capture effective limits for deterministic operation history.
 
-`DiskLimitMb` means one account-level aggregate writable-disk budget. `StorageProjectId` should evolve from a HostedRunner-owned identity to an account-owned quota identity (or equivalent shared ownership mapping) so all account roots are charged to the same quota. Infrastructure Runner host state, image cache, and host Docker storage remain outside that tenant budget. Keep `/tmp` bounded and memory-backed. Do not add separate build concurrency, per-app CPU, paid tiers, or organization policy fields without a corresponding product requirement.
+`DiskLimitMb` is intended to mean one account-level aggregate writable-disk budget. Stage 3 establishes the stable account-owned identity, but does not yet connect all account storage roots to one globally aggregated enforcement counter. Infrastructure Runner host state, image cache, and host Docker storage remain outside that tenant budget. Keep `/tmp` bounded and memory-backed. Do not add separate build concurrency, per-app CPU, paid tiers, or organization policy fields without a corresponding product requirement.
 
 ## Recommended migration sequence
 
 1. **Independent policy source:** move effective limits into subscription-owned configuration; define whether `MaxApplications` is per account. Preserve current operator-edited values during any conversion.
 2. **Policy ceilings and admission:** decide how specification shape interacts with subscription limits, then add account-level runner/app admission where explicitly intended. Current Stage 2 only centralizes resolution.
-3. **Account storage ownership design:** add account-level quota identity and mapping before moving any existing data. Inventory roots, handle XFS project ownership safely, and plan rollback/reconciliation. Do not migrate storage until that design is reviewed.
+3. **Aggregate account disk enforcement:** extend the account identity established in Stage 3 to every account-owned writable root and to trusted cross-host usage accounting, preserving infrastructure-owned storage boundaries.
 4. **Close disk escapes:** stage mount and image/log accounting decisions; make app/build rootfs read-only where compatible; provide explicit writable quota-backed paths and bounded tmpfs `/tmp`; ensure build temporary output/cache lands in accounted workspace or bounded tmpfs. Preserve infrastructure-owned storage outside tenant accounting.
-5. **Enforcement and observability:** apply aggregate account quota across all account paths, report account usage from trusted host measurements, and test exhaustion and provisioning/reprovision recovery before changing production policy values.
+5. **Enforcement and observability:** report account usage from trusted host measurements and test exhaustion and provisioning/reprovision recovery before changing production policy values.
 
-This sequence is a recommendation only; this task does not begin Stage 2 or implement migrations.
+This sequence is a recommendation only. Stage 3 migrates storage identity metadata; it does not migrate app/build storage paths or change XFS/cgroup enforcement.
 
 ## Principal code references
 
@@ -177,7 +177,9 @@ This sequence is a recommendation only; this task does not begin Stage 2 or impl
 - `src/Automaton.Api/Extensions/DataExtensions.cs` — Free plan/specification seed defaults.
 - `src/Automaton.Api/Services/HostedRunnerSpecificationResolver.cs` — plan-to-specification resolution.
 - `src/Automaton.Api/Models/SubscriptionResourcePolicy.cs` and `src/Automaton.Api/Services/SubscriptionResourcePolicyResolver.cs` — Stage 2 effective policy contract and centralized resolver.
-- `src/Automaton.Api/Services/HostedRunnerProvisioningService.cs` — snapshot persistence, storage allowance/project allocation, host placement reservations.
+- `src/Automaton.Infrastructure/Entities/AccountStorageAllocation.cs` — Stage 3 account-owned storage project identity.
+- `src/Automaton.Api/Services/AccountStorageProjectAllocationService.cs` — historical adoption and account-scoped project allocation.
+- `src/Automaton.Api/Services/HostedRunnerProvisioningService.cs` — snapshot persistence, account project compatibility copy, storage allowance, and host placement reservations.
 - `src/Automaton.Worker/Handlers/ManagedRunnerProvisionRequestedEventHandler.cs` — provisioning payload from persisted snapshot and HostedRunner `StorageProjectId`.
 - `system-apps/automaton-infrastructure/actions/provision-hosted-runner/main.py` and `reprovision-hosted-runner/main.py` — host cgroup and XFS project setup; volume mount list; Docker runner launch.
 - `src/Automaton.Runner/Services/HostContainerExecutionService.Runtime.cs` and `HostContainerExecutionService.cs` — brokered app/build container mounts and cgroup placement.

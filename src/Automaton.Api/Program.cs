@@ -473,6 +473,7 @@ services.AddScoped<IHostContainerTransport, SignalRHostContainerTransport>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
 services.AddScoped<ISubscriptionResourcePolicyResolver, SubscriptionResourcePolicyResolver>();
+services.AddScoped<IAccountStorageProjectAllocationService, AccountStorageProjectAllocationService>();
 services.AddScoped<HostedRunnerManagementService>();
 services.AddScoped<InfrastructureWorkflowExecutionService>();
 services.AddScoped<LocalRunnerHostBootstrapService>();

@@ -141,6 +141,7 @@ public class AdminSubscriptionPlansControllerAuditTests
                 Enabled = false
             }),
             new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(dbContext)),
+            new AccountStorageProjectAllocationService(dbContext),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
 
