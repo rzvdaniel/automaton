@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Messaging.Abstractions;
 
 namespace Automaton.Api.Controllers.Admin;
 
@@ -24,19 +26,22 @@ public class AdminSubscriptionPlansController : ControllerBase
     private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
     private readonly IHostedRunnerSpecificationResolver _hostedRunnerSpecificationResolver;
     private readonly IAuditEventService _auditEventService;
+    private readonly ITransactionalEventExecutor _transactionalEventExecutor;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         HostedRunnerProvisioningService hostedRunnerProvisioningService,
         IHostedRunnerSpecificationResolver hostedRunnerSpecificationResolver,
-        IAuditEventService auditEventService)
+        IAuditEventService auditEventService,
+        ITransactionalEventExecutor transactionalEventExecutor)
     {
         _db = db;
         _userManager = userManager;
         _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
         _hostedRunnerSpecificationResolver = hostedRunnerSpecificationResolver;
         _auditEventService = auditEventService;
+        _transactionalEventExecutor = transactionalEventExecutor;
     }
 
     #region Plans CRUD
@@ -71,6 +76,10 @@ public class AdminSubscriptionPlansController : ControllerBase
         var isActive = req.IsActive;
         var isDefault = isActive && req.IsDefault;
 
+        await using var transaction = isDefault && _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
         // Only one default plan at a time
         if (isDefault)
             await _db.SubscriptionPlans
@@ -94,6 +103,11 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         _db.SubscriptionPlans.Add(plan);
         await _db.SaveChangesAsync(cancellationToken);
+        if (transaction != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             EventType = AuditEventTypes.SubscriptionPlanCreated,
@@ -132,6 +146,10 @@ public class AdminSubscriptionPlansController : ControllerBase
         var newIsActive = req.IsActive ?? plan.IsActive;
         var newIsDefault = (req.IsDefault ?? plan.IsDefault) && newIsActive;
 
+        await using var transaction = newIsDefault && !plan.IsDefault && _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
         if (newIsDefault && !plan.IsDefault)
             await _db.SubscriptionPlans
                 .Where(p => p.IsDefault && p.Id != id)
@@ -149,6 +167,11 @@ public class AdminSubscriptionPlansController : ControllerBase
         plan.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
+        if (transaction != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return Ok(ToResponse(plan));
     }
 
@@ -220,40 +243,45 @@ public class AdminSubscriptionPlansController : ControllerBase
             if (capabilityError != null) return BadRequest(new { message = capabilityError });
         }
 
-        user.SubscriptionPlanId = req.PlanId;
-        await _db.SaveChangesAsync(cancellationToken);
-
         var hostedRunnerCapability = plan == null
             ? null
             : PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
-        if (hostedRunnerCapability?.Enabled == true)
-        {
-            await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId, cancellationToken);
-        }
-        else
-        {
-            await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
-                userId, "Admin removed subscription plan.", cancellationToken);
-        }
 
-        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        await _transactionalEventExecutor.ExecuteAsync(async durableCancellationToken =>
         {
-            EventType = AuditEventTypes.SubscriptionPlanAssignedToUser,
-            Action = AuditActions.Assigned,
-            EntityType = AuditEntityTypes.User,
-            EntityId = user.Id,
-            TargetUserId = user.Id,
-            Message = req.PlanId.HasValue
-                ? $"Subscription plan '{plan!.Name}' was assigned to user '{user.Email ?? user.Id.ToString()}'"
-                : $"Subscription plan was removed from user '{user.Email ?? user.Id.ToString()}'",
-            Metadata = new
+            user.SubscriptionPlanId = req.PlanId;
+            await _db.SaveChangesAsync(durableCancellationToken);
+
+            if (hostedRunnerCapability?.Enabled == true)
             {
-                user.Email,
-                PlanId = req.PlanId,
-                PlanName = plan?.Name,
-                HostedRunnerProvisioningTriggered = req.PlanId.HasValue
+                await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId, durableCancellationToken);
             }
-        }, cancellationToken);
+            else
+            {
+                await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
+                    userId, "Admin removed subscription plan.", durableCancellationToken);
+            }
+
+            await _auditEventService.WriteAsync(new AuditEventWriteRequest
+            {
+                EventType = AuditEventTypes.SubscriptionPlanAssignedToUser,
+                Action = AuditActions.Assigned,
+                EntityType = AuditEntityTypes.User,
+                EntityId = user.Id,
+                TargetUserId = user.Id,
+                Message = req.PlanId.HasValue
+                    ? $"Subscription plan '{plan!.Name}' was assigned to user '{user.Email ?? user.Id.ToString()}'"
+                    : $"Subscription plan was removed from user '{user.Email ?? user.Id.ToString()}'",
+                Metadata = new
+                {
+                    user.Email,
+                    PlanId = req.PlanId,
+                    PlanName = plan?.Name,
+                    HostedRunnerProvisioningTriggered = req.PlanId.HasValue
+                },
+                FailOnError = true
+            }, durableCancellationToken);
+        }, CancellationToken.None);
 
         return NoContent();
     }

@@ -153,7 +153,7 @@ public class HostedRunnerProvisioningService
         hostedRunner.UpdatedAt = now;
 
         IDbContextTransaction? capacityTransaction = null;
-        if (db.Database.IsRelational())
+        if (db.Database.IsRelational() && db.Database.CurrentTransaction == null)
         {
             capacityTransaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.ReadCommitted,
