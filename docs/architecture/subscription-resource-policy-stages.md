@@ -1,6 +1,14 @@
-# Original staged prompts (verbatim)
+# Subscription resource policy plan
 
-The complete supplied Stage 1–10 prompts are reproduced below without rewriting their requirements.
+## Current tracking status
+
+- Stages 1–3 are complete.
+- Stage 4 is next; Stages 5–10 remain planned.
+- Keep implementation object-oriented with small cohesive classes and methods, and control cyclomatic complexity. Split policy resolution, orchestration, storage preparation, and verification into clear responsibilities instead of large functions.
+
+## Original staged prompts (verbatim)
+
+The supplied prompts below are preserved without rewriting their requirements.
 
 > Yes. Below are the stages as separate copy-paste prompts so you can run them one by one in Codex.
 >
