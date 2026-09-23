@@ -61,8 +61,9 @@ public class HostedRunner
 
     public long StorageAllowanceBytes { get; set; }
     /// <summary>
-    /// Stable XFS project identity for the Hosted Runner aggregate storage
-    /// boundary. This is host metadata, not user input.
+    /// Compatibility snapshot of the account-owned XFS project identity.
+    /// This is host metadata, not user input; allocation authority is held by
+    /// AccountStorageAllocation.
     /// </summary>
     public int? StorageProjectId { get; set; }
     public DateTime? StorageMeasuredAtUtc { get; set; }

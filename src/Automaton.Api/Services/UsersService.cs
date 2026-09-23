@@ -710,6 +710,7 @@ public class UsersService
         await AddHardDeleteBlockerAsync(blockers, "organization app assignments", _db.OrganizationAppAssignments.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
         await AddHardDeleteBlockerAsync(blockers, "chat sessions", _db.AiChatSessionUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
         await AddHardDeleteBlockerAsync(blockers, "hosted runners", _db.HostedRunners.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "account storage allocations", _db.AccountStorageAllocations.AsNoTracking().CountAsync(x => x.AccountId == userId, cancellationToken));
         await AddHardDeleteBlockerAsync(blockers, "owned projects", _db.Projects.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
         await AddHardDeleteBlockerAsync(blockers, "owned organizations", _db.Organizations.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
 

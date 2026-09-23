@@ -166,10 +166,13 @@ Project ID       Used       Soft       Hard    Warn/Grace
         self,
         action_key: str,
         existing_volumes: dict[str, dict[str, str]] | None = None,
+        other_runner_volumes: dict[str, dict[str, str]] | None = None,
         missing_volume_error: str = "No such volume: {name}",
         image_pull_error: str | None = None,
         calls_out: list[tuple[str, ...]] | None = None,
         request_override: dict[str, object] | None = None,
+        existing_project_quota_limit_mb: int | None = None,
+        other_runner_project_id: int | None = None,
         xfs_project_error: str | None = None,
         xfs_limit_error: str | None = None,
         xfs_assignment_succeeds: bool = True,
@@ -180,6 +183,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         module = load_action(action_key)
         calls = calls_out if calls_out is not None else []
         volumes = dict(existing_volumes or {})
+        volumes.update(other_runner_volumes or {})
         request = action_request()
         if request_override:
             request.update(request_override)
@@ -211,6 +215,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     }]),
                     "",
                 )
+            if arguments[:3] == ("docker", "volume", "ls"):
+                return subprocess.CompletedProcess(arguments, 0, "\n".join(volumes) + "\n", "")
             if arguments[:3] == ("docker", "volume", "create"):
                 name = arguments[-1]
                 labels = {}
@@ -244,6 +250,9 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 project_id = int(request["xfsProjectId"])
                 if not xfs_quota_verification_succeeds:
                     stdout = "quota output unavailable\n"
+                elif not quota_configured and existing_project_quota_limit_mb is not None:
+                    hard_blocks = existing_project_quota_limit_mb * 1024
+                    stdout = f"Project ID   Used   Soft   Hard\n#{project_id} 0 0 {hard_blocks}\n"
                 elif not quota_configured:
                     stdout = "Project quota on /var/lib/docker\n#0 0 0 0\n"
                 else:
@@ -252,7 +261,15 @@ Project ID       Used       Soft       Hard    Warn/Grace
                         hard_blocks = 0
                     stdout = f"Project ID   Used   Soft   Hard\n#{project_id} 0 0 {hard_blocks}\n"
             elif arguments[:2] == ("xfs_io", "-c"):
-                project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
+                mountpoint = arguments[3]
+                is_other_runner_volume = any(
+                    mountpoint == f"/var/lib/docker/volumes/{name}/_data"
+                    for name in (other_runner_volumes or {})
+                )
+                if is_other_runner_volume:
+                    project_id = other_runner_project_id or 0
+                else:
+                    project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
                 stdout = f"fsxattr.projid = {project_id}\n"
             elif arguments[:2] == ("systemctl", "show"):
                 stdout = "1\n1\n256\n"
@@ -274,6 +291,65 @@ Project ID       Used       Soft       Hard    Warn/Grace
             module.main()
 
         return calls, volumes
+
+    def test_different_snapshot_cannot_overwrite_a_shared_project_quota(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        other_runner_id = "88888888-8888-4888-8888-888888888888"
+        other_runner_compact_id = other_runner_id.replace("-", "")
+        other_volumes = {
+            f"automaton-hosted-runner-{other_runner_compact_id}-system": volume_labels("system", other_runner_id),
+            f"automaton-hosted-runner-{other_runner_compact_id}-user": volume_labels("user", other_runner_id),
+        }
+
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "used by another Hosted Runner"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        other_runner_volumes=other_volumes,
+                        calls_out=calls,
+                        request_override={"diskLimitMb": 512, "xfsProjectId": 1234567},
+                        existing_project_quota_limit_mb=2048,
+                        other_runner_project_id=1234567,
+                    )
+
+                self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+                self.assertFalse(any(
+                    call[:2] == ("xfs_quota", "-x") and any("limit -p" in arg for arg in call)
+                    for call in calls
+                ))
+
+    def test_same_snapshot_can_reuse_a_shared_project_quota(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        other_runner_id = "88888888-8888-4888-8888-888888888888"
+        other_runner_compact_id = other_runner_id.replace("-", "")
+        other_volumes = {
+            f"automaton-hosted-runner-{other_runner_compact_id}-system": volume_labels("system", other_runner_id),
+            f"automaton-hosted-runner-{other_runner_compact_id}-user": volume_labels("user", other_runner_id),
+        }
+
+        calls, _ = self.run_provision_action(
+            "provision-hosted-runner",
+            existing,
+            other_runner_volumes=other_volumes,
+            existing_project_quota_limit_mb=512,
+            other_runner_project_id=1234567,
+        )
+
+        self.assertTrue(any(
+            call[:2] == ("xfs_quota", "-x") and any("limit -p bhard=512m 1234567" in arg for arg in call)
+            for call in calls
+        ))
+        self.assertFalse(any(call[:3] == ("docker", "volume", "ls") for call in calls))
 
     def assert_resource_contract(self, calls):
         run = next(call for call in calls if call[:2] == ("docker", "run"))

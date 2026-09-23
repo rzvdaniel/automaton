@@ -8,7 +8,6 @@ using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using System.Data;
-using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -31,6 +30,7 @@ public class HostedRunnerProvisioningService
     private readonly IEventPublisher eventPublisher;
     private readonly HostedRunnerOptions options;
     private readonly ISubscriptionResourcePolicyResolver resourcePolicyResolver;
+    private readonly IAccountStorageProjectAllocationService storageProjectAllocationService;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
     private readonly StorageTelemetryOptions storageTelemetryOptions;
@@ -41,6 +41,7 @@ public class HostedRunnerProvisioningService
         IEventPublisher eventPublisher,
         IOptionsSnapshot<HostedRunnerOptions> options,
         ISubscriptionResourcePolicyResolver resourcePolicyResolver,
+        IAccountStorageProjectAllocationService storageProjectAllocationService,
         IAuditEventService auditEventService,
         ILogger<HostedRunnerProvisioningService> logger,
         IOptions<StorageTelemetryOptions>? storageTelemetryOptions = null)
@@ -50,6 +51,7 @@ public class HostedRunnerProvisioningService
         this.eventPublisher = eventPublisher;
         this.options = options.Value;
         this.resourcePolicyResolver = resourcePolicyResolver;
+        this.storageProjectAllocationService = storageProjectAllocationService;
         this.auditEventService = auditEventService;
         this.logger = logger;
         this.storageTelemetryOptions = storageTelemetryOptions?.Value ?? new StorageTelemetryOptions();
@@ -98,6 +100,7 @@ public class HostedRunnerProvisioningService
         }
 
         var specification = policyResolution.Specification!;
+        var accountStorageProjectId = await storageProjectAllocationService.GetOrCreateAsync(userId, cancellationToken);
 
         var hostedRunner = await db.HostedRunners
             .Include(x => x.Runner)
@@ -123,9 +126,9 @@ public class HostedRunnerProvisioningService
         requestedSnapshot.Resources = policyResolution.Policy!.ApplyTo(requestedSnapshot.Resources);
         hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
         var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
-        if (hostedRunner.StorageProjectId is null)
+        if (hostedRunner.StorageProjectId != accountStorageProjectId)
         {
-            hostedRunner.StorageProjectId = await AllocateStorageProjectIdAsync(hostedRunner.Id, cancellationToken);
+            hostedRunner.StorageProjectId = accountStorageProjectId;
             if (!createdHostedRunner)
                 await db.SaveChangesAsync(cancellationToken);
         }
@@ -159,14 +162,17 @@ public class HostedRunnerProvisioningService
 
         try
         {
-            var host = await SelectHostAsync(
+            var hostSelection = await SelectHostAsync(
+                userId,
                 requestedSnapshot.Resources,
                 createdHostedRunner ? null : hostedRunner.Id,
+                accountStorageProjectId,
                 cancellationToken);
+            var host = hostSelection.Host;
             if (host == null)
             {
                 hostedRunner.Status = HostedRunnerStatuses.Failed;
-                hostedRunner.LastError = "No active runner host has enough available capacity.";
+                hostedRunner.LastError = hostSelection.FailureReason ?? "No active runner host has enough available capacity.";
                 AddDeployment(hostedRunner, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
                 await db.SaveChangesAsync(cancellationToken);
                 if (capacityTransaction != null)
@@ -305,11 +311,14 @@ public class HostedRunnerProvisioningService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<RunnerHost?> SelectHostAsync(
+    private async Task<(RunnerHost? Host, string? FailureReason)> SelectHostAsync(
+        Guid accountId,
         HostedRunnerResources requested,
         Guid? excludedHostedRunnerId,
+        int accountStorageProjectId,
         CancellationToken cancellationToken)
     {
+        var hasSharedProjectLimitConflict = false;
         var requestedStorageBytes = requested.DiskLimitMb * 1024L * 1024L;
         var now = DateTime.UtcNow;
         var hosts = (await db.RunnerHosts
@@ -365,6 +374,18 @@ public class HostedRunnerProvisioningService
                 continue;
             }
 
+            var hasIncompatibleSharedProjectLimit = host.HostedRunners.Any(r =>
+                r.UserId == accountId
+                && r.Id != excludedHostedRunnerId
+                && r.DeletedAt == null
+                && r.StorageProjectId == accountStorageProjectId
+                && (r.PendingSpecificationSnapshot ?? r.SpecificationSnapshot).Resources.DiskLimitMb != requested.DiskLimitMb);
+            if (hasIncompatibleSharedProjectLimit)
+            {
+                hasSharedProjectLimitConflict = true;
+                continue;
+            }
+
             var assigned = host.HostedRunners.Where(r =>
                 r.Id != excludedHostedRunnerId &&
                 (OccupyingStatuses.Contains(r.Status)
@@ -374,35 +395,22 @@ public class HostedRunnerProvisioningService
                 && host.ReservedMemoryMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb
                 && host.ReservedDiskMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.DiskLimitMb) + requested.DiskLimitMb <= host.TotalDiskMb)
             {
-                return host;
+                return (host, null);
             }
         }
 
-        return null;
+        if (hasSharedProjectLimitConflict)
+        {
+            return (null,
+                "The account already has a Hosted Runner on an eligible host using the same XFS project with a different disk-limit snapshot. " +
+                "Move or delete the co-located Hosted Runner before changing the shared project limit.");
+        }
+
+        return (null, null);
     }
 
     private bool IsMySqlProvider()
         => db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true;
-
-    private async Task<int> AllocateStorageProjectIdAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
-    {
-        // XFS project IDs are persisted in the control plane. The hash gives a
-        // stable first candidate, while linear probing plus the unique index
-        // makes collisions explicit instead of silently sharing a project.
-        var digest = SHA256.HashData(hostedRunnerId.ToByteArray());
-        var candidate = 1_000_000 + (int)(BitConverter.ToUInt32(digest, 0) % (uint)(int.MaxValue - 1_000_000));
-        var used = await db.HostedRunners
-            .Where(x => x.StorageProjectId != null)
-            .Select(x => x.StorageProjectId!.Value)
-            .ToListAsync(cancellationToken);
-        var usedIds = used.ToHashSet();
-        while (usedIds.Contains(candidate))
-        {
-            candidate++;
-            if (candidate == int.MaxValue) candidate = 1_000_000;
-        }
-        return candidate;
-    }
 
     private HostedRunnerDeployment AddDeployment(
         HostedRunner runner,

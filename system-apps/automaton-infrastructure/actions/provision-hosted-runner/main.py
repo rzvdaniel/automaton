@@ -160,7 +160,51 @@ def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int
     return parse_project_quota_report(result.stdout + result.stderr, project_id)
 
 
-def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
+def has_other_runner_volume_for_project(
+    docker_root: str,
+    filesystem_mountpoint: str,
+    runner_id: str,
+    project_id: int,
+) -> bool:
+    result = host(
+        "docker",
+        "volume",
+        "ls",
+        "--filter",
+        "label=automaton.managed=true",
+        "--filter",
+        "label=automaton.resource=hosted-runner-volume",
+        "--format",
+        "{{.Name}}",
+    )
+    for volume_name in result.stdout.splitlines():
+        if not volume_name.strip():
+            continue
+        metadata = inspect_volume(require_name(volume_name.strip(), "volumeName"))
+        if metadata is None:
+            continue
+        labels = metadata.get("labels", {})
+        if not isinstance(labels, dict):
+            raise RuntimeError("Managed Hosted Runner volume labels could not be verified")
+        if labels.get("automaton.managed") != "true" or labels.get("automaton.resource") != "hosted-runner-volume":
+            continue
+        if labels.get("automaton.hosted-runner-id") == runner_id:
+            continue
+        mountpoint = metadata.get("mountpoint")
+        if not isinstance(mountpoint, str) or not mountpoint.startswith("/"):
+            raise RuntimeError(f"Managed Hosted Runner storage volume {volume_name} has no valid mountpoint")
+        validate_mountpoint(mountpoint, docker_root)
+        if resolve_filesystem_mountpoint(mountpoint) != filesystem_mountpoint:
+            continue
+        other_project_id = current_project_id(mountpoint)
+        if other_project_id is None:
+            raise RuntimeError(f"XFS project identity could not be verified for managed volume {volume_name}")
+        if other_project_id == project_id:
+            return True
+    return False
+
+
+def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int, runner_id: str) -> None:
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
     docker_root = resolve_docker_root()
@@ -195,6 +239,12 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
 
     existing_quota = read_project_quota(filesystem_mountpoint, project_id)
     limit_bytes = disk_limit_mb * 1024 * 1024
+    if existing_quota is None or existing_quota[1] != limit_bytes:
+        if has_other_runner_volume_for_project(docker_root, filesystem_mountpoint, runner_id, project_id):
+            raise RuntimeError(
+                "The requested disk limit differs from the current or missing XFS project quota used by another Hosted Runner on this filesystem; "
+                "move or delete the co-located Hosted Runner before changing the shared project limit"
+            )
     if existing_quota is not None and existing_quota[0] > limit_bytes:
         raise RuntimeError("Disk limit is below current XFS project usage; data was not deleted")
     host("xfs_quota", "-x", "-c", f"limit -p bhard={disk_limit_mb}m {project_id}", filesystem_mountpoint)
@@ -302,7 +352,7 @@ def main() -> None:
 
     system_mountpoint = ensure_owned_volume(system_volume, runner_id, "system")
     user_mountpoint = ensure_owned_volume(user_volume, runner_id, "user")
-    ensure_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
+    ensure_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb, runner_id)
     cgroup_parent = ensure_resource_group(runner_id, cpu_limit, memory_mb, pids_limit)
 
     # Refresh mutable tags before changing any existing container. A failed
