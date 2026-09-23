@@ -240,7 +240,8 @@ public class Program
             await host.StartAsync();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.StartServiceModeAsync();
+            await runnerService.StartServiceModeAsync(
+                host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
         }, verboseOption);
 
         return command;

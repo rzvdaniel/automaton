@@ -46,7 +46,7 @@ public class RunnerHostService
     /// <summary>
     /// Start in non-interactive service mode - no prompts, use environment variables only
     /// </summary>
-    public async Task StartServiceModeAsync()
+    public async Task StartServiceModeAsync(CancellationToken stoppingToken)
     {
         try
         {
@@ -125,7 +125,7 @@ public class RunnerHostService
             logger.Information("Runner registered: {Name} (ID: {Id})", configService.ApplicationName, configService.RunnerId);
 
             // Start the runner without console interaction
-            await StartServiceRunnerAsync();
+            await StartServiceRunnerAsync(stoppingToken);
         }
         catch (Exception ex)
         {
@@ -164,7 +164,7 @@ public class RunnerHostService
     /// <summary>
     /// Start runner loop for service mode - no console interaction
     /// </summary>
-    private async Task StartServiceRunnerAsync()
+    private async Task StartServiceRunnerAsync(CancellationToken stoppingToken)
     {
         logger.Information("Connecting to server...");
 
@@ -200,8 +200,18 @@ public class RunnerHostService
         logger.Information("Server: {Server}", configService.BaseUrl);
         logger.Information("Status: {Status}", hubService.IsConnected() ? "Connected" : "Connecting...");
 
-        // Keep service running indefinitely
-        await Task.Delay(Timeout.Infinite);
+        try
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            logger.Information("Runner service stopping");
+        }
+        finally
+        {
+            await hubService.DisconnectAsync();
+        }
     }
 
     /// <summary>

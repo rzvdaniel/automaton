@@ -1,6 +1,6 @@
 # Critical analyzer findings remediation plan
 
-Status: proposed. This document plans follow-up work; it does not implement the fixes or authorize a production deployment.
+Status: batches 1–3 are implemented in [PR #302](https://github.com/rzvdaniel/automaton/pull/302), pending review and merge. The five rules `S4830`, `S5445`, `S4502`, `S2930`, and `S2190` are configured as build errors on that branch. Batch 4 (`S8949`, `S5693`, `S6932`) and the later `S6444` review remain planned. This document does not authorize a production deployment.
 
 Baseline: `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` on 2026-09-23, starting at commit `44b84cbf`. The build succeeded with 1,978 warning emissions. Counts below are distinct diagnostic locations after removing repeated output lines; rerun the command before each batch. The standalone analyzer reports potential defects, so each finding needs a code and behavior review before it is treated as confirmed.
 

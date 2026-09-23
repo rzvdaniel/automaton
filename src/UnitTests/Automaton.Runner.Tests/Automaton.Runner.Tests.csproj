@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Runner\Automaton.Runner.csproj" />
+    <Compile Include="..\Shared\LoopbackTlsServer.cs" Link="LoopbackTlsServer.cs" />
     <ProjectReference Include="..\RunnerRuntimeFixture\RunnerRuntimeFixture.csproj" ReferenceOutputAssembly="false" />
     <Content Include="..\GenericRuntimeAcceptanceFixtures\**\*"
              Link="AcceptanceFixtures\%(RecursiveDir)%(Filename)%(Extension)"
