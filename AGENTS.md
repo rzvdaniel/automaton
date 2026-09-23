@@ -40,6 +40,16 @@ Use the existing checkout for Automaton work. Do not create or move work into an
 - Never log or commit credentials, access tokens, API keys, connection strings, or raw secrets.
 - Run the smallest relevant verification after each change. Report unavailable checks exactly.
 
+## Maintainability guardrails
+
+- Before extending a service, identify the feature and responsibility that own the new behavior. Keep application services focused on coordinating use cases; place cohesive business decisions and invariants in their owning object or policy.
+- Do not add unrelated DTOs, options, or general utilities to a service file or a shared `Services` folder. Keep supporting types with the feature that owns them; share a helper only when real consumers need the same semantics.
+- Prefer composition and clear contracts. Add an interface for an actual boundary or variation point, not automatically for every class. Pure functions and data-only transport models are appropriate when they fit.
+- Treat CA1502 complexity, CA1506 coupling, and CA1501 inheritance warnings as refactoring prompts. Review existing findings as well as new ones. Do not introduce a new warning or worsen a finding in a symbol you change without explaining the reason in the handoff. Do not hide complexity by splitting one algorithm into meaningless helpers.
+- When changing a large service, check its responsibilities and dependency list, then make the smallest cohesive improvement within the task's scope. Preserve behavior, public contracts, cancellation, query semantics, transactions, and concurrency guarantees.
+- Run the affected build and tests, review analyzer warnings and the diff, and report any unresolved maintainability warnings. Do not weaken analyzer settings or add suppressions just to complete a task.
+- To list all current maintainability warnings for an affected .NET project, run `dotnet build <project.csproj> -c Release --no-incremental -v minimal` and inspect CA1501, CA1502, and CA1506. Incremental builds may omit warnings from projects they skip.
+
 ## Product surfaces
 
 - Website: `src/automaton-vue/`

@@ -1,0 +1,8 @@
+root = true
+
+[*.cs]
+# Report existing and new maintainability findings during ordinary builds.
+# Numeric thresholds are in src/CodeMetricsConfig.txt.
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
+dotnet_diagnostic.CA1501.severity = warning
