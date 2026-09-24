@@ -261,20 +261,10 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
-            (isPrivilegedHost ? $"runtime_network={Quote(network)}" : string.Empty),
-            (isPrivilegedHost ? "if ! docker network create \"$runtime_network\" >/dev/null; then" : string.Empty),
-            (isPrivilegedHost ? "  echo 'The private Runner runtime network could not be created.' >&2" : string.Empty),
-            (isPrivilegedHost ? "  exit 1" : string.Empty),
-            (isPrivilegedHost ? "fi" : string.Empty),
-            (isPrivilegedHost ? "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then" : string.Empty),
-            (isPrivilegedHost ? "  echo 'The private Runner runtime network gateway could not be resolved.' >&2" : string.Empty),
-            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
-            (isPrivilegedHost ? "  exit 1" : string.Empty),
-            (isPrivilegedHost ? "fi" : string.Empty),
-            (isPrivilegedHost ? $"mkdir -p {Quote(root)} {Quote(workspace)}" : string.Empty),
+            BuildNetworkSetupCommands(isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
-            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
+            BuildNetworkCleanupCommand(isPrivilegedHost),
             "  exit 1",
             "fi",
             "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",
@@ -299,6 +289,32 @@ public sealed class SelfHostedRunnerInstallationService(
             "esac",
             "AUTOMATON_RUNNER_INSTALL");
     }
+
+    private static string BuildNetworkSetupCommands(bool isPrivilegedHost, string network, string root, string workspace)
+    {
+        if (!isPrivilegedHost)
+        {
+            return string.Join('\n', new string[11]);
+        }
+
+        return string.Join('\n',
+            $"runtime_network={Quote(network)}",
+            "if ! docker network create \"$runtime_network\" >/dev/null; then",
+            "  echo 'The private Runner runtime network could not be created.' >&2",
+            "  exit 1",
+            "fi",
+            "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then",
+            "  echo 'The private Runner runtime network gateway could not be resolved.' >&2",
+            "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true",
+            "  exit 1",
+            "fi",
+            $"mkdir -p {Quote(root)} {Quote(workspace)}");
+    }
+
+    private static string BuildNetworkCleanupCommand(bool isPrivilegedHost)
+        => isPrivilegedHost
+            ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true"
+            : string.Empty;
 
     private static string GenerateToken() => $"re_{Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()}";
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
