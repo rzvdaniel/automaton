@@ -1,19 +1,16 @@
-using Automaton.Api.Data;
 using Automaton.Api.Models;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
 /// <summary>Authenticated Stage 4B2 relay for trusted Hosted container operations.</summary>
 public sealed class HostContainerRelayService(
-    ApplicationDbContext db,
+    HostContainerRelayStateResolver stateResolver,
     IHostContainerTransport transport,
-    ILogger<HostContainerRelayService> logger,
-    ApiInstanceIdentityService apiInstanceIdentityService)
+    ILogger<HostContainerRelayService> logger)
 {
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
         RunnerDetails caller,
@@ -21,134 +18,63 @@ public sealed class HostContainerRelayService(
         CancellationToken cancellationToken)
     {
         if (request is null || request.Scope is null)
+        {
             return Failure("invalid_request", "A host-container request and scope are required.");
-        if (caller.Purpose != RunnerPurposes.Managed || caller.HostedRunnerId is null)
-            return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
-
-        var persistedRunner = await db.Runners.SingleOrDefaultAsync(x => x.Id == caller.Id, cancellationToken);
-        if (persistedRunner is null
-            || !string.Equals(persistedRunner.ConnectionId, caller.ConnectionId, StringComparison.Ordinal))
-            return Failure("caller_not_managed_runner", "The caller connection is not the persisted Runner connection.");
-        if (persistedRunner.Purpose != RunnerPurposes.Managed)
-            return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
-        // A null persisted profile is the legacy representation of Standard.
-        // Normalize it here rather than rejecting existing Managed Hosted Runners
-        // that predate the application-profile field.
-        if (!RunnerApplicationProfiles.TryNormalize(persistedRunner.ApplicationProfile, out var profile)
-            || !string.Equals(profile, RunnerApplicationProfiles.Standard, StringComparison.Ordinal))
-            return Failure("caller_not_managed_runner", "The persisted Runner application profile is not Standard.");
-
-        var hosted = await db.HostedRunners.Include(x => x.RunnerHost)
-            .SingleOrDefaultAsync(x => x.Id == caller.HostedRunnerId && x.RunnerId == caller.Id && x.DeletedAt == null, cancellationToken);
-        if (hosted?.RunnerHostId is not Guid hostId || hosted.RunnerHost is null)
-            return Failure("hosted_runner_binding_mismatch", "The Hosted Runner is not bound to a Runner Host.");
-        if (caller.RunnerHostId is not Guid callerHostId || callerHostId != hostId)
-            return Failure("runner_host_binding_mismatch", "The caller Runner Host does not match persisted state.");
-        if (request.Scope.HostedRunnerId != Guid.Empty && request.Scope.HostedRunnerId != hosted.Id)
-            return Failure("hosted_runner_binding_mismatch", "The requested Hosted Runner does not match persisted state.");
-        if (request.Scope.RunnerHostId != Guid.Empty && request.Scope.RunnerHostId != hostId)
-            return Failure("runner_host_binding_mismatch", "The requested Runner Host does not match persisted state.");
-        var runtimeOperation = HostContainerRuntimeValidation.IsRuntimeOperation(request.Operation);
-        if (!runtimeOperation && request.Operation is not (HostContainerOperationKinds.ResolveImage or HostContainerOperationKinds.RunBuild))
-            return Failure("unsupported_operation", "The host-container operation is not supported.");
-        if (!runtimeOperation && string.IsNullOrWhiteSpace(request.RequestedImage))
-            return Failure("invalid_request", "ResolveImage requires an image reference.");
-        if (request.Operation == HostContainerOperationKinds.ResolveImage
-            && (request.Resources is not null || request.ContainerId is not null || request.Command is not null
-                || request.CandidateId != Guid.Empty || request.Storage is not null
-                || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment is null || request.Environment.Count != 0))
-            return Failure("unsupported_operation", "ResolveImage does not accept container execution inputs.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && (request.Command is null || request.Resources is not null || request.ContainerId is not null
-                || request.CandidateId != Guid.Empty || request.Storage is not null
-                || request.HostPort != 0 || request.ContainerPort != 0))
-            return Failure("invalid_request", "RunBuild requires a command and server-derived resources.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && (request.TimeoutSeconds is < 1 or > 86_400))
-            return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && (request.Environment is null || request.Command!.Arguments is null || request.Command.Environment is null
-                || string.IsNullOrWhiteSpace(request.Command.Executable)))
-            return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild)
-        {
-            var contractErrors = ApplicationContractValidator.Validate(new ApplicationContract
-            {
-                Build = new ApplicationBuildSpec
-                {
-                    Image = request.RequestedImage,
-                    Command = request.Command,
-                    TimeoutSeconds = request.TimeoutSeconds
-                }
-            });
-            if (contractErrors.Count > 0)
-                return Failure("invalid_request", string.Join("; ", contractErrors));
-        }
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && (request.RequestedImage!.Any(char.IsWhiteSpace) || request.RequestedImage.Contains('\0')
-                || request.RequestedImage.StartsWith("-", StringComparison.Ordinal)))
-            return Failure("invalid_request", "RunBuild contains an invalid image reference.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && request.Scope.DeploymentAttemptId == Guid.Empty)
-            return Failure("invalid_request", "RunBuild requires a server-issued deployment attempt.");
-
-        if (runtimeOperation)
-        {
-            if (request.Resources is not null)
-                return Failure("invalid_request", "Container resources are derived by the server.");
-            var runtimeError = HostContainerRuntimeValidation.Validate(request);
-            if (runtimeError is not null)
-                return Failure("invalid_request", runtimeError);
         }
 
-        var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
-            x => x.Id == request.Scope.DeploymentTargetId && x.WebAppId == request.Scope.AppId,
-            cancellationToken);
-        if (target is null)
-            return Failure("deployment_target_mismatch", "The deployment target was not found for the application.");
-        if (target.ExecutionRunnerId != caller.Id)
-            return Failure("app_assignment_mismatch", "The target is not assigned to the authenticated Hosted Runner.");
-        if (request.Operation == HostContainerOperationKinds.RunBuild
-            && target.ActiveDeploymentExecutionAttemptId != request.Scope.DeploymentAttemptId)
-            return Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt.");
+        var validationFailure = HostContainerRelayRequestValidator.ValidateCaller(caller);
+        if (validationFailure is not null)
+        {
+            return validationFailure;
+        }
 
-        var infrastructure = await db.Runners.SingleOrDefaultAsync(
-            x => x.Id == hosted.RunnerHost.InfrastructureRunnerId,
-            cancellationToken);
-        if (infrastructure is null || infrastructure.Purpose != RunnerPurposes.Infrastructure)
-            return Failure("infrastructure_runner_missing", "No same-host Infrastructure Runner is available.");
-        if (!RunnerPresenceEvaluator.IsOnline(infrastructure.ConnectionId, infrastructure.LastHeartbeatAtUtc, DateTime.UtcNow))
-            return Failure("infrastructure_runner_offline", "The same-host Infrastructure Runner is offline.");
-        if (!int.TryParse(infrastructure.ApiCompatibilityVersion, out var protocol)
-            || protocol < int.Parse(RunnerApiCompatibilityVersions.HostContainerExecution))
-            return Failure("host_container_protocol_unsupported", "The Infrastructure Runner does not support protocol 4.");
-        if (!RunnerCapabilities.Includes(infrastructure.CapabilitiesJson, RunnerCapabilities.HostContainerExecution, infrastructure.Purpose))
-            return Failure("host_container_capability_missing", "The Infrastructure Runner lacks HostContainerExecution capability.");
-        if (!RuntimeTunnelService.IsCurrentApiInstance(infrastructure.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId))
-            return Failure("infrastructure_runner_wrong_api_instance", "The Infrastructure Runner is connected to another API instance.");
+        var resolution = await stateResolver.ResolveAsync(caller, request, cancellationToken);
+        if (resolution.Failure is not null)
+        {
+            return resolution.Failure;
+        }
 
+        var state = resolution.State!;
         var forwarded = request with
         {
-            Scope = new HostContainerScope(hosted.Id, hostId, target.WebAppId, target.Id, request.Scope.DeploymentAttemptId),
-            Resources = request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
-                ? new HostContainerResourceRef(
-                    HostContainerResourceKinds.Source,
-                    HostContainerResourceKinds.Artifact,
-                    HostContainerResourceKinds.ApplicationData)
-                : null,
+            Scope = new HostContainerScope(
+                state.Hosted.Id,
+                state.HostId,
+                state.Target.WebAppId,
+                state.Target.Id,
+                request.Scope.DeploymentAttemptId),
+            Resources = GetServerResources(request.Operation),
             HostPort = 0,
             Environment = new Dictionary<string, string>(request.Environment, StringComparer.Ordinal)
         };
+
+        return await SendAsync(state, forwarded, cancellationToken);
+    }
+
+    private async Task<HostContainerExecutionResponse> SendAsync(
+        HostContainerRelayState state,
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            return await transport.ExecuteAsync(infrastructure.ConnectionId!, forwarded, cancellationToken);
+            return await transport.ExecuteAsync(state.Infrastructure.ConnectionId!, request, cancellationToken);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Host-container relay failed for host {RunnerHostId}", hostId);
+            logger.LogWarning(ex, "Host-container relay failed for host {RunnerHostId}", state.HostId);
             return Failure("infrastructure_transport_failure", "The Infrastructure Runner transport failed.");
         }
     }
 
-    private static HostContainerExecutionResponse Failure(string code, string message) => new() { ErrorCode = code, Error = message };
+    private static HostContainerResourceRef? GetServerResources(string operation) =>
+        operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            ? new HostContainerResourceRef(
+                HostContainerResourceKinds.Source,
+                HostContainerResourceKinds.Artifact,
+                HostContainerResourceKinds.ApplicationData)
+            : null;
+
+    private static HostContainerExecutionResponse Failure(string code, string message) =>
+        new() { ErrorCode = code, Error = message };
 }

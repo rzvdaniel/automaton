@@ -476,7 +476,8 @@ public sealed class HostContainerRelayServiceTests
             Db.AppDeploymentTargets.Add(Target);
             Db.SaveChanges();
             Transport.Result = new HostContainerExecutionResponse { Success = true, ResolvedImage = "python@sha256:test" };
-            Service = new HostContainerRelayService(Db, Transport, NullLogger<HostContainerRelayService>.Instance, new ApiInstanceIdentityService());
+            var stateResolver = new HostContainerRelayStateResolver(Db, new ApiInstanceIdentityService());
+            Service = new HostContainerRelayService(stateResolver, Transport, NullLogger<HostContainerRelayService>.Instance);
         }
 
         public static RelayFixture Create() => new();
