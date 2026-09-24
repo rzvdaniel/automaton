@@ -84,15 +84,39 @@ public sealed class InfrastructureCommandCallbackService(
         var deployment = await db.HostedRunnerDeployments.Include(x => x.HostedRunner)
             .SingleAsync(x => x.Id == request.OperationId, cancellationToken);
         var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.Id == commandId, cancellationToken);
-        if (existing != null && IsTerminal(existing.Status))
-        {
-            if (string.Equals(existing.ResultFingerprint, fingerprint, StringComparison.Ordinal))
-                return new(InfrastructureCommandResultOutcomes.AlreadyApplied);
-            return new(InfrastructureCommandResultOutcomes.TerminalStale);
-        }
+        var replayOutcome = GetTerminalReplayOutcome(existing, fingerprint);
+        if (replayOutcome != null)
+            return replayOutcome;
         if (IsTerminalDeployment(deployment.Status))
             return new(InfrastructureCommandResultOutcomes.TerminalStale);
-        var execution = existing ?? new AppModuleExecution
+
+        var execution = existing ?? CreateExecution(commandId, request);
+        ApplyExecution(execution, request.Execution);
+        execution.ResultFingerprint = fingerprint;
+        if (existing == null) db.AppModuleExecutions.Add(execution);
+
+        await ApplyDeploymentResultAsync(deployment, request, execution, cancellationToken);
+        if (request.SecretGrantIds.Count > 0)
+            await secretGrants.MarkConsumedAsync(request.SecretGrantIds, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return new(InfrastructureCommandResultOutcomes.Accepted);
+    }
+
+    private static InfrastructureCommandResultResponse? GetTerminalReplayOutcome(
+        AppModuleExecution? existing,
+        string fingerprint)
+    {
+        if (existing == null || !IsTerminal(existing.Status))
+            return null;
+
+        var outcome = string.Equals(existing.ResultFingerprint, fingerprint, StringComparison.Ordinal)
+            ? InfrastructureCommandResultOutcomes.AlreadyApplied
+            : InfrastructureCommandResultOutcomes.TerminalStale;
+        return new InfrastructureCommandResultResponse(outcome);
+    }
+
+    private static AppModuleExecution CreateExecution(Guid commandId, InfrastructureCommandResultRequest request)
+        => new()
         {
             Id = commandId,
             HostedRunnerOperationId = request.OperationId,
@@ -104,51 +128,72 @@ public sealed class InfrastructureCommandCallbackService(
             CreatedAtUtc = DateTime.UtcNow,
             CorrelationId = $"hosted-runner-operation:{request.OperationId:N}"
         };
-        ApplyExecution(execution, request.Execution);
-        execution.ResultFingerprint = fingerprint;
-        if (existing == null) db.AppModuleExecutions.Add(execution);
 
+    private async Task ApplyDeploymentResultAsync(
+        HostedRunnerDeployment deployment,
+        InfrastructureCommandResultRequest request,
+        AppModuleExecution execution,
+        CancellationToken cancellationToken)
+    {
         if (request.Execution.Status == AppModuleExecutionStatuses.Succeeded)
         {
-            if (!request.Result.Available || string.IsNullOrWhiteSpace(request.Result.Content))
-                throw new InvalidOperationException("A successful infrastructure command requires a result artifact.");
-            using var document = JsonDocument.Parse(request.Result.Content);
-            if (!document.RootElement.TryGetProperty("success", out var success) || !success.GetBoolean())
-                throw new InvalidOperationException("Infrastructure Action reported an unsuccessful host mutation.");
-            await lifecycle.ApplySuccessfulOperationAsync(deployment.HostedRunner, deployment, request.ActionKey,
-                document.RootElement, cancellationToken);
+            await ApplySuccessfulDeploymentResultAsync(deployment, request, cancellationToken);
+            return;
         }
-        else
+
+        await ApplyFailedDeploymentResultAsync(deployment, request, execution, cancellationToken);
+    }
+
+    private async Task ApplySuccessfulDeploymentResultAsync(
+        HostedRunnerDeployment deployment,
+        InfrastructureCommandResultRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!request.Result.Available || string.IsNullOrWhiteSpace(request.Result.Content))
+            throw new InvalidOperationException("A successful infrastructure command requires a result artifact.");
+        using var document = JsonDocument.Parse(request.Result.Content);
+        if (!document.RootElement.TryGetProperty("success", out var success) || !success.GetBoolean())
+            throw new InvalidOperationException("Infrastructure Action reported an unsuccessful host mutation.");
+        await lifecycle.ApplySuccessfulOperationAsync(
+            deployment.HostedRunner, deployment, request.ActionKey, document.RootElement, cancellationToken);
+    }
+
+    private async Task ApplyFailedDeploymentResultAsync(
+        HostedRunnerDeployment deployment,
+        InfrastructureCommandResultRequest request,
+        AppModuleExecution execution,
+        CancellationToken cancellationToken)
+    {
+        deployment.Status = HostedRunnerDeploymentStatuses.Failed;
+        deployment.Error = execution.FailureSummary ?? execution.ErrorCode ?? "Infrastructure Action failed.";
+        deployment.FinishedAt = DateTime.UtcNow;
+        deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
+
+        if (request.ActionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
         {
-            var isStorageMeasurement = request.ActionKey == StorageTelemetryActions.MeasureHostedRunnerStorage;
-            deployment.Status = HostedRunnerDeploymentStatuses.Failed;
-            deployment.Error = execution.FailureSummary ?? execution.ErrorCode ?? "Infrastructure Action failed.";
-            deployment.FinishedAt = DateTime.UtcNow;
-            if (isStorageMeasurement)
-            {
-                var verification = await db.HostedRunnerStorageVerifications
-                    .SingleOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
-                    ?? throw new InvalidOperationException("Storage verification request was not found.");
-                verification.Status = StorageVerificationStatuses.Failed;
-                verification.CompletedAtUtc = deployment.FinishedAt;
-                verification.Error = Truncate(deployment.Error, 2000);
-                deployment.HostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Failed;
-                deployment.HostedRunner.StorageMeasurementError = verification.Error;
-                deployment.HostedRunner.StorageState = HostedRunnerStorageStates.MeasurementFailed;
-                deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
-            }
-            else
-            {
-                deployment.HostedRunner.Status = request.ActionKey == "delete-hosted-runner"
-                    ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed;
-                deployment.HostedRunner.LastError = deployment.Error;
-                deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
-            }
+            await ApplyFailedStorageMeasurementAsync(deployment, cancellationToken);
+            return;
         }
-        if (request.SecretGrantIds.Count > 0)
-            await secretGrants.MarkConsumedAsync(request.SecretGrantIds, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return new(InfrastructureCommandResultOutcomes.Accepted);
+
+        deployment.HostedRunner.Status = request.ActionKey == "delete-hosted-runner"
+            ? HostedRunnerStatuses.DeleteFailed
+            : HostedRunnerStatuses.Failed;
+        deployment.HostedRunner.LastError = deployment.Error;
+    }
+
+    private async Task ApplyFailedStorageMeasurementAsync(
+        HostedRunnerDeployment deployment,
+        CancellationToken cancellationToken)
+    {
+        var verification = await db.HostedRunnerStorageVerifications
+            .SingleOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Storage verification request was not found.");
+        verification.Status = StorageVerificationStatuses.Failed;
+        verification.CompletedAtUtc = deployment.FinishedAt;
+        verification.Error = Truncate(deployment.Error, 2000);
+        deployment.HostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Failed;
+        deployment.HostedRunner.StorageMeasurementError = verification.Error;
+        deployment.HostedRunner.StorageState = HostedRunnerStorageStates.MeasurementFailed;
     }
 
     private async Task<SecretGrantScope> AuthorizeAsync(Guid apiKeyId, Guid commandId, Guid operationId,
