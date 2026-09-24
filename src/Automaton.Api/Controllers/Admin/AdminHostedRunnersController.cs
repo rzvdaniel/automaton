@@ -447,18 +447,21 @@ public class AdminHostedRunnersController : ControllerBase
 
         if (hostedRunner == null) return BadRequest(new { message = "Hosted runner provisioning could not be prepared." });
 
-        var responseRunner = await db.HostedRunners
+        var responseRunner = await LoadHostedRunnerResponseDataAsync(hostedRunner.Id, cancellationToken);
+
+        return Ok(ToResponse(responseRunner));
+    }
+
+    private Task<HostedRunner> LoadHostedRunnerResponseDataAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
+        => db.HostedRunners
             .AsNoTracking()
             .Include(x => x.User)
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
             .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
-            .Where(x => x.Id == hostedRunner.Id)
+            .Where(x => x.Id == hostedRunnerId)
             .FirstAsync(cancellationToken);
-
-        return Ok(ToResponse(responseRunner));
-    }
 
     [HttpPost("runners/{id:guid}/restart")]
     public async Task<ActionResult<HostedRunnerResponse>> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
@@ -685,7 +688,14 @@ public class AdminHostedRunnersController : ControllerBase
             RecoveredAtUtc = runner.RecoveredAtUtc,
             LastEnforcementReason = runner.LastEnforcementReason,
             LastNotificationAtUtc = runner.LastNotificationAtUtc,
-            LatestDeployment = deployment == null ? null : new HostedRunnerDeploymentResponse
+            LatestDeployment = ToDeploymentResponse(deployment)
+        };
+    }
+
+    private static HostedRunnerDeploymentResponse? ToDeploymentResponse(HostedRunnerDeployment? deployment)
+        => deployment == null
+            ? null
+            : new HostedRunnerDeploymentResponse
             {
                 Id = deployment.Id,
                 Action = deployment.Action,
@@ -695,9 +705,7 @@ public class AdminHostedRunnersController : ControllerBase
                 Error = deployment.Error,
                 StartedAt = deployment.StartedAt,
                 FinishedAt = deployment.FinishedAt
-            }
-        };
-    }
+            };
 }
 
 public sealed record DeleteHostedRunnerRequest(string DataDisposition);
