@@ -132,52 +132,8 @@ namespace Automaton.Core.Services
 
             while (step != null && !cancellationToken.IsCancellationRequested)
             {
-                var context = new StepExecutionContext
-                {
-                    Workflow = workflow,
-                    Definition = definition,
-                    Step = step,
-                    CancellationToken = cancellationToken,
-                };
-
-                try
-                {
-                    if (executeDelay >0)
-                    {
-                        await Task.Delay(executeDelay, cancellationToken);
-                    }
-
-                    // Notify step execution start
-                    await notificationService.SendStepExecution(step.Id);
-
-                    var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
-                    await AddLogWithNotification(workflowExecution, "Debug", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
-
-                    var stepResult = await step.ExecuteAsync(context);
-
-                    if (stepResult.InternalLogs != null && stepResult.InternalLogs.Any())
-                    {
-                        foreach (var log in stepResult.InternalLogs)
-                        {
-                            await AddLogWithNotification(workflowExecution, "Debug", log, step.Id, step.Name, cancellationToken: cancellationToken);
-                        }
-                    }
-
-                    var stepCompleteMessage = $"Completed step: {step.Name}";
-                    await AddLogWithNotification(workflowExecution, "Debug", stepCompleteMessage, step.Id, step.Name, cancellationToken: cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    var cancelMessage = "Workflow execution was canceled";
-                    await AddLogWithNotification(workflowExecution, "Warning", cancelMessage, cancellationToken: cancellationToken);
+                if (!await ExecuteStep(workflowExecution, workflow, definition, step, executeDelay, cancellationToken))
                     break;
-                }
-                catch (Exception ex)
-                {
-                    var errorMessage = $"Step {step.Name} with Id {step.Id} encountered an error. Message: {ex.Message}";
-                    await AddLogWithNotification(workflowExecution, "Error", errorMessage, step.Id, step.Name, ex, cancellationToken);
-                    workflowExecution.HasErrors();
-                }
 
                 step = step.GetNextStep();
             }
@@ -200,6 +156,101 @@ namespace Automaton.Core.Services
             workflowExecution.OutputVariables = nameKeyedOutputs;
 
             return workflowExecution;
+        }
+
+        private async Task<bool> ExecuteStep(
+            WorkflowExecution workflowExecution,
+            Workflow workflow,
+            WorkflowDefinition definition,
+            WorkflowStep step,
+            int executeDelay,
+            CancellationToken cancellationToken)
+        {
+            var context = new StepExecutionContext
+            {
+                Workflow = workflow,
+                Definition = definition,
+                Step = step,
+                CancellationToken = cancellationToken,
+            };
+
+            try
+            {
+                if (executeDelay > 0)
+                    await Task.Delay(executeDelay, cancellationToken);
+
+                await notificationService.SendStepExecution(step.Id);
+                await LogStepStarted(workflowExecution, step, cancellationToken);
+                var result = await step.ExecuteAsync(context);
+                await LogInternalStepMessages(workflowExecution, step, result, cancellationToken);
+                await AddLogWithNotification(
+                    workflowExecution,
+                    "Debug",
+                    $"Completed step: {step.Name}",
+                    step.Id,
+                    step.Name,
+                    cancellationToken: cancellationToken);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                await AddLogWithNotification(
+                    workflowExecution,
+                    "Warning",
+                    "Workflow execution was canceled",
+                    cancellationToken: cancellationToken);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Step {step.Name} with Id {step.Id} encountered an error. Message: {ex.Message}";
+                await AddLogWithNotification(
+                    workflowExecution,
+                    "Error",
+                    errorMessage,
+                    step.Id,
+                    step.Name,
+                    ex,
+                    cancellationToken);
+                workflowExecution.HasErrors();
+                return true;
+            }
+        }
+
+        private Task LogStepStarted(
+            WorkflowExecution workflowExecution,
+            WorkflowStep step,
+            CancellationToken cancellationToken)
+        {
+            var message = $"Executing step: {step.Name} (ID: {step.Id})";
+            return AddLogWithNotification(
+                workflowExecution,
+                "Debug",
+                message,
+                step.Id,
+                step.Name,
+                cancellationToken: cancellationToken);
+        }
+
+        private async Task LogInternalStepMessages(
+            WorkflowExecution workflowExecution,
+            WorkflowStep step,
+            ExecutionResult result,
+            CancellationToken cancellationToken)
+        {
+            if (result.InternalLogs == null || !result.InternalLogs.Any())
+                return;
+
+            foreach (var message in result.InternalLogs)
+            {
+                await AddLogWithNotification(
+                    workflowExecution,
+                    "Debug",
+                    message,
+                    step.Id,
+                    step.Name,
+                    cancellationToken: cancellationToken);
+            }
         }
 
         /// <summary>

@@ -152,79 +152,93 @@ namespace Automaton.Core.Scripting.Engines.Python
         {
             try
             {
-                var pathsToAdd = new List<string>();
-
-                // Priority 1: Add user-configured paths first
-                if (configuration.PythonPaths?.Any() == true)
-                {
-                    foreach (var p in configuration.PythonPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
-                    {
-                        pathsToAdd.Add(p);
-                    }
-                }
-
-                // Priority 2: ALSO add auto-detected paths if auto-detection is enabled
-                // This is now additive: both user and auto-detected paths are combined
-                if (configuration.AutoDetectPythonPaths)
-                {
-                    if (!string.IsNullOrWhiteSpace(detectedEnv.PythonPaths))
-                    {
-                        var detectedPaths = detectedEnv.PythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (var p in detectedPaths)
-                        {
-                            pathsToAdd.Add(p);
-                        }
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(detectedEnv.PythonHome))
-                    {
-                        var lib = Path.Combine(detectedEnv.PythonHome, "Lib");
-                        var sitePkgs = Path.Combine(lib, "site-packages");
-                        var dlls = Path.Combine(detectedEnv.PythonHome, "DLLs");
-                        foreach (var p in new[] { lib, sitePkgs, dlls })
-                        {
-                            if (Directory.Exists(p))
-                            {
-                                pathsToAdd.Add(p);
-                            }
-                        }
-                    }
-                }
-
-                // Deduplicate and filter - removes duplicates and non-existent paths
-                var finalPaths = pathsToAdd
-                    .Select(p => p.Trim())
-                    .Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
+                var finalPaths = GetConfiguredPythonPaths();
                 if (finalPaths.Any())
-                {
-                    lock (gilExecutionLock)
-                    {
-                        using (Py.GIL())
-                        {
-                            var sys = Py.Import("sys");
-                            var currentPath = sys.GetAttr("path");
-
-                            foreach (var p in finalPaths)
-                            {
-                                using var pyPath = new PyString(p);
-                                try
-                                {
-                                    if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
-                                    {
-                                        currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
-                                    }
-                                }
-                                catch {}
-                            }
-                        }
-                    }
-                }
+                    AddPathsToPythonSearchPath(finalPaths);
             }
             catch (Exception ex)
             {
+            }
+        }
+
+        private List<string> GetConfiguredPythonPaths()
+        {
+            var paths = new List<string>();
+            AddConfiguredPaths(paths);
+            AddDetectedPaths(paths);
+
+            return paths
+                .Select(path => path.Trim())
+                .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private void AddConfiguredPaths(List<string> paths)
+        {
+            if (configuration.PythonPaths?.Any() != true)
+                return;
+
+            paths.AddRange(configuration.PythonPaths.Where(path => !string.IsNullOrWhiteSpace(path)));
+        }
+
+        private void AddDetectedPaths(List<string> paths)
+        {
+            if (!configuration.AutoDetectPythonPaths)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(detectedEnv.PythonPaths))
+            {
+                paths.AddRange(detectedEnv.PythonPaths.Split(
+                    Path.PathSeparator,
+                    StringSplitOptions.RemoveEmptyEntries));
+            }
+
+            AddDetectedHomePaths(paths, detectedEnv.PythonHome);
+        }
+
+        private static void AddDetectedHomePaths(List<string> paths, string? pythonHome)
+        {
+            if (string.IsNullOrWhiteSpace(pythonHome))
+                return;
+
+            var library = Path.Combine(pythonHome, "Lib");
+            foreach (var path in new[]
+                     {
+                         library,
+                         Path.Combine(library, "site-packages"),
+                         Path.Combine(pythonHome, "DLLs")
+                     })
+            {
+                if (Directory.Exists(path))
+                    paths.Add(path);
+            }
+        }
+
+        private static void AddPathsToPythonSearchPath(IEnumerable<string> paths)
+        {
+            lock (gilExecutionLock)
+            {
+                using (Py.GIL())
+                {
+                    var currentPath = Py.Import("sys").GetAttr("path");
+                    foreach (var path in paths)
+                        TryAddPythonPath(currentPath, path);
+                }
+            }
+        }
+
+        private static void TryAddPythonPath(PyObject currentPath, string path)
+        {
+            using var pythonPath = new PyString(path);
+            try
+            {
+                if (!currentPath.InvokeMethod("__contains__", pythonPath).As<bool>())
+                    currentPath.InvokeMethod("insert", new PyInt(0), pythonPath);
+            }
+            catch
+            {
+                // A path that Python rejects must not prevent other configured paths from loading.
             }
         }
 
@@ -309,61 +323,14 @@ namespace Automaton.Core.Scripting.Engines.Python
                     SetupOutputCapture(scope);
 
                     // Push inputs
-                    foreach (var kvp in inputs)
-                    {
-                        using var pyValue = ConvertToPython(kvp.Value);
-                        scope.Set(kvp.Key, pyValue);
-                    }
+                    PushInputs(scope, inputs);
 
                     // Execute
                     scope.Exec(code);
 
                     // Emit captured output
-                    var capturedOutput = GetCapturedOutput(scope);
-                    if (!string.IsNullOrEmpty(capturedOutput))
-                    {
-                        OutputCallback?.Invoke(capturedOutput);
-
-                        // Check if the output contains error indicators
-                        if (capturedOutput.Contains("ERROR:") ||
-                            capturedOutput.Contains("Traceback") ||
-                            capturedOutput.Contains("Exception:") ||
-                            capturedOutput.Contains("Error:"))
-                        {
-                            variables["error"] = "Script execution produced errors";
-                            variables["errorOutput"] = capturedOutput;
-                        }
-                    }
-
-                    // Collect variables (skip builtins and our helpers)
-                    var namesObj = scope.Dir();
-                    for (int i = 0; i < namesObj.Length(); i++)
-                    {
-                        var name = namesObj[i].As<string>();
-                        if (!name.StartsWith("__") &&
-                            !name.StartsWith("_captured_") &&
-                            !name.Equals("sys") &&
-                            !name.Equals("StringIO") &&
-                            !name.Equals("_original_stdout") &&
-                            !name.Equals("_original_stderr") &&
-                            !name.Equals("_output_content"))
-                        {
-                            try
-                            {
-                                var pyValue = scope.Get(name);
-                                if (pyValue != null)
-                                {
-                                    var value = ConvertFromPython(pyValue);
-                                    variables[name] = value;
-                                }
-                            }
-                            catch
-                            {
-                                var pyValue = scope.Get(name);
-                                variables[name] = pyValue?.ToString() ?? string.Empty;
-                            }
-                        }
-                    }
+                    RecordCapturedOutput(scope, variables);
+                    CollectVariables(scope, variables);
                 }
                 catch (PythonException ex)
                 {
@@ -386,6 +353,71 @@ namespace Automaton.Core.Scripting.Engines.Python
             }
 
             return variables;
+        }
+
+        private void PushInputs(PyModule scope, IDictionary<string, string> inputs)
+        {
+            foreach (var input in inputs)
+            {
+                using var pythonValue = ConvertToPython(input.Value);
+                scope.Set(input.Key, pythonValue);
+            }
+        }
+
+        private void RecordCapturedOutput(PyModule scope, IDictionary<string, string> variables)
+        {
+            var output = GetCapturedOutput(scope);
+            if (string.IsNullOrEmpty(output))
+                return;
+
+            OutputCallback?.Invoke(output);
+            if (!ContainsErrorIndicator(output))
+                return;
+
+            variables["error"] = "Script execution produced errors";
+            variables["errorOutput"] = output;
+        }
+
+        private static bool ContainsErrorIndicator(string output) =>
+            output.Contains("ERROR:")
+            || output.Contains("Traceback")
+            || output.Contains("Exception:")
+            || output.Contains("Error:");
+
+        private void CollectVariables(PyModule scope, IDictionary<string, string> variables)
+        {
+            var names = scope.Dir();
+            for (var index = 0; index < names.Length(); index++)
+            {
+                var name = names[index].As<string>();
+                if (IsInternalVariable(name))
+                    continue;
+
+                variables[name] = ReadVariable(scope, name);
+            }
+        }
+
+        private static bool IsInternalVariable(string name) =>
+            name.StartsWith("__")
+            || name.StartsWith("_captured_")
+            || name.Equals("sys")
+            || name.Equals("StringIO")
+            || name.Equals("_original_stdout")
+            || name.Equals("_original_stderr")
+            || name.Equals("_output_content");
+
+        private string ReadVariable(PyModule scope, string name)
+        {
+            try
+            {
+                var pythonValue = scope.Get(name);
+                return pythonValue == null ? string.Empty : ConvertFromPython(pythonValue);
+            }
+            catch
+            {
+                var pythonValue = scope.Get(name);
+                return pythonValue?.ToString() ?? string.Empty;
+            }
         }
 
         private void SetupOutputCapture(PyModule scope)

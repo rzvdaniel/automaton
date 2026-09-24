@@ -7,104 +7,155 @@ public class PythonEnvironmentConfigurator
     public void Configure(PythonEnvironmentInfo detected, ScriptEngineConfiguration configuration)
     {
         if (configuration.AutoDetectPythonPaths && detected != null)
+            TryResolveAndSetPythonDll(detected);
+    }
+
+    private static void TryResolveAndSetPythonDll(PythonEnvironmentInfo detected)
+    {
+        if (!OperatingSystem.IsWindows() || !string.IsNullOrWhiteSpace(Runtime.PythonDLL))
+            return;
+
+        var candidateDirs = GetCandidateDirectories(detected);
+        var bestMatch = FindBestPythonDll(candidateDirs, detected);
+        if (!string.IsNullOrWhiteSpace(bestMatch) && File.Exists(bestMatch))
+            Runtime.PythonDLL = bestMatch;
+    }
+
+    private static List<string> GetCandidateDirectories(PythonEnvironmentInfo detected)
+    {
+        var candidateDirs = new List<string>();
+        AddEnvironmentHomeDirectories(candidateDirs, detected.PythonHome);
+        AddExecutableDirectory(candidateDirs, detected.PythonExe);
+        AddEnvironmentHomeDirectories(candidateDirs, Environment.GetEnvironmentVariable("PYTHONHOME"));
+        AddPathDirectories(candidateDirs);
+
+        return candidateDirs
+            .Select(path => path.Trim())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void AddEnvironmentHomeDirectories(List<string> directories, string? home)
+    {
+        if (string.IsNullOrWhiteSpace(home) || !Directory.Exists(home))
+            return;
+
+        directories.Add(home);
+        AddExistingSubdirectory(directories, home, "DLLs");
+        AddExistingSubdirectory(directories, home, "bin");
+    }
+
+    private static void AddExistingSubdirectory(List<string> directories, string home, string name)
+    {
+        var path = Path.Combine(home, name);
+        if (Directory.Exists(path))
+            directories.Add(path);
+    }
+
+    private static void AddExecutableDirectory(List<string> directories, string? executable)
+    {
+        if (string.IsNullOrWhiteSpace(executable))
+            return;
+
+        var directory = Path.GetDirectoryName(executable);
+        if (!string.IsNullOrWhiteSpace(directory))
+            directories.Add(directory);
+    }
+
+    private static void AddPathDirectories(List<string> directories)
+    {
+        var pathEnvironment = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var path in pathEnvironment.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            TryResolveAndSetPythonDll(detected, configuration);
+            if (Directory.Exists(path))
+                directories.Add(path);
         }
     }
 
-    private void TryResolveAndSetPythonDll(PythonEnvironmentInfo detected, ScriptEngineConfiguration configuration)
+    private static string? FindBestPythonDll(IEnumerable<string> directories, PythonEnvironmentInfo detected)
     {
-        if (!OperatingSystem.IsWindows()) return;
-        if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL)) return;
-
-        var candidateDirs = new List<string>();
-        if (!string.IsNullOrWhiteSpace(detected.PythonHome) && Directory.Exists(detected.PythonHome))
-        {
-            candidateDirs.Add(detected.PythonHome);
-            var dlls = Path.Combine(detected.PythonHome, "DLLs");
-            var bin = Path.Combine(detected.PythonHome, "bin");
-            if (Directory.Exists(dlls)) candidateDirs.Add(dlls);
-            if (Directory.Exists(bin)) candidateDirs.Add(bin);
-        }
-        if (!string.IsNullOrWhiteSpace(detected.PythonExe))
-        {
-            var exeDir = Path.GetDirectoryName(detected.PythonExe);
-            if (!string.IsNullOrWhiteSpace(exeDir)) candidateDirs.Add(exeDir);
-        }
-        var pyHomeEnv = Environment.GetEnvironmentVariable("PYTHONHOME");
-        if (!string.IsNullOrWhiteSpace(pyHomeEnv) && Directory.Exists(pyHomeEnv))
-        {
-            candidateDirs.Add(pyHomeEnv);
-            var dlls = Path.Combine(pyHomeEnv, "DLLs");
-            var bin = Path.Combine(pyHomeEnv, "bin");
-            if (Directory.Exists(dlls)) candidateDirs.Add(dlls);
-            if (Directory.Exists(bin)) candidateDirs.Add(bin);
-        }
-        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        foreach (var p in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (Directory.Exists(p)) candidateDirs.Add(p);
-        }
-        candidateDirs = candidateDirs
-        .Select(p => p.Trim())
-        .Where(p => !string.IsNullOrWhiteSpace(p))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToList();
         string? bestMatch = null;
-        int bestScore = int.MinValue;
-        var versionToken = (detected.PythonMajor.HasValue && detected.PythonMinor.HasValue)
-        ? ($"{detected.PythonMajor}{detected.PythonMinor}")
-        : null;
-        foreach (var dir in candidateDirs)
+        var bestScore = int.MinValue;
+        var versionToken = detected.PythonMajor.HasValue && detected.PythonMinor.HasValue
+            ? $"{detected.PythonMajor}{detected.PythonMinor}"
+            : null;
+
+        foreach (var directory in directories)
         {
-            try
+            foreach (var file in FindPythonDllFiles(directory))
             {
-                var files = Enumerable.Empty<string>();
-                try { files = Directory.EnumerateFiles(dir, "python3*.dll"); } catch { }
-                if (!files.Any())
-                {
-                    try { files = Directory.EnumerateFiles(dir, "python*.dll"); } catch { }
-                }
-                foreach (var file in files)
-                {
-                    var name = Path.GetFileName(file);
-                    var m = System.Text.RegularExpressions.Regex.Match(name, @"python(?<maj>\d)(?<min>\d{1,2})\.dll", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    int score = 0;
-                    if (m.Success)
-                    {
-                        var token = m.Groups["maj"].Value + m.Groups["min"].Value;
-                        if (!string.IsNullOrWhiteSpace(versionToken))
-                        {
-                            if (string.Equals(token, versionToken, StringComparison.Ordinal))
-                            {
-                                score += 1000;
-                            }
-                            else if (token.StartsWith(detected.PythonMajor?.ToString() ?? string.Empty))
-                            {
-                                score += 500;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        score += 10;
-                    }
-                    if (!string.IsNullOrWhiteSpace(detected.PythonHome) && dir.StartsWith(detected.PythonHome, StringComparison.OrdinalIgnoreCase))
-                    {
-                        score += 50;
-                    }
-                    if (score > bestScore)
-                    {
-                        bestScore = score;
-                        bestMatch = file;
-                    }
-                }
+                var score = ScorePythonDll(file, directory, detected, versionToken);
+                if (score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                bestMatch = file;
             }
-            catch { }
         }
-        if (!string.IsNullOrWhiteSpace(bestMatch) && File.Exists(bestMatch))
+
+        return bestMatch;
+    }
+
+    private static IEnumerable<string> FindPythonDllFiles(string directory)
+    {
+        var files = TryEnumerateFiles(directory, "python3*.dll");
+        return files.Count > 0 ? files : TryEnumerateFiles(directory, "python*.dll");
+    }
+
+    private static List<string> TryEnumerateFiles(string directory, string pattern)
+    {
+        var files = new List<string>();
+        try
         {
-            Runtime.PythonDLL = bestMatch;
+            foreach (var file in Directory.EnumerateFiles(directory, pattern))
+                files.Add(file);
         }
+        catch
+        {
+            // A directory may become inaccessible during discovery; keep any matches already found.
+        }
+
+        return files;
+    }
+
+    private static int ScorePythonDll(
+        string file,
+        string directory,
+        PythonEnvironmentInfo detected,
+        string? versionToken)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            Path.GetFileName(file),
+            @"python(?<maj>\d)(?<min>\d{1,2})\.dll",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var score = GetVersionScore(match, detected, versionToken);
+
+        if (!string.IsNullOrWhiteSpace(detected.PythonHome)
+            && directory.StartsWith(detected.PythonHome, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 50;
+        }
+
+        return score;
+    }
+
+    private static int GetVersionScore(
+        System.Text.RegularExpressions.Match match,
+        PythonEnvironmentInfo detected,
+        string? versionToken)
+    {
+        if (!match.Success)
+            return 10;
+
+        var token = match.Groups["maj"].Value + match.Groups["min"].Value;
+        if (string.IsNullOrWhiteSpace(versionToken))
+            return 0;
+        if (string.Equals(token, versionToken, StringComparison.Ordinal))
+            return 1000;
+
+        return token.StartsWith(detected.PythonMajor?.ToString() ?? string.Empty)
+            ? 500
+            : 0;
     }
 }

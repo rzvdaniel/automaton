@@ -8,59 +8,13 @@ public class PythonEnvironmentDetector
     public PythonEnvironmentInfo Detect()
     {
         var info = new PythonEnvironmentInfo();
-        var candidates = new[] { "python3", "python" };
-        foreach (var exe in candidates)
+        foreach (var executable in new[] { "python3", "python" })
         {
             try
             {
-                var home = RunPythonAndReadStdOut(exe, "-c \"import sys; print(sys.exec_prefix)\"")?.Trim();
-                if (string.IsNullOrWhiteSpace(home) || !Directory.Exists(home))
+                if (!TryDetectEnvironment(executable, info))
                     continue;
 
-                var paths = RunPythonAndReadStdOut(exe, "-c \"import sys, os; print(os.pathsep.join(sys.path))\"")?.Trim();
-                if (string.IsNullOrWhiteSpace(paths))
-                    continue;
-
-                var ver = RunPythonAndReadStdOut(exe, "-c \"import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')\"")?.Trim();
-                var sysExe = RunPythonAndReadStdOut(exe, "-c \"import sys; print(sys.executable)\"")?.Trim();
-                var dllPath = RunPythonAndReadStdOut(exe, "-c \"import sys; import os; print(getattr(sys, 'dllhandle', None) or os.path.join(sys.exec_prefix, 'python' + str(sys.version_info.major) + str(sys.version_info.minor) + '.dll'))\"")?.Trim();
-                var arch = RunPythonAndReadStdOut(exe, "-c \"import platform; print(platform.architecture()[0])\"")?.Trim();
-                var dist = RunPythonAndReadStdOut(exe, "-c \"import platform; print(platform.python_implementation())\"")?.Trim();
-                var sitePackages = RunPythonAndReadStdOut(exe, "-c \"import site; print(site.getsitepackages())\"")?.Trim();
-
-                info.PythonHome = home;
-                info.PythonPaths = paths;
-                info.PythonExe = !string.IsNullOrWhiteSpace(sysExe) ? sysExe : null;
-                info.PythonVersion = ver;
-                info.PythonDllPath = dllPath;
-                info.Architecture = arch;
-                if (!string.IsNullOrWhiteSpace(dist))
-                    info.Distributions.Add(dist);
-                if (!string.IsNullOrWhiteSpace(sitePackages))
-                {
-                    // Try to parse as list
-                    var cleaned = sitePackages.Trim('[', ']', ' ', '\'');
-                    var split = cleaned.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var s in split)
-                    {
-                        var p = s.Trim(' ', '\'');
-                        if (!string.IsNullOrWhiteSpace(p))
-                            info.SitePackagesPaths.Add(p);
-                    }
-                }
-                // Environment variables
-                info.EnvironmentVariables["PYTHONHOME"] = home;
-                info.EnvironmentVariables["PYTHONPATH"] = paths;
-                // Version breakdown
-                if (!string.IsNullOrWhiteSpace(ver))
-                {
-                    var parts = ver.Split('.', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2 && int.TryParse(parts[0], out var maj) && int.TryParse(parts[1], out var min))
-                    {
-                        info.PythonMajor = maj;
-                        info.PythonMinor = min;
-                    }
-                }
                 info.IsAutoDetectionSuccessful = true;
                 break;
             }
@@ -71,6 +25,89 @@ public class PythonEnvironmentDetector
             }
         }
         return info;
+    }
+
+    private static bool TryDetectEnvironment(string executable, PythonEnvironmentInfo info)
+    {
+        var home = ReadPythonValue(executable, "import sys; print(sys.exec_prefix)");
+        if (string.IsNullOrWhiteSpace(home) || !Directory.Exists(home))
+            return false;
+
+        var paths = ReadPythonValue(executable, "import sys, os; print(os.pathsep.join(sys.path))");
+        if (string.IsNullOrWhiteSpace(paths))
+            return false;
+
+        var version = ReadPythonValue(executable, "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')");
+        var sysExecutable = ReadPythonValue(executable, "import sys; print(sys.executable)");
+        var dllPath = ReadPythonValue(executable, "import sys; import os; print(getattr(sys, 'dllhandle', None) or os.path.join(sys.exec_prefix, 'python' + str(sys.version_info.major) + str(sys.version_info.minor) + '.dll'))");
+        var architecture = ReadPythonValue(executable, "import platform; print(platform.architecture()[0])");
+        var distribution = ReadPythonValue(executable, "import platform; print(platform.python_implementation())");
+        var sitePackages = ReadPythonValue(executable, "import site; print(site.getsitepackages())");
+
+        SetEnvironmentDetails(info, home, paths, version, sysExecutable, dllPath, architecture);
+        AddDistribution(info, distribution);
+        AddSitePackages(info, sitePackages);
+        SetPythonVersion(info, version);
+        return true;
+    }
+
+    private static string? ReadPythonValue(string executable, string command) =>
+        RunPythonAndReadStdOut(executable, $"-c \"{command}\"")?.Trim();
+
+    private static void SetEnvironmentDetails(
+        PythonEnvironmentInfo info,
+        string home,
+        string paths,
+        string? version,
+        string? executable,
+        string? dllPath,
+        string? architecture)
+    {
+        info.PythonHome = home;
+        info.PythonPaths = paths;
+        info.PythonExe = !string.IsNullOrWhiteSpace(executable) ? executable : null;
+        info.PythonVersion = version;
+        info.PythonDllPath = dllPath;
+        info.Architecture = architecture;
+        info.EnvironmentVariables["PYTHONHOME"] = home;
+        info.EnvironmentVariables["PYTHONPATH"] = paths;
+    }
+
+    private static void AddDistribution(PythonEnvironmentInfo info, string? distribution)
+    {
+        if (!string.IsNullOrWhiteSpace(distribution))
+            info.Distributions.Add(distribution);
+    }
+
+    private static void AddSitePackages(PythonEnvironmentInfo info, string? sitePackages)
+    {
+        if (string.IsNullOrWhiteSpace(sitePackages))
+            return;
+
+        var cleaned = sitePackages.Trim('[', ']', ' ', '\'');
+        foreach (var entry in cleaned.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var path = entry.Trim(' ', '\'');
+            if (!string.IsNullOrWhiteSpace(path))
+                info.SitePackagesPaths.Add(path);
+        }
+    }
+
+    private static void SetPythonVersion(PythonEnvironmentInfo info, string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return;
+
+        var parts = version.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2
+            || !int.TryParse(parts[0], out var major)
+            || !int.TryParse(parts[1], out var minor))
+        {
+            return;
+        }
+
+        info.PythonMajor = major;
+        info.PythonMinor = minor;
     }
 
     private static string? RunPythonAndReadStdOut(string exe, string args)

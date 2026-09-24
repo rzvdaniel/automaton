@@ -129,75 +129,107 @@ public static class ApplicationContractValidator
 
         ValidateCommand(contract.Build?.Command, "build.command", errors);
         ValidateCommand(contract.Runtime?.Command, "runtime.command", errors);
-
         ValidateImage(contract.Build?.Image, "build.image", errors);
         ValidateImage(contract.Runtime?.Image, "runtime.image", errors);
 
-        if (contract.Build is null)
-            errors.Add("build is required");
-        else
-        {
-            ValidateRelativePath(contract.Build.OutputDirectory, "build.outputDirectory", errors, allowEmpty: true);
-            ValidatePositiveRange(contract.Build.TimeoutSeconds, "build.timeoutSeconds", 1, 86_400, errors);
-        }
-
-        if (contract.Runtime is null)
-            errors.Add("runtime is required");
-        else
-            ValidatePort(contract.Runtime.Port, "runtime.port", errors);
-
-        if (contract.Health is null)
-            errors.Add("health is required");
-        else
-        {
-            if (contract.Health.Path is not null
-                && (string.IsNullOrWhiteSpace(contract.Health.Path)
-                    || !contract.Health.Path.StartsWith("/", StringComparison.Ordinal)
-                    || contract.Health.Path.Contains("..", StringComparison.Ordinal)
-                    || contract.Health.Path.Contains('\0')))
-            {
-                errors.Add("health.path must be an absolute application URL path without traversal");
-            }
-
-            if (contract.Health.Port.HasValue)
-                ValidatePort(contract.Health.Port.Value, "health.port", errors);
-            ValidatePositiveRange(contract.Health.StartupTimeoutSeconds, "health.startupTimeoutSeconds", 1, 86_400, errors);
-        }
-
-        if (contract.Storage is null)
-            errors.Add("storage is required");
-        else
-        {
-            ValidateRelativePath(contract.Storage.DataDirectory, "storage.dataDirectory", errors, allowEmpty: false);
-            if (contract.Storage.Mounts is null)
-            {
-                errors.Add("storage.mounts must be an array");
-            }
-            else
-            {
-                var environmentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var mount in contract.Storage.Mounts)
-                {
-                    if (mount is null)
-                    {
-                        errors.Add("storage.mounts entries must be objects");
-                        continue;
-                    }
-
-                    var validName = IsValidMountName(mount.Name);
-                    if (!validName)
-                        errors.Add("storage.mounts.name must be a valid environment-safe identifier");
-                    else if (!environmentNames.Add(mount.Name.ToUpperInvariant()))
-                        errors.Add("storage.mounts.name must be unique after environment-variable normalization");
-
-                    if (mount.ReadOnly)
-                        errors.Add("storage.mounts.readOnly is not supported by this runner");
-                    ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
-                }
-            }
-        }
+        ValidateBuild(contract.Build, errors);
+        ValidateRuntime(contract.Runtime, errors);
+        ValidateHealth(contract.Health, errors);
+        ValidateStorage(contract.Storage, errors);
 
         return errors;
+    }
+
+    private static void ValidateBuild(ApplicationBuildSpec? build, ICollection<string> errors)
+    {
+        if (build is null)
+        {
+            errors.Add("build is required");
+            return;
+        }
+
+        ValidateRelativePath(build.OutputDirectory, "build.outputDirectory", errors, allowEmpty: true);
+        ValidatePositiveRange(build.TimeoutSeconds, "build.timeoutSeconds", 1, 86_400, errors);
+    }
+
+    private static void ValidateRuntime(ApplicationRuntimeSpec? runtime, ICollection<string> errors)
+    {
+        if (runtime is null)
+        {
+            errors.Add("runtime is required");
+            return;
+        }
+
+        ValidatePort(runtime.Port, "runtime.port", errors);
+    }
+
+    private static void ValidateHealth(ApplicationHealthSpec? health, ICollection<string> errors)
+    {
+        if (health is null)
+        {
+            errors.Add("health is required");
+            return;
+        }
+
+        ValidateHealthPath(health.Path, errors);
+        if (health.Port.HasValue)
+            ValidatePort(health.Port.Value, "health.port", errors);
+        ValidatePositiveRange(health.StartupTimeoutSeconds, "health.startupTimeoutSeconds", 1, 86_400, errors);
+    }
+
+    private static void ValidateHealthPath(string? path, ICollection<string> errors)
+    {
+        if (path is not null
+            && (string.IsNullOrWhiteSpace(path)
+                || !path.StartsWith("/", StringComparison.Ordinal)
+                || path.Contains("..", StringComparison.Ordinal)
+                || path.Contains('\0')))
+        {
+            errors.Add("health.path must be an absolute application URL path without traversal");
+        }
+    }
+
+    private static void ValidateStorage(ApplicationStorageSpec? storage, ICollection<string> errors)
+    {
+        if (storage is null)
+        {
+            errors.Add("storage is required");
+            return;
+        }
+
+        ValidateRelativePath(storage.DataDirectory, "storage.dataDirectory", errors, allowEmpty: false);
+        if (storage.Mounts is null)
+        {
+            errors.Add("storage.mounts must be an array");
+            return;
+        }
+
+        var environmentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mount in storage.Mounts)
+        {
+            ValidateMount(mount, environmentNames, errors);
+        }
+    }
+
+    private static void ValidateMount(
+        ApplicationStorageMount? mount,
+        ISet<string> environmentNames,
+        ICollection<string> errors)
+    {
+        if (mount is null)
+        {
+            errors.Add("storage.mounts entries must be objects");
+            return;
+        }
+
+        if (!IsValidMountName(mount.Name))
+            errors.Add("storage.mounts.name must be a valid environment-safe identifier");
+        else if (!environmentNames.Add(mount.Name.ToUpperInvariant()))
+            errors.Add("storage.mounts.name must be unique after environment-variable normalization");
+
+        if (mount.ReadOnly)
+            errors.Add("storage.mounts.readOnly is not supported by this runner");
+        ValidateRelativePath(mount.RelativePath, "storage.mounts.relativePath", errors, allowEmpty: false);
     }
 
     public static void EnsureValid(ApplicationContract contract)
@@ -231,24 +263,47 @@ public static class ApplicationContractValidator
         if (command is null)
             return;
 
-        if (string.IsNullOrWhiteSpace(command.Executable) || command.Executable.Contains('\0'))
-            errors.Add($"{name}.executable is required and must not contain NUL");
-        else if (Path.IsPathRooted(command.Executable)
-            || LooksLikeWindowsRootedPath(command.Executable)
-            || ContainsTraversalSegment(command.Executable))
-            errors.Add($"{name}.executable must not point outside the runner-managed workspace");
-
-        if (command.Arguments is null)
-            errors.Add($"{name}.arguments must be an array");
-        else if (command.Arguments.Any(argument => argument is null || argument.Contains('\0')))
-            errors.Add($"{name}.arguments must not contain NUL");
-
+        ValidateExecutable(command.Executable, name, errors);
+        ValidateArguments(command.Arguments, name, errors);
         ValidateRelativePath(command.WorkingDirectory, $"{name}.workingDirectory", errors, allowEmpty: false);
-        if (command.Environment is null)
+        ValidateEnvironment(command.Environment, name, errors);
+    }
+
+    private static void ValidateExecutable(string executable, string name, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(executable) || executable.Contains('\0'))
+        {
+            errors.Add($"{name}.executable is required and must not contain NUL");
+            return;
+        }
+
+        if (Path.IsPathRooted(executable)
+            || LooksLikeWindowsRootedPath(executable)
+            || ContainsTraversalSegment(executable))
+        {
+            errors.Add($"{name}.executable must not point outside the runner-managed workspace");
+        }
+    }
+
+    private static void ValidateArguments(ICollection<string>? arguments, string name, ICollection<string> errors)
+    {
+        if (arguments is null)
+        {
+            errors.Add($"{name}.arguments must be an array");
+            return;
+        }
+
+        if (arguments.Any(argument => argument is null || argument.Contains('\0')))
+            errors.Add($"{name}.arguments must not contain NUL");
+    }
+
+    private static void ValidateEnvironment(IDictionary<string, string>? environment, string name, ICollection<string> errors)
+    {
+        if (environment is null)
         {
             errors.Add($"{name}.environment must be an object");
         }
-        else foreach (var pair in command.Environment)
+        else foreach (var pair in environment)
         {
             if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Contains('=') || pair.Key.Contains('\0'))
                 errors.Add($"{name}.environment contains an invalid variable name");

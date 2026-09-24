@@ -84,61 +84,57 @@ public abstract class WorkflowStep
 
     protected virtual void SetupProperties(StepExecutionContext context)
     {
+        var stepType = GetType();
         foreach (var input in Inputs)
         {
-            var stepType = GetType();
             var stepProperty = stepType.GetProperty(input.Value.Name);
             var variable = input.Value;
-            var value = variable.Value;
+            var value = ResolveInputValue(variable, stepProperty, context);
+            AssignInputValue(stepProperty, value);
+        }
+    }
 
-            // Auto-populate step inputs from Workflow.Variables
-            if (string.IsNullOrEmpty(value))
+    private string? ResolveInputValue(StepVariable variable, PropertyInfo stepProperty, StepExecutionContext context)
+    {
+        var value = variable.Value;
+        if (string.IsNullOrEmpty(value))
+        {
+            var runtimeVar = context.Workflow.Variables.Values
+                .FirstOrDefault(item => item.Name.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
+            if (runtimeVar != null)
             {
-                var runtimeVar = context.Workflow.Variables.Values
-                    .FirstOrDefault(v => v.Name.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
-
-                if (runtimeVar != null)
-                {
-                    value = runtimeVar.Value;
-
-                    logger.Debug(
-                        "Auto-populated step input '{Name}' from workflow Variables",
-                        variable.Name);
-                }
-            }
-
-            // Do string replacement parsing if not ignored
-            if (ShouldParseProperty(stepProperty))
-            {
-                variable.Value = value = StepVariableParser.Parse(variable, context.Workflow);
-            }
-
-            if (value == null)
-            {
-                continue;
-            }
-
-            // Only strings are supported on public step properties
-            if (stepProperty.PropertyType == typeof(string))
-            {
-                stepProperty.SetValue(this, value);
-            }
-            else
-            {
-                // If step exposes non-string property, attempt simple Guid coercion
-                if (stepProperty.PropertyType == typeof(Guid))
-                {
-                    if (Guid.TryParse(value, out var guidValue))
-                    {
-                        stepProperty.SetValue(this, guidValue);
-                        continue;
-                    }
-                }
-
-                logger.Error("Type mismatch: Cannot assign string to property of type {Type}", stepProperty.PropertyType);
-                throw new InvalidCastException($"Cannot assign string to property of type {stepProperty.PropertyType}");
+                value = runtimeVar.Value;
+                logger.Debug(
+                    "Auto-populated step input '{Name}' from workflow Variables",
+                    variable.Name);
             }
         }
+
+        if (ShouldParseProperty(stepProperty))
+            variable.Value = value = StepVariableParser.Parse(variable, context.Workflow);
+
+        return value;
+    }
+
+    private void AssignInputValue(PropertyInfo stepProperty, string? value)
+    {
+        if (value == null)
+            return;
+
+        if (stepProperty.PropertyType == typeof(string))
+        {
+            stepProperty.SetValue(this, value);
+            return;
+        }
+
+        if (stepProperty.PropertyType == typeof(Guid) && Guid.TryParse(value, out var guidValue))
+        {
+            stepProperty.SetValue(this, guidValue);
+            return;
+        }
+
+        logger.Error("Type mismatch: Cannot assign string to property of type {Type}", stepProperty.PropertyType);
+        throw new InvalidCastException($"Cannot assign string to property of type {stepProperty.PropertyType}");
     }
 
     private static bool ShouldParseProperty(PropertyInfo stepProperty)
