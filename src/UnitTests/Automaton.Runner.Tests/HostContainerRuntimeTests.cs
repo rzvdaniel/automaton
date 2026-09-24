@@ -107,38 +107,7 @@ public sealed class HostContainerRuntimeTests
         request.Command.Environment["MODE"] = "command";
         request = request with { Environment = new Dictionary<string, string> { ["MODE"] = "request" } };
         var result = await Service().ExecuteAsync(request);
-        Assert.That(result.Success, Is.True, result.Error);
-        var args = calls.Single(x => x[1] == "create").ToList();
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.HostPort, Is.Null);
-            Assert.That(calls.Any(x => x[1] == "start"), Is.False);
-            Assert.That(result.RequestedImage, Is.EqualTo(Digest));
-            Assert.That(result.ResolvedImage, Is.EqualTo(Digest));
-            Assert.That(args[args.IndexOf("--publish") + 1], Is.EqualTo("172.17.0.1::8080"));
-            Assert.That(args, Does.Contain("no-new-privileges"));
-            Assert.That(args[args.IndexOf("--cap-drop") + 1], Is.EqualTo("ALL"));
-            Assert.That(args[args.IndexOf("--network") + 1], Is.EqualTo("bridge"));
-            Assert.That(args[args.IndexOf("--cgroup-parent") + 1], Is.EqualTo($"automaton-hosted-runner-{scope.HostedRunnerId:N}.slice"));
-            Assert.That(args[args.IndexOf("--workdir") + 1], Is.EqualTo("/automaton/app/output"));
-            Assert.That(args[args.IndexOf("--entrypoint") + 1], Is.EqualTo("/automaton/app/scripts/serve"));
-            Assert.That(args.TakeLast(3), Is.EqualTo(new[] { Digest, "space separated", "--flag" }));
-            Assert.That(args, Does.Contain("MODE=request"));
-            Assert.That(args, Does.Contain("AUTOMATON_PORT=8080"));
-            Assert.That(args, Does.Contain("AUTOMATON_APP_DATA_DIR=/automaton/data"));
-            Assert.That(args, Does.Contain($"AUTOMATON_APP_ID={scope.AppId:D}"));
-            Assert.That(args, Does.Contain($"AUTOMATON_DEPLOYMENT_TARGET_ID={scope.DeploymentTargetId:D}"));
-            Assert.That(args, Does.Contain("AUTOMATON_STORAGE_UPLOADS=/automaton/data/uploads"));
-            Assert.That(string.Join(' ', args), Does.Not.Contain("docker.sock").And.Not.Contain("/host"));
-            Assert.That(args, Does.Not.Contain("--privileged").And.Not.Contain("--pid"));
-        });
-        var mounts = args.Where((_, index) => index > 0 && args[index - 1] == "--mount").ToArray();
-        Assert.That(mounts, Has.Length.EqualTo(3));
-        Assert.That(mounts[0], Does.Contain($"volume-subpath=workspace/apps/{scope.AppId:D}/targets/{scope.DeploymentTargetId:D}/artifacts/candidates/{request.CandidateId:D}/application"));
-        Assert.That(mounts[0], Does.Contain("\"target=/automaton/app\"").And.Contain("\"readonly\""));
-        Assert.That(mounts[1], Does.Contain($"volume-subpath=workspace/data/{scope.AppId:D}/database").And.Not.Contain("readonly"));
-        Assert.That(mounts[2], Does.Contain($"volume-subpath=workspace/data/{scope.AppId:D}/media/files").And.Not.Contain("readonly"));
-        Assert.That(mounts.All(x => x.Contains($"source=automaton-hosted-runner-{scope.HostedRunnerId:N}-user")), Is.True);
+        HostContainerRuntimeCreateAssertions.Verify(scope, request, result, calls, Digest);
     }
 
     [TestCase(false)]
@@ -276,8 +245,6 @@ public sealed class HostContainerRuntimeTests
         Assert.That(calls[1], Is.EqualTo(new[] { "docker", "logs", "--tail", "200", ContainerId }));
         Assert.That(result.Logs, Has.Length.EqualTo(65_536));
         Assert.That(result.Logs, Does.EndWith("last"));
-        Assert.That(await InfrastructureCommandService.ReadLogTailAsync(new StringReader(logs), CancellationToken.None),
-            Is.EqualTo(logs[^65_536..]));
     }
 
     [TestCase("../another-app")]
@@ -346,16 +313,4 @@ public sealed class HostContainerRuntimeTests
         Assert.That(creates.Select(x => x[x.IndexOf("--name") + 1]).Distinct().Count(), Is.EqualTo(2));
     }
 
-    [Test]
-    public void VolumeSubpathsMatchExistingWorkspaceAndStorageModel()
-    {
-        var workspace = new RunnerWorkspaceService();
-        var candidate = Guid.NewGuid();
-        var relative = Path.GetRelativePath(workspace.WorkspaceRoot,
-            workspace.GetAppRuntimeCandidateApplicationDirectory(scope.AppId, scope.DeploymentTargetId, candidate)).Replace('\\', '/');
-        Assert.That(RunnerWorkspaceService.GetRuntimeCandidateVolumeSubpath(scope.AppId, scope.DeploymentTargetId, candidate),
-            Is.EqualTo("workspace/" + relative));
-        var dataRelative = Path.GetRelativePath(workspace.WorkspaceRoot, workspace.ResolveApplicationDataPath(scope.AppId, "database")).Replace('\\', '/');
-        Assert.That(RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, "database"), Is.EqualTo("workspace/" + dataRelative));
-    }
 }

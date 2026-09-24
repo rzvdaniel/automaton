@@ -27,7 +27,7 @@ public sealed class RunnerStartupTests
         Assert.That(host.Services.GetRequiredService<RunnerHostService>(), Is.Not.Null);
         Assert.That(
             host.Services.GetServices<IHostedService>(),
-            Has.Some.TypeOf<RunnerRuntimeContainerManager>());
+            Has.Some.TypeOf<RunnerRuntimeContainerHostedService>());
         await host.StopAsync();
     }
 

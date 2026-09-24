@@ -69,8 +69,8 @@ internal static class InjectedSecretRedactionScenario
             duplicate.Status,
             result.StartedAtUtc,
             duplicate.StartedAtUtc,
-            service.ReadLogs(artifact).Content,
-            service.ReadResult(artifact).Content,
+            service.ReadLogs(artifact).Content ?? string.Empty,
+            service.ReadResult(artifact).Content ?? string.Empty,
             result.FailureSummary,
             Secret);
     }

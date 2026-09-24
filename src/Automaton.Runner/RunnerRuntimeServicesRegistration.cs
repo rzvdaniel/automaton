@@ -10,15 +10,7 @@ internal static class RunnerRuntimeServicesRegistration
     public static void Add(IServiceCollection services)
     {
         services.AddSingleton<RunnerRuntimeRegistry>();
-        services.AddSingleton<IApplicationContainerRuntime>(provider =>
-            RunnerApplicationContainerRuntimeSelection.UsesBroker(
-                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
-                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
-                Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"))
-                ? new BrokeredApplicationContainerRuntime(
-                    provider.GetRequiredService<HubService>(),
-                    provider.GetRequiredService<FileStorageService>())
-                : new DockerContainerRuntime());
+        services.AddSingleton<IApplicationContainerRuntime>(RunnerApplicationContainerRuntimeFactory.Create);
         services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
         services.AddSingleton<RunnerRuntimeContainerManager>();
         services.AddSingleton<IAppRuntimeProcessManager>(provider => provider.GetRequiredService<RunnerRuntimeContainerManager>());

@@ -451,70 +451,6 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
-    public async Task BrokeredStartPortIsPersistedBeforeReadinessAndRecoveredOnRestart()
-    {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var assignedPort = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        var runtime = new ScopedContainerRuntime(assignedPort);
-        var workspace = new RunnerWorkspaceService();
-        var registry = new RunnerRuntimeRegistry();
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var candidateId = Guid.NewGuid();
-        var manager = new RunnerRuntimeContainerManager(workspace, registry, runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
-        await manager.StartAsync(CancellationToken.None);
-
-        var apply = manager.ApplyAsync(appId, targetId, Contract(8080), candidateId: candidateId);
-        RunnerRuntimeDeploymentMetadata? pending = null;
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            await Task.Delay(25);
-            pending = await ReadMetadataAsync(workspace, appId, targetId);
-            if (pending.Candidate?.EffectivePort == assignedPort)
-                break;
-        }
-        Assert.That(pending!.Candidate!.EffectivePort, Is.EqualTo(assignedPort));
-        runtime.EnableReadiness();
-        await apply;
-        var ready = await ReadMetadataAsync(workspace, appId, targetId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(runtime.Created!.HostPort, Is.Zero);
-            Assert.That(runtime.Created.CandidateId, Is.EqualTo(candidateId));
-            Assert.That(ready.CandidateId, Is.EqualTo(candidateId));
-            Assert.That(runtime.Scopes, Is.All.EqualTo(new ApplicationContainerScope(appId, targetId)));
-            Assert.That(registry.IsPortRegistered(assignedPort), Is.True);
-        });
-        await manager.StopAsync(CancellationToken.None);
-
-        runtime.InspectedPort = assignedPort + 1;
-        var replacementRegistry = new RunnerRuntimeRegistry();
-        var replacement = new RunnerRuntimeContainerManager(workspace, replacementRegistry, runtime, NullLogger<RunnerRuntimeContainerManager>.Instance);
-        await replacement.StartAsync(CancellationToken.None);
-        RunnerRuntimeDeploymentMetadata recovered = await ReadMetadataAsync(workspace, appId, targetId);
-        for (var attempt = 0; attempt < 30; attempt++)
-        {
-            recovered = await ReadMetadataAsync(workspace, appId, targetId);
-            if (recovered.ContainerId == "brokered-container"
-                && recovered.EffectivePort == assignedPort + 1
-                && replacementRegistry.IsPortRegistered(assignedPort + 1))
-                break;
-            await Task.Delay(100);
-        }
-        Assert.Multiple(() =>
-        {
-            Assert.That(recovered.ContainerId, Is.EqualTo("brokered-container"));
-            Assert.That(recovered.EffectivePort, Is.EqualTo(assignedPort + 1));
-            Assert.That(replacementRegistry.IsPortRegistered(assignedPort + 1), Is.True);
-            Assert.That(runtime.CreateCalls, Is.EqualTo(1));
-        });
-        await replacement.StopAsync(appId, targetId);
-    }
-
-    [Test]
     public async Task BrokeredStartupReturnsBeforeReconciliationInspection()
     {
         var runtime = new ScopedContainerRuntime(19080) { InspectGate = new TaskCompletionSource<bool>() };
@@ -555,7 +491,7 @@ public sealed class RunnerRuntimeContainerManagerTests
             NullLogger<RunnerRuntimeContainerManager>.Instance);
     }
 
-    private static ApplicationContract Contract(int port) => new()
+    internal static ApplicationContract Contract(int port) => new()
     {
         Runtime = new ApplicationRuntimeSpec
         {
@@ -604,7 +540,7 @@ public sealed class RunnerRuntimeContainerManagerTests
             State = state
         };
 
-    private static async Task<RunnerRuntimeDeploymentMetadata> ReadMetadataAsync(RunnerWorkspaceService workspace, Guid appId, Guid targetId)
+    internal static async Task<RunnerRuntimeDeploymentMetadata> ReadMetadataAsync(RunnerWorkspaceService workspace, Guid appId, Guid targetId)
         => System.Text.Json.JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
             await File.ReadAllTextAsync(Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json")),
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
@@ -623,7 +559,7 @@ public sealed class RunnerRuntimeContainerManagerTests
             System.Text.Json.JsonSerializer.Serialize(metadata, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
 
-    private sealed class ScopedContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime
+    internal sealed class ScopedContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime
     {
         private readonly int assignedPort;
         private TcpListener? listener;

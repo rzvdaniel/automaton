@@ -392,7 +392,7 @@ public class HubService
         }
     }
 
-    private async Task<T> ExecuteWithRunnerActivityAsync<T>(Func<Task<T>> operation)
+    internal async Task<T> ExecuteWithRunnerActivityAsync<T>(Func<Task<T>> operation)
     {
         BeginRunnerActivity();
         try
