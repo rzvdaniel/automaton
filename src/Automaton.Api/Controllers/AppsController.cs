@@ -698,26 +698,32 @@ public class AppsController : BaseController
     /// <summary>
     /// Validate image file by checking magic bytes (file signatures)
     /// </summary>
-    private bool IsValidImageFile(Stream stream, string extension)
+    private static bool IsValidImageFile(Stream stream, string extension)
     {
         const int maxBytesToRead = 12;
         var buffer = new byte[maxBytesToRead];
-        
-        int bytesRead = stream.Read(buffer, 0, maxBytesToRead);
+
+        var bytesRead = stream.Read(buffer, 0, maxBytesToRead);
         if (bytesRead < 4)
             return false;
 
-        return extension.ToLowerInvariant() switch
+        return MatchesImageSignature(extension, buffer, bytesRead);
+    }
+
+    private static bool MatchesImageSignature(string extension, byte[] buffer, int bytesRead)
+        => extension.ToLowerInvariant() switch
         {
             ".png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
             ".jpg" or ".jpeg" => buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF,
             ".gif" => buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46,
-            ".webp" => bytesRead >= 12 && 
-                      buffer[0] == 0x52 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x46 &&
-                      buffer[8] == 0x57 && buffer[9] == 0x45 && buffer[10] == 0x42 && buffer[11] == 0x50,
+            ".webp" => HasWebpSignature(buffer, bytesRead),
             _ => false
         };
-    }
+
+    private static bool HasWebpSignature(byte[] buffer, int bytesRead)
+        => bytesRead >= 12
+           && buffer[0] == 0x52 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x46
+           && buffer[8] == 0x57 && buffer[9] == 0x45 && buffer[10] == 0x42 && buffer[11] == 0x50;
 
     /// <summary>
     /// Clean up old images for an app to prevent disk space exhaustion.
