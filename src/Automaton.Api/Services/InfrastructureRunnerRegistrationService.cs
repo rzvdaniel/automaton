@@ -16,6 +16,8 @@ public sealed class InfrastructureRunnerRegistrationService(
     IAuditEventService auditEventService,
     ILogger<InfrastructureRunnerRegistrationService> logger)
 {
+    private sealed record RegistrationResult(Runner Runner, RunnerHost Host, string RawApiKey);
+
     public async Task<InfrastructureRunnerRegistrationResponse?> RegisterAsync(
         string enrollmentApiKey,
         InfrastructureRunnerRegistrationRequest request,
@@ -55,86 +57,156 @@ public sealed class InfrastructureRunnerRegistrationService(
         var existingRunner = await db.Runners
             .FirstOrDefaultAsync(x => x.InstallationId == request.InstallationId, cancellationToken);
 
-        ApiKey permanentKey;
-        string rawPermanentKey;
-        Runner runner;
-        RunnerHost host;
+        var registration = existingRunner is null
+            ? await CreateRunnerRegistrationAsync(ownerId, request, now)
+            : await RefreshRunnerRegistrationAsync(existingRunner, ownerId, request, cancellationToken);
 
-        if (existingRunner != null)
+        UpdateReportedRunnerState(registration.Runner, registration.Host, request, capabilities, now, purpose);
+        return await PersistRegistrationAsync(registration, ownerId, request, capabilities, purpose, cancellationToken);
+    }
+
+    private async Task<InfrastructureRunnerRegistrationResponse> PersistRegistrationAsync(
+        RegistrationResult registration,
+        Guid ownerId,
+        InfrastructureRunnerRegistrationRequest request,
+        IReadOnlyList<string> capabilities,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        await db.SaveChangesAsync(cancellationToken);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
-            if (!string.Equals(existingRunner.Purpose, purpose, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("The installation ID belongs to a non-infrastructure Runner.");
-
-            host = await db.RunnerHosts
-                .FirstOrDefaultAsync(x => x.InfrastructureRunnerId == existingRunner.Id, cancellationToken)
-                ?? throw new InvalidOperationException("The infrastructure Runner is not linked to a host.");
-
-            (rawPermanentKey, permanentKey) = await apiKeyService.CreateApiKeyAsync(
-                ownerId,
-                $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
-                ApiKeyScope.Runner,
-                "Issued by Infrastructure Runner self-registration.",
-                saveChanges: false,
-                source: ApiKeySource.InfrastructureRunnerRegistration);
-
-            if (existingRunner.ApiKeyId.HasValue)
+            Action = AuditActions.Succeeded,
+            EntityType = AuditEntityTypes.Runner,
+            EntityId = registration.Runner.Id,
+            EventType = AuditEventTypes.RunnerEnrollmentCompleted,
+            Message = $"Infrastructure Runner '{registration.Runner.Name}' self-registered.",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = ownerId,
+            Metadata = new
             {
-                var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == existingRunner.ApiKeyId.Value, cancellationToken);
-                if (oldKey != null)
-                    oldKey.IsActive = false;
+                HostId = registration.Host.Id,
+                RunnerId = registration.Runner.Id,
+                registration.Runner.InstallationId,
+                registration.Runner.Purpose,
+                capabilities
             }
+        }, cancellationToken);
 
-            existingRunner.ApiKeyId = permanentKey.Id;
-            runner = existingRunner;
-        }
-        else
+        logger.LogInformation(
+            "Infrastructure Runner {RunnerId} self-registered host {RunnerHostId}",
+            registration.Runner.Id,
+            registration.Host.Id);
+        return new InfrastructureRunnerRegistrationResponse
         {
-            (rawPermanentKey, permanentKey) = await apiKeyService.CreateApiKeyAsync(
-                ownerId,
-                $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
-                ApiKeyScope.Runner,
-                "Issued by Infrastructure Runner self-registration.",
-                saveChanges: false,
-                source: ApiKeySource.InfrastructureRunnerRegistration);
+            RunnerId = registration.Runner.Id,
+            RunnerHostId = registration.Host.Id,
+            RunnerName = registration.Runner.Name,
+            ApiKey = registration.RawApiKey,
+            Purpose = purpose,
+            Capabilities = capabilities,
+            InstallationId = request.InstallationId
+        };
+    }
 
-            runner = new Runner
-            {
-                Id = Guid.NewGuid(),
-                Name = request.RunnerName,
-                Purpose = purpose,
-                ApiKeyId = permanentKey.Id,
-                InstallationId = request.InstallationId
-            };
+    private async Task<RegistrationResult> CreateRunnerRegistrationAsync(
+        Guid ownerId,
+        InfrastructureRunnerRegistrationRequest request,
+        DateTime now)
+    {
+        var (rawApiKey, permanentKey) = await CreatePermanentRunnerApiKeyAsync(ownerId, request.RunnerName);
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = request.RunnerName,
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiKeyId = permanentKey.Id,
+            InstallationId = request.InstallationId
+        };
+        var host = CreateRunnerHost(runner, request, now);
 
-            host = new RunnerHost
-            {
-                Id = Guid.NewGuid(),
-                Name = string.IsNullOrWhiteSpace(request.MachineName) ? request.RunnerName : request.MachineName,
-                Provider = string.IsNullOrWhiteSpace(request.Provider) ? "unknown" : request.Provider,
-                Region = request.Region,
-                PublicIp = request.PublicIp,
-                PrivateIp = request.PrivateIp,
-                ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
-                RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
-                HostedRunnerSchedulingEnabled = false,
-                Status = RunnerHostStatuses.Active,
-                ProvisioningStatus = RunnerHostProvisioningStatuses.Validating,
-                ProvisioningStartedAtUtc = now,
-                InfrastructureRunnerEnrolledAtUtc = now,
-                TotalCpuCores = request.CpuCores.GetValueOrDefault(2m),
-                TotalMemoryMb = request.MemoryMb.GetValueOrDefault(4096),
-                TotalDiskMb = request.DiskMb.GetValueOrDefault(40960),
-                LastHeartbeatAtUtc = now,
-                InfrastructureRunnerId = runner.Id,
-                MetadataJson = BuildMetadataJson(request, now),
-                CreatedAt = now
-            };
+        db.Runners.Add(runner);
+        db.RunnerHosts.Add(host);
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = ownerId });
+        return new RegistrationResult(runner, host, rawApiKey);
+    }
 
-            db.Runners.Add(runner);
-            db.RunnerHosts.Add(host);
-            db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = ownerId });
+    private async Task<RegistrationResult> RefreshRunnerRegistrationAsync(
+        Runner runner,
+        Guid ownerId,
+        InfrastructureRunnerRegistrationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The installation ID belongs to a non-infrastructure Runner.");
+
+        var host = await db.RunnerHosts
+            .FirstOrDefaultAsync(x => x.InfrastructureRunnerId == runner.Id, cancellationToken)
+            ?? throw new InvalidOperationException("The infrastructure Runner is not linked to a host.");
+        var (rawApiKey, permanentKey) = await CreatePermanentRunnerApiKeyAsync(ownerId, request.RunnerName);
+
+        if (runner.ApiKeyId.HasValue)
+        {
+            var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == runner.ApiKeyId.Value, cancellationToken);
+            if (oldKey is not null)
+                oldKey.IsActive = false;
         }
 
+        runner.ApiKeyId = permanentKey.Id;
+        return new RegistrationResult(runner, host, rawApiKey);
+    }
+
+    private Task<(string RawApiKey, ApiKey Entity)> CreatePermanentRunnerApiKeyAsync(Guid ownerId, string runnerName)
+    {
+        var keyName = $"Infrastructure Runner - {runnerName}";
+        if (keyName.Length > 100)
+            keyName = keyName[..100];
+
+        return apiKeyService.CreateApiKeyAsync(
+            ownerId,
+            keyName,
+            ApiKeyScope.Runner,
+            "Issued by Infrastructure Runner self-registration.",
+            saveChanges: false,
+            source: ApiKeySource.InfrastructureRunnerRegistration);
+    }
+
+    private static RunnerHost CreateRunnerHost(
+        Runner runner,
+        InfrastructureRunnerRegistrationRequest request,
+        DateTime now)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = string.IsNullOrWhiteSpace(request.MachineName) ? request.RunnerName : request.MachineName,
+            Provider = string.IsNullOrWhiteSpace(request.Provider) ? "unknown" : request.Provider,
+            Region = request.Region,
+            PublicIp = request.PublicIp,
+            PrivateIp = request.PrivateIp,
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
+            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
+            HostedRunnerSchedulingEnabled = false,
+            Status = RunnerHostStatuses.Active,
+            ProvisioningStatus = RunnerHostProvisioningStatuses.Validating,
+            ProvisioningStartedAtUtc = now,
+            InfrastructureRunnerEnrolledAtUtc = now,
+            TotalCpuCores = request.CpuCores.GetValueOrDefault(2m),
+            TotalMemoryMb = request.MemoryMb.GetValueOrDefault(4096),
+            TotalDiskMb = request.DiskMb.GetValueOrDefault(40960),
+            LastHeartbeatAtUtc = now,
+            InfrastructureRunnerId = runner.Id,
+            MetadataJson = BuildMetadataJson(request, now),
+            CreatedAt = now
+        };
+
+    private static void UpdateReportedRunnerState(
+        Runner runner,
+        RunnerHost host,
+        InfrastructureRunnerRegistrationRequest request,
+        IReadOnlyList<string> capabilities,
+        DateTime now,
+        string purpose)
+    {
         runner.Name = request.RunnerName;
         runner.Version = request.RunnerVersion;
         runner.MachineName = request.MachineName;
@@ -158,31 +230,6 @@ public sealed class InfrastructureRunnerRegistrationService(
             ? host.ProvisioningStatus
             : RunnerHostProvisioningStatuses.Validating;
         host.UpdatedAt = now;
-
-        await db.SaveChangesAsync(cancellationToken);
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Succeeded,
-            EntityType = AuditEntityTypes.Runner,
-            EntityId = runner.Id,
-            EventType = AuditEventTypes.RunnerEnrollmentCompleted,
-            Message = $"Infrastructure Runner '{runner.Name}' self-registered.",
-            Outcome = AuditOutcomes.Success,
-            ActorUserId = ownerId,
-            Metadata = new { HostId = host.Id, RunnerId = runner.Id, runner.InstallationId, runner.Purpose, capabilities }
-        }, cancellationToken);
-
-        logger.LogInformation("Infrastructure Runner {RunnerId} self-registered host {RunnerHostId}", runner.Id, host.Id);
-        return new InfrastructureRunnerRegistrationResponse
-        {
-            RunnerId = runner.Id,
-            RunnerHostId = host.Id,
-            RunnerName = runner.Name,
-            ApiKey = rawPermanentKey,
-            Purpose = purpose,
-            Capabilities = capabilities,
-            InstallationId = request.InstallationId
-        };
     }
 
     private static void ValidateRequest(InfrastructureRunnerRegistrationRequest request)
