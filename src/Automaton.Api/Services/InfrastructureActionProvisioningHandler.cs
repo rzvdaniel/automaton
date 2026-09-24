@@ -268,83 +268,8 @@ public sealed class InfrastructureActionProvisioningHandler(
         HostedRunnerDeployment deployment,
         JsonElement result,
         CancellationToken cancellationToken)
-    {
-        RunnerStorageTelemetryService.EnsureAllowance(hostedRunner);
-        var verification = await db.HostedRunnerStorageVerifications
-            .FirstOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
-            ?? throw new InvalidOperationException("Storage verification request was not found.");
-        var systemBytes = ReadNonNegativeInt64(result, "systemBytes");
-        var userBytes = ReadNonNegativeInt64(result, "userBytes");
-        var totalBytes = ReadNonNegativeInt64(result, "totalBytes");
-        EnsureAuthoritativeStorageResult(result, systemBytes, userBytes, totalBytes);
-        var now = DateTime.UtcNow;
-        db.HostedRunnerStorageObservations.Add(new HostedRunnerStorageObservation
-        {
-            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
-            Source = StorageMeasurementSources.InfrastructureRunnerVerified,
-            MeasuredAtUtc = now, ReceivedAtUtc = now,
-            SystemBytes = systemBytes, UserBytes = userBytes, TotalBytes = totalBytes,
-            Success = true
-        });
-        ApplyVerifiedStorageMeasurement(hostedRunner, systemBytes, userBytes, totalBytes, now);
-        verification.Status = StorageVerificationStatuses.Succeeded;
-        verification.CompletedAtUtc = now;
-        verification.Error = null;
-    }
-
-    private static void EnsureAuthoritativeStorageResult(JsonElement result, long systemBytes, long userBytes, long totalBytes)
-    {
-        if (!result.TryGetProperty("usageSource", out var usageSource)
-            || usageSource.ValueKind != JsonValueKind.String
-            || !string.Equals(usageSource.GetString(), "xfs-project-quota", StringComparison.Ordinal))
-            throw new InvalidOperationException("Storage verification did not report authoritative XFS project-quota usage.");
-        if (systemBytes + userBytes != totalBytes)
-            throw new InvalidOperationException("Storage verification returned inconsistent totals.");
-    }
-
-    private void ApplyVerifiedStorageMeasurement(
-        HostedRunner hostedRunner,
-        long systemBytes,
-        long userBytes,
-        long totalBytes,
-        DateTime now)
-    {
-        hostedRunner.StorageVerifiedAtUtc = now;
-        hostedRunner.StorageVerifiedSystemBytes = systemBytes;
-        hostedRunner.StorageVerifiedUserBytes = userBytes;
-        hostedRunner.StorageVerifiedTotalBytes = totalBytes;
-        hostedRunner.StorageMeasuredAtUtc = now;
-        hostedRunner.StorageReceivedAtUtc = now;
-        hostedRunner.StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified;
-        hostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded;
-        hostedRunner.StorageSystemBytes = hostedRunner.StorageVerifiedSystemBytes;
-        hostedRunner.StorageUserBytes = hostedRunner.StorageVerifiedUserBytes;
-        hostedRunner.StorageTotalBytes = totalBytes;
-        hostedRunner.StorageUsagePercent = hostedRunner.StorageAllowanceBytes > 0
-            ? totalBytes * 100m / hostedRunner.StorageAllowanceBytes
-            : null;
-        var newStorageState = StorageTelemetryPolicy.EvaluateHostedRunner(
-            hostedRunner.StorageAllowanceBytes, totalBytes, success: true, storageTelemetryOptions.Value);
-        TrackStoragePolicyChange(hostedRunner, newStorageState, now);
-        hostedRunner.StorageState = newStorageState;
-        hostedRunner.StorageMeasurementError = null;
-    }
-
-    private void TrackStoragePolicyChange(HostedRunner hostedRunner, string newStorageState, DateTime now)
-    {
-        if (string.Equals(hostedRunner.StorageState, newStorageState, StringComparison.Ordinal))
-            return;
-        db.AuditEvents.Add(new AuditEvent
-        {
-            Id = Guid.NewGuid(), Category = LogCategories.Audit, Action = AuditActions.Changed,
-            EntityType = AuditEntityTypes.HostedRunner, EntityId = hostedRunner.Id,
-            TargetUserId = hostedRunner.UserId, Outcome = AuditOutcomes.Success,
-            EventType = StorageTelemetryAuditEvents.HostedRunnerPolicyChanged,
-            Message = $"Hosted Runner storage policy changed from '{hostedRunner.StorageState}' to '{newStorageState}'.",
-            MetadataJson = JsonSerializer.Serialize(new { PreviousState = hostedRunner.StorageState, NewState = newStorageState }),
-            CreatedAtUtc = now
-        });
-    }
+        => await HostedRunnerStorageVerificationResultApplier.ApplyAsync(
+            db, hostedRunner, deployment, result, storageTelemetryOptions.Value, cancellationToken);
 
     private static void MarkHostedRunnerDeleted(HostedRunner hostedRunner)
     {
@@ -390,10 +315,4 @@ public sealed class InfrastructureActionProvisioningHandler(
             _ => AuditEventTypes.HostedRunnerProvisioningFailed
         };
 
-    private static long ReadNonNegativeInt64(JsonElement root, string property)
-    {
-        if (!root.TryGetProperty(property, out var element) || !element.TryGetInt64(out var value) || value < 0)
-            throw new InvalidOperationException($"Infrastructure Action returned invalid {property}.");
-        return value;
-    }
 }
