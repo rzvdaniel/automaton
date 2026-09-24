@@ -1,4 +1,3 @@
-using System.Reflection;
 using Automaton.Ai.Models;
 using Automaton.Ai.Providers;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,11 +10,10 @@ public class AnthropicProviderStreamingEmissionTests
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithTokens_ShouldEmitTokenOnlyMessage()
     {
-        var provider = new AnthropicProvider(NullLogger.Instance);
         ConversationUpdatedEvent? captured = null;
-        provider.ConversationUpdated += (_, e) => captured = e;
+        var emitter = new AnthropicConversationEventEmitter(NullLogger.Instance, updated => captured = updated);
 
-        InvokeEmitStreamingTextUpdate(provider,
+        emitter.EmitStreamingTextUpdate(
             conversationId: "conv-1",
             text: string.Empty,
             isComplete: true,
@@ -41,11 +39,10 @@ public class AnthropicProviderStreamingEmissionTests
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithoutTokens_ShouldSkipEmission()
     {
-        var provider = new AnthropicProvider(NullLogger.Instance);
         var eventRaised = false;
-        provider.ConversationUpdated += (_, _) => eventRaised = true;
+        var emitter = new AnthropicConversationEventEmitter(NullLogger.Instance, _ => eventRaised = true);
 
-        InvokeEmitStreamingTextUpdate(provider,
+        emitter.EmitStreamingTextUpdate(
             conversationId: "conv-1",
             text: string.Empty,
             isComplete: true,
@@ -58,23 +55,4 @@ public class AnthropicProviderStreamingEmissionTests
         Assert.That(eventRaised, Is.False);
     }
 
-    private static void InvokeEmitStreamingTextUpdate(
-        AnthropicProvider provider,
-        string conversationId,
-        string text,
-        bool isComplete,
-        int? inputTokens,
-        int? outputTokens,
-        string? model,
-        int? cacheReadTokens,
-        int? cacheCreationTokens)
-    {
-        var method = typeof(AnthropicProvider).GetMethod(
-            "EmitStreamingTextUpdate",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.That(method, Is.Not.Null, "Could not find EmitStreamingTextUpdate via reflection");
-
-        method!.Invoke(provider, [conversationId, text, isComplete, inputTokens, outputTokens, model, cacheReadTokens, cacheCreationTokens]);
-    }
 }

@@ -1,12 +1,8 @@
 using Anthropic.SDK;
-using Anthropic.SDK.Common;
 using Anthropic.SDK.Messaging;
 using Automaton.Ai.Models;
 using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Retry;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tool = Anthropic.SDK.Common.Tool;
@@ -16,9 +12,13 @@ namespace Automaton.Ai.Providers;
 /// <summary>
 /// Anthropic Claude provider implementation using the Anthropic.SDK package
 /// </summary>
-public class AnthropicProvider : IAiProvider
+internal sealed class AnthropicConversationWorkflow
 {
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
+    private readonly AnthropicStreamResponseProcessor streamResponseProcessor;
+    private readonly AnthropicConversationEventEmitter eventEmitter;
+    private readonly AnthropicMessageFactory messageFactory;
+    private readonly AnthropicTurnExecutor turnExecutor;
 
     /// <summary>
     /// Maximum number of conversation messages to keep in history (sliding window).
@@ -30,34 +30,20 @@ public class AnthropicProvider : IAiProvider
     /// Fallback output token cap used when no model-specific MaxTokens is configured.
     /// 8192 is within the output limit of all current Claude models.
     /// </summary>
-    private const int AnthropicDefaultMaxTokens = 8192;
+    private const string DefaultModelName = Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet;
 
-    /// <inheritdoc />
-    public string ProviderName => "Anthropic";
-
-    /// <inheritdoc />
-    public string DefaultModel => Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet;
-
-    public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
-
-    public AnthropicProvider(Microsoft.Extensions.Logging.ILogger logger)
+    public AnthropicConversationWorkflow(
+        Microsoft.Extensions.Logging.ILogger logger,
+        Action<ConversationUpdatedEvent> publish)
     {
         _logger = logger;
+        eventEmitter = new AnthropicConversationEventEmitter(_logger, publish);
+        messageFactory = new AnthropicMessageFactory(_logger);
+        streamResponseProcessor = new AnthropicStreamResponseProcessor(_logger, eventEmitter.EmitStreamingTextUpdate);
+        turnExecutor = new AnthropicTurnExecutor(_logger, streamResponseProcessor, eventEmitter);
     }
 
-    /// <summary>
-    /// Shared HttpClient with infinite timeout for streaming AI calls.
-    /// CancellationToken controls actual request lifetime — not the client timeout.
-    /// </summary>
-    private static readonly HttpClient StreamingHttpClient = new()
-    {
-        Timeout = System.Threading.Timeout.InfiniteTimeSpan
-    };
-
-    private static readonly System.Reflection.PropertyInfo? AnthropicHttpClientProperty =
-        typeof(AnthropicClient).GetProperty(
-            "HttpClient",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+    public string DefaultModel => DefaultModelName;
 
     public async Task<ProviderResult> CallAsync(
         ConversationRequest request,
@@ -89,14 +75,13 @@ public class AnthropicProvider : IAiProvider
     {
         // Create Anthropic client with API key, then inject our streaming HttpClient
         // so that long-running streaming calls don't hit the default 100-second timeout.
-        var client = new AnthropicClient(request.ApiKey);
-        AnthropicHttpClientProperty?.SetValue(client, StreamingHttpClient);
+        var client = turnExecutor.CreateClient(request.ApiKey);
 
         // Build the initial messages
-        var messages = BuildMessages(request);
+        var messages = messageFactory.BuildMessages(request);
 
         // Build the tools list
-        var anthropicTools = BuildTools(tools);
+        var anthropicTools = messageFactory.BuildTools(tools);
 
         // Handle iterative conversation with tool calls
         var responseBuilder = new StringBuilder();
@@ -124,86 +109,9 @@ public class AnthropicProvider : IAiProvider
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
                 break;
             }
-                // Build system messages with cache_control only on the stable base prompt.
-                // When SystemPromptParts is provided, we split into up to 3 blocks:
-                //   [0] base + tier prompt  → cache_control: ephemeral  (always identical, cached)
-                //   [1] instructionBlock    → no cache_control           (per-app, changes rarely)
-                //   [2] memoryBlock         → no cache_control           (per-session, always unique)
-                // The cache key covers the prefix up to the first breakpoint, so blocks [1] and [2]
-                // never invalidate the cache for block [0]. Cache hits count at 10% toward rate limits.
-                List<SystemMessage>? systemMessage = null;
-                if (request.SystemPromptParts is { } parts)
-                {
-                    systemMessage = new List<SystemMessage>
-                    {
-                        new SystemMessage(parts.BasePrompt)
-                        {
-                            CacheControl = new CacheControl { Type = CacheControlType.ephemeral }
-                        }
-                    };
-                    if (!string.IsNullOrWhiteSpace(parts.InstructionBlock))
-                        systemMessage.Add(new SystemMessage(parts.InstructionBlock));
-                    if (!string.IsNullOrWhiteSpace(parts.MemoryBlock))
-                        systemMessage.Add(new SystemMessage(parts.MemoryBlock));
-                }
-                else if (!string.IsNullOrEmpty(request.SystemPrompt))
-                {
-                    systemMessage = new List<SystemMessage>
-                    {
-                        new SystemMessage(request.SystemPrompt)
-                        {
-                            CacheControl = new CacheControl { Type = CacheControlType.ephemeral }
-                        }
-                    };
-                }
-
-                var messageParams = new MessageParameters
-                {
-                    Model = request.Model ?? DefaultModel,
-                    MaxTokens = request.MaxTokens ?? AnthropicDefaultMaxTokens,
-                    System = systemMessage,
-                    Messages = messages,
-                    Tools = (!breakAfterPlanPresentation && anthropicTools.Count > 0) ? anthropicTools : null,
-                    Stream = true
-                };
-
-            // Stream the response, retrying on rate limit errors with exponential backoff (via Polly)
-            var retryPipeline = new ResiliencePipelineBuilder()
-                .AddRetry(new RetryStrategyOptions
-                {
-                    MaxRetryAttempts = request.MaxRateLimitRetries,
-                    Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
-                    BackoffType       = DelayBackoffType.Exponential,
-                    UseJitter         = true,
-                    ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
-                    DelayGenerator    = static args =>
-                    {
-                        // Honour Anthropic's retry-after header if present in the exception message
-                        if (TryParseRetryAfter(args.Outcome.Exception, out var retryAfter))
-                            return ValueTask.FromResult<TimeSpan?>(retryAfter);
-                        return ValueTask.FromResult<TimeSpan?>(null); // fall back to exponential
-                    },
-                    OnRetry           = args =>
-                    {
-                        var delaySecs = (int)args.RetryDelay.TotalSeconds;
-                        _logger.LogWarning(
-                            "Anthropic rate limit hit (attempt {Retry}/{MaxRetries}). Model={Model}, Retrying in {Delay}s. Reason: {Error}",
-                            args.AttemptNumber + 1, request.MaxRateLimitRetries,
-                            request.Model, delaySecs, args.Outcome.Exception?.Message);
-                        EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
-                        return ValueTask.CompletedTask;
-                    }
-                })
-                .Build();
-
-            var streamResult = await retryPipeline.ExecuteAsync(async ct =>
-                await StreamResponseAsync(
-                    client, messageParams, request.ConversationId, ct,
-                    accumulatedInputTokens: tokenUsage.InputTokens,
-                    accumulatedOutputTokens: tokenUsage.OutputTokens,
-                    accumulatedCacheReadTokens: tokenUsage.CacheReadTokens,
-                    accumulatedCacheCreationTokens: tokenUsage.CacheCreationTokens),
-                cancellationToken);
+            var streamResult = await turnExecutor.ExecuteAsync(
+                client, request, messages, anthropicTools, breakAfterPlanPresentation,
+                tokenUsage, cancellationToken);
 
             // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
             tokenUsage.Add(
@@ -224,92 +132,21 @@ public class AnthropicProvider : IAiProvider
                 break;
             }
 
-            // Add assistant message with tool use blocks to conversation
-            var assistantContent = new List<ContentBase>();
-
-            if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
-            {
-                assistantContent.Add(new TextContent { Text = streamResult.TextContent });
-            }
-
-            foreach (var toolUse in streamResult.ToolUseBlocks)
-            {
-                assistantContent.Add(new ToolUseContent
-                {
-                    Id = toolUse.Id,
-                    Name = toolUse.Name,
-                    // Anthropic API requires Input to be non-null; use empty object if null
-                    Input = toolUse.Input ?? JsonNode.Parse("{}")
-                });
-            }
-
-            messages.Add(new Message
-            {
-                Role = RoleType.Assistant,
-                Content = assistantContent
-            });
-
-            // Execute all tool calls concurrently — results are order-independent
-            var toolResultsList = new List<ContentBase>();
-            var shouldStopDueToFailures = false;
-            var shouldBreakForApproval  = false;
-
-            var toolTasks = streamResult.ToolUseBlocks.Select(async toolUse =>
-            {
-                var argsJson = toolUse.Input != null ? JsonSerializer.Serialize(toolUse.Input) : "{}";
-                EmitToolCallStarted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson);
-                var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
-                EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
-                return (toolUse, argsJson, toolResult);
-            });
-
-            var toolExecutionResults = await Task.WhenAll(toolTasks);
-
-            foreach (var (toolUse, argsJson, toolResult) in toolExecutionResults)
-            {
-                var isFailure = toolResult.StartsWith("Tool execution failed:") ||
-                               toolResult.StartsWith("Error executing tool") ||
-                               toolResult.Contains("A second operation was started");
-
-                if (isFailure)
-                {
-                    consecutiveFailures.TryGetValue(toolUse.Name, out var currentFailures);
-                    consecutiveFailures[toolUse.Name] = currentFailures + 1;
-
-                    if (consecutiveFailures[toolUse.Name] >= maxConsecutiveFailures)
-                    {
-                        _logger.LogWarning(
-                            "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
-                            toolUse.Name, consecutiveFailures[toolUse.Name]);
-                        shouldStopDueToFailures = true;
-                    }
-                }
-                else
-                {
-                    consecutiveFailures[toolUse.Name] = 0;
-                }
-
-                if (ProviderHelpers.ToolResultAwaitsApproval(toolUse.Name, toolResult))
-                    shouldBreakForApproval = true;
-
-                toolResultsList.Add(new ToolResultContent
-                {
-                    ToolUseId = toolUse.Id,
-                    Content   = new List<ContentBase> { new TextContent { Text = toolResult } }
-                });
-            }
-
-            var toolResults = toolResultsList;
+            AddAssistantToolUseMessage(messages, streamResult);
+            var execution = await ExecuteToolUseBlocksAsync(
+                request.ConversationId, streamResult.ToolUseBlocks, executeToolAsync);
+            var toolOutcome = ProcessToolExecutionResults(
+                execution, consecutiveFailures, maxConsecutiveFailures);
 
             // If we hit max failures, add a message and break
-            if (shouldStopDueToFailures)
+            if (toolOutcome.ShouldStopDueToFailures)
             {
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 // Still add the tool results so the AI sees the final error
                 messages.Add(new Message
                 {
                     Role = RoleType.User,
-                    Content = toolResults
+                    Content = toolOutcome.Results
                 });
                 break;
             }
@@ -318,10 +155,10 @@ public class AnthropicProvider : IAiProvider
             messages.Add(new Message
             {
                 Role = RoleType.User,
-                Content = toolResults
+                Content = toolOutcome.Results
             });
 
-            if (shouldBreakForApproval)
+            if (toolOutcome.ShouldBreakForApproval)
             {
                 breakAfterPlanPresentation = true;
                 continue;
@@ -331,451 +168,96 @@ public class AnthropicProvider : IAiProvider
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
-    private List<Message> BuildMessages(ConversationRequest request)
+    private static void AddAssistantToolUseMessage(List<Message> messages, AnthropicStreamResponseProcessor.StreamResult result)
     {
-        var messages = new List<Message>();
+        var content = new List<ContentBase>();
+        if (!string.IsNullOrWhiteSpace(result.TextContent))
+            content.Add(new TextContent { Text = result.TextContent });
 
-        // Add conversation history with sliding window to prevent unbounded token growth
-        if (request.ConversationHistory?.Any() == true)
+        foreach (var block in result.ToolUseBlocks)
         {
-            var historyToInclude = request.ConversationHistory;
-
-            // Apply sliding window: keep only last N messages
-            if (request.ConversationHistory.Count > MaxConversationHistoryMessages)
+            content.Add(new ToolUseContent
             {
-                var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
-                historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
-
-                _logger.LogDebug(
-                    "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
-                    request.ConversationHistory.Count,
-                    historyToInclude.Count);
-            }
-
-            foreach (var msg in historyToInclude)
-            {
-                var role = msg.Role.ToLowerInvariant() == "assistant" ? RoleType.Assistant : RoleType.User;
-                messages.Add(new Message
-                {
-                    Role = role,
-                    Content = new List<ContentBase> { new TextContent { Text = msg.Content } }
-                });
-            }
-        }
-
-        // Add current user message
-        messages.Add(new Message
-        {
-            Role = RoleType.User,
-            Content = new List<ContentBase> { new TextContent { Text = request.InitialMessage } }
-        });
-
-        return messages;
-    }
-
-    private List<Tool> BuildTools(IEnumerable<ProviderTool> tools)
-    {
-        var anthropicTools = new List<Tool>();
-
-        foreach (var tool in tools)
-        {
-            try
-            {
-                // Parse the input schema JSON into a JsonNode for the Function
-                JsonNode? schemaNode = null;
-
-                if (!string.IsNullOrEmpty(tool.InputSchemaJson) && tool.InputSchemaJson != "{}")
-                {
-                    try
-                    {
-                        schemaNode = JsonNode.Parse(tool.InputSchemaJson);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to parse input schema for tool {ToolName}", tool.Name);
-                        // Default to empty object schema
-                        schemaNode = JsonNode.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    }
-                }
-                else
-                {
-                    schemaNode = JsonNode.Parse("{\"type\":\"object\",\"properties\":{}}");
-                }
-
-                anthropicTools.Add(new Tool(new Function(tool.Name, tool.Description, schemaNode)));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to create tool {ToolName}", tool.Name);
-            }
-        }
-
-        return anthropicTools;
-    }
-
-    private async Task<StreamResult> StreamResponseAsync(
-        AnthropicClient client,
-        MessageParameters messageParams,
-        string conversationId,
-        CancellationToken cancellationToken,
-        int? accumulatedInputTokens = null,
-        int accumulatedOutputTokens = 0,
-        int? accumulatedCacheReadTokens = null,
-        int? accumulatedCacheCreationTokens = null)
-    {
-        var result = new StreamResult { Model = messageParams.Model };
-        var currentText = new StringBuilder();
-        var toolUseBlocks = new Dictionary<int, ToolUseInfo>();
-
-        // Track when we last emitted an update for throttling
-        var lastEmitTime = DateTime.UtcNow;
-        var emitIntervalMs = 100;
-
-        try
-        {
-            var currentToolIndex = 0;
-
-            await foreach (var streamEvent in client.Messages.StreamClaudeMessageAsync(messageParams, cancellationToken))
-            {
-                // Capture usage tokens if available (usually in final event)
-                if (streamEvent.Usage != null)
-                {
-                    result.InputTokens = streamEvent.Usage.InputTokens;
-                    result.OutputTokens = streamEvent.Usage.OutputTokens;
-                    result.CacheCreationTokens = streamEvent.Usage.CacheCreationInputTokens;
-                    result.CacheReadTokens = streamEvent.Usage.CacheReadInputTokens;
-                }
-
-                // Handle text content
-                if (streamEvent.Delta?.Text != null)
-                {
-                    currentText.Append(streamEvent.Delta.Text);
-
-                    // Throttle updates
-                    var now = DateTime.UtcNow;
-                    if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
-                    {
-                        EmitStreamingTextUpdate(conversationId, currentText.ToString(), isComplete: false);
-                        lastEmitTime = now;
-                    }
-                }
-
-                // Handle tool use content blocks
-                if (streamEvent.ContentBlock != null)
-                {
-                    if (streamEvent.ContentBlock.Type == "tool_use")
-                    {
-                        toolUseBlocks[currentToolIndex] = new ToolUseInfo
-                        {
-                            Index = currentToolIndex,
-                            Id = streamEvent.ContentBlock.Id ?? "",
-                            Name = streamEvent.ContentBlock.Name ?? "",
-                            InputBuilder = new StringBuilder()
-                        };
-                        currentToolIndex++;
-                    }
-                }
-
-                // Handle tool input deltas
-                if (streamEvent.Delta?.PartialJson != null)
-                {
-                    var lastToolIndex = currentToolIndex - 1;
-                    if (lastToolIndex >= 0 && toolUseBlocks.TryGetValue(lastToolIndex, out var toolInfo))
-                    {
-                        toolInfo.InputBuilder.Append(streamEvent.Delta.PartialJson);
-                    }
-                }
-
-                // Handle stop reason
-                if (streamEvent.Delta?.StopReason != null)
-                {
-                    result.StopReason = streamEvent.Delta.StopReason;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during Anthropic streaming: {Message}", ex.Message);
-            throw;
-        }
-
-        // Finalize text content
-        var finalText = currentText.ToString();
-
-        // Only emit tokens on the final turn (StopReason != "tool_use") to avoid double-counting.
-        // The final turn carries the full accumulated billing total for all iterations.
-        var isFinalTurn = result.StopReason != "tool_use";
-        int? emitInput = null;
-        int? emitOutput = null;
-        int? emitCacheRead = null;
-        int? emitCacheCreation = null;
-        if (isFinalTurn)
-        {
-            var totalIn = (accumulatedInputTokens ?? 0) + (result.InputTokens ?? 0);
-            emitInput = totalIn > 0 ? totalIn : null;
-            var totalOut = accumulatedOutputTokens + (result.OutputTokens ?? 0);
-            emitOutput = totalOut > 0 ? totalOut : null;
-            var totalCache = (accumulatedCacheReadTokens ?? 0) + (result.CacheReadTokens ?? 0);
-            emitCacheRead = totalCache > 0 ? totalCache : null;
-            var totalCreation = (accumulatedCacheCreationTokens ?? 0) + (result.CacheCreationTokens ?? 0);
-            emitCacheCreation = totalCreation > 0 ? totalCreation : null;
-        }
-
-        if (!string.IsNullOrWhiteSpace(finalText))
-        {
-            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true,
-                inputTokens: emitInput,
-                outputTokens: emitOutput,
-                model: result.Model,
-                cacheReadTokens: emitCacheRead,
-                cacheCreationTokens: emitCacheCreation);
-            result.TextContent = finalText;
-        }
-        else if (isFinalTurn && (emitInput.HasValue || emitOutput.HasValue || emitCacheRead.HasValue))
-        {
-            // Final turn with no text — emit a token-only event so billing totals are still recorded.
-            EmitStreamingTextUpdate(conversationId, string.Empty, isComplete: true,
-                inputTokens: emitInput,
-                outputTokens: emitOutput,
-                model: result.Model,
-                cacheReadTokens: emitCacheRead,
-                cacheCreationTokens: emitCacheCreation);
-        }
-
-        // Log Anthropic prompt cache stats
-        if (result.CacheReadTokens > 0 || result.CacheCreationTokens > 0)
-        {
-            _logger.LogDebug(
-                "Anthropic cache stats — read: {CacheRead} tokens, creation: {CacheCreation} tokens (saved ~{Saved} tokens from billing)",
-                result.CacheReadTokens ?? 0,
-                result.CacheCreationTokens ?? 0,
-                result.CacheReadTokens ?? 0);
-        }
-        else
-        {
-            _logger.LogDebug("Anthropic cache stats — no cache hit this request (creation: {CacheCreation})",
-                result.CacheCreationTokens ?? 0);
-        }
-
-        // Finalize tool use blocks
-        foreach (var toolInfo in toolUseBlocks.Values)
-        {
-            var inputJson = toolInfo.InputBuilder.ToString();
-            JsonNode? inputNode = null;
-
-            if (!string.IsNullOrEmpty(inputJson))
-            {
-                try
-                {
-                    inputNode = JsonNode.Parse(inputJson);
-                }
-                catch
-                {
-                    _logger.LogWarning("Failed to parse tool input JSON: {Json}", inputJson);
-                }
-            }
-
-            result.ToolUseBlocks.Add(new ToolUseBlockInfo
-            {
-                Id = toolInfo.Id,
-                Name = toolInfo.Name,
-                Input = inputNode
+                Id = block.Id,
+                Name = block.Name,
+                Input = block.Input ?? JsonNode.Parse("{}")
             });
         }
 
-        return result;
+        messages.Add(new Message { Role = RoleType.Assistant, Content = content });
     }
 
-    private static bool IsRateLimitException(Exception ex)
+    private async Task<IReadOnlyList<ExecutedToolResult>> ExecuteToolUseBlocksAsync(
+        string conversationId,
+        IReadOnlyList<AnthropicStreamResponseProcessor.ToolUseBlockInfo> toolUseBlocks,
+        Func<string, string, string, Task<string>> executeToolAsync)
     {
-        var msg = ex.Message;
-        if (msg.Contains("insufficient_quota",       StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("quota_exceeded",           StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("exceeded_current_quota",   StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("insufficient balance",     StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("suspended",                StringComparison.OrdinalIgnoreCase))
+        var tasks = toolUseBlocks.Select(async toolUse =>
+        {
+            var argsJson = toolUse.Input is null ? "{}" : JsonSerializer.Serialize(toolUse.Input);
+            eventEmitter.EmitToolCallStarted(conversationId, toolUse.Id, toolUse.Name, argsJson);
+            var result = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
+            eventEmitter.EmitToolCallCompleted(conversationId, toolUse.Id, toolUse.Name, argsJson, result);
+            return new ExecutedToolResult(toolUse.Id, toolUse.Name, argsJson, result);
+        });
+
+        return await Task.WhenAll(tasks);
+    }
+
+    private ToolExecutionOutcome ProcessToolExecutionResults(
+        IReadOnlyList<ExecutedToolResult> executions,
+        Dictionary<string, int> consecutiveFailures,
+        int maxConsecutiveFailures)
+    {
+        var results = new List<ContentBase>(executions.Count);
+        var shouldStop = false;
+        var shouldBreakForApproval = false;
+        foreach (var execution in executions)
+        {
+            shouldStop |= UpdateFailureCount(execution, consecutiveFailures, maxConsecutiveFailures);
+            shouldBreakForApproval |= ProviderHelpers.ToolResultAwaitsApproval(execution.Name, execution.Result);
+            results.Add(new ToolResultContent
+            {
+                ToolUseId = execution.Id,
+                Content = new List<ContentBase> { new TextContent { Text = execution.Result } }
+            });
+        }
+
+        return new ToolExecutionOutcome(results, shouldStop, shouldBreakForApproval);
+    }
+
+    private bool UpdateFailureCount(
+        ExecutedToolResult execution,
+        Dictionary<string, int> consecutiveFailures,
+        int maxConsecutiveFailures)
+    {
+        if (!IsToolExecutionFailure(execution.Result))
+        {
+            consecutiveFailures[execution.Name] = 0;
+            return false;
+        }
+
+        consecutiveFailures.TryGetValue(execution.Name, out var currentFailures);
+        var failureCount = consecutiveFailures[execution.Name] = currentFailures + 1;
+        if (failureCount < maxConsecutiveFailures)
             return false;
 
-        return msg.Contains("rate_limit",        StringComparison.OrdinalIgnoreCase) ||
-               msg.Contains("rate limited",      StringComparison.OrdinalIgnoreCase) ||
-               msg.Contains("429",               StringComparison.OrdinalIgnoreCase);
+        _logger.LogWarning(
+            "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
+            execution.Name, failureCount);
+        return true;
     }
 
-    private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
-    {
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage>
-            {
-                new ConversationMessage("assistant",
-                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/{maxRetries})...")
-            },
-            ToolCalls = new List<ToolCall>(),
-            ToolResults = new List<ToolResult>()
-        });
-    }
+    private static bool IsToolExecutionFailure(string result) =>
+        result.StartsWith("Tool execution failed:") ||
+        result.StartsWith("Error executing tool") ||
+        result.Contains("A second operation was started");
 
-    /// <summary>
-    /// Attempts to extract a <c>retry-after</c> delay from the Anthropic SDK exception message.
-    /// Anthropic 429 responses often include "retry after N" or "please retry in N seconds" in the body.
-    /// </summary>
-    private static bool TryParseRetryAfter(Exception? ex, out TimeSpan retryAfter)
-    {
-        retryAfter = TimeSpan.Zero;
-        if (ex is null) return false;
+    private sealed record ExecutedToolResult(string Id, string Name, string ArgumentsJson, string Result);
 
-        // Pattern: "retry after 30" / "retry in 30 seconds" / "retry-after: 30"
-        var match = RetryAfterPattern.Match(ex.Message);
-        if (match.Success && int.TryParse(match.Groups["secs"].Value, out var secs) && secs > 0)
-        {
-            retryAfter = TimeSpan.FromSeconds(secs);
-            return true;
-        }
-        return false;
-    }
+    private sealed record ToolExecutionOutcome(
+        List<ContentBase> Results,
+        bool ShouldStopDueToFailures,
+        bool ShouldBreakForApproval);
 
-    private static readonly Regex RetryAfterPattern = new(
-        @"retry[- ](?:after|in)\D*(?<secs>\d+)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private void EmitToolCallStarted(string conversationId, string toolCallId, string toolName, string argsJson)
-    {
-        var currentToolCalls = new List<ToolCall>
-        {
-            new ToolCall
-            {
-                Id = toolCallId,
-                Name = toolName,
-                Arguments = ParseToolArguments(argsJson)
-            }
-        };
-
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage>(),
-            ToolCalls = currentToolCalls,
-            ToolResults = new List<ToolResult>()
-        });
-    }
-
-    private void EmitToolCallCompleted(string conversationId, string toolCallId, string toolName, string argsJson, string result)
-    {
-        var currentToolCalls = new List<ToolCall>
-        {
-            new ToolCall
-            {
-                Id = toolCallId,
-                Name = toolName,
-                Arguments = ParseToolArguments(argsJson)
-            }
-        };
-
-        var toolResultObj = new ToolResult
-        {
-            ToolCallId = toolCallId,
-            Result = result,
-            IsSuccess = !result.StartsWith("Tool execution failed:") && !result.StartsWith("Error executing tool"),
-            ErrorMessage = result.StartsWith("Tool execution failed:") || result.StartsWith("Error executing tool") ? result : null
-        };
-
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage>(),
-            ToolCalls = currentToolCalls,
-            ToolResults = new List<ToolResult> { toolResultObj }
-        });
-    }
-
-    private Dictionary<string, object?> ParseToolArguments(string argsJson)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(argsJson) || argsJson == "{}")
-                return new Dictionary<string, object?>();
-
-            return JsonDocument.Parse(argsJson).RootElement.EnumerateObject()
-                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString());
-        }
-        catch
-        {
-            return new Dictionary<string, object?>();
-        }
-    }
-
-    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete, int? inputTokens = null, int? outputTokens = null, string? model = null, int? cacheReadTokens = null, int? cacheCreationTokens = null)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(conversationId))
-            {
-                _logger.LogWarning("EmitStreamingTextUpdate called with null/empty conversationId");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(text) &&
-                (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue && !cacheReadTokens.HasValue && !cacheCreationTokens.HasValue)))
-            {
-                _logger.LogDebug("EmitStreamingTextUpdate called with null/empty text, skipping");
-                return;
-            }
-
-            var message = new ConversationMessage("assistant", text)
-            {
-                IsStreaming = !isComplete,
-                InputTokens = isComplete ? inputTokens : null,
-                OutputTokens = isComplete ? outputTokens : null,
-                Model = isComplete ? model : null,
-                CacheReadTokens = isComplete ? cacheReadTokens : null,
-                CacheCreationTokens = isComplete ? cacheCreationTokens : null,
-            };
-
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = conversationId,
-                Messages = new List<ConversationMessage> { message },
-                ToolCalls = new List<ToolCall>(),
-                ToolResults = new List<ToolResult>()
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in EmitStreamingTextUpdate: {Message}", ex.Message);
-            throw;
-        }
-    }
-
-    // Helper classes
-    private class StreamResult
-    {
-        public string? TextContent { get; set; }
-        public string? StopReason { get; set; }
-        public List<ToolUseBlockInfo> ToolUseBlocks { get; } = new();
-        
-        // Token usage from API response
-        public int? InputTokens { get; set; }
-        public int? OutputTokens { get; set; }
-        public string? Model { get; set; }
-
-        // Anthropic prompt caching stats (null when cache not involved)
-        public int? CacheCreationTokens { get; set; }
-        public int? CacheReadTokens { get; set; }
-    }
-
-    private class ToolUseBlockInfo
-    {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        public JsonNode? Input { get; set; }
-    }
-
-    private class ToolUseInfo
-    {
-        public int Index { get; set; }
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        public StringBuilder InputBuilder { get; set; } = new();
-    }
 }
