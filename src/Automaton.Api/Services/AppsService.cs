@@ -26,6 +26,7 @@ public class AppsService
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly AppDeploymentTargetManagementService? deploymentTargetManagementService;
+    private readonly AppListingService appListingService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -56,84 +57,12 @@ public class AppsService
         this.backendRouteConfigService = backendRouteConfigService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetManagementService = deploymentTargetManagementService;
+        this.appListingService = new AppListingService(dataContext, authorizationService);
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
     public async Task<IReadOnlyList<AppListItemDto>> ListAsync(Guid? projectId = null, CancellationToken cancellationToken = default)
-    {
-        var now = DateTime.UtcNow;
-        var rows = await authorizationService.GetAppsQueryByContext(projectId)
-            .AsNoTracking()
-            .Select(app => new
-            {
-                app.Id, app.Name, app.Summary, app.Description, app.ThumbnailUrl, app.Tags,
-                app.IsPublished, app.PublicUrl, app.Updated, app.ProjectId,
-                CanLaunchPublicly = app.IsPublished &&
-                    app.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    app.AccessStatus == AppAccessStatuses.Active,
-                Runner = dataContext.Runners
-                    .Where(runner => app.DeploymentTargets.Any(target =>
-                        target.IsDefault &&
-                        target.ExecutionRunnerId == runner.Id))
-                    .Select(r => new AppListRunnerDto
-                    {
-                        Id = r.Id, Name = r.Name, Purpose = r.Purpose,
-                        ConnectivityStatus = RunnerPresenceEvaluator.DeriveStatus(r.ConnectionId, r.LastHeartbeatAtUtc, now)
-                    }).FirstOrDefault(),
-                LiveTarget = app.DeploymentTargets
-                    .Where(target => target.IsDefault)
-                    .Select(target => new
-                    {
-                        target.Name,
-                        target.Status,
-                        target.GenericRuntimeDeployed,
-                        target.LastSuccessfulDeploymentAt,
-                        target.Id,
-                        IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
-                        Runner = target.ExecutionRunner == null ? null : new
-                        {
-                            target.ExecutionRunner.ApplicationProfile,
-                            target.ExecutionRunner.ConnectionId,
-                            target.ExecutionRunner.LastHeartbeatAtUtc,
-                        },
-                    }).FirstOrDefault()
-            }).ToListAsync(cancellationToken);
-
-        var items = rows.Select(row =>
-        {
-            return new AppListItemDto
-            {
-                Id = row.Id, Name = row.Name, Summary = row.Summary ?? string.Empty,
-                Description = row.Description ?? string.Empty,
-                ThumbnailUrl = row.ThumbnailUrl, Tags = ParseTags(row.Tags), IsPublished = row.IsPublished,
-                PublicUrl = row.PublicUrl, CanLaunchPublicly = row.CanLaunchPublicly, UpdatedAtUtc = row.Updated,
-                CanDelete = !row.ProjectId.HasValue,
-                Runner = row.Runner,
-                LiveEnvironment = row.LiveTarget == null ? null : new AppListEnvironmentDto
-                {
-                    Name = row.LiveTarget.Name,
-                    Status = row.LiveTarget.Runner == null
-                        ? "Unassigned"
-                        : row.LiveTarget.Status.ToString(),
-                    IsHostedRunner = row.LiveTarget.IsHostedRunner,
-                    ApplicationProfile = row.LiveTarget.Runner?.ApplicationProfile,
-                    RunnerOnline = row.LiveTarget.Runner != null && RunnerPresenceEvaluator.DeriveStatus(
-                        row.LiveTarget.Runner.ConnectionId,
-                        row.LiveTarget.Runner.LastHeartbeatAtUtc,
-                        now) == RunnerStatus.Online,
-                    GenericRuntimeDeployed = row.LiveTarget.GenericRuntimeDeployed,
-                    LastSuccessfulDeploymentAtUtc = row.LiveTarget.LastSuccessfulDeploymentAt?.UtcDateTime,
-                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.GenericRuntimeDeployed,
-                    RoutePath = PublishedAppHostNames.BuildPrivateTargetPath(row.Id, Guid.Empty, isDefault: true),
-                },
-                Runtime = new AppListRuntimeDto
-                {
-                    GenericRuntimeDeployed = row.LiveTarget?.GenericRuntimeDeployed == true
-                }
-            };
-        }).ToArray();
-        return items;
-    }
+        => await appListingService.ListAsync(projectId, cancellationToken);
 
     // Legacy projection retained for MCP callers until their contract is migrated.
     public IEnumerable<AppModel> ListForMcp(Guid? projectId = null)
