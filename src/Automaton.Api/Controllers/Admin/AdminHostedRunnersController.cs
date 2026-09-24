@@ -132,27 +132,60 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.Include(x => x.RunnerHost).FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
-        var action = actionKey == StorageEnforcementActions.SuspendHostedRunner ? HostedRunnerDeploymentActions.Suspend : HostedRunnerDeploymentActions.Resume;
+        var action = GetEnforcementDeploymentAction(actionKey);
         var existing = await db.HostedRunnerDeployments.FirstOrDefaultAsync(x => x.HostedRunnerId == id && x.Action == action &&
             (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
         if (existing != null) return Accepted(new { existing.Id, existing.Status });
-        if (runner.RunnerHostId == null) return BadRequest(new { message = "The hosted Runner has no assigned Runner Host." });
-        if (!runner.RunnerHost!.InfrastructureRunnerId.HasValue)
-            return BadRequest(new { message = "The hosted Runner host has no assigned Infrastructure Runner." });
-        if (action == HostedRunnerDeploymentActions.Resume && runner.EnforcementState != HostedRunnerEnforcementStates.Suspended)
-            return Conflict(new { message = "Resume is only available for a suspended Runner." });
-        if (action == HostedRunnerDeploymentActions.Suspend && (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended || runner.EnforcementState == HostedRunnerEnforcementStates.ResumePending || runner.EnforcementState == HostedRunnerEnforcementStates.SuspensionPending))
-            return Conflict(new { message = "The Runner is already suspended or has a suspension operation in progress." });
+        var validationFailure = ValidateEnforcementRequest(runner, action);
+        if (validationFailure != null) return validationFailure;
         var operation = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = id, Action = action, Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow, Logs = "Administrator requested storage enforcement action." };
-        var message = new InfrastructureCommandRequestedEvent(
+        var message = CreateEnforcementCommandMessage(runner, operation, actionKey);
+        await PersistEnforcementCommandAsync(runner, operation, action, message, cancellationToken);
+        await WriteEnforcementAuditAsync(runner, GetEnforcementRequestedEventType(actionKey),
+            $"Administrator requested '{actionKey}'.", cancellationToken);
+        return Accepted(new { operation.Id, operation.Status });
+    }
+
+    private static string GetEnforcementDeploymentAction(string actionKey)
+        => actionKey == StorageEnforcementActions.SuspendHostedRunner
+            ? HostedRunnerDeploymentActions.Suspend
+            : HostedRunnerDeploymentActions.Resume;
+
+    private static ActionResult? ValidateEnforcementRequest(HostedRunner runner, string action)
+    {
+        if (runner.RunnerHostId == null)
+            return new BadRequestObjectResult(new { message = "The hosted Runner has no assigned Runner Host." });
+        if (!runner.RunnerHost!.InfrastructureRunnerId.HasValue)
+            return new BadRequestObjectResult(new { message = "The hosted Runner host has no assigned Infrastructure Runner." });
+        if (action == HostedRunnerDeploymentActions.Resume && runner.EnforcementState != HostedRunnerEnforcementStates.Suspended)
+            return new ConflictObjectResult(new { message = "Resume is only available for a suspended Runner." });
+        if (action == HostedRunnerDeploymentActions.Suspend &&
+            runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending or HostedRunnerEnforcementStates.SuspensionPending)
+            return new ConflictObjectResult(new { message = "The Runner is already suspended or has a suspension operation in progress." });
+        return null;
+    }
+
+    private static InfrastructureCommandRequestedEvent CreateEnforcementCommandMessage(
+        HostedRunner runner,
+        HostedRunnerDeployment operation,
+        string actionKey)
+        => new(
             CommandId: operation.Id,
             OperationId: operation.Id,
-            RunnerHostId: runner.RunnerHostId.Value,
-            InfrastructureRunnerId: runner.RunnerHost.InfrastructureRunnerId.Value,
+            RunnerHostId: runner.RunnerHostId!.Value,
+            InfrastructureRunnerId: runner.RunnerHost!.InfrastructureRunnerId!.Value,
             ActionKey: actionKey,
-            InputJson: JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
+            InputJson: JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, expectedContainerName = runner.ContainerName }),
             SecretGrantIds: [],
             CreatedAtUtc: DateTime.UtcNow);
+
+    private async Task PersistEnforcementCommandAsync(
+        HostedRunner runner,
+        HostedRunnerDeployment operation,
+        string action,
+        InfrastructureCommandRequestedEvent message,
+        CancellationToken cancellationToken)
+    {
         await transactionalEventExecutor.ExecuteAsync(async token =>
         {
             db.HostedRunnerDeployments.Add(operation);
@@ -163,11 +196,12 @@ public class AdminHostedRunnersController : ControllerBase
             await db.SaveChangesAsync(token);
             await eventPublisher.PublishAsync(message, token);
         }, cancellationToken);
-        await WriteEnforcementAuditAsync(runner,
-            actionKey == StorageEnforcementActions.SuspendHostedRunner ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested : StorageTelemetryAuditEvents.EnforcementResumeRequested,
-            $"Administrator requested '{actionKey}'.", cancellationToken);
-        return Accepted(new { operation.Id, operation.Status });
     }
+
+    private static string GetEnforcementRequestedEventType(string actionKey)
+        => actionKey == StorageEnforcementActions.SuspendHostedRunner
+            ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested
+            : StorageTelemetryAuditEvents.EnforcementResumeRequested;
 
     private Task WriteEnforcementAuditAsync(HostedRunner runner, string eventType, string message, CancellationToken cancellationToken) =>
         auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -326,6 +360,19 @@ public class AdminHostedRunnersController : ControllerBase
             return NotFound();
         }
 
+        ApplyHostIdentityAndConnectivity(host, request);
+        var schedulingError = ValidateSchedulingUpdate(host, request.HostedRunnerSchedulingEnabled);
+        if (schedulingError != null) return Conflict(new { message = schedulingError });
+        ApplySchedulingUpdate(host, request.HostedRunnerSchedulingEnabled);
+        ApplyHostCapacityUpdate(host, request);
+        host.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(host));
+    }
+
+    private static void ApplyHostIdentityAndConnectivity(RunnerHost host, UpdateRunnerHostRequest request)
+    {
         if (request.Name != null) host.Name = request.Name;
         if (request.Provider != null) host.Provider = request.Provider;
         if (request.Region != null) host.Region = request.Region == string.Empty ? null : request.Region;
@@ -333,26 +380,32 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.PrivateIp != null) host.PrivateIp = request.PrivateIp == string.Empty ? null : request.PrivateIp;
         if (request.ProvisioningTransport != null) host.ProvisioningTransport = request.ProvisioningTransport;
         if (request.RuntimeConnectivityMode != null) host.RuntimeConnectivityMode = request.RuntimeConnectivityMode;
-        if (request.HostedRunnerSchedulingEnabled.HasValue)
-        {
-            if (request.HostedRunnerSchedulingEnabled.Value
-                && host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort
-                && !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
-            {
-                return Conflict(new { message = addressError });
-            }
-            if (request.HostedRunnerSchedulingEnabled.Value
-                && (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
-                    || !host.ValidatedAtUtc.HasValue
-                    || !host.ApprovedAtUtc.HasValue
-                    || host.Status != RunnerHostStatuses.Active
-                    || host.ProvisioningTransport != RunnerHostProvisioningTransports.InfrastructureRunner
-                    || !host.InfrastructureRunnerId.HasValue))
-            {
-                return Conflict(new { message = "A host must be Ready, validated, approved, active, and bound to an Infrastructure Runner before scheduling can be enabled." });
-            }
-            host.HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled.Value;
-        }
+    }
+
+    private static string? ValidateSchedulingUpdate(RunnerHost host, bool? schedulingEnabled)
+    {
+        if (schedulingEnabled != true) return null;
+        if (host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort
+            && !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
+            return addressError;
+        if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
+            || !host.ValidatedAtUtc.HasValue
+            || !host.ApprovedAtUtc.HasValue
+            || host.Status != RunnerHostStatuses.Active
+            || host.ProvisioningTransport != RunnerHostProvisioningTransports.InfrastructureRunner
+            || !host.InfrastructureRunnerId.HasValue)
+            return "A host must be Ready, validated, approved, active, and bound to an Infrastructure Runner before scheduling can be enabled.";
+        return null;
+    }
+
+    private static void ApplySchedulingUpdate(RunnerHost host, bool? schedulingEnabled)
+    {
+        if (schedulingEnabled.HasValue)
+            host.HostedRunnerSchedulingEnabled = schedulingEnabled.Value;
+    }
+
+    private static void ApplyHostCapacityUpdate(RunnerHost host, UpdateRunnerHostRequest request)
+    {
         if (request.Status != null) host.Status = request.Status;
         if (request.TotalCpuCores.HasValue) host.TotalCpuCores = request.TotalCpuCores.Value;
         if (request.ReservedCpuCores.HasValue) host.ReservedCpuCores = request.ReservedCpuCores.Value;
@@ -360,10 +413,6 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.ReservedMemoryMb.HasValue) host.ReservedMemoryMb = request.ReservedMemoryMb.Value;
         if (request.TotalDiskMb.HasValue) host.TotalDiskMb = request.TotalDiskMb.Value;
         if (request.ReservedDiskMb.HasValue) host.ReservedDiskMb = request.ReservedDiskMb.Value;
-        host.UpdatedAt = DateTime.UtcNow;
-
-        await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(host));
     }
 
     [HttpGet("runners")]
