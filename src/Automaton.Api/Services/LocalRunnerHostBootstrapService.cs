@@ -29,46 +29,7 @@ public sealed class LocalRunnerHostBootstrapService(
 
         if (existingHost != null)
         {
-            var changed = false;
-
-            if (existingHost.Status != RunnerHostStatuses.Active)
-            {
-                existingHost.Status = RunnerHostStatuses.Active;
-                changed = true;
-            }
-
-            if (existingHost.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready)
-            {
-                existingHost.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
-                existingHost.ValidatedAtUtc ??= DateTime.UtcNow;
-                changed = true;
-            }
-
-            if (!existingHost.HostedRunnerSchedulingEnabled)
-            {
-                existingHost.HostedRunnerSchedulingEnabled = true;
-                changed = true;
-            }
-
-            if (existingHost.TotalCpuCores != config.LocalRunnerHostCpuCores)
-            {
-                existingHost.TotalCpuCores = config.LocalRunnerHostCpuCores;
-                changed = true;
-            }
-
-            if (existingHost.TotalMemoryMb != config.LocalRunnerHostMemoryMb)
-            {
-                existingHost.TotalMemoryMb = config.LocalRunnerHostMemoryMb;
-                changed = true;
-            }
-
-            if (existingHost.TotalDiskMb != config.LocalRunnerHostDiskMb)
-            {
-                existingHost.TotalDiskMb = config.LocalRunnerHostDiskMb;
-                changed = true;
-            }
-
-            if (changed)
+            if (UpdateExistingHost(existingHost, config))
             {
                 existingHost.UpdatedAt = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync(cancellationToken);
@@ -98,5 +59,49 @@ public sealed class LocalRunnerHostBootstrapService(
         dbContext.RunnerHosts.Add(host);
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Seeded local runner host {RunnerHostId} for runtime-local managed runners", host.Id);
+    }
+
+    private static bool UpdateExistingHost(RunnerHost host, HostedRunnerOptions config)
+    {
+        var changed = false;
+
+        if (host.Status != RunnerHostStatuses.Active)
+        {
+            host.Status = RunnerHostStatuses.Active;
+            changed = true;
+        }
+
+        if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready)
+        {
+            host.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
+            host.ValidatedAtUtc ??= DateTime.UtcNow;
+            changed = true;
+        }
+
+        if (!host.HostedRunnerSchedulingEnabled)
+        {
+            host.HostedRunnerSchedulingEnabled = true;
+            changed = true;
+        }
+
+        if (host.TotalCpuCores != config.LocalRunnerHostCpuCores)
+        {
+            host.TotalCpuCores = config.LocalRunnerHostCpuCores;
+            changed = true;
+        }
+
+        if (host.TotalMemoryMb != config.LocalRunnerHostMemoryMb)
+        {
+            host.TotalMemoryMb = config.LocalRunnerHostMemoryMb;
+            changed = true;
+        }
+
+        if (host.TotalDiskMb != config.LocalRunnerHostDiskMb)
+        {
+            host.TotalDiskMb = config.LocalRunnerHostDiskMb;
+            changed = true;
+        }
+
+        return changed;
     }
 }
