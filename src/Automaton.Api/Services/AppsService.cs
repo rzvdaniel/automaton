@@ -1182,36 +1182,9 @@ public class AppsService
     public async Task<AppModel> ForkAsync(Guid sourceAppId, ForkAppRequest? request = null)
     {
         request ??= new Models.ForkAppRequest();
-
-        var source = await dataContext.WebApps
-            .Include(x => x.WebAppUsers)
-            .Include(x => x.WebAppScreenshots)
-            .FirstOrDefaultAsync(x =>
-                x.Id == sourceAppId &&
-                x.IsPublished &&
-                x.ReviewStatus == AppReviewStatuses.Approved &&
-                x.AccessStatus == AppAccessStatuses.Active);
-
-        if (source == null)
-            throw new InvalidOperationException("Fork source app not found.");
-
-        if (!source.IsForkable)
-            throw new InvalidOperationException("Forking is disabled for this app.");
-
-        var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
-            ?? throw new InvalidOperationException("Fork source app has no owner.");
-
-        if (!fileStorageService.AppSourceExists(sourceOwner, sourceAppId))
-            throw new InvalidOperationException("Fork source app has no source files.");
-
-        var creator = await dataContext.Users
-            .Where(u => u.Id == sourceOwner)
-            .Select(u => new
-            {
-                u.Id,
-                DisplayName = !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name
-            })
-            .FirstOrDefaultAsync();
+        var sourceInfo = await LoadForkSourceAsync(sourceAppId);
+        var source = sourceInfo.Source;
+        var sourceOwner = sourceInfo.OwnerId;
 
         var newId = Guid.NewGuid();
         var now = DateTime.UtcNow;
@@ -1241,7 +1214,7 @@ public class AppsService
             ForkedFromAppId = source.Id,
             ForkedFromAuthorUserId = sourceOwner,
             ForkedFromAppName = source.Name,
-            ForkedFromAuthorName = creator?.DisplayName ?? "Automaton creator",
+            ForkedFromAuthorName = sourceInfo.CreatorDisplayName ?? "Automaton creator",
             Created = now,
             Updated = now,
         };
@@ -1264,27 +1237,7 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
 
-        await fileStorageService.CopySourceFilesAsync(sourceOwner, sourceAppId, UserId, newId);
-
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
-        {
-            Action = AuditActions.Forked,
-            EntityType = AuditEntityTypes.App,
-            EntityId = newId,
-            EventType = AuditEventTypes.AppForked,
-            Message = $"App '{entity.Name}' was forked",
-            Outcome = AuditOutcomes.Success,
-            ActorUserId = UserId,
-            Metadata = new
-            {
-                SourceAppId = sourceAppId,
-                SourceAppName = source.Name,
-                NewAppId = newId,
-                NewAppName = entity.Name
-            }
-        });
-
+        await CopySourceAndRecordForkAsync(sourceOwner, sourceAppId, entity);
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -1295,6 +1248,55 @@ public class AppsService
         ApplyStorageMetadata(forked, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
         return forked;
     }
+
+    private async Task<ForkSourceInfo> LoadForkSourceAsync(Guid sourceAppId)
+    {
+        var source = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
+            .FirstOrDefaultAsync(x =>
+                x.Id == sourceAppId &&
+                x.IsPublished &&
+                x.ReviewStatus == AppReviewStatuses.Approved &&
+                x.AccessStatus == AppAccessStatuses.Active)
+            ?? throw new InvalidOperationException("Fork source app not found.");
+        if (!source.IsForkable)
+            throw new InvalidOperationException("Forking is disabled for this app.");
+        var ownerId = source.WebAppUsers.FirstOrDefault()?.UserId
+            ?? throw new InvalidOperationException("Fork source app has no owner.");
+        if (!fileStorageService.AppSourceExists(ownerId, sourceAppId))
+            throw new InvalidOperationException("Fork source app has no source files.");
+        var creatorDisplayName = await dataContext.Users
+            .Where(user => user.Id == ownerId)
+            .Select(user => !string.IsNullOrEmpty(user.DisplayName) ? user.DisplayName : user.Name)
+            .FirstOrDefaultAsync();
+        return new ForkSourceInfo(source, ownerId, creatorDisplayName);
+    }
+
+    private async Task CopySourceAndRecordForkAsync(Guid sourceOwnerId, Guid sourceAppId, Entities.WebApp fork)
+    {
+        await fileStorageService.CopySourceFilesAsync(sourceOwnerId, sourceAppId, UserId, fork.Id);
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, fork.Name, fork.Id);
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Forked,
+            EntityType = AuditEntityTypes.App,
+            EntityId = fork.Id,
+            EventType = AuditEventTypes.AppForked,
+            Message = $"App '{fork.Name}' was forked",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                SourceAppId = sourceAppId,
+                SourceAppName = fork.ForkedFromAppName,
+                NewAppId = fork.Id,
+                NewAppName = fork.Name
+            }
+        });
+    }
+
+    private sealed record ForkSourceInfo(Entities.WebApp Source, Guid OwnerId, string? CreatorDisplayName);
 
     private static string NormalizeForkName(string? requestedName, string sourceName)
     {
