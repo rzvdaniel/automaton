@@ -484,122 +484,18 @@ public class AiChatHistoryService : IAiChatHistoryService
     {
         try
         {
-            // Verify user has access to the session
-            var hasAccess = await dataContext.AiChatSessions
-                .AnyAsync(s => s.Id == request.SessionId &&
-                              s.AiChatSessionUsers.Any(su => su.UserId == userId));
-
-            if (!hasAccess)
-            {
-                logger.Warning("User {UserId} does not have access to session {SessionId}", userId, request.SessionId);
-                throw new UnauthorizedAccessException("Access denied to this session");
-            }
-
-            // Calculate total tokens
-            int? totalTokens = null;
-            if (request.InputTokens.HasValue && request.OutputTokens.HasValue)
-            {
-                totalTokens = request.InputTokens.Value + request.OutputTokens.Value;
-            }
-
-            var messageEntity = new AiChatMessage
-            {
-                Id = Guid.NewGuid(),
-                SessionId = request.SessionId,
-                Role = request.Role,
-                Content = request.Content,
-                MessageType = request.MessageType,
-                Metadata = request.Metadata,
-                InputTokens = request.InputTokens,
-                OutputTokens = request.OutputTokens,
-                TotalTokens = totalTokens,
-                Model = request.Model,
-                CreatedAt = DateTime.UtcNow
-            };
-
+            await EnsureSessionAccessAsync(request.SessionId, userId);
+            var totalTokens = CalculateTotalTokens(request.InputTokens, request.OutputTokens);
+            var messageEntity = CreateMessageEntity(request, totalTokens);
             dataContext.AiChatMessages.Add(messageEntity);
 
-            // Update session metrics and get app resource for cascade update
-            var session = await dataContext.AiChatSessions
-                .FirstOrDefaultAsync(s => s.Id == request.SessionId);
-            
+            var session = await dataContext.AiChatSessions.FirstOrDefaultAsync(s => s.Id == request.SessionId);
             if (session != null)
-            {
-                // Update session activity timestamp
-                session.LastActivityAt = DateTime.UtcNow;
-                session.UpdatedAt = DateTime.UtcNow;
-
-                // Count prompts (user messages only)
-                if (request.Role.Equals("user", StringComparison.OrdinalIgnoreCase))
-                {
-                    session.TotalPromptsSubmitted++;
-                }
-
-                // Add token counts (only for AI-generated messages)
-                if (request.InputTokens.HasValue)
-                {
-                    session.TotalInputTokens += request.InputTokens.Value;
-                }
-                if (request.OutputTokens.HasValue)
-                {
-                    session.TotalOutputTokens += request.OutputTokens.Value;
-                }
-                if (totalTokens.HasValue)
-                {
-                    session.TotalTokens += totalTokens.Value;
-                }
-
-                if (request.CacheReadTokens.HasValue) session.TotalCacheReadTokens += request.CacheReadTokens.Value;
-                if (request.CacheCreationTokens.HasValue) session.TotalCacheCreationTokens += request.CacheCreationTokens.Value;
-
-                // If this is a WebApp session, cascade updates to the app entity
-                if (session.ResourceType == ChatResourceType.WebApp)
-                {
-                    var app = await dataContext.WebApps
-                        .FirstOrDefaultAsync(w => w.Id == session.ResourceId);
-                    
-                    if (app != null)
-                    {
-                        app.LastChatActivityAt = DateTime.UtcNow;
-                        
-                        if (request.Role.Equals("user", StringComparison.OrdinalIgnoreCase))
-                        {
-                            app.TotalPromptsSubmittedInChat++;
-                        }
-                        
-                        if (totalTokens.HasValue)
-                        {
-                            app.TotalChatTokensUsed += totalTokens.Value;
-                        }
-                    }
-                }
-            }
+                await UpdateSessionActivityAsync(session, request, totalTokens);
 
             await dataContext.SaveChangesAsync();
-
-            // Record usage as telemetry for future analytics and operations.
-            if (request.InputTokens.HasValue || request.OutputTokens.HasValue)
-                await tokenBudgetService.RecordUsageAsync(
-                    userId,
-                    session?.Provider ?? string.Empty,
-                    session?.Model ?? string.Empty,
-                    request.InputTokens ?? 0,
-                    request.OutputTokens ?? 0);
-
-            return new ChatMessageDto
-            {
-                Id = messageEntity.Id,
-                SessionId = messageEntity.SessionId,
-                Role = messageEntity.Role,
-                Content = messageEntity.Content,
-                MessageType = messageEntity.MessageType,
-                Metadata = messageEntity.Metadata,
-                InputTokens = messageEntity.InputTokens,
-                OutputTokens = messageEntity.OutputTokens,
-                TotalTokens = messageEntity.TotalTokens,
-                Model = messageEntity.Model,
-                CreatedAt = messageEntity.CreatedAt
-            };
+            await RecordUsageTelemetryAsync(session, userId, request);
+            return MapMessage(messageEntity);
         }
         catch (Exception ex)
         {
@@ -607,6 +503,95 @@ public class AiChatHistoryService : IAiChatHistoryService
             throw;
         }
     }
+
+    private async Task EnsureSessionAccessAsync(Guid sessionId, Guid userId)
+    {
+        var hasAccess = await dataContext.AiChatSessions.AnyAsync(session => session.Id == sessionId
+            && session.AiChatSessionUsers.Any(user => user.UserId == userId));
+        if (hasAccess)
+            return;
+
+        logger.Warning("User {UserId} does not have access to session {SessionId}", userId, sessionId);
+        throw new UnauthorizedAccessException("Access denied to this session");
+    }
+
+    private static int? CalculateTotalTokens(int? inputTokens, int? outputTokens)
+        => inputTokens.HasValue && outputTokens.HasValue ? inputTokens.Value + outputTokens.Value : null;
+
+    private static AiChatMessage CreateMessageEntity(SaveChatMessageRequest request, int? totalTokens)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            SessionId = request.SessionId,
+            Role = request.Role,
+            Content = request.Content,
+            MessageType = request.MessageType,
+            Metadata = request.Metadata,
+            InputTokens = request.InputTokens,
+            OutputTokens = request.OutputTokens,
+            TotalTokens = totalTokens,
+            Model = request.Model,
+            CreatedAt = DateTime.UtcNow
+        };
+
+    private async Task UpdateSessionActivityAsync(
+        AiChatSession session,
+        SaveChatMessageRequest request,
+        int? totalTokens)
+    {
+        var isUserMessage = request.Role.Equals("user", StringComparison.OrdinalIgnoreCase);
+        session.LastActivityAt = DateTime.UtcNow;
+        session.UpdatedAt = DateTime.UtcNow;
+        if (isUserMessage)
+            session.TotalPromptsSubmitted++;
+        session.TotalInputTokens += request.InputTokens ?? 0;
+        session.TotalOutputTokens += request.OutputTokens ?? 0;
+        session.TotalTokens += totalTokens ?? 0;
+        session.TotalCacheReadTokens += request.CacheReadTokens ?? 0;
+        session.TotalCacheCreationTokens += request.CacheCreationTokens ?? 0;
+
+        if (session.ResourceType != ChatResourceType.WebApp)
+            return;
+
+        var app = await dataContext.WebApps.FirstOrDefaultAsync(webApp => webApp.Id == session.ResourceId);
+        if (app == null)
+            return;
+
+        app.LastChatActivityAt = DateTime.UtcNow;
+        if (isUserMessage)
+            app.TotalPromptsSubmittedInChat++;
+        if (totalTokens.HasValue)
+            app.TotalChatTokensUsed += totalTokens.Value;
+    }
+
+    private Task RecordUsageTelemetryAsync(AiChatSession? session, Guid userId, SaveChatMessageRequest request)
+    {
+        if (!request.InputTokens.HasValue && !request.OutputTokens.HasValue)
+            return Task.CompletedTask;
+
+        return tokenBudgetService.RecordUsageAsync(
+            userId,
+            session?.Provider ?? string.Empty,
+            session?.Model ?? string.Empty,
+            request.InputTokens ?? 0,
+            request.OutputTokens ?? 0);
+    }
+
+    private static ChatMessageDto MapMessage(AiChatMessage message)
+        => new()
+        {
+            Id = message.Id,
+            SessionId = message.SessionId,
+            Role = message.Role,
+            Content = message.Content,
+            MessageType = message.MessageType,
+            Metadata = message.Metadata,
+            InputTokens = message.InputTokens,
+            OutputTokens = message.OutputTokens,
+            TotalTokens = message.TotalTokens,
+            Model = message.Model,
+            CreatedAt = message.CreatedAt
+        };
 
     public async Task<List<ChatMessageDto>> SaveMessagesAsync(SaveChatMessagesRequest request, Guid userId)
     {
