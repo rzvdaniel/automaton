@@ -147,7 +147,7 @@ public class AppsService
         // Load app definition from file system
         var ownerId = ResolveAppOwnerId(appEntity) ?? UserId;
         var definition = fileStorageService.LoadAppAsync(ownerId, id).Result;
-        
+
         // If not in file system, fall back to database (for migration)
         if (definition == null && !string.IsNullOrEmpty(appEntity.Definition))
         {
