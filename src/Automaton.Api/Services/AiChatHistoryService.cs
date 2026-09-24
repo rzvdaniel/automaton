@@ -852,60 +852,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .OrderByDescending(s => s.UpdatedAt)
                 .ToListAsync();
 
-            var sessions = sessionEntities.Select(session => new ChatSessionExportItemDto
-            {
-                Session = new ChatSessionDto
-                {
-                    Id = session.Id,
-                    ResourceType = session.ResourceType,
-                    ResourceId = session.ResourceId,
-                    Title = session.Title,
-                    Provider = session.Provider,
-                    Model = session.Model,
-                    IsActive = session.IsActive,
-                    CreatedAt = session.CreatedAt,
-                    UpdatedAt = session.UpdatedAt,
-                    MessageCount = session.Messages.Count,
-                    TotalPromptsSubmitted = session.TotalPromptsSubmitted,
-                    TotalApiCalls = session.TotalApiCalls,
-                    TotalInputTokens = session.TotalInputTokens,
-                    TotalOutputTokens = session.TotalOutputTokens,
-                    TotalTokens = session.TotalTokens,
-                    TotalCacheReadTokens = session.TotalCacheReadTokens,
-                    TotalCacheCreationTokens = session.TotalCacheCreationTokens,
-                    EffectiveInputTokens = Math.Max(0, session.TotalInputTokens - session.TotalCacheReadTokens),
-                    CacheHitRate = session.TotalInputTokens > 0 ? Math.Min(1.0, (double)session.TotalCacheReadTokens / session.TotalInputTokens) : 0,
-                    CacheHitPercent = session.TotalInputTokens > 0 ? Math.Min(100.0, ((double)session.TotalCacheReadTokens / session.TotalInputTokens) * 100.0) : 0,
-                    ComplexityTier = session.ComplexityTier,
-                    EffectiveVerificationStrategy = session.Messages
-                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
-                        .OrderBy(m => m.CreatedAt)
-                        .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
-                        .FirstOrDefault(),
-                    EffectiveExecutionPolicy = session.Messages
-                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(ExecutionPolicyPrefix))
-                        .OrderBy(m => m.CreatedAt)
-                        .Select(m => m.Content.Substring(ExecutionPolicyPrefix.Length))
-                        .FirstOrDefault()
-                },
-                Messages = session.Messages
-                    .OrderBy(m => m.CreatedAt)
-                    .Select(m => new ChatMessageDto
-                    {
-                        Id = m.Id,
-                        SessionId = m.SessionId,
-                        Role = m.Role,
-                        Content = m.Content,
-                        MessageType = m.MessageType,
-                        Metadata = m.Metadata,
-                        InputTokens = m.InputTokens,
-                        OutputTokens = m.OutputTokens,
-                        TotalTokens = m.TotalTokens,
-                        Model = m.Model,
-                        CreatedAt = m.CreatedAt
-                    })
-                    .ToList()
-            }).ToList();
+            var sessions = sessionEntities.Select(MapExportSession).ToList();
 
             return new ChatSessionExportDto
             {
@@ -922,5 +869,76 @@ public class AiChatHistoryService : IAiChatHistoryService
             throw;
         }
     }
+
+    private static ChatSessionExportItemDto MapExportSession(AiChatSession session)
+        => new()
+        {
+            Session = MapExportSessionDetails(session),
+            Messages = session.Messages
+                .OrderBy(message => message.CreatedAt)
+                .Select(MapExportMessage)
+                .ToList()
+        };
+
+    private static ChatSessionDto MapExportSessionDetails(AiChatSession session)
+        => new()
+        {
+            Id = session.Id,
+            ResourceType = session.ResourceType,
+            ResourceId = session.ResourceId,
+            Title = session.Title,
+            Provider = session.Provider,
+            Model = session.Model,
+            IsActive = session.IsActive,
+            CreatedAt = session.CreatedAt,
+            UpdatedAt = session.UpdatedAt,
+            MessageCount = session.Messages.Count,
+            TotalPromptsSubmitted = session.TotalPromptsSubmitted,
+            TotalApiCalls = session.TotalApiCalls,
+            TotalInputTokens = session.TotalInputTokens,
+            TotalOutputTokens = session.TotalOutputTokens,
+            TotalTokens = session.TotalTokens,
+            TotalCacheReadTokens = session.TotalCacheReadTokens,
+            TotalCacheCreationTokens = session.TotalCacheCreationTokens,
+            EffectiveInputTokens = Math.Max(0, session.TotalInputTokens - session.TotalCacheReadTokens),
+            CacheHitRate = CalculateCacheHitRate(session),
+            CacheHitPercent = CalculateCacheHitPercent(session),
+            ComplexityTier = session.ComplexityTier,
+            EffectiveVerificationStrategy = GetSystemSetting(session, VerificationStrategyPrefix),
+            EffectiveExecutionPolicy = GetSystemSetting(session, ExecutionPolicyPrefix)
+        };
+
+    private static double CalculateCacheHitRate(AiChatSession session)
+        => session.TotalInputTokens > 0
+            ? Math.Min(1.0, (double)session.TotalCacheReadTokens / session.TotalInputTokens)
+            : 0;
+
+    private static double CalculateCacheHitPercent(AiChatSession session)
+        => session.TotalInputTokens > 0
+            ? Math.Min(100.0, ((double)session.TotalCacheReadTokens / session.TotalInputTokens) * 100.0)
+            : 0;
+
+    private static string? GetSystemSetting(AiChatSession session, string prefix)
+        => session.Messages
+            .Where(message => message.Role == "system" && message.MessageType == ChatMessageType.System && message.Content.StartsWith(prefix))
+            .OrderBy(message => message.CreatedAt)
+            .Select(message => message.Content.Substring(prefix.Length))
+            .FirstOrDefault();
+
+    private static ChatMessageDto MapExportMessage(AiChatMessage message)
+        => new()
+        {
+            Id = message.Id,
+            SessionId = message.SessionId,
+            Role = message.Role,
+            Content = message.Content,
+            MessageType = message.MessageType,
+            Metadata = message.Metadata,
+            InputTokens = message.InputTokens,
+            OutputTokens = message.OutputTokens,
+            TotalTokens = message.TotalTokens,
+            Model = message.Model,
+            CreatedAt = message.CreatedAt
+        };
 
 }
