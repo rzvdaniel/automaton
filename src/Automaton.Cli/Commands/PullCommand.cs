@@ -216,149 +216,24 @@ public static class PullCommand
     }
 
     internal static string CreateStagingDirectory(string targetDirectory)
-    {
-        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
-        var parent = Directory.GetParent(fullTargetDirectory)?.FullName
-            ?? throw new InvalidOperationException("The pull target must have a parent directory.");
-        Directory.CreateDirectory(parent);
-
-        var stagingDirectory = Path.Combine(parent, $".{Path.GetFileName(fullTargetDirectory)}.pulling-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(stagingDirectory);
-        return stagingDirectory;
-    }
+        => PullFileCommitter.CreateStagingDirectory(targetDirectory);
 
     internal static void CommitStagedProject(string stagingDirectory, string targetDirectory, bool targetExisted)
-    {
-        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
-        if (!targetExisted)
-        {
-            Directory.Move(stagingDirectory, fullTargetDirectory);
-            return;
-        }
-
-        if (!Directory.Exists(fullTargetDirectory))
-        {
-            throw new InvalidOperationException("The pull target changed before commit.");
-        }
-
-        if (Directory.EnumerateFileSystemEntries(fullTargetDirectory).Any())
-        {
-            throw new InvalidOperationException("The pull target must remain empty until commit.");
-        }
-
-        Directory.Delete(fullTargetDirectory);
-        Directory.Move(stagingDirectory, fullTargetDirectory);
-    }
+        => PullFileCommitter.CommitProject(stagingDirectory, targetDirectory, targetExisted);
 
     internal static void CommitStagedRefresh(
         string stagingDirectory,
         string targetDirectory,
         IReadOnlyList<SourceDownload> downloads)
-    {
-        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
-        var backupDirectory = stagingDirectory + ".rollback";
-        var changedFiles = new List<(string Target, string? Backup)>();
-        var preserveBackups = false;
-
-        try
-        {
-            foreach (var download in downloads)
-            {
-                var relativePath = Path.GetRelativePath(fullTargetDirectory, download.LocalPath);
-                var stagedPath = ResolveTargetPath(stagingDirectory, relativePath);
-                if (!File.Exists(stagedPath))
-                {
-                    throw new InvalidOperationException($"Staged pull file is missing: {download.RemotePath}");
-                }
-
-                EnsureNoReparsePoints(download.LocalPath);
-                Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
-
-                string? backupPath = null;
-                if (File.Exists(download.LocalPath))
-                {
-                    backupPath = ResolveTargetPath(backupDirectory, relativePath);
-                    Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
-                    File.Copy(download.LocalPath, backupPath);
-                }
-
-                changedFiles.Add((download.LocalPath, backupPath));
-                File.Move(stagedPath, download.LocalPath, overwrite: true);
-            }
-        }
-        catch (Exception commitError)
-        {
-            Exception? rollbackError = null;
-            foreach (var changedFile in changedFiles.AsEnumerable().Reverse())
-            {
-                try
-                {
-                    if (changedFile.Backup is null)
-                    {
-                        if (File.Exists(changedFile.Target))
-                        {
-                            File.Delete(changedFile.Target);
-                        }
-                    }
-                    else
-                    {
-                        File.Copy(changedFile.Backup, changedFile.Target, overwrite: true);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    rollbackError ??= ex;
-                }
-            }
-
-            if (rollbackError is not null)
-            {
-                preserveBackups = true;
-                throw new InvalidOperationException(
-                    $"Pull could not finish and local rollback also failed: {rollbackError.Message}. Recovery copies are in '{backupDirectory}'.",
-                    commitError);
-            }
-
-            throw;
-        }
-        finally
-        {
-            if (!preserveBackups && Directory.Exists(backupDirectory))
-            {
-                Directory.Delete(backupDirectory, recursive: true);
-            }
-        }
-    }
+        => PullFileCommitter.Commit(stagingDirectory, targetDirectory, downloads);
 
     internal static async Task StageAndCommitRefreshAsync(
         string targetDirectory,
         IReadOnlyList<SourceDownload> downloads,
         Func<string, Task<string>> readFile,
         bool nonInteractive)
-    {
-        var stagingDirectory = CreateStagingDirectory(targetDirectory);
-        try
-        {
-            var stagedDownloads = downloads
-                .Select(download => download with
-                {
-                    LocalPath = ResolveTargetPath(
-                        stagingDirectory,
-                        Path.GetRelativePath(targetDirectory, download.LocalPath))
-                })
-                .ToList();
-
-            await DownloadFilesAsync(stagedDownloads, readFile, nonInteractive);
-            CommitStagedRefresh(stagingDirectory, targetDirectory, downloads);
-        }
-        finally
-        {
-            if (Directory.Exists(stagingDirectory))
-            {
-                Directory.Delete(stagingDirectory, recursive: true);
-            }
-        }
-    }
+        => await PullFileCommitter.StageAndCommitRefreshAsync(
+            targetDirectory, downloads, readFile, nonInteractive);
 
     private static ApplicationContract ReadApplicationContract(JsonElement app)
     {
@@ -560,83 +435,13 @@ public static class PullCommand
     }
 
     internal static string ResolveTargetPath(string targetDirectory, string relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            throw new InvalidOperationException("Remote source contained an empty file path.");
-        }
-
-        var normalizedRelativePath = relativePath
-            .Replace('\\', Path.DirectorySeparatorChar)
-            .Replace('/', Path.DirectorySeparatorChar);
-        if (Path.IsPathRooted(normalizedRelativePath))
-        {
-            throw new InvalidOperationException($"Remote source path must be project-relative: {relativePath}");
-        }
-
-        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
-        var fullPath = Path.GetFullPath(Path.Combine(fullTargetDirectory, normalizedRelativePath));
-        var relative = Path.GetRelativePath(fullTargetDirectory, fullPath);
-        if (Path.IsPathRooted(relative)
-            || relative.Equals("..", StringComparison.Ordinal)
-            || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException($"Remote source path points outside the target directory: {relativePath}");
-        }
-
-        return fullPath;
-    }
+        => PullFileCommitter.ResolveTargetPath(targetDirectory, relativePath);
 
     internal static List<SourceDownload> PrepareDownloads(IEnumerable<string> files, string targetDirectory)
-    {
-        var downloads = files
-            .Select(remotePath => new SourceDownload(remotePath, ResolveTargetPath(targetDirectory, remotePath)))
-            .ToList();
+        => PullFileCommitter.PrepareDownloads(files, targetDirectory);
 
-        foreach (var download in downloads)
-        {
-            EnsureNoReparsePoints(download.LocalPath);
-        }
-
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
-        {
-            var collision = downloads
-                .GroupBy(download => download.LocalPath, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault(group => group.Count() > 1);
-            if (collision is not null)
-            {
-                throw new InvalidOperationException(
-                    $"Remote source paths collide on this case-insensitive filesystem: {string.Join(", ", collision.Select(download => download.RemotePath))}");
-            }
-        }
-
-        return downloads;
-    }
-
-    private static void EnsureNoReparsePoints(string path)
-    {
-        var current = Path.GetFullPath(path);
-        while (!string.IsNullOrEmpty(current))
-        {
-            if (File.Exists(current) || Directory.Exists(current))
-            {
-                var attributes = File.GetAttributes(current);
-                if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                {
-                    throw new InvalidOperationException(
-                        $"Remote source path cannot be written through a symbolic link or junction: {path}");
-                }
-            }
-
-            var parent = Directory.GetParent(current)?.FullName;
-            if (parent is null || string.Equals(parent, current, StringComparison.Ordinal))
-            {
-                break;
-            }
-
-            current = parent;
-        }
-    }
+    internal static void EnsureNoReparsePoints(string path)
+        => PullFileCommitter.EnsureNoReparsePoints(path);
 
     private static string SanitizeDirectoryName(string value)
     {

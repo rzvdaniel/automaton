@@ -2,8 +2,6 @@ using Automaton.Cli.Models;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Formats.Tar;
 using System.ComponentModel;
 
@@ -14,26 +12,14 @@ public sealed class RunnerInstallService
     private const string DefaultDockerImage = "rzvdaniel/automaton-runner:latest";
     private const string RunnerDownloadsBase = "https://studio.automaton.monster/downloads/runner/latest";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private readonly ConfigService _configService;
+    private readonly RunnerInstallManifestStore _manifestStore = new();
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(10) };
 
     public RunnerInstallService(ConfigService configService)
     {
         _configService = configService;
     }
-
-    private static string RunnerHome =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton", "runner");
-
-    private static string RunnerInstallsDir => Path.Combine(RunnerHome, "installs");
-    private static string ActiveRunnerFile => Path.Combine(RunnerHome, "active-runner.txt");
 
     public RunnerCommandResult GetInstallStatus(string? runnerName = null)
     {
@@ -89,7 +75,7 @@ public sealed class RunnerInstallService
             return new RunnerCommandResult { Success = false, Summary = "Runner install failed", Checks = checks };
         }
 
-        Directory.CreateDirectory(RunnerInstallsDir);
+        Directory.CreateDirectory(_manifestStore.InstallsDirectory);
         var existing = LoadInstall(safeName);
         if (existing != null)
         {
@@ -217,15 +203,15 @@ public sealed class RunnerInstallService
             }
         }
 
-        var installFile = GetInstallRecordPath(install.SafeRunnerName);
+        var installFile = _manifestStore.GetInstallRecordPath(install.SafeRunnerName);
         if (File.Exists(installFile))
         {
             File.Delete(installFile);
         }
 
-        if (string.Equals(ReadActiveRunnerSafeName(), install.SafeRunnerName, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(_manifestStore.ReadActiveRunnerSafeName(), install.SafeRunnerName, StringComparison.OrdinalIgnoreCase))
         {
-            File.Delete(ActiveRunnerFile);
+            _manifestStore.ClearActiveRunner();
         }
 
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, $"runner '{install.RunnerName}' removed"));
@@ -308,7 +294,7 @@ public sealed class RunnerInstallService
         CancellationToken cancellationToken)
     {
         request.ProgressReporter?.Invoke("Installing native runner...");
-        var installRoot = Path.Combine(RunnerInstallsDir, safeName);
+        var installRoot = Path.Combine(_manifestStore.InstallsDirectory, safeName);
         var logsDir = Path.Combine(installRoot, "logs");
         var extractedDir = Path.Combine(installRoot, "runner");
         var dataDir = Path.Combine(installRoot, "data");
@@ -357,7 +343,7 @@ public sealed class RunnerInstallService
         request.ProgressReporter?.Invoke("Creating native runner service...");
         await InstallNativeServiceAsync(install, cancellationToken);
         SaveInstallRecord(install);
-        SetActiveRunner(install.SafeRunnerName);
+        _manifestStore.SetActiveRunner(install.SafeRunnerName);
 
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, "native runner service installed"));
         nextSteps.Add("Run automaton runner status");
@@ -425,7 +411,7 @@ public sealed class RunnerInstallService
             SafeRunnerName = safeName,
             Mode = RunnerInstallModes.Docker,
             ApiServerUrl = request.ApiServerUrl,
-            InstallRoot = Path.Combine(RunnerInstallsDir, safeName),
+            InstallRoot = Path.Combine(_manifestStore.InstallsDirectory, safeName),
             BinaryPath = string.Empty,
             DockerContainerName = containerName,
             DockerVolumeName = volumeName,
@@ -436,7 +422,7 @@ public sealed class RunnerInstallService
 
         Directory.CreateDirectory(install.InstallRoot);
         SaveInstallRecord(install);
-        SetActiveRunner(install.SafeRunnerName);
+        _manifestStore.SetActiveRunner(install.SafeRunnerName);
 
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, $"container {containerName} started"));
         nextSteps.Add($"Run docker logs -f {containerName}");
@@ -762,7 +748,7 @@ WantedBy=multi-user.target
     private RunnerInstallRecord? LoadInstall(string? runnerName)
     {
         var safeName = string.IsNullOrWhiteSpace(runnerName)
-            ? ReadActiveRunnerSafeName()
+            ? _manifestStore.ReadActiveRunnerSafeName()
             : SanitizeRunnerName(runnerName);
 
         if (string.IsNullOrWhiteSpace(safeName))
@@ -770,14 +756,7 @@ WantedBy=multi-user.target
             return null;
         }
 
-        var path = GetInstallRecordPath(safeName);
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
-        var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<RunnerInstallRecord>(json, JsonOptions);
+        return _manifestStore.Load(safeName);
     }
 
     private RunnerInstallRecord LoadInstallOrThrow(string? runnerName)
@@ -785,21 +764,8 @@ WantedBy=multi-user.target
 
     private void SaveInstallRecord(RunnerInstallRecord record)
     {
-        Directory.CreateDirectory(RunnerInstallsDir);
-        File.WriteAllText(GetInstallRecordPath(record.SafeRunnerName), JsonSerializer.Serialize(record, JsonOptions));
+        _manifestStore.Save(record);
     }
-
-    private static string GetInstallRecordPath(string safeRunnerName)
-        => Path.Combine(RunnerInstallsDir, $"{safeRunnerName}.json");
-
-    private static void SetActiveRunner(string safeRunnerName)
-    {
-        Directory.CreateDirectory(RunnerHome);
-        File.WriteAllText(ActiveRunnerFile, safeRunnerName);
-    }
-
-    private static string? ReadActiveRunnerSafeName()
-        => File.Exists(ActiveRunnerFile) ? File.ReadAllText(ActiveRunnerFile).Trim() : null;
 
     private static async Task<bool> DockerContainerExistsAsync(string containerName, CancellationToken cancellationToken)
     {

@@ -76,35 +76,31 @@ public class AutomatonApiClient : IDisposable
         }
 
         var apps = await ListAppsAsync(ct);
-        if (apps.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var app in apps.EnumerateArray())
-            {
-                var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty)
-                    && publicUrlProperty.ValueKind == JsonValueKind.String
-                    ? publicUrlProperty.GetString()
-                    : null;
-                if (!string.Equals(publicUrl, value, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var appId = app.TryGetProperty("id", out var idProperty)
-                    && idProperty.ValueKind == JsonValueKind.String
-                    ? idProperty.GetString()
-                    : null;
-                if (!Guid.TryParse(appId, out _))
-                {
-                    throw new InvalidOperationException($"The app list returned an invalid ID for slug '{value}'.");
-                }
-
-                return await GetAppAsync(appId!, ct);
-            }
-        }
+        var appId = FindAppIdBySlug(apps, value);
+        if (appId != null) return await GetAppAsync(appId, ct);
 
         throw new InvalidOperationException(
             $"App '{value}' was not found. Use an app ID or exact slug for an app you can access; project apps may require an app ID.");
     }
+
+    private static string? FindAppIdBySlug(JsonElement apps, string slug)
+    {
+        if (apps.ValueKind != JsonValueKind.Array) return null;
+        foreach (var app in apps.EnumerateArray())
+        {
+            if (!string.Equals(GetStringProperty(app, "publicUrl"), slug, StringComparison.OrdinalIgnoreCase)) continue;
+            var appId = GetStringProperty(app, "id");
+            if (!Guid.TryParse(appId, out _))
+                throw new InvalidOperationException($"The app list returned an invalid ID for slug '{slug}'.");
+            return appId;
+        }
+        return null;
+    }
+
+    private static string? GetStringProperty(JsonElement item, string propertyName)
+        => item.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
 
     public async Task<IReadOnlyList<DeploymentTargetInfo>> ListDeploymentTargetsAsync(
         string appId,
@@ -316,16 +312,7 @@ public class AutomatonApiClient : IDisposable
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         content.Add(streamContent, "file", "deploy-package.zip");
 
-        var query = new List<string>();
-        if (clean)
-        {
-            query.Add("clean=true");
-        }
-        if (!string.IsNullOrWhiteSpace(targetSlug))
-        {
-            query.Add($"targetSlug={Uri.EscapeDataString(targetSlug)}");
-        }
-        var url = $"api/apps/{appId}/deploy-package{(query.Count > 0 ? $"?{string.Join("&", query)}" : "")}";
+        var url = BuildDeployPackageUrl(appId, clean, targetSlug);
         var correlationId = Guid.NewGuid().ToString("N");
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
@@ -333,57 +320,74 @@ public class AutomatonApiClient : IDisposable
         };
         request.Headers.TryAddWithoutValidation("X-Automaton-Correlation-Id", correlationId);
 
-        HttpResponseMessage resp;
+        using var resp = await SendUploadRequestAsync(request, url, zipStream, correlationId, ct);
+        return await WaitForDeploymentResultAsync(appId, resp, ct);
+    }
+
+    private static string BuildDeployPackageUrl(string appId, bool clean, string? targetSlug)
+    {
+        var query = new List<string>();
+        if (clean) query.Add("clean=true");
+        if (!string.IsNullOrWhiteSpace(targetSlug)) query.Add($"targetSlug={Uri.EscapeDataString(targetSlug)}");
+        var queryString = query.Count == 0 ? "" : $"?{string.Join("&", query)}";
+        return $"api/apps/{appId}/deploy-package{queryString}";
+    }
+
+    private async Task<HttpResponseMessage> SendUploadRequestAsync(
+        HttpRequestMessage request,
+        string url,
+        Stream zipStream,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            resp = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
-            if (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-
+            if (cancellationToken.IsCancellationRequested) throw;
             throw new CliHttpRequestException(
                 BuildUploadDiagnostic(_http.BaseAddress, url, GetPackageBytes(zipStream), correlationId, ex),
-                correlationId,
-                ex);
-        }
-
-        using (resp)
-        {
-            await EnsureSuccessAsync(resp);
-            var accepted = await ReadJsonAsync(resp, ct);
-            if (!accepted.TryGetProperty("operationId", out var operationIdProperty)
-                || !Guid.TryParse(operationIdProperty.GetString(), out var operationId))
-            {
-                throw new InvalidOperationException("Deploy package response did not contain an operation ID.");
-            }
-
-            while (true)
-            {
-                using var statusResponse = await _http.GetAsync(
-                    $"api/apps/{appId}/deploy-operations/{operationId}",
-                    ct);
-                await EnsureSuccessAsync(statusResponse);
-                var status = await ReadJsonAsync(statusResponse, ct);
-                var operationStatus = status.TryGetProperty("status", out var statusProperty)
-                    ? statusProperty.GetString()
-                    : null;
-                if (string.Equals(operationStatus, "Succeeded", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(operationStatus, "Failed", StringComparison.OrdinalIgnoreCase))
-                {
-                    return status.TryGetProperty("result", out var result)
-                        && result.ValueKind == JsonValueKind.Object
-                        ? result.Clone()
-                        : status;
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(1), ct);
-            }
+                correlationId, ex);
         }
     }
+
+    private async Task<JsonElement> WaitForDeploymentResultAsync(
+        string appId,
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        await EnsureSuccessAsync(response);
+        var accepted = await ReadJsonAsync(response, cancellationToken);
+        var operationId = GetDeploymentOperationId(accepted);
+        while (true)
+        {
+            using var statusResponse = await _http.GetAsync($"api/apps/{appId}/deploy-operations/{operationId}", cancellationToken);
+            await EnsureSuccessAsync(statusResponse);
+            var status = await ReadJsonAsync(statusResponse, cancellationToken);
+            if (IsTerminalDeploymentStatus(status)) return GetDeploymentResult(status);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+    }
+
+    private static Guid GetDeploymentOperationId(JsonElement accepted)
+        => accepted.TryGetProperty("operationId", out var operationIdProperty)
+            && Guid.TryParse(operationIdProperty.GetString(), out var operationId)
+                ? operationId
+                : throw new InvalidOperationException("Deploy package response did not contain an operation ID.");
+
+    private static bool IsTerminalDeploymentStatus(JsonElement status)
+    {
+        var value = GetStringProperty(status, "status");
+        return string.Equals(value, "Succeeded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "Failed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static JsonElement GetDeploymentResult(JsonElement status)
+        => status.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object
+            ? result.Clone()
+            : status;
 
     private static long? GetPackageBytes(Stream stream)
     {

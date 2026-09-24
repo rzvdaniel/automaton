@@ -29,70 +29,20 @@ public class NewAppServiceTests
     public async Task CreateAsync_WhenNameAndCredentialsArePresent_CreatesAppAndWritesProjectFiles()
     {
         var projectRoot = CreateProjectRoot();
-        var references = GetReferenceSources();
-        var service = new NewAppService(
-            new ConfigService(),
-            (_, _, name, _) => Task.FromResult(((string)"app-123", name)),
-            (_, _, _) => Task.FromResult(references));
+        var result = await CreateSuccessfulService().CreateAsync(
+            projectRoot, "My App", "https://automaton.monster", "ak_test", "local");
 
-        var result = await service.CreateAsync(projectRoot, "My App", "https://automaton.monster", "ak_test", "local");
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.AppId, Is.EqualTo("app-123"));
-        Assert.That(result.Name, Is.EqualTo("My App"));
-        Assert.That(result.Checks.Any(check => check.Name == "aiGuidance" && check.Success), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
-        Assert.That(File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md")), Does.Contain("automaton validate"));
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
-        var skill = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
-        Assert.That(skill, Does.Contain("Prefer a Standard or Hosted Runner for ordinary applications"));
-        Assert.That(skill, Does.Contain("automaton target approve <environment>"));
-        Assert.That(skill, Does.Contain("automaton target revoke <environment>"));
-        Assert.That(skill, Does.Not.Contain("--acknowledge-privileged-host-access"));
-
-        var configService = new ConfigService();
-        var config = configService.LoadProjectConfig(projectRoot);
-        Assert.That(config.Name, Is.EqualTo("My App"));
-        Assert.That(config.Application, Is.Not.Null);
-        Assert.That(ApplicationContractValidator.Validate(config.Application), Is.Empty);
-        Assert.That(config.AppId, Is.Null);
-        Assert.That(config.Application.Storage.DataDirectory, Is.EqualTo("data"));
-        Assert.That(config.Application.Build.Command, Is.Null);
-        var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
-        Assert.That(env!.AppId, Is.EqualTo("app-123"));
-        Assert.That(env.Server, Is.EqualTo("https://automaton.monster"));
-        Assert.That(env.ApiKey, Is.Null);
+        AssertSuccessfulScaffold(result, projectRoot);
     }
 
     [Test]
     public async Task CreateAsync_WhenRemoteCreationFails_LeavesLocalScaffoldForLaterLinking()
     {
         var projectRoot = CreateProjectRoot();
-        var references = GetReferenceSources();
-        var service = new NewAppService(
-            new ConfigService(),
-            (_, _, _, _) => throw new HttpRequestException("API error 500 Internal Server Error"),
-            (_, _, _) => Task.FromResult(references));
+        var result = await CreateFailingService().CreateAsync(
+            projectRoot, "My App", "https://automaton.monster", "ak_test", "local");
 
-        var result = await service.CreateAsync(projectRoot, "My App", "https://automaton.monster", "ak_test", "local");
-
-        Assert.That(result.Success, Is.False);
-        Assert.That(result.ConfigPath, Is.EqualTo(Path.Combine(projectRoot, "automaton.json")));
-        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success), Is.True);
-        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.AiGuidance && check.Success), Is.True);
-        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success), Is.True);
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Retry remote app creation with automaton create"));
-
-        var config = new ConfigService().TryLoadProjectConfig(projectRoot);
-        Assert.That(config, Is.Not.Null);
-        Assert.That(config!.AppId, Is.Null);
-        Assert.That(config.Name, Is.EqualTo("My App"));
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
+        AssertRemoteCreationFailure(result, projectRoot);
     }
 
     [Test]
@@ -216,6 +166,88 @@ public class NewAppServiceTests
         Assert.That(configService.LoadNamedEnvironmentConfig(projectRoot, "staging")?.AppId, Is.EqualTo("app-staging"));
         Assert.That(configService.LoadNamedEnvironmentConfig(projectRoot, "live"), Is.Null);
         Assert.That(configService.LoadProjectEnvironmentSelection(projectRoot).Default, Is.EqualTo("staging"));
+    }
+
+    private static NewAppService CreateSuccessfulService()
+    {
+        var references = GetReferenceSources();
+        return new NewAppService(
+            new ConfigService(),
+            (_, _, name, _) => Task.FromResult(("app-123", name)),
+            (_, _, _) => Task.FromResult(references));
+    }
+
+    private static NewAppService CreateFailingService()
+    {
+        var references = GetReferenceSources();
+        return new NewAppService(
+            new ConfigService(),
+            (_, _, _, _) => throw new HttpRequestException("API error 500 Internal Server Error"),
+            (_, _, _) => Task.FromResult(references));
+    }
+
+    private static void AssertSuccessfulScaffold(NewAppResult result, string projectRoot)
+    {
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.AppId, Is.EqualTo("app-123"));
+        Assert.That(result.Name, Is.EqualTo("My App"));
+        Assert.That(result.Checks.Any(check => check.Name == "aiGuidance" && check.Success), Is.True);
+        AssertScaffoldFiles(projectRoot);
+        AssertScaffoldConfig(projectRoot);
+    }
+
+    private static void AssertScaffoldFiles(string projectRoot)
+    {
+        Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references")), Is.False);
+        Assert.That(File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md")), Does.Contain("automaton validate"));
+        var skillPath = Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md");
+        Assert.That(File.Exists(skillPath), Is.True);
+        var skill = File.ReadAllText(skillPath);
+        Assert.That(skill, Does.Contain("Prefer a Standard or Hosted Runner for ordinary applications"));
+        Assert.That(skill, Does.Contain("automaton target approve <environment>"));
+        Assert.That(skill, Does.Contain("automaton target revoke <environment>"));
+        Assert.That(skill, Does.Not.Contain("--acknowledge-privileged-host-access"));
+    }
+
+    private static void AssertScaffoldConfig(string projectRoot)
+    {
+        var configService = new ConfigService();
+        var config = configService.LoadProjectConfig(projectRoot);
+        Assert.That(config.Name, Is.EqualTo("My App"));
+        Assert.That(config.Application, Is.Not.Null);
+        Assert.That(ApplicationContractValidator.Validate(config.Application), Is.Empty);
+        Assert.That(config.AppId, Is.Null);
+        Assert.That(config.Application.Storage.DataDirectory, Is.EqualTo("data"));
+        Assert.That(config.Application.Build.Command, Is.Null);
+        var environment = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
+        Assert.That(environment?.AppId, Is.EqualTo("app-123"));
+        Assert.That(environment?.Server, Is.EqualTo("https://automaton.monster"));
+        Assert.That(environment?.ApiKey, Is.Null);
+    }
+
+    private static void AssertRemoteCreationFailure(NewAppResult result, string projectRoot)
+    {
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.ConfigPath, Is.EqualTo(Path.Combine(projectRoot, "automaton.json")));
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success), Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.AiGuidance && check.Success), Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success), Is.True);
+        Assert.That(result.NextSteps, Has.Some.EqualTo("Retry remote app creation with automaton create"));
+        AssertFailureScaffold(projectRoot);
+    }
+
+    private static void AssertFailureScaffold(string projectRoot)
+    {
+        var config = new ConfigService().TryLoadProjectConfig(projectRoot);
+        Assert.That(config, Is.Not.Null);
+        Assert.That(config!.AppId, Is.Null);
+        Assert.That(config.Name, Is.EqualTo("My App"));
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
     }
 
     private string CreateProjectRoot()
