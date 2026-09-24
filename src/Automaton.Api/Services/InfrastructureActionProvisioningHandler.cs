@@ -42,52 +42,96 @@ public sealed class InfrastructureActionProvisioningHandler(
             .SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken)
             ?? throw new UnauthorizedAccessException("The infrastructure command operation was not found.");
 
-        if (!ActiveDeploymentStatuses.Contains(operation.Status, StringComparer.Ordinal))
-        {
-            if (IsTerminalDeployment(operation.Status)) return true;
-            throw new InvalidOperationException("The infrastructure command operation is not in a terminalizable state.");
-        }
+        EnsureTerminalizable(operation.Status);
 
         var now = DateTime.UtcNow;
         if (db.Database.IsRelational())
         {
-            var affected = await db.HostedRunnerDeployments
-                .Where(x => x.Id == operationId && ActiveDeploymentStatuses.Contains(x.Status))
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
-                    .SetProperty(x => x.Error, reason)
-                    .SetProperty(x => x.FinishedAt, now), cancellationToken);
-            if (affected != 1)
-            {
-                db.ChangeTracker.Clear();
-                var current = await db.HostedRunnerDeployments.AsNoTracking()
-                    .SingleAsync(x => x.Id == operationId, cancellationToken);
-                if (IsTerminalDeployment(current.Status)) return true;
-                throw new InvalidOperationException("The infrastructure command operation changed state during terminalization.");
-            }
-
-            var hostedRunnerAffected = await db.HostedRunners
-                .Where(x => x.Id == operation.HostedRunnerId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, operation.Action == HostedRunnerDeploymentActions.Deprovision
-                        ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed)
-                    .SetProperty(x => x.LastError, reason)
-                    .SetProperty(x => x.UpdatedAt, now), cancellationToken);
-            if (hostedRunnerAffected != 1)
-                throw new InvalidOperationException("The hosted Runner could not be terminalized with its infrastructure command.");
+            if (!await TryTerminalizeRelationalAsync(operation, operationId, reason, now, cancellationToken))
+                return true;
         }
         else
         {
-            operation.Status = HostedRunnerDeploymentStatuses.Failed;
-            operation.Error = reason;
-            operation.FinishedAt = now;
-            operation.HostedRunner.Status = operation.Action == HostedRunnerDeploymentActions.Deprovision
-                ? HostedRunnerStatuses.DeleteFailed : HostedRunnerStatuses.Failed;
-            operation.HostedRunner.LastError = reason;
-            operation.HostedRunner.UpdatedAt = now;
-            await db.SaveChangesAsync(cancellationToken);
+            await ApplyInMemoryTerminalizationAsync(operation, reason, now, cancellationToken);
         }
 
+        await WriteTerminalizationAuditAsync(operation, operationId, actionKey, reason, cancellationToken);
+        return true;
+    }
+
+    private static void EnsureTerminalizable(string status)
+    {
+        if (ActiveDeploymentStatuses.Contains(status, StringComparer.Ordinal) || IsTerminalDeployment(status))
+            return;
+        throw new InvalidOperationException("The infrastructure command operation is not in a terminalizable state.");
+    }
+
+    private async Task<bool> TryTerminalizeRelationalAsync(
+        HostedRunnerDeployment operation,
+        Guid operationId,
+        string reason,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var affected = await db.HostedRunnerDeployments
+            .Where(x => x.Id == operationId && ActiveDeploymentStatuses.Contains(x.Status))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
+                .SetProperty(x => x.Error, reason)
+                .SetProperty(x => x.FinishedAt, now), cancellationToken);
+        if (affected != 1)
+            return await ConfirmTerminalizationRaceAsync(operationId, cancellationToken);
+
+        var hostedRunnerAffected = await db.HostedRunners
+            .Where(x => x.Id == operation.HostedRunnerId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, GetFailureStatus(operation.Action))
+                .SetProperty(x => x.LastError, reason)
+                .SetProperty(x => x.UpdatedAt, now), cancellationToken);
+        if (hostedRunnerAffected != 1)
+            throw new InvalidOperationException("The hosted Runner could not be terminalized with its infrastructure command.");
+        return true;
+    }
+
+    private async Task<bool> ConfirmTerminalizationRaceAsync(
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        var current = await db.HostedRunnerDeployments.AsNoTracking()
+            .SingleAsync(x => x.Id == operationId, cancellationToken);
+        if (IsTerminalDeployment(current.Status))
+            return false;
+        throw new InvalidOperationException("The infrastructure command operation changed state during terminalization.");
+    }
+
+    private async Task ApplyInMemoryTerminalizationAsync(
+        HostedRunnerDeployment operation,
+        string reason,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        operation.Status = HostedRunnerDeploymentStatuses.Failed;
+        operation.Error = reason;
+        operation.FinishedAt = now;
+        operation.HostedRunner.Status = GetFailureStatus(operation.Action);
+        operation.HostedRunner.LastError = reason;
+        operation.HostedRunner.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string GetFailureStatus(string action)
+        => action == HostedRunnerDeploymentActions.Deprovision
+            ? HostedRunnerStatuses.DeleteFailed
+            : HostedRunnerStatuses.Failed;
+
+    private async Task WriteTerminalizationAuditAsync(
+        HostedRunnerDeployment operation,
+        Guid operationId,
+        string actionKey,
+        string reason,
+        CancellationToken cancellationToken)
+    {
         var eventType = operation.Action switch
         {
             HostedRunnerDeploymentActions.Restart => AuditEventTypes.RunnerRestartFailed,
@@ -106,7 +150,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             Metadata = new { OperationId = operationId, operation.Action, ActionKey = actionKey, Reason = reason },
             FailOnError = true
         }, cancellationToken);
-        return true;
     }
 
     private static bool IsTerminalDeployment(string status) => status is
@@ -124,149 +167,199 @@ public sealed class InfrastructureActionProvisioningHandler(
             hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         deployment.Error = null;
-        if (actionKey is "provision-hosted-runner" or "reprovision-hosted-runner")
-        {
-            if (!result.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True
-                || !result.TryGetProperty("containerId", out var containerId)
-                || containerId.ValueKind != JsonValueKind.String
-                || string.IsNullOrWhiteSpace(containerId.GetString())
-                || !result.TryGetProperty("containerName", out var containerName)
-                || containerName.ValueKind != JsonValueKind.String
-                || string.IsNullOrWhiteSpace(containerName.GetString()))
-                throw new InvalidOperationException("Infrastructure Action returned an invalid Hosted Runner container identity.");
 
-            hostedRunner.ContainerId = containerId.GetString();
-            hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
-            deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+        if (IsProvisioningAction(actionKey))
+        {
+            ApplyProvisioningResult(hostedRunner, deployment, result);
             return;
         }
 
         if (actionKey == "restart-hosted-runner")
         {
-            deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
-            if (!deployment.ExpectedRunnerId.HasValue)
-                throw new InvalidOperationException("The restart operation has no expected Runner identity.");
-            var now = DateTime.UtcNow;
-            var timeoutSeconds = Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900);
-            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
-            deployment.ReconnectAfterUtc ??= deployment.StartedAt;
-            deployment.ReconnectDeadlineUtc = now.AddSeconds(timeoutSeconds);
-            deployment.Logs = "Restart command completed; waiting for the hosted Runner to reconnect and heartbeat.";
+            ApplyRestartResult(hostedRunner, deployment);
             return;
         }
 
         if (actionKey == StorageEnforcementActions.SuspendHostedRunner)
         {
-            hostedRunner.Status = HostedRunnerStatuses.Suspended;
-            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
-            hostedRunner.SuspendedAtUtc = DateTime.UtcNow;
-            hostedRunner.LastEnforcementReason = "Hosted Runner container was stopped after the storage grace period.";
-            deployment.Logs = "Hosted Runner container stopped; persistent volumes were preserved.";
-            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
-            deployment.FinishedAt = DateTime.UtcNow;
+            ApplySuspensionResult(hostedRunner, deployment);
             await WriteLifecycleAuditAsync(hostedRunner, actionKey, succeeded: true, null, cancellationToken);
             return;
         }
 
         if (actionKey == StorageEnforcementActions.ResumeHostedRunner)
         {
-            hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
-            deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
-            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
-            deployment.ReconnectAfterUtc ??= deployment.StartedAt;
-            deployment.ReconnectDeadlineUtc = DateTime.UtcNow.AddSeconds(Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900));
-            deployment.Logs = "Resume command completed; waiting for the hosted Runner to reconnect.";
+            ApplyResumeResult(hostedRunner, deployment);
             return;
         }
 
         if (actionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
-        {
-            RunnerStorageTelemetryService.EnsureAllowance(hostedRunner);
-            var verification = await db.HostedRunnerStorageVerifications
-                .FirstOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
-                ?? throw new InvalidOperationException("Storage verification request was not found.");
-            var systemBytes = ReadNonNegativeInt64(result, "systemBytes");
-            var userBytes = ReadNonNegativeInt64(result, "userBytes");
-            var totalBytes = ReadNonNegativeInt64(result, "totalBytes");
-            if (!result.TryGetProperty("usageSource", out var usageSource)
-                || usageSource.ValueKind != JsonValueKind.String
-                || !string.Equals(usageSource.GetString(), "xfs-project-quota", StringComparison.Ordinal))
-                throw new InvalidOperationException("Storage verification did not report authoritative XFS project-quota usage.");
-            if (systemBytes + userBytes != totalBytes)
-                throw new InvalidOperationException("Storage verification returned inconsistent totals.");
-            var now = DateTime.UtcNow;
-            db.HostedRunnerStorageObservations.Add(new HostedRunnerStorageObservation
-            {
-                Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
-                Source = StorageMeasurementSources.InfrastructureRunnerVerified,
-                MeasuredAtUtc = now, ReceivedAtUtc = now,
-                SystemBytes = systemBytes, UserBytes = userBytes, TotalBytes = totalBytes,
-                Success = true
-            });
-            hostedRunner.StorageVerifiedAtUtc = now;
-            hostedRunner.StorageVerifiedSystemBytes = systemBytes;
-            hostedRunner.StorageVerifiedUserBytes = userBytes;
-            hostedRunner.StorageVerifiedTotalBytes = totalBytes;
-            hostedRunner.StorageMeasuredAtUtc = now;
-            hostedRunner.StorageReceivedAtUtc = now;
-            hostedRunner.StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified;
-            hostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded;
-            hostedRunner.StorageSystemBytes = systemBytes;
-            hostedRunner.StorageUserBytes = userBytes;
-            hostedRunner.StorageTotalBytes = totalBytes;
-            hostedRunner.StorageUsagePercent = hostedRunner.StorageAllowanceBytes > 0
-                ? totalBytes * 100m / hostedRunner.StorageAllowanceBytes : null;
-            var newStorageState = StorageTelemetryPolicy.EvaluateHostedRunner(
-                hostedRunner.StorageAllowanceBytes, totalBytes, success: true, storageTelemetryOptions.Value);
-            if (!string.Equals(hostedRunner.StorageState, newStorageState, StringComparison.Ordinal))
-            {
-                db.AuditEvents.Add(new AuditEvent
-                {
-                    Id = Guid.NewGuid(), Category = LogCategories.Audit, Action = AuditActions.Changed,
-                    EntityType = AuditEntityTypes.HostedRunner, EntityId = hostedRunner.Id,
-                    TargetUserId = hostedRunner.UserId, Outcome = AuditOutcomes.Success,
-                    EventType = StorageTelemetryAuditEvents.HostedRunnerPolicyChanged,
-                    Message = $"Hosted Runner storage policy changed from '{hostedRunner.StorageState}' to '{newStorageState}'.",
-                    MetadataJson = JsonSerializer.Serialize(new { PreviousState = hostedRunner.StorageState, NewState = newStorageState }),
-                    CreatedAtUtc = now
-                });
-            }
-            hostedRunner.StorageState = newStorageState;
-            hostedRunner.StorageMeasurementError = null;
-            verification.Status = StorageVerificationStatuses.Succeeded;
-            verification.CompletedAtUtc = now;
-            verification.Error = null;
-        }
+            await ApplyStorageVerificationResultAsync(hostedRunner, deployment, result, cancellationToken);
 
         deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
         deployment.FinishedAt = DateTime.UtcNow;
         deployment.Logs = $"Trusted infrastructure Action '{actionKey}' completed.";
         if (actionKey == "delete-hosted-runner")
-        {
-            hostedRunner.ApiKeyId = null;
-            hostedRunner.RunnerId = null;
-            hostedRunner.ContainerId = null;
-            hostedRunner.RuntimeEndpoint = null;
-            hostedRunner.RuntimePort = null;
-            hostedRunner.Status = HostedRunnerStatuses.Deleted;
-            hostedRunner.DeletedAt = DateTime.UtcNow;
-        }
+            MarkHostedRunnerDeleted(hostedRunner);
         await WriteLifecycleAuditAsync(hostedRunner, actionKey, succeeded: true, null, cancellationToken);
+    }
+
+    private static bool IsProvisioningAction(string actionKey)
+        => actionKey is "provision-hosted-runner" or "reprovision-hosted-runner";
+
+    private static void ApplyProvisioningResult(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        JsonElement result)
+    {
+        if (!result.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True
+            || !result.TryGetProperty("containerId", out var containerId)
+            || containerId.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(containerId.GetString())
+            || !result.TryGetProperty("containerName", out var containerName)
+            || containerName.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(containerName.GetString()))
+            throw new InvalidOperationException("Infrastructure Action returned an invalid Hosted Runner container identity.");
+
+        hostedRunner.ContainerId = containerId.GetString();
+        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
+        deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+    }
+
+    private void ApplyRestartResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
+    {
+        deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
+        if (!deployment.ExpectedRunnerId.HasValue)
+            throw new InvalidOperationException("The restart operation has no expected Runner identity.");
+        var now = DateTime.UtcNow;
+        var timeoutSeconds = Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900);
+        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
+        deployment.ReconnectAfterUtc ??= deployment.StartedAt;
+        deployment.ReconnectDeadlineUtc = now.AddSeconds(timeoutSeconds);
+        deployment.Logs = "Restart command completed; waiting for the hosted Runner to reconnect and heartbeat.";
+    }
+
+    private static void ApplySuspensionResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
+    {
+        hostedRunner.Status = HostedRunnerStatuses.Suspended;
+        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+        hostedRunner.SuspendedAtUtc = DateTime.UtcNow;
+        hostedRunner.LastEnforcementReason = "Hosted Runner container was stopped after the storage grace period.";
+        deployment.Logs = "Hosted Runner container stopped; persistent volumes were preserved.";
+        deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
+        deployment.FinishedAt = DateTime.UtcNow;
+    }
+
+    private void ApplyResumeResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
+    {
+        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
+        deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
+        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
+        deployment.ReconnectAfterUtc ??= deployment.StartedAt;
+        deployment.ReconnectDeadlineUtc = DateTime.UtcNow.AddSeconds(
+            Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900));
+        deployment.Logs = "Resume command completed; waiting for the hosted Runner to reconnect.";
+    }
+
+    private async Task ApplyStorageVerificationResultAsync(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        JsonElement result,
+        CancellationToken cancellationToken)
+    {
+        RunnerStorageTelemetryService.EnsureAllowance(hostedRunner);
+        var verification = await db.HostedRunnerStorageVerifications
+            .FirstOrDefaultAsync(x => x.Id == deployment.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Storage verification request was not found.");
+        var systemBytes = ReadNonNegativeInt64(result, "systemBytes");
+        var userBytes = ReadNonNegativeInt64(result, "userBytes");
+        var totalBytes = ReadNonNegativeInt64(result, "totalBytes");
+        EnsureAuthoritativeStorageResult(result, systemBytes, userBytes, totalBytes);
+        var now = DateTime.UtcNow;
+        db.HostedRunnerStorageObservations.Add(new HostedRunnerStorageObservation
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
+            Source = StorageMeasurementSources.InfrastructureRunnerVerified,
+            MeasuredAtUtc = now, ReceivedAtUtc = now,
+            SystemBytes = systemBytes, UserBytes = userBytes, TotalBytes = totalBytes,
+            Success = true
+        });
+        ApplyVerifiedStorageMeasurement(hostedRunner, systemBytes, userBytes, totalBytes, now);
+        verification.Status = StorageVerificationStatuses.Succeeded;
+        verification.CompletedAtUtc = now;
+        verification.Error = null;
+    }
+
+    private static void EnsureAuthoritativeStorageResult(JsonElement result, long systemBytes, long userBytes, long totalBytes)
+    {
+        if (!result.TryGetProperty("usageSource", out var usageSource)
+            || usageSource.ValueKind != JsonValueKind.String
+            || !string.Equals(usageSource.GetString(), "xfs-project-quota", StringComparison.Ordinal))
+            throw new InvalidOperationException("Storage verification did not report authoritative XFS project-quota usage.");
+        if (systemBytes + userBytes != totalBytes)
+            throw new InvalidOperationException("Storage verification returned inconsistent totals.");
+    }
+
+    private void ApplyVerifiedStorageMeasurement(
+        HostedRunner hostedRunner,
+        long systemBytes,
+        long userBytes,
+        long totalBytes,
+        DateTime now)
+    {
+        hostedRunner.StorageVerifiedAtUtc = now;
+        hostedRunner.StorageVerifiedSystemBytes = systemBytes;
+        hostedRunner.StorageVerifiedUserBytes = userBytes;
+        hostedRunner.StorageVerifiedTotalBytes = totalBytes;
+        hostedRunner.StorageMeasuredAtUtc = now;
+        hostedRunner.StorageReceivedAtUtc = now;
+        hostedRunner.StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified;
+        hostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded;
+        hostedRunner.StorageSystemBytes = hostedRunner.StorageVerifiedSystemBytes;
+        hostedRunner.StorageUserBytes = hostedRunner.StorageVerifiedUserBytes;
+        hostedRunner.StorageTotalBytes = totalBytes;
+        hostedRunner.StorageUsagePercent = hostedRunner.StorageAllowanceBytes > 0
+            ? totalBytes * 100m / hostedRunner.StorageAllowanceBytes
+            : null;
+        var newStorageState = StorageTelemetryPolicy.EvaluateHostedRunner(
+            hostedRunner.StorageAllowanceBytes, totalBytes, success: true, storageTelemetryOptions.Value);
+        TrackStoragePolicyChange(hostedRunner, newStorageState, now);
+        hostedRunner.StorageState = newStorageState;
+        hostedRunner.StorageMeasurementError = null;
+    }
+
+    private void TrackStoragePolicyChange(HostedRunner hostedRunner, string newStorageState, DateTime now)
+    {
+        if (string.Equals(hostedRunner.StorageState, newStorageState, StringComparison.Ordinal))
+            return;
+        db.AuditEvents.Add(new AuditEvent
+        {
+            Id = Guid.NewGuid(), Category = LogCategories.Audit, Action = AuditActions.Changed,
+            EntityType = AuditEntityTypes.HostedRunner, EntityId = hostedRunner.Id,
+            TargetUserId = hostedRunner.UserId, Outcome = AuditOutcomes.Success,
+            EventType = StorageTelemetryAuditEvents.HostedRunnerPolicyChanged,
+            Message = $"Hosted Runner storage policy changed from '{hostedRunner.StorageState}' to '{newStorageState}'.",
+            MetadataJson = JsonSerializer.Serialize(new { PreviousState = hostedRunner.StorageState, NewState = newStorageState }),
+            CreatedAtUtc = now
+        });
+    }
+
+    private static void MarkHostedRunnerDeleted(HostedRunner hostedRunner)
+    {
+        hostedRunner.ApiKeyId = null;
+        hostedRunner.RunnerId = null;
+        hostedRunner.ContainerId = null;
+        hostedRunner.RuntimeEndpoint = null;
+        hostedRunner.RuntimePort = null;
+        hostedRunner.Status = HostedRunnerStatuses.Deleted;
+        hostedRunner.DeletedAt = DateTime.UtcNow;
     }
 
     private Task WriteLifecycleAuditAsync(HostedRunner runner, string actionKey, bool succeeded, string? error, CancellationToken cancellationToken)
     {
-        var eventType = actionKey switch
-        {
-            "restart-hosted-runner" => succeeded ? AuditEventTypes.RunnerRestartSucceeded : AuditEventTypes.RunnerRestartFailed,
-            StorageEnforcementActions.SuspendHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementSuspensionSucceeded : StorageTelemetryAuditEvents.EnforcementSuspensionFailed,
-            StorageEnforcementActions.ResumeHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementResumeSucceeded : StorageTelemetryAuditEvents.EnforcementResumeFailed,
-            "delete-hosted-runner" => succeeded ? AuditEventTypes.HostedRunnerDeleted : AuditEventTypes.HostedRunnerDeleteFailed,
-            StorageTelemetryActions.MeasureHostedRunnerStorage => succeeded ? AuditEventTypes.HostedRunnerStorageVerificationSucceeded : AuditEventTypes.HostedRunnerStorageVerificationFailed,
-            _ => succeeded ? AuditEventTypes.HostedRunnerProvisioningSucceeded : AuditEventTypes.HostedRunnerProvisioningFailed
-        };
+        var eventType = GetLifecycleEventType(actionKey, succeeded);
         return auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = succeeded ? AuditActions.Succeeded : AuditActions.Failed,
@@ -279,6 +372,23 @@ public sealed class InfrastructureActionProvisioningHandler(
             Metadata = new { runner.Name, runner.RunnerHostId, ActionKey = actionKey, Error = error }
         }, cancellationToken);
     }
+
+    private static string GetLifecycleEventType(string actionKey, bool succeeded)
+        => (actionKey, succeeded) switch
+        {
+            ("restart-hosted-runner", true) => AuditEventTypes.RunnerRestartSucceeded,
+            ("restart-hosted-runner", false) => AuditEventTypes.RunnerRestartFailed,
+            (StorageEnforcementActions.SuspendHostedRunner, true) => StorageTelemetryAuditEvents.EnforcementSuspensionSucceeded,
+            (StorageEnforcementActions.SuspendHostedRunner, false) => StorageTelemetryAuditEvents.EnforcementSuspensionFailed,
+            (StorageEnforcementActions.ResumeHostedRunner, true) => StorageTelemetryAuditEvents.EnforcementResumeSucceeded,
+            (StorageEnforcementActions.ResumeHostedRunner, false) => StorageTelemetryAuditEvents.EnforcementResumeFailed,
+            ("delete-hosted-runner", true) => AuditEventTypes.HostedRunnerDeleted,
+            ("delete-hosted-runner", false) => AuditEventTypes.HostedRunnerDeleteFailed,
+            (StorageTelemetryActions.MeasureHostedRunnerStorage, true) => AuditEventTypes.HostedRunnerStorageVerificationSucceeded,
+            (StorageTelemetryActions.MeasureHostedRunnerStorage, false) => AuditEventTypes.HostedRunnerStorageVerificationFailed,
+            (_, true) => AuditEventTypes.HostedRunnerProvisioningSucceeded,
+            _ => AuditEventTypes.HostedRunnerProvisioningFailed
+        };
 
     private static long ReadNonNegativeInt64(JsonElement root, string property)
     {
