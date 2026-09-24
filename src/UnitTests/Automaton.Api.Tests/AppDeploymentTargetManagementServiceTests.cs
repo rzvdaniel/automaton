@@ -507,9 +507,11 @@ public class AppDeploymentTargetManagementServiceTests
                 db,
                 authorization,
                 new AppRunnerAuthorizationPolicy(db, authorization),
-                successfulCleanup ? new SuccessfulCleanupHubContext() : new RejectingHubContext(),
                 routeService,
-                new AppDeploymentTargetStateService(db));
+                new AppDeploymentTargetStateService(db),
+                new AppDeploymentTargetRuntimeCleanupService(
+                    db,
+                    successfulCleanup ? new SuccessfulCleanupHubContext() : new RejectingHubContext()));
             return new TestFixtureContext(db, app, service, routeRoot, userId);
         }
 

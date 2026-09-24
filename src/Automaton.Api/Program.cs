@@ -377,6 +377,7 @@ services.AddScoped<AppsService>();
 services.AddScoped<IAppDeploymentTargetResolver, AppDeploymentTargetResolver>();
 services.AddScoped<AppDeploymentTargetStateService>();
 services.AddScoped<AppDeploymentTargetManagementService>();
+services.AddScoped<AppDeploymentTargetRuntimeCleanupService>();
 services.AddScoped<Automaton.Api.Controllers.AppDeploymentTargetExceptionFilter>();
 services.AddScoped<IAppRunnerAuthorizationPolicy, AppRunnerAuthorizationPolicy>();
 services.AddScoped<AppRunnerAssignmentPolicy>();

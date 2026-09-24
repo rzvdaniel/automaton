@@ -4,11 +4,9 @@ using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -17,9 +15,9 @@ public sealed partial class AppDeploymentTargetManagementService(
     ApplicationDbContext dbContext,
     ResourceAuthorizationService authorizationService,
     IAppRunnerAuthorizationPolicy runnerAuthorizationPolicy,
-    IHubContext<AutomatonHub> hubContext,
     BackendRouteConfigService routeConfigService,
-    AppDeploymentTargetStateService targetStateService)
+    AppDeploymentTargetStateService targetStateService,
+    AppDeploymentTargetRuntimeCleanupService runtimeCleanupService)
 {
     public async Task<IReadOnlyList<AppDeploymentTargetSummary>> ListAsync(
         Guid appId, Guid userId, CancellationToken cancellationToken = default)
@@ -223,7 +221,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                     throw new AppDeploymentTargetConflictException(
                         "This target is deployed. Explicit runtime cleanup is required before changing its Runner.");
                 }
-                await CleanupRuntimeAsync(target, cancellationToken);
+                await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
                 ResetDeploymentState(target);
             }
 
@@ -269,7 +267,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             }
             if (IsDeployed(target))
             {
-                await CleanupRuntimeAsync(target, cancellationToken);
+                await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
             }
 
             dbContext.AppDeploymentTargets.Remove(target);
@@ -314,7 +312,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                 var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
                 if (IsDeployed(target))
                 {
-                    await CleanupRuntimeAsync(target, cancellationToken);
+                    await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
                 }
             }
 
@@ -416,72 +414,6 @@ public sealed partial class AppDeploymentTargetManagementService(
         currentDefault.IsDefault = false;
         currentDefault.SynchronizeDefaultConstraint();
         currentDefault.UpdatedAt = now;
-    }
-
-    private async Task CleanupRuntimeAsync(
-        AppDeploymentTarget target, CancellationToken cancellationToken)
-    {
-        target.CleanupPending = true;
-        target.LastCleanupAttemptAt = DateTimeOffset.UtcNow;
-        target.LastCleanupError = null;
-        target.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var runner = target.ExecutionRunner;
-        if (runner == null || string.IsNullOrWhiteSpace(runner.ConnectionId) ||
-            !string.Equals(runner.Status, RunnerStatus.Online.ToString(), StringComparison.OrdinalIgnoreCase))
-        {
-            await RecordCleanupFailureAsync(
-                target,
-                "The assigned Runner must be online to clean up this deployed target.",
-                cancellationToken);
-        }
-
-        try
-        {
-            var result = await hubContext.Clients.Client(runner!.ConnectionId!)
-                .InvokeAsync<CleanupAppDeploymentTargetResult>(
-                    AutomatonHubMethods.CleanupAppDeploymentTarget,
-                    new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id),
-                    cancellationToken);
-            if (!result.Success ||
-                result.AppId != target.WebAppId ||
-                result.DeploymentTargetId != target.Id)
-            {
-                await RecordCleanupFailureAsync(
-                    target,
-                    result.Error ?? "The Runner could not clean up this deployment target.",
-                    cancellationToken);
-            }
-        }
-        catch (AppDeploymentTargetConflictException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            await RecordCleanupFailureAsync(
-                target,
-                "Runner cleanup request failed. Retry when the Runner is online.",
-                CancellationToken.None);
-        }
-
-        target.CleanupPending = false;
-        target.LastCleanupError = null;
-        target.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task RecordCleanupFailureAsync(
-        AppDeploymentTarget target,
-        string error,
-        CancellationToken cancellationToken)
-    {
-        target.CleanupPending = true;
-        target.LastCleanupError = error.Length <= 1000 ? error : error[..1000];
-        target.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        throw new AppDeploymentTargetConflictException(target.LastCleanupError);
     }
 
     private static void ResetDeploymentState(AppDeploymentTarget target)
