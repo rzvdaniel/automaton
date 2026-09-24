@@ -25,46 +25,67 @@ public sealed class InfrastructureWorkflowExecutionService(
         Guid requestedByUserId,
         CancellationToken cancellationToken)
     {
-        if (request.RunnerHostId == Guid.Empty)
-        {
-            throw new ArgumentException("Runner host is required.");
-        }
-
-        var idempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey)
-            ? $"host-validation:{request.RunnerHostId:N}:{Guid.NewGuid():N}"
-            : request.IdempotencyKey.Trim();
-
-        var existing = await db.InfrastructureWorkflowExecutions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+        ValidateHostId(request.RunnerHostId);
+        var idempotencyKey = ResolveIdempotencyKey(request);
+        var existing = await FindExistingExecutionAsync(idempotencyKey, cancellationToken);
         if (existing != null)
         {
             return Map(existing);
         }
 
-        var host = await db.RunnerHosts
+        var host = await LoadHostAsync(request.RunnerHostId, cancellationToken);
+        var runner = ValidateRunnerForHostValidation(host, host.InfrastructureRunner, request.RunnerId);
+        var execution = CreateExecution(requestedByUserId, host, runner, idempotencyKey);
+        await MarkExecutionRunningAsync(execution, cancellationToken);
+        await ExecuteAndFinalizeAsync(execution, host, requestedByUserId, cancellationToken);
+        return Map(execution);
+    }
+
+    private static void ValidateHostId(Guid runnerHostId)
+    {
+        if (runnerHostId == Guid.Empty)
+            throw new ArgumentException("Runner host is required.");
+    }
+
+    private static string ResolveIdempotencyKey(StartHostValidationRequest request)
+        => string.IsNullOrWhiteSpace(request.IdempotencyKey)
+            ? $"host-validation:{request.RunnerHostId:N}:{Guid.NewGuid():N}"
+            : request.IdempotencyKey.Trim();
+
+    private Task<InfrastructureWorkflowExecution?> FindExistingExecutionAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+        => db.InfrastructureWorkflowExecutions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+
+    private async Task<RunnerHost> LoadHostAsync(Guid runnerHostId, CancellationToken cancellationToken)
+        => await db.RunnerHosts
             .Include(x => x.InfrastructureRunner)
-            .FirstOrDefaultAsync(x => x.Id == request.RunnerHostId, cancellationToken)
+            .FirstOrDefaultAsync(x => x.Id == runnerHostId, cancellationToken)
             ?? throw new InvalidOperationException("The target Runner host was not found.");
 
-        var runner = host.InfrastructureRunner;
+    private static Runner ValidateRunnerForHostValidation(
+        RunnerHost host,
+        Runner? runner,
+        Guid? requestedRunnerId)
+    {
         if (runner == null || !host.InfrastructureRunnerId.HasValue)
-        {
             throw new InvalidOperationException("The Runner host has no linked Infrastructure Runner.");
-        }
-
-        if (request.RunnerId.HasValue && request.RunnerId != runner.Id)
-        {
+        if (requestedRunnerId.HasValue && requestedRunnerId != runner.Id)
             throw new InvalidOperationException("The selected Runner is not the active Infrastructure Runner for this host.");
-        }
-
         if (!RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.WorkflowExecution, runner.Purpose)
             || !RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.HostExecution, runner.Purpose))
-        {
             throw new InvalidOperationException("The Infrastructure Runner does not have the capabilities required for host validation.");
-        }
+        return runner;
+    }
 
-        var execution = new InfrastructureWorkflowExecution
+    private static InfrastructureWorkflowExecution CreateExecution(
+        Guid requestedByUserId,
+        RunnerHost host,
+        Runner runner,
+        string idempotencyKey)
+        => new()
         {
             Id = Guid.NewGuid(),
             WorkflowVersionId = HostValidationWorkflowVersion,
@@ -76,45 +97,26 @@ public sealed class InfrastructureWorkflowExecutionService(
             CreatedAtUtc = DateTime.UtcNow
         };
 
+    private async Task MarkExecutionRunningAsync(
+        InfrastructureWorkflowExecution execution,
+        CancellationToken cancellationToken)
+    {
         db.InfrastructureWorkflowExecutions.Add(execution);
         await db.SaveChangesAsync(cancellationToken);
-
         execution.Status = InfrastructureWorkflowExecutionStatuses.Running;
         execution.StartedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+    }
 
+    private async Task ExecuteAndFinalizeAsync(
+        InfrastructureWorkflowExecution execution,
+        RunnerHost host,
+        Guid requestedByUserId,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            var result = await commandExecutor.ExecuteScriptAsync(
-                host,
-                BuildHostValidationScript(hostedRunnerOptions.Value.DockerNetwork),
-                cancellationToken);
-            execution.ExitCode = result.ExitStatus;
-            execution.ResultJson = result.Succeeded && LooksLikeJson(result.StandardOutput)
-                ? result.StandardOutput.Trim()
-                : null;
-            execution.Error = result.Succeeded ? null : Limit(result.StandardError);
-            execution.Status = result.Succeeded
-                ? InfrastructureWorkflowExecutionStatuses.Succeeded
-                : InfrastructureWorkflowExecutionStatuses.Failed;
-
-            if (!result.Succeeded)
-            {
-                host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
-                host.ProvisioningFailureCode = "HostValidationExecutionFailed";
-                host.ProvisioningFailureMessage = Limit(result.StandardError, 2000);
-                host.HostedRunnerSchedulingEnabled = false;
-                await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
-            }
-
-            if (result.Succeeded && execution.ResultJson != null)
-            {
-                ApplyHostValidationSnapshot(host, execution.ResultJson);
-                await UpdateProvisioningOperationFromValidationAsync(host, cancellationToken);
-            }
-
-            AppendLogs(execution, result.StandardOutput, "stdout");
-            AppendLogs(execution, result.StandardError, "stderr");
+            await CaptureValidationResultAsync(execution, host, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -135,6 +137,56 @@ public sealed class InfrastructureWorkflowExecutionService(
             logger.LogError(ex, "Infrastructure workflow execution {ExecutionId} failed", execution.Id);
         }
 
+        await PersistExecutionAndAuditAsync(execution, requestedByUserId, cancellationToken);
+    }
+
+    private async Task CaptureValidationResultAsync(
+        InfrastructureWorkflowExecution execution,
+        RunnerHost host,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandExecutor.ExecuteScriptAsync(
+            host,
+            BuildHostValidationScript(hostedRunnerOptions.Value.DockerNetwork),
+            cancellationToken);
+        execution.ExitCode = result.ExitStatus;
+        execution.ResultJson = result.Succeeded && LooksLikeJson(result.StandardOutput)
+            ? result.StandardOutput.Trim()
+            : null;
+        execution.Error = result.Succeeded ? null : Limit(result.StandardError);
+        execution.Status = result.Succeeded
+            ? InfrastructureWorkflowExecutionStatuses.Succeeded
+            : InfrastructureWorkflowExecutionStatuses.Failed;
+
+        if (!result.Succeeded)
+        {
+            MarkExecutionFailed(host, result.StandardError);
+            await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
+        }
+
+        if (result.Succeeded && execution.ResultJson != null)
+        {
+            ApplyHostValidationSnapshot(host, execution.ResultJson);
+            await UpdateProvisioningOperationFromValidationAsync(host, cancellationToken);
+        }
+
+        AppendLogs(execution, result.StandardOutput, "stdout");
+        AppendLogs(execution, result.StandardError, "stderr");
+    }
+
+    private static void MarkExecutionFailed(RunnerHost host, string standardError)
+    {
+        host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
+        host.ProvisioningFailureCode = "HostValidationExecutionFailed";
+        host.ProvisioningFailureMessage = Limit(standardError, 2000);
+        host.HostedRunnerSchedulingEnabled = false;
+    }
+
+    private async Task PersistExecutionAndAuditAsync(
+        InfrastructureWorkflowExecution execution,
+        Guid requestedByUserId,
+        CancellationToken cancellationToken)
+    {
         execution.CompletedAtUtc = DateTime.UtcNow;
         db.InfrastructureWorkflowExecutions.Update(execution);
         db.InfrastructureWorkflowExecutionLogs.AddRange(execution.Logs);
@@ -153,8 +205,6 @@ public sealed class InfrastructureWorkflowExecutionService(
             ActorUserId = requestedByUserId,
             Metadata = new { execution.Id, execution.TargetRunnerHostId, execution.TargetRunnerId, execution.Status }
         }, cancellationToken);
-
-        return Map(execution);
     }
 
     public async Task<InfrastructureWorkflowExecutionResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -265,49 +315,69 @@ public sealed class InfrastructureWorkflowExecutionService(
     {
         using var document = JsonDocument.Parse(resultJson);
         var root = document.RootElement;
+        ApplyMetadataSnapshot(host, root);
+        ApplyHealthSnapshot(host, root);
+        ApplyNetworkSnapshot(host, root);
+        ApplyResourceSnapshot(host, root);
+        host.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ApplyMetadataSnapshot(RunnerHost host, JsonElement root)
+    {
         if (root.TryGetProperty("metadata", out var metadata)
             && metadata.ValueKind == JsonValueKind.Object)
-        {
             host.MetadataJson = metadata.GetRawText();
-        }
+    }
 
-        if (root.TryGetProperty("health", out var health)
-            && health.ValueKind == JsonValueKind.Object)
+    private static void ApplyHealthSnapshot(RunnerHost host, JsonElement root)
+    {
+        if (!root.TryGetProperty("health", out var health)
+            || health.ValueKind != JsonValueKind.Object)
+            return;
+
+        host.HealthJson = health.GetRawText();
+        var healthy = IsHealthCheckHealthy(health, "docker")
+            && IsHealthCheckHealthy(health, "network")
+            && IsHealthCheckHealthy(health, "disk");
+        if (healthy)
         {
-            host.HealthJson = health.GetRawText();
-
-            var dockerHealthy = health.TryGetProperty("docker", out var docker)
-                && string.Equals(docker.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
-            var networkHealthy = health.TryGetProperty("network", out var networkHealth)
-                && string.Equals(networkHealth.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
-            var diskHealthy = health.TryGetProperty("disk", out var diskHealth)
-                && string.Equals(diskHealth.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
-            if (dockerHealthy && networkHealthy && diskHealthy)
-            {
-                var isLocalDevelopmentHost = host.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker;
-                var wasApproved = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
-                    && host.ApprovedAtUtc.HasValue;
-                host.ProvisioningStatus = isLocalDevelopmentHost || wasApproved
-                    ? RunnerHostProvisioningStatuses.Ready
-                    : RunnerHostProvisioningStatuses.AwaitingApproval;
-                host.ValidatedAtUtc = DateTime.UtcNow;
-                host.ProvisioningFailureCode = null;
-                host.ProvisioningFailureMessage = null;
-                if (!isLocalDevelopmentHost && !wasApproved)
-                {
-                    host.HostedRunnerSchedulingEnabled = false;
-                }
-            }
-            else
-            {
-                host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
-                host.ValidatedAtUtc = null;
-                host.ProvisioningFailureCode = "HostValidationFailed";
-                host.ProvisioningFailureMessage = "One or more host validation checks failed.";
-                host.HostedRunnerSchedulingEnabled = false;
-            }
+            MarkHostValidationSucceeded(host);
+            return;
         }
 
+        MarkHostValidationFailed(host, "One or more host validation checks failed.");
+    }
+
+    private static bool IsHealthCheckHealthy(JsonElement health, string checkName)
+        => health.TryGetProperty(checkName, out var check)
+            && string.Equals(check.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
+
+    private static void MarkHostValidationSucceeded(RunnerHost host)
+    {
+        var isLocalDevelopmentHost = host.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker;
+        var wasApproved = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
+            && host.ApprovedAtUtc.HasValue;
+        host.ProvisioningStatus = isLocalDevelopmentHost || wasApproved
+            ? RunnerHostProvisioningStatuses.Ready
+            : RunnerHostProvisioningStatuses.AwaitingApproval;
+        host.ValidatedAtUtc = DateTime.UtcNow;
+        host.ProvisioningFailureCode = null;
+        host.ProvisioningFailureMessage = null;
+        if (!isLocalDevelopmentHost && !wasApproved)
+            host.HostedRunnerSchedulingEnabled = false;
+    }
+
+    private static void MarkHostValidationFailed(RunnerHost host, string message)
+    {
+        host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
+        host.ValidatedAtUtc = null;
+        host.ProvisioningFailureCode = "HostValidationFailed";
+        host.ProvisioningFailureMessage = message;
+        host.HostedRunnerSchedulingEnabled = false;
+    }
+
+    private static void ApplyNetworkSnapshot(RunnerHost host, JsonElement root)
+    {
         if (root.TryGetProperty("metadata", out var metadataRoot)
             && metadataRoot.TryGetProperty("network", out var network)
             && network.TryGetProperty("privateIp", out var privateIp)
@@ -317,7 +387,10 @@ public sealed class InfrastructureWorkflowExecutionService(
         {
             host.PrivateIp = privateIp.GetString();
         }
+    }
 
+    private static void ApplyResourceSnapshot(RunnerHost host, JsonElement root)
+    {
         if (TryGetDecimal(root, "totalCpuCores", out var totalCpuCores) && totalCpuCores > 0)
         {
             host.TotalCpuCores = totalCpuCores;
@@ -332,8 +405,6 @@ public sealed class InfrastructureWorkflowExecutionService(
         {
             host.TotalDiskMb = totalDiskMb;
         }
-
-        host.UpdatedAt = DateTime.UtcNow;
     }
 
     private static bool TryGetDecimal(JsonElement root, string propertyName, out decimal value)

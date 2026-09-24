@@ -275,51 +275,87 @@ public class PublishedAppStorageService
         for (var i = 0; i < html.Length; i++)
         {
             var attribute = TryReadReferenceAttribute(html, i);
-            if (attribute is null)
+            if (attribute is null || !TryReadReferenceValue(html, i, attribute, out var reference, out var nextIndex))
             {
                 continue;
             }
 
-            var valueStart = SkipWhitespace(html, i + attribute.Length);
-            if (valueStart >= html.Length || html[valueStart] != '=')
-            {
-                continue;
-            }
-
-            valueStart = SkipWhitespace(html, valueStart + 1);
-            if (valueStart >= html.Length)
-            {
-                continue;
-            }
-
-            var quote = html[valueStart];
-            if (quote is '"' or '\'')
-            {
-                var valueEnd = html.IndexOf(quote, valueStart + 1);
-                if (valueEnd < 0)
-                {
-                    continue;
-                }
-
-                yield return new HtmlReference(attribute, html[(valueStart + 1)..valueEnd].Trim());
-                i = valueEnd;
-                continue;
-            }
-
-            var unquotedEnd = valueStart;
-            while (unquotedEnd < html.Length &&
-                !char.IsWhiteSpace(html[unquotedEnd]) &&
-                html[unquotedEnd] != '>')
-            {
-                unquotedEnd++;
-            }
-
-            if (unquotedEnd > valueStart)
-            {
-                yield return new HtmlReference(attribute, html[valueStart..unquotedEnd].Trim());
-                i = unquotedEnd;
-            }
+            yield return new HtmlReference(attribute, reference);
+            i = nextIndex;
         }
+    }
+
+    private static bool TryReadReferenceValue(
+        string html,
+        int attributeStart,
+        string attribute,
+        out string reference,
+        out int nextIndex)
+    {
+        var valueStart = SkipWhitespace(html, attributeStart + attribute.Length);
+        if (valueStart >= html.Length || html[valueStart] != '=')
+        {
+            reference = string.Empty;
+            nextIndex = 0;
+            return false;
+        }
+
+        valueStart = SkipWhitespace(html, valueStart + 1);
+        if (valueStart >= html.Length)
+        {
+            reference = string.Empty;
+            nextIndex = 0;
+            return false;
+        }
+
+        var quote = html[valueStart];
+        if (quote is '"' or '\'')
+            return TryReadQuotedReference(html, valueStart, quote, out reference, out nextIndex);
+
+        return TryReadUnquotedReference(html, valueStart, out reference, out nextIndex);
+    }
+
+    private static bool TryReadQuotedReference(
+        string html,
+        int valueStart,
+        char quote,
+        out string reference,
+        out int nextIndex)
+    {
+        nextIndex = html.IndexOf(quote, valueStart + 1);
+        if (nextIndex < 0)
+        {
+            reference = string.Empty;
+            nextIndex = 0;
+            return false;
+        }
+
+        reference = html[(valueStart + 1)..nextIndex].Trim();
+        return true;
+    }
+
+    private static bool TryReadUnquotedReference(
+        string html,
+        int valueStart,
+        out string reference,
+        out int nextIndex)
+    {
+        nextIndex = valueStart;
+        while (nextIndex < html.Length &&
+            !char.IsWhiteSpace(html[nextIndex]) &&
+            html[nextIndex] != '>')
+        {
+            nextIndex++;
+        }
+
+        if (nextIndex == valueStart)
+        {
+            reference = string.Empty;
+            return false;
+        }
+
+        reference = html[valueStart..nextIndex].Trim();
+        return true;
     }
 
     private static string? TryReadReferenceAttribute(string html, int index)

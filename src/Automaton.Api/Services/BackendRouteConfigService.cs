@@ -48,6 +48,20 @@ public class BackendRouteConfigService
         Guid? pendingGenericRuntimeTargetId = null,
         bool? pendingGenericRuntimeDeployed = null)
     {
+        var eligibleTargets = CreateEligibleTargets(
+            pendingGenericRuntimeTargetId,
+            pendingGenericRuntimeDeployed);
+        var hostedRoutes = await LoadHostedRoutesAsync(eligibleTargets, cancellationToken);
+        var selfHostedRoutes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
+        var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
+
+        await WriteRoutesAsync(routes, cancellationToken);
+    }
+
+    private IQueryable<Automaton.Api.Entities.AppDeploymentTarget> CreateEligibleTargets(
+        Guid? pendingGenericRuntimeTargetId,
+        bool? pendingGenericRuntimeDeployed)
+    {
         if (pendingGenericRuntimeTargetId.HasValue != pendingGenericRuntimeDeployed.HasValue)
         {
             throw new ArgumentException(
@@ -55,21 +69,23 @@ public class BackendRouteConfigService
                 nameof(pendingGenericRuntimeTargetId));
         }
 
-        var eligibleTargets = dbContext.AppDeploymentTargets.AsNoTracking();
-        if (pendingGenericRuntimeTargetId is { } pendingTargetId)
+        var targets = dbContext.AppDeploymentTargets.AsNoTracking();
+        if (pendingGenericRuntimeTargetId is not { } targetId)
         {
-            var pendingDeploymentState = pendingGenericRuntimeDeployed!.Value;
-            eligibleTargets = eligibleTargets.Where(target =>
-                target.Id == pendingTargetId
-                    ? pendingDeploymentState
-                    : target.GenericRuntimeDeployed);
-        }
-        else
-        {
-            eligibleTargets = eligibleTargets.Where(target => target.GenericRuntimeDeployed);
+            return targets.Where(target => target.GenericRuntimeDeployed);
         }
 
-        var hostedRoutes = await eligibleTargets
+        var deployed = pendingGenericRuntimeDeployed!.Value;
+        return targets.Where(target => target.Id == targetId
+            ? deployed
+            : target.GenericRuntimeDeployed);
+    }
+
+    private async Task<List<RouteTarget>> LoadHostedRoutesAsync(
+        IQueryable<Automaton.Api.Entities.AppDeploymentTarget> eligibleTargets,
+        CancellationToken cancellationToken)
+    {
+        return await eligibleTargets
             .Where(target =>
                 target.ExecutionRunnerId != null)
             .Join(
@@ -104,8 +120,13 @@ public class BackendRouteConfigService
                 false,
                 x.RequiresAuthentication))
             .ToListAsync(cancellationToken);
+    }
 
-        var selfHostedRouteCandidates = await eligibleTargets
+    private async Task<List<RouteTarget>> LoadSelfHostedRoutesAsync(
+        IQueryable<Automaton.Api.Entities.AppDeploymentTarget> eligibleTargets,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await eligibleTargets
             .Where(target =>
                 target.ExecutionRunnerId != null &&
                 !dbContext.HostedRunners.Any(hostedRunner =>
@@ -139,7 +160,7 @@ public class BackendRouteConfigService
             })
             .ToListAsync(cancellationToken);
 
-        var selfHostedRoutes = selfHostedRouteCandidates
+        return candidates
             .Where(candidate => SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(
                 candidate.Purpose,
                 candidate.ApplicationProfile))
@@ -152,9 +173,10 @@ public class BackendRouteConfigService
                 true,
                 candidate.RequiresAuthentication))
             .ToList();
+    }
 
-        var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
-
+    private async Task WriteRoutesAsync(List<RouteTarget> routes, CancellationToken cancellationToken)
+    {
         var rootPath = ResolveRootPath();
         Directory.CreateDirectory(rootPath);
 
@@ -176,6 +198,21 @@ public class BackendRouteConfigService
             return;
         }
 
+        await WriteConfigAtomicallyAsync(routes, targetPath, tempPath, backupPath, cancellationToken);
+
+        logger.LogInformation(
+            "Refreshed managed runtime routes for {RouteCount} target(s) at {TargetPath}",
+            routes.Count,
+            targetPath);
+    }
+
+    private async Task WriteConfigAtomicallyAsync(
+        IReadOnlyCollection<RouteTarget> routes,
+        string targetPath,
+        string tempPath,
+        string backupPath,
+        CancellationToken cancellationToken)
+    {
         var content = BuildConfig(routes);
         await File.WriteAllTextAsync(tempPath, content, new UTF8Encoding(false), cancellationToken);
 
@@ -193,11 +230,6 @@ public class BackendRouteConfigService
             TryDelete(tempPath);
             throw;
         }
-
-        logger.LogInformation(
-            "Refreshed managed runtime routes for {RouteCount} target(s) at {TargetPath}",
-            routes.Count,
-            targetPath);
     }
 
     private string BuildConfig(IReadOnlyCollection<RouteTarget> routes)
@@ -205,6 +237,17 @@ public class BackendRouteConfigService
         var builder = new StringBuilder();
         builder.AppendLine("http:");
 
+        AppendRouters(builder, routes);
+        builder.AppendLine("  middlewares:");
+        AppendMiddlewares(builder, routes);
+        builder.AppendLine("  services:");
+        AppendServices(builder, routes);
+
+        return builder.ToString();
+    }
+
+    private void AppendRouters(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
+    {
         builder.AppendLine("  routers:");
         foreach (var route in routes.Where(route => route.IsDefault))
         {
@@ -232,6 +275,10 @@ public class BackendRouteConfigService
             AppendRuntimeRouter(builder, route, key, host, "/", 50);
         }
 
+    }
+
+    private void AppendMiddlewares(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
+    {
         builder.AppendLine("  middlewares:");
         foreach (var route in routes.Where(route => route.RequiresAuthentication))
         {
@@ -265,6 +312,10 @@ public class BackendRouteConfigService
             AppendRuntimeRewrite(builder, route, key, "^/(.*)$");
         }
 
+    }
+
+    private static void AppendServices(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
+    {
         builder.AppendLine("  services:");
         foreach (var route in routes.Where(route => !route.UsesRuntimeTunnel && !string.IsNullOrWhiteSpace(route.Slug)))
         {
@@ -280,7 +331,6 @@ public class BackendRouteConfigService
             AppendRuntimeService(builder, route, key);
         }
 
-        return builder.ToString();
     }
 
     private static void AppendRuntimeRouter(

@@ -133,18 +133,6 @@ public class SystemAiService : ISystemAiService
                 "System AI request: Provider={Provider}, Model={Model}, UserId={UserId}",
                 providerName, model, userId ?? "anonymous");
 
-            // Capture token counts from provider events so system AI usage is billed
-            int capturedInput = 0, capturedOutput = 0;
-            EventHandler<ConversationUpdatedEvent> tokenCapture = (_, e) =>
-            {
-                foreach (var msg in e.Messages)
-                {
-                    if (msg.InputTokens.HasValue)  capturedInput  = msg.InputTokens.Value;
-                    if (msg.OutputTokens.HasValue) capturedOutput += msg.OutputTokens.Value;
-                }
-            };
-            provider.ConversationUpdated += tokenCapture;
-
             var request = new ConversationRequest
             {
                 Provider = providerName,
@@ -156,35 +144,62 @@ public class SystemAiService : ISystemAiService
                 MaxConsecutiveFailures = 1
             };
 
-            var result = await provider.CallAsync(
-                request,
-                Enumerable.Empty<ProviderTool>(),
-                (_, _, _) => Task.FromResult(string.Empty),
-                CancellationToken.None);
-
-            provider.ConversationUpdated -= tokenCapture;
+            var completion = await CallProviderAsync(provider, request);
 
             // Record usage as telemetry for future analytics and operations.
-            if ((capturedInput > 0 || capturedOutput > 0) && resolvedUserId.HasValue)
+            if ((completion.InputTokens > 0 || completion.OutputTokens > 0) && resolvedUserId.HasValue)
             {
                 await _tokenBudgetService.RecordUsageAsync(
-                    resolvedUserId.Value, providerName, model, capturedInput, capturedOutput);
+                    resolvedUserId.Value, providerName, model, completion.InputTokens, completion.OutputTokens);
 
                 _logger.LogDebug(
                     "System AI usage recorded: UserId={UserId}, Input={Input}, Output={Output}",
-                    userId, capturedInput, capturedOutput);
+                    userId, completion.InputTokens, completion.OutputTokens);
             }
 
             _logger.LogDebug(
                 "System AI response completed: UserId={UserId}, ResponseLength={Length}",
-                userId ?? "anonymous", result.ResponseText.Length);
+                userId ?? "anonymous", completion.ResponseText.Length);
 
-            return result.ResponseText;
+            return completion.ResponseText;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "System AI request failed: UserId={UserId}", userId ?? "anonymous");
             throw;
+        }
+    }
+
+    private static async Task<(string ResponseText, int InputTokens, int OutputTokens)> CallProviderAsync(
+        IAiProvider provider,
+        ConversationRequest request)
+    {
+        var inputTokens = 0;
+        var outputTokens = 0;
+        EventHandler<ConversationUpdatedEvent> tokenCapture = (_, update) =>
+        {
+            foreach (var message in update.Messages)
+            {
+                if (message.InputTokens.HasValue)
+                    inputTokens = message.InputTokens.Value;
+                if (message.OutputTokens.HasValue)
+                    outputTokens += message.OutputTokens.Value;
+            }
+        };
+
+        provider.ConversationUpdated += tokenCapture;
+        try
+        {
+            var result = await provider.CallAsync(
+                request,
+                Enumerable.Empty<ProviderTool>(),
+                (_, _, _) => Task.FromResult(string.Empty),
+                CancellationToken.None);
+            return (result.ResponseText, inputTokens, outputTokens);
+        }
+        finally
+        {
+            provider.ConversationUpdated -= tokenCapture;
         }
     }
 

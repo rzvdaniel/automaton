@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 
@@ -5,6 +6,24 @@ namespace Automaton.Api.Services;
 
 public static class RunnerHostRuntimeAddressValidator
 {
+    private static readonly (uint Network, int PrefixLength)[] NonPublicRanges =
+    [
+        (0x00000000, 8),  // 0.0.0.0/8
+        (0x0A000000, 8),  // 10.0.0.0/8
+        (0x7F000000, 8),  // 127.0.0.0/8
+        (0x64400000, 10), // 100.64.0.0/10
+        (0xA9FE0000, 16), // 169.254.0.0/16
+        (0xAC100000, 12), // 172.16.0.0/12
+        (0xC0000000, 24), // 192.0.0.0/24
+        (0xC0000200, 24), // 192.0.2.0/24
+        (0xC0586300, 24), // 192.88.99.0/24
+        (0xC0A80000, 16), // 192.168.0.0/16
+        (0xC6120000, 15), // 198.18.0.0/15
+        (0xC6336400, 24), // 198.51.100.0/24
+        (0xCB007100, 24), // 203.0.113.0/24
+        (0xE0000000, 3)   // 224.0.0.0/3 and above
+    ];
+
     public static bool TryValidatePublicIpv4(string? value, out string error)
     {
         error = string.Empty;
@@ -15,27 +34,24 @@ public static class RunnerHostRuntimeAddressValidator
             return false;
         }
 
-        var bytes = address.GetAddressBytes();
-        var isPrivateOrSpecialPurpose =
-            bytes[0] is 0 or 10 or 127 ||
-            (bytes[0] == 100 && bytes[1] is >= 64 and <= 127) ||
-            (bytes[0] == 169 && bytes[1] == 254) ||
-            (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
-            (bytes[0] == 192 && bytes[1] == 0 && bytes[2] == 0) ||
-            (bytes[0] == 192 && bytes[1] == 0 && bytes[2] == 2) ||
-            (bytes[0] == 192 && bytes[1] == 88 && bytes[2] == 99) ||
-            (bytes[0] == 192 && bytes[1] == 168) ||
-            (bytes[0] == 198 && bytes[1] is 18 or 19) ||
-            (bytes[0] == 198 && bytes[1] == 51 && bytes[2] == 100) ||
-            (bytes[0] == 203 && bytes[1] == 0 && bytes[2] == 113) ||
-            bytes[0] >= 224;
-
-        if (isPrivateOrSpecialPurpose)
+        if (IsInNonPublicRange(BinaryPrimitives.ReadUInt32BigEndian(address.GetAddressBytes())))
         {
             error = "The public host-port address must be a publicly routable unicast IPv4 address.";
             return false;
         }
 
         return true;
+    }
+
+    private static bool IsInNonPublicRange(uint address)
+    {
+        foreach (var (network, prefixLength) in NonPublicRanges)
+        {
+            var mask = uint.MaxValue << (32 - prefixLength);
+            if ((address & mask) == network)
+                return true;
+        }
+
+        return false;
     }
 }
