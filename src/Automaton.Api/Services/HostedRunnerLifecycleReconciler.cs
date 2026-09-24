@@ -46,40 +46,65 @@ public sealed class HostedRunnerLifecycleReconciler(
         var reconciled = 0;
         foreach (var id in candidates)
         {
-            db.ChangeTracker.Clear();
-            var operation = await db.HostedRunnerDeployments
-                .Include(x => x.HostedRunner).ThenInclude(x => x.RunnerHost)
-                .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-            if (operation == null || !RecoverableStatuses.Contains(operation.Status)) continue;
-            var execution = await db.AppModuleExecutions.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.HostedRunnerOperationId == id, cancellationToken);
-
-            if (execution != null)
-            {
-                if (!IsTerminal(execution.Status)) continue;
-                var reason = execution.Status == AppModuleExecutionStatuses.Succeeded
-                    ? HostedRunnerDeploymentErrors.LifecycleResultAmbiguous
-                    : execution.FailureSummary ?? HostedRunnerDeploymentErrors.LifecycleExecutionFailed;
-                if (await FailAsync(operation, reason, now, cancellationToken)) reconciled++;
-                continue;
-            }
-
-            // All hosted Runner infrastructure actions are durably handed off to
-            // RabbitMQ. Absence of an API-side execution record is expected while
-            // the command is queued or being consumed; do not redispatch it.
-            if (operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision
-                or HostedRunnerDeploymentActions.Restart or HostedRunnerDeploymentActions.Deprovision
-                or HostedRunnerDeploymentActions.Suspend or HostedRunnerDeploymentActions.Resume
-                or HostedRunnerDeploymentActions.VerifyStorage)
-                continue;
-
-            if (await RepublishAsync(operation, now, recoveryCutoff, cancellationToken)) reconciled++;
+            if (await ReconcileCandidateAsync(id, now, recoveryCutoff, cancellationToken))
+                reconciled++;
         }
 
         if (reconciled > 0)
             logger.LogWarning("Reconciled {Count} stale hosted Runner lifecycle operations", reconciled);
         return reconciled;
     }
+
+    private async Task<bool> ReconcileCandidateAsync(
+        Guid operationId,
+        DateTime now,
+        DateTime recoveryCutoff,
+        CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        var operation = await db.HostedRunnerDeployments
+            .Include(x => x.HostedRunner).ThenInclude(x => x.RunnerHost)
+            .SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken);
+        if (operation == null || !RecoverableStatuses.Contains(operation.Status))
+            return false;
+
+        var execution = await db.AppModuleExecutions.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.HostedRunnerOperationId == operationId, cancellationToken);
+        if (execution != null)
+            return await ReconcileExistingExecutionAsync(operation, execution, now, cancellationToken);
+
+        // All hosted Runner infrastructure actions are durably handed off to
+        // RabbitMQ. Absence of an API-side execution record is expected while
+        // the command is queued or being consumed; do not redispatch it.
+        if (IsInfrastructureAction(operation.Action))
+            return false;
+
+        return await RepublishAsync(operation, now, recoveryCutoff, cancellationToken);
+    }
+
+    private async Task<bool> ReconcileExistingExecutionAsync(
+        HostedRunnerDeployment operation,
+        AppModuleExecution execution,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (!IsTerminal(execution.Status))
+            return false;
+
+        var reason = execution.Status == AppModuleExecutionStatuses.Succeeded
+            ? HostedRunnerDeploymentErrors.LifecycleResultAmbiguous
+            : execution.FailureSummary ?? HostedRunnerDeploymentErrors.LifecycleExecutionFailed;
+        return await FailAsync(operation, reason, now, cancellationToken);
+    }
+
+    private static bool IsInfrastructureAction(string action)
+        => action is HostedRunnerDeploymentActions.Provision
+            or HostedRunnerDeploymentActions.Reprovision
+            or HostedRunnerDeploymentActions.Restart
+            or HostedRunnerDeploymentActions.Deprovision
+            or HostedRunnerDeploymentActions.Suspend
+            or HostedRunnerDeploymentActions.Resume
+            or HostedRunnerDeploymentActions.VerifyStorage;
 
     private async Task<bool> RepublishAsync(
         HostedRunnerDeployment operation,
@@ -113,36 +138,63 @@ public sealed class HostedRunnerLifecycleReconciler(
             }
             : BuildInfrastructureRequest(operation, hostedRunner, host);
 
+        return await TryClaimAndPublishAsync(operation, message, now, recoveryCutoff, cancellationToken);
+    }
+
+    private async Task<bool> TryClaimAndPublishAsync(
+        HostedRunnerDeployment operation,
+        object message,
+        DateTime now,
+        DateTime recoveryCutoff,
+        CancellationToken cancellationToken)
+    {
         var claimed = false;
         await transactionalEventExecutor.ExecuteAsync(async token =>
         {
-            if (db.Database.IsRelational())
-            {
-                var affected = await db.HostedRunnerDeployments
-                    .Where(x => x.Id == operation.Id
-                        && RecoverableStatuses.Contains(x.Status)
-                        && (x.LastRecoveryAttemptUtc == null || x.LastRecoveryAttemptUtc <= recoveryCutoff))
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Queued)
-                        .SetProperty(x => x.LastRecoveryAttemptUtc, now), token);
-                if (affected != 1) return;
-            }
-            else
-            {
-                if (!RecoverableStatuses.Contains(operation.Status)
-                    || operation.LastRecoveryAttemptUtc > recoveryCutoff) return;
-                operation.Status = HostedRunnerDeploymentStatuses.Queued;
-                operation.LastRecoveryAttemptUtc = now;
-                await db.SaveChangesAsync(token);
-            }
+            if (!await TryClaimRecoveryAsync(operation, now, recoveryCutoff, token))
+                return;
+
             claimed = true;
-            if (message is ManagedRunnerProvisionRequestedEvent managed)
-                await eventPublisher.PublishAsync(managed, token);
-            else
-                await eventPublisher.PublishAsync((InfrastructureCommandRequestedEvent)message, token);
+            await PublishRecoveryMessageAsync(message, token);
         }, cancellationToken);
         return claimed;
     }
+
+    private async Task<bool> TryClaimRecoveryAsync(
+        HostedRunnerDeployment operation,
+        DateTime now,
+        DateTime recoveryCutoff,
+        CancellationToken cancellationToken)
+    {
+        if (db.Database.IsRelational())
+        {
+            var affected = await db.HostedRunnerDeployments
+                .Where(x => x.Id == operation.Id
+                    && RecoverableStatuses.Contains(x.Status)
+                    && (x.LastRecoveryAttemptUtc == null || x.LastRecoveryAttemptUtc <= recoveryCutoff))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Queued)
+                    .SetProperty(x => x.LastRecoveryAttemptUtc, now), cancellationToken);
+            return affected == 1;
+        }
+
+        if (!RecoverableStatuses.Contains(operation.Status)
+            || operation.LastRecoveryAttemptUtc > recoveryCutoff)
+            return false;
+
+        operation.Status = HostedRunnerDeploymentStatuses.Queued;
+        operation.LastRecoveryAttemptUtc = now;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private Task PublishRecoveryMessageAsync(object message, CancellationToken cancellationToken)
+        => message switch
+        {
+            ManagedRunnerProvisionRequestedEvent managed => eventPublisher.PublishAsync(managed, cancellationToken),
+            InfrastructureCommandRequestedEvent infrastructure => eventPublisher.PublishAsync(infrastructure, cancellationToken),
+            _ => throw new InvalidOperationException("Unsupported hosted Runner recovery message type.")
+        };
 
     private async Task<bool> FailAsync(
         HostedRunnerDeployment operation,
