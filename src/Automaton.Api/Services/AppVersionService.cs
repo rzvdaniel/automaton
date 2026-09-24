@@ -82,6 +82,17 @@ public class AppVersionService
 
         dataContext.AppVersions.Add(appVersion);
 
+        await AddLinkedStepSnapshotsAsync(appVersion.Id, appId);
+
+        await dataContext.SaveChangesAsync();
+
+        logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
+
+        return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
+    }
+
+    private async Task AddLinkedStepSnapshotsAsync(Guid appVersionId, Guid appId)
+    {
         var linkedSteps = await dataContext.WebAppSteps
             .Where(was => was.WebAppId == appId)
             .Include(was => was.CustomStep)
@@ -92,33 +103,23 @@ public class AppVersionService
         {
             var definition = JsonSerializer.Deserialize<CustomStepDefinition>(step.Definition)
                 ?? new CustomStepDefinition();
-
             var variablesSnapshot = JsonSerializer.Serialize(new
             {
                 inputVariables = definition.CodeInputVariables ?? new List<Core.Models.StepVariable>(),
                 outputVariables = definition.CodeOutputVariables ?? new List<Core.Models.StepVariable>()
             });
-
-            var stepSnapshot = new AppVersionStep
+            dataContext.AppVersionSteps.Add(new AppVersionStep
             {
                 Id = Guid.NewGuid(),
-                AppVersionId = appVersion.Id,
+                AppVersionId = appVersionId,
                 StepId = step.Id,
                 StepName = step.Name,
                 Action = AppVersionStepAction.Linked,
                 Language = definition.Language,
                 CodeSnapshot = definition.Code ?? string.Empty,
                 VariablesSnapshot = variablesSnapshot
-            };
-
-            dataContext.AppVersionSteps.Add(stepSnapshot);
+            });
         }
-
-        await dataContext.SaveChangesAsync();
-
-        logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
-
-        return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
     }
 
     /// <summary>
