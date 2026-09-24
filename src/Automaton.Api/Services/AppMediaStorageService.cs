@@ -205,31 +205,16 @@ public class AppMediaStorageService
 
             while (true)
             {
-                var request = new FetchFileChunkRequest
-                {
-                    SessionId = sessionId,
-                    Offset = offset,
-                    ChunkSize = ChunkSize,
-                    AppId = appId,
-                    RelativePath = normalizedPath,
-                    StorageScope = FileTransferStorageScopes.Media
-                };
-
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.FetchFileChunk, request, cancellationToken);
-
-                using var chunkCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                chunkCts.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
-
-                FileChunkReadyMessage chunk;
-                try
-                {
-                    chunk = await channel.Reader.ReadAsync(chunkCts.Token);
-                }
-                catch (OperationCanceledException)
-                {
+                var chunk = await RequestNextChunkAsync(
+                    appId,
+                    normalizedPath,
+                    runner,
+                    sessionId,
+                    offset,
+                    channel,
+                    cancellationToken);
+                if (chunk is null)
                     return StatusCodes.Status504GatewayTimeout;
-                }
 
                 if (chunk.StatusCode != StatusCodes.Status200OK)
                 {
@@ -257,6 +242,40 @@ public class AppMediaStorageService
         finally
         {
             downloadRegistry.Complete(sessionId);
+        }
+    }
+
+    private async Task<FileChunkReadyMessage?> RequestNextChunkAsync(
+        Guid appId,
+        string normalizedPath,
+        Runner runner,
+        string sessionId,
+        long offset,
+        Channel<FileChunkReadyMessage> channel,
+        CancellationToken cancellationToken)
+    {
+        var request = new FetchFileChunkRequest
+        {
+            SessionId = sessionId,
+            Offset = offset,
+            ChunkSize = ChunkSize,
+            AppId = appId,
+            RelativePath = normalizedPath,
+            StorageScope = FileTransferStorageScopes.Media
+        };
+
+        await automatonHub.Clients.Client(runner.ConnectionId!)
+            .SendAsync(AutomatonHubMethods.FetchFileChunk, request, cancellationToken);
+
+        using var chunkCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        chunkCancellation.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
+        try
+        {
+            return await channel.Reader.ReadAsync(chunkCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
     }
 
