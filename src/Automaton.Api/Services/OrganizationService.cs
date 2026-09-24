@@ -1,10 +1,8 @@
 
 using Automaton.Mcp.SystemPrompts;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -36,10 +34,7 @@ public class OrganizationService : IOrganizationService
 
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
-    private readonly IEmailService emailService;
-    private readonly ConfigurationService configurationService;
-    private readonly UserManager<ApplicationUser> userManager;
-    private readonly UsersService usersService;
+    private readonly OrganizationInvitationNotificationService invitationNotificationService;
     private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
@@ -48,18 +43,12 @@ public class OrganizationService : IOrganizationService
     public OrganizationService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IEmailService emailService,
-        ConfigurationService configurationService,
-        UserManager<ApplicationUser> userManager,
-        UsersService usersService,
+        OrganizationInvitationNotificationService invitationNotificationService,
         IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
-        this.emailService = emailService;
-        this.configurationService = configurationService;
-        this.userManager = userManager;
-        this.usersService = usersService;
+        this.invitationNotificationService = invitationNotificationService;
         this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<OrganizationService>();
     }
@@ -547,110 +536,7 @@ public class OrganizationService : IOrganizationService
             cancellationToken: cancellationToken);
 
 
-        // Send invitation email
-        try
-        {
-            // Get or create user account
-            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);
-            var createdNewUser = false;
-            
-            if (user == null)
-            {
-                // Create a new user account without password
-                // Use email prefix as name initially, safely handling edge cases
-                var emailParts = request.Email.Split('@');
-                var userName = emailParts.Length > 0 ? emailParts[0] : request.Email;
-                
-                // Generate unique PublicUsername using UsersService
-                var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(userName);
-                
-                user = new ApplicationUser
-                {
-                    UserName = request.Email,
-                    Email = request.Email,
-                    EmailConfirmed = false,
-                    Name = userName,
-                    PublicUsername = publicUsername
-                };
-                
-                var createResult = await userManager.CreateAsync(user);
-                if (!createResult.Succeeded)
-                {
-                    logger.Warning("Failed to create user account for {Email}: {Errors}", 
-                        request.Email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
-                }
-                else
-                {
-                    createdNewUser = true;
-                    logger.Debug("Created new user account for organization invitation: {Email}", request.Email);
-                }
-            }
-
-            // Generate invitation URL
-            var invitationUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/organizations/invitations/accept?token={token}";
-
-            // Determine if user needs to set up a password (new users or users without passwords)
-            var userNeedsPasswordSetup = user != null && (createdNewUser || !(await userManager.HasPasswordAsync(user)));
-            string? setupPasswordUrl = null;
-
-            if (userNeedsPasswordSetup && user != null)
-            {
-                var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-                var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-                setupPasswordUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}&create=true";
-            }
-
-            // Get inviter name
-            var inviter = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == UserId, cancellationToken);
-            var inviterName = inviter?.Name ?? inviter?.UserName ?? "Someone";
-
-            // Calculate expiration hours
-            var expirationHours = (int)Math.Ceiling((invitation.ExpiresAt - DateTime.UtcNow).TotalHours);
-
-            // Build email template variables
-            var variables = new Dictionary<string, string>
-            {
-                { "OrganizationName", organization.Name },
-                { "InviterName", inviterName },
-                { "Role", request.Role.ToString() },
-                { "ExpirationHours", expirationHours.ToString() },
-                { "SupportEmail", configurationService.EmailConfig.SupportEmail }
-            };
-
-            // If user needs to set a password, only send password setup link
-            // They'll accept the invitation from dashboard after logging in
-            if (!string.IsNullOrEmpty(setupPasswordUrl))
-            {
-                variables["SetupPasswordUrl"] = setupPasswordUrl;
-            }
-            else
-            {
-                // User already has password, send invitation link
-                variables["InvitationUrl"] = invitationUrl;
-            }
-
-            var emailDetails = new EmailData
-            {
-                Template = "AutomatonOrganizationInvitation",
-                From = new EmailAccount
-                {
-                    Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
-                        ? configurationService.EmailConfig.EmailAccount
-                        : configurationService.EmailConfig.FromEmail
-                },
-                To = new[] { new EmailAccount { Email = request.Email, Name = user?.Name ?? request.Email } },
-                Variables = variables
-            };
-
-            await emailService.Send(emailDetails, cancellationToken);
-            logger.Debug("Invitation email sent to {Email} for organization {OrganizationId}", request.Email, organizationId);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to send invitation email to {Email} for organization {OrganizationId}", 
-                request.Email, organizationId);
-            // Don't fail the invitation creation if email fails
-        }
+        await invitationNotificationService.SendAsync(invitation, organization, request, UserId, cancellationToken);
 
         return invitation;
     }

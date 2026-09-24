@@ -541,6 +541,7 @@ services.AddScoped<ResourceAuthorizationService>();
 services.AddScoped<SensitiveVariableService>();
 services.AddScoped<UserSettingsService>();
 services.AddScoped<IOrganizationService, OrganizationService>();
+services.AddScoped<OrganizationInvitationNotificationService>();
 
 // Project authorization handlers
 services.AddScoped<IAuthorizationHandler, ProjectMemberHandler>();
