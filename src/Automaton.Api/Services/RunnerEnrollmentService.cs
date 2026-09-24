@@ -497,26 +497,9 @@ public sealed class RunnerEnrollmentService(
         DateTime now,
         CancellationToken cancellationToken)
     {
-        var hostedRunner = await db.HostedRunners
-            .FirstOrDefaultAsync(x => x.Id == enrollment.HostedRunnerId && x.DeletedAt == null, cancellationToken);
-        var operation = enrollment.OperationId.HasValue
-            ? await db.HostedRunnerDeployments.FirstOrDefaultAsync(
-                x => x.Id == enrollment.OperationId.Value && x.HostedRunnerId == enrollment.HostedRunnerId,
-                cancellationToken)
-            : null;
-        if (hostedRunner == null
-            || operation == null
-            || operation.Status != HostedRunnerDeploymentStatuses.WaitingForRegistration
-            || operation.RegistrationDeadlineUtc is not DateTime registrationDeadline
-            || registrationDeadline <= now
-            || hostedRunner.RunnerHostId != host.Id
-            || hostedRunner.UserId != enrollment.RequestedByUserId
-            || host.InfrastructureRunnerId == null
-            || hostedRunner.Status is not (HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Reprovisioning))
+        var hostedRunner = await LoadWaitingHostedRunnerAsync(enrollment, host, now, cancellationToken);
+        if (hostedRunner is null)
         {
-            enrollment.Status = RunnerEnrollmentStatuses.Failed;
-            enrollment.FailureReason = "The hosted Runner enrollment scope is no longer valid.";
-            await db.SaveChangesAsync(cancellationToken);
             return null;
         }
 
@@ -526,59 +509,20 @@ public sealed class RunnerEnrollmentService(
         if (runnerName.Length > 120)
             return null;
         var capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
-        var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
-            hostedRunner.UserId,
-            $"Hosted Runner - {runnerName}"[..Math.Min(100, $"Hosted Runner - {runnerName}".Length)],
-            ApiKeyScope.Runner,
-            "Issued after one-time hosted Runner enrollment.",
-            saveChanges: false,
-            source: ApiKeySource.RunnerProvisioning);
-
-        var runner = await db.Runners
-            .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.InstallationId == enrollment.InstallationId, cancellationToken);
-        if (runner != null)
+        var registration = await RegisterHostedRunnerAsync(
+            enrollment,
+            hostedRunner,
+            request,
+            runnerName,
+            capabilities,
+            cancellationToken);
+        if (registration is null)
         {
-            if (!string.Equals(runner.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase)
-                || !runner.RunnerUsers.Any(x => x.UserId == hostedRunner.UserId))
-            {
-                enrollment.Status = RunnerEnrollmentStatuses.Failed;
-                enrollment.FailureReason = "The hosted Runner installation identity belongs to another Runner.";
-                await db.SaveChangesAsync(cancellationToken);
-                return null;
-            }
-
-            if (runner.ApiKeyId.HasValue)
-            {
-                var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == runner.ApiKeyId.Value, cancellationToken);
-                if (oldKey != null)
-                    oldKey.IsActive = false;
-            }
-
-            runner.Name = runnerName;
-            runner.Status = RunnerConnectivityStatuses.Unknown;
-            runner.Version = request.RunnerVersion;
-            runner.MachineName = request.MachineName;
-            runner.ConnectionId = null;
-            runner.Purpose = RunnerPurposes.Managed;
-            runner.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed);
+            return null;
         }
-        else
-        {
-            runner = new Runner
-            {
-                Id = Guid.NewGuid(),
-                Name = runnerName,
-                Status = RunnerConnectivityStatuses.Unknown,
-                Version = request.RunnerVersion,
-                MachineName = request.MachineName,
-                Purpose = RunnerPurposes.Managed,
-                CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed),
-                InstallationId = enrollment.InstallationId
-            };
-            db.Runners.Add(runner);
-            db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = hostedRunner.UserId });
-        }
+
+        var runner = registration.Runner;
+        var apiKey = registration.ApiKey;
 
         runner.ApiKeyId = apiKey.Id;
         hostedRunner.RunnerId = runner.Id;
@@ -589,21 +533,7 @@ public sealed class RunnerEnrollmentService(
         enrollment.UsedAtUtc = now;
         enrollment.RunnerId = runner.Id;
 
-        if (enrollment.SecretVersionId.HasValue)
-        {
-            var version = await db.SecretVersions.FirstOrDefaultAsync(x => x.Id == enrollment.SecretVersionId, cancellationToken);
-            if (version != null)
-                version.RevokedAtUtc ??= now;
-            var grants = await db.ExecutionSecretGrants
-                .Where(x => x.SecretVersionId == enrollment.SecretVersionId && x.RevokedAtUtc == null)
-                .ToListAsync(cancellationToken);
-            foreach (var grant in grants)
-            {
-                if (grant.LeasedAtUtc.HasValue)
-                    grant.ConsumedAtUtc ??= now;
-                grant.RevokedAtUtc = now;
-            }
-        }
+        await RevokeEnrollmentSecretGrantsAsync(enrollment.SecretVersionId, now, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -620,17 +550,192 @@ public sealed class RunnerEnrollmentService(
         }, cancellationToken);
 
         logger.LogInformation("Hosted Runner {HostedRunnerId} enrolled as Runner {RunnerId}", hostedRunner.Id, runner.Id);
-        return new RunnerEnrollmentExchangeResponse
+        return CreateHostedRunnerExchangeResponse(runner, host, enrollment, registration.RawApiKey, capabilities);
+    }
+
+    private async Task<HostedRunner?> LoadWaitingHostedRunnerAsync(
+        RunnerEnrollment enrollment,
+        RunnerHost host,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var hostedRunner = await db.HostedRunners
+            .FirstOrDefaultAsync(x => x.Id == enrollment.HostedRunnerId && x.DeletedAt == null, cancellationToken);
+        var operation = enrollment.OperationId.HasValue
+            ? await db.HostedRunnerDeployments.FirstOrDefaultAsync(
+                x => x.Id == enrollment.OperationId.Value && x.HostedRunnerId == enrollment.HostedRunnerId,
+                cancellationToken)
+            : null;
+        if (IsWaitingEnrollmentScopeValid(enrollment, host, hostedRunner, operation, now))
         {
-            RunnerId = runner.Id,
-            RunnerHostId = host.Id,
-            RunnerName = runner.Name,
-            ApiKey = rawApiKey,
-            Purpose = runner.Purpose,
-            Capabilities = capabilities,
+            return hostedRunner;
+        }
+
+        await MarkHostedEnrollmentFailedAsync(enrollment, "The hosted Runner enrollment scope is no longer valid.", cancellationToken);
+        return null;
+    }
+
+    private static bool IsWaitingEnrollmentScopeValid(
+        RunnerEnrollment enrollment,
+        RunnerHost host,
+        HostedRunner? hostedRunner,
+        HostedRunnerDeployment? operation,
+        DateTime now) =>
+        hostedRunner is not null
+        && operation is not null
+        && operation.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration
+        && operation.RegistrationDeadlineUtc is DateTime registrationDeadline
+        && registrationDeadline > now
+        && hostedRunner.RunnerHostId == host.Id
+        && hostedRunner.UserId == enrollment.RequestedByUserId
+        && host.InfrastructureRunnerId is not null
+        && hostedRunner.Status is HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Reprovisioning;
+
+    private async Task MarkHostedEnrollmentFailedAsync(
+        RunnerEnrollment enrollment,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        enrollment.Status = RunnerEnrollmentStatuses.Failed;
+        enrollment.FailureReason = reason;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<HostedRunnerRegistration?> RegisterHostedRunnerAsync(
+        RunnerEnrollment enrollment,
+        HostedRunner hostedRunner,
+        RunnerEnrollmentExchangeRequest request,
+        string runnerName,
+        IReadOnlyList<string> capabilities,
+        CancellationToken cancellationToken)
+    {
+        var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
+            hostedRunner.UserId,
+            $"Hosted Runner - {runnerName}"[..Math.Min(100, $"Hosted Runner - {runnerName}".Length)],
+            ApiKeyScope.Runner,
+            "Issued after one-time hosted Runner enrollment.",
+            saveChanges: false,
+            source: ApiKeySource.RunnerProvisioning);
+
+        var runner = await db.Runners
+            .Include(x => x.RunnerUsers)
+            .FirstOrDefaultAsync(x => x.InstallationId == enrollment.InstallationId, cancellationToken);
+        if (runner is not null && !IsHostedRunnerIdentityOwnedByUser(runner, hostedRunner.UserId))
+        {
+            await MarkHostedEnrollmentFailedAsync(
+                enrollment,
+                "The hosted Runner installation identity belongs to another Runner.",
+                cancellationToken);
+            return null;
+        }
+
+        runner = runner is null
+            ? CreateHostedRunner(enrollment, hostedRunner.UserId, request, runnerName, capabilities)
+            : await UpdateExistingHostedRunnerAsync(runner, request, runnerName, capabilities, cancellationToken);
+
+        return new HostedRunnerRegistration(runner, apiKey, rawApiKey);
+    }
+
+    private static bool IsHostedRunnerIdentityOwnedByUser(Runner runner, Guid userId) =>
+        string.Equals(runner.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase)
+        && runner.RunnerUsers.Any(x => x.UserId == userId);
+
+    private Runner CreateHostedRunner(
+        RunnerEnrollment enrollment,
+        Guid userId,
+        RunnerEnrollmentExchangeRequest request,
+        string runnerName,
+        IReadOnlyList<string> capabilities)
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = runnerName,
+            Status = RunnerConnectivityStatuses.Unknown,
+            Version = request.RunnerVersion,
+            MachineName = request.MachineName,
+            Purpose = RunnerPurposes.Managed,
+            CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed),
             InstallationId = enrollment.InstallationId
         };
+        db.Runners.Add(runner);
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = userId });
+        return runner;
     }
+
+    private async Task<Runner> UpdateExistingHostedRunnerAsync(
+        Runner runner,
+        RunnerEnrollmentExchangeRequest request,
+        string runnerName,
+        IReadOnlyList<string> capabilities,
+        CancellationToken cancellationToken)
+    {
+        if (runner.ApiKeyId.HasValue)
+        {
+            var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == runner.ApiKeyId.Value, cancellationToken);
+            if (oldKey is not null)
+            {
+                oldKey.IsActive = false;
+            }
+        }
+
+        runner.Name = runnerName;
+        runner.Status = RunnerConnectivityStatuses.Unknown;
+        runner.Version = request.RunnerVersion;
+        runner.MachineName = request.MachineName;
+        runner.ConnectionId = null;
+        runner.Purpose = RunnerPurposes.Managed;
+        runner.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed);
+        return runner;
+    }
+
+    private async Task RevokeEnrollmentSecretGrantsAsync(
+        Guid? secretVersionId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (!secretVersionId.HasValue)
+        {
+            return;
+        }
+
+        var version = await db.SecretVersions.FirstOrDefaultAsync(x => x.Id == secretVersionId, cancellationToken);
+        if (version is not null)
+        {
+            version.RevokedAtUtc ??= now;
+        }
+
+        var grants = await db.ExecutionSecretGrants
+            .Where(x => x.SecretVersionId == secretVersionId && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var grant in grants)
+        {
+            if (grant.LeasedAtUtc.HasValue)
+            {
+                grant.ConsumedAtUtc ??= now;
+            }
+
+            grant.RevokedAtUtc = now;
+        }
+    }
+
+    private static RunnerEnrollmentExchangeResponse CreateHostedRunnerExchangeResponse(
+        Runner runner,
+        RunnerHost host,
+        RunnerEnrollment enrollment,
+        string rawApiKey,
+        IReadOnlyList<string> capabilities) => new()
+    {
+        RunnerId = runner.Id,
+        RunnerHostId = host.Id,
+        RunnerName = runner.Name,
+        ApiKey = rawApiKey,
+        Purpose = runner.Purpose,
+        Capabilities = capabilities,
+        InstallationId = enrollment.InstallationId
+    };
+
+    private sealed record HostedRunnerRegistration(Runner Runner, ApiKey ApiKey, string RawApiKey);
 
     private static string GenerateEnrollmentToken()
         => $"re_{Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))}"
