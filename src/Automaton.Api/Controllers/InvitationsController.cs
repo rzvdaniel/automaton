@@ -124,87 +124,112 @@ public class InvitationsController : ControllerBase
         var invite = await invitationService.ValidateInvitationToken(token);
         if (invite == null) return BadRequest(new { message = "Invalid or expired token" });
 
-        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == invite.ProjectId);
-        if (project == null) return BadRequest(new { message = "Project not found" });
+        if (!await db.Projects.AnyAsync(project => project.Id == invite.ProjectId))
+            return BadRequest(new { message = "Project not found" });
 
-        var user = await userManager.FindByEmailAsync(invite.Email);
+        var preparation = await PrepareInviteeAsync(invite, request);
+        if (preparation.Error is not null)
+            return preparation.Error;
 
-        if (user == null)
-        {
-            var displayName = string.IsNullOrWhiteSpace(request.Name) ? invite.Email : request.Name;
-            var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(displayName);
-
-            user = new ApplicationUser
-            {
-                UserName = invite.Email,
-                Email = invite.Email,
-                Name = displayName,
-                PublicUsername = publicUsername,
-                EmailConfirmed = true,
-                IsEnterpriseEnabled = true,
-                RegisteredAtUtc = DateTime.UtcNow,
-                RegistrationProvider = RegistrationProviders.Invitation
-            };
-
-            var createResult = await userManager.CreateAsync(user, request.Password);
-            if (!createResult.Succeeded)
-            {
-                return BadRequest(new { message = "Failed to create user", errors = createResult.Errors.Select(e => e.Description) });
-            }
-
-            user = await userManager.FindByEmailAsync(invite.Email);
-        }
-        else
-        {
-            var hasPassword = await userManager.HasPasswordAsync(user);
-            if (!hasPassword)
-            {
-                var addResult = await userManager.AddPasswordAsync(user, request.Password);
-                if (!addResult.Succeeded)
-                {
-                    return BadRequest(new { message = "Failed to set password", errors = addResult.Errors.Select(e => e.Description) });
-                }
-            }
-            else
-            {
-                return BadRequest(new
-                {
-                    message = "This invited account already has a password. Sign in with that account to accept the invitation."
-                });
-            }
-        }
-
-        var existingMembership = await db.ProjectMembers.FirstOrDefaultAsync(pm => pm.ProjectId == invite.ProjectId && pm.UserId == user.Id);
-        if (existingMembership != null)
-        {
-            if (!existingMembership.IsActive)
-            {
-                existingMembership.IsActive = true;
-                existingMembership.Role = Enum.TryParse<ProjectRole>(invite.Role, out var rr) ? rr : ProjectRole.Viewer;
-                existingMembership.InvitedBy = invite.InvitedBy;
-                existingMembership.JoinedAt = DateTime.UtcNow;
-            }
-        }
-        else
-        {
-            db.ProjectMembers.Add(new ProjectMember
-            {
-                ProjectId = invite.ProjectId,
-                UserId = user.Id,
-                Role = Enum.TryParse<ProjectRole>(invite.Role, out var rr2) ? rr2 : ProjectRole.Viewer,
-                JoinedAt = DateTime.UtcNow,
-                InvitedBy = invite.InvitedBy,
-                IsActive = true
-            });
-        }
+        var user = preparation.User!;
+        await EnsureProjectMembershipAsync(invite, user);
 
         await db.SaveChangesAsync();
 
         await invitationService.ConsumeInvitationToken(token);
 
-    await usersService.MarkSuccessfulLoginAsync(user);
+        await usersService.MarkSuccessfulLoginAsync(user);
         await signInManager.SignInAsync(user, isPersistent: false);
 
         return Ok(new { message = "Invitation accepted and account setup complete", redirect = "/projects" });
     }
+
+    private async Task<InviteePreparationResult> PrepareInviteeAsync(
+        InvitationToken invite,
+        AcceptInvitationRequest request)
+    {
+        var user = await userManager.FindByEmailAsync(invite.Email);
+        if (user is null)
+            return await CreateInvitedUserAsync(invite, request);
+
+        if (await userManager.HasPasswordAsync(user))
+        {
+            return new InviteePreparationResult(null, BadRequest(new
+            {
+                message = "This invited account already has a password. Sign in with that account to accept the invitation."
+            }));
+        }
+
+        var result = await userManager.AddPasswordAsync(user, request.Password);
+        return result.Succeeded
+            ? new InviteePreparationResult(user, null)
+            : new InviteePreparationResult(null, BadRequest(new
+            {
+                message = "Failed to set password",
+                errors = result.Errors.Select(error => error.Description)
+            }));
+    }
+
+    private async Task<InviteePreparationResult> CreateInvitedUserAsync(
+        InvitationToken invite,
+        AcceptInvitationRequest request)
+    {
+        var displayName = string.IsNullOrWhiteSpace(request.Name) ? invite.Email : request.Name;
+        var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(displayName);
+        var user = new ApplicationUser
+        {
+            UserName = invite.Email,
+            Email = invite.Email,
+            Name = displayName,
+            PublicUsername = publicUsername,
+            EmailConfirmed = true,
+            IsEnterpriseEnabled = true,
+            RegisteredAtUtc = DateTime.UtcNow,
+            RegistrationProvider = RegistrationProviders.Invitation
+        };
+
+        var result = await userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            return new InviteePreparationResult(null, BadRequest(new
+            {
+                message = "Failed to create user",
+                errors = result.Errors.Select(error => error.Description)
+            }));
+        }
+
+        return new InviteePreparationResult(await userManager.FindByEmailAsync(invite.Email), null);
+    }
+
+    private async Task EnsureProjectMembershipAsync(InvitationToken invite, ApplicationUser user)
+    {
+        var membership = await db.ProjectMembers.FirstOrDefaultAsync(
+            member => member.ProjectId == invite.ProjectId && member.UserId == user.Id);
+        if (membership is null)
+        {
+            db.ProjectMembers.Add(new ProjectMember
+            {
+                ProjectId = invite.ProjectId,
+                UserId = user.Id,
+                Role = ParseInvitationRole(invite.Role),
+                JoinedAt = DateTime.UtcNow,
+                InvitedBy = invite.InvitedBy,
+                IsActive = true
+            });
+            return;
+        }
+
+        if (!membership.IsActive)
+        {
+            membership.IsActive = true;
+            membership.Role = ParseInvitationRole(invite.Role);
+            membership.InvitedBy = invite.InvitedBy;
+            membership.JoinedAt = DateTime.UtcNow;
+        }
+    }
+
+    private static ProjectRole ParseInvitationRole(string role)
+        => Enum.TryParse<ProjectRole>(role, out var parsedRole) ? parsedRole : ProjectRole.Viewer;
+
+    private sealed record InviteePreparationResult(ApplicationUser? User, IActionResult? Error);
 }
