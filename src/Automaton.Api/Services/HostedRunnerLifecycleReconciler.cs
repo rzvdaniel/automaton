@@ -205,57 +205,96 @@ public sealed class HostedRunnerLifecycleReconciler(
         var failed = false;
         await transactionalEventExecutor.ExecuteAsync(async token =>
         {
-            if (db.Database.IsRelational())
-            {
-                var affected = await db.HostedRunnerDeployments
-                    .Where(x => x.Id == operation.Id && RecoverableStatuses.Contains(x.Status))
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
-                        .SetProperty(x => x.Error, reason)
-                        .SetProperty(x => x.FinishedAt, now), token);
-                if (affected != 1) return;
-                var hostedRunnerAffected = await db.HostedRunners.Where(x => x.Id == operation.HostedRunnerId)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, HostedRunnerStatuses.Failed)
-                        .SetProperty(x => x.LastError, reason)
-                        .SetProperty(x => x.UpdatedAt, now), token);
-                if (hostedRunnerAffected != 1)
-                    throw new InvalidOperationException($"Hosted Runner {operation.HostedRunnerId} could not be failed during lifecycle recovery.");
-            }
-            else
-            {
-                if (!RecoverableStatuses.Contains(operation.Status)) return;
-                operation.Status = HostedRunnerDeploymentStatuses.Failed;
-                operation.Error = reason;
-                operation.FinishedAt = now;
-                operation.HostedRunner.Status = HostedRunnerStatuses.Failed;
-                operation.HostedRunner.LastError = reason;
-                operation.HostedRunner.UpdatedAt = now;
-                await db.SaveChangesAsync(token);
-            }
+            if (!await TryPersistFailureAsync(operation, reason, now, token))
+                return;
+
             failed = true;
-            var eventType = operation.Action switch
-            {
-                HostedRunnerDeploymentActions.Restart => AuditEventTypes.RunnerRestartFailed,
-                HostedRunnerDeploymentActions.Deprovision => AuditEventTypes.HostedRunnerDeleteFailed,
-                _ => AuditEventTypes.HostedRunnerProvisioningFailed
-            };
-            await auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                Action = AuditActions.Failed, EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = operation.HostedRunnerId, EventType = eventType,
-                Outcome = AuditOutcomes.Failed, Message = $"Hosted runner '{operation.HostedRunner.Name}' lifecycle recovery failed",
-                TargetUserId = operation.HostedRunner.UserId,
-                Metadata = new { OperationId = operation.Id, operation.Action, Error = reason }, FailOnError = true
-            }, token);
-            if (operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)
-                await eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
-                {
-                    HostedRunnerId = operation.HostedRunnerId, UserId = operation.HostedRunner.UserId,
-                    Error = reason, CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
-                }, token);
+            await WriteFailureAuditAsync(operation, reason, token);
+            await PublishProvisioningFailureAsync(operation, reason, token);
         }, cancellationToken);
         return failed;
+    }
+
+    private async Task<bool> TryPersistFailureAsync(
+        HostedRunnerDeployment operation,
+        string reason,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (db.Database.IsRelational())
+        {
+            var affected = await db.HostedRunnerDeployments
+                .Where(x => x.Id == operation.Id && RecoverableStatuses.Contains(x.Status))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
+                    .SetProperty(x => x.Error, reason)
+                    .SetProperty(x => x.FinishedAt, now), cancellationToken);
+            if (affected != 1)
+                return false;
+
+            var hostedRunnerAffected = await db.HostedRunners.Where(x => x.Id == operation.HostedRunnerId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, HostedRunnerStatuses.Failed)
+                    .SetProperty(x => x.LastError, reason)
+                    .SetProperty(x => x.UpdatedAt, now), cancellationToken);
+            if (hostedRunnerAffected != 1)
+                throw new InvalidOperationException($"Hosted Runner {operation.HostedRunnerId} could not be failed during lifecycle recovery.");
+            return true;
+        }
+
+        if (!RecoverableStatuses.Contains(operation.Status))
+            return false;
+
+        operation.Status = HostedRunnerDeploymentStatuses.Failed;
+        operation.Error = reason;
+        operation.FinishedAt = now;
+        operation.HostedRunner.Status = HostedRunnerStatuses.Failed;
+        operation.HostedRunner.LastError = reason;
+        operation.HostedRunner.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private Task WriteFailureAuditAsync(
+        HostedRunnerDeployment operation,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var eventType = operation.Action switch
+        {
+            HostedRunnerDeploymentActions.Restart => AuditEventTypes.RunnerRestartFailed,
+            HostedRunnerDeploymentActions.Deprovision => AuditEventTypes.HostedRunnerDeleteFailed,
+            _ => AuditEventTypes.HostedRunnerProvisioningFailed
+        };
+        return auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Failed,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = operation.HostedRunnerId,
+            EventType = eventType,
+            Outcome = AuditOutcomes.Failed,
+            Message = $"Hosted runner '{operation.HostedRunner.Name}' lifecycle recovery failed",
+            TargetUserId = operation.HostedRunner.UserId,
+            Metadata = new { OperationId = operation.Id, operation.Action, Error = reason },
+            FailOnError = true
+        }, cancellationToken);
+    }
+
+    private Task PublishProvisioningFailureAsync(
+        HostedRunnerDeployment operation,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        if (operation.Action is not (HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision))
+            return Task.CompletedTask;
+
+        return eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
+        {
+            HostedRunnerId = operation.HostedRunnerId,
+            UserId = operation.HostedRunner.UserId,
+            Error = reason,
+            CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
+        }, cancellationToken);
     }
 
     private InfrastructureCommandRequestedEvent BuildInfrastructureRequest(
