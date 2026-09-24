@@ -28,30 +28,7 @@ public sealed class HostedRunnerRestartReconciler(
             await using var transaction = db.Database.IsRelational()
                 ? await db.Database.BeginTransactionAsync(cancellationToken)
                 : null;
-            var claimed = 0;
-            if (db.Database.IsRelational())
-            {
-                claimed = await db.HostedRunnerDeployments
-                    .Where(x => x.Id == id
-                        && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
-                        && x.ReconnectDeadlineUtc <= now)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
-                        .SetProperty(x => x.Error, HostedRunnerDeploymentErrors.RestartReconnectTimedOut)
-                        .SetProperty(x => x.FinishedAt, now), cancellationToken);
-            }
-            else
-            {
-                var candidate = await db.HostedRunnerDeployments.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-                if (candidate?.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
-                    && candidate.ReconnectDeadlineUtc <= now)
-                {
-                    candidate.Status = HostedRunnerDeploymentStatuses.Failed;
-                    candidate.Error = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
-                    candidate.FinishedAt = now;
-                    claimed = 1;
-                }
-            }
+            var claimed = await TryClaimTimedOutOperationAsync(id, now, cancellationToken);
             if (claimed != 1)
             {
                 if (transaction != null) await transaction.RollbackAsync(cancellationToken);
@@ -59,36 +36,73 @@ public sealed class HostedRunnerRestartReconciler(
                 continue;
             }
 
-            var operation = await db.HostedRunnerDeployments
-                .Include(x => x.HostedRunner)
-                .SingleAsync(x => x.Id == id, cancellationToken);
-            operation.HostedRunner.Status = HostedRunnerStatuses.Failed;
-            operation.HostedRunner.LastError = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
-            if (operation.Action == HostedRunnerDeploymentActions.Resume)
-            {
-                operation.HostedRunner.Status = HostedRunnerStatuses.Suspended;
-                operation.HostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
-                operation.HostedRunner.LastEnforcementReason = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
-            }
-            operation.HostedRunner.UpdatedAt = now;
-            await db.SaveChangesAsync(cancellationToken);
-            await auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                Action = AuditActions.Failed,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = operation.HostedRunnerId,
-                EventType = AuditEventTypes.RunnerRestartFailed,
-                Outcome = AuditOutcomes.Failed,
-                Message = $"Hosted runner '{operation.HostedRunner.Name}' restart reconnect timed out",
-                TargetUserId = operation.HostedRunner.UserId,
-                Metadata = new { OperationId = operation.Id, Error = operation.Error },
-                FailOnError = true
-            }, cancellationToken);
+            await RecordTimedOutRestartAsync(id, now, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
             failed++;
             db.ChangeTracker.Clear();
         }
         if (failed > 0) logger.LogWarning("Failed {Count} hosted Runner restarts after reconnect timeout", failed);
         return failed;
+    }
+
+    private async Task<int> TryClaimTimedOutOperationAsync(Guid id, DateTime now, CancellationToken cancellationToken)
+    {
+        if (db.Database.IsRelational())
+        {
+            return await db.HostedRunnerDeployments
+                .Where(x => x.Id == id
+                    && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
+                    && x.ReconnectDeadlineUtc <= now)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Failed)
+                    .SetProperty(x => x.Error, HostedRunnerDeploymentErrors.RestartReconnectTimedOut)
+                    .SetProperty(x => x.FinishedAt, now), cancellationToken);
+        }
+
+        var candidate = await db.HostedRunnerDeployments.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (candidate?.Status != HostedRunnerDeploymentStatuses.WaitingForReconnect
+            || candidate.ReconnectDeadlineUtc is not DateTime deadline
+            || deadline > now)
+            return 0;
+
+        candidate.Status = HostedRunnerDeploymentStatuses.Failed;
+        candidate.Error = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
+        candidate.FinishedAt = now;
+        return 1;
+    }
+
+    private async Task RecordTimedOutRestartAsync(Guid id, DateTime now, CancellationToken cancellationToken)
+    {
+        var operation = await db.HostedRunnerDeployments
+            .Include(x => x.HostedRunner)
+            .SingleAsync(x => x.Id == id, cancellationToken);
+        ApplyRestartTimeout(operation.HostedRunner, operation.Action, now);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Failed,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = operation.HostedRunnerId,
+            EventType = AuditEventTypes.RunnerRestartFailed,
+            Outcome = AuditOutcomes.Failed,
+            Message = $"Hosted runner '{operation.HostedRunner.Name}' restart reconnect timed out",
+            TargetUserId = operation.HostedRunner.UserId,
+            Metadata = new { OperationId = operation.Id, Error = operation.Error },
+            FailOnError = true
+        }, cancellationToken);
+    }
+
+    private static void ApplyRestartTimeout(HostedRunner hostedRunner, string action, DateTime now)
+    {
+        hostedRunner.Status = HostedRunnerStatuses.Failed;
+        hostedRunner.LastError = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
+        if (action == HostedRunnerDeploymentActions.Resume)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.Suspended;
+            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+            hostedRunner.LastEnforcementReason = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
+        }
+
+        hostedRunner.UpdatedAt = now;
     }
 }
