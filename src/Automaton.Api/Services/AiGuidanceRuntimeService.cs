@@ -156,78 +156,9 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         var existingDocuments = (await _dbContext.AiGuidanceDocuments.ToListAsync(cancellationToken))
             .ToDictionary(item => item.Key, StringComparer.Ordinal);
         var now = DateTime.UtcNow;
-        var changed = 0;
         var seedKeys = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var source in _embeddedGuidanceProvider.GetSeedSources())
-        {
-            var metadata = AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath);
-            seedKeys.Add(metadata.Key);
-
-            var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
-            var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
-            var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
-
-            var contentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(parsed.Body))).ToLowerInvariant();
-            var isNew = !existingDocuments.TryGetValue(metadata.Key, out var document);
-            if (isNew)
-            {
-                document = new AiGuidanceDocument { Id = Guid.NewGuid(), Key = metadata.Key, IsEnabled = true, CreatedAt = now };
-                _dbContext.AiGuidanceDocuments.Add(document);
-            }
-
-            var requiresSynchronization = isNew
-                || !string.Equals(document!.Source, AiGuidanceSources.Seed, StringComparison.Ordinal)
-                || document.SeedVersion != AutomatonGuidanceSeedCatalog.CurrentSeedVersion
-                || !string.Equals(document.SeedContentHash, contentHash, StringComparison.Ordinal)
-                || !string.Equals(document.Title, title, StringComparison.Ordinal)
-                || !string.Equals(document.Description, description, StringComparison.Ordinal)
-                || !string.Equals(document.Surface, metadata.Surface, StringComparison.Ordinal)
-                || !string.Equals(document.DocumentKind, metadata.DocumentKind, StringComparison.Ordinal)
-                || !string.Equals(document.TagsJson, metadata.TagsJson, StringComparison.Ordinal)
-                || !string.Equals(document.OutputPath, metadata.OutputPath, StringComparison.Ordinal)
-                || document.RequiredByDefault != metadata.RequiredByDefault
-                || document.IsModelLoadable != metadata.IsModelLoadable
-                || document.SortOrder != metadata.SortOrder
-                || document.IsSeedRetired;
-
-            if (!requiresSynchronization)
-            {
-                continue;
-            }
-
-            document.Title = title;
-            document.Surface = metadata.Surface;
-            document.DocumentKind = metadata.DocumentKind;
-            document.Description = description;
-            document.TagsJson = metadata.TagsJson;
-            document.OutputPath = metadata.OutputPath;
-            document.ContentMarkdown = parsed.Body;
-            document.RequiredByDefault = metadata.RequiredByDefault;
-            document.IsModelLoadable = metadata.IsModelLoadable;
-            document.SortOrder = metadata.SortOrder;
-            document.Source = "Seed";
-            document.SeedVersion = AutomatonGuidanceSeedCatalog.CurrentSeedVersion;
-            document.SeedContentHash = contentHash;
-            document.LastSeedSynchronizedAt = now;
-            document.IsSeedRetired = false;
-            document.Version = isNew ? 1 : document.Version + 1;
-            document.UpdatedAt = now;
-            changed++;
-        }
-
-        foreach (var document in existingDocuments.Values.Where(item =>
-            item.Source == AiGuidanceSources.Seed &&
-            !item.IsSeedRetired &&
-            !seedKeys.Contains(item.Key)))
-        {
-            document.IsSeedRetired = true;
-            document.IsEnabled = false;
-            document.LastSeedSynchronizedAt = now;
-            document.Version++;
-            document.UpdatedAt = now;
-            changed++;
-        }
+        var changed = SynchronizeSeedSources(existingDocuments, seedKeys, now);
+        changed += RetireMissingSeedDocuments(existingDocuments.Values, seedKeys, now);
 
         if (changed > 0)
         {
@@ -236,6 +167,129 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         }
 
         return changed;
+    }
+
+    private int SynchronizeSeedSources(
+        IReadOnlyDictionary<string, AiGuidanceDocument> existingDocuments,
+        HashSet<string> seedKeys,
+        DateTime now)
+    {
+        var changed = 0;
+        foreach (var source in _embeddedGuidanceProvider.GetSeedSources())
+        {
+            if (SynchronizeSeedSource(source.RelativePath, source.Content, existingDocuments, seedKeys, now))
+                changed++;
+        }
+
+        return changed;
+    }
+
+    private bool SynchronizeSeedSource(
+        string relativePath,
+        string content,
+        IReadOnlyDictionary<string, AiGuidanceDocument> existingDocuments,
+        HashSet<string> seedKeys,
+        DateTime now)
+    {
+        var metadata = AutomatonGuidanceSeedCatalog.Resolve(relativePath);
+        seedKeys.Add(metadata.Key);
+        var parsed = AiGuidanceMarkdownFrontMatter.Parse(content);
+        var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
+        var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
+        var contentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(parsed.Body))).ToLowerInvariant();
+        var isNew = !existingDocuments.TryGetValue(metadata.Key, out var document);
+        if (isNew)
+        {
+            document = new AiGuidanceDocument { Id = Guid.NewGuid(), Key = metadata.Key, IsEnabled = true, CreatedAt = now };
+            _dbContext.AiGuidanceDocuments.Add(document);
+        }
+
+        if (!RequiresSeedSynchronization(document!, metadata, title, description, contentHash, isNew))
+            return false;
+
+        ApplySeedDocument(document!, metadata, parsed.Body, title, description, contentHash, isNew, now);
+        return true;
+    }
+
+    private static bool RequiresSeedSynchronization(
+        AiGuidanceDocument document,
+        AutomatonGuidanceSeedMetadata metadata,
+        string title,
+        string description,
+        string contentHash,
+        bool isNew)
+        => isNew
+           || HasChangedSeedContent(document, contentHash)
+           || HasChangedSeedMetadata(document, metadata, title, description);
+
+    private static bool HasChangedSeedContent(AiGuidanceDocument document, string contentHash)
+        => document.SeedVersion != AutomatonGuidanceSeedCatalog.CurrentSeedVersion
+           || !string.Equals(document.SeedContentHash, contentHash, StringComparison.Ordinal)
+           || document.IsSeedRetired;
+
+    private static bool HasChangedSeedMetadata(
+        AiGuidanceDocument document,
+        AutomatonGuidanceSeedMetadata metadata,
+        string title,
+        string description)
+        => !string.Equals(document.Source, AiGuidanceSources.Seed, StringComparison.Ordinal)
+           || !string.Equals(document.Title, title, StringComparison.Ordinal)
+           || !string.Equals(document.Description, description, StringComparison.Ordinal)
+           || !string.Equals(document.Surface, metadata.Surface, StringComparison.Ordinal)
+           || !string.Equals(document.DocumentKind, metadata.DocumentKind, StringComparison.Ordinal)
+           || !string.Equals(document.TagsJson, metadata.TagsJson, StringComparison.Ordinal)
+           || !string.Equals(document.OutputPath, metadata.OutputPath, StringComparison.Ordinal)
+           || document.RequiredByDefault != metadata.RequiredByDefault
+           || document.IsModelLoadable != metadata.IsModelLoadable
+           || document.SortOrder != metadata.SortOrder;
+
+    private static void ApplySeedDocument(
+        AiGuidanceDocument document,
+        AutomatonGuidanceSeedMetadata metadata,
+        string body,
+        string title,
+        string description,
+        string contentHash,
+        bool isNew,
+        DateTime now)
+    {
+        document.Title = title;
+        document.Surface = metadata.Surface;
+        document.DocumentKind = metadata.DocumentKind;
+        document.Description = description;
+        document.TagsJson = metadata.TagsJson;
+        document.OutputPath = metadata.OutputPath;
+        document.ContentMarkdown = body;
+        document.RequiredByDefault = metadata.RequiredByDefault;
+        document.IsModelLoadable = metadata.IsModelLoadable;
+        document.SortOrder = metadata.SortOrder;
+        document.Source = AiGuidanceSources.Seed;
+        document.SeedVersion = AutomatonGuidanceSeedCatalog.CurrentSeedVersion;
+        document.SeedContentHash = contentHash;
+        document.LastSeedSynchronizedAt = now;
+        document.IsSeedRetired = false;
+        document.Version = isNew ? 1 : document.Version + 1;
+        document.UpdatedAt = now;
+    }
+
+    private static int RetireMissingSeedDocuments(
+        IEnumerable<AiGuidanceDocument> documents,
+        HashSet<string> seedKeys,
+        DateTime now)
+    {
+        var retiredCount = 0;
+        foreach (var document in documents.Where(item =>
+            item.Source == AiGuidanceSources.Seed && !item.IsSeedRetired && !seedKeys.Contains(item.Key)))
+        {
+            document.IsSeedRetired = true;
+            document.IsEnabled = false;
+            document.LastSeedSynchronizedAt = now;
+            document.Version++;
+            document.UpdatedAt = now;
+            retiredCount++;
+        }
+
+        return retiredCount;
     }
 
     private IQueryable<AiGuidanceCatalogItem> QueryCatalog(System.Linq.Expressions.Expression<Func<AiGuidanceDocument, bool>> predicate) =>
