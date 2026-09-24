@@ -19,38 +19,79 @@ public sealed class ScheduledActionExecutionHandler(
 {
     public async Task HandleAsync(ScheduledActionExecutionRequestedEvent message, CancellationToken cancellationToken)
     {
-        var snapshot = await db.ActionScheduleOccurrences.AsNoTracking()
-            .Include(x => x.Schedule).SingleOrDefaultAsync(x => x.Id == message.OccurrenceId, cancellationToken);
-        if (snapshot == null
-            || snapshot.ScheduleId != message.ScheduleId
-            || snapshot.IdempotencyKey != message.IdempotencyKey
-            || snapshot.ScheduledForUtc != message.ScheduledForUtc)
+        var snapshot = await LoadOccurrenceSnapshotAsync(message.OccurrenceId, cancellationToken);
+        if (!MatchesMessage(snapshot, message))
         {
             logger.LogWarning("Rejected mismatched scheduled Action occurrence {OccurrenceId}", message.OccurrenceId);
             return;
         }
-        if (snapshot.Status == ActionScheduleOccurrenceStatuses.Dispatching)
+
+        if (await RecoverDispatchAsync(snapshot!, cancellationToken))
         {
-            var existingExecution = await db.AppModuleExecutions.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == snapshot.Id, cancellationToken);
-            if (existingExecution != null)
-            {
-                await db.ActionScheduleOccurrences.Where(x => x.Id == snapshot.Id)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.ExecutionId, existingExecution.Id)
-                        .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Dispatched)
-                        .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
-                return;
-            }
-            if (snapshot.UpdatedAtUtc > DateTime.UtcNow.AddMinutes(-2)) return;
+            return;
         }
-        if (snapshot.Status is ActionScheduleOccurrenceStatuses.Dispatched
-            or ActionScheduleOccurrenceStatuses.Skipped
-            or ActionScheduleOccurrenceStatuses.Failed)
+
+        if (IsTerminal(snapshot!.Status))
             return;
 
+        if (!await TryClaimOccurrenceAsync(message.OccurrenceId, cancellationToken))
+            return;
+
+        await DispatchClaimedOccurrenceAsync(message.OccurrenceId, cancellationToken);
+    }
+
+    private Task<ActionScheduleOccurrence?> LoadOccurrenceSnapshotAsync(
+        Guid occurrenceId,
+        CancellationToken cancellationToken)
+        => db.ActionScheduleOccurrences.AsNoTracking()
+            .Include(x => x.Schedule)
+            .SingleOrDefaultAsync(x => x.Id == occurrenceId, cancellationToken);
+
+    private static bool MatchesMessage(
+        ActionScheduleOccurrence? occurrence,
+        ScheduledActionExecutionRequestedEvent message)
+        => occurrence != null
+           && occurrence.ScheduleId == message.ScheduleId
+           && occurrence.IdempotencyKey == message.IdempotencyKey
+           && occurrence.ScheduledForUtc == message.ScheduledForUtc;
+
+    private async Task<bool> RecoverDispatchAsync(
+        ActionScheduleOccurrence occurrence,
+        CancellationToken cancellationToken)
+    {
+        if (occurrence.Status != ActionScheduleOccurrenceStatuses.Dispatching)
+            return false;
+
+        var existingExecution = await db.AppModuleExecutions.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrence.Id, cancellationToken);
+        if (existingExecution != null)
+        {
+            await MarkDispatchedAsync(occurrence.Id, existingExecution.Id, cancellationToken);
+            return true;
+        }
+
+        return occurrence.UpdatedAtUtc > DateTime.UtcNow.AddMinutes(-2);
+    }
+
+    private Task<int> MarkDispatchedAsync(
+        Guid occurrenceId,
+        Guid executionId,
+        CancellationToken cancellationToken)
+        => db.ActionScheduleOccurrences.Where(x => x.Id == occurrenceId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.ExecutionId, executionId)
+                .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Dispatched)
+                .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
+
+    private static bool IsTerminal(string status)
+        => status is ActionScheduleOccurrenceStatuses.Dispatched
+            or ActionScheduleOccurrenceStatuses.Skipped
+            or ActionScheduleOccurrenceStatuses.Failed;
+
+    private async Task<bool> TryClaimOccurrenceAsync(Guid occurrenceId, CancellationToken cancellationToken)
+    {
         var claimed = await db.ActionScheduleOccurrences
-            .Where(x => x.Id == message.OccurrenceId
+            .Where(x => x.Id == occurrenceId
                 && (x.Status == ActionScheduleOccurrenceStatuses.Published
                     || x.Status == ActionScheduleOccurrenceStatuses.Dispatching
                         && x.UpdatedAtUtc <= DateTime.UtcNow.AddMinutes(-2)))
@@ -58,49 +99,72 @@ public sealed class ScheduledActionExecutionHandler(
                 .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Dispatching)
                 .SetProperty(x => x.Attempt, x => x.Attempt + 1)
                 .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
-        if (claimed == 0) return;
+        return claimed > 0;
+    }
 
+    private async Task DispatchClaimedOccurrenceAsync(Guid occurrenceId, CancellationToken cancellationToken)
+    {
         try
         {
             db.ChangeTracker.Clear();
-            var occurrence = await db.ActionScheduleOccurrences.Include(x => x.Schedule)
-                .SingleAsync(x => x.Id == message.OccurrenceId, cancellationToken);
-            var schedule = occurrence.Schedule;
-            if (!schedule.Enabled && schedule.ScheduleType != ActionScheduleTypes.OneTime)
-                throw new InvalidOperationException("Schedule was disabled before dispatch.");
-            await schedules.ValidateForDispatchAsync(schedule, cancellationToken);
-            using var input = JsonDocument.Parse(schedule.InputJson);
-            var execution = schedule.ExecutionScope switch
-            {
-                ActionExecutionScopes.AppRunner => await executions.ExecuteScheduledAsync(
-                    schedule.ApplicationId,
-                    schedule.ActionKey,
-                    schedule.OwnerUserId ?? throw new InvalidOperationException("AppRunner schedules require a user owner."),
-                    input.RootElement.Clone(),
-                    occurrence.Id,
-                    cancellationToken),
-                ActionExecutionScopes.InfrastructureRunner => await DispatchInfrastructureAsync(
-                    schedule, occurrence.Id, input.RootElement, cancellationToken),
-                ActionExecutionScopes.Worker => throw new InvalidOperationException(
-                    "No trusted Worker scheduled Action handler is registered for this Action."),
-                _ => throw new InvalidOperationException("Scheduled Action execution scope is invalid.")
-            };
-            occurrence.ExecutionId = execution.Id;
-            occurrence.Status = ActionScheduleOccurrenceStatuses.Dispatched;
-            occurrence.UpdatedAtUtc = DateTime.UtcNow;
-            schedule.LastExecutionId = execution.Id;
-            await db.SaveChangesAsync(cancellationToken);
+            await ExecuteClaimedOccurrenceAsync(occurrenceId, cancellationToken);
         }
         catch (Exception ex)
         {
-            db.ChangeTracker.Clear();
-            await db.ActionScheduleOccurrences.Where(x => x.Id == message.OccurrenceId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Failed)
-                    .SetProperty(x => x.FailureSummary, Limit(ex.Message, 2000))
-                    .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
-            logger.LogWarning(ex, "Scheduled Action occurrence {OccurrenceId} failed before dispatch", message.OccurrenceId);
+            await MarkOccurrenceFailedAsync(occurrenceId, ex, cancellationToken);
+            logger.LogWarning(ex, "Scheduled Action occurrence {OccurrenceId} failed before dispatch", occurrenceId);
         }
+    }
+
+    private async Task ExecuteClaimedOccurrenceAsync(Guid occurrenceId, CancellationToken cancellationToken)
+    {
+        var occurrence = await db.ActionScheduleOccurrences.Include(x => x.Schedule)
+            .SingleAsync(x => x.Id == occurrenceId, cancellationToken);
+        var schedule = occurrence.Schedule;
+        if (!schedule.Enabled && schedule.ScheduleType != ActionScheduleTypes.OneTime)
+            throw new InvalidOperationException("Schedule was disabled before dispatch.");
+        await schedules.ValidateForDispatchAsync(schedule, cancellationToken);
+        using var input = JsonDocument.Parse(schedule.InputJson);
+        var execution = await ExecuteScheduleAsync(schedule, occurrence.Id, input.RootElement, cancellationToken);
+        occurrence.ExecutionId = execution.Id;
+        occurrence.Status = ActionScheduleOccurrenceStatuses.Dispatched;
+        occurrence.UpdatedAtUtc = DateTime.UtcNow;
+        schedule.LastExecutionId = execution.Id;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private Task<AppModuleExecution> ExecuteScheduleAsync(
+        ActionSchedule schedule,
+        Guid occurrenceId,
+        JsonElement input,
+        CancellationToken cancellationToken)
+        => schedule.ExecutionScope switch
+        {
+            ActionExecutionScopes.AppRunner => executions.ExecuteScheduledAsync(
+                schedule.ApplicationId,
+                schedule.ActionKey,
+                schedule.OwnerUserId ?? throw new InvalidOperationException("AppRunner schedules require a user owner."),
+                input.Clone(),
+                occurrenceId,
+                cancellationToken),
+            ActionExecutionScopes.InfrastructureRunner => DispatchInfrastructureAsync(
+                schedule, occurrenceId, input, cancellationToken),
+            ActionExecutionScopes.Worker => throw new InvalidOperationException(
+                "No trusted Worker scheduled Action handler is registered for this Action."),
+            _ => throw new InvalidOperationException("Scheduled Action execution scope is invalid.")
+        };
+
+    private Task<int> MarkOccurrenceFailedAsync(
+        Guid occurrenceId,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        return db.ActionScheduleOccurrences.Where(x => x.Id == occurrenceId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Failed)
+                .SetProperty(x => x.FailureSummary, Limit(exception.Message, 2000))
+                .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
     }
 
     private async Task<AppModuleExecution> DispatchInfrastructureAsync(
