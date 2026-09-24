@@ -105,12 +105,26 @@ public sealed partial class HostContainerExecutionService
             _ => throw new InvalidOperationException("Unsupported container operation.")
         };
         var result = await executor(arguments, RuntimeOperationTimeout, cancellationToken);
-        if (!result.Success)
-        {
-            if (request.Operation == HostContainerOperationKinds.RemoveContainer && IsMissingContainer(result, inspection.ContainerId))
-                return new HostContainerExecutionResponse { Success = true };
-            return Failure("container_operation", "Docker could not complete the application container operation.");
-        }
+        if (!result.Success) return HandleFailedContainerOperation(request.Operation, result, inspection.ContainerId);
+        return await CompleteContainerOperationAsync(request, result, inspection, cancellationToken);
+    }
+
+    private static HostContainerExecutionResponse HandleFailedContainerOperation(
+        string operation,
+        InfrastructureCommandResponse result,
+        string containerId)
+    {
+        if (operation == HostContainerOperationKinds.RemoveContainer && IsMissingContainer(result, containerId))
+            return new HostContainerExecutionResponse { Success = true };
+        return Failure("container_operation", "Docker could not complete the application container operation.");
+    }
+
+    private async Task<HostContainerExecutionResponse> CompleteContainerOperationAsync(
+        HostContainerExecutionRequest request,
+        InfrastructureCommandResponse result,
+        HostContainerExecutionResponse inspection,
+        CancellationToken cancellationToken)
+    {
         if (request.Operation == HostContainerOperationKinds.GetContainerLogs)
         {
             var logs = result.Output + result.Error;
@@ -145,61 +159,82 @@ public sealed partial class HostContainerExecutionService
             using var document = JsonDocument.Parse(result.Output);
             var root = document.RootElement;
             RejectDuplicateProperties(root);
-            var id = root.GetProperty("Id").GetString();
-            if (!HostContainerRuntimeValidation.IsContainerId(id))
-                throw new JsonException("Invalid container ID.");
-            var running = root.GetProperty("State").GetProperty("Running").GetBoolean();
-            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(root.GetProperty("Config").GetProperty("Labels"))
-                ?? throw new JsonException("Missing labels.");
-            if (labels.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
-                throw new JsonException("Invalid labels.");
-            if (RuntimeLabels(scope).Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
-                return Failure("container_ownership", "The container is not owned by the requested application and Hosted Runner scope.");
-
-            if (!discoverEndpoint)
-                return new HostContainerExecutionResponse
-                {
-                    Success = true, Exists = true, Running = running, ContainerId = id!, Labels = labels
-                };
-
-            var address = GetPrivateRuntimeHostAddress();
-            var hostConfig = root.GetProperty("HostConfig");
-            if (hostConfig.GetProperty("NetworkMode").GetString() != "bridge")
-                throw new JsonException("Unexpected runtime network.");
-            var configured = hostConfig.GetProperty("PortBindings").EnumerateObject().ToArray();
-            if (configured.Length != 1 || !TryParseTcpPort(configured[0].Name, out var containerPort))
-                throw new JsonException("Expected one TCP publication.");
-            var requestedBinding = SingleBinding(configured[0].Value);
-            RequireAddress(requestedBinding, address);
-            ParseHostPort(requestedBinding);
-
-            int? hostPort = null;
-            var ports = root.GetProperty("NetworkSettings").GetProperty("Ports");
-            if (ports.ValueKind != JsonValueKind.Null)
-            {
-                foreach (var port in ports.EnumerateObject())
-                {
-                    if (port.Value.ValueKind == JsonValueKind.Null)
-                        continue;
-                    if (port.Name != configured[0].Name)
-                        throw new JsonException("Unexpected published port.");
-                    var binding = SingleBinding(port.Value);
-                    RequireAddress(binding, address);
-                    hostPort = ParseHostPort(binding);
-                }
-            }
-            if (running && !hostPort.HasValue)
-                throw new JsonException("Running container has no effective publication.");
-            return new HostContainerExecutionResponse
-            {
-                Success = true, Exists = true, Running = running, ContainerId = id!, Labels = labels,
-                ContainerPort = containerPort, HostPort = hostPort, HostAddress = hostPort.HasValue ? address : null
-            };
+            var inspection = ReadContainerIdentity(root, scope);
+            if (inspection.Failure is not null) return inspection.Failure;
+            if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!);
+            return DiscoverContainerEndpoint(root, inspection.Id!, inspection.Running, inspection.Labels!);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
         {
             return Failure("container_inspect", "Docker returned invalid application container state or endpoint configuration.");
         }
+    }
+
+    private static (string? Id, bool Running, Dictionary<string, string>? Labels, HostContainerExecutionResponse? Failure)
+        ReadContainerIdentity(JsonElement root, HostContainerScope scope)
+    {
+        var id = root.GetProperty("Id").GetString();
+        if (!HostContainerRuntimeValidation.IsContainerId(id)) throw new JsonException("Invalid container ID.");
+        var running = root.GetProperty("State").GetProperty("Running").GetBoolean();
+        var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(root.GetProperty("Config").GetProperty("Labels"))
+            ?? throw new JsonException("Missing labels.");
+        if (labels.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+            throw new JsonException("Invalid labels.");
+        if (RuntimeLabels(scope).Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
+            return (null, false, null, Failure("container_ownership", "The container is not owned by the requested application and Hosted Runner scope."));
+        return (id, running, labels, null);
+    }
+
+    private static HostContainerExecutionResponse CreateInspectionResponse(
+        string id,
+        bool running,
+        Dictionary<string, string> labels)
+        => new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
+
+    private static HostContainerExecutionResponse DiscoverContainerEndpoint(
+        JsonElement root,
+        string id,
+        bool running,
+        Dictionary<string, string> labels)
+    {
+        var address = GetPrivateRuntimeHostAddress();
+        var portBinding = ReadRequestedPortBinding(root, address);
+        var hostPort = ReadEffectiveHostPort(root, portBinding.BindingName, address);
+        if (running && !hostPort.HasValue) throw new JsonException("Running container has no effective publication.");
+        return new HostContainerExecutionResponse
+        {
+            Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels,
+            ContainerPort = portBinding.ContainerPort, HostPort = hostPort, HostAddress = hostPort.HasValue ? address : null
+        };
+    }
+
+    private static (string BindingName, int ContainerPort) ReadRequestedPortBinding(JsonElement root, string address)
+    {
+        var hostConfig = root.GetProperty("HostConfig");
+        if (hostConfig.GetProperty("NetworkMode").GetString() != "bridge") throw new JsonException("Unexpected runtime network.");
+        var configured = hostConfig.GetProperty("PortBindings").EnumerateObject().ToArray();
+        if (configured.Length != 1 || !TryParseTcpPort(configured[0].Name, out var containerPort))
+            throw new JsonException("Expected one TCP publication.");
+        var binding = SingleBinding(configured[0].Value);
+        RequireAddress(binding, address);
+        ParseHostPort(binding);
+        return (configured[0].Name, containerPort);
+    }
+
+    private static int? ReadEffectiveHostPort(JsonElement root, string bindingName, string address)
+    {
+        var ports = root.GetProperty("NetworkSettings").GetProperty("Ports");
+        if (ports.ValueKind == JsonValueKind.Null) return null;
+        int? hostPort = null;
+        foreach (var port in ports.EnumerateObject())
+        {
+            if (port.Value.ValueKind == JsonValueKind.Null) continue;
+            if (port.Name != bindingName) throw new JsonException("Unexpected published port.");
+            var binding = SingleBinding(port.Value);
+            RequireAddress(binding, address);
+            hostPort = ParseHostPort(binding);
+        }
+        return hostPort;
     }
 
     private static Dictionary<string, string> RuntimeLabels(HostContainerScope scope) => new(StringComparer.Ordinal)

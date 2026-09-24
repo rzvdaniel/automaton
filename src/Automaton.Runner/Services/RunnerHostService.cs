@@ -1,4 +1,4 @@
-﻿using Automaton.Core.Scripting.Engines.Python;
+using Automaton.Core.Scripting.Engines.Python;
 using Automaton.Runner.Console.Models;
 using Automaton.Runner.Console.Services;
 using Serilog;
@@ -22,6 +22,9 @@ public class RunnerHostService
     private readonly ScriptEngineSettingsReporter scriptEngineSettingsReporter;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
 
+    private readonly RunnerRegistrationWorkflow registrationWorkflow;
+    private readonly RunnerLocalFastApiProcess fastApiProcess;
+    private readonly RunnerEnrollmentWorkflow enrollmentWorkflow;
     private CancellationTokenSource? cancellationTokenSource;
 
     public RunnerHostService(
@@ -41,6 +44,9 @@ public class RunnerHostService
         this.logger = Log.ForContext<RunnerHostService>();
         this.scriptEngineSettingsReporter = scriptEngineSettingsReporter;
         this.runnerWorkspaceService = runnerWorkspaceService;
+        registrationWorkflow = new RunnerRegistrationWorkflow(configService, storageService, httpClient, logger);
+        fastApiProcess = new RunnerLocalFastApiProcess(runnerWorkspaceService, logger);
+        enrollmentWorkflow = new RunnerEnrollmentWorkflow(configService, storageService, apiKeyAuthService, httpClient, logger);
     }
 
     /// <summary>
@@ -62,16 +68,7 @@ public class RunnerHostService
 
             var enrollmentApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
             var runnerPurpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
-            if (string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
-                && !configService.IsRunnerRegistered()
-                && !string.IsNullOrWhiteSpace(enrollmentApiKey))
-            {
-                if (!await RegisterInfrastructureRunnerAsync(enrollmentApiKey))
-                {
-                    logger.Error("Infrastructure Runner self-registration failed");
-                    throw new InvalidOperationException("Infrastructure Runner self-registration failed.");
-                }
-            }
+            await EnsureInfrastructureRunnerRegisteredAsync(runnerPurpose, enrollmentApiKey);
 
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (RunnerIdentityPolicy.IsManagedHostedRunner(
@@ -113,7 +110,7 @@ public class RunnerHostService
                 }
                 
                 logger.Debug("Registering runner with name: {RunnerName}", runnerName);
-                var registerSuccess = await RegisterRunnerAsync(runnerName);
+                var registerSuccess = await registrationWorkflow.RegisterRunnerAsync(runnerName);
 
                 if (!registerSuccess)
                 {
@@ -132,6 +129,17 @@ public class RunnerHostService
             logger.Fatal(ex, "Fatal error in service mode startup");
             throw;
         }
+    }
+
+    private async Task EnsureInfrastructureRunnerRegisteredAsync(string runnerPurpose, string? enrollmentApiKey)
+    {
+        var shouldRegister = string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
+            && !configService.IsRunnerRegistered()
+            && !string.IsNullOrWhiteSpace(enrollmentApiKey);
+        if (!shouldRegister) return;
+        if (await RegisterInfrastructureRunnerAsync(enrollmentApiKey!)) return;
+        logger.Error("Infrastructure Runner self-registration failed");
+        throw new InvalidOperationException("Infrastructure Runner self-registration failed.");
     }
 
     private async Task<string?> ResolveManagedHostedRunnerCredentialAsync(string? persistedApiKey)
@@ -221,179 +229,149 @@ public class RunnerHostService
     {
         try
         {
-            WriteLine("=== Automaton Runner - Interactive Setup ===");
-            WriteLine();
-
-            // DEBUG: Log all environment variables that might affect configuration
-            logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
-            logger.Debug("AUTOMATON_SERVER_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
-            logger.Debug("AUTOMATON_API_KEY: {EnvVar}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
-            logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
-            logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
-            logger.Debug("DOTNET_VERSION: {EnvVar}", Environment.Version);
-            logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
-            logger.Debug("=== END ENVIRONMENT VARIABLES ===");
+            ShowInteractiveSetupHeader();
             await ApplyInstallationProfileAsync();
-
-            WriteLine("=== ENVIRONMENT VARIABLES DEBUG ===");
-            WriteLine("AUTOMATON_SERVER_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
-            WriteLine("AUTOMATON_API_KEY: {0}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
-            WriteLine("ASPNETCORE_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
-            WriteLine("DOTNET_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
-            WriteLine("DOTNET_VERSION: {0}", Environment.Version);
-            WriteLine("Current Directory: {0}", Environment.CurrentDirectory);
-            WriteLine("=== END ENVIRONMENT VARIABLES ===");
-            WriteLine();
-
-            // Check Server Url
-            var serverUrl = await storageService.LoadServerUrlAsync();
-            if (string.IsNullOrEmpty(serverUrl))
-            {
-                // Server not configured and will load the default from appsettings.json
-                // Ask user to confirm or change
-                var configuredServer = await PromptForServerConfigurationAsync();
-            }
-            else
-            {
-                WriteLine($"✅ Server registered: {serverUrl}");
-            }
-
-            // Check Authentication
-            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN")))
-                {
-                    WriteLine("🔐 Enrolling this Runner using the one-time enrollment token...");
-                    if (!await EnrollAsync())
-                    {
-                        WriteLine("❌ Runner enrollment failed. Check the server URL and enrollment token.");
-                        return;
-                    }
-
-                    apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-                }
-            }
-
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                // Check if the API key might be set in registry but not visible to current process
-                var isSetInRegistry = OperatingSystem.IsWindows() &&
-                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY", EnvironmentVariableTarget.User));
-
-                if (isSetInRegistry)
-                {
-                    WriteLine("⚠️  API key is saved but not visible to this terminal session.");
-                    WriteLine();
-                    WriteLine("📋 To fix this:");
-                    WriteLine("   1. Close this terminal window");
-                    WriteLine("   2. Open a new terminal");
-                    WriteLine("   3. Run 'automaton-runner' again");
-                    WriteLine();
-                    WriteLine("   OR set it for current session:");
-                    WriteLine("   $env:AUTOMON_API_KEY = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')");
-                    WriteLine();
-                    Write("Would you like to enter the API key again for this session? (Y/n): ");
-                    var response = ReadLine()?.Trim().ToLower();
-
-                    if (response == "n" || response == "no")
-                    {
-                        WriteLine("❌ Authentication required to continue. Exiting.");
-                        return;
-                    }
-                }
-
-                WriteLine("🔧 Authentication required...");
-                WriteLine();
-                WriteLine("This Runner requires a system-issued Runner credential.");
-                WriteLine("Re-enroll or reprovision the Runner from Automaton Studio.");
-                WriteLine();
-
-                Write("Enter the system-issued Runner credential (starts with 'ak_runner_'): ");
-                var inputApiKey = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(inputApiKey))
-                {
-                    WriteLine("❌ API key is required. Exiting.");
-                    return;
-                }
-
-                await apiKeyAuthService.SetApiKeyAsync(inputApiKey);
-                WriteLine("✅ Authentication configured successfully!");
-                WriteLine();
-            }
-            else
-            {
-                var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
-                WriteLine($"✅ Authenticated via: {(hasEnvKey ? "Environment Variable" : "Stored API Key")}");
-
-                // Validate API key against the server
-                WriteLine();
-                var isValid = await ValidateApiKeyWithServerAsync(apiKey);
-
-                if (!isValid)
-                {
-                    var canContinue = await HandleInvalidApiKeyAsync();
-                    if (!canContinue)
-                    {
-                        return;
-                    }
-                }
-            }
-
-            // Set up HTTP client authentication
+            await ConfigureInteractiveServerAsync();
+            if (!await EnsureInteractiveAuthenticationAsync()) return;
             await SetupHttpClientAuth();
-
-            // Check/Configure Runner Registration
-            if (!configService.IsRunnerRegistered())
-            {
-                WriteLine("🔧 Runner registration required...");
-                WriteLine();
-
-                Write("Enter a name for this runner (e.g., 'My-Server-Runner'): ");
-                var runnerName = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(runnerName))
-                {
-                    runnerName = $"AutoRunner-{Environment.MachineName}";
-                    WriteLine($"Using default name: {runnerName}");
-                }
-
-                var registerSuccess = await RegisterRunnerAsync(runnerName);
-                if (!registerSuccess)
-                {
-                    WriteLine("❌ Runner registration failed. Cannot start runner.");
-                    return;
-                }
-                WriteLine();
-            }
-            else
-            {
-                WriteLine($"✅ Runner registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
-            }
-
-            // Start the runner
-            // Autodetect Python environment and submit to server
-            var detector = new PythonEnvironmentDetector();
-            var detected = detector.Detect();
-            if (detected != null && detected.IsAutoDetectionSuccessful)
-            {
-                await scriptEngineSettingsReporter.SubmitPythonSettingsAsync(detected, CancellationToken.None);
-            }
-
+            if (!await EnsureInteractiveRunnerRegistrationAsync()) return;
+            await SubmitDetectedPythonSettingsAsync();
             await StartRunnerAsync();
         }
         catch (Exception ex)
         {
-            // Log technical details to file logs only
             logger.Error(ex, "Error in interactive runner setup. Error: {ErrorType}", ex.GetType().Name);
-
-            // Show friendly message to user
             WriteLine($"❌ Setup error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
         }
     }
 
+    private void ShowInteractiveSetupHeader()
+    {
+        WriteLine("=== Automaton Runner - Interactive Setup ===");
+        WriteLine();
+        logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
+        logger.Debug("AUTOMATON_SERVER_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
+        logger.Debug("AUTOMATON_API_KEY: {EnvVar}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
+        logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+        logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
+        logger.Debug("DOTNET_VERSION: {EnvVar}", Environment.Version);
+        logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
+        logger.Debug("=== END ENVIRONMENT VARIABLES ===");
+        WriteLine("=== ENVIRONMENT VARIABLES DEBUG ===");
+        WriteLine("AUTOMATON_SERVER_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
+        WriteLine("AUTOMATON_API_KEY: {0}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
+        WriteLine("ASPNETCORE_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+        WriteLine("DOTNET_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
+        WriteLine("DOTNET_VERSION: {0}", Environment.Version);
+        WriteLine("Current Directory: {0}", Environment.CurrentDirectory);
+        WriteLine("=== END ENVIRONMENT VARIABLES ===");
+        WriteLine();
+    }
+
+    private async Task ConfigureInteractiveServerAsync()
+    {
+        var serverUrl = await storageService.LoadServerUrlAsync();
+        if (string.IsNullOrEmpty(serverUrl)) await PromptForServerConfigurationAsync();
+        else WriteLine($"✅ Server registered: {serverUrl}");
+    }
+
+    private async Task<bool> EnsureInteractiveAuthenticationAsync()
+    {
+        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
+        if (string.IsNullOrEmpty(apiKey) && !string.IsNullOrWhiteSpace(enrollmentToken))
+        {
+            WriteLine("🔐 Enrolling this Runner using the one-time enrollment token...");
+            if (!await EnrollAsync())
+            {
+                WriteLine("❌ Runner enrollment failed. Check the server URL and enrollment token.");
+                return false;
+            }
+            apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        }
+        if (string.IsNullOrEmpty(apiKey)) return await PromptForInteractiveApiKeyAsync();
+        var hasEnvironmentKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
+        WriteLine($"✅ Authenticated via: {(hasEnvironmentKey ? "Environment Variable" : "Stored API Key")}");
+        WriteLine();
+        return await ValidateApiKeyWithServerAsync(apiKey) || await HandleInvalidApiKeyAsync();
+    }
+
+    private async Task<bool> PromptForInteractiveApiKeyAsync()
+    {
+        if (ShouldWarnAboutStoredApiKey() && !ConfirmApiKeyEntry()) return false;
+        WriteLine("🔧 Authentication required...");
+        WriteLine();
+        WriteLine("This Runner requires a system-issued Runner credential.");
+        WriteLine("Re-enroll or reprovision the Runner from Automaton Studio.");
+        WriteLine();
+        Write("Enter the system-issued Runner credential (starts with 'ak_runner_'): ");
+        var inputApiKey = ReadLine();
+        if (string.IsNullOrWhiteSpace(inputApiKey))
+        {
+            WriteLine("❌ API key is required. Exiting.");
+            return false;
+        }
+        await apiKeyAuthService.SetApiKeyAsync(inputApiKey);
+        WriteLine("✅ Authentication configured successfully!");
+        WriteLine();
+        return true;
+    }
+
+    private static bool ShouldWarnAboutStoredApiKey()
+        => OperatingSystem.IsWindows()
+            && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY", EnvironmentVariableTarget.User));
+
+    private static bool ConfirmApiKeyEntry()
+    {
+        WriteLine("⚠️  API key is saved but not visible to this terminal session.");
+        WriteLine();
+        WriteLine("📋 To fix this:");
+        WriteLine("   1. Close this terminal window");
+        WriteLine("   2. Open a new terminal");
+        WriteLine("   3. Run 'automaton-runner' again");
+        WriteLine();
+        WriteLine("   OR set it for current session:");
+        WriteLine("   $env:AUTOMON_API_KEY = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')");
+        WriteLine();
+        Write("Would you like to enter the API key again for this session? (Y/n): ");
+        var response = ReadLine()?.Trim().ToLower();
+        if (response is not ("n" or "no")) return true;
+        WriteLine("❌ Authentication required to continue. Exiting.");
+        return false;
+    }
+
+    private async Task<bool> EnsureInteractiveRunnerRegistrationAsync()
+    {
+        if (configService.IsRunnerRegistered())
+        {
+            WriteLine($"✅ Runner registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
+            return true;
+        }
+        WriteLine("🔧 Runner registration required...");
+        WriteLine();
+        Write("Enter a name for this runner (e.g., 'My-Server-Runner'): ");
+        var runnerName = ReadLine();
+        if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            runnerName = $"AutoRunner-{Environment.MachineName}";
+            WriteLine($"Using default name: {runnerName}");
+        }
+        if (await registrationWorkflow.RegisterRunnerAsync(runnerName))
+        {
+            WriteLine();
+            return true;
+        }
+        WriteLine("❌ Runner registration failed. Cannot start runner.");
+        return false;
+    }
+
+    private async Task SubmitDetectedPythonSettingsAsync()
+    {
+        var detected = new PythonEnvironmentDetector().Detect();
+        if (detected is not null && detected.IsAutoDetectionSuccessful)
+            await scriptEngineSettingsReporter.SubmitPythonSettingsAsync(detected, CancellationToken.None);
+    }
     /// <summary>
     /// Interactive authentication
     /// </summary>
@@ -403,73 +381,8 @@ public class RunnerHostService
         {
             WriteLine("=== Automaton Runner - Authentication ===");
             WriteLine();
-
-            // Configure server if provided or prompt
-            if (!string.IsNullOrEmpty(serverUrl))
-            {
-                await configService.UpdateServerUrlAsync(serverUrl);
-                WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
-            }
-            else if (!configService.IsServerConfigured())
-            {
-                WriteLine("Server URL is required for authentication.");
-                Write($"Enter server URL (or press Enter for {configService.BaseUrl}): ");
-                var inputServerUrl = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(inputServerUrl))
-                {
-                    inputServerUrl = $"{configService.BaseUrl}";
-                }
-
-                await configService.UpdateServerUrlAsync(inputServerUrl);
-                WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
-            }
-            else
-            {
-                WriteLine($"✅ Using saved server: {configService.BaseUrl}");
-            }
-
-            // Handle API key authentication
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                await apiKeyAuthService.SetApiKeyAsync(apiKey);
-                WriteLine("✅ Authentication successful!");
-
-                // Validate the provided API key
-                WriteLine();
-                var isValid = await ValidateApiKeyWithServerAsync(apiKey);
-                if (!isValid)
-                {
-                    var canContinue = await HandleInvalidApiKeyAsync();
-                    if (!canContinue)
-                    {
-                        return;
-                    }
-                }
-            }
-            else
-            {
-                var newApiKey = await PromptForNewApiKeyAsync();
-                if (newApiKey == null)
-                {
-                    WriteLine("❌ API key is required.");
-                    return;
-                }
-
-                // Validate the entered API key
-                WriteLine();
-                var isValid = await ValidateApiKeyWithServerAsync(newApiKey);
-                if (!isValid)
-                {
-                    var canContinue = await HandleInvalidApiKeyAsync();
-                    if (!canContinue)
-                    {
-                        return;
-                    }
-                }
-            }
-
-            // Show next steps
+            await ConfigureAuthenticationServerAsync(serverUrl);
+            if (!await ConfigureAuthenticationCredentialAsync(apiKey)) return;
             WriteLine();
             WriteLine("📋 Next steps:");
             WriteLine("1. Register runner: automaton-runner register");
@@ -487,6 +400,49 @@ public class RunnerHostService
         }
     }
 
+    private async Task ConfigureAuthenticationServerAsync(string? serverUrl)
+    {
+        if (!string.IsNullOrEmpty(serverUrl))
+        {
+            await configService.UpdateServerUrlAsync(serverUrl);
+            WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
+            return;
+        }
+        if (configService.IsServerConfigured())
+        {
+            WriteLine($"✅ Using saved server: {configService.BaseUrl}");
+            return;
+        }
+        WriteLine("Server URL is required for authentication.");
+        Write($"Enter server URL (or press Enter for {configService.BaseUrl}): ");
+        var inputServerUrl = ReadLine();
+        if (string.IsNullOrWhiteSpace(inputServerUrl)) inputServerUrl = configService.BaseUrl;
+        await configService.UpdateServerUrlAsync(inputServerUrl);
+        WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
+    }
+
+    private async Task<bool> ConfigureAuthenticationCredentialAsync(string? apiKey)
+    {
+        var credential = apiKey;
+        if (!string.IsNullOrEmpty(credential))
+        {
+            await apiKeyAuthService.SetApiKeyAsync(credential);
+            WriteLine("✅ Authentication successful!");
+        }
+        else
+        {
+            credential = await PromptForNewApiKeyAsync();
+            if (credential is null)
+            {
+                WriteLine("❌ API key is required.");
+                return false;
+            }
+        }
+        WriteLine();
+        if (await ValidateApiKeyWithServerAsync(credential)) return true;
+        return await HandleInvalidApiKeyAsync();
+    }
+
     /// <summary>
     /// Interactive registration
     /// </summary>
@@ -495,82 +451,12 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Registration ===");
-
-            try
-            {
-                WriteLine($"Server: {configService.BaseUrl}");
-            }
-            catch (InvalidOperationException)
-            {
-                WriteLine("? Server URL not configured. Please run 'automaton-runner auth --server <url>' first.");
-                return;
-            }
-            WriteLine();
-
-            // Check if already registered and not forcing
-            if (configService.IsRunnerRegistered() && !force)
-            {
-                WriteLine($"? Runner already registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
-                WriteLine();
-                Write("Do you want to register with a different name? (y/N): ");
-                var response = ReadLine()?.Trim().ToLower();
-
-                if (response != "y" && response != "yes")
-                {
-                    WriteLine("Registration cancelled.");
-                    return;
-                }
-                force = true;
-            }
-
-            // Check authentication
-            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                WriteLine("? Authentication required before registration.");
-                WriteLine("Run: automaton-runner auth");
-                return;
-            }
-
+            if (!TryShowRegistrationServer()) return;
+            if (!ConfirmRegistrationReplacement(force)) return;
+            if (!await EnsureRegistrationAuthenticationAsync()) return;
             await SetupHttpClientAuth();
-
-            // Get runner name if not provided
-            if (string.IsNullOrEmpty(runnerName))
-            {
-                var currentName = configService.ApplicationName;
-                var prompt = !string.IsNullOrEmpty(currentName)
-                    ? $"Enter runner name (current: {currentName}): "
-                    : "Enter runner name: ";
-
-                Write(prompt);
-                runnerName = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(runnerName))
-                {
-                    if (!string.IsNullOrEmpty(currentName))
-                    {
-                        runnerName = currentName;
-                        WriteLine($"Using current name: {runnerName}");
-                    }
-                    else
-                    {
-                        runnerName = $"AutoRunner-{Environment.MachineName}";
-                        WriteLine($"Using default name: {runnerName}");
-                    }
-                }
-            }
-
-            var success = await RegisterRunnerAsync(runnerName);
-            if (success)
-            {
-                WriteLine($"? Runner '{runnerName}' registered successfully!");
-                WriteLine();
-                WriteLine("?? Next step: automaton-runner");
-            }
-            else
-            {
-                WriteLine($"? Failed to register runner '{runnerName}'");
-            }
+            var resolvedName = ResolveInteractiveRunnerName(runnerName);
+            ReportRegistrationResult(resolvedName, await registrationWorkflow.RegisterRunnerAsync(resolvedName));
         }
         catch (Exception ex)
         {
@@ -581,6 +467,73 @@ public class RunnerHostService
             WriteLine($"? Registration error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
         }
+    }
+
+    private bool TryShowRegistrationServer()
+    {
+        try
+        {
+            WriteLine($"Server: {configService.BaseUrl}");
+            WriteLine();
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            WriteLine("? Server URL not configured. Please run 'automaton-runner auth --server <url>' first.");
+            return false;
+        }
+    }
+
+    private bool ConfirmRegistrationReplacement(bool force)
+    {
+        if (!configService.IsRunnerRegistered() || force) return true;
+        WriteLine($"? Runner already registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
+        WriteLine();
+        Write("Do you want to register with a different name? (y/N): ");
+        var response = ReadLine()?.Trim().ToLower();
+        if (response is "y" or "yes") return true;
+        WriteLine("Registration cancelled.");
+        return false;
+    }
+
+    private async Task<bool> EnsureRegistrationAuthenticationAsync()
+    {
+        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        if (!string.IsNullOrEmpty(apiKey)) return true;
+        WriteLine("? Authentication required before registration.");
+        WriteLine("Run: automaton-runner auth");
+        return false;
+    }
+
+    private string ResolveInteractiveRunnerName(string? runnerName)
+    {
+        if (!string.IsNullOrEmpty(runnerName)) return runnerName;
+        var currentName = configService.ApplicationName;
+        Write(!string.IsNullOrEmpty(currentName)
+            ? $"Enter runner name (current: {currentName}): "
+            : "Enter runner name: ");
+        var enteredName = ReadLine();
+        if (!string.IsNullOrWhiteSpace(enteredName)) return enteredName;
+        if (!string.IsNullOrEmpty(currentName))
+        {
+            WriteLine($"Using current name: {currentName}");
+            return currentName;
+        }
+        var defaultName = $"AutoRunner-{Environment.MachineName}";
+        WriteLine($"Using default name: {defaultName}");
+        return defaultName;
+    }
+
+    private static void ReportRegistrationResult(string runnerName, bool success)
+    {
+        if (!success)
+        {
+            WriteLine($"? Failed to register runner '{runnerName}'");
+            return;
+        }
+        WriteLine($"? Runner '{runnerName}' registered successfully!");
+        WriteLine();
+        WriteLine("?? Next step: automaton-runner");
     }
 
     /// <summary>
@@ -788,7 +741,7 @@ public class RunnerHostService
             runnerName = $"AutoRunner-{Environment.MachineName}";
         }
 
-        return await RegisterRunnerAsync(runnerName);
+        return await registrationWorkflow.RegisterRunnerAsync(runnerName);
     }
 
     private async Task EnsureRunnerRegistrationConsistencyAsync()
@@ -833,7 +786,7 @@ public class RunnerHostService
                 logger.Warning("Runner {RunnerName} is registered locally but not found on server. Re-registering before hub connect.", runnerName);
                 WriteLine($"?? Runner '{runnerName}' was not found on the server. Re-registering...");
 
-                var registerSuccess = await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
+                var registerSuccess = await registrationWorkflow.RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
                 if (!registerSuccess)
                 {
                     throw new InvalidOperationException($"Failed to re-register runner '{runnerName}' before connecting to the hub.");
@@ -873,385 +826,14 @@ public class RunnerHostService
             : ManagedHostedRunnerCredentialDecision.FailClosed;
     }
 
-    private async Task<bool> RegisterRunnerAsync(string runnerName, bool ignoreStoredRunnerId = false)
-    {
-        try
-        {
-            // Check if we have an existing runner ID stored locally
-            var existingRunnerId = ignoreStoredRunnerId ? null : storageService.GetRunnerId();
-            Guid runnerId = Guid.Empty;
-            bool isUpdate = false;
+    internal Task<bool> EnrollAsync()
+        => enrollmentWorkflow.EnrollAsync();
 
-            if (!string.IsNullOrEmpty(existingRunnerId) && Guid.TryParse(existingRunnerId, out var parsedId))
-            {
-                // Reuse existing runner ID for update
-                runnerId = parsedId;
-                isUpdate = true;
-                WriteLine($"?? Found existing runner ID: {runnerId}");
-                WriteLine($"?? Updating runner name to: {runnerName}");
-            }
-            else
-            {
-                // No local ID - check if runner exists on server by name
-                WriteLine($"?? Checking if runner '{runnerName}' already exists on server...");
+    private Task<bool> RegisterInfrastructureRunnerAsync(string enrollmentApiKey)
+        => enrollmentWorkflow.RegisterInfrastructureRunnerAsync(enrollmentApiKey);
 
-                try
-                {
-                    var existingRunnerResponse = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners/by-name/{Uri.EscapeDataString(runnerName)}");
-
-                    if (existingRunnerResponse.IsSuccessStatusCode)
-                    {
-                        // Runner exists on server! Retrieve its ID
-                        var runnerDetails = await existingRunnerResponse.Content.ReadAsAsync<RunnerDetails>();
-                        
-                       if(runnerDetails != null)
-                       {
-                            runnerId = runnerDetails.Id;
-                            isUpdate = true;
-                            WriteLine($"?? Found existing runner on server with ID: {runnerId}");
-                            WriteLine($"?? Will reuse this runner locally");
-
-                            // Save to local storage for next time
-                            await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                            logger.Warning("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
-                            WriteLine($"? Runner '{runnerName}' recovered successfully!");
-                            return true;
-                        }
-                        else
-                        {
-                            // Couldn't parse runner details, create new runner Id
-                            runnerId = Guid.NewGuid();
-                            WriteLine($"?? Creating new runner with ID: {runnerId}");
-                        }
-                    }
-                    else
-                    {
-                        // Runner doesn't exist on server, create new ID
-                        runnerId = Guid.NewGuid();
-                        WriteLine($"?? Creating new runner with ID: {runnerId}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // If lookup fails, just create new ID and continue
-                    logger.Debug(ex, "Could not check for existing runner by name, will create new: {ErrorMessage}", ex.Message);
-                    runnerId = Guid.NewGuid();
-                    WriteLine($"?? Creating new runner with ID: {runnerId}");
-                }
-            }
-
-            var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
-            var installationId = await storageService.GetOrCreateInstallationIdAsync();
-            var runnerData = new
-            {
-                Id = runnerId,
-                Name = runnerName,
-                Version = Environment.Version.ToString(),
-                MachineName = Environment.MachineName,
-                Purpose = purpose,
-                Capabilities = RunnerCapabilities.ForInstallationProfile(
-                    Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
-                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                    purpose),
-                RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
-                    ? (Guid?)runnerHostId
-                    : null,
-                HostedRunnerId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"), out var hostedRunnerId)
-                    ? (Guid?)hostedRunnerId
-                    : null,
-                InstallationId = installationId,
-            };
-
-            var json = JsonSerializer.Serialize(runnerData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            HttpResponseMessage response;
-
-            if (isUpdate)
-            {
-                // Update existing runner via PUT
-                WriteLine($"?? Making update request to: {configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}");
-                WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
-                WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-
-                response = await httpClient.PutAsync($"{configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}", content);
-            }
-            else
-            {
-                // Register new runner via POST
-                WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
-                WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
-                WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-
-                response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
-            }
-
-            WriteLine($"?? Server response: {response.StatusCode}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                logger.Debug("Runner {RunnerName} {Action} with ID {RunnerId}", runnerName, isUpdate ? "updated" : "registered", runnerId);
-                WriteLine($"? Runner {(isUpdate ? "updated" : "registered")} successfully!");
-                return true;
-            }
-
-            if (isUpdate &&
-                (response.StatusCode == System.Net.HttpStatusCode.NotFound
-                || response.StatusCode == System.Net.HttpStatusCode.Forbidden
-                || response.StatusCode == System.Net.HttpStatusCode.Unauthorized))
-            {
-                logger.Warning("Stored runner ID {RunnerId} for {RunnerName} was rejected with status {StatusCode}. Retrying registration without the stale local ID.", runnerId, runnerName, response.StatusCode);
-                WriteLine($"?? Stored runner ID was rejected by the server ({response.StatusCode}). Recovering runner identity...");
-                return await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
-            }
-
-            var errorContent = await response.Content.ReadAsStringAsync();
-            logger.Warning("Runner {Action} failed: {StatusCode} - {Error}", isUpdate ? "update" : "registration", response.StatusCode, errorContent);
-
-            WriteLine($"? {(isUpdate ? "Update" : "Registration")} failed: {response.StatusCode}");
-            if (!string.IsNullOrEmpty(errorContent))
-            {
-                WriteLine($"?? Server response body: {errorContent}");
-            }
-
-            // Provide specific guidance based on status code
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                WriteLine();
-                WriteLine("?? Authentication troubleshooting:");
-                WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
-                WriteLine("2. Check if the API key has expired in Automaton Studio");
-                WriteLine("3. Ensure the credential was issued by the Runner enrollment or provisioning workflow");
-                WriteLine("4. Verify the Automaton Studio server is running and accessible");
-            }
-            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                WriteLine("The API key is valid but doesn't have permission for runner registration.");
-                WriteLine("?? Re-enroll or reprovision the Runner from Automaton Studio to obtain a valid system credential.");
-            }
-
-            return false;
-        }
-        catch (Exception ex)
-        {
-            // Log technical details to file logs only
-            logger.Error(ex, "Error during runner registration. Error: {ErrorType}", ex.GetType().Name);
-
-            // Show friendly message to user
-            WriteLine($"? Registration error: {ex.Message}");
-            WriteLine("Check the log files for detailed technical information.");
-            return false;
-        }
-    }
-
-    internal async Task<bool> EnrollAsync()
-    {
-        var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
-        if (string.IsNullOrWhiteSpace(enrollmentToken))
-        {
-            return false;
-        }
-
-        var runnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
-        if (string.IsNullOrWhiteSpace(runnerName))
-        {
-            runnerName = $"infrastructure-{Environment.MachineName}";
-        }
-
-        var request = new RunnerEnrollmentExchangeRequest
-        {
-            EnrollmentToken = enrollmentToken,
-            RunnerName = runnerName,
-            RunnerVersion = Environment.Version.ToString(),
-            MachineName = Environment.MachineName,
-            OperatingSystem = RuntimeInformation.OSDescription,
-            Architecture = RuntimeInformation.OSArchitecture.ToString(),
-            ImageVersion = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE")
-        };
-
-        try
-        {
-            using var response = await httpClient.PostAsJsonAsync(
-                $"{configService.BaseUrl}/api/runner-enrollments/exchange",
-                request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.Warning("Runner enrollment failed with status {StatusCode}", response.StatusCode);
-                return false;
-            }
-
-            var enrollment = await response.Content.ReadFromJsonAsync<RunnerEnrollmentExchangeResponse>();
-            if (enrollment == null || string.IsNullOrWhiteSpace(enrollment.ApiKey))
-            {
-                logger.Warning("Runner enrollment response did not include a durable credential");
-                return false;
-            }
-
-            await apiKeyAuthService.SetEnrolledApiKeyAsync(enrollment.ApiKey);
-            await storageService.SaveRunnerConfigAsync(enrollment.RunnerId.ToString(), enrollment.RunnerName);
-            await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
-            {
-                Purpose = enrollment.Purpose,
-                Capabilities = enrollment.Capabilities,
-                RunnerHostId = enrollment.RunnerHostId,
-                InstallationId = enrollment.InstallationId
-            });
-
-            ApplyInstallationProfile(enrollment.Purpose, enrollment.Capabilities, enrollment.RunnerHostId);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", enrollment.RunnerId.ToString());
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", enrollment.RunnerName);
-            Environment.SetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN", null);
-
-            logger.Information(
-                "Runner enrollment completed for host {RunnerHostId} as runner {RunnerId}",
-                enrollment.RunnerHostId,
-                enrollment.RunnerId);
-            WriteLine($"✅ Runner enrolled successfully: {enrollment.RunnerName}");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            logger.Warning(ex, "Runner enrollment request failed");
-            return false;
-        }
-    }
-
-    private async Task<bool> RegisterInfrastructureRunnerAsync(string enrollmentApiKey)
-    {
-        var installationId = await storageService.GetOrCreateInstallationIdAsync();
-        var purpose = RunnerPurposes.Infrastructure;
-        var capabilities = RunnerCapabilities.ForInstallationProfile(
-            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            purpose);
-        var configuredRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
-        var request = new InfrastructureRunnerRegistrationRequest
-        {
-            InstallationId = installationId,
-            RunnerName = string.IsNullOrWhiteSpace(configuredRunnerName)
-                ? $"infrastructure-{Environment.MachineName}"
-                : configuredRunnerName,
-            RunnerVersion = Environment.Version.ToString(),
-            MachineName = Environment.MachineName,
-            OperatingSystem = RuntimeInformation.OSDescription,
-            Architecture = RuntimeInformation.OSArchitecture.ToString(),
-            DockerVersion = Environment.GetEnvironmentVariable("AUTOMATON_DOCKER_VERSION"),
-            PublicIp = Environment.GetEnvironmentVariable("AUTOMATON_PUBLIC_IP"),
-            PrivateIp = Environment.GetEnvironmentVariable("AUTOMATON_PRIVATE_IP"),
-            Provider = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PROVIDER"),
-            Region = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_REGION"),
-            CpuCores = Environment.ProcessorCount,
-            MemoryMb = GetHostMemoryMb(),
-            DiskMb = GetHostDiskMb(),
-            Capabilities = capabilities
-        };
-
-        using var httpRequest = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{configService.BaseUrl}/api/infrastructure-runners/register")
-        {
-            Content = JsonContent.Create(request)
-        };
-        httpRequest.Headers.Add("X-API-Key", enrollmentApiKey);
-
-        using var response = await httpClient.SendAsync(httpRequest);
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.Warning("Infrastructure Runner self-registration failed with status {StatusCode}", response.StatusCode);
-            return false;
-        }
-
-        var registration = await response.Content.ReadFromJsonAsync<InfrastructureRunnerRegistrationResponse>();
-        if (registration == null || string.IsNullOrWhiteSpace(registration.ApiKey))
-        {
-            logger.Warning("Infrastructure Runner self-registration response did not include a permanent credential");
-            return false;
-        }
-
-        await apiKeyAuthService.SetEnrolledApiKeyAsync(registration.ApiKey);
-        await storageService.SaveRunnerConfigAsync(registration.RunnerId.ToString(), registration.RunnerName);
-        await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
-        {
-            Purpose = registration.Purpose,
-            Capabilities = registration.Capabilities,
-            RunnerHostId = registration.RunnerHostId,
-            InstallationId = registration.InstallationId
-        });
-
-        ApplyInstallationProfile(registration.Purpose, registration.Capabilities, registration.RunnerHostId);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", registration.RunnerId.ToString());
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", registration.RunnerName);
-        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", null);
-        WriteLine($"✅ Infrastructure Runner self-registration completed: {registration.RunnerName}");
-        return true;
-    }
-
-    private static int? GetHostMemoryMb()
-    {
-        var memInfoPath = File.Exists("/host/proc/meminfo") ? "/host/proc/meminfo" : "/proc/meminfo";
-        if (!File.Exists(memInfoPath))
-            return null;
-
-        var line = File.ReadLines(memInfoPath)
-            .FirstOrDefault(value => value.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase));
-        if (line == null)
-            return null;
-
-        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length >= 2 && long.TryParse(parts[1], out var memoryKb)
-            ? (int)Math.Clamp(memoryKb / 1024, 1, int.MaxValue)
-            : null;
-    }
-
-    private static int? GetHostDiskMb()
-    {
-        try
-        {
-            var root = Directory.Exists("/host") ? "/host" : "/";
-            var drive = new DriveInfo(root);
-            return (int)Math.Clamp(drive.TotalSize / (1024L * 1024L), 1, int.MaxValue);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private async Task ApplyInstallationProfileAsync()
-    {
-        var profile = await storageService.LoadInstallationProfileAsync();
-        if (profile == null || string.IsNullOrWhiteSpace(profile.Purpose))
-        {
-            return;
-        }
-
-        var capabilities = RunnerCapabilities.ForInstallationProfile(profile.Capabilities, profile.Purpose);
-        if (!(profile.Capabilities ?? Array.Empty<string>())
-            .SequenceEqual(capabilities, StringComparer.OrdinalIgnoreCase))
-        {
-            profile.Capabilities = capabilities;
-            await storageService.SaveInstallationProfileAsync(profile);
-        }
-
-        ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
-    }
-
-    private static void ApplyInstallationProfile(
-        string purpose,
-        IReadOnlyList<string> capabilities,
-        Guid? runnerHostId)
-    {
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
-        Environment.SetEnvironmentVariable(
-            "AUTOMATON_RUNNER_CAPABILITIES",
-            string.Join(',', RunnerCapabilities.ForInstallationProfile(
-                capabilities,
-                purpose)));
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
-    }
-
+    private Task ApplyInstallationProfileAsync()
+        => enrollmentWorkflow.ApplyInstallationProfileAsync();
     public async Task ShowStatusAsync()
     {
         WriteLine();
@@ -1551,157 +1133,8 @@ public class RunnerHostService
         }
     }
 
-    private static bool IsRunningInContainer =>
-        string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase)
-        || File.Exists("/.dockerenv");
+    private Task StartFastApiProcessAsync(CancellationToken cancellationToken = default)
+        => fastApiProcess.StartAsync(cancellationToken);
 
-    /// <summary>
-    /// Starts the local FastAPI backend process on non-container environments.
-    /// FastAPI inherits the runner process environment — AUTOMATON_SERVER_URL, AUTOMATON_API_KEY,
-    /// and RUNNER_SCRIPTS_DIR are standard env vars set by the operator.
-    /// In Docker, this is a no-op — the entrypoint script already starts FastAPI.
-    /// </summary>
-    private async Task StartFastApiProcessAsync(CancellationToken cancellationToken = default)
-    {
-        if (IsRunningInContainer)
-        {
-            logger.Debug("Running in container — FastAPI managed by entrypoint, skipping launch");
-            return;
-        }
-
-        // Ask any running FastAPI instance (from a previous runner run) to shut down,
-        // then wait until the port is actually free before launching the new one.
-        // This is reliable across process restarts — no PID file or static field needed.
-        try
-        {
-            using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            await probe.GetAsync("http://localhost:8001/shutdown", cancellationToken);
-
-            // Poll until the port is released (connection refused = old process exited)
-            var stopDeadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < stopDeadline)
-            {
-                try
-                {
-                    using var check = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-                    using var response = await check.GetAsync("http://localhost:8001/health", cancellationToken);
-                    await Task.Delay(200, cancellationToken); // still bound — keep waiting
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch
-                {
-                    break; // connection refused — port is free
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch { /* not running — fine */ }
-
-        var mainPy = Path.Combine(AppContext.BaseDirectory, "fastapi_server", "main.py");
-        if (!File.Exists(mainPy))
-        {
-            logger.Warning("FastAPI main.py not found at {Path} — skipping auto-launch", mainPy);
-            WriteLine($"[!] FastAPI main.py not found at {mainPy} — skipping auto-launch.");
-            return;
-        }
-
-        // FastAPI inherits the runner's process environment but RUNNER_SCRIPTS_DIR may not be
-        // set when running locally (dotnet run). Always inject it explicitly so the fallback
-        // /app/data/apps (Docker-only) is never used on a standalone machine.
-        var scriptsDir = runnerWorkspaceService.GetFastApiScriptsRoot();
-        var psi = new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "python",
-            Arguments = $"\"{mainPy}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = Path.GetDirectoryName(mainPy)!
-        };
-        psi.Environment["RUNNER_SCRIPTS_DIR"] = scriptsDir;
-
-        if (runnerWorkspaceService.UsesLegacyScriptsLayout)
-        {
-            psi.Environment.Remove("AUTOMATON_WORKSPACE_ROOT");
-        }
-        else
-        {
-            psi.Environment["AUTOMATON_WORKSPACE_ROOT"] = runnerWorkspaceService.WorkspaceRoot;
-        }
-
-        try
-        {
-            if (runnerWorkspaceService.UsesLegacyScriptsLayout)
-            {
-                logger.Debug(
-                    "Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir} in legacy scripts layout mode",
-                    scriptsDir);
-            }
-            else
-            {
-                logger.Debug(
-                    "Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir} and workspace root {WorkspaceRoot}",
-                    scriptsDir,
-                    runnerWorkspaceService.WorkspaceRoot);
-            }
-            WriteLine($"🔧 FastAPI scripts dir: {scriptsDir}");
-            var proc = System.Diagnostics.Process.Start(psi);
-            logger.Debug("FastAPI backend launched (PID {Pid})", proc?.Id);
-        }
-        catch (Exception ex)
-        {
-            logger.Warning(ex, "Failed to auto-launch FastAPI backend — start it manually");
-            WriteLine($"[!] Failed to auto-launch FastAPI backend: {ex.Message}");
-            WriteLine("[!] Start it manually: python fastapi_server/main.py");
-        }
-    }
-
-    /// <summary>
-    /// Waits for the local FastAPI backend to become ready before connecting to the server hub.
-    /// In Docker, FastAPI starts alongside the .NET runner; this health check ensures it's up.
-    /// On bare-metal (no FastAPI), this times out gracefully and logs a warning.
-    /// </summary>
-    internal async Task WaitForFastApiAsync(int maxWaitSeconds = 30, CancellationToken cancellationToken = default)
-    {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        var deadline = DateTime.UtcNow.AddSeconds(maxWaitSeconds);
-        var attempt = 0;
-        while (DateTime.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                using var response = await client.GetAsync("http://localhost:8001/health", cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    if (attempt > 0) WriteLine(); // newline after the dots
-                    logger.Debug("FastAPI backend ready");
-                    return;
-                }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch { /* not ready yet */ }
-
-            if (attempt == 0)
-                Write("⏳ Waiting for FastAPI backend");
-            else
-                Write(".");
-
-            attempt++;
-            await Task.Delay(1000, cancellationToken);
-        }
-
-        WriteLine(); // newline after the dots
-        logger.Warning("FastAPI backend did not become ready within {Seconds}s - tunnel will be unavailable", maxWaitSeconds);
-        WriteLine($"[!] FastAPI backend not ready after {maxWaitSeconds}s. App controller execution will not work.");
-        WriteLine("[!] Run: pip install fastapi \"uvicorn[standard]\" and restart.");
-    }
-}
+    internal Task WaitForFastApiAsync(int maxWaitSeconds = 30, CancellationToken cancellationToken = default)
+        => fastApiProcess.WaitAsync(maxWaitSeconds, cancellationToken);}

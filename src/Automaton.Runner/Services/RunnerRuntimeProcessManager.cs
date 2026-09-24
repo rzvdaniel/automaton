@@ -1,9 +1,5 @@
 using System.Diagnostics;
-using System.Net;
-using System.Net.Http;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -36,21 +32,15 @@ public sealed class RuntimeApplyResult
 /// </summary>
 public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHostedService, IDisposable
 {
-    private const string MetadataFileName = "deployment.json";
     private const string RuntimePortEnvironmentVariable = "AUTOMATON_PORT";
     private readonly RunnerWorkspaceService workspace;
+    private readonly RunnerRuntimeProcessMetadataStore metadataStore;
+    private readonly RunnerRuntimeProcessPortAllocator portAllocator = new();
     private readonly RunnerRuntimeRegistry registry;
     private readonly ILogger<RunnerRuntimeProcessManager> logger;
-    private readonly Func<RunnerRuntimeDeploymentMetadata, Exception?>? metadataWriteFailureFactory;
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> runtimes = [];
     private readonly Dictionary<DeploymentRuntimeKey, ActiveRuntime> candidates = [];
-    private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
-    private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    };
 
     public RunnerRuntimeProcessManager(
         RunnerWorkspaceService workspace,
@@ -59,20 +49,20 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         Func<RunnerRuntimeDeploymentMetadata, Exception?>? metadataWriteFailureFactory = null)
     {
         this.workspace = workspace;
+        metadataStore = new RunnerRuntimeProcessMetadataStore(workspace, metadataWriteFailureFactory);
         this.registry = registry;
         this.logger = logger;
-        this.metadataWriteFailureFactory = metadataWriteFailureFactory;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         foreach (var metadataPath in Directory.Exists(workspace.AppsRoot)
-            ? Directory.EnumerateFiles(workspace.AppsRoot, MetadataFileName, SearchOption.AllDirectories)
+            ? Directory.EnumerateFiles(workspace.AppsRoot, "deployment.json", SearchOption.AllDirectories)
             : [])
         {
             try
             {
-                var metadata = await ReadMetadataAsync(metadataPath, cancellationToken);
+                var metadata = await metadataStore.ReadAsync(metadataPath, cancellationToken);
                 if (metadata is null || (metadata.Runtime?.Command is null && metadata.Candidate?.Runtime?.Command is null))
                     continue;
 
@@ -93,7 +83,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 candidate.ProcessStartTimeUtc = null;
                 candidate.EffectivePort = null;
                 candidate.State = RuntimeReadinessState.Starting;
-                await WriteMetadataAsync(metadata, cancellationToken);
+                await metadataStore.WriteAsync(metadata, cancellationToken);
 
                 var activeCandidate = await StartRuntimeAsync(
                     appId,
@@ -125,9 +115,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         Guid? candidateId = null)
     {
         ApplicationContractValidator.EnsureValid(contract);
-        var metadataPath = GetMetadataPath(appId, deploymentTargetId);
+        var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var previousMetadata = File.Exists(metadataPath)
-            ? await ReadMetadataAsync(metadataPath, cancellationToken)
+            ? await metadataStore.ReadAsync(metadataPath, cancellationToken)
             : null;
 
         if (previousMetadata?.Candidate is not null)
@@ -140,7 +130,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         if (contract.Runtime.Command is null)
         {
             await StopAsync(appId, deploymentTargetId);
-            await WriteMetadataAsync(
+            await metadataStore.WriteAsync(
                 new RunnerRuntimeDeploymentMetadata
                 {
                     AppId = appId.ToString(),
@@ -175,7 +165,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         candidate.ArtifactId = GetArtifactId(candidate.ArtifactRoot);
         Directory.CreateDirectory(candidate.ArtifactRoot);
         var pending = CreatePendingMetadata(appId, deploymentTargetId, previousMetadata, candidate);
-        await WriteMetadataAsync(pending, cancellationToken);
+        await metadataStore.WriteAsync(pending, cancellationToken);
 
         ActiveRuntime? activeCandidate = null;
         try
@@ -201,7 +191,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     activeCandidate))
             {
                 if (previousMetadata is not null)
-                    await WriteMetadataAsync(previousMetadata, CancellationToken.None);
+                    await metadataStore.WriteAsync(previousMetadata, CancellationToken.None);
                 else if (File.Exists(metadataPath))
                     File.Delete(metadataPath);
             }
@@ -225,8 +215,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         var targetRoot = ValidateArtifactRoot(appId, deploymentTargetId, candidate.ArtifactRoot);
         candidate.ArtifactRoot = targetRoot;
         Directory.CreateDirectory(targetRoot);
-        var workingDirectory = ResolveWorkspacePath(targetRoot, command.WorkingDirectory, "working directory");
-        var executable = ResolveExecutable(targetRoot, command.Executable);
+        var workingDirectory = RunnerRuntimeProcessExecutionPolicy.ResolveWorkspacePath(
+            targetRoot, command.WorkingDirectory, "working directory");
+        var executable = RunnerRuntimeProcessExecutionPolicy.ResolveExecutable(targetRoot, command.Executable);
         var storage = workspace.PrepareApplicationStorage(
             appId,
             candidate.Storage ?? new ApplicationStorageSpec());
@@ -235,14 +226,14 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             deploymentTargetId,
             candidate.ArtifactId ?? Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(logDirectory);
-        var stdout = CreateLogWriter(Path.Combine(logDirectory, "runtime.stdout.log"));
-        var stderr = CreateLogWriter(Path.Combine(logDirectory, "runtime.stderr.log"));
+        var stdout = RunnerRuntimeProcessExecutionPolicy.CreateLogWriter(Path.Combine(logDirectory, "runtime.stdout.log"));
+        var stderr = RunnerRuntimeProcessExecutionPolicy.CreateLogWriter(Path.Combine(logDirectory, "runtime.stderr.log"));
         Process? process = null;
         ActiveRuntime? active = null;
 
         try
         {
-            var startInfo = CreateStartInfo(
+            var startInfo = RunnerRuntimeProcessExecutionPolicy.CreateStartInfo(
                 executable,
                 command,
                 workingDirectory,
@@ -253,8 +244,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 storage);
             process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Could not start runtime process for app {appId}.");
-            process.OutputDataReceived += (_, args) => WriteLine(stdout, args.Data);
-            process.ErrorDataReceived += (_, args) => WriteLine(stderr, args.Data);
+            process.OutputDataReceived += (_, args) => RunnerRuntimeProcessExecutionPolicy.WriteLine(stdout, args.Data);
+            process.ErrorDataReceived += (_, args) => RunnerRuntimeProcessExecutionPolicy.WriteLine(stderr, args.Data);
             process.EnableRaisingEvents = true;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -271,14 +262,14 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
             candidate.EffectivePort = effectivePort;
             candidate.ProcessId = process.Id;
-            candidate.ProcessStartTimeUtc = GetProcessStartTime(process);
+            candidate.ProcessStartTimeUtc = RunnerRuntimeProcessExecutionPolicy.GetProcessStartTime(process);
             candidate.StartedAtUtc = DateTimeOffset.UtcNow;
             candidate.State = RuntimeReadinessState.Starting;
             metadata.Candidate = candidate;
-            await WriteMetadataAsync(metadata, cancellationToken);
+            await metadataStore.WriteAsync(metadata, cancellationToken);
 
-            await WaitForReadinessAsync(
-                runtimeProcess,
+            await RunnerRuntimeProcessExecutionPolicy.WaitForReadinessAsync(
+                runtimeProcess.Process,
                 effectivePort,
                 candidate.Health ?? new ApplicationHealthSpec(),
                 cancellationToken);
@@ -290,7 +281,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (process is not null)
             {
-                await StopProcessAsync(process, cancellationToken);
+                await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(process, cancellationToken);
                 RemoveActiveRuntime(key, process);
             }
             if (active is not null)
@@ -327,9 +318,9 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 ?? throw new InvalidOperationException("Runtime candidate metadata is missing.");
             candidateMetadata.EffectivePort = candidate.Port;
             candidateMetadata.ProcessId = candidate.Process.Id;
-            candidateMetadata.ProcessStartTimeUtc = GetProcessStartTime(candidate.Process);
+            candidateMetadata.ProcessStartTimeUtc = RunnerRuntimeProcessExecutionPolicy.GetProcessStartTime(candidate.Process);
             candidateMetadata.State = RuntimeReadinessState.Ready;
-            await WriteMetadataAsync(metadata, cancellationToken);
+            await metadataStore.WriteAsync(metadata, cancellationToken);
 
             ActiveRuntime? old;
             lock (gate)
@@ -346,7 +337,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             promotionIrreversible = true;
 
             if (old is not null && !old.HasExited)
-            await StopProcessAsync(old.Process, cancellationToken);
+            await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(old.Process, cancellationToken);
 
             if (old is not null)
                 DeleteArtifactDirectory(old.ArtifactRoot, candidate.ArtifactRoot);
@@ -365,7 +356,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             metadata.Candidate = null;
             try
             {
-                await WriteMetadataAsync(metadata, cancellationToken);
+                await metadataStore.WriteAsync(metadata, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -400,7 +391,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         {
             if (!IsCurrentRuntime(key, candidate))
             {
-                await StopProcessAsync(candidate.Process, cancellationToken);
+                await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(candidate.Process, cancellationToken);
                 RemoveActiveRuntime(key, candidate.Process);
                 candidate.Dispose();
             }
@@ -425,7 +416,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
             registry.Remove(key.AppId, key.DeploymentTargetId);
         foreach (var runtime in active)
         {
-            await StopProcessAsync(runtime.Process, cancellationToken);
+            await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(runtime.Process, cancellationToken);
             runtime.Dispose();
         }
     }
@@ -451,7 +442,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
 
         foreach (var runtime in active)
         {
-            await StopProcessAsync(runtime.Process);
+            await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(runtime.Process);
             runtime.Dispose();
         }
     }
@@ -488,8 +479,8 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     {
         try
         {
-            var path = GetMetadataPath(key.AppId, key.DeploymentTargetId);
-            var metadata = await ReadMetadataAsync(path, CancellationToken.None);
+            var path = metadataStore.GetPath(key.AppId, key.DeploymentTargetId);
+            var metadata = await metadataStore.ReadAsync(path, CancellationToken.None);
             if (metadata is not null)
             {
                 metadata.EffectivePort = null;
@@ -497,7 +488,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                 metadata.ProcessStartTimeUtc = null;
                 metadata.State = RuntimeReadinessState.Failed;
                 metadata.LastError = $"Runtime process exited with code {exitCode}.";
-                await WriteMetadataAsync(metadata, CancellationToken.None);
+                await metadataStore.WriteAsync(metadata, CancellationToken.None);
             }
         }
         catch (Exception ex)
@@ -521,7 +512,7 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
                     return;
             }
 
-            await StopProcessAsync(process);
+            await RunnerRuntimeProcessExecutionPolicy.StopProcessAsync(process);
         }
         catch (ArgumentException)
         {
@@ -670,335 +661,13 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
     {
         lock (gate)
         {
-            var gatewayPort = RunnerPlatformPorts.GetRuntimeGatewayPort();
             var used = runtimes.Values.Concat(candidates.Values)
                 .Where(runtime => !runtime.HasExited)
                 .Select(runtime => runtime.Port)
                 .ToHashSet();
-
-            if (requestedPort != gatewayPort && !used.Contains(requestedPort) && CanBind(requestedPort))
-                return requestedPort;
-
-            for (var port = portStart; port <= portEnd; port++)
-                if (port != gatewayPort && !used.Contains(port) && CanBind(port))
-                    return port;
-        }
-
-        throw new InvalidOperationException($"No runtime ports available in range {portStart}-{portEnd}.");
-    }
-
-    private static ProcessStartInfo CreateStartInfo(
-        string executable,
-        ApplicationCommandSpec command,
-        string workingDirectory,
-        int effectivePort,
-        Guid appId,
-        Guid deploymentTargetId,
-        string targetRoot,
-        RunnerApplicationStorageRuntime storage)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = command.UseShell ? GetShellExecutable() : executable,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        if (command.UseShell)
-        {
-            var shellCommand = string.Join(
-                " ",
-                new[] { executable }.Concat(command.Arguments).Select(QuoteShellArgument));
-            if (OperatingSystem.IsWindows())
-            {
-                startInfo.ArgumentList.Add("/d");
-                startInfo.ArgumentList.Add("/s");
-                startInfo.ArgumentList.Add("/c");
-            }
-            else
-            {
-                startInfo.ArgumentList.Add("-c");
-            }
-            startInfo.ArgumentList.Add(shellCommand);
-        }
-        else
-        {
-            foreach (var argument in command.Arguments)
-                startInfo.ArgumentList.Add(argument);
-        }
-
-        foreach (var pair in command.Environment)
-            startInfo.Environment[pair.Key] = pair.Value;
-        startInfo.Environment[RuntimePortEnvironmentVariable] = effectivePort.ToString();
-        startInfo.Environment["AUTOMATON_APP_ID"] = appId.ToString();
-        startInfo.Environment["AUTOMATON_DEPLOYMENT_TARGET_ID"] = deploymentTargetId.ToString();
-        startInfo.Environment["AUTOMATON_RUNTIME_ROOT"] = targetRoot;
-        startInfo.Environment["AUTOMATON_APP_DATA_DIR"] = storage.DataDirectory;
-        foreach (var mount in storage.Mounts)
-            startInfo.Environment[$"AUTOMATON_STORAGE_{mount.Key.ToUpperInvariant()}"] = mount.Value;
-        return startInfo;
-    }
-
-    private async Task WaitForReadinessAsync(
-        ActiveRuntime runtime,
-        int effectivePort,
-        ApplicationHealthSpec health,
-        CancellationToken cancellationToken)
-    {
-        var healthPort = health.Port ?? effectivePort;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(health.StartupTimeoutSeconds));
-        using var httpClient = health.Path is null
-            ? null
-            : new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-
-        while (!timeout.IsCancellationRequested)
-        {
-            if (runtime.HasExited)
-                throw new InvalidOperationException(
-                    $"Runtime process exited before becoming ready (exit code {runtime.ExitCode?.ToString() ?? "unknown"}).");
-
-            try
-            {
-                if (health.Path is null)
-                {
-                    using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(IPAddress.Loopback, healthPort, timeout.Token);
-                    return;
-                }
-                else
-                {
-                    using var response = await httpClient!.GetAsync(
-                        new UriBuilder("http", IPAddress.Loopback.ToString(), healthPort)
-                        {
-                            Path = health.Path
-                        }.Uri,
-                        timeout.Token);
-                    if ((int)response.StatusCode is >= 200 and < 300)
-                        return;
-                }
-            }
-            catch (SocketException) when (!timeout.IsCancellationRequested)
-            {
-            }
-            catch (HttpRequestException) when (!timeout.IsCancellationRequested)
-            {
-            }
-            catch (TaskCanceledException) when (!timeout.IsCancellationRequested)
-            {
-            }
-            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-            {
-                break;
-            }
-
-            try
-            {
-                await Task.Delay(100, timeout.Token);
-            }
-            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-            {
-                break;
-            }
-        }
-
-        throw new TimeoutException(
-            $"Runtime did not become ready on 127.0.0.1:{healthPort} within {health.StartupTimeoutSeconds} seconds.");
-    }
-
-    private string GetMetadataPath(Guid appId, Guid deploymentTargetId)
-        => Path.Combine(workspace.GetAppAutomationRoot(appId, deploymentTargetId), MetadataFileName);
-
-    private async Task<RunnerRuntimeDeploymentMetadata?> ReadMetadataAsync(
-        string path,
-        CancellationToken cancellationToken)
-    {
-        if (!File.Exists(path))
-            return null;
-        var metadata = JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
-            await File.ReadAllTextAsync(path, cancellationToken),
-            JsonOptions);
-        if (metadata is null
-            || (metadata.Runtime is null && metadata.Candidate?.Runtime is null))
-            throw new InvalidOperationException("Runtime deployment metadata is invalid.");
-        return metadata;
-    }
-
-    private async Task WriteMetadataAsync(
-        RunnerRuntimeDeploymentMetadata metadata,
-        CancellationToken cancellationToken)
-    {
-        var injectedFailure = metadataWriteFailureFactory?.Invoke(metadata);
-        if (injectedFailure is not null)
-            throw injectedFailure;
-
-        var path = GetMetadataPath(
-            Guid.Parse(metadata.AppId),
-            Guid.Parse(metadata.DeploymentTargetId));
-        var directory = Path.GetDirectoryName(path)!;
-        Directory.CreateDirectory(directory);
-        var temporaryPath = Path.Combine(
-            directory,
-            $".{MetadataFileName}.{Guid.NewGuid():N}.tmp");
-
-        try
-        {
-            await using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 4096,
-                options: FileOptions.Asynchronous | FileOptions.WriteThrough))
-            await using (var writer = new StreamWriter(stream))
-            {
-                await writer.WriteAsync(
-                    JsonSerializer.Serialize(metadata, JsonOptions).AsMemory(),
-                    cancellationToken);
-                await writer.FlushAsync(cancellationToken);
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, path, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-                File.Delete(temporaryPath);
+            return portAllocator.AllocatePort(requestedPort, used);
         }
     }
-
-    private static string ResolveExecutable(string root, string executable)
-    {
-        if (IsBareExecutable(executable))
-            return executable;
-        return ResolveWorkspacePath(root, executable, "executable");
-    }
-
-    private static string ResolveWorkspacePath(string root, string relativePath, string description)
-        => ManagedPathBoundary.ResolveInside(
-            root,
-            relativePath,
-            $"Runtime {description}");
-
-    private static bool IsBareExecutable(string value)
-        => !string.IsNullOrWhiteSpace(value)
-            && !value.Contains('/')
-            && !value.Contains('\\')
-            && !Path.IsPathRooted(value)
-            && !(value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':');
-
-    private static string GetShellExecutable() => OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-
-    private static string QuoteShellArgument(string value)
-        => OperatingSystem.IsWindows()
-            ? $"\"{value.Replace("\"", "\\\"")}\""
-            : $"'{value.Replace("'", "'\\''")}'";
-
-    private static void WriteLine(StreamWriter writer, string? value)
-    {
-        if (value is null)
-            return;
-
-        try { writer.WriteLine(value); }
-        catch (ObjectDisposedException) { }
-    }
-
-    private static StreamWriter CreateLogWriter(string path)
-        => new(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-        {
-            AutoFlush = true
-        };
-
-    private static async Task StopProcessAsync(Process process, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (process.HasExited)
-                return;
-
-            if (cancellationToken.IsCancellationRequested)
-            {
-                await ForceKillProcessTreeAsync(process);
-                await process.WaitForExitAsync(CancellationToken.None)
-                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-                return;
-            }
-
-            process.CloseMainWindow();
-            await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
-        }
-        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
-        {
-            try
-            {
-                await ForceKillProcessTreeAsync(process);
-                await process.WaitForExitAsync(CancellationToken.None)
-                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-            }
-            catch (Exception cleanupException) when (cleanupException is InvalidOperationException or TimeoutException or COMException)
-            {
-            }
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
-    private static async Task ForceKillProcessTreeAsync(Process process)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            if (process.HasExited)
-                return;
-
-            using var taskKill = Process.Start(new ProcessStartInfo
-            {
-                FileName = "taskkill.exe",
-                ArgumentList = { "/PID", process.Id.ToString(), "/T", "/F" },
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            });
-            if (taskKill is not null)
-                await taskKill.WaitForExitAsync(CancellationToken.None)
-                    .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-            return;
-        }
-
-        if (!process.HasExited)
-            process.Kill(entireProcessTree: true);
-    }
-
-    private static DateTimeOffset? GetProcessStartTime(Process process)
-    {
-        try { return process.StartTime.ToUniversalTime(); }
-        catch { return null; }
-    }
-
-    private static bool CanBind(int port)
-    {
-        try
-        {
-            using var listener = new TcpListener(IPAddress.Loopback, port);
-            listener.Start();
-            return true;
-        }
-        catch (SocketException)
-        {
-            return false;
-        }
-    }
-
-    private static int ReadPort(string name, int fallback)
-        => int.TryParse(Environment.GetEnvironmentVariable(name), out var port)
-            && port is > 0 and <= 65_535
-            ? port
-            : fallback;
 
     public void Dispose() => StopAsync(CancellationToken.None).GetAwaiter().GetResult();
 
