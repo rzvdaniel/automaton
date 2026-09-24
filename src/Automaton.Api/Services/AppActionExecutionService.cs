@@ -60,6 +60,18 @@ public sealed class AppActionExecutionService
             if (existing != null) return existing;
         }
         AppActionManifestParser.ValidateKey(actionKey);
+        var resolved = await ResolveActionTargetAsync(appId, actionKey, userId, cancellationToken);
+        return await CreateAndDispatchAsync(
+            appId, resolved.Target.Id, actionKey, userId, input, occurrenceId, triggerType,
+            resolved.Runner, resolved.Action, cancellationToken);
+    }
+
+    private async Task<(Runner Runner, AppDeploymentTarget Target, AppActionModuleInfo Action)> ResolveActionTargetAsync(
+        Guid appId,
+        string actionKey,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
         var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
             ?? throw new KeyNotFoundException("App not found.");
         if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
@@ -81,8 +93,7 @@ public sealed class AppActionExecutionService
             cancellationToken);
         var deployedAction = deployed.Actions.SingleOrDefault(item => string.Equals(item.Key, actionKey, StringComparison.Ordinal))
             ?? throw new KeyNotFoundException("Action is not deployed on the assigned Runner.");
-        return await CreateAndDispatchAsync(
-            appId, target.Id, actionKey, userId, input, occurrenceId, triggerType, runner, deployedAction, cancellationToken);
+        return (runner, target, deployedAction);
     }
 
     internal async Task<AppModuleExecution> ExecuteScheduledOnRunnerAsync(
@@ -138,7 +149,7 @@ public sealed class AppActionExecutionService
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                await scope.ServiceProvider.GetRequiredService<AppActionExecutionService>()
+                await scope.ServiceProvider.GetRequiredService<AppActionExecutionDispatcher>()
                     .DispatchAsync(executionId, connectionId, inputJson);
             }
             catch
@@ -148,43 +159,6 @@ public sealed class AppActionExecutionService
             }
         }, CancellationToken.None);
         return execution;
-    }
-
-    internal async Task DispatchAsync(Guid executionId, string connectionId, string inputJson)
-    {
-        var execution = await db.AppModuleExecutions.SingleOrDefaultAsync(item => item.Id == executionId);
-        if (execution == null) return;
-        try
-        {
-            var deploymentTargetId = execution.DeploymentTargetId
-                ?? throw new InvalidOperationException(
-                    "Runner Action execution has no deployment target.");
-            execution.Status = AppModuleExecutionStatuses.Running;
-            execution.StartedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            using var inputDocument = JsonDocument.Parse(inputJson);
-            var runnerPurpose = await db.Runners.AsNoTracking().Where(item => item.Id == execution.RunnerId).Select(item => item.Purpose).SingleOrDefaultAsync();
-            var result = await hub.Clients.Client(connectionId).InvokeAsync<AppActionExecutionResult>(
-                AutomatonHubMethods.ExecuteAppActionModule,
-                new ExecuteAppActionModuleRequest
-                {
-                    ExecutionId = execution.Id, AppId = execution.AppId, ActionKey = execution.ModuleKey,
-                    DeploymentTargetId = deploymentTargetId,
-                    ExpectedDeploymentHash = execution.DeploymentHash,
-                    Input = inputDocument.RootElement.Clone(),
-                    SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(execution.AppId)
-                        && string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
-                }, CancellationToken.None);
-            ApplyResult(execution, result);
-        }
-        catch (Exception ex)
-        {
-            execution.Status = AppModuleExecutionStatuses.Failed;
-            execution.ErrorCode = AppModuleExecutionErrorCodes.PlatformError;
-            execution.FailureSummary = Limit(ex.Message, 1000);
-            execution.CompletedAtUtc = DateTime.UtcNow;
-        }
-        await db.SaveChangesAsync(CancellationToken.None);
     }
 
     public async Task<IReadOnlyList<AppModuleExecution>> ListAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
@@ -281,14 +255,6 @@ public sealed class AppActionExecutionService
             cancellationToken);
     }
 
-    private static void ApplyResult(AppModuleExecution execution, AppActionExecutionResult result)
-    {
-        execution.Status = result.Status; execution.DeploymentHash = result.DeploymentHash; execution.ExitCode = result.ExitCode;
-        execution.ErrorCode = result.ErrorCode; execution.FailureSummary = Limit(result.FailureSummary, 1000);
-        execution.StartedAtUtc = result.StartedAtUtc; execution.CompletedAtUtc = result.CompletedAtUtc;
-        execution.LogsAvailableUntilUtc = result.LogsExpireAtUtc; execution.ResultAvailableUntilUtc = result.ResultExpireAtUtc;
-    }
-
     private async Task<(string ConnectionId, Guid DeploymentTargetId)> GetAuthorizedRunnerConnectionAsync(
         Guid appId,
         Guid userId,
@@ -315,5 +281,4 @@ public sealed class AppActionExecutionService
             throw new UnauthorizedAccessException("You do not have permission to deploy or modify this App.");
     }
 
-    private static string? Limit(string? value, int max) => value?.Length > max ? value[..max] : value;
 }

@@ -397,6 +397,7 @@ services.AddScoped<ConnectedFlowArtifactService>();
 services.AddScoped<DeploymentOperationService>();
 services.AddHostedService<DeploymentOperationDispatcher>();
 services.AddScoped<AppActionExecutionService>();
+services.AddScoped<AppActionExecutionDispatcher>();
 services.AddScoped<ActionScheduleService>();
 services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
 services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
