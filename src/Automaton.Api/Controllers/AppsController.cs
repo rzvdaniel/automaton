@@ -1175,7 +1175,11 @@ public class AppsController : BaseController
 
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var fileName = segments.LastOrDefault() ?? string.Empty;
-        if (fileName.StartsWith(".", StringComparison.Ordinal) ||
+        return IsExcludedRuntimeFileName(fileName) || ContainsExcludedRuntimeDirectory(segments);
+    }
+
+    private static bool IsExcludedRuntimeFileName(string fileName)
+        => fileName.StartsWith(".", StringComparison.Ordinal) ||
             fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
             fileName.Equals("automaton.json", StringComparison.OrdinalIgnoreCase) ||
             fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
@@ -1183,18 +1187,15 @@ public class AppsController : BaseController
             fileName.Equals("package-lock.json", StringComparison.OrdinalIgnoreCase) ||
             fileName.StartsWith("vite.config.", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
+            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase);
 
-        return segments.Any(segment =>
+    private static bool ContainsExcludedRuntimeDirectory(IEnumerable<string> segments)
+        => segments.Any(segment =>
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("src", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("source", StringComparison.OrdinalIgnoreCase));
-    }
 
     private static object CreateSkippedEntry(string path, string reason, string ruleSource)
     {
