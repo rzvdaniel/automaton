@@ -328,7 +328,13 @@ public class AppsService
         dataContext.WebAppUsers.Add(appUser);
         await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
         await dataContext.SaveChangesAsync();
+        await InitializeAppFilesAsync(entity);
+        await WriteAppCreatedAuditAsync(entity, app.Name);
+        return entity.Id;
+    }
 
+    private async Task InitializeAppFilesAsync(Entities.WebApp entity)
+    {
         // Create default app metadata in file system (no index.html — AI will write it)
         var defaultDefinition = new Models.AppDefinition
         {
@@ -363,9 +369,12 @@ public class AppsService
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
         await fileStorageService.WriteSourceFileAsync(UserId, entity.Id, "automaton.json", automatonConfig);
+    }
 
+    private async Task WriteAppCreatedAuditAsync(Entities.WebApp entity, string appName)
+    {
         // Log activity
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, appName, entity.Id);
 
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
         {
@@ -382,9 +391,6 @@ public class AppsService
                 ExecutionRunnerId = GetDefaultRunnerId(entity)
             }
         });
-
-
-        return entity.Id;
     }
 
     public async Task Update(Guid id, AppModel app)
