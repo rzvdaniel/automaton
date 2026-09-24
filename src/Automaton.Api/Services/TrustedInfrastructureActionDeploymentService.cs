@@ -20,8 +20,28 @@ public sealed class TrustedInfrastructureActionDeploymentService(
         string actionKey,
         CancellationToken cancellationToken)
     {
-        TrustedInfrastructureActions.EnsureAllowed(actionKey);
+        var (actionRoot, expectedHash) = GetBundledAction(actionKey);
+        var deploymentTargetId = await GetPlatformDeploymentTargetIdAsync(cancellationToken);
+        var current = await GetDeployedActionAsync(connectionId, deploymentTargetId, actionKey, cancellationToken);
+        if (IsCurrentAction(current, expectedHash))
+            return current!;
 
+        await DeployActionAsync(
+            connectionId,
+            deploymentTargetId,
+            actionKey,
+            actionRoot,
+            expectedHash,
+            cancellationToken);
+
+        return await GetDeployedActionAsync(connectionId, deploymentTargetId, actionKey, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"Trusted infrastructure Action '{actionKey}' was not visible after deployment.");
+    }
+
+    private static (string ActionRoot, string ExpectedHash) GetBundledAction(string actionKey)
+    {
+        TrustedInfrastructureActions.EnsureAllowed(actionKey);
         var actionRoot = Path.Combine(
             AppContext.BaseDirectory,
             "SystemApps",
@@ -34,12 +54,23 @@ public sealed class TrustedInfrastructureActionDeploymentService(
         _ = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
 
         var expectedHash = ComputeContentHash(actionRoot);
-        var deploymentTargetId = await db.AppDeploymentTargets
+        return (actionRoot, expectedHash);
+    }
+
+    private Task<Guid> GetPlatformDeploymentTargetIdAsync(CancellationToken cancellationToken)
+        => db.AppDeploymentTargets
             .Where(target =>
                 target.WebAppId == InfrastructureAppTrust.PlatformAppId &&
                 target.IsDefault)
             .Select(target => target.Id)
             .SingleAsync(cancellationToken);
+
+    private async Task<AppActionModuleInfo?> GetDeployedActionAsync(
+        string connectionId,
+        Guid deploymentTargetId,
+        string actionKey,
+        CancellationToken cancellationToken)
+    {
         var modules = await hub.Clients.Client(connectionId)
             .InvokeAsync<AppActionModulesResponse>(
                 AutomatonHubMethods.ListAppActionModules,
@@ -48,9 +79,20 @@ public sealed class TrustedInfrastructureActionDeploymentService(
                     deploymentTargetId,
                     actionKey),
                 cancellationToken);
-        var current = modules.Actions.SingleOrDefault(x => string.Equals(x.Key, actionKey, StringComparison.Ordinal));
-        if (current != null && string.Equals(current.ContentHash, expectedHash, StringComparison.Ordinal)) return current;
+        return modules.Actions.SingleOrDefault(x => string.Equals(x.Key, actionKey, StringComparison.Ordinal));
+    }
 
+    private static bool IsCurrentAction(AppActionModuleInfo? action, string expectedHash)
+        => action is not null && string.Equals(action.ContentHash, expectedHash, StringComparison.Ordinal);
+
+    private async Task DeployActionAsync(
+        string connectionId,
+        Guid deploymentTargetId,
+        string actionKey,
+        string actionRoot,
+        string expectedHash,
+        CancellationToken cancellationToken)
+    {
         var response = await hub.Clients.Client(connectionId)
             .InvokeAsync<AppActionDeploymentResult>(
                 AutomatonHubMethods.PrepareAppActionModule,
@@ -64,17 +106,6 @@ public sealed class TrustedInfrastructureActionDeploymentService(
                 cancellationToken);
         if (response.Status is not ("deployed" or "unchanged"))
             throw new InvalidOperationException(response.Message ?? $"Trusted infrastructure Action '{actionKey}' could not be deployed.");
-
-        modules = await hub.Clients.Client(connectionId)
-            .InvokeAsync<AppActionModulesResponse>(
-                AutomatonHubMethods.ListAppActionModules,
-                new AppActionModuleRequest(
-                    InfrastructureAppTrust.PlatformAppId,
-                    deploymentTargetId,
-                    actionKey),
-                cancellationToken);
-        return modules.Actions.SingleOrDefault(x => string.Equals(x.Key, actionKey, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException($"Trusted infrastructure Action '{actionKey}' was not visible after deployment.");
     }
 
     private static byte[] CreateSourceZip(string actionRoot)
