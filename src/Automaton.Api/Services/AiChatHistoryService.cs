@@ -726,14 +726,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             if (session == null) return;
 
-            if (inputTokens.HasValue) session.TotalInputTokens += inputTokens.Value;
-            if (outputTokens.HasValue) session.TotalOutputTokens += outputTokens.Value;
-            if (inputTokens.HasValue || outputTokens.HasValue)
-                session.TotalTokens += (inputTokens ?? 0) + (outputTokens ?? 0);
-
-            if (cacheReadTokens.HasValue) session.TotalCacheReadTokens += cacheReadTokens.Value;
-            if (cacheCreationTokens.HasValue) session.TotalCacheCreationTokens += cacheCreationTokens.Value;
-
+            ApplyTokenUsage(session, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens);
             session.UpdatedAt = DateTime.UtcNow;
             await dataContext.SaveChangesAsync();
 
@@ -748,6 +741,21 @@ public class AiChatHistoryService : IAiChatHistoryService
         {
             logger.Warning(ex, "Failed to accumulate tokens for session {SessionId}", sessionId);
         }
+    }
+
+    private static void ApplyTokenUsage(
+        AiChatSession session,
+        int? inputTokens,
+        int? outputTokens,
+        int? cacheReadTokens,
+        int? cacheCreationTokens)
+    {
+        if (inputTokens.HasValue) session.TotalInputTokens += inputTokens.Value;
+        if (outputTokens.HasValue) session.TotalOutputTokens += outputTokens.Value;
+        if (inputTokens.HasValue || outputTokens.HasValue)
+            session.TotalTokens += (inputTokens ?? 0) + (outputTokens ?? 0);
+        if (cacheReadTokens.HasValue) session.TotalCacheReadTokens += cacheReadTokens.Value;
+        if (cacheCreationTokens.HasValue) session.TotalCacheCreationTokens += cacheCreationTokens.Value;
     }
 
     public async Task IncrementApiCallsAsync(Guid sessionId, Guid userId, int count)
