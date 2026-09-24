@@ -1,5 +1,6 @@
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -42,19 +43,7 @@ public class PublicMarketplaceController : ControllerBase
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active);
 
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            query = query.Where(a => a.Category == category);
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(a =>
-                a.Name.ToLower().Contains(term) ||
-                (a.Summary != null && a.Summary.ToLower().Contains(term)) ||
-                (a.Tags != null && a.Tags.ToLower().Contains(term)));
-        }
+        query = ApplyCatalogFilters(query, category, search);
 
         var apps = await query
             .OrderByDescending(a => a.IsFeatured)
@@ -118,6 +107,24 @@ public class PublicMarketplaceController : ControllerBase
             await PopulateApplicationSourceFlagsAsync(apps);
 
         return Ok(apps);
+    }
+
+    private static IQueryable<WebApp> ApplyCatalogFilters(
+        IQueryable<WebApp> query,
+        string? category,
+        string? search)
+    {
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(app => app.Category == category);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(app =>
+                app.Name.ToLower().Contains(term) ||
+                (app.Summary != null && app.Summary.ToLower().Contains(term)) ||
+                (app.Tags != null && app.Tags.ToLower().Contains(term)));
+        }
+        return query;
     }
 
     [HttpGet("apps/{appId:guid}")]
