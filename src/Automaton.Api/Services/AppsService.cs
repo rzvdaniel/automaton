@@ -421,34 +421,7 @@ public class AppsService
         var previousExecutionRunnerId = GetDefaultRunnerId(entity);
 
         await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
-        AppVisibilityPolicy.EnsureValidConfiguration(
-            app.RuntimeVisibility,
-            app.CatalogVisibility,
-            app.MarketplacePreviewMode);
-        entity.Name = app.Name;
-        entity.Summary = app.Summary;
-        entity.Description = app.Description;
-        entity.IsPublished = app.IsPublished;
-        entity.IsForkable = app.IsForkable;
-        entity.PublicUrl = app.PublicUrl;
-        entity.RequiresAuthentication = app.RequiresAuthentication;
-        entity.RuntimeVisibility = app.RuntimeVisibility;
-        entity.CatalogVisibility = app.CatalogVisibility;
-        entity.MarketplacePreviewMode = app.MarketplacePreviewMode;
-        entity.IsProfileFeatured = app.IsProfileFeatured;
-        entity.Updated = DateTime.UtcNow;
-        // Definition is now empty - content in file system
-        entity.Definition = "{}";
-        if (app.Application is not null)
-        {
-            ApplicationContractValidator.EnsureValid(app.Application);
-            entity.ApplicationContractJson = ApplicationContractSerialization.Serialize(app.Application);
-        }
-
-        // Public profile display fields
-        entity.ThumbnailUrl = app.ThumbnailUrl;
-        entity.Category = app.Category;
-        entity.Tags = AppTagNormalizer.Serialize(app.Tags);
+        ApplyUpdatedAppFields(entity, app);
 
         await dataContext.SaveChangesAsync();
 
@@ -479,6 +452,38 @@ public class AppsService
         {
             await backendRouteConfigService.RefreshAsync();
         }
+    }
+
+    private static void ApplyUpdatedAppFields(Entities.WebApp entity, AppModel app)
+    {
+        AppVisibilityPolicy.EnsureValidConfiguration(
+            app.RuntimeVisibility,
+            app.CatalogVisibility,
+            app.MarketplacePreviewMode);
+        entity.Name = app.Name;
+        entity.Summary = app.Summary;
+        entity.Description = app.Description;
+        entity.IsPublished = app.IsPublished;
+        entity.IsForkable = app.IsForkable;
+        entity.PublicUrl = app.PublicUrl;
+        entity.RequiresAuthentication = app.RequiresAuthentication;
+        entity.RuntimeVisibility = app.RuntimeVisibility;
+        entity.CatalogVisibility = app.CatalogVisibility;
+        entity.MarketplacePreviewMode = app.MarketplacePreviewMode;
+        entity.IsProfileFeatured = app.IsProfileFeatured;
+        entity.Updated = DateTime.UtcNow;
+        // Definition is now empty - content in file system
+        entity.Definition = "{}";
+        if (app.Application is not null)
+        {
+            ApplicationContractValidator.EnsureValid(app.Application);
+            entity.ApplicationContractJson = ApplicationContractSerialization.Serialize(app.Application);
+        }
+
+        // Public profile display fields
+        entity.ThumbnailUrl = app.ThumbnailUrl;
+        entity.Category = app.Category;
+        entity.Tags = AppTagNormalizer.Serialize(app.Tags);
     }
 
     private async Task WriteUpdateAuditEventsAsync(
