@@ -17,6 +17,15 @@ namespace Automaton.Api.Services;
 
 public class RunnerService
 {
+    private sealed record PendingHostedRunnerRestart(
+        Guid Id,
+        Guid HostedRunnerId,
+        string Status,
+        string? PreviousConnectionId,
+        DateTime? ReconnectAfterUtc,
+        string Name,
+        Guid UserId);
+
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
@@ -256,22 +265,13 @@ public class RunnerService
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         ApplyPendingHostedRunnerSpecification(hostedRunner);
 
-        var deployment = hostedRunner.Deployments
-            .Where(x =>
-                (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
-                && x.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration)
-            .OrderByDescending(x => x.StartedAt)
-            .FirstOrDefault();
-
-        if (deployment != null)
-        {
-            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
-            deployment.FinishedAt = DateTime.UtcNow;
-            deployment.Logs = "Runner registered successfully and is linked to this hosted runner.";
-        }
+        var deploymentAction = CompleteLatestRegistrationDeployment(
+            hostedRunner,
+            includeSucceeded: false,
+            "Runner registered successfully and is linked to this hosted runner.");
 
         logger.Debug("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
-        return deployment?.Action;
+        return deploymentAction;
     }
 
     private string? LinkHostedRunnerAfterReconnect(Runner runner, Guid userId, Guid? hostedRunnerId)
@@ -302,44 +302,62 @@ public class RunnerService
         hostedRunner.LastError = null;
         ApplyPendingHostedRunnerSpecification(hostedRunner);
 
-        var deployment = hostedRunner.Deployments
-            .Where(x =>
-                (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
-                && (x.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration || x.Status == HostedRunnerDeploymentStatuses.Succeeded))
-            .OrderByDescending(x => x.StartedAt)
-            .FirstOrDefault();
-
-        if (deployment != null)
-        {
-            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
-            deployment.FinishedAt = DateTime.UtcNow;
-            deployment.Logs = "Runner connected successfully and is linked to this hosted runner.";
-            deployment.Error = null;
-        }
-
-        var enforcementResume = hostedRunner.Deployments
-            .Where(x => x.Action == HostedRunnerDeploymentActions.Resume &&
-                x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
-            .OrderByDescending(x => x.StartedAt)
-            .FirstOrDefault();
-        if (enforcementResume != null)
-        {
-            enforcementResume.Status = HostedRunnerDeploymentStatuses.Succeeded;
-            enforcementResume.FinishedAt = DateTime.UtcNow;
-            enforcementResume.Logs = "Hosted Runner reconnected after storage enforcement recovery.";
-            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
-            hostedRunner.RecoveredAtUtc = DateTime.UtcNow;
-            hostedRunner.LastEnforcementReason = "Runner reconnected after authoritative storage recovery.";
-            dbContext.AuditEvents.Add(new AuditEvent
-            {
-                Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = hostedRunner.Id,
-                TargetUserId = hostedRunner.UserId, Outcome = "Success", EventType = StorageTelemetryAuditEvents.EnforcementRecovered,
-                Message = "Hosted Runner recovered after storage enforcement.", CreatedAtUtc = DateTime.UtcNow
-            });
-        }
+        var deploymentAction = CompleteLatestRegistrationDeployment(
+            hostedRunner,
+            includeSucceeded: true,
+            "Runner connected successfully and is linked to this hosted runner.");
+        CompleteEnforcementResume(hostedRunner);
 
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
-        return deployment?.Action;
+        return deploymentAction;
+    }
+
+    private static string? CompleteLatestRegistrationDeployment(
+        HostedRunner hostedRunner,
+        bool includeSucceeded,
+        string completionMessage)
+    {
+        var deployment = hostedRunner.Deployments
+            .Where(deployment =>
+                (deployment.Action == HostedRunnerDeploymentActions.Provision ||
+                 deployment.Action == HostedRunnerDeploymentActions.Reprovision) &&
+                (deployment.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration ||
+                 includeSucceeded && deployment.Status == HostedRunnerDeploymentStatuses.Succeeded))
+            .OrderByDescending(deployment => deployment.StartedAt)
+            .FirstOrDefault();
+        if (deployment is null)
+            return null;
+
+        deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
+        deployment.FinishedAt = DateTime.UtcNow;
+        deployment.Logs = completionMessage;
+        if (includeSucceeded)
+            deployment.Error = null;
+        return deployment.Action;
+    }
+
+    private void CompleteEnforcementResume(HostedRunner hostedRunner)
+    {
+        var enforcementResume = hostedRunner.Deployments
+            .Where(deployment => deployment.Action == HostedRunnerDeploymentActions.Resume &&
+                deployment.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
+            .OrderByDescending(deployment => deployment.StartedAt)
+            .FirstOrDefault();
+        if (enforcementResume is null)
+            return;
+
+        enforcementResume.Status = HostedRunnerDeploymentStatuses.Succeeded;
+        enforcementResume.FinishedAt = DateTime.UtcNow;
+        enforcementResume.Logs = "Hosted Runner reconnected after storage enforcement recovery.";
+        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
+        hostedRunner.RecoveredAtUtc = DateTime.UtcNow;
+        hostedRunner.LastEnforcementReason = "Runner reconnected after authoritative storage recovery.";
+        dbContext.AuditEvents.Add(new AuditEvent
+        {
+            Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = hostedRunner.Id,
+            TargetUserId = hostedRunner.UserId, Outcome = "Success", EventType = StorageTelemetryAuditEvents.EnforcementRecovered,
+            Message = "Hosted Runner recovered after storage enforcement.", CreatedAtUtc = DateTime.UtcNow
+        });
     }
 
     private bool IsRegistrationAttemptCurrent(Runner runner, HostedRunner hostedRunner)
@@ -560,102 +578,66 @@ public class RunnerService
 
     internal async Task CompleteHostedRunnerRestartAsync(Runner runner, CancellationToken cancellationToken)
     {
-        var operation = await dbContext.HostedRunnerDeployments
+        var operation = await GetPendingHostedRunnerRestartAsync(runner.Id, cancellationToken);
+        if (operation == null || string.IsNullOrWhiteSpace(runner.ConnectionId)) return;
+        if (string.Equals(runner.ConnectionId, operation.PreviousConnectionId, StringComparison.Ordinal)) return;
+
+        if (!await HasNewRunnerConnectionAsync(runner.Id, runner.ConnectionId, operation.ReconnectAfterUtc, cancellationToken))
+            return;
+
+        await CompleteHostedRunnerRestartAtomicallyAsync(operation, runner.Id, DateTime.UtcNow, cancellationToken);
+    }
+
+    private Task<PendingHostedRunnerRestart?> GetPendingHostedRunnerRestartAsync(
+        Guid runnerId,
+        CancellationToken cancellationToken)
+        => dbContext.HostedRunnerDeployments
             .Where(x => x.Action == HostedRunnerDeploymentActions.Restart
                 && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
-                && x.ExpectedRunnerId == runner.Id
+                && x.ExpectedRunnerId == runnerId
                 && x.ReconnectAfterUtc != null
                 && x.ReconnectDeadlineUtc > DateTime.UtcNow)
             .OrderByDescending(x => x.StartedAt)
-            .Select(x => new
-            {
+            .Select(x => new PendingHostedRunnerRestart(
                 x.Id,
                 x.HostedRunnerId,
                 x.Status,
                 x.PreviousConnectionId,
                 x.ReconnectAfterUtc,
                 x.HostedRunner.Name,
-                x.HostedRunner.UserId
-            })
+                x.HostedRunner.UserId))
             .FirstOrDefaultAsync(cancellationToken);
-        if (operation == null || string.IsNullOrWhiteSpace(runner.ConnectionId)) return;
-        if (string.Equals(runner.ConnectionId, operation.PreviousConnectionId, StringComparison.Ordinal)) return;
 
-        var hasNewSession = await dbContext.RunnerConnectionSessions.AnyAsync(x =>
-            x.RunnerId == runner.Id
-            && x.ConnectionId == runner.ConnectionId
-            && x.ConnectedAtUtc > operation.ReconnectAfterUtc,
+    private Task<bool> HasNewRunnerConnectionAsync(
+        Guid runnerId,
+        string connectionId,
+        DateTime? reconnectAfterUtc,
+        CancellationToken cancellationToken)
+        => dbContext.RunnerConnectionSessions.AnyAsync(x =>
+            x.RunnerId == runnerId
+            && x.ConnectionId == connectionId
+            && x.ConnectedAtUtc > reconnectAfterUtc,
             cancellationToken);
-        if (!hasNewSession) return;
 
-        var now = DateTime.UtcNow;
+    private async Task CompleteHostedRunnerRestartAtomicallyAsync(
+        PendingHostedRunnerRestart operation,
+        Guid runnerId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
         await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
         try
         {
-            var completed = 0;
-            if (dbContext.Database.IsRelational())
-            {
-                completed = await dbContext.HostedRunnerDeployments
-                    .Where(x => x.Id == operation.Id
-                        && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
-                        && x.ReconnectDeadlineUtc > now)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Succeeded)
-                        .SetProperty(x => x.FinishedAt, now)
-                        .SetProperty(x => x.Error, (string?)null)
-                        .SetProperty(x => x.Logs, "Restart confirmed by a new Runner connection and heartbeat."),
-                        cancellationToken);
-                if (completed == 1)
-                {
-                    var hostedRunnerUpdated = await dbContext.HostedRunners
-                        .Where(x => x.Id == operation.HostedRunnerId)
-                        .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(x => x.Status, HostedRunnerStatuses.Running)
-                            .SetProperty(x => x.LastError, (string?)null)
-                            .SetProperty(x => x.UpdatedAt, now),
-                            cancellationToken);
-                    if (hostedRunnerUpdated != 1)
-                        throw new InvalidOperationException("The hosted Runner restart state could not be completed.");
-                }
-            }
-            else if (operation.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
-            {
-                var trackedOperation = await dbContext.HostedRunnerDeployments.SingleAsync(
-                    x => x.Id == operation.Id,
-                    cancellationToken);
-                trackedOperation.Status = HostedRunnerDeploymentStatuses.Succeeded;
-                trackedOperation.FinishedAt = now;
-                trackedOperation.Error = null;
-                trackedOperation.Logs = "Restart confirmed by a new Runner connection and heartbeat.";
-                var hostedRunner = await dbContext.HostedRunners.SingleAsync(
-                    x => x.Id == operation.HostedRunnerId,
-                    cancellationToken);
-                hostedRunner.Status = HostedRunnerStatuses.Running;
-                hostedRunner.LastError = null;
-                hostedRunner.UpdatedAt = now;
-                await dbContext.SaveChangesAsync(cancellationToken);
-                completed = 1;
-            }
-            if (completed != 1)
+            var completed = await PersistRestartCompletionAsync(operation, now, cancellationToken);
+            if (!completed)
             {
                 if (transaction != null) await transaction.RollbackAsync(cancellationToken);
                 return;
             }
 
-            await auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                Action = AuditActions.Succeeded,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = operation.HostedRunnerId,
-                EventType = AuditEventTypes.RunnerRestartSucceeded,
-                Outcome = AuditOutcomes.Success,
-                Message = $"Hosted runner '{operation.Name}' restart was confirmed by heartbeat",
-                TargetUserId = operation.UserId,
-                Metadata = new { OperationId = operation.Id, RunnerId = runner.Id },
-                FailOnError = true
-            }, cancellationToken);
+            await WriteRunnerRestartAuditAsync(operation, runnerId, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -664,6 +646,81 @@ public class RunnerService
             throw;
         }
     }
+
+    private async Task<bool> PersistRestartCompletionAsync(
+        PendingHostedRunnerRestart operation,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsRelational())
+            return await PersistRelationalRestartCompletionAsync(operation, now, cancellationToken);
+
+        var trackedOperation = await dbContext.HostedRunnerDeployments.SingleAsync(
+            x => x.Id == operation.Id,
+            cancellationToken);
+        if (trackedOperation.Status != HostedRunnerDeploymentStatuses.WaitingForReconnect)
+            return false;
+
+        trackedOperation.Status = HostedRunnerDeploymentStatuses.Succeeded;
+        trackedOperation.FinishedAt = now;
+        trackedOperation.Error = null;
+        trackedOperation.Logs = "Restart confirmed by a new Runner connection and heartbeat.";
+        var hostedRunner = await dbContext.HostedRunners.SingleAsync(
+            x => x.Id == operation.HostedRunnerId,
+            cancellationToken);
+        hostedRunner.Status = HostedRunnerStatuses.Running;
+        hostedRunner.LastError = null;
+        hostedRunner.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private async Task<bool> PersistRelationalRestartCompletionAsync(
+        PendingHostedRunnerRestart operation,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var completed = await dbContext.HostedRunnerDeployments
+            .Where(x => x.Id == operation.Id
+                && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
+                && x.ReconnectDeadlineUtc > now)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Succeeded)
+                .SetProperty(x => x.FinishedAt, now)
+                .SetProperty(x => x.Error, (string?)null)
+                .SetProperty(x => x.Logs, "Restart confirmed by a new Runner connection and heartbeat."),
+                cancellationToken);
+        if (completed != 1)
+            return false;
+
+        var hostedRunnerUpdated = await dbContext.HostedRunners
+            .Where(x => x.Id == operation.HostedRunnerId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, HostedRunnerStatuses.Running)
+                .SetProperty(x => x.LastError, (string?)null)
+                .SetProperty(x => x.UpdatedAt, now),
+                cancellationToken);
+        if (hostedRunnerUpdated != 1)
+            throw new InvalidOperationException("The hosted Runner restart state could not be completed.");
+        return true;
+    }
+
+    private Task WriteRunnerRestartAuditAsync(
+        PendingHostedRunnerRestart operation,
+        Guid runnerId,
+        CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Succeeded,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = operation.HostedRunnerId,
+            EventType = AuditEventTypes.RunnerRestartSucceeded,
+            Outcome = AuditOutcomes.Success,
+            Message = $"Hosted runner '{operation.Name}' restart was confirmed by heartbeat",
+            TargetUserId = operation.UserId,
+            Metadata = new { OperationId = operation.Id, RunnerId = runnerId },
+            FailOnError = true
+        }, cancellationToken);
 
     public async Task MarkDisconnectedAsync(Guid runnerId, string connectionId, CancellationToken cancellationToken)
     {
