@@ -40,30 +40,33 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        // Try to get API key from header first
-        var apiKey = Request.Headers[Options.HeaderName].FirstOrDefault();
-   
-        // If not in header, try query parameter
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            apiKey = Request.Query[Options.QueryParameterName].FirstOrDefault();
-        }
-
-        // If still no API key, check Authorization header for Bearer token format
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            var authHeader = Request.Headers.Authorization.FirstOrDefault();
-            if (authHeader?.StartsWith("Bearer ak_") == true)
-            {
-                apiKey = authHeader["Bearer ".Length..];
-            }
-        }
+        var apiKey = GetApiKeyFromRequest();
 
         if (string.IsNullOrEmpty(apiKey))
         {
             return AuthenticateResult.NoResult();
         }
 
+        return await AuthenticateApiKeyAsync(apiKey);
+    }
+
+    private string? GetApiKeyFromRequest()
+    {
+        var apiKey = Request.Headers[Options.HeaderName].FirstOrDefault();
+        if (string.IsNullOrEmpty(apiKey))
+            apiKey = Request.Query[Options.QueryParameterName].FirstOrDefault();
+
+        if (!string.IsNullOrEmpty(apiKey))
+            return apiKey;
+
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        return authHeader?.StartsWith("Bearer ak_") == true
+            ? authHeader["Bearer ".Length..]
+            : null;
+    }
+
+    private async Task<AuthenticateResult> AuthenticateApiKeyAsync(string apiKey)
+    {
         var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(apiKey);
         if (apiKeyEntity == null)
         {
@@ -71,19 +74,13 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("Invalid API key");
         }
 
-        // Get the user associated with this API key
-        var userId = await dbContext.ApiKeyUsers
-            .Where(aku => aku.ApiKeyId == apiKeyEntity.Id)
-            .Select(aku => aku.UserId)
-            .FirstOrDefaultAsync();
-        
+        var (userId, user) = await LoadApiKeyUserAsync(apiKeyEntity.Id);
         if (userId == Guid.Empty)
         {
             Logger.LogWarning("API key {ApiKeyId} has no associated user", apiKeyEntity.Id);
             return AuthenticateResult.Fail("Invalid API key - no user association");
         }
-        
-        var user = await dbContext.Users.FindAsync(userId);
+
         if (user == null)
         {
             Logger.LogWarning("User {UserId} not found for API key {ApiKeyId}", userId, apiKeyEntity.Id);
@@ -93,6 +90,24 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         Logger.LogDebug("API key authentication succeeded for user {UserId} with scope {Scope} on request {Method} {Path}",
             userId, apiKeyEntity.Scope, Request.Method, Request.Path);
 
+        return await CreateAuthenticationResultAsync(apiKeyEntity, userId, user);
+    }
+
+    private async Task<(Guid UserId, ApplicationUser? User)> LoadApiKeyUserAsync(Guid apiKeyId)
+    {
+        var userId = await dbContext.ApiKeyUsers
+            .Where(aku => aku.ApiKeyId == apiKeyId)
+            .Select(aku => aku.UserId)
+            .FirstOrDefaultAsync();
+        var user = userId == Guid.Empty ? null : await dbContext.Users.FindAsync(userId);
+        return (userId, user);
+    }
+
+    private async Task<AuthenticateResult> CreateAuthenticationResultAsync(
+        ApiKey apiKeyEntity,
+        Guid userId,
+        ApplicationUser user)
+    {
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
