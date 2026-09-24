@@ -28,12 +28,7 @@ namespace Automaton.Api.Services
         {
             try
             {
-                // Get flow count efficiently
-                var flowStats = await dbContext.Flows
-                    .Where(f => f.FlowUsers.Any(u => u.UserId == userId))
-                    .GroupBy(f => 1)
-                    .Select(g => new { Count = g.Count() })
-                    .FirstOrDefaultAsync(cancellationToken);
+                var totalFlows = await GetTotalFlowsAsync(cancellationToken);
 
                 // Use RunnerService to get accurate runner status information
                 // This leverages the existing GetRunnersWithUpdatedStatus logic that pings runners
@@ -42,152 +37,30 @@ namespace Automaton.Api.Services
                 var totalRunners = runnerMetrics.Total;
                 var onlineRunners = runnerMetrics.Online;
 
-                // Recent executions for success rate calculation
-                var cutoffDate = DateTime.UtcNow.AddDays(-7); // Last 7 days
-                var executionStats = await dbContext.FlowExecutions
-                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                               e.Started >= cutoffDate)
-                    .GroupBy(e => 1)
-                    .Select(g => new {
-                        TotalCount = g.Count(),
-                        SuccessCount = g.Count(e => e.Status == WorkflowStatus.Success.ToString())
-                    })
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                var totalFlows = flowStats?.Count ?? 0;
-                var totalExecutions = executionStats?.TotalCount ?? 0;
-                var successfulExecutions = executionStats?.SuccessCount ?? 0;
+                var activityMetrics = await GetActivityMetricsAsync(cancellationToken);
+                var applicationMetrics = await GetApplicationMetricsAsync(cancellationToken);
+                var resourceCounts = await GetResourceCountsAsync(cancellationToken);
                 
-                var successRate = totalExecutions > 0 ? (double)successfulExecutions / totalExecutions * 100 : 0;
-
-                // Get additional metrics
-                var totalApps = await dbContext.WebApps
-                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
-                    .CountAsync(cancellationToken);
-
-                // Apps-focused metrics
-                var publishedApps = await dbContext.WebApps
-                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId) && a.IsPublished)
-                    .CountAsync(cancellationToken);
-
-                var totalAppViews = await dbContext.WebApps
-                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
-                    .SumAsync(a => a.ViewCount, cancellationToken);
-
-                var recentApps = await dbContext.WebApps
-                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
-                    .OrderByDescending(a => a.Updated)
-                    .Take(5)
-                    .Select(a => new Models.RecentAppMetric
-                    {
-                        Id = a.Id,
-                        Name = a.Name,
-                        Summary = a.Summary,
-                        IsPublished = a.IsPublished,
-                        PublicUrl = a.PublicUrl,
-                        ViewCount = a.ViewCount,
-                        Updated = a.Updated
-                    })
-                    .ToListAsync(cancellationToken);
-
-                var publishedAppsList = await dbContext.WebApps
-                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId) && a.IsPublished)
-                    .OrderByDescending(a => a.ViewCount)
-                    .Take(5)
-                    .Select(a => new Models.PublishedAppMetric
-                    {
-                        Id = a.Id,
-                        Name = a.Name,
-                        Summary = a.Summary,
-                        PublicUrl = a.PublicUrl!,
-                        ViewCount = a.ViewCount,
-                        PublishedAt = a.PublishedAt
-                    })
-                    .ToListAsync(cancellationToken);
-
-                var totalCustomSteps = await dbContext.CustomSteps
-                    .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId))
-                    .CountAsync(cancellationToken);
-                
-                var activeSchedules = await dbContext.Schedules
-                    .Where(fs => fs.ScheduleUsers.Any(u => u.UserId == userId))
-                    .CountAsync(cancellationToken);
-                
-                // Time-based execution counts
-                var today = DateTime.UtcNow.Date;
-                var thisWeekStart = today.AddDays(-(int)today.DayOfWeek);
-                var thisMonthStart = new DateTime(today.Year, today.Month, 1);
-                
-                var executionsToday = await dbContext.FlowExecutions
-                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                               e.Started >= today)
-                    .CountAsync(cancellationToken);
-                
-                var executionsThisWeek = await dbContext.FlowExecutions
-                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                               e.Started >= thisWeekStart)
-                    .CountAsync(cancellationToken);
-                
-                var executionsThisMonth = await dbContext.FlowExecutions
-                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                               e.Started >= thisMonthStart)
-                    .CountAsync(cancellationToken);
-                
-                // Get daily execution trends for the last 7 days
-                var trendCutoff = DateTime.UtcNow.AddDays(-7).Date;
-                var executionTrends = await dbContext.FlowExecutions
-                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                               e.Started >= trendCutoff)
-                    .GroupBy(e => e.Started.Date)
-                    .Select(g => new Models.DailyExecutionTrend
-                    {
-                        Date = g.Key,
-                        SuccessCount = g.Count(e => e.Status == WorkflowStatus.Success.ToString()),
-                        FailureCount = g.Count(e => e.Status == WorkflowStatus.Error.ToString()),
-                        TotalCount = g.Count()
-                    })
-                    .OrderBy(t => t.Date)
-                    .ToListAsync(cancellationToken);
-                
-                // Get top flows by execution count - join with Flows table to get names
-                var topFlows = await (from fe in dbContext.FlowExecutions
-                                     join f in dbContext.Flows on fe.FlowId equals f.Id
-                                     where fe.FlowExecutionUsers.Any(u => u.UserId == userId) &&
-                                           fe.Started >= cutoffDate
-                                     group fe by new { fe.FlowId, f.Name } into g
-                                     orderby g.Count() descending
-                                     select new Models.FlowHealthMetric
-                                     {
-                                         FlowId = g.Key.FlowId,
-                                         FlowName = g.Key.Name,
-                                         ExecutionCount = g.Count(),
-                                         SuccessRate = g.Count() > 0 ? 
-                                             (double)g.Count(e => e.Status == WorkflowStatus.Success.ToString()) / g.Count() * 100 : 0,
-                                         LastExecuted = g.Max(e => e.Started)
-                                     })
-                                     .Take(5)
-                                     .ToListAsync(cancellationToken);
-
                 return new Models.DashboardStats
                 {
                     TotalFlows = totalFlows,
                     TotalRunners = totalRunners,
                     OnlineRunners = onlineRunners,
-                    SuccessRate = Math.Round(successRate, 1),
-                    RecentExecutions = totalExecutions,
-                    TotalApps = totalApps,
-                    TotalCustomSteps = totalCustomSteps,
-                    ActiveSchedules = activeSchedules,
-                    ExecutionsToday = executionsToday,
-                    ExecutionsThisWeek = executionsThisWeek,
-                    ExecutionsThisMonth = executionsThisMonth,
-                    ExecutionTrends = executionTrends,
-                    TopFlows = topFlows,
+                    SuccessRate = Math.Round(activityMetrics.SuccessRate, 1),
+                    RecentExecutions = activityMetrics.TotalExecutions,
+                    TotalApps = applicationMetrics.TotalApps,
+                    TotalCustomSteps = resourceCounts.CustomSteps,
+                    ActiveSchedules = resourceCounts.Schedules,
+                    ExecutionsToday = activityMetrics.ExecutionsToday,
+                    ExecutionsThisWeek = activityMetrics.ExecutionsThisWeek,
+                    ExecutionsThisMonth = activityMetrics.ExecutionsThisMonth,
+                    ExecutionTrends = activityMetrics.ExecutionTrends,
+                    TopFlows = activityMetrics.TopFlows,
                     // Apps-focused metrics
-                    PublishedApps = publishedApps,
-                    TotalAppViews = totalAppViews,
-                    RecentApps = recentApps,
-                    PublishedAppsList = publishedAppsList
+                    PublishedApps = applicationMetrics.PublishedApps,
+                    TotalAppViews = applicationMetrics.TotalAppViews,
+                    RecentApps = applicationMetrics.RecentApps,
+                    PublishedAppsList = applicationMetrics.PublishedAppsList
                 };
             }
             catch (Exception ex)
@@ -196,6 +69,153 @@ namespace Automaton.Api.Services
                 return new Models.DashboardStats();
             }
         }
+
+        private Task<int> GetTotalFlowsAsync(CancellationToken cancellationToken)
+            => dbContext.Flows
+                .Where(flow => flow.FlowUsers.Any(user => user.UserId == userId))
+                .CountAsync(cancellationToken);
+
+        private async Task<(int CustomSteps, int Schedules)> GetResourceCountsAsync(CancellationToken cancellationToken)
+        {
+            var customSteps = await dbContext.CustomSteps
+                .Where(step => step.CustomStepUsers.Any(user => user.UserId == userId))
+                .CountAsync(cancellationToken);
+            var schedules = await dbContext.Schedules
+                .Where(schedule => schedule.ScheduleUsers.Any(user => user.UserId == userId))
+                .CountAsync(cancellationToken);
+            return (customSteps, schedules);
+        }
+
+        private async Task<ActivityMetrics> GetActivityMetricsAsync(CancellationToken cancellationToken)
+        {
+            var cutoffDate = DateTime.UtcNow.AddDays(-7);
+            var executionStats = await dbContext.FlowExecutions
+                .Where(execution => execution.FlowExecutionUsers.Any(user => user.UserId == userId)
+                    && execution.Started >= cutoffDate)
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    TotalCount = group.Count(),
+                    SuccessCount = group.Count(execution => execution.Status == WorkflowStatus.Success.ToString())
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+            var totalExecutions = executionStats?.TotalCount ?? 0;
+            var successRate = totalExecutions > 0
+                ? (double)(executionStats?.SuccessCount ?? 0) / totalExecutions * 100
+                : 0;
+
+            var today = DateTime.UtcNow.Date;
+            var thisWeekStart = today.AddDays(-(int)today.DayOfWeek);
+            var thisMonthStart = new DateTime(today.Year, today.Month, 1);
+            var executionsToday = await CountExecutionsSinceAsync(today, cancellationToken);
+            var executionsThisWeek = await CountExecutionsSinceAsync(thisWeekStart, cancellationToken);
+            var executionsThisMonth = await CountExecutionsSinceAsync(thisMonthStart, cancellationToken);
+            var executionTrends = await GetExecutionTrendsAsync(cancellationToken);
+            var topFlows = await GetTopFlowsAsync(cutoffDate, cancellationToken);
+
+            return new ActivityMetrics(
+                totalExecutions, successRate, executionsToday, executionsThisWeek, executionsThisMonth,
+                executionTrends, topFlows);
+        }
+
+        private Task<int> CountExecutionsSinceAsync(DateTime start, CancellationToken cancellationToken)
+            => dbContext.FlowExecutions
+                .Where(execution => execution.FlowExecutionUsers.Any(user => user.UserId == userId)
+                    && execution.Started >= start)
+                .CountAsync(cancellationToken);
+
+        private Task<List<Models.DailyExecutionTrend>> GetExecutionTrendsAsync(CancellationToken cancellationToken)
+        {
+            var trendCutoff = DateTime.UtcNow.AddDays(-7).Date;
+            return dbContext.FlowExecutions
+                .Where(execution => execution.FlowExecutionUsers.Any(user => user.UserId == userId)
+                    && execution.Started >= trendCutoff)
+                .GroupBy(execution => execution.Started.Date)
+                .Select(group => new Models.DailyExecutionTrend
+                {
+                    Date = group.Key,
+                    SuccessCount = group.Count(execution => execution.Status == WorkflowStatus.Success.ToString()),
+                    FailureCount = group.Count(execution => execution.Status == WorkflowStatus.Error.ToString()),
+                    TotalCount = group.Count()
+                })
+                .OrderBy(trend => trend.Date)
+                .ToListAsync(cancellationToken);
+        }
+
+        private Task<List<Models.FlowHealthMetric>> GetTopFlowsAsync(DateTime cutoffDate, CancellationToken cancellationToken)
+            => (from execution in dbContext.FlowExecutions
+                join flow in dbContext.Flows on execution.FlowId equals flow.Id
+                where execution.FlowExecutionUsers.Any(user => user.UserId == userId)
+                    && execution.Started >= cutoffDate
+                group execution by new { execution.FlowId, flow.Name } into flowGroup
+                orderby flowGroup.Count() descending
+                select new Models.FlowHealthMetric
+                {
+                    FlowId = flowGroup.Key.FlowId,
+                    FlowName = flowGroup.Key.Name,
+                    ExecutionCount = flowGroup.Count(),
+                    SuccessRate = flowGroup.Count() > 0
+                        ? (double)flowGroup.Count(execution => execution.Status == WorkflowStatus.Success.ToString()) / flowGroup.Count() * 100
+                        : 0,
+                    LastExecuted = flowGroup.Max(execution => execution.Started)
+                })
+                .Take(5)
+                .ToListAsync(cancellationToken);
+
+        private sealed record ActivityMetrics(
+            int TotalExecutions,
+            double SuccessRate,
+            int ExecutionsToday,
+            int ExecutionsThisWeek,
+            int ExecutionsThisMonth,
+            List<Models.DailyExecutionTrend> ExecutionTrends,
+            List<Models.FlowHealthMetric> TopFlows);
+
+        private async Task<ApplicationMetrics> GetApplicationMetricsAsync(CancellationToken cancellationToken)
+        {
+            var userApps = dbContext.WebApps.Where(app => app.WebAppUsers.Any(user => user.UserId == userId));
+            var totalApps = await userApps.CountAsync(cancellationToken);
+            var publishedApps = await userApps.Where(app => app.IsPublished).CountAsync(cancellationToken);
+            var totalAppViews = await userApps.SumAsync(app => app.ViewCount, cancellationToken);
+            var recentApps = await userApps
+                .OrderByDescending(app => app.Updated)
+                .Take(5)
+                .Select(app => new Models.RecentAppMetric
+                {
+                    Id = app.Id,
+                    Name = app.Name,
+                    Summary = app.Summary,
+                    IsPublished = app.IsPublished,
+                    PublicUrl = app.PublicUrl,
+                    ViewCount = app.ViewCount,
+                    Updated = app.Updated
+                })
+                .ToListAsync(cancellationToken);
+            var publishedAppsList = await userApps
+                .Where(app => app.IsPublished)
+                .OrderByDescending(app => app.ViewCount)
+                .Take(5)
+                .Select(app => new Models.PublishedAppMetric
+                {
+                    Id = app.Id,
+                    Name = app.Name,
+                    Summary = app.Summary,
+                    PublicUrl = app.PublicUrl!,
+                    ViewCount = app.ViewCount,
+                    PublishedAt = app.PublishedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            return new ApplicationMetrics(totalApps, publishedApps, totalAppViews, recentApps, publishedAppsList);
+        }
+
+        private sealed record ApplicationMetrics(
+            int TotalApps,
+            int PublishedApps,
+            int TotalAppViews,
+            List<Models.RecentAppMetric> RecentApps,
+            List<Models.PublishedAppMetric> PublishedAppsList);
+
         internal static (int Total, int Online) GetAppOwnerRunnerMetrics(IEnumerable<RunnerDetails> runners)
         {
             // Keep Dashboard counts aligned with the app-owner Runners surface, which hides
