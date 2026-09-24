@@ -620,6 +620,35 @@ public class AppsService
         var appName = app.Name;
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
+        await DeleteAppResourcesAsync(id, app, ownerId);
+
+        // Log activity
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
+        
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.App,
+            EntityId = id,
+            EventType = AuditEventTypes.AppDeleted,
+            Message = $"App '{appName}' was deleted",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                AppId = id,
+                Name = appName,
+                app.PublicUrl,
+                ExecutionRunnerId = GetDefaultRunnerId(app),
+                OwnerUserId = ownerId
+            }
+        });
+
+        await backendRouteConfigService.RefreshAsync();
+    }
+
+    private async Task DeleteAppResourcesAsync(Guid id, Entities.WebApp app, Guid ownerId)
+    {
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
         try
         {
@@ -646,31 +675,6 @@ public class AppsService
             }
             throw;
         }
-
-        // Log activity
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
-        
-        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
-        {
-            Action = AuditActions.Deleted,
-            EntityType = AuditEntityTypes.App,
-            EntityId = id,
-            EventType = AuditEventTypes.AppDeleted,
-            Message = $"App '{appName}' was deleted",
-            Outcome = AuditOutcomes.Success,
-            ActorUserId = UserId,
-            Metadata = new
-            {
-                AppId = id,
-                Name = appName,
-                app.PublicUrl,
-                ExecutionRunnerId = GetDefaultRunnerId(app),
-                OwnerUserId = ownerId
-            }
-        });
-
-        await backendRouteConfigService.RefreshAsync();
-
     }
 
     public async Task Publish(
