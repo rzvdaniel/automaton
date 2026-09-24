@@ -460,7 +460,7 @@ public sealed class RunnerInstallService
             var serviceName = install.ServiceName!;
             var scriptPath = Path.Combine(install.InstallRoot, "service-wrapper.ps1");
             install.ServiceDefinitionPath = scriptPath;
-            File.WriteAllText(scriptPath, BuildWindowsWrapperScript(install));
+            File.WriteAllText(scriptPath, RunnerServiceDefinitionBuilder.BuildWindowsWrapperScript(install));
             var command = $"-NoProfile -Command \"New-Service -Name '{serviceName}' -BinaryPathName 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{scriptPath}\\\"' -DisplayName 'Automaton Runner ({install.RunnerName})' -StartupType {(install.AutoStart ? "Automatic" : "Manual")}; Start-Service -Name '{serviceName}'\"";
             await RunProcessCheckedAsync("powershell", command, cancellationToken);
             return;
@@ -470,7 +470,7 @@ public sealed class RunnerInstallService
         {
             var servicePath = $"/etc/systemd/system/{install.ServiceName}.service";
             install.ServiceDefinitionPath = servicePath;
-            var contents = BuildSystemdService(install);
+            var contents = RunnerServiceDefinitionBuilder.BuildSystemdService(install);
             await WriteElevatedFileAsync(servicePath, contents, cancellationToken);
             await RunProcessCheckedAsync("systemctl", "daemon-reload", cancellationToken);
             if (install.AutoStart)
@@ -487,7 +487,7 @@ public sealed class RunnerInstallService
             Directory.CreateDirectory(agentsDir);
             var plistPath = Path.Combine(agentsDir, $"{install.ServiceName}.plist");
             install.ServiceDefinitionPath = plistPath;
-            File.WriteAllText(plistPath, BuildLaunchdPlist(install));
+            File.WriteAllText(plistPath, RunnerServiceDefinitionBuilder.BuildLaunchdPlist(install));
             await RunProcessCheckedAsync("launchctl", $"load -w \"{plistPath}\"", cancellationToken);
             return;
         }
@@ -653,84 +653,6 @@ public sealed class RunnerInstallService
             $"AUTOMATON_RUNNER_NAME={runnerName}",
             $"RUNNER_SCRIPTS_DIR={Path.Combine(dataDir, "apps")}"
         });
-    }
-
-    private static string BuildWindowsWrapperScript(RunnerInstallRecord install)
-    {
-        return $@"$envFile = ""{install.EnvFilePath}""
-Get-Content -LiteralPath $envFile | ForEach-Object {{
-  if ($_ -match '^(.*?)=(.*)$') {{
-    [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-  }}
-}}
-& ""{install.BinaryPath}"" service *>> ""{install.LogsPath}""";
-    }
-
-    private static string BuildSystemdService(RunnerInstallRecord install)
-    {
-        var user = Environment.UserName;
-        return $"""
-[Unit]
-Description=Automaton Runner ({install.RunnerName})
-After=network.target
-
-[Service]
-Type=simple
-User={user}
-WorkingDirectory={install.InstallRoot}
-EnvironmentFile={install.EnvFilePath}
-ExecStart={install.BinaryPath} service
-Restart=always
-RestartSec=10
-StandardOutput=append:{install.LogsPath}
-StandardError=append:{install.LogsPath}
-
-[Install]
-WantedBy=multi-user.target
-""";
-    }
-
-    private static string BuildLaunchdPlist(RunnerInstallRecord install)
-    {
-        var envVars = ParseEnvFile(install.EnvFilePath!);
-        var envXml = string.Join(Environment.NewLine, envVars.Select(kvp => $"    <key>{System.Security.SecurityElement.Escape(kvp.Key)}</key>{Environment.NewLine}    <string>{System.Security.SecurityElement.Escape(kvp.Value)}</string>"));
-        return $"""
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>{install.ServiceName}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>{install.BinaryPath}</string>
-    <string>service</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <{(install.AutoStart ? "true" : "false")}/>
-  <key>WorkingDirectory</key>
-  <string>{install.InstallRoot}</string>
-  <key>StandardOutPath</key>
-  <string>{install.LogsPath}</string>
-  <key>StandardErrorPath</key>
-  <string>{install.LogsPath}</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-{envXml}
-  </dict>
-</dict>
-</plist>
-""";
-    }
-
-    private static Dictionary<string, string> ParseEnvFile(string path)
-    {
-        return File.ReadAllLines(path)
-            .Where(line => !string.IsNullOrWhiteSpace(line) && line.Contains('='))
-            .Select(line => line.Split('=', 2))
-            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
     }
 
     private static string GetRunnerArchiveFileName()

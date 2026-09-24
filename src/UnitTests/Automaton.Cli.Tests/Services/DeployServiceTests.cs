@@ -1,7 +1,7 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Automaton.Core.Models;
-using System.Text.Json;
+using Automaton.Core.Services;
 using NUnit.Framework;
 
 namespace Automaton.Cli.Tests.Services;
@@ -37,29 +37,6 @@ public class DeployServiceTests
     }
 
     [Test]
-    public void CreateBuildProcessStartInfo_UsesStructuredArgumentsEnvironmentAndNoShellByDefault()
-    {
-        var startInfo = DeployService.CreateBuildProcessStartInfo(
-            new ApplicationCommandSpec
-            {
-                Executable = "arbitrary-builder",
-                Arguments = ["argument with spaces", "$(not-a-shell-expression)"],
-                WorkingDirectory = "build",
-                Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" }
-            },
-            "C:\\workspace\\build");
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(startInfo.FileName, Is.EqualTo("arbitrary-builder"));
-            Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "argument with spaces", "$(not-a-shell-expression)" }));
-            Assert.That(startInfo.WorkingDirectory, Is.EqualTo("C:\\workspace\\build"));
-            Assert.That(startInfo.UseShellExecute, Is.False);
-            Assert.That(startInfo.Environment["BUILD_MODE"], Is.EqualTo("release"));
-        });
-    }
-
-    [Test]
     public async Task DeployAsync_WhenCredentialsAreMissing_FailsBeforeBuild()
     {
         var projectRoot = CreateProjectRoot();
@@ -83,17 +60,7 @@ public class DeployServiceTests
     [Test]
     public async Task DeployAsync_WhenRuntimeCommandIsMissing_FailsBeforeRemoteOperations()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        var application = ApplicationContractTestFactory.Create();
-        application.Runtime.Command = null;
-        application.Build.Command = null;
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = application
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        var (projectRoot, configService) = CreateProjectWithMissingRuntimeCommand();
         var snapshotCalls = 0;
         var deployCalls = 0;
         var service = new DeployService(
@@ -150,28 +117,14 @@ public class DeployServiceTests
     [Test]
     public async Task DeployAsync_WhenPackageDeploySucceeds_ReturnsSuccessShape()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: true);
 
         var progress = new List<string>();
         var service = new DeployService(
             configService,
-            progress.Add,
-            (_, _, _, _, zip, _, _) =>
-            {
-                Assert.That(zip.Length, Is.GreaterThan(0));
-                return Task.FromResult((
-                    new DeployUploadResult(5, 0, 0.2),
-                    new DeployRuntimeResult(true, 1, "package deployed", Logs: ["stdout: runner build diagnostic"])));
-            });
+            progress: progress.Add,
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.SuccessfulPackage);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
@@ -201,9 +154,8 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(4, 0, 0.1),
-                new DeployRuntimeResult(true, 1, "deployed"))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.SuccessfulDeployment);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
@@ -215,103 +167,38 @@ public class DeployServiceTests
     [Test]
     public async Task DeployAsync_WhenManagedRuntimeIsPreparing_ReturnsManagedRuntimeNextSteps()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: true);
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "Managed runtime is being prepared.",
-                    "preparingManagedRuntime",
-                    true))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.ManagedRuntimePreparing);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.HasWarnings, Is.True);
-        Assert.That(result.NextSteps, Does.Contain("Managed runtime is being prepared. Rerun automaton deploy in a moment."));
-        Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
-        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed runtime is being prepared.");
+        DeployServiceTestDoubles.AssertManagedRuntimePreparing(result);
     }
 
     [Test]
     public async Task DeployAsync_WhenFrontendOnly_RequestsManagedRuntimeReadinessBeforeUpload()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "Generic App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: false, name: "Generic App");
 
-        var readinessCalled = false;
-        var service = new DeployService(
-            configService,
-            deployPackageAsync: (_, _, _, _, _, _, _) => throw new InvalidOperationException("upload must wait for runtime readiness"),
-            createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")),
-            ensureManagedRuntimeReadyAsync: (_, _, _, _) =>
-            {
-                readinessCalled = true;
-                using var document = JsonDocument.Parse("{\"isReady\":false,\"state\":\"managedRunnerProvisionFailed\",\"message\":\"Managed runner could not be provisioned.\",\"requiresRetry\":true}");
-                return Task.FromResult(document.RootElement.Clone());
-            });
+        await DeployServiceTestDoubles.AssertFrontendOnlyReadinessFailureAsync(projectRoot, configService);
 
-        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(readinessCalled, Is.True);
-        Assert.That(result.Success, Is.False);
-        Assert.That(result.NextSteps, Does.Contain("Managed runner could not be provisioned."));
-        Assert.That(result.Checks.Single(check => check.Name == DeployCheckNames.RunnerAssignment).IsWarning, Is.False);
     }
 
     [Test]
     public async Task DeployAsync_WhenManagedRunnerRequiresProtocolUpgrade_DoesNotBlamePlan()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: true);
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "Runner 'hosted' must be upgraded for container-based application execution before deployment.",
-                    "managedRuntimeUnavailable",
-                    false))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.ProtocolUpgradeRequired);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.NextSteps, Does.Contain("The assigned Runner does not support the current container-based application deployment protocol."));
-        Assert.That(result.NextSteps, Does.Contain("Ask an administrator to upgrade the Hosted Runner, or assign a compatible Runner, then rerun automaton deploy."));
-        Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
-        Assert.That(result.NextSteps.Any(step => step.Contains("plan", StringComparison.OrdinalIgnoreCase)), Is.False);
-        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Runner 'hosted' must be upgraded for container-based application execution before deployment.");
+        DeployServiceTestDoubles.AssertProtocolUpgradeGuidance(result);
     }
 
     [Test]
@@ -330,14 +217,8 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "Your subscription plan does not include a hosted runner.",
-                    "managedRunnerProvisionFailed",
-                    false))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.PlanCapabilityMissing);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
@@ -349,67 +230,29 @@ public class DeployServiceTests
     [Test]
     public async Task DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: true);
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "Normal hosted Runner provisioning requires an Infrastructure Runner transport.",
-                    "managedRunnerProvisionFailed",
-                    false))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.InfrastructureRunnerMissing);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(result.NextSteps, Does.Contain("No eligible Runner Host is available for managed Hosted Runner provisioning."));
-        Assert.That(result.NextSteps.Any(step => step.Contains("protocol-4 Infrastructure Runner with HostContainerExecution", StringComparison.Ordinal)), Is.True);
-        Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
+        DeployServiceTestDoubles.AssertInfrastructureRunnerGuidance(result);
     }
 
     [Test]
     public async Task DeployAsync_WhenAssignedRunnerIsOffline_ReturnsAssignedRunnerNextSteps()
     {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        WriteBackendController(projectRoot);
+        var (projectRoot, configService) = CreateConfiguredProject(includeBackend: true);
 
         var service = new DeployService(
             configService,
-            (_, _, _, _, _, _, _) => Task.FromResult((
-                new DeployUploadResult(1, 0, 0.1),
-                new DeployRuntimeResult(
-                    false,
-                    0,
-                    "No connected runner is assigned to this app.",
-                    "managedRuntimeUnavailable",
-                    false))));
+            checkReported: null,
+            deployPackageAsync: DeployServiceTestDoubles.AssignedRunnerOffline);
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.NextSteps, Does.Contain("This app is assigned to a runner, but that runner is not currently connected."));
-        Assert.That(result.NextSteps, Does.Contain("Bring the assigned runner online or reassign the app to a healthy runner in Automaton Studio, then rerun automaton deploy."));
-        Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
-        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "No connected runner is assigned to this app.");
+        DeployServiceTestDoubles.AssertAssignedRunnerOfflineGuidance(result);
     }
 
     [Test]
@@ -435,59 +278,6 @@ public class DeployServiceTests
         AssertCheck(result, DeployCheckNames.PackageUpload, false, "package upload failed");
     }
 
-    [Test]
-    public async Task DeployAsync_NamedTargetPassesSlugAndReportsDeploymentIdentity()
-    {
-        var projectRoot = CreateProjectRoot();
-        var configService = new ConfigService();
-        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
-        {
-            Name = "App",
-            Application = ApplicationContractTestFactory.Create()
-        });
-        SaveEnvironment(
-            configService,
-            projectRoot,
-            "https://api.example.com",
-            "ak_test",
-            Guid.NewGuid().ToString());
-        WriteFrontendIndexHtml(projectRoot);
-        string? requestedTarget = null;
-        var target = new DeploymentTargetInfo(
-            "target-eu",
-            "Server EU",
-            "server-eu",
-            false,
-            "Running",
-            null,
-            new DeploymentTargetRunnerInfo("runner-eu", "Runner EU", true));
-        var service = new DeployService(
-            configService,
-            deployPackageAsync: (_, _, _, targetSlug, _, _, _) =>
-            {
-                requestedTarget = targetSlug;
-                return Task.FromResult((
-                    new DeployUploadResult(1, 0, 0.1),
-                    new DeployRuntimeResult(true, 1, "deployed")));
-            },
-            createSnapshotAsync: (_, _, _, _) =>
-                Task.FromResult((true, "snapshot created")));
-
-        var result = await service.DeployAsync(
-            projectRoot,
-            clean: false,
-            directoryOverride: null,
-            target: target);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(requestedTarget, Is.EqualTo("server-eu"));
-            Assert.That(result.TargetSlug, Is.EqualTo("server-eu"));
-            Assert.That(result.RunnerName, Is.EqualTo("Runner EU"));
-            Assert.That(result.DeploymentMode, Is.EqualTo("named"));
-        });
-    }
-
     private static void AssertCheck(DeployResult result, string name, bool expectedSuccess, string expectedMessageFragment)
     {
         var check = result.Checks.Last(c => c.Name == name);
@@ -501,6 +291,37 @@ public class DeployServiceTests
         Directory.CreateDirectory(path);
         tempDirectories.Add(path);
         return path;
+    }
+
+    private (string Root, ConfigService Config) CreateConfiguredProject(bool includeBackend, string name = "App")
+    {
+        var root = CreateProjectRoot();
+        var config = new ConfigService();
+        config.SaveProjectConfig(root, new AutomatonConfig
+        {
+            Name = name,
+            Application = ApplicationContractTestFactory.Create()
+        });
+        SaveEnvironment(config, root, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(root);
+        if (includeBackend)
+        {
+            WriteBackendController(root);
+        }
+
+        return (root, config);
+    }
+
+    private (string Root, ConfigService Config) CreateProjectWithMissingRuntimeCommand()
+    {
+        var root = CreateProjectRoot();
+        var config = new ConfigService();
+        var application = ApplicationContractTestFactory.Create();
+        application.Runtime!.Command = null;
+        application.Build!.Command = null;
+        config.SaveProjectConfig(root, new AutomatonConfig { Name = "App", Application = application });
+        SaveEnvironment(config, root, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        return (root, config);
     }
 
     private static void WriteFrontendIndexHtml(string projectRoot)

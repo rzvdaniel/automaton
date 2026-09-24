@@ -29,105 +29,130 @@ public static class InitCommand
             jsonOption
         };
 
-        cmd.SetHandler(async (string? appId, string? name, bool asJson) =>
-        {
-            var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd, allowMissingEnvironment: true);
-
-            if (!string.IsNullOrWhiteSpace(appId))
-            {
-                if (!asJson && string.IsNullOrWhiteSpace(appId))
-                {
-                    Console.Write("App ID: ");
-                    appId = Console.ReadLine()?.Trim();
-                }
-
-                var linkService = new LinkAppService(config);
-                var linkResult = await linkService.LinkAsync(cwd, appId, server, apiKey);
-
-                if (asJson)
-                {
-                    CliJson.Write(new
-                    {
-                        success = linkResult.Success,
-                        summary = linkResult.Success ? "Init complete" : linkResult.Summary,
-                        checks = linkResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                        nextSteps = linkResult.NextSteps,
-                        action = "link",
-                        appId = linkResult.AppId,
-                        name = linkResult.Name,
-                        server = linkResult.Server,
-                        configPath = linkResult.ConfigPath
-                    });
-                    Environment.ExitCode = linkResult.Success ? 0 : 1;
-                    return;
-                }
-
-                if (!linkResult.Success)
-                {
-                    CliDiagnosticsWriter.Write(new CommandDiagnosticResult
-                    {
-                        Success = false,
-                        Summary = "Init failed",
-                        Checks = linkResult.Checks,
-                        NextSteps = linkResult.NextSteps
-                    });
-                    Environment.ExitCode = 1;
-                    return;
-                }
-
-                AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{linkResult.Name}[/] ({linkResult.AppId})");
-                AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
-                Environment.ExitCode = 0;
-                return;
-            }
-
-            if (!asJson && string.IsNullOrWhiteSpace(name))
-            {
-                Console.Write("App name: ");
-                name = Console.ReadLine()?.Trim();
-            }
-
-            var newAppService = new NewAppService(config);
-            var createResult = await newAppService.CreateAsync(cwd, name, server, apiKey);
-
-            if (asJson)
-            {
-                CliJson.Write(new
-                {
-                    success = createResult.Success,
-                    summary = createResult.Success ? "Init complete" : createResult.Summary,
-                    checks = createResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                    nextSteps = createResult.NextSteps,
-                    action = "create",
-                    appId = createResult.AppId,
-                    name = createResult.Name,
-                    server = createResult.Server,
-                    configPath = createResult.ConfigPath
-                });
-                Environment.ExitCode = createResult.Success ? 0 : 1;
-                return;
-            }
-
-            if (!createResult.Success)
-            {
-                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
-                {
-                    Success = false,
-                    Summary = "Init failed",
-                    Checks = createResult.Checks,
-                    NextSteps = createResult.NextSteps
-                });
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{createResult.Name}[/]");
-            AnsiConsole.MarkupLine($"[grey]App ID:[/] {createResult.AppId}");
-            AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
-            Environment.ExitCode = 0;
-        }, appOption, nameOption, jsonOption);
+        cmd.SetHandler(
+            (string? appId, string? name, bool asJson) => HandleInitAsync(config, appId, name, asJson),
+            appOption,
+            nameOption,
+            jsonOption);
 
         return cmd;
+    }
+
+    private static async Task HandleInitAsync(
+        ConfigService config,
+        string? appId,
+        string? name,
+        bool asJson)
+    {
+        var cwd = Directory.GetCurrentDirectory();
+        var (server, apiKey) = config.ResolveCredentials(directory: cwd, allowMissingEnvironment: true);
+        if (!string.IsNullOrWhiteSpace(appId))
+        {
+            await LinkExistingAppAsync(config, cwd, appId, server, apiKey, asJson);
+            return;
+        }
+
+        name = ResolveName(name, asJson);
+        var result = await new NewAppService(config).CreateAsync(cwd, name, server, apiKey);
+        WriteCreateResult(result, asJson);
+    }
+
+    private static string? ResolveName(string? name, bool asJson)
+    {
+        if (asJson || !string.IsNullOrWhiteSpace(name))
+            return name;
+
+        Console.Write("App name: ");
+        return Console.ReadLine()?.Trim();
+    }
+
+    private static async Task LinkExistingAppAsync(
+        ConfigService config,
+        string cwd,
+        string appId,
+        string server,
+        string apiKey,
+        bool asJson)
+    {
+        var result = await new LinkAppService(config).LinkAsync(cwd, appId, server, apiKey);
+        WriteLinkResult(result, asJson);
+    }
+
+    private static void WriteLinkResult(LinkAppResult result, bool asJson)
+    {
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = result.Success,
+                summary = result.Success ? "Init complete" : result.Summary,
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = result.NextSteps,
+                action = "link",
+                appId = result.AppId,
+                name = result.Name,
+                server = result.Server,
+                configPath = result.ConfigPath
+            });
+            Environment.ExitCode = result.Success ? 0 : 1;
+            return;
+        }
+
+        if (!result.Success)
+        {
+            WriteFailure("Init failed", result.Checks, result.NextSteps);
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{result.Name}[/] ({result.AppId})");
+        AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
+        Environment.ExitCode = 0;
+    }
+
+    private static void WriteCreateResult(NewAppResult result, bool asJson)
+    {
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = result.Success,
+                summary = result.Success ? "Init complete" : result.Summary,
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = result.NextSteps,
+                action = "create",
+                appId = result.AppId,
+                name = result.Name,
+                server = result.Server,
+                configPath = result.ConfigPath
+            });
+            Environment.ExitCode = result.Success ? 0 : 1;
+            return;
+        }
+
+        if (!result.Success)
+        {
+            WriteFailure("Init failed", result.Checks, result.NextSteps);
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{result.Name}[/]");
+        AnsiConsole.MarkupLine($"[grey]App ID:[/] {result.AppId}");
+        AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
+        Environment.ExitCode = 0;
+    }
+
+    private static void WriteFailure(
+        string summary,
+        IReadOnlyList<CommandDiagnosticCheck> checks,
+        IReadOnlyList<string> nextSteps)
+    {
+        CliDiagnosticsWriter.Write(new CommandDiagnosticResult
+        {
+            Success = false,
+            Summary = summary,
+            Checks = checks,
+            NextSteps = nextSteps
+        });
+        Environment.ExitCode = 1;
     }
 }

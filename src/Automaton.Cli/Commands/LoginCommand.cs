@@ -25,66 +25,114 @@ public static class LoginCommand
             jsonOption
         };
 
-        cmd.SetHandler(async (string? server, string? key, bool device, bool local, bool asJson) =>
-        {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            try
-            {
-                var cwd = Directory.GetCurrentDirectory();
-                var global = !local;
-                var existing = config.ResolveExistingConfig(global, cwd);
-                server = string.IsNullOrWhiteSpace(server)
-                    ? existing.Server ?? ConfigService.DefaultHostedServer
-                    : server.TrimEnd('/');
-
-                var completionService = new CliAuthorizationCompletionService(config);
-                if (existing.PendingAuthorizationCompletion is not null
-                    && !await completionService.TryCompletePendingAsync(cwd, global))
-                {
-                    checks.Add(new CommandDiagnosticCheck(
-                        CommandDiagnosticCheckNames.Authentication,
-                        true,
-                        "credential is saved; server acknowledgement remains pending and will be retried automatically",
-                        IsWarning: true));
-                    if (!asJson)
-                        Console.Error.WriteLine("Warning: CLI credential is saved, but server acknowledgement is pending. Automaton will retry automatically.");
-                }
-
-                var keyWasRequested = Environment.GetCommandLineArgs()
-                    .Any(argument => string.Equals(argument, "--key", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(argument, "-k", StringComparison.OrdinalIgnoreCase));
-                if (keyWasRequested && string.IsNullOrWhiteSpace(key))
-                    key = PromptForApiKey();
-
-                if (!string.IsNullOrWhiteSpace(key))
-                {
-                    await LoginWithExistingKeyAsync(config, cwd, server, key, global, asJson, checks);
-                    return;
-                }
-
-                await LoginWithDeviceAuthorizationAsync(config, cwd, server, global, device, asJson, checks);
-            }
-            catch (Exception ex)
-            {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
-                nextSteps.Add("Run automaton login to start browser/device authorization");
-                var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                if (asJson)
-                {
-                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                }
-                else
-                {
-                    CliDiagnosticsWriter.Write(failure);
-                }
-
-                Environment.ExitCode = 1;
-            }
-        }, serverOption, keyOption, deviceOption, localOption, jsonOption);
+        cmd.SetHandler(
+            (string? server, string? key, bool device, bool local, bool asJson) =>
+                HandleLoginAsync(config, server, key, device, local, asJson),
+            serverOption,
+            keyOption,
+            deviceOption,
+            localOption,
+            jsonOption);
 
         return cmd;
+    }
+
+    private static async Task HandleLoginAsync(
+        ConfigService config,
+        string? requestedServer,
+        string? key,
+        bool device,
+        bool local,
+        bool asJson)
+    {
+        var checks = new List<CommandDiagnosticCheck>();
+        try
+        {
+            var cwd = Directory.GetCurrentDirectory();
+            var global = !local;
+            var server = await ResolveServerAsync(config, cwd, global, requestedServer, asJson, checks);
+            key = ResolveRequestedKey(key);
+
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                await LoginWithExistingKeyAsync(config, cwd, server, key, global, asJson, checks);
+                return;
+            }
+
+            await LoginWithDeviceAuthorizationAsync(config, cwd, server, global, device, asJson, checks);
+        }
+        catch (Exception ex)
+        {
+            WriteLoginFailure(ex, checks, asJson);
+        }
+    }
+
+    private static async Task<string> ResolveServerAsync(
+        ConfigService config,
+        string cwd,
+        bool global,
+        string? requestedServer,
+        bool asJson,
+        ICollection<CommandDiagnosticCheck> checks)
+    {
+        var existing = config.ResolveExistingConfig(global, cwd);
+        var server = string.IsNullOrWhiteSpace(requestedServer)
+            ? existing.Server ?? ConfigService.DefaultHostedServer
+            : requestedServer.TrimEnd('/');
+
+        if (existing.PendingAuthorizationCompletion is not null
+            && !await new CliAuthorizationCompletionService(config).TryCompletePendingAsync(cwd, global))
+        {
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.Authentication,
+                true,
+                "credential is saved; server acknowledgement remains pending and will be retried automatically",
+                IsWarning: true));
+            if (!asJson)
+                Console.Error.WriteLine("Warning: CLI credential is saved, but server acknowledgement is pending. Automaton will retry automatically.");
+        }
+
+        return server;
+    }
+
+    private static string? ResolveRequestedKey(string? key)
+    {
+        var keyWasRequested = Environment.GetCommandLineArgs()
+            .Any(argument => string.Equals(argument, "--key", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(argument, "-k", StringComparison.OrdinalIgnoreCase));
+        return keyWasRequested && string.IsNullOrWhiteSpace(key) ? PromptForApiKey() : key;
+    }
+
+    private static void WriteLoginFailure(
+        Exception exception,
+        ICollection<CommandDiagnosticCheck> checks,
+        bool asJson)
+    {
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, exception.Message));
+        var failure = new CommandDiagnosticResult
+        {
+            Success = false,
+            Summary = "Login failed",
+            Checks = checks.ToList(),
+            NextSteps = ["Run automaton login to start browser/device authorization"]
+        };
+
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = false,
+                summary = failure.Summary,
+                checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = failure.NextSteps
+            });
+        }
+        else
+        {
+            CliDiagnosticsWriter.Write(failure);
+        }
+
+        Environment.ExitCode = 1;
     }
 
     private static async Task LoginWithDeviceAuthorizationAsync(
@@ -98,57 +146,87 @@ public static class LoginCommand
     {
         using var client = new AutomatonApiClient(server);
         var authorization = await client.CreateCliAuthorizationRequestAsync(Environment.MachineName);
-
+        ShowAuthorizationInstructions(authorization, server, forceDevice, asJson);
         if (!asJson)
-        {
-            AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
-            AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
-            AnsiConsole.MarkupLine($"[link={authorization.VerificationUrl}]{authorization.VerificationUrl}[/]");
-        }
+            AnsiConsole.MarkupLine("[grey]Waiting for authorization...[/]");
 
+        var apiKey = await PollForApiKeyAsync(client, authorization);
+        using var authenticatedClient = new AutomatonApiClient(server, apiKey);
+        await SaveDeviceAuthorizationAsync(config, cwd, server, apiKey, global, authorization);
+        await CompleteDeviceAuthorizationAsync(config, cwd, global, asJson, server, authenticatedClient, checks);
+    }
+
+    private static void ShowAuthorizationInstructions(
+        CliAuthorizationResponse authorization,
+        string server,
+        bool forceDevice,
+        bool asJson)
+    {
+        if (asJson)
+            return;
+
+        AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
+        AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
+        AnsiConsole.MarkupLine($"[link={authorization.VerificationUrl}]{authorization.VerificationUrl}[/]");
         var browserOpened = !forceDevice && CliBrowserService.TryOpenUrl(authorization.VerificationUrl);
-        if (!asJson && browserOpened)
+        if (browserOpened)
         {
             AnsiConsole.MarkupLine($"Confirm this code in Studio: [bold]{authorization.UserCode}[/]");
         }
-        else if (!asJson && forceDevice)
+        else if (forceDevice)
         {
             AnsiConsole.MarkupLine($"Open the URL above and enter this code: [bold]{authorization.UserCode}[/]");
         }
-        else if (!asJson)
+        else
         {
             AnsiConsole.MarkupLine("[yellow]A browser could not be opened. Open the URL above on another device.[/]");
             AnsiConsole.MarkupLine($"Enter this code: [bold]{authorization.UserCode}[/]");
         }
 
-        if (!asJson)
-            AnsiConsole.MarkupLine("[grey]Waiting for authorization...[/]");
+    }
 
+    private static async Task<string> PollForApiKeyAsync(
+        AutomatonApiClient client,
+        CliAuthorizationResponse authorization)
+    {
         var deadline = DateTime.UtcNow.AddSeconds(authorization.ExpiresIn);
-        string? apiKey = null;
         while (DateTime.UtcNow < deadline)
         {
             var status = await client.PollCliAuthorizationAsync(authorization.RequestId, authorization.Verifier);
             var state = status.TryGetProperty("status", out var stateProperty) ? stateProperty.GetString() : null;
             if (string.Equals(state, "authorized", StringComparison.OrdinalIgnoreCase))
-            {
-                apiKey = status.GetProperty("apiKey").GetString();
-                break;
-            }
-
-            if (state is "expired" or "invalid" or "completed")
-                throw new InvalidOperationException("The CLI authorization request is no longer available.");
-
-            if (state == "cancelled")
-                throw new InvalidOperationException("Authorization was cancelled in Studio.");
-
+                return GetAuthorizedApiKey(status);
+            ThrowIfAuthorizationEnded(state);
             await Task.Delay(TimeSpan.FromSeconds(authorization.PollInterval));
         }
 
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new TimeoutException("The CLI authorization request expired before it was approved.");
+        throw new TimeoutException("The CLI authorization request expired before it was approved.");
+    }
 
-        using var authenticatedClient = new AutomatonApiClient(server, apiKey);
+    private static string GetAuthorizedApiKey(System.Text.Json.JsonElement status)
+    {
+        var apiKey = status.GetProperty("apiKey").GetString();
+        return !string.IsNullOrWhiteSpace(apiKey)
+            ? apiKey
+            : throw new TimeoutException("The CLI authorization request expired before it was approved.");
+    }
+
+    private static void ThrowIfAuthorizationEnded(string? state)
+    {
+        if (state is "expired" or "invalid" or "completed")
+            throw new InvalidOperationException("The CLI authorization request is no longer available.");
+        if (state == "cancelled")
+            throw new InvalidOperationException("Authorization was cancelled in Studio.");
+    }
+
+    private static async Task SaveDeviceAuthorizationAsync(
+        ConfigService config,
+        string cwd,
+        string server,
+        string apiKey,
+        bool global,
+        CliAuthorizationResponse authorization)
+    {
         await SaveCredentialsAsync(
             config,
             cwd,
@@ -161,13 +239,19 @@ public static class LoginCommand
                 Server = server,
                 Verifier = authorization.Verifier
             });
+    }
 
+    private static async Task CompleteDeviceAuthorizationAsync(
+        ConfigService config,
+        string cwd,
+        bool global,
+        bool asJson,
+        string server,
+        AutomatonApiClient authenticatedClient,
+        List<CommandDiagnosticCheck> checks)
+    {
         var completionService = new CliAuthorizationCompletionService(config);
-        if (await completionService.TryCompletePendingAsync(cwd, global))
-        {
-            // The completion service clears the pending state after the server acknowledges delivery.
-        }
-        else
+        if (!await completionService.TryCompletePendingAsync(cwd, global))
         {
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.Authentication,
@@ -178,25 +262,41 @@ public static class LoginCommand
                 AnsiConsole.MarkupLine("[yellow]⚠[/] Credential saved; server acknowledgement will be retried on the next CLI invocation.");
         }
 
-        string displayName;
+        var displayName = await GetDisplayNameAsync(authenticatedClient, asJson, checks);
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
+        if (!checks.Any(check => check.Name == CommandDiagnosticCheckNames.UserProfile))
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
+
+        WriteDeviceAuthorizationResult(checks, asJson, global, server, displayName);
+    }
+
+    private static async Task<string> GetDisplayNameAsync(
+        AutomatonApiClient authenticatedClient,
+        bool asJson,
+        ICollection<CommandDiagnosticCheck> checks)
+    {
         try
         {
             var user = await authenticatedClient.GetUserProfileAsync();
-            displayName = GetUserDisplayName(user);
+            return GetUserDisplayName(user);
         }
         catch (Exception ex)
         {
-            displayName = "Automaton user";
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true,
                 "credential saved; profile details could not be loaded", true));
             if (!asJson)
                 AnsiConsole.MarkupLine($"[yellow]⚠[/] Signed in, but profile details could not be loaded: {Markup.Escape(ex.Message)}");
+            return "Automaton user";
         }
+    }
 
-        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
-        if (!checks.Any(x => x.Name == CommandDiagnosticCheckNames.UserProfile))
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
-
+    private static void WriteDeviceAuthorizationResult(
+        IReadOnlyList<CommandDiagnosticCheck> checks,
+        bool asJson,
+        bool global,
+        string server,
+        string displayName)
+    {
         if (asJson)
         {
             CliJson.Write(new

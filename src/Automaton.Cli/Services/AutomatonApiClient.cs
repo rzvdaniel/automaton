@@ -75,35 +75,42 @@ public class AutomatonApiClient : IDisposable
             return await GetAppAsync(value, ct);
         }
 
+        var appId = await FindAppIdBySlugAsync(value, ct);
+        return await GetAppAsync(appId, ct);
+    }
+
+    private async Task<string> FindAppIdBySlugAsync(string slug, CancellationToken ct)
+    {
         var apps = await ListAppsAsync(ct);
         if (apps.ValueKind == JsonValueKind.Array)
         {
             foreach (var app in apps.EnumerateArray())
             {
-                var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty)
-                    && publicUrlProperty.ValueKind == JsonValueKind.String
-                    ? publicUrlProperty.GetString()
-                    : null;
-                if (!string.Equals(publicUrl, value, StringComparison.OrdinalIgnoreCase))
+                if (ReadPublicUrl(app) is not { } publicUrl
+                    || !string.Equals(publicUrl, slug, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                var appId = app.TryGetProperty("id", out var idProperty)
-                    && idProperty.ValueKind == JsonValueKind.String
-                    ? idProperty.GetString()
-                    : null;
-                if (!Guid.TryParse(appId, out _))
-                {
-                    throw new InvalidOperationException($"The app list returned an invalid ID for slug '{value}'.");
-                }
-
-                return await GetAppAsync(appId!, ct);
+                return ReadAppId(app, slug);
             }
         }
 
         throw new InvalidOperationException(
-            $"App '{value}' was not found. Use an app ID or exact slug for an app you can access; project apps may require an app ID.");
+            $"App '{slug}' was not found. Use an app ID or exact slug for an app you can access; project apps may require an app ID.");
+    }
+
+    private static string? ReadPublicUrl(JsonElement app) =>
+        app.TryGetProperty("publicUrl", out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+
+    private static string ReadAppId(JsonElement app, string slug)
+    {
+        var appId = app.TryGetProperty("id", out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+        return Guid.TryParse(appId, out _) ? appId! : throw new InvalidOperationException($"The app list returned an invalid ID for slug '{slug}'.");
     }
 
     public async Task<IReadOnlyList<DeploymentTargetInfo>> ListDeploymentTargetsAsync(
@@ -361,29 +368,37 @@ public class AutomatonApiClient : IDisposable
                 throw new InvalidOperationException("Deploy package response did not contain an operation ID.");
             }
 
-            while (true)
-            {
-                using var statusResponse = await _http.GetAsync(
-                    $"api/apps/{appId}/deploy-operations/{operationId}",
-                    ct);
-                await EnsureSuccessAsync(statusResponse);
-                var status = await ReadJsonAsync(statusResponse, ct);
-                var operationStatus = status.TryGetProperty("status", out var statusProperty)
-                    ? statusProperty.GetString()
-                    : null;
-                if (string.Equals(operationStatus, "Succeeded", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(operationStatus, "Failed", StringComparison.OrdinalIgnoreCase))
-                {
-                    return status.TryGetProperty("result", out var result)
-                        && result.ValueKind == JsonValueKind.Object
-                        ? result.Clone()
-                        : status;
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(1), ct);
-            }
+            return await PollDeployOperationAsync(appId, operationId, ct);
         }
     }
+
+    private async Task<JsonElement> PollDeployOperationAsync(string appId, Guid operationId, CancellationToken ct)
+    {
+        while (true)
+        {
+            using var response = await _http.GetAsync($"api/apps/{appId}/deploy-operations/{operationId}", ct);
+            await EnsureSuccessAsync(response);
+            var status = await ReadJsonAsync(response, ct);
+            if (IsTerminalDeployStatus(status))
+            {
+                return ReadDeployResult(status);
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), ct);
+        }
+    }
+
+    private static bool IsTerminalDeployStatus(JsonElement status)
+    {
+        var value = status.TryGetProperty("status", out var property) ? property.GetString() : null;
+        return string.Equals(value, "Succeeded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "Failed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static JsonElement ReadDeployResult(JsonElement status) =>
+        status.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object
+            ? result.Clone()
+            : status;
 
     private static long? GetPackageBytes(Stream stream)
     {

@@ -39,74 +39,108 @@ public static class RunnerCommand
             nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption
         };
 
-        cmd.SetHandler(async (string? name, string? server, string? key, bool native, bool replace, bool? autoStart, string? image, bool asJson) =>
-        {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new List<string>();
-
-            try
-            {
-                var cwd = Directory.GetCurrentDirectory();
-                var (_, storedApiKey) = config.ResolveCredentials(directory: cwd);
-
-                var runnerName = string.IsNullOrWhiteSpace(name) && !asJson
-                    ? PromptForValue("Enter runner name")
-                    : name?.Trim();
-                var resolvedServer = string.IsNullOrWhiteSpace(server)
-                    ? runnerService.GetDefaultServer(null)
-                    : runnerService.GetDefaultServer(server);
-                var resolvedKey = string.IsNullOrWhiteSpace(key) ? storedApiKey : key.Trim();
-
-                if (string.IsNullOrWhiteSpace(runnerName))
-                {
-                    throw new InvalidOperationException("Runner name is required.");
-                }
-
-                if (string.IsNullOrWhiteSpace(resolvedKey))
-                {
-                    if (asJson)
-                    {
-                        throw new InvalidOperationException("Runner API key is required. Run automaton login first or pass --key.");
-                    }
-
-                    resolvedKey = ReadSecretFromConsole("Enter runner API key");
-                }
-
-                var resolvedAutoStart = autoStart ?? (asJson
-                    ? true
-                    : !native
-                        ? PromptForYesNo("Start automatically when Docker restarts?", true)
-                        : PromptForYesNo("Start automatically on machine boot?", true));
-
-                var request = new RunnerInstallRequest
-                {
-                    RunnerName = runnerName!,
-                    ApiServerUrl = resolvedServer,
-                    ApiKey = resolvedKey!,
-                    Mode = native ? RunnerInstallModes.Native : RunnerInstallModes.Docker,
-                    AutoStart = resolvedAutoStart,
-                    DockerImage = image,
-                    ReplaceExisting = replace,
-                    ProgressReporter = asJson ? null : message => Console.WriteLine(message)
-                };
-
-                var result = await runnerService.InstallAsync(request);
-                WriteResult(result, asJson);
-                Environment.ExitCode = result.Success ? 0 : 1;
-            }
-            catch (Exception ex)
-            {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, false, ex.Message));
-                nextSteps.Add("Run automaton login if server URL or API key has not been configured yet");
-                var failure = new RunnerCommandResult { Success = false, Summary = "Runner install failed", Checks = checks, NextSteps = nextSteps };
-                WriteResult(failure, asJson);
-                Environment.ExitCode = 1;
-            }
-        }, nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption);
+        cmd.SetHandler(
+            (string? name, string? server, string? key, bool native, bool replace, bool? autoStart, string? image, bool asJson) =>
+                InstallAsync(config, runnerService, name, server, key, native, replace, autoStart, image, asJson),
+            nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption);
 
         cmd.AddAlias("up");
 
         return cmd;
+    }
+
+    private static async Task InstallAsync(
+        ConfigService config,
+        RunnerInstallService runnerService,
+        string? name,
+        string? server,
+        string? key,
+        bool native,
+        bool replace,
+        bool? autoStart,
+        string? image,
+        bool asJson)
+    {
+        try
+        {
+            var request = await CreateInstallRequestAsync(
+                config, runnerService, name, server, key, native, replace, autoStart, image, asJson);
+            var result = await runnerService.InstallAsync(request);
+            WriteResult(result, asJson);
+            Environment.ExitCode = result.Success ? 0 : 1;
+        }
+        catch (Exception exception)
+        {
+            WriteInstallFailure(exception, asJson);
+        }
+    }
+
+    private static async Task<RunnerInstallRequest> CreateInstallRequestAsync(
+        ConfigService config,
+        RunnerInstallService runnerService,
+        string? name,
+        string? server,
+        string? key,
+        bool native,
+        bool replace,
+        bool? autoStart,
+        string? image,
+        bool asJson)
+    {
+        var cwd = Directory.GetCurrentDirectory();
+        var (_, storedApiKey) = config.ResolveCredentials(directory: cwd);
+        var runnerName = ResolveRunnerName(name, asJson);
+        var resolvedServer = runnerService.GetDefaultServer(server);
+        var resolvedKey = ResolveRunnerKey(key, storedApiKey, asJson);
+        var resolvedAutoStart = ResolveAutoStart(autoStart, asJson, native);
+        return new RunnerInstallRequest
+        {
+            RunnerName = runnerName,
+            ApiServerUrl = resolvedServer,
+            ApiKey = resolvedKey,
+            Mode = native ? RunnerInstallModes.Native : RunnerInstallModes.Docker,
+            AutoStart = resolvedAutoStart,
+            DockerImage = image,
+            ReplaceExisting = replace,
+            ProgressReporter = asJson ? null : message => Console.WriteLine(message)
+        };
+    }
+
+    private static string ResolveRunnerName(string? name, bool asJson)
+    {
+        var runnerName = string.IsNullOrWhiteSpace(name) && !asJson ? PromptForValue("Enter runner name") : name?.Trim();
+        return !string.IsNullOrWhiteSpace(runnerName)
+            ? runnerName
+            : throw new InvalidOperationException("Runner name is required.");
+    }
+
+    private static string ResolveRunnerKey(string? key, string? storedApiKey, bool asJson)
+    {
+        if (!string.IsNullOrWhiteSpace(key)) return key.Trim();
+        if (!string.IsNullOrWhiteSpace(storedApiKey)) return storedApiKey;
+        if (asJson) throw new InvalidOperationException("Runner API key is required. Run automaton login first or pass --key.");
+        return ReadSecretFromConsole("Enter runner API key");
+    }
+
+    private static bool ResolveAutoStart(bool? autoStart, bool asJson, bool native)
+    {
+        if (autoStart.HasValue) return autoStart.Value;
+        if (asJson) return true;
+        var prompt = native ? "Start automatically on machine boot?" : "Start automatically when Docker restarts?";
+        return PromptForYesNo(prompt, true);
+    }
+
+    private static void WriteInstallFailure(Exception exception, bool asJson)
+    {
+        var failure = new RunnerCommandResult
+        {
+            Success = false,
+            Summary = "Runner install failed",
+            Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, false, exception.Message)],
+            NextSteps = ["Run automaton login if server URL or API key has not been configured yet"]
+        };
+        WriteResult(failure, asJson);
+        Environment.ExitCode = 1;
     }
 
     private static Command BuildStatusCommand(RunnerInstallService runnerService)

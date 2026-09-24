@@ -25,137 +25,24 @@ public sealed class PublishService
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         try
         {
-            var appConfig = _config.TryLoadProjectConfig(directory);
-            var resolved = _config.ResolveContext(appConfig, directory, environmentName);
-            var server = resolved.Server;
-            var apiKey = resolved.ApiKey;
-            var appId = resolved.AppId;
-            var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(directory, "automaton.json")), appConfig, appId, nextSteps);
-            var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
-            checks.Add(appLinkCheck);
-            checks.Add(credentialsCheck);
+            var project = ResolveProject(directory, environmentName, checks, nextSteps);
+            if (project.Failure is not null) return project.Failure;
+            var context = project.Context!;
+            using var client = new AutomatonApiClient(context.Server, context.ApiKey);
+            var app = await client.GetAppAsync(context.AppId, cancellationToken);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {context.AppId}"));
 
-            if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
-            {
-                return new PublishResult
-                {
-                    Success = false,
-                    Summary = "Publish failed",
-                    Checks = checks,
-                    NextSteps = nextSteps.ToList(),
-                        AppId = appId,
-                        AppName = appConfig?.Name,
-                    StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server, appId)
-                };
-            }
+            var publication = ResolvePublication(app, context, slug, requiresAuthentication, isForkable, yes, nonInteractive, checks, nextSteps);
+            if (publication.Failure is not null) return publication.Failure;
+            var options = publication.Options!;
+            var approvalFailure = ConfirmPublish(context, options, yes, nonInteractive, checks);
+            if (approvalFailure is not null) return approvalFailure;
 
-            using var client = new AutomatonApiClient(server!, apiKey!);
-            var app = await client.GetAppAsync(appId!, cancellationToken);
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appId}"));
-
-            var resolvedSlug = !string.IsNullOrWhiteSpace(slug)
-                ? slug.Trim()
-                : TryReadString(app, "publicUrl");
-            var resolvedRequiresAuthentication = requiresAuthentication ?? TryReadBool(app, "requiresAuthentication") ?? false;
-            var resolvedIsForkable = isForkable ?? TryReadBool(app, "isForkable") ?? false;
-
-            if (string.IsNullOrWhiteSpace(resolvedSlug))
-            {
-                if (yes || nonInteractive)
-                {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "public URL slug is required for first publish"));
-                    nextSteps.Add("Rerun automaton publish --slug <your-app-slug>");
-                    return new PublishResult
-                    {
-                        Success = false,
-                        Summary = "Publish failed",
-                        Checks = checks,
-                        NextSteps = nextSteps.ToList(),
-                        AppId = appId,
-                        AppName = appConfig.Name,
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
-                        RequiresAuthentication = resolvedRequiresAuthentication,
-                        IsForkable = resolvedIsForkable
-                    };
-                }
-
-                resolvedSlug = PromptForSlug(appConfig.Name);
-            }
-
-            if (!yes)
-            {
-                if (nonInteractive)
-                {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish requires --yes in non-interactive mode"));
-                    return new PublishResult
-                    {
-                        Success = false,
-                        Summary = "Publish failed",
-                        Checks = checks,
-                        NextSteps = ["Rerun automaton publish --yes once you intend to make the app public"],
-                        AppId = appId,
-                        AppName = appConfig.Name,
-                        Slug = resolvedSlug,
-                        Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
-                        RequiresAuthentication = resolvedRequiresAuthentication,
-                        IsForkable = resolvedIsForkable
-                    };
-                }
-
-                Console.Write($"Publish '{appConfig.Name}' at {CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug)}? [y/N]: ");
-                var confirmation = Console.ReadLine()?.Trim();
-                if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish cancelled by user"));
-                    return new PublishResult
-                    {
-                        Success = false,
-                        Cancelled = true,
-                        Summary = "Publish cancelled",
-                        Checks = checks,
-                        NextSteps = ["Rerun automaton publish --yes when you are ready to make the app public"],
-                        AppId = appId,
-                        AppName = appConfig.Name,
-                        Slug = resolvedSlug,
-                        Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
-                        RequiresAuthentication = resolvedRequiresAuthentication,
-                        IsForkable = resolvedIsForkable
-                    };
-                }
-            }
-
-            await client.PublishAppAsync(
-                appId!,
-                resolvedSlug,
-                resolvedRequiresAuthentication,
-                category: null,
-                tags: null,
-                resolvedIsForkable,
-                cancellationToken);
-
-            var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug);
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
-
-            return new PublishResult
-            {
-                Success = true,
-                Summary = "Publish complete",
-                Checks = checks,
-                NextSteps = [],
-                AppId = appId,
-                AppName = appConfig.Name,
-                Slug = resolvedSlug,
-                Url = publishedUrl,
-                StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
-                RequiresAuthentication = resolvedRequiresAuthentication,
-                IsForkable = resolvedIsForkable
-            };
+            await client.PublishAppAsync(context.AppId, options.Slug, options.RequiresAuthentication,
+                category: null, tags: null, options.IsForkable, cancellationToken);
+            return CreateSuccess(context, options, checks);
         }
         catch (Exception ex)
         {
@@ -171,6 +58,159 @@ public sealed class PublishService
             };
         }
     }
+
+    private PublishPreparation ResolveProject(
+        string directory,
+        string? environmentName,
+        ICollection<CommandDiagnosticCheck> checks,
+        ISet<string> nextSteps)
+    {
+        var appConfig = _config.TryLoadProjectConfig(directory);
+        var resolved = _config.ResolveContext(appConfig, directory, environmentName);
+        var appLinkCheck = CliCommandChecks.ValidateProjectLink(
+            File.Exists(Path.Combine(directory, "automaton.json")), appConfig, resolved.AppId, nextSteps);
+        var credentialsCheck = CliCommandChecks.ValidateCredentials(resolved.Server, resolved.ApiKey, nextSteps);
+        checks.Add(appLinkCheck);
+        checks.Add(credentialsCheck);
+        if (appLinkCheck.Success && credentialsCheck.Success && appConfig is not null
+            && !string.IsNullOrWhiteSpace(resolved.Server) && !string.IsNullOrWhiteSpace(resolved.ApiKey))
+        {
+            return new PublishPreparation(new PublishContext(appConfig, resolved.Server, resolved.ApiKey, resolved.AppId!), null);
+        }
+
+        var failure = new PublishResult
+        {
+            Success = false,
+            Summary = "Publish failed",
+            Checks = checks.ToList(),
+            NextSteps = nextSteps.ToList(),
+            AppId = resolved.AppId,
+            AppName = appConfig?.Name,
+            StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(resolved.Server, resolved.AppId)
+        };
+        return new PublishPreparation(null, failure);
+    }
+
+    private static PublishOptionsResult ResolvePublication(
+        JsonElement app,
+        PublishContext context,
+        string? slug,
+        bool? requiresAuthentication,
+        bool? isForkable,
+        bool yes,
+        bool nonInteractive,
+        ICollection<CommandDiagnosticCheck> checks,
+        ISet<string> nextSteps)
+    {
+        var resolvedSlug = !string.IsNullOrWhiteSpace(slug) ? slug.Trim() : TryReadString(app, "publicUrl");
+        var authRequired = requiresAuthentication ?? TryReadBool(app, "requiresAuthentication") ?? false;
+        var forkable = isForkable ?? TryReadBool(app, "isForkable") ?? false;
+        if (!string.IsNullOrWhiteSpace(resolvedSlug))
+        {
+            return new PublishOptionsResult(new PublishOptions(resolvedSlug, authRequired, forkable), null);
+        }
+
+        if (yes || nonInteractive)
+        {
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "public URL slug is required for first publish"));
+            nextSteps.Add("Rerun automaton publish --slug <your-app-slug>");
+            var failure = CreateFailure(context, checks, nextSteps, authRequired, forkable);
+            return new PublishOptionsResult(null, failure);
+        }
+
+        return new PublishOptionsResult(new PublishOptions(PromptForSlug(context.Config.Name), authRequired, forkable), null);
+    }
+
+    private static PublishResult? ConfirmPublish(
+        PublishContext context,
+        PublishOptions options,
+        bool yes,
+        bool nonInteractive,
+        ICollection<CommandDiagnosticCheck> checks)
+    {
+        if (yes) return null;
+        if (nonInteractive)
+        {
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish requires --yes in non-interactive mode"));
+            return CreateApprovalFailure(context, options, checks, cancelled: false);
+        }
+
+        Console.Write($"Publish '{context.Config.Name}' at {CliAppUrlBuilder.BuildPublishedUrl(context.Server, options.Slug)}? [y/N]: ");
+        var confirmation = Console.ReadLine()?.Trim();
+        var confirmed = string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase);
+        if (confirmed) return null;
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish cancelled by user"));
+        return CreateApprovalFailure(context, options, checks, cancelled: true);
+    }
+
+    private static PublishResult CreateApprovalFailure(
+        PublishContext context,
+        PublishOptions options,
+        ICollection<CommandDiagnosticCheck> checks,
+        bool cancelled) => new()
+        {
+            Success = false,
+            Cancelled = cancelled,
+            Summary = cancelled ? "Publish cancelled" : "Publish failed",
+            Checks = checks.ToList(),
+            NextSteps = [cancelled
+                ? "Rerun automaton publish --yes when you are ready to make the app public"
+                : "Rerun automaton publish --yes once you intend to make the app public"],
+            AppId = context.AppId,
+            AppName = context.Config.Name,
+            Slug = options.Slug,
+            Url = CliAppUrlBuilder.BuildPublishedUrl(context.Server, options.Slug),
+            StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(context.Server, context.AppId),
+            RequiresAuthentication = options.RequiresAuthentication,
+            IsForkable = options.IsForkable
+        };
+
+    private static PublishResult CreateFailure(
+        PublishContext context,
+        IEnumerable<CommandDiagnosticCheck> checks,
+        IEnumerable<string> nextSteps,
+        bool requiresAuthentication,
+        bool isForkable) => new()
+        {
+            Success = false,
+            Summary = "Publish failed",
+            Checks = checks.ToList(),
+            NextSteps = nextSteps.ToList(),
+            AppId = context.AppId,
+            AppName = context.Config.Name,
+            StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(context.Server, context.AppId),
+            RequiresAuthentication = requiresAuthentication,
+            IsForkable = isForkable
+        };
+
+    private static PublishResult CreateSuccess(
+        PublishContext context,
+        PublishOptions options,
+        ICollection<CommandDiagnosticCheck> checks)
+    {
+        var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(context.Server, options.Slug);
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
+        return new PublishResult
+        {
+            Success = true,
+            Summary = "Publish complete",
+            Checks = checks.ToList(),
+            NextSteps = [],
+            AppId = context.AppId,
+            AppName = context.Config.Name,
+            Slug = options.Slug,
+            Url = publishedUrl,
+            StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(context.Server, context.AppId),
+            RequiresAuthentication = options.RequiresAuthentication,
+            IsForkable = options.IsForkable
+        };
+    }
+
+    private sealed record PublishContext(AutomatonConfig Config, string Server, string ApiKey, string AppId);
+    private sealed record PublishOptions(string Slug, bool RequiresAuthentication, bool IsForkable);
+    private sealed record PublishPreparation(PublishContext? Context, PublishResult? Failure);
+    private sealed record PublishOptionsResult(PublishOptions? Options, PublishResult? Failure);
 
     private static string PromptForSlug(string? appName)
     {

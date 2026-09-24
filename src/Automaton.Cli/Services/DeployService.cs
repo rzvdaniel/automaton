@@ -77,110 +77,139 @@ public sealed class DeployService
         CancellationToken cancellationToken = default)
     {
         var preflight = CreateLocalPreflight(directory, directoryOverride, environmentName);
-        var checks = preflight.Checks;
-        var nextSteps = preflight.NextSteps;
-        DeployUploadResult? uploadResult = null;
-        DeployRuntimeResult? runtimeResult = null;
-
-        foreach (var check in checks)
-        {
-            checkReported?.Invoke(check);
-        }
-
-        var projectConfig = preflight.ProjectConfig;
-        var server = preflight.Server;
-        var apiKey = preflight.ApiKey;
-        var appId = preflight.AppId;
-        var deployDirectory = preflight.DeployDirectory;
-
+        ReportPreflightChecks(preflight.Checks);
         if (!preflight.IsValid)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
+            return DeployResultFactory.Create(false, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+                preflight.AppId, preflight.Server, clean, directoryOverride, null, null, target);
         }
 
-        var deploymentApplication = ResolveDeploymentApplication(projectConfig!.Application, directoryOverride);
+        await CreateRestorePointAsync(preflight, cancellationToken);
+        var readinessFailure = await CheckManagedRuntimeReadinessAsync(preflight, clean, target, cancellationToken);
+        if (readinessFailure is not null) return readinessFailure;
 
+        var deployment = await DeployPackageForPreflightAsync(directory, clean, directoryOverride, preflight,
+            DeploymentApplicationResolver.Resolve(preflight.ProjectConfig!.Application, directoryOverride), target, cancellationToken);
+        if (deployment.Failure is not null) return deployment.Failure;
+        return CreateFinalDeploymentResult(preflight, clean, directoryOverride, target, deployment);
+    }
+
+    private void ReportPreflightChecks(IEnumerable<DeployCheckResult> checks)
+    {
+        foreach (var check in checks) checkReported?.Invoke(check);
+    }
+
+    private async Task CreateRestorePointAsync(LocalDeployPreflight preflight, CancellationToken cancellationToken)
+    {
         try
         {
             ReportProgress("Creating restore point before deployment...");
-            var snapshotResult = await createSnapshotAsync(server!, apiKey!, appId!, cancellationToken);
-            AddCheck(checks, new DeployCheckResult("restore_point", snapshotResult.Created, snapshotResult.Message, IsWarning: !snapshotResult.Created));
-            ReportProgress(snapshotResult.Message);
+            var snapshot = await createSnapshotAsync(preflight.Server!, preflight.ApiKey!, preflight.AppId!, cancellationToken);
+            AddCheck(preflight.Checks, new DeployCheckResult("restore_point", snapshot.Created, snapshot.Message, IsWarning: !snapshot.Created));
+            ReportProgress(snapshot.Message);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            AddCheck(checks, new DeployCheckResult("restore_point", false, ex.Message, IsWarning: true));
-            ReportProgress($"Restore point warning: {ex.Message}");
+            AddCheck(preflight.Checks, new DeployCheckResult("restore_point", false, exception.Message, IsWarning: true));
+            ReportProgress($"Restore point warning: {exception.Message}");
         }
+    }
 
-        // Every deployed app uses the configured generic runtime contract. The
-        // runner assignment is not inferred from source files or technology.
-        if (ensureManagedRuntimeReadyAsync != null && target?.IsDefault != false)
+    private async Task<DeployResult?> CheckManagedRuntimeReadinessAsync(
+        LocalDeployPreflight preflight,
+        bool clean,
+        DeploymentTargetInfo? target,
+        CancellationToken cancellationToken)
+    {
+        if (ensureManagedRuntimeReadyAsync is null || target?.IsDefault == false) return null;
+        var readiness = await WaitForManagedRuntimeAsync(preflight.Server!, preflight.ApiKey!, preflight.AppId!, cancellationToken);
+        if (readiness.Ready) return null;
+        preflight.NextSteps.Add(readiness.NextStep);
+        AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message));
+        if (RequiresManagedRuntimeGuidance(readiness.State))
         {
-            var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
-            if (!readiness.Ready)
-            {
-                nextSteps.Add(readiness.NextStep);
-                AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message));
-                if (readiness.State is DeployStateManagedRunnerProvisionFailed
-                    or DeployStateManagedRunnerWaitingForConnection
-                    or DeployStateManagedRuntimeUnavailable
-                    or DeployStatePreparingManagedRuntime)
-                {
-                    AddManagedRuntimeNextSteps(
-                        nextSteps,
-                        new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true));
-                }
-
-                runtimeResult = new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true);
-                return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
-            }
+            AddManagedRuntimeNextSteps(preflight.NextSteps,
+                new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true));
         }
 
+        var runtime = new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true);
+        return DeployResultFactory.Create(false, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+            preflight.AppId, preflight.Server, clean, preflight.DeployDirectory, null, runtime, target);
+    }
+
+    private static bool RequiresManagedRuntimeGuidance(string state) => state is
+        DeployStateManagedRunnerProvisionFailed or DeployStateManagedRunnerWaitingForConnection
+        or DeployStateManagedRuntimeUnavailable or DeployStatePreparingManagedRuntime;
+
+    private async Task<DeployAttempt> DeployPackageForPreflightAsync(
+        string directory,
+        bool clean,
+        string? directoryOverride,
+        LocalDeployPreflight preflight,
+        ApplicationContract application,
+        DeploymentTargetInfo? target,
+        CancellationToken cancellationToken)
+    {
+        DeployUploadResult? upload = null;
+        DeployRuntimeResult? runtime = null;
         try
         {
             ReportProgress("Creating deploy package...");
-            using var zip = ZipService.CreateDeployPackageZip(
-                directory,
-                appId!,
-                deploymentApplication,
-                projectConfig.Source,
-                deployDirectory);
+            using var zip = ZipService.CreateDeployPackageZip(directory, preflight.AppId!, application,
+                preflight.ProjectConfig!.Source, preflight.DeployDirectory);
             ReportProgress("Uploading deploy package to the assigned runner...");
-            var result = await deployPackageAsync(
-                server!, apiKey!, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
-            uploadResult = result.Upload;
-            runtimeResult = result.Deploy;
-            ReportDeploymentLogs(runtimeResult.Logs);
-            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
+            var result = await deployPackageAsync(preflight.Server!, preflight.ApiKey!, preflight.AppId!,
+                target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
+            upload = result.Upload;
+            runtime = result.Deploy;
+            ReportDeploymentLogs(runtime.Logs);
+            AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true,
+                FormatUploadMessage("uploaded", "deploy package", upload)));
+            return new DeployAttempt(upload, runtime, null);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            nextSteps.Add("Inspect runner deployment logs in Automaton Studio.");
-            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
+            preflight.NextSteps.Add("Inspect runner deployment logs in Automaton Studio.");
+            AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.PackageUpload, false, exception.Message));
+            var failure = DeployResultFactory.Create(false, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+                preflight.AppId, preflight.Server, clean, directoryOverride, upload, runtime, target);
+            return new DeployAttempt(upload, runtime, failure);
         }
-
-        if (runtimeResult == null)
-        {
-            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, "runner did not return a deployment result"));
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
-        }
-
-        if (!runtimeResult.Success || runtimeResult.RunnerCount <= 0)
-        {
-            AddManagedRuntimeNextSteps(nextSteps, runtimeResult);
-            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, runtimeResult.Message ?? "deploy package did not reach any runner", IsWarning: true));
-            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
-        }
-
-        AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, runtimeResult.Message ?? $"deploy package applied to {runtimeResult.RunnerCount} runner(s)"));
-        ReportProgress(runtimeResult.Message ?? $"Deploy package applied to {runtimeResult.RunnerCount} runner(s).");
-
-        return CreateResult(
-            true, checks, nextSteps, projectConfig, appId, server, clean,
-            deployDirectory, uploadResult, runtimeResult, target);
     }
+
+    private DeployResult CreateFinalDeploymentResult(
+        LocalDeployPreflight preflight,
+        bool clean,
+        string? directoryOverride,
+        DeploymentTargetInfo? target,
+        DeployAttempt deployment)
+    {
+        var runtime = deployment.Runtime;
+        if (runtime is null)
+        {
+            AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false,
+                "runner did not return a deployment result"));
+            return DeployResultFactory.Create(false, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+                preflight.AppId, preflight.Server, clean, directoryOverride, deployment.Upload, null, target);
+        }
+
+        if (!runtime.Success || runtime.RunnerCount <= 0)
+        {
+            AddManagedRuntimeNextSteps(preflight.NextSteps, runtime);
+            AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false,
+                runtime.Message ?? "deploy package did not reach any runner", IsWarning: true));
+            return DeployResultFactory.Create(true, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+                preflight.AppId, preflight.Server, clean, preflight.DeployDirectory, deployment.Upload, runtime, target);
+        }
+
+        AddCheck(preflight.Checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true,
+            runtime.Message ?? $"deploy package applied to {runtime.RunnerCount} runner(s)"));
+        ReportProgress(runtime.Message ?? $"Deploy package applied to {runtime.RunnerCount} runner(s).");
+        return DeployResultFactory.Create(true, preflight.Checks, preflight.NextSteps, preflight.ProjectConfig,
+            preflight.AppId, preflight.Server, clean, preflight.DeployDirectory, deployment.Upload, runtime, target);
+    }
+
+    private sealed record DeployAttempt(DeployUploadResult? Upload, DeployRuntimeResult? Runtime, DeployResult? Failure);
 
     public DeployResult? ValidateLocalProject(
         string directory,
@@ -191,7 +220,7 @@ public sealed class DeployService
         var preflight = CreateLocalPreflight(directory, directoryOverride, environmentName);
         return preflight.IsValid
             ? null
-            : CreateResult(
+            : DeployResultFactory.Create(
                 false,
                 preflight.Checks,
                 preflight.NextSteps,
@@ -231,7 +260,7 @@ public sealed class DeployService
             return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
         }
 
-        var deploymentApplication = ResolveDeploymentApplication(projectConfig.Application, directoryOverride);
+        var deploymentApplication = DeploymentApplicationResolver.Resolve(projectConfig.Application, directoryOverride);
         var buildCheck = ValidateBuildForRunner(deploymentApplication.Build, directory, nextSteps);
         checks.Add(buildCheck);
         if (!buildCheck.Success)
@@ -409,18 +438,6 @@ public sealed class DeployService
         return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, $"{status}: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
     }
 
-    private static ApplicationContract ResolveDeploymentApplication(ApplicationContract application, string? directoryOverride)
-    {
-        if (string.IsNullOrWhiteSpace(directoryOverride))
-            return application;
-
-        var copy = JsonSerializer.Deserialize<ApplicationContract>(JsonSerializer.Serialize(application))
-            ?? throw new InvalidOperationException("The application contract could not be copied for deployment.");
-        copy.Build.OutputDirectory = directoryOverride;
-        ApplicationContractValidator.EnsureValid(copy);
-        return copy;
-    }
-
     private static DeployCheckResult ValidateActions(string directory, ISet<string> nextSteps, out int actionCount)
     {
         try
@@ -445,49 +462,6 @@ public sealed class DeployService
         }
     }
 
-    private static DeployResult CreateResult(
-        bool success,
-        IReadOnlyList<DeployCheckResult> checks,
-        IEnumerable<string> nextSteps,
-        Models.AutomatonConfig? projectConfig,
-        string? appId,
-        string? server,
-        bool clean,
-        string? deployDirectory,
-        DeployUploadResult? uploadResult,
-        DeployRuntimeResult? runtimeResult,
-        DeploymentTargetInfo? target = null)
-    {
-        return new DeployResult
-        {
-            Success = success,
-            Summary = success
-                ? checks.Any(check => !check.Success && check.IsWarning) ? "Deploy complete with warnings" : "Deploy complete"
-                : "Deploy failed",
-            AppId = appId,
-            AppName = projectConfig?.Name,
-            TargetSlug = target?.Slug,
-            TargetName = target?.Name,
-            RunnerName = target?.Runner?.Name,
-            DeploymentMode = target == null || target.IsDefault ? "default" : "named",
-            OpenAppUrl = !string.IsNullOrWhiteSpace(appId) ? CliAppUrlBuilder.BuildStudioApplicationUrl(server, appId) : null,
-            StudioAppUrl = !string.IsNullOrWhiteSpace(appId) ? CliAppUrlBuilder.BuildStudioAppUrl(server, appId) : null,
-            DeployDirectory = deployDirectory,
-            Clean = clean,
-            Checks = checks,
-            NextSteps = nextSteps.ToList(),
-            RuntimeUploaded = uploadResult,
-            Runtime = runtimeResult,
-            HasWarnings = checks.Any(check => !check.Success && check.IsWarning),
-            RuntimeRunning = runtimeResult?.Success == true && runtimeResult.RunnerCount > 0
-        };
-    }
-
-    internal static System.Diagnostics.ProcessStartInfo CreateBuildProcessStartInfo(
-        ApplicationCommandSpec command,
-        string workingDir)
-        => ApplicationBuildExecutor.CreateStartInfo(command, workingDir);
-
     private static async Task<(DeployUploadResult Upload, DeployRuntimeResult Deploy)> DeployPackageAsync(
         string server,
         string apiKey,
@@ -504,28 +478,34 @@ public sealed class DeployService
         var sourceFiles = deployResult.TryGetProperty("sourceFilesDeployed", out var sourceProperty) ? sourceProperty.GetInt32() : 0;
         var runtimeFiles = deployResult.TryGetProperty("runtimeFilesDeployed", out var runtimeProperty) ? runtimeProperty.GetInt32() : 0;
         var success = deployResult.TryGetProperty("success", out var successProperty) && successProperty.GetBoolean();
-        var message = deployResult.TryGetProperty("message", out var messageProperty) ? messageProperty.GetString() : null;
-        if (deployResult.TryGetProperty("actions", out var actionsProperty) && actionsProperty.ValueKind == JsonValueKind.Array)
-        {
-            var actionSummary = string.Join("; ", actionsProperty.EnumerateArray().Select(action =>
-                $"Action {action.GetProperty("actionKey").GetString()}: {action.GetProperty("status").GetString()}"));
-            if (!string.IsNullOrWhiteSpace(actionSummary)) message = string.IsNullOrWhiteSpace(message) ? actionSummary : $"{message} {actionSummary}";
-        }
+        var message = AppendActionSummary(ReadOptionalString(deployResult, "message"), deployResult);
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
         var state = deployResult.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
         var requiresRetry = deployResult.TryGetProperty("requiresRetry", out var requiresRetryProperty) && requiresRetryProperty.GetBoolean();
-        var logs = deployResult.TryGetProperty("logs", out var logsProperty)
-            && logsProperty.ValueKind == JsonValueKind.Array
-            ? logsProperty.EnumerateArray()
-                .Where(log => log.ValueKind == JsonValueKind.String)
-                .Select(log => log.GetString()!)
-                .ToArray()
-            : null;
+        var logs = ReadStringArray(deployResult, "logs");
 
         return (
             new DeployUploadResult(sourceFiles + runtimeFiles, 0, sizeMb),
             new DeployRuntimeResult(success, runnerCount, message, state, requiresRetry, logs));
     }
+
+    private static string? AppendActionSummary(string? message, JsonElement result)
+    {
+        if (!result.TryGetProperty("actions", out var actions) || actions.ValueKind != JsonValueKind.Array) return message;
+        var summary = string.Join("; ", actions.EnumerateArray().Select(action =>
+            $"Action {action.GetProperty("actionKey").GetString()}: {action.GetProperty("status").GetString()}"));
+        if (string.IsNullOrWhiteSpace(summary)) return message;
+        return string.IsNullOrWhiteSpace(message) ? summary : $"{message} {summary}";
+    }
+
+    private static string? ReadOptionalString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var property) ? property.GetString() : null;
+
+    private static string[]? ReadStringArray(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Array
+            ? property.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString()!).ToArray()
+            : null;
 
     private static async Task<JsonElement> EnsureManagedRuntimeReadyAsync(
         string server,
@@ -664,5 +644,58 @@ public sealed class DeployService
         }
 
         return (false, message ?? "Skipped restore point creation because no source changes were detected.");
+    }
+}
+
+internal static class DeployResultFactory
+{
+    public static DeployResult Create(
+        bool success,
+        IReadOnlyList<DeployCheckResult> checks,
+        IEnumerable<string> nextSteps,
+        AutomatonConfig? projectConfig,
+        string? appId,
+        string? server,
+        bool clean,
+        string? deployDirectory,
+        DeployUploadResult? uploadResult,
+        DeployRuntimeResult? runtimeResult,
+        DeploymentTargetInfo? target = null)
+    {
+        var hasWarnings = checks.Any(check => !check.Success && check.IsWarning);
+        return new DeployResult
+        {
+            Success = success,
+            Summary = !success ? "Deploy failed" : hasWarnings ? "Deploy complete with warnings" : "Deploy complete",
+            AppId = appId,
+            AppName = projectConfig?.Name,
+            TargetSlug = target?.Slug,
+            TargetName = target?.Name,
+            RunnerName = target?.Runner?.Name,
+            DeploymentMode = target is null || target.IsDefault ? "default" : "named",
+            OpenAppUrl = string.IsNullOrWhiteSpace(appId) ? null : CliAppUrlBuilder.BuildStudioApplicationUrl(server, appId),
+            StudioAppUrl = string.IsNullOrWhiteSpace(appId) ? null : CliAppUrlBuilder.BuildStudioAppUrl(server, appId),
+            DeployDirectory = deployDirectory,
+            Clean = clean,
+            Checks = checks,
+            NextSteps = nextSteps.ToList(),
+            RuntimeUploaded = uploadResult,
+            Runtime = runtimeResult,
+            HasWarnings = hasWarnings,
+            RuntimeRunning = runtimeResult?.Success == true && runtimeResult.RunnerCount > 0
+        };
+    }
+}
+
+internal static class DeploymentApplicationResolver
+{
+    public static ApplicationContract Resolve(ApplicationContract application, string? directoryOverride)
+    {
+        if (string.IsNullOrWhiteSpace(directoryOverride)) return application;
+        var copy = JsonSerializer.Deserialize<ApplicationContract>(JsonSerializer.Serialize(application))
+            ?? throw new InvalidOperationException("The application contract could not be copied for deployment.");
+        copy.Build.OutputDirectory = directoryOverride;
+        ApplicationContractValidator.EnsureValid(copy);
+        return copy;
     }
 }

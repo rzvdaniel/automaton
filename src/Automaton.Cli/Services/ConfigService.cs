@@ -349,25 +349,10 @@ public class ConfigService
         var local = LoadProjectLocalConfig(cwd);
         var global = LoadGlobalConfig();
         var resolvedEnvironmentName = ResolveEnvironmentName(cwd, environmentName);
-        var namedEnvironment = resolvedEnvironmentName == null
-            ? new GlobalConfig()
-            : LoadNamedEnvironmentConfig(cwd, resolvedEnvironmentName)
-                ?? (allowMissingEnvironment
-                    ? new GlobalConfig()
-                    : throw new InvalidOperationException(CreateMissingEnvironmentMessage(cwd, resolvedEnvironmentName)));
+        var namedEnvironment = LoadContextEnvironment(cwd, resolvedEnvironmentName, allowMissingEnvironment);
         var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-
-        var credentialSource = !string.IsNullOrWhiteSpace(envApiKey)
-            ? CliCredentialSource.EnvironmentVariable
-            : !string.IsNullOrWhiteSpace(namedEnvironment.ApiKey)
-                ? CliCredentialSource.NamedEnvironment
-                : !string.IsNullOrWhiteSpace(local.ApiKey)
-                    ? CliCredentialSource.ProjectLocal
-                    : !string.IsNullOrWhiteSpace(global.ApiKey)
-                        ? CliCredentialSource.Global
-                        : CliCredentialSource.None;
-
+        var credentialSource = ResolveCredentialSource(envApiKey, namedEnvironment, local, global);
         var selectedConfig = credentialSource switch
         {
             CliCredentialSource.NamedEnvironment => namedEnvironment,
@@ -376,25 +361,50 @@ public class ConfigService
             _ => null
         };
 
-        var server = envServer
-            ?? namedEnvironment.Server
-            ?? local.Server
-            ?? global.Server;
-        var apiKey = envApiKey
-            ?? namedEnvironment.ApiKey
-            ?? local.ApiKey
-            ?? global.ApiKey;
-
         return new ResolvedCliContext
         {
             EnvironmentName = resolvedEnvironmentName,
-            Server = server?.TrimEnd('/'),
-            ApiKey = apiKey,
+            Server = ResolveServer(envServer, namedEnvironment, local, global)?.TrimEnd('/'),
+            ApiKey = ResolveApiKey(envApiKey, namedEnvironment, local, global),
             AppId = namedEnvironment.AppId?.Trim(),
             CredentialSource = credentialSource,
             PendingAuthorizationCompletion = selectedConfig?.PendingAuthorizationCompletion
         };
     }
+
+    private GlobalConfig LoadContextEnvironment(string directory, string? environmentName, bool allowMissingEnvironment)
+    {
+        if (environmentName is null)
+        {
+            return new GlobalConfig();
+        }
+
+        var environment = LoadNamedEnvironmentConfig(directory, environmentName);
+        if (environment is not null || allowMissingEnvironment)
+        {
+            return environment ?? new GlobalConfig();
+        }
+
+        throw new InvalidOperationException(CreateMissingEnvironmentMessage(directory, environmentName));
+    }
+
+    private static CliCredentialSource ResolveCredentialSource(
+        string? environmentApiKey,
+        GlobalConfig namedEnvironment,
+        GlobalConfig local,
+        GlobalConfig global)
+    {
+        if (!string.IsNullOrWhiteSpace(environmentApiKey)) return CliCredentialSource.EnvironmentVariable;
+        if (!string.IsNullOrWhiteSpace(namedEnvironment.ApiKey)) return CliCredentialSource.NamedEnvironment;
+        if (!string.IsNullOrWhiteSpace(local.ApiKey)) return CliCredentialSource.ProjectLocal;
+        return !string.IsNullOrWhiteSpace(global.ApiKey) ? CliCredentialSource.Global : CliCredentialSource.None;
+    }
+
+    private static string? ResolveServer(string? environmentServer, GlobalConfig namedEnvironment, GlobalConfig local, GlobalConfig global) =>
+        environmentServer ?? namedEnvironment.Server ?? local.Server ?? global.Server;
+
+    private static string? ResolveApiKey(string? environmentApiKey, GlobalConfig namedEnvironment, GlobalConfig local, GlobalConfig global) =>
+        environmentApiKey ?? namedEnvironment.ApiKey ?? local.ApiKey ?? global.ApiKey;
 
     public (string? server, string? apiKey) ResolveCredentials(
         AutomatonConfig? projectConfig = null,

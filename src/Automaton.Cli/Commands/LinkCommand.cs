@@ -23,59 +23,77 @@ public static class LinkCommand
             environmentOption
         };
 
-        cmd.SetHandler(async (string? appId, bool asJson, string? environmentName) =>
-        {
-            var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(
-                directory: cwd,
-                environmentName: environmentName,
-                allowMissingEnvironment: true);
-
-            var resolvedAppId = appId;
-            if (!asJson && string.IsNullOrWhiteSpace(resolvedAppId))
-            {
-                Console.Write("App ID: ");
-                resolvedAppId = Console.ReadLine()?.Trim();
-            }
-
-            var linkService = new LinkAppService(config);
-            var result = await linkService.LinkAsync(cwd, resolvedAppId, server, apiKey, environmentName);
-
-            if (asJson)
-            {
-                CliJson.Write(new
-                {
-                    success = result.Success,
-                    summary = result.Summary,
-                    checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                    nextSteps = result.NextSteps,
-                    appId = result.AppId,
-                    name = result.Name,
-                    server = result.Server,
-                    configPath = result.ConfigPath
-                });
-                Environment.ExitCode = result.Success ? 0 : 1;
-                return;
-            }
-
-            if (!result.Success)
-            {
-                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
-                {
-                    Success = result.Success,
-                    Summary = result.Summary,
-                    Checks = result.Checks,
-                    NextSteps = result.NextSteps
-                });
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{result.Name}[/] ({result.AppId})");
-            AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
-            Environment.ExitCode = 0;
-        }, appIdArgument, jsonOption, environmentOption);
+        cmd.SetHandler(
+            (string? appId, bool asJson, string? environmentName) =>
+                HandleLinkAsync(config, appId, asJson, environmentName),
+            appIdArgument,
+            jsonOption,
+            environmentOption);
 
         return cmd;
+    }
+
+    private static async Task HandleLinkAsync(
+        ConfigService config,
+        string? appId,
+        bool asJson,
+        string? environmentName)
+    {
+        var cwd = Directory.GetCurrentDirectory();
+        var (server, apiKey) = config.ResolveCredentials(
+            directory: cwd,
+            environmentName: environmentName,
+            allowMissingEnvironment: true);
+        var resolvedAppId = ResolveAppId(appId, asJson);
+        var result = await new LinkAppService(config).LinkAsync(
+            cwd, resolvedAppId, server, apiKey, environmentName);
+
+        WriteResult(result, asJson);
+    }
+
+    private static string? ResolveAppId(string? appId, bool asJson)
+    {
+        if (asJson || !string.IsNullOrWhiteSpace(appId))
+            return appId;
+
+        Console.Write("App ID: ");
+        return Console.ReadLine()?.Trim();
+    }
+
+    private static void WriteResult(LinkAppResult result, bool asJson)
+    {
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = result.Success,
+                summary = result.Summary,
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = result.NextSteps,
+                appId = result.AppId,
+                name = result.Name,
+                server = result.Server,
+                configPath = result.ConfigPath
+            });
+            Environment.ExitCode = result.Success ? 0 : 1;
+            return;
+        }
+
+        if (!result.Success)
+        {
+            CliDiagnosticsWriter.Write(new CommandDiagnosticResult
+            {
+                Success = result.Success,
+                Summary = result.Summary,
+                Checks = result.Checks,
+                NextSteps = result.NextSteps
+            });
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Linked app [bold]{result.Name}[/] ({result.AppId})");
+        AnsiConsole.MarkupLine("[grey]Existing local source was not modified. Run 'automaton deploy' to deploy it.[/]");
+        Environment.ExitCode = 0;
     }
 }

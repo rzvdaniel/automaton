@@ -18,7 +18,6 @@ namespace Automaton.Cli.Commands;
 /// </summary>
 public static class PullCommand
 {
-    private const int OverwritePreviewCount = 10;
     internal sealed record SourceDownload(string RemotePath, string LocalPath);
 
     public static Command Build(ConfigService config)
@@ -86,20 +85,20 @@ public static class PullCommand
         var (server, apiKey) = config.RequireCredentials(appConfig, cwd, environmentName);
         var targetDir = dir ?? config.FindNearestProjectRoot(cwd) ?? cwd;
 
-        WriteStart(nonInteractive, appConfig.Name, targetDir);
+        PullCommandOutput.WriteStart(nonInteractive, appConfig.Name, targetDir);
 
         using var client = new AutomatonApiClient(server, apiKey);
         var sourceFiles = await ListSourceFilesAsync(client, resolved.AppId);
 
         if (sourceFiles.Count == 0)
         {
-            WriteNoFiles(nonInteractive);
+            PullCommandOutput.WriteNoFiles(nonInteractive);
             return;
         }
 
         var downloads = PrepareDownloads(sourceFiles, targetDir);
-        var overwritePaths = GetOverwritePaths(downloads);
-        EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
+        var overwritePaths = PullOverwritePolicy.GetOverwritePaths(downloads);
+        PullOverwritePolicy.EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
 
         await StageAndCommitRefreshAsync(
             targetDir,
@@ -107,114 +106,11 @@ public static class PullCommand
             remotePath => client.ReadScopedFileAsync(resolved.AppId, "source", remotePath),
             nonInteractive);
 
-        WritePulledApp(nonInteractive, appConfig.Name, resolved.AppId, targetDir);
+        PullCommandOutput.WritePulledApp(nonInteractive, appConfig.Name, resolved.AppId, targetDir);
     }
 
-    private static async Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive, string? environmentName)
-    {
-        var (server, apiKey) = config.RequireCredentials(
-            directory: cwd,
-            environmentName: environmentName,
-            allowMissingEnvironment: true);
-        using var client = new AutomatonApiClient(server, apiKey);
-
-        var app = await ResolveAppAsync(client, appIdentifier);
-        var appId = GetRequiredString(app, "id");
-        var appName = GetRequiredString(app, "name");
-        var application = ReadApplicationContract(app);
-        var slug = TryReadString(app, "publicUrl");
-        var folderName = SanitizeDirectoryName(slug ?? appName);
-        var targetDir = dir ?? Path.Combine(cwd, folderName);
-
-        if (Directory.Exists(targetDir) && Directory.EnumerateFileSystemEntries(targetDir).Any())
-        {
-            throw new InvalidOperationException($"Target directory already exists and is not empty: {targetDir}");
-        }
-
-        var sourceFiles = await ListSourceFilesAsync(client, appId);
-        if (sourceFiles.Count == 0)
-        {
-            throw new InvalidOperationException("This app does not have portable source files to pull. Runtime artifact fallback is not enabled.");
-        }
-
-        var downloads = PrepareDownloads(sourceFiles, targetDir);
-        WriteStart(nonInteractive, appName, targetDir);
-
-        var targetExisted = Directory.Exists(targetDir);
-        var stagingDirectory = CreateStagingDirectory(targetDir);
-        try
-        {
-            var stagedDownloads = downloads
-                .Select(download => download with
-                {
-                    LocalPath = Path.Combine(stagingDirectory, Path.GetRelativePath(targetDir, download.LocalPath))
-                })
-                .ToList();
-
-            await DownloadFilesAsync(client, appId, stagedDownloads, nonInteractive);
-
-            var pulledConfig = config.TryLoadProjectConfig(stagingDirectory);
-            if (pulledConfig == null)
-            {
-                pulledConfig = new AutomatonConfig
-                {
-                    Name = appName,
-                    Slug = slug,
-                    Application = application
-                };
-            }
-            else
-            {
-                pulledConfig.Name = appName;
-                pulledConfig.Slug = slug;
-                pulledConfig.Application = application;
-            }
-
-            config.SaveProjectConfig(stagingDirectory, pulledConfig);
-            var selectedEnvironmentName = config.ResolveAppBindingEnvironmentName(cwd, environmentName);
-            var environment = config.LoadNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName) ?? new GlobalConfig();
-            environment.Server = server;
-            environment.AppId = appId;
-            config.SaveNamedEnvironmentConfig(stagingDirectory, selectedEnvironmentName, environment);
-            config.SaveProjectEnvironmentSelection(
-                stagingDirectory,
-                new ProjectEnvironmentSelection { Default = selectedEnvironmentName });
-
-            string? guidanceWarning = null;
-            AiGuidanceSyncResult? guidance = null;
-            try
-            {
-                var guidanceReferences = await client.GetAiGuidanceExportAsync();
-                guidance = new AiGuidancePackService().Sync(stagingDirectory, guidanceReferences);
-            }
-            catch (Exception ex)
-            {
-                guidanceWarning = $"Latest AI guidance unavailable: {ex.Message}";
-            }
-
-            CommitStagedProject(stagingDirectory, targetDir, targetExisted);
-
-            WritePulledApp(nonInteractive, appName, appId, targetDir);
-            if (guidance is not null)
-            {
-                if (nonInteractive) Console.WriteLine($"Local AI guidance synced ({guidance.Mode}).");
-                else AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
-            }
-            else if (!string.IsNullOrWhiteSpace(guidanceWarning))
-            {
-                if (nonInteractive) Console.WriteLine($"Warning: {guidanceWarning}");
-                else AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
-            }
-        }
-        finally
-        {
-            if (Directory.Exists(stagingDirectory))
-            {
-                Directory.Delete(stagingDirectory, recursive: true);
-            }
-        }
-    }
-
+    private static Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive, string? environmentName)
+        => PullNewProjectWorkflow.PullAsync(config, cwd, appIdentifier, dir, nonInteractive, environmentName);
     internal static string CreateStagingDirectory(string targetDirectory)
     {
         var fullTargetDirectory = Path.GetFullPath(targetDirectory);
@@ -254,85 +150,11 @@ public static class PullCommand
         string stagingDirectory,
         string targetDirectory,
         IReadOnlyList<SourceDownload> downloads)
-    {
-        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
-        var backupDirectory = stagingDirectory + ".rollback";
-        var changedFiles = new List<(string Target, string? Backup)>();
-        var preserveBackups = false;
-
-        try
-        {
-            foreach (var download in downloads)
-            {
-                var relativePath = Path.GetRelativePath(fullTargetDirectory, download.LocalPath);
-                var stagedPath = ResolveTargetPath(stagingDirectory, relativePath);
-                if (!File.Exists(stagedPath))
-                {
-                    throw new InvalidOperationException($"Staged pull file is missing: {download.RemotePath}");
-                }
-
-                EnsureNoReparsePoints(download.LocalPath);
-                Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
-
-                string? backupPath = null;
-                if (File.Exists(download.LocalPath))
-                {
-                    backupPath = ResolveTargetPath(backupDirectory, relativePath);
-                    Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
-                    File.Copy(download.LocalPath, backupPath);
-                }
-
-                changedFiles.Add((download.LocalPath, backupPath));
-                File.Move(stagedPath, download.LocalPath, overwrite: true);
-            }
-        }
-        catch (Exception commitError)
-        {
-            Exception? rollbackError = null;
-            foreach (var changedFile in changedFiles.AsEnumerable().Reverse())
-            {
-                try
-                {
-                    if (changedFile.Backup is null)
-                    {
-                        if (File.Exists(changedFile.Target))
-                        {
-                            File.Delete(changedFile.Target);
-                        }
-                    }
-                    else
-                    {
-                        File.Copy(changedFile.Backup, changedFile.Target, overwrite: true);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    rollbackError ??= ex;
-                }
-            }
-
-            if (rollbackError is not null)
-            {
-                preserveBackups = true;
-                throw new InvalidOperationException(
-                    $"Pull could not finish and local rollback also failed: {rollbackError.Message}. Recovery copies are in '{backupDirectory}'.",
-                    commitError);
-            }
-
-            throw;
-        }
-        finally
-        {
-            if (!preserveBackups && Directory.Exists(backupDirectory))
-            {
-                Directory.Delete(backupDirectory, recursive: true);
-            }
-        }
-    }
+        => PullRefreshCommitter.Commit(stagingDirectory, targetDirectory, downloads, ResolveTargetPath, EnsureNoReparsePoints);
 
     internal static async Task StageAndCommitRefreshAsync(
         string targetDirectory,
-        IReadOnlyList<SourceDownload> downloads,
+        IReadOnlyList<PullCommand.SourceDownload> downloads,
         Func<string, Task<string>> readFile,
         bool nonInteractive)
     {
@@ -360,7 +182,7 @@ public static class PullCommand
         }
     }
 
-    private static ApplicationContract ReadApplicationContract(JsonElement app)
+    internal static ApplicationContract ReadApplicationContract(JsonElement app)
     {
         if (!app.TryGetProperty("application", out var application)
             || application.ValueKind != JsonValueKind.Object)
@@ -372,7 +194,7 @@ public static class PullCommand
         return ApplicationContractSerialization.Deserialize(application.GetRawText());
     }
 
-    private static async Task<List<string>> ListSourceFilesAsync(AutomatonApiClient client, string appId)
+    internal static async Task<List<string>> ListSourceFilesAsync(AutomatonApiClient client, string appId)
     {
         var filesResult = await client.ListScopedFilesAsync(appId, "source");
         var files = new List<string>();
@@ -412,10 +234,10 @@ public static class PullCommand
             .ToList();
     }
 
-    private static async Task DownloadFilesAsync(
+    internal static async Task DownloadFilesAsync(
         AutomatonApiClient client,
         string appId,
-        IReadOnlyList<SourceDownload> downloads,
+        IReadOnlyList<PullCommand.SourceDownload> downloads,
         bool nonInteractive)
     {
         await DownloadFilesAsync(
@@ -463,95 +285,6 @@ public static class PullCommand
         var content = await readFile(download.RemotePath);
         Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
         await File.WriteAllTextAsync(download.LocalPath, content, Encoding.UTF8);
-    }
-
-    private static List<string> GetOverwritePaths(IEnumerable<SourceDownload> downloads)
-    {
-        var overwritePaths = new List<string>();
-
-        foreach (var download in downloads)
-        {
-            if (File.Exists(download.LocalPath))
-            {
-                overwritePaths.Add(download.RemotePath);
-            }
-        }
-
-        return overwritePaths;
-    }
-
-    private static void EnsureOverwriteApproved(IReadOnlyList<string> overwritePaths, bool force, bool nonInteractive)
-    {
-        if (overwritePaths.Count == 0)
-        {
-            return;
-        }
-
-        if (force)
-        {
-            WriteOverwriteNotice(overwritePaths, nonInteractive, forced: true);
-            return;
-        }
-
-        if (nonInteractive)
-        {
-            throw new InvalidOperationException(BuildNonInteractiveOverwriteError(overwritePaths));
-        }
-
-        WriteOverwriteNotice(overwritePaths, nonInteractive, forced: false);
-        Console.Write("Continue? [y/N] ");
-        var confirmation = Console.ReadLine()?.Trim();
-        if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new OperationCanceledException("Pull cancelled.");
-        }
-    }
-
-    private static void WriteOverwriteNotice(IReadOnlyList<string> overwritePaths, bool nonInteractive, bool forced)
-    {
-        var message = BuildOverwriteMessage(overwritePaths, forced);
-
-        if (nonInteractive)
-        {
-            Console.WriteLine(message);
-            return;
-        }
-
-        foreach (var line in message.Split(Environment.NewLine))
-        {
-            AnsiConsole.MarkupLine(Markup.Escape(line));
-        }
-    }
-
-    private static string BuildNonInteractiveOverwriteError(IReadOnlyList<string> overwritePaths)
-    {
-        var preview = BuildOverwritePreview(overwritePaths);
-        return $"Pull would overwrite {overwritePaths.Count} existing local file(s). Re-run with --force to continue.{Environment.NewLine}{preview}";
-    }
-
-    private static string BuildOverwriteMessage(IReadOnlyList<string> overwritePaths, bool forced)
-    {
-        var intro = forced
-            ? $"Warning: --force enabled. Pull will overwrite {overwritePaths.Count} existing local file(s) from the remote app."
-            : $"Warning: pull will overwrite {overwritePaths.Count} existing local file(s) from the remote app.";
-
-        return $"{intro}{Environment.NewLine}{BuildOverwritePreview(overwritePaths)}{Environment.NewLine}Local-only files will be kept.";
-    }
-
-    private static string BuildOverwritePreview(IReadOnlyList<string> overwritePaths)
-    {
-        var lines = overwritePaths
-            .Take(OverwritePreviewCount)
-            .Select(path => $"  {path}")
-            .ToList();
-
-        if (overwritePaths.Count > OverwritePreviewCount)
-        {
-            lines.Add($"  ... and {overwritePaths.Count - OverwritePreviewCount} more");
-        }
-
-        return string.Join(Environment.NewLine, lines);
     }
 
     internal static async Task<JsonElement> ResolveAppAsync(AutomatonApiClient client, string appIdentifier)
@@ -613,7 +346,7 @@ public static class PullCommand
         return downloads;
     }
 
-    private static void EnsureNoReparsePoints(string path)
+    internal static void EnsureNoReparsePoints(string path)
     {
         var current = Path.GetFullPath(path);
         while (!string.IsNullOrEmpty(current))
@@ -638,7 +371,7 @@ public static class PullCommand
         }
     }
 
-    private static string SanitizeDirectoryName(string value)
+    internal static string SanitizeDirectoryName(string value)
     {
         var sanitized = Regex.Replace(value.Trim(), @"[^\w\- ]+", string.Empty)
             .Trim()
@@ -647,7 +380,7 @@ public static class PullCommand
         return string.IsNullOrWhiteSpace(sanitized) ? "automaton-app" : sanitized;
     }
 
-    private static string GetRequiredString(JsonElement element, string propertyName)
+    internal static string GetRequiredString(JsonElement element, string propertyName)
     {
         var value = TryReadString(element, propertyName);
         if (string.IsNullOrWhiteSpace(value))
@@ -658,51 +391,116 @@ public static class PullCommand
         return value;
     }
 
-    private static string? TryReadString(JsonElement element, string propertyName)
+    internal static string? TryReadString(JsonElement element, string propertyName)
     {
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
     }
 
-    private static void WriteStart(bool nonInteractive, string appName, string targetDir)
+
+}
+
+internal static class PullRefreshCommitter
+{
+    public static void Commit(
+        string stagingDirectory,
+        string targetDirectory,
+        IReadOnlyList<PullCommand.SourceDownload> downloads,
+        Func<string, string, string> resolveTargetPath,
+        Action<string> ensureNoReparsePoints)
     {
-        if (nonInteractive)
+        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+        var backupDirectory = stagingDirectory + ".rollback";
+        var changedFiles = new List<(string Target, string? Backup)>();
+        var preserveBackups = false;
+        try
         {
-            Console.WriteLine($"Pulling {appName} -> {targetDir}");
+            foreach (var download in downloads)
+            {
+                CommitDownload(stagingDirectory, backupDirectory, fullTargetDirectory, download,
+                    changedFiles, resolveTargetPath, ensureNoReparsePoints);
+            }
         }
-        else
+        catch (Exception commitError)
         {
-            AnsiConsole.MarkupLine($"[bold]Pulling[/] [cyan]{Markup.Escape(appName)}[/] → {Markup.Escape(targetDir)}");
+            var rollbackError = RollbackChangedFiles(changedFiles);
+            if (rollbackError is not null)
+            {
+                preserveBackups = true;
+                throw CreateRollbackFailure(rollbackError, backupDirectory, commitError);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (!preserveBackups && Directory.Exists(backupDirectory))
+            {
+                Directory.Delete(backupDirectory, recursive: true);
+            }
         }
     }
 
-    private static void WriteNoFiles(bool nonInteractive)
+    private static void CommitDownload(
+        string stagingDirectory,
+        string backupDirectory,
+        string targetDirectory,
+        PullCommand.SourceDownload download,
+        ICollection<(string Target, string? Backup)> changedFiles,
+        Func<string, string, string> resolveTargetPath,
+        Action<string> ensureNoReparsePoints)
     {
-        if (nonInteractive)
-        {
-            Console.WriteLine("No source files found on the server.");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine("[yellow]No source files found on the server.[/]");
-        }
+        var relativePath = Path.GetRelativePath(targetDirectory, download.LocalPath);
+        var stagedPath = resolveTargetPath(stagingDirectory, relativePath);
+        if (!File.Exists(stagedPath)) throw new InvalidOperationException($"Staged pull file is missing: {download.RemotePath}");
+        ensureNoReparsePoints(download.LocalPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
+        var backupPath = BackupExistingFile(backupDirectory, relativePath, download.LocalPath, resolveTargetPath);
+        changedFiles.Add((download.LocalPath, backupPath));
+        File.Move(stagedPath, download.LocalPath, overwrite: true);
     }
 
-    private static void WritePulledApp(bool nonInteractive, string appName, string appId, string targetDirectory)
+    private static string? BackupExistingFile(
+        string backupDirectory,
+        string relativePath,
+        string targetPath,
+        Func<string, string, string> resolveTargetPath)
     {
-        if (nonInteractive)
+        if (!File.Exists(targetPath)) return null;
+        var backupPath = resolveTargetPath(backupDirectory, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
+        File.Copy(targetPath, backupPath);
+        return backupPath;
+    }
+
+    private static Exception? RollbackChangedFiles(IEnumerable<(string Target, string? Backup)> changedFiles)
+    {
+        Exception? rollbackError = null;
+        foreach (var changedFile in changedFiles.Reverse())
         {
-            Console.WriteLine($"Pulled app: {appName}");
-            Console.WriteLine($"App ID: {appId}");
-            Console.WriteLine($"Local project: {targetDirectory}");
-            Console.WriteLine("Edit locally, then run 'automaton deploy'.");
+            try { RestoreChangedFile(changedFile); }
+            catch (Exception exception) { rollbackError ??= exception; }
+        }
+
+        return rollbackError;
+    }
+
+    private static void RestoreChangedFile((string Target, string? Backup) changedFile)
+    {
+        if (changedFile.Backup is not null)
+        {
+            File.Copy(changedFile.Backup, changedFile.Target, overwrite: true);
             return;
         }
 
-        AnsiConsole.MarkupLine($"[green]✓[/] Pulled app [bold]{Markup.Escape(appName)}[/]");
-        AnsiConsole.MarkupLine($"[grey]App ID:[/] {Markup.Escape(appId)}");
-        AnsiConsole.MarkupLine($"[grey]Local project:[/] {Markup.Escape(targetDirectory)}");
-        AnsiConsole.MarkupLine("[grey]Edit locally, then run 'automaton deploy'.[/]");
+        if (File.Exists(changedFile.Target)) File.Delete(changedFile.Target);
     }
+
+    private static InvalidOperationException CreateRollbackFailure(
+        Exception rollbackError,
+        string backupDirectory,
+        Exception commitError) =>
+        new($"Pull could not finish and local rollback also failed: {rollbackError.Message}. Recovery copies are in '{backupDirectory}'.",
+            commitError);
 }
