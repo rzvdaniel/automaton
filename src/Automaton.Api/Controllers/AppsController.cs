@@ -585,77 +585,25 @@ public class AppsController : BaseController
             }
 
             if (file == null || file.Length == 0)
-            {
                 return BadRequest(new { message = "No file provided" });
-            }
 
             if ((app.Screenshots?.Count ?? 0) >= 8)
             {
                 return BadRequest(new { message = "You can upload up to 8 screenshots per app" });
             }
 
-            const long maxFileSize = 2 * 1024 * 1024;
-            if (file.Length > maxFileSize)
-            {
-                logger.LogWarning("[AppsController] Screenshot file size exceeds limit for app {AppId}: {Size} bytes", id, file.Length);
-                return BadRequest(new { message = "File size exceeds 2MB limit" });
-            }
+            var validationFailure = ValidateScreenshotUpload(id, file, out var fileExtension);
+            if (validationFailure != null) return validationFailure;
 
-            var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var storedScreenshot = await StoreScreenshotFileAsync(id, file, fileExtension);
+            if (storedScreenshot.ErrorMessage != null)
+                return BadRequest(new { message = storedScreenshot.ErrorMessage });
 
-            if (!allowedMimeTypes.Contains(file.ContentType))
-            {
-                logger.LogWarning("[AppsController] Invalid screenshot MIME type for app {AppId}: {MimeType}", id, file.ContentType);
-                return BadRequest(new { message = "Invalid file type. Only image files are allowed." });
-            }
-
-            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!allowedExtensions.Contains(fileExtension))
-            {
-                logger.LogWarning("[AppsController] Invalid screenshot extension for app {AppId}: {Extension}", id, fileExtension);
-                return BadRequest(new { message = "Invalid file extension. Only .jpg, .png, .gif, and .webp are allowed." });
-            }
-
-            if (Path.GetFileName(file.FileName) != file.FileName || file.FileName.Contains(".."))
-            {
-                logger.LogWarning("[AppsController] Suspicious screenshot filename detected for app {AppId}: {FileName}", id, file.FileName);
-                return BadRequest(new { message = "Invalid filename" });
-            }
-
-            var screenshotsDir = GetAppMediaDirectory("app-screenshots", id);
-            Directory.CreateDirectory(screenshotsDir);
-
-            var fileName = $"{Guid.NewGuid()}{fileExtension}";
-            var filePath = Path.Combine(screenshotsDir, fileName);
-            var fullPath = Path.GetFullPath(filePath);
-            var fullDirPath = Path.GetFullPath(screenshotsDir);
-
-            if (!fullPath.StartsWith(fullDirPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            {
-                logger.LogError("[AppsController] Screenshot path traversal attempt detected for app {AppId}", id);
-                return BadRequest(new { message = "Invalid file path" });
-            }
-
-            using (var stream = file.OpenReadStream())
-            {
-                if (!IsValidImageFile(stream, fileExtension))
-                {
-                    logger.LogWarning("[AppsController] Screenshot content doesn't match image format for app {AppId}", id);
-                    return BadRequest(new { message = "File content is not a valid image" });
-                }
-
-                stream.Seek(0, SeekOrigin.Begin);
-
-                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await stream.CopyToAsync(fileStream);
-            }
-
-            var imageUrl = $"/app-screenshots/{id}/{fileName}";
+            var imageUrl = $"/app-screenshots/{id}/{storedScreenshot.FileName}";
             var screenshot = await appsService.AddScreenshotAsync(id, imageUrl);
 
             logger.LogDebug("[AppsController] Screenshot uploaded for app {AppId}: {FileName} by user {User}",
-                id, fileName, User.Identity?.Name);
+                id, storedScreenshot.FileName, User.Identity?.Name);
 
             return Ok(screenshot);
         }
@@ -664,6 +612,70 @@ public class AppsController : BaseController
             logger.LogError(ex, "[AppsController] Error uploading screenshot for app {AppId}", id);
             return StatusCode(500, new { message = "Failed to upload screenshot" });
         }
+    }
+
+    private async Task<(string? FileName, string? ErrorMessage)> StoreScreenshotFileAsync(
+        Guid appId,
+        IFormFile file,
+        string fileExtension)
+    {
+        var screenshotsDir = GetAppMediaDirectory("app-screenshots", appId);
+        Directory.CreateDirectory(screenshotsDir);
+        var fileName = $"{Guid.NewGuid()}{fileExtension}";
+        var filePath = Path.Combine(screenshotsDir, fileName);
+        var fullPath = Path.GetFullPath(filePath);
+        var fullDirPath = Path.GetFullPath(screenshotsDir);
+        if (!fullPath.StartsWith(fullDirPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            logger.LogError("[AppsController] Screenshot path traversal attempt detected for app {AppId}", appId);
+            return (null, "Invalid file path");
+        }
+
+        using var stream = file.OpenReadStream();
+        if (!IsValidImageFile(stream, fileExtension))
+        {
+            logger.LogWarning("[AppsController] Screenshot content doesn't match image format for app {AppId}", appId);
+            return (null, "File content is not a valid image");
+        }
+
+        stream.Seek(0, SeekOrigin.Begin);
+        using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await stream.CopyToAsync(fileStream);
+        return (fileName, null);
+    }
+
+    private IActionResult? ValidateScreenshotUpload(Guid appId, IFormFile file, out string fileExtension)
+    {
+        fileExtension = string.Empty;
+        const long maxFileSize = 2 * 1024 * 1024;
+        if (file.Length > maxFileSize)
+        {
+            logger.LogWarning("[AppsController] Screenshot file size exceeds limit for app {AppId}: {Size} bytes", appId, file.Length);
+            return BadRequest(new { message = "File size exceeds 2MB limit" });
+        }
+
+        var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedMimeTypes.Contains(file.ContentType))
+        {
+            logger.LogWarning("[AppsController] Invalid screenshot MIME type for app {AppId}: {MimeType}", appId, file.ContentType);
+            return BadRequest(new { message = "Invalid file type. Only image files are allowed." });
+        }
+
+        fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        if (!allowedExtensions.Contains(fileExtension))
+        {
+            logger.LogWarning("[AppsController] Invalid screenshot extension for app {AppId}: {Extension}", appId, fileExtension);
+            return BadRequest(new { message = "Invalid file extension. Only .jpg, .png, .gif, and .webp are allowed." });
+        }
+
+        if (Path.GetFileName(file.FileName) != file.FileName || file.FileName.Contains(".."))
+        {
+            logger.LogWarning("[AppsController] Suspicious screenshot filename detected for app {AppId}: {FileName}", appId, file.FileName);
+            return BadRequest(new { message = "Invalid filename" });
+        }
+
+        return null;
     }
 
     [HttpDelete("{id}/screenshots/{screenshotId:guid}")]
