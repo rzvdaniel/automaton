@@ -195,44 +195,77 @@ public sealed class ApplicationDeploymentService
         }
         catch (Exception deploymentException)
         {
-            if (!targetStateFinalized)
-            {
-                try
-                {
-                    await deploymentTargetStateService.MarkCompletedAsync(
-                        appId,
-                        target.Id,
-                        success: false,
-                        cancellationToken: CancellationToken.None,
-                        deploymentOperationId: deploymentOperationId,
-                        executionAttemptId: executionAttemptId);
-                }
-                catch (Exception completionException)
-                {
-                    logger.Error(completionException,
-                        "Failed to finalize failed generic deployment for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                        appId, target.Id);
-                }
-            }
-
-            if (pendingRouteApplied && !targetStateFinalized)
-            {
-                try
-                {
-                    await backendRouteConfigService.RefreshAsync(CancellationToken.None);
-                }
-                catch (Exception compensationException)
-                {
-                    logger.Error(compensationException,
-                        "Failed to compensate generic route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                        appId, target.Id);
-                }
-            }
-
-            logger.Error(deploymentException,
-                "Generic package deployment failed for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                appId, target.Id);
+            await HandleDeploymentFailureAsync(
+                appId,
+                target.Id,
+                deploymentOperationId,
+                executionAttemptId,
+                targetStateFinalized,
+                pendingRouteApplied,
+                deploymentException);
             throw;
+        }
+    }
+
+    private async Task HandleDeploymentFailureAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid? deploymentOperationId,
+        Guid? executionAttemptId,
+        bool targetStateFinalized,
+        bool pendingRouteApplied,
+        Exception deploymentException)
+    {
+        if (!targetStateFinalized)
+        {
+            await TryMarkDeploymentFailedAsync(appId, deploymentTargetId, deploymentOperationId, executionAttemptId);
+        }
+
+        if (pendingRouteApplied && !targetStateFinalized)
+        {
+            await TryRestoreRouteAsync(appId, deploymentTargetId);
+        }
+
+        logger.Error(deploymentException,
+            "Generic package deployment failed for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+            appId, deploymentTargetId);
+    }
+
+    private async Task TryMarkDeploymentFailedAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid? deploymentOperationId,
+        Guid? executionAttemptId)
+    {
+        try
+        {
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId,
+                deploymentTargetId,
+                success: false,
+                cancellationToken: CancellationToken.None,
+                deploymentOperationId: deploymentOperationId,
+                executionAttemptId: executionAttemptId);
+        }
+        catch (Exception completionException)
+        {
+            logger.Error(completionException,
+                "Failed to finalize failed generic deployment for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+                appId, deploymentTargetId);
+        }
+    }
+
+    private async Task TryRestoreRouteAsync(Guid appId, Guid deploymentTargetId)
+    {
+        try
+        {
+            await backendRouteConfigService.RefreshAsync(CancellationToken.None);
+        }
+        catch (Exception compensationException)
+        {
+            logger.Error(compensationException,
+                "Failed to compensate generic route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+                appId, deploymentTargetId);
         }
     }
 
