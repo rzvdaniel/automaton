@@ -435,45 +435,16 @@ public class RunnerService
             RunnerSessionDisconnectReasons.SupersededConnection,
             cancellationToken);
 
-        runner.ConnectionId = runnerConnection.ConnectionId;
-        runner.LastConnectedAtUtc = now;
-        runner.LastHeartbeatAtUtc = now;
-        runner.Status = RunnerConnectivityStatuses.Online;
-        runner.Version = runnerConnection.Version;
-        runner.MachineName = runnerConnection.MachineName;
-        runner.IpAddress = runnerConnection.IpAddress;
-        runner.ApiInstanceId = runnerConnection.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
-        runner.ApiColor = runnerConnection.ApiColor ?? apiInstanceIdentityService.ApiColor;
-        ApplyInstallationReport(runner, runnerConnection);
+        ApplyConnectionDetails(runner, runnerConnection, now);
 
         // Mark entity as modified
         dbContext.Entry(runner).State = EntityState.Modified;
-
-        // Update runner entity
         dbContext.Update(runner);
-
-        // Save changes
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        dbContext.RunnerConnectionSessions.Add(new RunnerConnectionSession
-        {
-            Id = Guid.NewGuid(),
-            RunnerId = runner.Id,
-            ConnectionId = runnerConnection.ConnectionId!,
-            ConnectedAtUtc = now,
-            ApiInstanceId = runner.ApiInstanceId,
-            ApiColor = runner.ApiColor
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await RecordRunnerConnectionSessionAsync(runner, runnerConnection.ConnectionId!, now, cancellationToken);
 
-        var completedHostedRunnerAction = LinkHostedRunnerAfterReconnect(runner, userId, runnerConnection.HostedRunnerId);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteHostedRunnerRegistrationCompletionAuditAsync(completedHostedRunnerAction, runner, cancellationToken);
-        await managedRunnerAppAssignmentService.ReconcileHostedRunnerIdentityAsync(userId, runner.Id, cancellationToken);
-        if (RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(runner.Purpose, runner.ApplicationProfile))
-        {
-            await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
-        }
+        await CompleteHostedRunnerReconnectAsync(runner, userId, runnerConnection.HostedRunnerId, cancellationToken);
 
         await WriteRunnerApplicationEventsAsync(
             runner.Id,
@@ -490,6 +461,54 @@ public class RunnerService
             },
             userId,
             cancellationToken);
+    }
+
+    private void ApplyConnectionDetails(Runner runner, RunnerDetails connection, DateTime now)
+    {
+        runner.ConnectionId = connection.ConnectionId;
+        runner.LastConnectedAtUtc = now;
+        runner.LastHeartbeatAtUtc = now;
+        runner.Status = RunnerConnectivityStatuses.Online;
+        runner.Version = connection.Version;
+        runner.MachineName = connection.MachineName;
+        runner.IpAddress = connection.IpAddress;
+        runner.ApiInstanceId = connection.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
+        runner.ApiColor = connection.ApiColor ?? apiInstanceIdentityService.ApiColor;
+        ApplyInstallationReport(runner, connection);
+    }
+
+    private async Task RecordRunnerConnectionSessionAsync(
+        Runner runner,
+        string connectionId,
+        DateTime connectedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        dbContext.RunnerConnectionSessions.Add(new RunnerConnectionSession
+        {
+            Id = Guid.NewGuid(),
+            RunnerId = runner.Id,
+            ConnectionId = connectionId,
+            ConnectedAtUtc = connectedAtUtc,
+            ApiInstanceId = runner.ApiInstanceId,
+            ApiColor = runner.ApiColor
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task CompleteHostedRunnerReconnectAsync(
+        Runner runner,
+        Guid userId,
+        Guid? hostedRunnerId,
+        CancellationToken cancellationToken)
+    {
+        var completedHostedRunnerAction = LinkHostedRunnerAfterReconnect(runner, userId, hostedRunnerId);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteHostedRunnerRegistrationCompletionAuditAsync(completedHostedRunnerAction, runner, cancellationToken);
+        await managedRunnerAppAssignmentService.ReconcileHostedRunnerIdentityAsync(userId, runner.Id, cancellationToken);
+        if (RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(runner.Purpose, runner.ApplicationProfile))
+        {
+            await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
+        }
     }
 
     public async Task RecordHeartbeatAsync(Guid runnerId, Guid userId, RunnerDetails runnerHeartbeat, CancellationToken cancellationToken)
