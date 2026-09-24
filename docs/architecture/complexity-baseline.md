@@ -1,23 +1,21 @@
-# Complexity and coupling gate
+# Complexity and coupling cleanup backlog
 
-The all-project analyzer gate builds every tracked C# project under `src/`, including tests and runtime fixtures. It records SARIF per project and checks `S3776` (cognitive complexity), `CA1502` (cyclomatic complexity), and `CA1506` (type/method coupling).
+The Sonar and .NET analyzers run during normal C# builds. `CA1502` (cyclomatic complexity), `CA1506` (coupling), and `S3776` (cognitive complexity) are errors. The error diagnostics are the source of truth for developers and coding agents; no external service or checked-in exception baseline is used.
 
-## Reviewed starting baseline
+## Initial inventory
 
-Recorded on 2026-09-23 from `main` commit `39ff68887f09bf3086130b039fe538b763417fc0`, using .NET SDK `9.0.318`, compiler `4.14.0`, and the pinned `SonarAnalyzer.CSharp` package `10.34.0.3385`. The scan covered all 22 tracked `.csproj` files, including four fixtures/projects outside `Automaton.All.sln`.
+The initial inventory was recorded on 2026-09-23 from `main` commit `39ff68887f09bf3086130b039fe538b763417fc0`, using .NET SDK `9.0.318`, compiler `4.14.0`, and `SonarAnalyzer.CSharp` `10.34.0.3385`. It covered all 22 tracked C# projects under `src/`, including test projects and fixtures. Since that scan, the Runner runtime fixture cleanup resolved three findings; the remaining historical work is being handled in reviewable batches.
 
-| Rule | Existing findings |
+| Rule | Initial findings |
 | --- | ---: |
 | `S3776` cognitive complexity | 132 |
 | `CA1502` cyclomatic complexity | 102 |
 | `CA1506` coupling | 340 |
-| **Total unique symbols/rules** | **574** |
+| **Total** | **574** |
 
-These are unique SARIF findings. Normal solution build output repeats some project diagnostics when referenced projects are built by multiple consumers, so its raw warning count is not the baseline count.
+These counts describe the initial inventory. MSBuild can emit the same diagnostic more than once when a project is built through multiple consumers, so build-log line counts are not unique finding counts.
 
-The baseline lives in [`scripts/quality/complexity-baseline.json`](../../scripts/quality/complexity-baseline.json). Its identity uses the rule, project-relative file, source symbol, and normalized declaration signature; numeric scores are compared separately. The baseline records the analyzer configuration digest, SDK, and compiler. Missing reports, unsupported SARIF, duplicate identities, build failures, tool drift, and analyzer-configuration changes fail closed.
-
-The largest method findings are an initial review queue, not an automatic refactoring order. Risk, test coverage, and recent change history still need to guide batch selection.
+The highest initial method scores are a review queue, not an automatic refactoring order. Risk, recent change history, ownership, and behavioral test coverage should guide each batch.
 
 | Candidate | Cognitive | Cyclomatic | Method coupling |
 | --- | ---: | ---: | ---: |
@@ -32,24 +30,24 @@ The largest method findings are an initial review queue, not an automatic refact
 | `RunnersCommand.Build` | 50 | 28 | 41 |
 | `OpenAiProvider.CallResponsesAsync` | 49 | 30 | 45 |
 
-## Running the check
+## Run analyzers locally and in CI
 
-Run the strict no-regression gate locally or in CI:
-
-```text
-python scripts/quality/complexity_gate.py
-```
-
-The command uses the exact .NET SDK pinned in the baseline, builds all tracked C# projects, and writes ignored per-project reports under `.artifacts/quality/complexity/`. New findings and higher scores fail. A lower score is accepted while its symbol remains above the analyzer threshold; resolved symbols are reported as cleanup progress.
-
-To list the current findings without applying the comparison, run:
+For focused work, build the project being changed so its analyzer diagnostics are easy to inspect:
 
 ```text
-python scripts/quality/complexity_gate.py --report-only
+dotnet build src/Automaton.Runner/Automaton.Runner.csproj -c Debug --no-incremental -v minimal
 ```
 
-`--require-zero` additionally fails while any historical finding remains. Use it after the backlog is cleared. `--create-baseline` exists only for an explicitly reviewed first baseline and refuses to overwrite one. Do not regenerate the baseline to accept debt, move findings, or bypass a regression.
+Before handoff, build the all-project solution:
 
-## Cleanup target
+```text
+dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal
+```
 
-The checked-in baseline is temporary migration state, not an accepted debt allowance. Refactor existing production and test symbols in small behavior-preserving batches until the no-regression gate reports zero findings. Then verify with `--require-zero`, promote the three diagnostics to build errors, and remove the historical baseline exception from the CI path. Do not reduce configured thresholds or create trivial helpers/interfaces simply to lower a score. Review complexity and coupling together with responsibility ownership, behavior coverage, and the total design.
+`Automaton.All.sln` contains all 22 tracked C# projects, including test projects and fixtures. The Studio Server Azure pipeline runs the same all-project build in Release. It currently fails on historical findings until cleanup resolves them. This is intentional: builds should show the analyzer diagnostics directly to developers and coding agents, and each cleanup batch should remove errors without adding suppressions or weakening thresholds.
+
+The all-project solution and project-level package reference keep analysis available without an online Sonar service. Analyzer versions are pinned in `src/Directory.Build.targets`; metric thresholds are in `src/CodeMetricsConfig.txt`; rule severity is in the root `.editorconfig`.
+
+## Cleanup policy
+
+Refactor production and test symbols in small behavior-preserving batches. Do not reduce thresholds or split an algorithm into trivial helpers just to lower a score. Review complexity and coupling together with responsibility ownership, behavior coverage, and the total design. Run affected tests for behavior changes and record analyzer errors resolved by the batch.
