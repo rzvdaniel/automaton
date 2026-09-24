@@ -374,6 +374,7 @@ services.AddHangfireServer();
 
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
+services.AddScoped<AppRuntimeArchiveUploadService>();
 services.AddScoped<IAppDeploymentTargetResolver, AppDeploymentTargetResolver>();
 services.AddScoped<AppDeploymentTargetStateService>();
 services.AddScoped<AppDeploymentTargetManagementService>();

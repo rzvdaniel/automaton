@@ -19,6 +19,7 @@ public class AppsController : BaseController
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
+    private readonly AppRuntimeArchiveUploadService runtimeArchiveUploadService;
     private readonly AppArchiveService appArchiveService;
     private readonly SettingsService settingsService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
@@ -35,6 +36,7 @@ public class AppsController : BaseController
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
         AppVersionService appVersionService,
+        AppRuntimeArchiveUploadService runtimeArchiveUploadService,
         AppArchiveService appArchiveService,
         SettingsService settingsService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
@@ -50,6 +52,7 @@ public class AppsController : BaseController
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
+        this.runtimeArchiveUploadService = runtimeArchiveUploadService;
         this.appArchiveService = appArchiveService;
         this.settingsService = settingsService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
@@ -1074,103 +1077,17 @@ public class AppsController : BaseController
     {
         try
         {
-            if (file == null || file.Length == 0)
+            if (file is null || file.Length == 0)
                 return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
 
             if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { success = false, message = "Only .zip archives are supported" });
 
-            // Resolve the app owner for file-system path construction
-            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
-            if (appInfo == null)
+            var result = await runtimeArchiveUploadService.UploadAsync(id, file, clean);
+            if (result is null)
                 return NotFound(new { success = false, message = "App not found" });
 
-            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var runtimePath = fileStorageService.GetAppRuntimeDirectoryPath(ownerId, id);
-
-            // clean=true: delete current public frontend live files before extracting.
-            if (clean)
-            {
-                await fileStorageService.ClearApplicationRuntimeAsync(ownerId, id);
-            }
-            else
-            {
-                Directory.CreateDirectory(runtimePath);
-            }
-
-            var written = new List<string>();
-            var skipped = new List<object>();
-            var errors  = new List<object>();
-
-            using var stream  = file.OpenReadStream();
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-
-            foreach (var entry in archive.Entries)
-            {
-                // Skip directory-only entries
-                if (string.IsNullOrEmpty(entry.Name)) continue;
-
-                var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-
-                // Skip platform metadata, hidden files, and source/dependency folders that should never be live output.
-                if (ShouldSkipRuntimeUploadEntry(relativePath))
-                {
-                    skipped.Add(CreateSkippedEntry(relativePath, "Excluded by platform rule", "platform"));
-                    continue;
-                }
-
-                if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(relativePath))
-                {
-                    skipped.Add(CreateSkippedEntry(relativePath, "Blocked by public runtime file policy", "platform"));
-                    continue;
-                }
-
-                // Zip-slip protection: verify the resolved path stays inside live/frontend/.
-                var destPath = Path.GetFullPath(Path.Combine(runtimePath, relativePath));
-                var fullRuntimePath = Path.GetFullPath(runtimePath);
-                if (!destPath.StartsWith(fullRuntimePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                {
-                    errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
-                    continue;
-                }
-
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    using var entryStream = entry.Open();
-                    using var outStream   = System.IO.File.Create(destPath);
-                    await entryStream.CopyToAsync(outStream);
-                    written.Add(relativePath);
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(new { path = relativePath, reason = ex.Message });
-                }
-            }
-
-            logger.LogDebug(
-                "Zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
-                id, written.Count, skipped.Count, errors.Count, clean);
-
-            await appsService.SetLocalDevelopmentMetadataAsync(
-                id,
-                ownerId,
-                runtimeSource: AppRuntimeSources.CliBuild);
-
-            if (written.Count > 0)
-            {
-                try
-                {
-                    await appVersionService.CreateSnapshotAsync(
-                        id, userContextService.GetUserId(), AppVersionTrigger.ManualSave);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Version snapshot failed for app {AppId} after zip upload — upload still succeeded", id);
-                }
-            }
-
-            return Ok(new { success = true, written, skipped, errors });
+            return Ok(new { success = true, result.Written, result.Skipped, result.Errors });
         }
         catch (InvalidDataException)
         {
@@ -1181,48 +1098,6 @@ public class AppsController : BaseController
             logger.LogError(ex, "Failed to upload zip for app {AppId}", id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
-    }
-
-    private static bool ShouldSkipRuntimeUploadEntry(string relativePath)
-    {
-        var normalized = relativePath.Replace('\\', '/').Trim('/');
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return true;
-        }
-
-        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var fileName = segments.LastOrDefault() ?? string.Empty;
-        return IsExcludedRuntimeFileName(fileName) || ContainsExcludedRuntimeDirectory(segments);
-    }
-
-    private static bool IsExcludedRuntimeFileName(string fileName)
-        => fileName.StartsWith(".", StringComparison.Ordinal) ||
-            fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("automaton.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("package.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("package-lock.json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.StartsWith("vite.config.", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase);
-
-    private static bool ContainsExcludedRuntimeDirectory(IEnumerable<string> segments)
-        => segments.Any(segment =>
-            segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("src", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("source", StringComparison.OrdinalIgnoreCase));
-
-    private static object CreateSkippedEntry(string path, string reason, string ruleSource)
-    {
-        return new
-        {
-            path,
-            reason,
-            ruleSource
-        };
     }
 
     private string BuildRestrictedRuntimeUrl(Guid appId)
