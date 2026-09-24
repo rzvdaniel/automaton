@@ -14,6 +14,22 @@ namespace Automaton.Api.Extensions
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await dbContext.Database.MigrateAsync(cancellationToken);
 
+            var specification = await EnsureFreeHostedRunnerSpecificationAsync(dbContext, cancellationToken);
+            await EnsureHostedRunnerPlatformSettingsAsync(dbContext, specification, cancellationToken);
+            await EnsureFreeSubscriptionPlanAsync(dbContext, specification, cancellationToken);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            var guidanceService = scope.ServiceProvider.GetRequiredService<IAiGuidanceRuntimeService>();
+            await guidanceService.SeedMissingDefaultsAsync(cancellationToken);
+
+            return app;
+        }
+
+        private static async Task<HostedRunnerSpecification> EnsureFreeHostedRunnerSpecificationAsync(
+            ApplicationDbContext dbContext,
+            CancellationToken cancellationToken)
+        {
             var specification = await dbContext.HostedRunnerSpecifications
                 .SingleOrDefaultAsync(x => x.Id == HostedRunnerSpecificationIds.Free, cancellationToken);
             if (specification == null)
@@ -40,6 +56,14 @@ namespace Automaton.Api.Extensions
                 });
             }
 
+            return specification;
+        }
+
+        private static async Task EnsureHostedRunnerPlatformSettingsAsync(
+            ApplicationDbContext dbContext,
+            HostedRunnerSpecification specification,
+            CancellationToken cancellationToken)
+        {
             if (!await dbContext.HostedRunnerPlatformSettings.AnyAsync(cancellationToken))
             {
                 dbContext.HostedRunnerPlatformSettings.Add(new HostedRunnerPlatformSettings
@@ -50,7 +74,13 @@ namespace Automaton.Api.Extensions
                     UpdatedAtUtc = DateTime.UtcNow
                 });
             }
+        }
 
+        private static async Task EnsureFreeSubscriptionPlanAsync(
+            ApplicationDbContext dbContext,
+            HostedRunnerSpecification specification,
+            CancellationToken cancellationToken)
+        {
             var freePlan = await dbContext.SubscriptionPlans
                 .SingleOrDefaultAsync(x => x.Id == SubscriptionPlanIds.Free, cancellationToken);
             if (freePlan == null)
@@ -84,13 +114,6 @@ namespace Automaton.Api.Extensions
                     freePlan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(capabilities);
                 }
             }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            var guidanceService = scope.ServiceProvider.GetRequiredService<IAiGuidanceRuntimeService>();
-            await guidanceService.SeedMissingDefaultsAsync(cancellationToken);
-
-            return app;
         }
     }
 }
