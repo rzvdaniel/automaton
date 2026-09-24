@@ -746,12 +746,22 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync();
+        await RecordPublishedAppAsync(entity, id, ownerId, publicUrl, requiresAuthentication, isForkable);
+    }
 
+    private async Task RecordPublishedAppAsync(
+        Entities.WebApp entity,
+        Guid appId,
+        Guid ownerId,
+        string publicUrl,
+        bool requiresAuthentication,
+        bool isForkable)
+    {
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
         {
             Action = AuditActions.Published,
             EntityType = AuditEntityTypes.App,
-            EntityId = id,
+            EntityId = appId,
             EventType = AuditEventTypes.AppPublished,
             Message = $"App '{entity.Name}' was published",
             Outcome = AuditOutcomes.Success,
@@ -769,7 +779,7 @@ public class AppsService
 
         await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
         {
-            AppId = id,
+            AppId = appId,
             Level = ApplicationEventLevels.Info,
             Category = ApplicationEventCategories.Publishing,
             EventType = ApplicationEventTypes.AppPublished,
@@ -787,7 +797,7 @@ public class AppsService
 
 
         // Log activity
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, appId);
         await backendRouteConfigService.RefreshAsync();
     }
 
@@ -816,12 +826,16 @@ public class AppsService
         // Keep PublicUrl for re-publishing with same slug
 
         dataContext.SaveChanges();
+        await RecordUnpublishedAppAsync(entity, id);
+    }
 
+    private async Task RecordUnpublishedAppAsync(Entities.WebApp entity, Guid appId)
+    {
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
         {
             Action = AuditActions.Unpublished,
             EntityType = AuditEntityTypes.App,
-            EntityId = id,
+            EntityId = appId,
             EventType = AuditEventTypes.AppUnpublished,
             Message = $"App '{entity.Name}' was unpublished",
             Outcome = AuditOutcomes.Success,
@@ -835,7 +849,7 @@ public class AppsService
 
         await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
         {
-            AppId = id,
+            AppId = appId,
             Level = ApplicationEventLevels.Info,
             Category = ApplicationEventCategories.Publishing,
             EventType = ApplicationEventTypes.AppUnpublished,
@@ -850,7 +864,7 @@ public class AppsService
 
 
         // Log activity
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, id);
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, appId);
         await backendRouteConfigService.RefreshAsync();
     }
 
