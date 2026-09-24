@@ -40,7 +40,47 @@ public class AdminLogsController : ControllerBase
         query.Page = Math.Max(1, query.Page);
         query.PageSize = Math.Clamp(query.PageSize, 1, 200);
 
-        var dbQuery = dbContext.AuditEvents.AsNoTracking();
+        var dbQuery = ApplyFilters(dbContext.AuditEvents.AsNoTracking(), query);
+
+        var totalCount = await dbQuery.CountAsync(cancellationToken);
+
+        var items = await dbQuery
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(x => new AuditEventDto
+            {
+                Id = x.Id,
+                Category = x.Category,
+                Action = x.Action,
+                EntityType = x.EntityType,
+                EntityId = x.EntityId,
+                EntityDisplay = GetEntityDisplay(x.EntityType, x.EntityId, x.MetadataJson),
+                UserId = x.UserId,
+                TargetUserId = x.TargetUserId,
+                UserName = x.UserName,
+                Outcome = x.Outcome,
+                EventType = x.EventType,
+                Message = x.Message,
+                MetadataJson = x.MetadataJson,
+                IpAddress = x.IpAddress,
+                CreatedAtUtc = x.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new PagedResult<AuditEventDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = query.Page,
+            PageSize = query.PageSize
+        });
+    }
+
+    private static IQueryable<Entities.AuditEvent> ApplyFilters(
+        IQueryable<Entities.AuditEvent> dbQuery,
+        AuditEventQuery query)
+    {
 
         if (!string.IsNullOrWhiteSpace(query.EventType))
         {
@@ -82,9 +122,16 @@ public class AdminLogsController : ControllerBase
             dbQuery = dbQuery.Where(x => x.CreatedAtUtc <= query.ToUtc.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Search))
+        return ApplySearchFilter(dbQuery, query.Search);
+    }
+
+    private static IQueryable<Entities.AuditEvent> ApplySearchFilter(
+        IQueryable<Entities.AuditEvent> dbQuery,
+        string? searchText)
+    {
+        if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var search = query.Search.Trim();
+            var search = searchText.Trim();
             dbQuery = dbQuery.Where(x =>
                 x.Message.Contains(search) ||
                 x.EventType.Contains(search) ||
@@ -93,39 +140,7 @@ public class AdminLogsController : ControllerBase
                 (x.MetadataJson != null && x.MetadataJson.Contains(search)));
         }
 
-        var totalCount = await dbQuery.CountAsync(cancellationToken);
-
-        var items = await dbQuery
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .Select(x => new AuditEventDto
-            {
-                Id = x.Id,
-                Category = x.Category,
-                Action = x.Action,
-                EntityType = x.EntityType,
-                EntityId = x.EntityId,
-                EntityDisplay = GetEntityDisplay(x.EntityType, x.EntityId, x.MetadataJson),
-                UserId = x.UserId,
-                TargetUserId = x.TargetUserId,
-                UserName = x.UserName,
-                Outcome = x.Outcome,
-                EventType = x.EventType,
-                Message = x.Message,
-                MetadataJson = x.MetadataJson,
-                IpAddress = x.IpAddress,
-                CreatedAtUtc = x.CreatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
-
-        return Ok(new PagedResult<AuditEventDto>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            Page = query.Page,
-            PageSize = query.PageSize
-        });
+        return dbQuery;
     }
 
     [HttpGet("event-types")]

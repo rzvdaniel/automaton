@@ -21,6 +21,8 @@ public class AppInstructionInjector
 {
     private const int CharsPerToken = 4;
 
+    private sealed record InstructionEntry(int Priority, string Path, string FileName);
+
     private readonly AppFileStorageService _storage;
     private readonly AppInstructionsConfig _config;
     private readonly Serilog.ILogger _logger;
@@ -56,53 +58,69 @@ public class AppInstructionInjector
             .Where(f => !f.StartsWith(".instructions/", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        // Always inject _index.md first (it's a short summary)
-        var ordered = new List<(int priority, string path, string filename)>();
-
-        foreach (var file in files)
-        {
-            var filename = Path.GetFileName(file);
-            var content  = await File.ReadAllTextAsync(file);
-            var meta     = ParseFrontmatter(content);
-
-            // _index.md always gets injected with highest priority
-            if (filename.Equals("_index.md", StringComparison.OrdinalIgnoreCase))
-            {
-                ordered.Insert(0, (0, file, filename));
-                continue;
-            }
-
-            var context = meta.GetValueOrDefault("context", "always");
-            if (!context.Equals("always", StringComparison.OrdinalIgnoreCase))
-                continue; // on-request files are skipped here
-
-            // applyTo: comma-separated glob patterns — only inject when the app contains matching files
-            if (meta.TryGetValue("applyTo", out var applyTo) && !string.IsNullOrWhiteSpace(applyTo))
-            {
-                if (!MatchesAnyFile(applyTo, appFiles))
-                {
-                    _logger.Debug("Skipping {File}: applyTo '{ApplyTo}' matched no app files", filename, applyTo);
-                    continue;
-                }
-            }
-
-            var priorityStr = meta.GetValueOrDefault("priority", "medium");
-            var priority = priorityStr.ToLower() switch
-            {
-                "high"   => 1,
-                "medium" => 2,
-                "low"    => 3,
-                _        => 2
-            };
-
-            ordered.Add((priority, file, filename));
-        }
-
-        ordered = ordered.OrderBy(x => x.priority).ToList();
-
+        var ordered = await LoadInstructionEntriesAsync(files, appFiles);
         if (ordered.Count == 0)
             return null;
 
+        var result = await BuildInjectionContentAsync(ordered);
+        if (result.Length < 30) // Nothing meaningful
+            return null;
+
+        _logger.Debug("Injecting {Chars} chars of instructions for app {AppId}", result.Length, appId);
+        return result;
+    }
+
+    private async Task<List<InstructionEntry>> LoadInstructionEntriesAsync(
+        IEnumerable<string> files,
+        IReadOnlyCollection<string> appFiles)
+    {
+        var ordered = new List<InstructionEntry>();
+        foreach (var file in files)
+        {
+            var filename = Path.GetFileName(file);
+            var content = await File.ReadAllTextAsync(file);
+            var entry = CreateInstructionEntry(file, filename, ParseFrontmatter(content), appFiles);
+            if (entry is not null)
+                ordered.Add(entry);
+        }
+
+        return ordered.OrderBy(entry => entry.Priority).ToList();
+    }
+
+    private InstructionEntry? CreateInstructionEntry(
+        string path,
+        string filename,
+        Dictionary<string, string> metadata,
+        IReadOnlyCollection<string> appFiles)
+    {
+        // _index.md is a short summary and is always injected before other instructions.
+        if (filename.Equals("_index.md", StringComparison.OrdinalIgnoreCase))
+            return new InstructionEntry(0, path, filename);
+
+        var context = metadata.GetValueOrDefault("context", "always");
+        if (!context.Equals("always", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (metadata.TryGetValue("applyTo", out var applyTo) && !string.IsNullOrWhiteSpace(applyTo) &&
+            !MatchesAnyFile(applyTo, appFiles))
+        {
+            _logger.Debug("Skipping {File}: applyTo '{ApplyTo}' matched no app files", filename, applyTo);
+            return null;
+        }
+
+        return new InstructionEntry(GetPriority(metadata), path, filename);
+    }
+
+    private static int GetPriority(IReadOnlyDictionary<string, string> metadata)
+        => metadata.GetValueOrDefault("priority", "medium").ToLower() switch
+        {
+            "high" => 1,
+            "low" => 3,
+            _ => 2
+        };
+
+    private async Task<string> BuildInjectionContentAsync(IReadOnlyCollection<InstructionEntry> ordered)
+    {
         var sb = new StringBuilder();
         sb.AppendLine("## User Instructions");
         sb.AppendLine();
@@ -111,11 +129,11 @@ public class AppInstructionInjector
 
         var remaining = _config.MaxTokens * CharsPerToken;
 
-        foreach (var (_, path, filename) in ordered)
+        foreach (var entry in ordered)
         {
             if (remaining <= 0) break;
 
-            var content  = await File.ReadAllTextAsync(path);
+            var content = await File.ReadAllTextAsync(entry.Path);
             var stripped = StripFrontmatter(content).Trim();
 
             if (stripped.Length == 0) continue;
@@ -124,19 +142,14 @@ public class AppInstructionInjector
                 ? stripped
                 : stripped[..remaining] + "\n_(truncated due to token budget)_";
 
-            sb.AppendLine($"### {filename}");
+            sb.AppendLine($"### {entry.FileName}");
             sb.AppendLine(chunk);
             sb.AppendLine();
 
             remaining -= stripped.Length;
         }
 
-        var result = sb.ToString().Trim();
-        if (result.Length < 30) // Nothing meaningful
-            return null;
-
-        _logger.Debug("Injecting {Chars} chars of instructions for app {AppId}", result.Length, appId);
-        return result;
+        return sb.ToString().Trim();
     }
 
     // ── Glob matching ────────────────────────────────────────────────────────

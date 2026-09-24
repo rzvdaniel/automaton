@@ -21,6 +21,20 @@ public class AppFileStorageServiceTests
     }
 
     [Test]
+    public void MatchesExcludeRule_SupportsDirectoryExtensionPathAndSegmentRules()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(AppFileStorageService.MatchesExcludeRule("secrets\\token.json", ["secrets/**"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend\\settings.env", ["*.env"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("frontend/config.json", ["frontend/config.json"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/.env", [".env"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/notes.md", [".env"]), Is.False);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/notes.md", [" "]), Is.False);
+        });
+    }
+
+    [Test]
     public async Task CopySourceFilesAsync_CopiesOnlyPortableSourceDirectories_AndSkipsSecrets()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
