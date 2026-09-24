@@ -190,101 +190,122 @@ public sealed class RunnerEnrollmentService(
             var now = DateTime.UtcNow;
             var lifetimeMinutes = Math.Clamp(options.Value.TokenLifetimeMinutes, 1, 60);
             var expiresAtUtc = now.AddMinutes(lifetimeMinutes);
-            var priorEnrollments = await db.RunnerEnrollments
-                .Where(x => x.HostedRunnerId == hostedRunnerId && x.Status == RunnerEnrollmentStatuses.Pending)
-                .ToListAsync(cancellationToken);
-            var priorVersionIds = priorEnrollments
-                .Where(x => x.SecretVersionId.HasValue)
-                .Select(x => x.SecretVersionId!.Value)
-                .ToArray();
-            foreach (var prior in priorEnrollments)
-            {
-                prior.Status = RunnerEnrollmentStatuses.Revoked;
-                prior.FailureReason = "Superseded by a new hosted Runner enrollment.";
-            }
-            if (priorVersionIds.Length > 0)
-            {
-                var priorVersions = await db.SecretVersions.Where(x => priorVersionIds.Contains(x.Id)).ToListAsync(cancellationToken);
-                var priorGrants = await db.ExecutionSecretGrants.Where(x => priorVersionIds.Contains(x.SecretVersionId)).ToListAsync(cancellationToken);
-                foreach (var priorVersion in priorVersions)
-                    priorVersion.RevokedAtUtc ??= now;
-                foreach (var grant in priorGrants)
-                    grant.RevokedAtUtc ??= now;
-            }
+            await RevokePriorEnrollmentsAsync(hostedRunnerId, now, cancellationToken);
+            await DeactivateExistingApiKeyAsync(hostedRunner, cancellationToken);
 
-            if (hostedRunner.ApiKeyId.HasValue)
-            {
-                var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == hostedRunner.ApiKeyId.Value, cancellationToken);
-                if (oldKey != null)
-                    oldKey.IsActive = false;
-                hostedRunner.ApiKeyId = null;
-            }
-
-            var token = GenerateEnrollmentToken();
-            var enrollment = new RunnerEnrollment
-            {
-                Id = Guid.NewGuid(),
-                RunnerHostId = runnerHostId,
-                HostedRunnerId = hostedRunner.Id,
-                OperationId = operationId,
-                RequestedByUserId = hostedRunner.UserId,
-                ExpectedPurpose = RunnerPurposes.Managed,
-                ExpectedCapabilitiesJson = RunnerCapabilities.Serialize(
-                    RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
-                    RunnerPurposes.Managed),
-                EnrollmentTokenHash = HashToken(token),
-                InstallationId = $"hr_{hostedRunner.Id:N}",
-                Status = RunnerEnrollmentStatuses.Pending,
-                CreatedAtUtc = now,
-                ExpiresAtUtc = expiresAtUtc
-            };
-            db.RunnerEnrollments.Add(enrollment);
-
-            var enrollmentVersion = await secretStore.CreateVersionAsync(
-                new SecretOwner(SecretOwnerTypes.HostedRunner, hostedRunner.Id),
-                "hosted-runner-enrollment",
-                token,
-                expiresAtUtc,
-                cancellationToken);
-            enrollment.SecretVersionId = enrollmentVersion.SecretVersionId;
-            var grantId = await secretGrantService.CreateGrantAsync(
-                enrollmentVersion.SecretVersionId,
-                new SecretGrantScope(
-                    operationId,
-                    InfrastructureAppTrust.PlatformAppId,
-                    actionKey,
-                    infrastructureRunnerId,
-                    runnerHostId,
-                    SecretOwnerTypes.HostedRunner,
-                    hostedRunner.Id),
-                "AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN",
-                expiresAtUtc,
-                cancellationToken,
-                SecretDeliveryPolicies.SingleDelivery);
+            var material = await CreateEnrollmentAndGrantAsync(
+                hostedRunner, runnerHostId, operationId, actionKey, infrastructureRunnerId,
+                now, expiresAtUtc, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
 
-            await auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                Action = AuditActions.Created,
-                EntityType = AuditEntityTypes.RunnerEnrollment,
-                EntityId = enrollment.Id,
-                EventType = AuditEventTypes.RunnerEnrollmentCreated,
-                Message = $"One-time enrollment created for hosted Runner '{hostedRunner.Name}'.",
-                Outcome = AuditOutcomes.Success,
-                ActorUserId = hostedRunner.UserId,
-                TargetUserId = hostedRunner.UserId,
-                Metadata = new { hostedRunner.Id, OperationId = operationId, GrantId = grantId, expiresAtUtc }
-            }, cancellationToken);
+            await WriteEnrollmentCreatedAuditAsync(hostedRunner, operationId, material, cancellationToken);
 
             if (transaction != null)
                 await transaction.CommitAsync(cancellationToken);
-            return new(enrollment.Id, grantId, expiresAtUtc);
+            return material;
         }
         finally
         {
             if (transaction != null)
                 await transaction.DisposeAsync();
         }
+    }
+
+    private async Task<HostedRunnerEnrollmentMaterial> CreateEnrollmentAndGrantAsync(
+        HostedRunner hostedRunner,
+        Guid runnerHostId,
+        Guid operationId,
+        string actionKey,
+        Guid infrastructureRunnerId,
+        DateTime now,
+        DateTime expiresAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var token = GenerateEnrollmentToken();
+        var enrollment = new RunnerEnrollment
+        {
+            Id = Guid.NewGuid(),
+            RunnerHostId = runnerHostId,
+            HostedRunnerId = hostedRunner.Id,
+            OperationId = operationId,
+            RequestedByUserId = hostedRunner.UserId,
+            ExpectedPurpose = RunnerPurposes.Managed,
+            ExpectedCapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed), RunnerPurposes.Managed),
+            EnrollmentTokenHash = HashToken(token),
+            InstallationId = $"hr_{hostedRunner.Id:N}",
+            Status = RunnerEnrollmentStatuses.Pending,
+            CreatedAtUtc = now,
+            ExpiresAtUtc = expiresAtUtc
+        };
+        db.RunnerEnrollments.Add(enrollment);
+        var enrollmentVersion = await secretStore.CreateVersionAsync(
+            new SecretOwner(SecretOwnerTypes.HostedRunner, hostedRunner.Id),
+            "hosted-runner-enrollment", token, expiresAtUtc, cancellationToken);
+        enrollment.SecretVersionId = enrollmentVersion.SecretVersionId;
+        var grantId = await secretGrantService.CreateGrantAsync(
+            enrollmentVersion.SecretVersionId,
+            new SecretGrantScope(operationId, InfrastructureAppTrust.PlatformAppId, actionKey,
+                infrastructureRunnerId, runnerHostId, SecretOwnerTypes.HostedRunner, hostedRunner.Id),
+            "AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN", expiresAtUtc, cancellationToken,
+            SecretDeliveryPolicies.SingleDelivery);
+        return new(enrollment.Id, grantId, expiresAtUtc);
+    }
+
+    private Task WriteEnrollmentCreatedAuditAsync(
+        HostedRunner hostedRunner,
+        Guid operationId,
+        HostedRunnerEnrollmentMaterial material,
+        CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.RunnerEnrollment,
+            EntityId = material.EnrollmentId,
+            EventType = AuditEventTypes.RunnerEnrollmentCreated,
+            Message = $"One-time enrollment created for hosted Runner '{hostedRunner.Name}'.",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = hostedRunner.UserId,
+            TargetUserId = hostedRunner.UserId,
+            Metadata = new { hostedRunner.Id, OperationId = operationId, GrantId = material.SecretGrantId, ExpiresAtUtc = material.ExpiresAtUtc }
+        }, cancellationToken);
+
+    private async Task RevokePriorEnrollmentsAsync(
+        Guid hostedRunnerId,
+        DateTime revokedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var priorEnrollments = await db.RunnerEnrollments
+            .Where(x => x.HostedRunnerId == hostedRunnerId && x.Status == RunnerEnrollmentStatuses.Pending)
+            .ToListAsync(cancellationToken);
+        var priorVersionIds = priorEnrollments
+            .Where(x => x.SecretVersionId.HasValue)
+            .Select(x => x.SecretVersionId!.Value)
+            .ToArray();
+        foreach (var prior in priorEnrollments)
+        {
+            prior.Status = RunnerEnrollmentStatuses.Revoked;
+            prior.FailureReason = "Superseded by a new hosted Runner enrollment.";
+        }
+
+        if (priorVersionIds.Length == 0) return;
+        var priorVersions = await db.SecretVersions.Where(x => priorVersionIds.Contains(x.Id)).ToListAsync(cancellationToken);
+        var priorGrants = await db.ExecutionSecretGrants.Where(x => priorVersionIds.Contains(x.SecretVersionId)).ToListAsync(cancellationToken);
+        foreach (var priorVersion in priorVersions)
+            priorVersion.RevokedAtUtc ??= revokedAtUtc;
+        foreach (var grant in priorGrants)
+            grant.RevokedAtUtc ??= revokedAtUtc;
+    }
+
+    private async Task DeactivateExistingApiKeyAsync(
+        HostedRunner hostedRunner,
+        CancellationToken cancellationToken)
+    {
+        if (!hostedRunner.ApiKeyId.HasValue) return;
+        var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == hostedRunner.ApiKeyId.Value, cancellationToken);
+        if (oldKey != null)
+            oldKey.IsActive = false;
+        hostedRunner.ApiKeyId = null;
     }
 
     public async Task<bool> RevokeAsync(
