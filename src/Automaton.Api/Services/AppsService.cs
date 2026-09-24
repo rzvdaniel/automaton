@@ -529,7 +529,36 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUpdated, app.Name, id);
 
-        if (!string.Equals(previousName, entity.Name, StringComparison.Ordinal))
+        await WriteUpdateAuditEventsAsync(
+            entity,
+            id,
+            ownerId,
+            new AppUpdateSnapshot(
+                previousName,
+                previousSummary,
+                previousDescription,
+                previousIsForkable,
+                previousPublicUrl,
+                previousRequiresAuthentication,
+                previousThumbnailUrl,
+                previousCategory,
+                previousTags,
+                previousIsProfileFeatured,
+                previousExecutionRunnerId));
+
+        if (previousExecutionRunnerId != GetDefaultRunnerId(entity))
+        {
+            await backendRouteConfigService.RefreshAsync();
+        }
+    }
+
+    private async Task WriteUpdateAuditEventsAsync(
+        Entities.WebApp entity,
+        Guid id,
+        Guid ownerId,
+        AppUpdateSnapshot previous)
+    {
+        if (!string.Equals(previous.Name, entity.Name, StringComparison.Ordinal))
         {
             await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
             {
@@ -537,19 +566,19 @@ public class AppsService
                 EntityType = AuditEntityTypes.App,
                 EntityId = id,
                 EventType = AuditEventTypes.AppRenamed,
-                Message = $"App was renamed from '{previousName}' to '{entity.Name}'",
+                Message = $"App was renamed from '{previous.Name}' to '{entity.Name}'",
                 Outcome = AuditOutcomes.Success,
                 ActorUserId = UserId,
                 Metadata = new
                 {
-                    PreviousName = previousName,
+                    PreviousName = previous.Name,
                     entity.Name,
                     OwnerUserId = ownerId
                 }
             });
         }
 
-        if (!string.Equals(previousPublicUrl, entity.PublicUrl, StringComparison.Ordinal))
+        if (!string.Equals(previous.PublicUrl, entity.PublicUrl, StringComparison.Ordinal))
         {
             await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
             {
@@ -562,7 +591,7 @@ public class AppsService
                 ActorUserId = UserId,
                 Metadata = new
                 {
-                    PreviousSlug = previousPublicUrl,
+                    PreviousSlug = previous.PublicUrl,
                     NewSlug = entity.PublicUrl,
                     OwnerUserId = ownerId
                 }
@@ -570,15 +599,15 @@ public class AppsService
         }
 
         var metadataChanged =
-            !string.Equals(previousSummary, entity.Summary, StringComparison.Ordinal) ||
-            !string.Equals(previousDescription, entity.Description, StringComparison.Ordinal) ||
-            previousIsForkable != entity.IsForkable ||
-            previousRequiresAuthentication != entity.RequiresAuthentication ||
-            !string.Equals(previousThumbnailUrl, entity.ThumbnailUrl, StringComparison.Ordinal) ||
-            !string.Equals(previousCategory, entity.Category, StringComparison.Ordinal) ||
-            !string.Equals(previousTags, entity.Tags, StringComparison.Ordinal) ||
-            previousIsProfileFeatured != entity.IsProfileFeatured ||
-            previousExecutionRunnerId != GetDefaultRunnerId(entity);
+            !string.Equals(previous.Summary, entity.Summary, StringComparison.Ordinal) ||
+            !string.Equals(previous.Description, entity.Description, StringComparison.Ordinal) ||
+            previous.IsForkable != entity.IsForkable ||
+            previous.RequiresAuthentication != entity.RequiresAuthentication ||
+            !string.Equals(previous.ThumbnailUrl, entity.ThumbnailUrl, StringComparison.Ordinal) ||
+            !string.Equals(previous.Category, entity.Category, StringComparison.Ordinal) ||
+            !string.Equals(previous.Tags, entity.Tags, StringComparison.Ordinal) ||
+            previous.IsProfileFeatured != entity.IsProfileFeatured ||
+            previous.ExecutionRunnerId != GetDefaultRunnerId(entity);
 
         if (metadataChanged)
         {
@@ -607,12 +636,20 @@ public class AppsService
             });
         }
 
-        if (previousExecutionRunnerId != GetDefaultRunnerId(entity))
-        {
-            await backendRouteConfigService.RefreshAsync();
-        }
-
     }
+
+    private sealed record AppUpdateSnapshot(
+        string Name,
+        string? Summary,
+        string? Description,
+        bool IsForkable,
+        string? PublicUrl,
+        bool RequiresAuthentication,
+        string? ThumbnailUrl,
+        string? Category,
+        string? Tags,
+        bool IsProfileFeatured,
+        Guid? ExecutionRunnerId);
 
     public async Task Remove(Guid id)
     {
