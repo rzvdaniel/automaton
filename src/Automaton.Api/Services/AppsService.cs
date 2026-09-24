@@ -1083,16 +1083,7 @@ public class AppsService
         await runnerAssignmentPolicy.AssignAsync(entity, null, UserId);
         await dataContext.SaveChangesAsync();
 
-        await fileStorageService.CopySourceFilesAsync(UserId, appId, UserId, newId);
-
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        await auditEventService.WriteAsync(
-            action: "Duplicated",
-            entityType: "App",
-            entityId: newId,
-            message: $"App '{entity.Name}' was duplicated",
-            metadata: new { SourceAppId = appId, NewAppId = newId, UserId });
-
+        await CopySourceAndRecordDuplicationAsync(appId, newId, entity.Name);
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -1102,6 +1093,18 @@ public class AppsService
         var duplicated = MapToModel(newEntity, null, UserId);
         ApplyStorageMetadata(duplicated, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
         return duplicated;
+    }
+
+    private async Task CopySourceAndRecordDuplicationAsync(Guid sourceAppId, Guid duplicateAppId, string appName)
+    {
+        await fileStorageService.CopySourceFilesAsync(UserId, sourceAppId, UserId, duplicateAppId);
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, appName, duplicateAppId);
+        await auditEventService.WriteAsync(
+            action: "Duplicated",
+            entityType: "App",
+            entityId: duplicateAppId,
+            message: $"App '{appName}' was duplicated",
+            metadata: new { SourceAppId = sourceAppId, NewAppId = duplicateAppId, UserId });
     }
 
     /// <summary>
