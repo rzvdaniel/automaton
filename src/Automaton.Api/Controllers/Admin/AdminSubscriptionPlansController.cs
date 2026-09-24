@@ -159,16 +159,7 @@ public class AdminSubscriptionPlansController : ControllerBase
                 .Where(p => p.IsDefault && p.Id != id)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsDefault, false), cancellationToken);
 
-        if (req.Name        != null) plan.Name               = req.Name;
-        if (req.Description != null) plan.Description        = req.Description;
-        if (req.PriceUsd              .HasValue) plan.PriceUsd               = req.PriceUsd.Value;
-        if (req.StripeProductId != null) plan.StripeProductId = req.StripeProductId == "" ? null : req.StripeProductId;
-        if (req.StripePriceId   != null) plan.StripePriceId   = req.StripePriceId   == "" ? null : req.StripePriceId;
-        if (req.IsActive              .HasValue) plan.IsActive               = req.IsActive.Value;
-        plan.IsDefault = newIsDefault;
-        if (req.Capabilities != null) plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(req.Capabilities);
-        if (req.SortOrder             .HasValue) plan.SortOrder              = req.SortOrder.Value;
-        plan.UpdatedAt = DateTime.UtcNow;
+        SubscriptionPlanUpdateApplier.Apply(plan, req, newIsDefault);
 
         await _db.SaveChangesAsync(cancellationToken);
         if (transaction != null)
