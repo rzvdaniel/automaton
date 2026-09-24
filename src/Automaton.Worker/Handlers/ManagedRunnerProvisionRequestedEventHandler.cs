@@ -23,23 +23,9 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
 
     public async Task HandleAsync(ManagedRunnerProvisionRequestedEvent message, CancellationToken cancellationToken = default)
     {
-        if (message.OperationId == Guid.Empty)
-        {
-            logger.LogWarning("Managed runner provisioning request has no operation id and was rejected");
-            return;
-        }
-
-        var hostedRunner = await dbContext.HostedRunners
-            .Include(x => x.RunnerHost)
-            .Include(x => x.Deployments)
-            .FirstOrDefaultAsync(x => x.Id == message.HostedRunnerId && x.DeletedAt == null, cancellationToken);
-
-        if (hostedRunner == null)
-        {
-            logger.LogWarning("Managed runner provisioning skipped because hosted runner {HostedRunnerId} no longer exists", message.HostedRunnerId);
-            return;
-        }
-
+        if (TryHandleMissingOperation(message)) return;
+        var hostedRunner = await LoadHostedRunnerAsync(message, cancellationToken);
+        if (hostedRunner == null) return;
         var deployment = hostedRunner.Deployments.FirstOrDefault(x => x.Id == message.OperationId);
         if (deployment == null)
         {
@@ -48,15 +34,10 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         }
 
         var host = hostedRunner.RunnerHost;
-        if (host?.InfrastructureRunnerId == null)
+        var error = GetHostValidationError(host);
+        if (error is not null)
         {
-            await FailAsync(hostedRunner, deployment, "The selected Runner Host has no Infrastructure Runner assigned.", message.CorrelationId, cancellationToken);
-            return;
-        }
-
-        if (!string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.InfrastructureRunner, StringComparison.Ordinal))
-        {
-            await FailAsync(hostedRunner, deployment, "Normal hosted Runner provisioning requires an Infrastructure Runner transport.", message.CorrelationId, cancellationToken);
+            await FailAsync(hostedRunner, deployment, error, message.CorrelationId, cancellationToken);
             return;
         }
 
@@ -66,32 +47,80 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        if (!HostedRunnerImageReference.IsImmutable(options.Value.DockerImage))
+        error = GetRequestValidationError(hostedRunner, message);
+        if (error is not null)
         {
-            const string error = "Hosted Runner provisioning requires an immutable container image reference in the form repository@sha256:<digest>.";
             await FailAsync(hostedRunner, deployment, error, message.CorrelationId, cancellationToken);
             return;
         }
 
-        if (message.SecretGrantIds.Count == 0)
-        {
-            await FailAsync(hostedRunner, deployment, "The hosted Runner provisioning request has no enrollment credential grant.", message.CorrelationId, cancellationToken);
-            return;
-        }
+        var infrastructureRequest = CreateInfrastructureRequest(hostedRunner, deployment, host!, message);
+        await DispatchAsync(hostedRunner, deployment, infrastructureRequest, cancellationToken);
+    }
 
+    private bool TryHandleMissingOperation(ManagedRunnerProvisionRequestedEvent message)
+    {
+        if (message.OperationId != Guid.Empty) return false;
+        logger.LogWarning("Managed runner provisioning request has no operation id and was rejected");
+        return true;
+    }
+
+    private async Task<HostedRunner?> LoadHostedRunnerAsync(
+        ManagedRunnerProvisionRequestedEvent message,
+        CancellationToken cancellationToken)
+    {
+        var hostedRunner = await dbContext.HostedRunners
+            .Include(x => x.RunnerHost)
+            .Include(x => x.Deployments)
+            .FirstOrDefaultAsync(x => x.Id == message.HostedRunnerId && x.DeletedAt == null, cancellationToken);
+        if (hostedRunner == null)
+            logger.LogWarning("Managed runner provisioning skipped because hosted runner {HostedRunnerId} no longer exists", message.HostedRunnerId);
+        return hostedRunner;
+    }
+
+    private static string? GetHostValidationError(RunnerHost? host)
+    {
+        if (host?.InfrastructureRunnerId == null)
+            return "The selected Runner Host has no Infrastructure Runner assigned.";
+        if (!string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.InfrastructureRunner, StringComparison.Ordinal))
+            return "Normal hosted Runner provisioning requires an Infrastructure Runner transport.";
+        return null;
+    }
+
+    private string? GetRequestValidationError(HostedRunner hostedRunner, ManagedRunnerProvisionRequestedEvent message)
+    {
+        if (!HostedRunnerImageReference.IsImmutable(options.Value.DockerImage))
+            return "Hosted Runner provisioning requires an immutable container image reference in the form repository@sha256:<digest>.";
+        if (message.SecretGrantIds.Count == 0)
+            return "The hosted Runner provisioning request has no enrollment credential grant.";
+        return hostedRunner.StorageProjectId is > 0
+            ? null
+            : "The Hosted Runner has no persisted storage project identity.";
+    }
+
+    private InfrastructureCommandRequestedEvent CreateInfrastructureRequest(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        RunnerHost host,
+        ManagedRunnerProvisionRequestedEvent message)
+        => new(
+            CommandId: deployment.Id,
+            OperationId: deployment.Id,
+            RunnerHostId: host.Id,
+            InfrastructureRunnerId: host.InfrastructureRunnerId!.Value,
+            ActionKey: deployment.Action == HostedRunnerDeploymentActions.Reprovision
+                ? "reprovision-hosted-runner"
+                : ProvisionActionKey,
+            InputJson: CreateInfrastructureInput(hostedRunner, deployment, host),
+            SecretGrantIds: message.SecretGrantIds,
+            CreatedAtUtc: DateTime.UtcNow);
+
+    private string CreateInfrastructureInput(HostedRunner hostedRunner, HostedRunnerDeployment deployment, RunnerHost host)
+    {
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
-        if (hostedRunner.StorageProjectId is not > 0)
-        {
-            await FailAsync(hostedRunner, deployment, "The Hosted Runner has no persisted storage project identity.", message.CorrelationId, cancellationToken);
-            return;
-        }
-        var runtimeHostAddress = RequirePrivateRuntimeHostAddress(host.PrivateIp);
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
             ?? hostedRunner.SpecificationSnapshot.SourceSpecificationId;
-        var specificationId = snapshotSpecificationId == Guid.Empty
-            ? hostedRunner.HostedRunnerSpecificationId
-            : snapshotSpecificationId;
-        var input = JsonSerializer.Serialize(new
+        return JsonSerializer.Serialize(new
         {
             operationId = deployment.Id,
             hostedRunnerId = hostedRunner.Id,
@@ -103,7 +132,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             memoryMb = resources.MemoryLimitMb,
             memoryReservationMb = resources.MemoryReservationMb,
             diskLimitMb = resources.DiskLimitMb,
-            xfsProjectId = hostedRunner.StorageProjectId.Value,
+            xfsProjectId = hostedRunner.StorageProjectId!.Value,
             pidsLimit = resources.PidsLimit,
             sharedMemoryMb = resources.SharedMemoryMb,
             dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,
@@ -112,31 +141,27 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             runnerPort = options.Value.RuntimePort,
             networkName = options.Value.DockerNetwork,
             runtimeNetworkName = options.Value.RuntimeDockerNetwork,
-            runtimeHostAddress,
+            runtimeHostAddress = RequirePrivateRuntimeHostAddress(host.PrivateIp),
             systemVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-system",
             userVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-user",
-            specificationId,
+            specificationId = snapshotSpecificationId == Guid.Empty
+                ? hostedRunner.HostedRunnerSpecificationId
+                : snapshotSpecificationId,
             runnerName = hostedRunner.Name
         });
+    }
 
-        var infrastructureRequest = new InfrastructureCommandRequestedEvent(
-            CommandId: deployment.Id,
-            OperationId: deployment.Id,
-            RunnerHostId: host.Id,
-            InfrastructureRunnerId: host.InfrastructureRunnerId.Value,
-            ActionKey: deployment.Action == HostedRunnerDeploymentActions.Reprovision
-                ? "reprovision-hosted-runner"
-                : ProvisionActionKey,
-            InputJson: input,
-            SecretGrantIds: message.SecretGrantIds,
-            CreatedAtUtc: DateTime.UtcNow);
-
+    private async Task DispatchAsync(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        InfrastructureCommandRequestedEvent infrastructureRequest,
+        CancellationToken cancellationToken)
+    {
         var claimed = false;
         await transactionalEventExecutor.ExecuteAsync(async transactionCancellationToken =>
         {
             claimed = await TryClaimDispatchAsync(deployment, transactionCancellationToken);
             if (!claimed) return;
-
             hostedRunner.Status = HostedRunnerStatuses.Provisioning;
             hostedRunner.LastError = null;
             hostedRunner.UpdatedAt = DateTime.UtcNow;
@@ -146,9 +171,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         }, cancellationToken);
 
         if (!claimed)
-        {
             logger.LogInformation("Ignoring duplicate managed runner provisioning request for operation {OperationId} in state {Status}", deployment.Id, deployment.Status);
-        }
     }
 
     private static string RequirePrivateRuntimeHostAddress(string? value)
