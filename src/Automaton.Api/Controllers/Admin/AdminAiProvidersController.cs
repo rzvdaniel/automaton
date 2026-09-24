@@ -206,32 +206,13 @@ public class AdminAiProvidersController : ControllerBase
         if (provider == null)
             return NotFound();
 
-        // Check for duplicate name if name is being changed
-        if (request.Name != null && request.Name != provider.Name)
+        if (!await AiProviderAdminUpdatePolicy.TrySetNameAsync(dbContext, provider, id, request.Name))
         {
-            var existingProvider = await dbContext.AiProviders
-                .FirstOrDefaultAsync(p => p.Name == request.Name && p.Id != id);
-
-            if (existingProvider != null)
-                return BadRequest($"A provider with name '{request.Name}' already exists.");
-
-            provider.Name = request.Name;
+            return BadRequest($"A provider with name '{request.Name}' already exists.");
         }
 
         var previousIsActive = provider.IsActive;
-        if (request.DisplayName != null) provider.DisplayName = request.DisplayName;
-        if (request.Description != null) provider.Description = request.Description;
-        if (request.BaseUrl != null) provider.BaseUrl = request.BaseUrl;
-        if (request.IsActive.HasValue) provider.IsActive = request.IsActive.Value;
-        if (request.RequiresApiKey.HasValue) provider.RequiresApiKey = request.RequiresApiKey.Value;
-        if (request.EnvironmentKeyName != null) provider.EnvironmentKeyName = request.EnvironmentKeyName;
-        if (request.ApiKeyHelpUrl != null) provider.ApiKeyHelpUrl = request.ApiKeyHelpUrl;
-        if (request.IconName != null) provider.IconName = request.IconName;
-        if (request.SortOrder.HasValue) provider.SortOrder = request.SortOrder.Value;
-        // Allow clearing ExtraBodyJson by sending empty string; null means "don't change"
-        if (request.ExtraBodyJson != null) provider.ExtraBodyJson = string.IsNullOrWhiteSpace(request.ExtraBodyJson) ? null : request.ExtraBodyJson;
-
-        provider.UpdatedAt = DateTime.UtcNow;
+        AiProviderUpdateApplier.Apply(provider, request);
 
         await dbContext.SaveChangesAsync();
 
@@ -636,68 +617,28 @@ public class AdminAiProvidersController : ControllerBase
         if (model == null)
             return NotFound();
 
-        // Check for duplicate model ID if it's being changed
-        if (request.ModelId != null && request.ModelId != model.ModelId)
+        var modelIdError = await AiProviderAdminUpdatePolicy.TrySetModelIdAsync(
+            dbContext,
+            model,
+            id,
+            request.ModelId);
+        if (modelIdError is not null)
         {
-            var existingModel = await dbContext.AiModels
-                .FirstOrDefaultAsync(m => m.AiProviderId == model.AiProviderId && m.ModelId == request.ModelId && m.Id != id);
-
-            if (existingModel != null)
-                return BadRequest($"A model with ID '{request.ModelId}' already exists for this provider.");
-
-            model.ModelId = request.ModelId;
+            return BadRequest(modelIdError);
         }
 
-        // If setting as default, require a system API key for the provider
-        if (request.IsDefault == true && !model.IsDefault)
+        var defaultModelError = await AiProviderAdminUpdatePolicy.ValidateAndApplyDefaultModelAsync(
+            dbContext,
+            aiApiKeyService,
+            model,
+            request.IsDefault);
+        if (defaultModelError is not null)
         {
-            var provider = await dbContext.AiProviders.FindAsync(model.AiProviderId);
-            var providerName = provider?.Name ?? string.Empty;
-
-            var hasSystemKey = await aiApiKeyService.HasSystemApiKeyAsync(providerName);
-
-            if (!hasSystemKey)
-                return BadRequest($"Cannot set '{providerName}' as the global default: no system API key exists for this provider. " +
-                                  "Add an API key with 'For all users' scope first.");
-
-            var existingDefaults = await dbContext.AiModels
-                .Where(m => m.IsDefault && m.Id != id)
-                .ToListAsync();
-
-            foreach (var defaultModel in existingDefaults)
-            {
-                defaultModel.IsDefault = false;
-            }
+            return BadRequest(defaultModelError);
         }
 
-        // If setting as planning model, unset the global planning model across all providers
-        if (request.IsPlanningModel == true && !model.IsPlanningModel)
-        {
-            var existingPlanners = await dbContext.AiModels
-                .Where(m => m.IsPlanningModel && m.Id != id)
-                .ToListAsync();
-
-            foreach (var plannerModel in existingPlanners)
-            {
-                plannerModel.IsPlanningModel = false;
-            }
-        }
-
-        if (request.DisplayName != null) model.DisplayName = request.DisplayName;
-        if (request.Description != null) model.Description = request.Description;
-        if (request.IsActive.HasValue) model.IsActive = request.IsActive.Value;
-        if (request.IsDefault.HasValue) model.IsDefault = request.IsDefault.Value;
-        if (request.IsPlanningModel.HasValue) model.IsPlanningModel = request.IsPlanningModel.Value;
-        if (request.MaxTokens.HasValue) model.MaxTokens = request.MaxTokens.Value;
-        if (request.SupportsStreaming.HasValue) model.SupportsStreaming = request.SupportsStreaming.Value;
-        if (request.SupportsTools.HasValue) model.SupportsTools = request.SupportsTools.Value;
-        if (request.SupportsVision.HasValue) model.SupportsVision = request.SupportsVision.Value;
-        if (request.CostPer1MTokensInput.HasValue) model.CostPer1MTokensInput = request.CostPer1MTokensInput.Value;
-        if (request.CostPer1MTokensOutput.HasValue) model.CostPer1MTokensOutput = request.CostPer1MTokensOutput.Value;
-        if (request.ExtraBodyJson != null) model.ExtraBodyJson = string.IsNullOrWhiteSpace(request.ExtraBodyJson) ? null : request.ExtraBodyJson;
-        if (request.SortOrder.HasValue) model.SortOrder = request.SortOrder.Value;
-
-        model.UpdatedAt = DateTime.UtcNow;
+        await AiProviderAdminUpdatePolicy.ClearOtherPlanningModelsAsync(dbContext, model, request.IsPlanningModel);
+        AiModelUpdateApplier.Apply(model, request);
 
         await dbContext.SaveChangesAsync();
 
