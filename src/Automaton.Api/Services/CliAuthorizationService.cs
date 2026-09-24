@@ -153,7 +153,20 @@ public sealed class CliAuthorizationService
         request.ApiKeyId = entity.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        await WriteCredentialIssuedAuditAsync(request, entity, cancellationToken);
+
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+
+        logger.LogInformation("CLI authorization completed for user {UserId} on device {DeviceName}", request.UserId, request.DeviceName);
+        return new CliAuthorizationPollResult(rawKey, request.UserId.Value);
+    }
+
+    private Task WriteCredentialIssuedAuditAsync(
+        CliAuthorizationRequest request,
+        ApiKey entity,
+        CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Created,
             EntityType = AuditEntityTypes.ApiKey,
@@ -172,13 +185,6 @@ public sealed class CliAuthorizationService
                 Source = "cli-device-authorization"
             }
         }, cancellationToken);
-
-        if (transaction is not null)
-            await transaction.CommitAsync(cancellationToken);
-
-        logger.LogInformation("CLI authorization completed for user {UserId} on device {DeviceName}", request.UserId, request.DeviceName);
-        return new CliAuthorizationPollResult(rawKey, request.UserId.Value);
-    }
 
     public async Task<bool> CompleteAsync(
         Guid requestId,
