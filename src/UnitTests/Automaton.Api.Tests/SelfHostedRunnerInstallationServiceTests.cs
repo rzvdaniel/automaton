@@ -283,10 +283,11 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         var audit = new RecordingAuditEventService();
         var apiKeys = new ApiKeyService(db, NullLogger<ApiKeyService>.Instance, null!, audit);
         return new SelfHostedRunnerInstallationService(
-            db, apiKeys, userContext, audit,
+            db, userContext, audit,
+            new SelfHostedRunnerEnrollmentExchangeService(
+                db, apiKeys, audit, NullLogger<SelfHostedRunnerEnrollmentExchangeService>.Instance),
             Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(new HostedRunnerOptions { DockerImage = "automaton/runner:test", ServerUrl = "https://api.example.test" }),
-            NullLogger<SelfHostedRunnerInstallationService>.Instance);
+            Options.Create(new HostedRunnerOptions { DockerImage = "automaton/runner:test", ServerUrl = "https://api.example.test" }));
     }
 
     private static ApplicationDbContext CreateDbContext() => new(
