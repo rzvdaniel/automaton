@@ -28,7 +28,8 @@ jobs:
   variables:
     automatonAllSolution: './Automaton.All.sln'
     automatonServerProject: './src/Automaton.Api/Automaton.Api.csproj'
-    buildConfiguration: 'Release'
+    validationConfiguration: 'Debug'
+    publishConfiguration: 'Release'
 
   steps:
   - task: UseDotNet@2 
@@ -42,7 +43,7 @@ jobs:
     inputs:
       command: build
       projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
-      arguments: '--configuration $(buildConfiguration) --no-incremental --verbosity minimal'
+      arguments: '--configuration $(validationConfiguration) --no-incremental --verbosity minimal'
 
   - task: DotNetCoreCLI@2
     displayName: "Test all C# projects"
@@ -50,7 +51,7 @@ jobs:
       command: test
       projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
       publishTestResults: true
-      arguments: '--configuration $(buildConfiguration) --no-build --no-restore --verbosity minimal'
+      arguments: '--configuration $(validationConfiguration) --no-build --no-restore --verbosity minimal'
 
   - task: FileTransform@1
     displayName: Transform appsettings
@@ -65,7 +66,7 @@ jobs:
       command: 'publish'
       publishWebProjects: false
       projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Api/Automaton.Api.csproj'
-      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Api" --no-restore'
+      arguments: '--configuration $(publishConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Api" --no-restore'
       zipAfterPublish: false
     displayName: 'Publish Automaton Server'
 
