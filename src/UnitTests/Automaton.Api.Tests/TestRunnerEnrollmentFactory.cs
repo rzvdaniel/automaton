@@ -14,6 +14,12 @@ internal static class TestRunnerEnrollmentFactory
         ApplicationDbContext db,
         IAuditEventService auditEventService,
         HostedRunnerOptions? hostedRunnerOptions = null)
+        => CreateWithSecretGrantService(db, auditEventService, hostedRunnerOptions).Service;
+
+    public static RunnerEnrollmentTestServices CreateWithSecretGrantService(
+        ApplicationDbContext db,
+        IAuditEventService auditEventService,
+        HostedRunnerOptions? hostedRunnerOptions = null)
     {
         var apiKeyService = new ApiKeyService(
             db,
@@ -22,7 +28,8 @@ internal static class TestRunnerEnrollmentFactory
             auditEventService);
         var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
         var hostedOptions = Options.Create(hostedRunnerOptions ?? new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" });
-        return new RunnerEnrollmentService(
+        var grants = new ExecutionSecretGrantService(db, protector);
+        var service = new RunnerEnrollmentService(
             db,
             new HostedRunnerEnrollmentExchangeService(
                 db,
@@ -45,6 +52,11 @@ internal static class TestRunnerEnrollmentFactory
                 auditEventService,
                 Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
                 new SecretStore(db, protector),
-                new ExecutionSecretGrantService(db, protector)));
+                grants));
+        return new RunnerEnrollmentTestServices(service, grants);
     }
 }
+
+internal sealed record RunnerEnrollmentTestServices(
+    RunnerEnrollmentService Service,
+    ExecutionSecretGrantService SecretGrants);
