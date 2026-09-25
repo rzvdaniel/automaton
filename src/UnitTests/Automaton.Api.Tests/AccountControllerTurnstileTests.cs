@@ -17,7 +17,7 @@ public class AccountControllerTurnstileTests
     [Test]
     public async Task RegisterUser_WhenTurnstileValidationFails_ReturnsBadRequest()
     {
-        var controller = CreateController(new StubTurnstileService(false));
+        var controller = CreateRegistrationController(new StubTurnstileService(false));
 
         var result = await controller.RegisterUser(new RegisterUserCommand("User", "user@example.com", "Password1!", "user", "bad-token"));
 
@@ -27,7 +27,7 @@ public class AccountControllerTurnstileTests
     [Test]
     public async Task ForgotUserPassword_WhenTurnstileValidationFails_ReturnsBadRequest()
     {
-        var controller = CreateController(new StubTurnstileService(false));
+        var controller = CreateRecoveryController(new StubTurnstileService(false));
 
         var result = await controller.ForgotUserPassword(new ForgotUserPasswordCommand("user@example.com", "bad-token"), CancellationToken.None);
 
@@ -38,7 +38,7 @@ public class AccountControllerTurnstileTests
     public async Task ForgotUserPassword_WhenTurnstileValidationSucceeds_DelegatesToMediator()
     {
         var mediator = new StubMediator();
-        var controller = CreateController(new StubTurnstileService(true), mediator);
+        var controller = CreateRecoveryController(new StubTurnstileService(true), mediator);
 
         var result = await controller.ForgotUserPassword(new ForgotUserPasswordCommand("user@example.com", "good-token"), CancellationToken.None);
 
@@ -46,7 +46,39 @@ public class AccountControllerTurnstileTests
         Assert.That(mediator.LastRequest, Is.InstanceOf<ForgotUserPasswordCommand>());
     }
 
-    private static AccountController CreateController(ICloudflareTurnstileService turnstileService, IMediator? mediator = null)
+    private static AccountRegistrationController CreateRegistrationController(ICloudflareTurnstileService turnstileService)
+    {
+        var controller = new AccountRegistrationController(
+            CreateConfiguration(),
+            null!,
+            null!,
+            null!,
+            null!,
+            turnstileService,
+            null!,
+            NullLogger<AccountRegistrationController>.Instance)
+        {
+            ControllerContext = CreateControllerContext()
+        };
+
+        return controller;
+    }
+
+    private static AccountPasswordRecoveryController CreateRecoveryController(
+        ICloudflareTurnstileService turnstileService,
+        IMediator? mediator = null)
+    {
+        var services = new ServiceCollection();
+        if (mediator != null)
+            services.AddSingleton(mediator);
+
+        return new AccountPasswordRecoveryController(turnstileService)
+        {
+            ControllerContext = CreateControllerContext(services.BuildServiceProvider())
+        };
+    }
+
+    private static ConfigurationService CreateConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -56,38 +88,22 @@ public class AccountControllerTurnstileTests
             })
             .Build();
 
-        var services = new ServiceCollection();
-        if (mediator != null)
-        {
-            services.AddSingleton(mediator);
-        }
+        return new ConfigurationService(configuration);
+    }
 
-        var controller = new AccountController(
-            new ConfigurationService(configuration),
-            null!,
-            null!,
-            null!,
-            null!,
-            turnstileService,
-            null!,
-            new RefreshTokenCookieService(),
-            null!,
-            NullLogger<AccountController>.Instance)
+    private static ControllerContext CreateControllerContext(IServiceProvider? requestServices = null)
+    {
+        return new ControllerContext
         {
-            ControllerContext = new ControllerContext
+            HttpContext = new DefaultHttpContext
             {
-                HttpContext = new DefaultHttpContext
+                RequestServices = requestServices ?? new ServiceCollection().BuildServiceProvider(),
+                Connection =
                 {
-                    RequestServices = services.BuildServiceProvider(),
-                    Connection =
-                    {
-                        RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.5")
-                    }
+                    RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.5")
                 }
             }
         };
-
-        return controller;
     }
 
     private sealed class StubTurnstileService(bool shouldPass) : ICloudflareTurnstileService
