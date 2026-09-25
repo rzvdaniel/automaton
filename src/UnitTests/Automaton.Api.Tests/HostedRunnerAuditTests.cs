@@ -34,22 +34,7 @@ public partial class HostedRunnerAuditTests
         var runnerId = Guid.NewGuid();
         var accessor = CreateHttpContextAccessor(userId, "runner-owner@automaton.test");
         var userContext = new UserContextService(accessor);
-        var runnerService = new RunnerService(
-            db,
-            userContext,
-            authorizationService: null!,
-            runnerRegistrationService: new RunnerRegistrationService(
-                db, userContext, new RunnerAuditService(new NoOpAuditEventService())),
-            runnerDeletionService: new RunnerDeletionService(db, new RunnerDeletionPolicy(db, null!), new NoOpAuditEventService(), userContext),
-            connectionSessionService: new RunnerConnectionSessionService(db, null!, userContext),
-            runnerQueryService: new RunnerQueryService(
-                db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)),
-            restartCompletionService: new HostedRunnerRestartCompletionService(db, new NoOpAuditEventService()),
-            flowExecutionService: new RunnerFlowExecutionService(
-                new RunnerQueryService(db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)), null!),
-            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
-            connectionLifecycleService: new RunnerConnectionLifecycleService(
-                db, null!, null!, null!, null!, null!, null!));
+        var runnerService = HostedRunnerProfileTestServiceFactory.Create(db, userContext);
 
         await runnerService.Add(new RunnerDetails
         {
@@ -1449,7 +1434,7 @@ public partial class HostedRunnerAuditTests
         }
     }
 
-    private sealed class NoOpAuditEventService : IAuditEventService
+    internal sealed class NoOpAuditEventService : IAuditEventService
     {
         public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
