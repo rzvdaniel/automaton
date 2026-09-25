@@ -27,16 +27,20 @@ public sealed class RunnerRuntimeProcessManagerTests : RunnerRuntimeProcessManag
             "runtime.stdout.log");
         var output = await WaitForLogLineAsync(outputPath, "child:");
         var childMarker = output.LastIndexOf("child:", StringComparison.Ordinal);
-        var childPid = int.Parse(output[(childMarker + "child:".Length)..].Split('\r', '\n')[0]);
+        var childPid = int.Parse(
+            output[(childMarker + "child:".Length)..]
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)[0]);
 
         using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        await cancelled.CancelAsync();
         await manager.StopAsync(cancelled.Token);
+        var runtimeStopped = await WaitForProcessExitAsync(metadata.ProcessId!.Value);
+        var childStopped = await WaitForProcessExitAsync(childPid);
 
         Assert.Multiple(() =>
         {
-            Assert.That(IsProcessAlive(metadata.ProcessId!.Value), Is.False);
-            Assert.That(IsProcessAlive(childPid), Is.False);
+            Assert.That(runtimeStopped, Is.True);
+            Assert.That(childStopped, Is.True);
         });
     }
 
@@ -95,8 +99,7 @@ public sealed class RunnerRuntimeProcessManagerTests : RunnerRuntimeProcessManag
     {
         var registry = new RunnerRuntimeRegistry();
         using var manager = CreateManager(new RunnerWorkspaceService(), registry);
-        var contract = CreateContract(["--does-not-listen"]);
-        contract.Runtime.Command!.Arguments = ["--version"];
+        var contract = CreateContract(["--startup-delay", "5000"]);
         contract.Health.StartupTimeoutSeconds = 1;
 
         Assert.That(

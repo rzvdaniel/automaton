@@ -41,8 +41,7 @@ internal static class RunnerRuntimeProcessManagerFailedReplacementScenario
 
     private static async Task AssertReplacementFailsAsync(ScenarioContext context)
     {
-        var replacement = CreateContract([]);
-        replacement.Runtime.Command!.Arguments = ["missing-runtime-fixture.dll"];
+        var replacement = CreateContract(["--startup-delay", "5000"]);
         replacement.Health.StartupTimeoutSeconds = 1;
         Assert.That(
             async () => await context.Manager.ApplyAsync(context.AppId, context.TargetId, replacement),
