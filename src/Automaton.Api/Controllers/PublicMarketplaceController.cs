@@ -2,6 +2,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,21 @@ public class PublicMarketplaceController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly AppFileStorageService _appFileStorageService;
     private readonly AppsService _appsService;
+    private readonly PublicMarketplaceCreatorAppsQuery _creatorAppsQuery;
+    private readonly PublicMarketplaceCatalogQuery _catalogQuery;
 
     public PublicMarketplaceController(
         ApplicationDbContext dbContext,
         AppFileStorageService appFileStorageService,
-        AppsService appsService)
+        AppsService appsService,
+        PublicMarketplaceCreatorAppsQuery creatorAppsQuery,
+        PublicMarketplaceCatalogQuery catalogQuery)
     {
         _dbContext = dbContext;
         _appFileStorageService = appFileStorageService;
         _appsService = appsService;
+        _creatorAppsQuery = creatorAppsQuery;
+        _catalogQuery = catalogQuery;
     }
 
     [HttpGet("apps")]
@@ -35,96 +42,12 @@ public class PublicMarketplaceController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] int take = 20)
     {
-        var currentUserId = TryGetCurrentUserId();
-        var query = _dbContext.WebApps
-            .AsNoTracking()
-            .Where(a =>
-                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
-                a.ReviewStatus == AppReviewStatuses.Approved &&
-                a.AccessStatus == AppAccessStatuses.Active);
+        var apps = await _catalogQuery.GetAppsAsync(
+            category, search, take, TryGetCurrentUserId(), HttpContext.RequestAborted);
 
-        query = ApplyCatalogFilters(query, category, search);
-
-        var apps = await query
-            .OrderByDescending(a => a.IsFeatured)
-            .ThenByDescending(a => a.StarCount)
-            .ThenByDescending(a => a.ViewCount)
-            .ThenByDescending(a => a.PublishedAt)
-            .Take(Math.Clamp(take, 1, 100))
-            .Select(a => new MarketplaceAppCardDto
-            {
-                Id = a.Id,
-                Name = a.Name,
-                CreatorPublicUsername = _dbContext.WebAppUsers
-                    .Where(wu => wu.WebAppId == a.Id)
-                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
-                    .Select(u => u.PublicUsername)
-                    .FirstOrDefault(),
-                CreatorDisplayName = _dbContext.WebAppUsers
-                    .Where(wu => wu.WebAppId == a.Id)
-                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
-                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
-                    .FirstOrDefault(),
-                Summary = a.Summary,
-                Description = a.Description,
-                ThumbnailUrl = a.ThumbnailUrl ??
-                    _dbContext.WebAppScreenshots
-                        .Where(s => s.WebAppId == a.Id)
-                        .OrderBy(s => s.SortOrder)
-                        .ThenBy(s => s.CreatedAt)
-                        .Select(s => s.ImageUrl)
-                        .FirstOrDefault(),
-                Category = a.Category,
-                Tags = a.Tags,
-                ViewCount = a.ViewCount,
-                StarCount = a.StarCount,
-                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
-                IsForkable = a.IsForkable,
-                IsStarredByCurrentUser = currentUserId.HasValue &&
-                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
-                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
-                PublishedAt = a.PublishedAt,
-                UpdatedAt = a.Updated,
-                IsFeatured = a.IsFeatured,
-                Screenshots = _dbContext.WebAppScreenshots
-                    .Where(s => s.WebAppId == a.Id)
-                    .OrderBy(s => s.SortOrder)
-                    .ThenBy(s => s.CreatedAt)
-                    .Select(s => new MarketplaceAppScreenshotDto
-                    {
-                        Id = s.Id,
-                        ImageUrl = s.ImageUrl,
-                        Caption = s.Caption,
-                        SortOrder = s.SortOrder
-                    })
-                    .ToList()
-            })
-            .ToListAsync();
-
-            await PopulateApplicationSourceFlagsAsync(apps);
+        await PopulateApplicationSourceFlagsAsync(apps);
 
         return Ok(apps);
-    }
-
-    private static IQueryable<WebApp> ApplyCatalogFilters(
-        IQueryable<WebApp> query,
-        string? category,
-        string? search)
-    {
-        if (!string.IsNullOrWhiteSpace(category))
-            query = query.Where(app => app.Category == category);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(app =>
-                app.Name.ToLower().Contains(term) ||
-                (app.Summary != null && app.Summary.ToLower().Contains(term)) ||
-                (app.Tags != null && app.Tags.ToLower().Contains(term)));
-        }
-        return query;
     }
 
     [HttpGet("apps/{appId:guid}")]
@@ -132,7 +55,53 @@ public class PublicMarketplaceController : ControllerBase
     {
         var currentUserId = TryGetCurrentUserId();
 
-        var app = await _dbContext.WebApps
+        var app = await LoadAppDetailsAsync(appId, currentUserId);
+
+        if (app == null)
+        {
+            return NotFound(new { message = "App not found or not published" });
+        }
+
+        var ownerUserId = await _dbContext.WebAppUsers
+            .AsNoTracking()
+            .Where(wu => wu.WebAppId == app.Id)
+            .Select(wu => (Guid?)wu.UserId)
+            .FirstOrDefaultAsync();
+
+        app.CanRemix = app.IsForkable &&
+            ownerUserId.HasValue &&
+            _appFileStorageService.AppSourceExists(ownerUserId.Value, app.Id);
+
+        app.Screenshots = await _dbContext.WebAppScreenshots
+            .AsNoTracking()
+            .Where(s => s.WebAppId == app.Id)
+            .OrderBy(s => s.SortOrder)
+            .ThenBy(s => s.CreatedAt)
+            .Select(s => new MarketplaceAppScreenshotDto
+            {
+                Id = s.Id,
+                ImageUrl = s.ImageUrl,
+                Caption = s.Caption,
+                SortOrder = s.SortOrder
+            })
+            .ToListAsync();
+
+        await PopulateApplicationSourceFlagsAsync([app]);
+
+        app.RelatedApps = await LoadRelatedAppsAsync(app, currentUserId);
+
+        await PopulateApplicationSourceFlagsAsync(app.RelatedApps);
+
+        app.ForksAndRemixes = await LoadForksAndRemixesAsync(app, currentUserId);
+
+        await PopulateApplicationSourceFlagsAsync(app.ForksAndRemixes);
+
+        return Ok(app);
+    }
+
+    private async Task<MarketplaceAppDetailsDto?> LoadAppDetailsAsync(Guid appId, Guid? currentUserId)
+    {
+        return await _dbContext.WebApps
             .AsNoTracking()
             .Where(a =>
                 a.Id == appId &&
@@ -179,39 +148,11 @@ public class PublicMarketplaceController : ControllerBase
                 IsFeatured = a.IsFeatured
             })
             .FirstOrDefaultAsync();
+    }
 
-        if (app == null)
-        {
-            return NotFound(new { message = "App not found or not published" });
-        }
-
-        var ownerUserId = await _dbContext.WebAppUsers
-            .AsNoTracking()
-            .Where(wu => wu.WebAppId == app.Id)
-            .Select(wu => (Guid?)wu.UserId)
-            .FirstOrDefaultAsync();
-
-        app.CanRemix = app.IsForkable &&
-            ownerUserId.HasValue &&
-            _appFileStorageService.AppSourceExists(ownerUserId.Value, app.Id);
-
-        app.Screenshots = await _dbContext.WebAppScreenshots
-            .AsNoTracking()
-            .Where(s => s.WebAppId == app.Id)
-            .OrderBy(s => s.SortOrder)
-            .ThenBy(s => s.CreatedAt)
-            .Select(s => new MarketplaceAppScreenshotDto
-            {
-                Id = s.Id,
-                ImageUrl = s.ImageUrl,
-                Caption = s.Caption,
-                SortOrder = s.SortOrder
-            })
-            .ToListAsync();
-
-        await PopulateApplicationSourceFlagsAsync([app]);
-
-        app.RelatedApps = await _dbContext.WebApps
+    private async Task<List<MarketplaceAppCardDto>> LoadRelatedAppsAsync(MarketplaceAppDetailsDto app, Guid? currentUserId)
+    {
+        return await _dbContext.WebApps
             .AsNoTracking()
             .Where(a =>
                 a.Id != app.Id &&
@@ -277,10 +218,11 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
+    }
 
-        await PopulateApplicationSourceFlagsAsync(app.RelatedApps);
-
-        app.ForksAndRemixes = await _dbContext.WebApps
+    private async Task<List<MarketplaceAppCardDto>> LoadForksAndRemixesAsync(MarketplaceAppDetailsDto app, Guid? currentUserId)
+    {
+        return await _dbContext.WebApps
             .AsNoTracking()
             .Where(a =>
                 a.ForkedFromAppId == app.Id &&
@@ -341,10 +283,6 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
-
-        await PopulateApplicationSourceFlagsAsync(app.ForksAndRemixes);
-
-        return Ok(app);
     }
 
     [HttpGet("apps/{appId:guid}/creator-apps")]
@@ -352,82 +290,15 @@ public class PublicMarketplaceController : ControllerBase
     {
         var currentUserId = TryGetCurrentUserId();
 
-        var creatorUserId = await _dbContext.WebApps
-            .AsNoTracking()
-            .Where(a =>
-                a.Id == appId &&
-                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
-                a.ReviewStatus == AppReviewStatuses.Approved &&
-                a.AccessStatus == AppAccessStatuses.Active)
-            .Join(_dbContext.WebAppUsers, a => a.Id, wu => wu.WebAppId, (_, wu) => wu.UserId)
-            .FirstOrDefaultAsync();
+        var creatorUserId = await _creatorAppsQuery.FindCreatorUserIdAsync(appId);
 
         if (creatorUserId == Guid.Empty)
         {
             return NotFound(new { message = "Creator not found for app" });
         }
 
-        var apps = await _dbContext.WebApps
-            .AsNoTracking()
-            .Where(a =>
-                a.Id != appId &&
-                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
-                a.ReviewStatus == AppReviewStatuses.Approved &&
-                a.AccessStatus == AppAccessStatuses.Active &&
-                _dbContext.WebAppUsers.Any(wu => wu.WebAppId == a.Id && wu.UserId == creatorUserId))
-            .OrderByDescending(a => a.IsProfileFeatured)
-            .ThenByDescending(a => a.IsFeatured)
-            .ThenByDescending(a => a.PublishedAt)
-            .Take(Math.Clamp(take, 1, 12))
-            .Select(a => new MarketplaceAppCardDto
-            {
-                Id = a.Id,
-                Name = a.Name,
-                CreatorPublicUsername = _dbContext.Users
-                    .Where(u => u.Id == creatorUserId)
-                    .Select(u => u.PublicUsername)
-                    .FirstOrDefault(),
-                CreatorDisplayName = _dbContext.Users
-                    .Where(u => u.Id == creatorUserId)
-                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
-                    .FirstOrDefault(),
-                Summary = a.Summary,
-                Description = a.Description,
-                ThumbnailUrl = a.ThumbnailUrl ??
-                    _dbContext.WebAppScreenshots
-                        .Where(s => s.WebAppId == a.Id)
-                        .OrderBy(s => s.SortOrder)
-                        .ThenBy(s => s.CreatedAt)
-                        .Select(s => s.ImageUrl)
-                        .FirstOrDefault(),
-                Category = a.Category,
-                Tags = a.Tags,
-                ViewCount = a.ViewCount,
-                StarCount = a.StarCount,
-                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
-                IsForkable = a.IsForkable,
-                IsStarredByCurrentUser = currentUserId.HasValue &&
-                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
-                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
-                PublishedAt = a.PublishedAt,
-                UpdatedAt = a.Updated,
-                IsFeatured = a.IsFeatured,
-                Screenshots = _dbContext.WebAppScreenshots
-                    .Where(s => s.WebAppId == a.Id)
-                    .OrderBy(s => s.SortOrder)
-                    .ThenBy(s => s.CreatedAt)
-                    .Select(s => new MarketplaceAppScreenshotDto
-                    {
-                        Id = s.Id,
-                        ImageUrl = s.ImageUrl,
-                        Caption = s.Caption,
-                        SortOrder = s.SortOrder
-                    })
-                    .ToList()
-            })
+        var apps = await _creatorAppsQuery
+            .FindCreatorApps(appId, creatorUserId, currentUserId, take)
             .ToListAsync();
 
         await PopulateApplicationSourceFlagsAsync(apps);
@@ -514,44 +385,4 @@ public class PublicMarketplaceController : ControllerBase
                 _appFileStorageService.HasAnySourceEntries(ownerUserId, app.Id);
         }
     }
-}
-
-public class MarketplaceAppCardDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string? CreatorPublicUsername { get; set; }
-    public string? CreatorDisplayName { get; set; }
-    public string? Summary { get; set; }
-    public string? Description { get; set; }
-    public string? ThumbnailUrl { get; set; }
-    public string? Category { get; set; }
-    public string? Tags { get; set; }
-    public int ViewCount { get; set; }
-    public int StarCount { get; set; }
-    public int ForkCount { get; set; }
-    public bool IsForkable { get; set; }
-    public bool IsStarredByCurrentUser { get; set; }
-    public string? PublicUrl { get; set; }
-    public bool CanLaunch { get; set; }
-    public DateTime? PublishedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
-    public bool HasApplicationSource { get; set; }
-    public bool IsFeatured { get; set; }
-    public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
-}
-
-public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
-{
-    public bool CanRemix { get; set; }
-    public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
-    public List<MarketplaceAppCardDto> ForksAndRemixes { get; set; } = new();
-}
-
-public class MarketplaceAppScreenshotDto
-{
-    public Guid Id { get; set; }
-    public string ImageUrl { get; set; } = string.Empty;
-    public string? Caption { get; set; }
-    public int SortOrder { get; set; }
 }

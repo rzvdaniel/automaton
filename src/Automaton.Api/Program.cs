@@ -384,6 +384,8 @@ services.AddScoped<IAppRunnerAuthorizationPolicy, AppRunnerAuthorizationPolicy>(
 services.AddScoped<AppRunnerAssignmentPolicy>();
 services.AddScoped<AdminAppsService>();
 services.AddScoped<PublicAppsService>();
+services.AddScoped<PublicMarketplaceCreatorAppsQuery>();
+services.AddScoped<PublicMarketplaceCatalogQuery>();
 services.AddScoped<WebAppStarService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
