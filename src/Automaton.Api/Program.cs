@@ -1,4 +1,4 @@
-﻿using Automaton.Core.Scripting;
+using Automaton.Core.Scripting;
 using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
@@ -374,6 +374,7 @@ services.AddHangfireServer();
 
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
+services.AddScoped<AppImageManagementService>();
 services.AddScoped<AppRuntimeArchiveUploadService>();
 services.AddScoped<IAppDeploymentTargetResolver, AppDeploymentTargetResolver>();
 services.AddScoped<AppDeploymentTargetStateService>();
