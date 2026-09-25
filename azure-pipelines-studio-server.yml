@@ -23,9 +23,8 @@ jobs:
     vmImage: 'ubuntu-latest'
 
   variables:
-    automatonServerSolution: './Automaton.Server.sln'
+    automatonAllSolution: './Automaton.All.sln'
     automatonServerProject: './src/Automaton.Api/Automaton.Api.csproj'
-    buildPlatform: 'Any CPU'
     buildConfiguration: 'Release'
 
   steps:
@@ -39,36 +38,16 @@ jobs:
     displayName: "Build all C# projects with analyzer errors"
     inputs:
       command: build
-      projects: '$(System.DefaultWorkingDirectory)/Automaton.All.sln'
+      projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
       arguments: '--configuration $(buildConfiguration) --no-incremental --verbosity minimal'
 
   - task: DotNetCoreCLI@2
-    displayName: "Test"
+    displayName: "Test all C# projects"
     inputs:
       command: test
-      projects: '**/$(automatonServerSolution)'
-      arguments: '--configuration $(buildConfiguration)'
-  
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore Nuget Packages'
-    inputs:
-      command: 'restore'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonServerSolution)'
-      includeNuGetOrg: true
-    
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'build'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonServerSolution)'
-      arguments: '--no-restore'
-    displayName: 'Build projects'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonServerSolution)'
-      arguments: '--no-restore --no-build'
-    displayName: 'Run Tests'
+      projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
+      publishTestResults: true
+      arguments: '--configuration $(buildConfiguration) --no-build --no-restore --verbosity minimal'
 
   - task: FileTransform@1
     displayName: Transform appsettings
