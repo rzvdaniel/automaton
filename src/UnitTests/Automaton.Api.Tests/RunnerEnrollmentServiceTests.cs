@@ -192,13 +192,28 @@ public class RunnerEnrollmentServiceTests
         var grantService = new ExecutionSecretGrantService(db, protector);
         var service = new RunnerEnrollmentService(
             db,
-            apiKeyService,
-            auditService,
-            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
-            new SecretStore(db, protector),
-            grantService,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
+            new HostedRunnerEnrollmentExchangeService(
+                db,
+                apiKeyService,
+                auditService,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<HostedRunnerEnrollmentExchangeService>.Instance),
+            new InfrastructureRunnerEnrollmentExchangeService(
+                db,
+                apiKeyService,
+                auditService,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<InfrastructureRunnerEnrollmentExchangeService>.Instance),
+            new RunnerEnrollmentAdministrationService(
+                db,
+                auditService,
+                Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+                Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" })),
+            new HostedRunnerEnrollmentProvisioningService(
+                db,
+                apiKeyService,
+                auditService,
+                Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+                new SecretStore(db, protector),
+                grantService));
 
         var priorMaterial = await service.CreateHostedRunnerAsync(
             hostedRunner.Id,
