@@ -2,7 +2,6 @@ using Automaton.Ai.Models;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
-using Automaton.Api.Services.Interfaces;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
@@ -22,12 +21,9 @@ namespace Automaton.Api.Controllers;
 public abstract class AiConversationControllerBase : BaseController
 {
     protected readonly IAutomatonMcpClient _mcpClient;
-    protected readonly AiApiKeyService _aiApiKeyService;
-    protected readonly IAiChatHistoryService _chatHistoryService;
-    protected readonly IAiProvidersSettingsService _settingsService;
+    protected readonly AiConversationHistoryPersistenceService _historyPersistenceService;
+    protected readonly AiConversationProviderResolver _providerResolver;
     protected readonly ISystemAiRateLimitService _rateLimitService;
-    protected readonly AiProviderMetadataService _providerMetadataService;
-    protected readonly ITokenBudgetService _tokenBudgetService;
     protected readonly IAppSystemPromptBuilder _appPromptBuilder;
     protected readonly ILogger _logger;
 
@@ -41,22 +37,16 @@ public abstract class AiConversationControllerBase : BaseController
 
     protected AiConversationControllerBase(
         IAutomatonMcpClient mcpClient,
-        AiApiKeyService aiApiKeyService,
-        IAiChatHistoryService chatHistoryService,
-        IAiProvidersSettingsService settingsService,
+        AiConversationHistoryPersistenceService historyPersistenceService,
+        AiConversationProviderResolver providerResolver,
         ISystemAiRateLimitService rateLimitService,
-        AiProviderMetadataService providerMetadataService,
-        ITokenBudgetService tokenBudgetService,
         IAppSystemPromptBuilder appPromptBuilder,
         ILogger logger)
     {
         _mcpClient = mcpClient;
-        _aiApiKeyService = aiApiKeyService;
-        _chatHistoryService = chatHistoryService;
-        _settingsService = settingsService;
+        _historyPersistenceService = historyPersistenceService;
+        _providerResolver = providerResolver;
         _rateLimitService = rateLimitService;
-        _providerMetadataService = providerMetadataService;
-        _tokenBudgetService = tokenBudgetService;
         _appPromptBuilder = appPromptBuilder;
         _logger = logger;
     }
@@ -114,75 +104,35 @@ public abstract class AiConversationControllerBase : BaseController
         {
             userId = GetUserId();
 
-            // 1. Resolve provider/model/key
-            var provider = request.Provider;
-            var model = request.Model;
-
-            if (string.IsNullOrWhiteSpace(model))
-                model = await _providerMetadataService.GetPreferredModelAsync(provider);
-
-            if (string.IsNullOrWhiteSpace(model))
+            var providerResolution = await _providerResolver.ResolveAsync(userId, request.Provider, request.Model);
+            if (providerResolution.Configuration is null)
             {
-                await WriteErrorEvent($"No active model configured for provider '{provider}'.");
+                await WriteErrorEvent(providerResolution.ErrorMessage!);
                 return;
             }
 
-            // Pass through the model selection policy hook.
-            model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
-
-            var aiConfig = await _settingsService.GetEffectiveConfigAsync();
-
-            var modelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(provider, model);
-            var modelExtraBodyJson = await _providerMetadataService.GetModelExtraBodyJsonAsync(provider, model);
-            var modelSupportsTools = await _providerMetadataService.GetModelSupportsToolsAsync(provider, model);
-
-            (var apiKey, isSystemKey) = await _aiApiKeyService.GetDecryptedApiKeyWithSourceAsync(userId, provider);
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                await WriteErrorEvent($"No API key configured for provider '{provider}'.");
-                return;
-            }
-
-            _logger.LogDebug(
-                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, systemKey={IsSystemKey}",
-                userId, provider, model, isSystemKey);
+            var providerConfiguration = providerResolution.Configuration;
+            isSystemKey = providerConfiguration.IsSystemKey;
+            var provider = providerConfiguration.Provider;
+            var model = providerConfiguration.Model;
+            var aiConfig = providerConfiguration.Settings;
 
             // 2. Resolve session
-            sessionId = await ResolveSessionAsync(request, userId, provider, model);
+            sessionId = await _historyPersistenceService.ResolveSessionAsync(
+                request.SessionId,
+                request.ResourceId,
+                ResourceType,
+                userId,
+                provider,
+                model);
             var resolvedSessionId = sessionId.Value;
 
-            // 3. Load history
-            var history = await LoadConversationHistoryAsync(resolvedSessionId, userId);
-            var compactedHistory = ConversationHistoryCompactor.Compact(
-                history,
-                aiConfig.MaxConversationHistoryMessages,
-                aiConfig.HistoryCompaction);
-
-            // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
-            var promptParts = await BuildSystemPromptAsync(request, userId, resolvedSessionId, compactedHistory, cancellationToken);
-            var mode = ConversationModeFactory.From(request.Mode);
-            var modePromptSuffix = mode.SystemPromptSuffix;
-            // Append mode suffix to the base prompt so it stays within the cached block
-            var partsWithMode = promptParts with { BasePrompt = promptParts.BasePrompt + modePromptSuffix };
-
-            // 5. Wire tool provider
-            _mcpClient.SetToolProvider(GetToolProvider());
-
-            // 6. Pre-conversation hook (e.g. create version snapshot)
-            var conversationToken = await OnBeforeConversationAsync(request, userId, resolvedSessionId);
-
-            // 6b. Persist user message immediately — before the AI responds.
-            //     Industry standard: the user's message belongs to history the moment it is sent,
-            //     regardless of whether the AI succeeds, fails, or the stream is cancelled.
-            await EnsurePolicyMarkerMessagesAsync(resolvedSessionId, userId);
-            await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-            {
-                SessionId = resolvedSessionId,
-                Role = "user",
-                Content = request.Message,
-                MessageType = ChatMessageType.Text,
-                Metadata = "{}"
-            }, userId);
+            var preparation = await PrepareConversationAsync(
+                request,
+                userId,
+                resolvedSessionId,
+                aiConfig,
+                cancellationToken);
 
             // 7. Subscribe to events and run conversation
             eventHandler = (_, e) =>
@@ -193,80 +143,27 @@ public abstract class AiConversationControllerBase : BaseController
             _mcpClient.ConversationUpdated += eventHandler;
 
             // 8. Run conversation
-            var conversationRequest = new ConversationRequest
-            {
-                ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
-                InitialMessage = request.Message,
-                SystemPrompt = partsWithMode.Full,
-                SystemPromptParts = partsWithMode,
-                Provider = provider,
-                Model = model,
-                ApiKey = apiKey,
-                ConversationHistory = compactedHistory,
-                Context = BuildContextDictionary(request, userId),
-                MaxIterations = mode.Name == ConversationModes.Autonomous
-                    ? IterationLimits.ResolveForAutonomous(
-                        globalOverride:     aiConfig.MaxIterations,
-                        autonomousOverride: aiConfig.IterationLimits.Autonomous)
-                    : IterationLimits.Resolve(
-                        _resolvedTier,
-                        globalOverride: aiConfig.MaxIterations,
-                        tierOverride:   aiConfig.IterationLimits.For(_resolvedTier)),
-                MaxConsecutiveFailures = aiConfig.MaxConsecutiveFailures,
-                MaxTokens = modelMaxTokens,
-                MaxRateLimitRetries = aiConfig.RateLimitRetry.MaxRetries,
-                RateLimitRetryInitialDelaySeconds = aiConfig.RateLimitRetry.InitialDelaySeconds,
-                StreamingTimeoutMinutes = aiConfig.Streaming.TimeoutMinutes,
-                Mode = request.Mode,
-                ExtraBodyJson = modelExtraBodyJson,
-                SupportsTools = modelSupportsTools
-            };
+            var conversationRequest = BuildConversationRequest(request, userId, providerConfiguration, preparation);
 
             var result = await _mcpClient.StartConversationAsync(conversationRequest, cancellationToken);
 
             var updatesSnapshot = new List<ConversationUpdatedEvent>(pendingUpdates.ToArray());
-
-            // 9. Persist AI responses and usage on success.
-            if (result.IsSuccess)
-            {
-                var savedToolCallIds = new HashSet<string>();
-                foreach (var update in updatesSnapshot)
-                    await SaveConversationUpdateAsync(update, resolvedSessionId, userId, savedToolCallIds);
-
-                if (result.ApiCallCount > 0)
-                    await _chatHistoryService.IncrementApiCallsAsync(resolvedSessionId, userId, result.ApiCallCount);
-
-                // 8b. Post-conversation hook (e.g. update version summary)
-                await OnAfterConversationAsync(request, userId, result, conversationToken);
-
-                await WriteEvent("done", new
-                {
-                    conversationId = result.ConversationId,
-                    sessionId,
-                    model,
-                    effectiveVerificationStrategy = _effectiveVerificationStrategy,
-                    effectiveExecutionPolicy = _effectiveExecutionPolicy,
-                    success = true
-                });
-            }
-            else
-            {
-                // Persist usage metrics even when generation fails so spent tokens are not lost.
-                await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
-
-                var errorMsg = result.ErrorMessage ?? "Conversation failed";
-                if (IsRateLimitError(errorMsg))
-                    await WriteErrorEvent(RateLimitMessage(isSystemKey), "RATE_LIMIT");
-                else
-                    await WriteErrorEvent(errorMsg);
-            }
+            await HandleConversationResultAsync(
+                request,
+                result,
+                updatesSnapshot,
+                resolvedSessionId,
+                userId,
+                model,
+                isSystemKey,
+                preparation.ConversationToken);
         }
         catch (OperationCanceledException)
         {
             _logger.LogDebug("AI conversation stream cancelled");
 
             // Client cancelled/closed stream — still persist consumed token usage.
-            await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
+            await _historyPersistenceService.FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
 
             await WriteEvent("cancelled", new { message = "Stream cancelled by client" });
         }
@@ -275,7 +172,7 @@ public abstract class AiConversationControllerBase : BaseController
             _logger.LogError(ex, "Error during AI conversation stream");
 
             // Persist token usage for unexpected failures as best-effort accounting.
-            await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
+            await _historyPersistenceService.FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
 
             if (IsRateLimitError(ex.Message))
                 await WriteErrorEvent(RateLimitMessage(isSystemKey), "RATE_LIMIT");
@@ -287,6 +184,155 @@ public abstract class AiConversationControllerBase : BaseController
             if (eventHandler != null)
                 _mcpClient.ConversationUpdated -= eventHandler;
         }
+    }
+
+    private async Task<ConversationPreparation> PrepareConversationAsync(
+        BaseStreamConversationRequest request,
+        Guid userId,
+        Guid sessionId,
+        Automaton.Api.Config.AiProvidersConfig aiConfig,
+        CancellationToken cancellationToken)
+    {
+        var history = await _historyPersistenceService.LoadConversationHistoryAsync(sessionId, userId);
+        var compactedHistory = ConversationHistoryCompactor.Compact(
+            history,
+            aiConfig.MaxConversationHistoryMessages,
+            aiConfig.HistoryCompaction);
+
+        var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, compactedHistory, cancellationToken);
+        var mode = ConversationModeFactory.From(request.Mode);
+        var promptPartsWithMode = promptParts with
+        {
+            BasePrompt = promptParts.BasePrompt + mode.SystemPromptSuffix
+        };
+
+        _mcpClient.SetToolProvider(GetToolProvider());
+        var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
+        await _historyPersistenceService.EnsurePolicyMarkerMessagesAsync(
+            sessionId,
+            userId,
+            _effectiveVerificationStrategy,
+            _effectiveExecutionPolicy);
+        await _historyPersistenceService.SaveUserMessageAsync(sessionId, request.Message, userId);
+
+        return new ConversationPreparation(compactedHistory, promptPartsWithMode, mode, conversationToken);
+    }
+
+    private ConversationRequest BuildConversationRequest(
+        BaseStreamConversationRequest request,
+        Guid userId,
+        AiConversationProviderConfiguration providerConfiguration,
+        ConversationPreparation preparation)
+    {
+        var aiConfig = providerConfiguration.Settings;
+        var mode = preparation.Mode;
+        return new ConversationRequest
+        {
+            ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
+            InitialMessage = request.Message,
+            SystemPrompt = preparation.SystemPromptParts.Full,
+            SystemPromptParts = preparation.SystemPromptParts,
+            Provider = providerConfiguration.Provider,
+            Model = providerConfiguration.Model,
+            ApiKey = providerConfiguration.ApiKey,
+            ConversationHistory = preparation.History,
+            Context = BuildContextDictionary(request, userId),
+            MaxIterations = mode.Name == ConversationModes.Autonomous
+                ? IterationLimits.ResolveForAutonomous(
+                    globalOverride: aiConfig.MaxIterations,
+                    autonomousOverride: aiConfig.IterationLimits.Autonomous)
+                : IterationLimits.Resolve(
+                    _resolvedTier,
+                    globalOverride: aiConfig.MaxIterations,
+                    tierOverride: aiConfig.IterationLimits.For(_resolvedTier)),
+            MaxConsecutiveFailures = aiConfig.MaxConsecutiveFailures,
+            MaxTokens = providerConfiguration.MaxTokens,
+            MaxRateLimitRetries = aiConfig.RateLimitRetry.MaxRetries,
+            RateLimitRetryInitialDelaySeconds = aiConfig.RateLimitRetry.InitialDelaySeconds,
+            StreamingTimeoutMinutes = aiConfig.Streaming.TimeoutMinutes,
+            Mode = request.Mode,
+            ExtraBodyJson = providerConfiguration.ExtraBodyJson,
+            SupportsTools = providerConfiguration.SupportsTools
+        };
+    }
+
+    private sealed record ConversationPreparation(
+        List<ConversationMessage>? History,
+        SystemPromptParts SystemPromptParts,
+        IConversationMode Mode,
+        object? ConversationToken);
+
+    private async Task HandleConversationResultAsync(
+        BaseStreamConversationRequest request,
+        ConversationResult result,
+        IReadOnlyList<ConversationUpdatedEvent> updates,
+        Guid sessionId,
+        Guid userId,
+        string model,
+        bool isSystemKey,
+        object? conversationToken)
+    {
+        if (!result.IsSuccess)
+        {
+            await HandleFailedConversationAsync(result, updates, sessionId, userId, isSystemKey);
+            return;
+        }
+
+        await PersistSuccessfulConversationAsync(
+            request,
+            result,
+            updates,
+            sessionId,
+            userId,
+            model,
+            conversationToken);
+    }
+
+    private async Task HandleFailedConversationAsync(
+        ConversationResult result,
+        IReadOnlyList<ConversationUpdatedEvent> updates,
+        Guid sessionId,
+        Guid userId,
+        bool isSystemKey)
+    {
+        await _historyPersistenceService.FlushPendingTokenUsageAsync(updates, sessionId, userId);
+        var errorMessage = result.ErrorMessage ?? "Conversation failed";
+        if (IsRateLimitError(errorMessage))
+        {
+            await WriteErrorEvent(RateLimitMessage(isSystemKey), "RATE_LIMIT");
+            return;
+        }
+
+        await WriteErrorEvent(errorMessage);
+    }
+
+    private async Task PersistSuccessfulConversationAsync(
+        BaseStreamConversationRequest request,
+        ConversationResult result,
+        IReadOnlyList<ConversationUpdatedEvent> updates,
+        Guid sessionId,
+        Guid userId,
+        string model,
+        object? conversationToken)
+    {
+        var savedToolCallIds = new HashSet<string>();
+        foreach (var update in updates)
+            await _historyPersistenceService.SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
+
+        if (result.ApiCallCount > 0)
+            await _historyPersistenceService.IncrementApiCallsAsync(sessionId, userId, result.ApiCallCount);
+
+        await OnAfterConversationAsync(request, userId, result, conversationToken);
+
+        await WriteEvent("done", new
+        {
+            conversationId = result.ConversationId,
+            sessionId,
+            model,
+            effectiveVerificationStrategy = _effectiveVerificationStrategy,
+            effectiveExecutionPolicy = _effectiveExecutionPolicy,
+            success = true
+        });
     }
 
     private static bool IsRateLimitError(string? message)
@@ -304,53 +350,6 @@ public abstract class AiConversationControllerBase : BaseController
             ? "The shared demo key has hit the provider's rate limit. Add your own API key to continue without restrictions."
             : "Your API key has hit the provider's rate limit. Please wait a moment and try again.";
 
-    // ── Session management ────────────────────────────────────────────────
-
-    private async Task<Guid> ResolveSessionAsync(
-        BaseStreamConversationRequest request, Guid userId, string provider, string model)
-    {
-        if (request.SessionId.HasValue)
-            return request.SessionId.Value;
-
-        if (request.ResourceId.HasValue)
-        {
-            var session = await _chatHistoryService.GetOrCreateActiveSessionAsync(
-                ResourceType, request.ResourceId.Value, userId, provider, model);
-            _logger.LogDebug("Auto-created session {SessionId} for resource {ResourceId}",
-                session.Id, request.ResourceId);
-            return session.Id;
-        }
-
-        var generalSession = await _chatHistoryService.CreateSessionAsync(new CreateChatSessionRequest
-        {
-            ResourceType = ResourceType,
-            ResourceId = Guid.Empty,
-            Title = "New Chat",
-            Provider = provider,
-            Model = model
-        }, userId);
-        return generalSession.Id;
-    }
-
-    // ── History loading ───────────────────────────────────────────────────
-
-    protected async Task<List<ConversationMessage>?> LoadConversationHistoryAsync(Guid sessionId, Guid userId)
-    {
-        try
-        {
-            var messages = await _chatHistoryService.GetMessagesAsync(sessionId, userId);
-            return messages
-                .Where(m => m.MessageType == ChatMessageType.Text)
-                .Select(m => new ConversationMessage(m.Role, m.Content))
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load conversation history for session {SessionId}", sessionId);
-            return null;
-        }
-    }
-
     // ── Context dictionary ────────────────────────────────────────────────
 
     protected virtual Dictionary<string, object> BuildContextDictionary(
@@ -366,202 +365,6 @@ public abstract class AiConversationControllerBase : BaseController
     }
 
     // ── Persistence ───────────────────────────────────────────────────────
-
-    private async Task SaveConversationUpdateAsync(
-        ConversationUpdatedEvent update,
-        Guid sessionId,
-        Guid userId,
-        HashSet<string> savedToolCallIds)
-    {
-        try
-        {
-            foreach (var message in update.Messages)
-            {
-                if (message.IsStreaming) continue;
-
-                // Token-only update (pure tool-call turn, no text) — accumulate tokens without saving a blank message.
-                if (string.IsNullOrEmpty(message.Content))
-                {
-                    if (message.InputTokens.HasValue || message.OutputTokens.HasValue || message.CacheReadTokens.HasValue || message.CacheCreationTokens.HasValue)
-                        await _chatHistoryService.AccumulateTokensAsync(sessionId, userId, message.InputTokens, message.OutputTokens, message.CacheReadTokens, message.CacheCreationTokens);
-                    continue;
-                }
-
-                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                {
-                    SessionId = sessionId,
-                    Role = message.Role,
-                    Content = message.Content,
-                    MessageType = ChatMessageType.Text,
-                    InputTokens = message.InputTokens,
-                    OutputTokens = message.OutputTokens,
-                    Model = message.Model,
-                    CacheReadTokens = message.CacheReadTokens,
-                    CacheCreationTokens = message.CacheCreationTokens,
-                    Metadata = "{}"
-                }, userId);
-            }
-
-            foreach (var toolCall in update.ToolCalls)
-            {
-                if (!savedToolCallIds.Add(toolCall.Id)) continue;
-
-                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                {
-                    SessionId = sessionId,
-                    Role = "assistant",
-                    Content = $"Executing tool: {toolCall.Name}",
-                    MessageType = ChatMessageType.ToolExecution,
-                    Metadata = JsonSerializer.Serialize(new
-                    {
-                        toolCallId = toolCall.Id,
-                        toolName = toolCall.Name,
-                        arguments = toolCall.Arguments
-                    })
-                }, userId);
-            }
-
-            foreach (var toolResult in update.ToolResults)
-            {
-                if (!savedToolCallIds.Add($"result:{toolResult.ToolCallId}")) continue;
-
-                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                {
-                    SessionId = sessionId,
-                    Role = "tool",
-                    Content = toolResult.Result ?? string.Empty,
-                    MessageType = toolResult.IsSuccess ? ChatMessageType.OperationComplete : ChatMessageType.CodeError,
-                    Metadata = JsonSerializer.Serialize(new
-                    {
-                        toolCallId = toolResult.ToolCallId,
-                        success = toolResult.IsSuccess,
-                        error = toolResult.ErrorMessage
-                    })
-                }, userId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error saving conversation update for session {SessionId}", sessionId);
-        }
-    }
-
-    private async Task FlushPendingTokenUsageAsync(
-        IReadOnlyList<ConversationUpdatedEvent> updates,
-        Guid sessionId,
-        Guid userId)
-    {
-        if (updates.Count == 0)
-            return;
-
-        var inputTokens = 0;
-        var outputTokens = 0;
-        var cacheReadTokens = 0;
-        var cacheCreationTokens = 0;
-        var hasAny = false;
-
-        foreach (var update in updates)
-        {
-            foreach (var message in update.Messages)
-            {
-                if (message.InputTokens.HasValue)
-                {
-                    inputTokens += message.InputTokens.Value;
-                    hasAny = true;
-                }
-
-                if (message.OutputTokens.HasValue)
-                {
-                    outputTokens += message.OutputTokens.Value;
-                    hasAny = true;
-                }
-
-                if (message.CacheReadTokens.HasValue)
-                {
-                    cacheReadTokens += message.CacheReadTokens.Value;
-                    hasAny = true;
-                }
-
-                if (message.CacheCreationTokens.HasValue)
-                {
-                    cacheCreationTokens += message.CacheCreationTokens.Value;
-                    hasAny = true;
-                }
-            }
-        }
-
-        if (!hasAny)
-            return;
-
-        await _chatHistoryService.AccumulateTokensAsync(
-            sessionId,
-            userId,
-            inputTokens > 0 ? inputTokens : null,
-            outputTokens > 0 ? outputTokens : null,
-            cacheReadTokens > 0 ? cacheReadTokens : null,
-            cacheCreationTokens > 0 ? cacheCreationTokens : null);
-    }
-
-    private async Task FlushPendingTokenUsageIfPossibleAsync(
-        Guid? sessionId,
-        Guid userId,
-        ConcurrentQueue<ConversationUpdatedEvent> pendingUpdates)
-    {
-        if (!sessionId.HasValue || userId == Guid.Empty)
-            return;
-
-        var updatesSnapshot = pendingUpdates.ToArray();
-        if (updatesSnapshot.Length == 0)
-            return;
-
-        await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
-    }
-
-    private async Task EnsurePolicyMarkerMessagesAsync(Guid sessionId, Guid userId)
-    {
-        var existingMessages = await _chatHistoryService.GetMessagesAsync(sessionId, userId);
-
-        await EnsureSinglePolicyMarkerMessageAsync(
-            sessionId,
-            userId,
-            existingMessages,
-            "Verification strategy: ",
-            _effectiveVerificationStrategy);
-
-        await EnsureSinglePolicyMarkerMessageAsync(
-            sessionId,
-            userId,
-            existingMessages,
-            "Execution policy: ",
-            _effectiveExecutionPolicy);
-    }
-
-    private async Task EnsureSinglePolicyMarkerMessageAsync(
-        Guid sessionId,
-        Guid userId,
-        IReadOnlyList<ChatMessageDto> existingMessages,
-        string prefix,
-        string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return;
-
-        var hasMarker = existingMessages.Any(m =>
-            m.Role.Equals("system", StringComparison.OrdinalIgnoreCase) &&
-            m.Content.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-
-        if (hasMarker)
-            return;
-
-        await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-        {
-            SessionId = sessionId,
-            Role = "system",
-            Content = $"{prefix}{value}",
-            MessageType = ChatMessageType.System,
-            Metadata = "{}"
-        }, userId);
-    }
 
     // ── SSE writing ───────────────────────────────────────────────────────
 

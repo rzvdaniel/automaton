@@ -648,6 +648,8 @@ internal static class ApiOperationsRegistration
         services.AddScoped<ApiKeyService>();
         services.AddScoped<AiApiKeyService>();
         services.AddScoped<AiProviderMetadataService>();
+        services.AddScoped<AiConversationProviderResolver>();
+        services.AddScoped<AiConversationHistoryPersistenceService>();
         services.AddScoped<IAiGuidanceRuntimeService, AiGuidanceRuntimeService>();
         services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
         services.AddScoped<AdminAiGuidanceService>();
