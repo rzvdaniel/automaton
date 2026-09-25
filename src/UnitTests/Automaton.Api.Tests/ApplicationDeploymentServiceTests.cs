@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using static Automaton.Api.Hubs.AutomatonHub;
@@ -50,23 +51,10 @@ public sealed class ApplicationDeploymentServiceTests
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
             runnerApiCompatibilityVersion: RunnerApiCompatibilityVersions.Legacy);
-
-        var package = fixture.CreatePackage(hasRuntime: true);
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await fixture.Service.DeployPackageAsync(
-                fixture.AppId,
-                fixture.OwnerId,
-                targetSlug: fixture.Target.Slug,
-                package,
-                clean: true,
-                CancellationToken.None));
-
-        Assert.That(exception!.Message, Does.Contain("Upgrade the Runner before deploying"));
-        Assert.That(fixture.RunnerInvocationStarted.Task.IsCompleted, Is.False);
-
-        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(item => item.Id == fixture.Target.Id);
-        Assert.That(target.GenericRuntimeDeployed, Is.False);
-        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Failed));
+        await fixture.AssertIncompatibleRunnerIsRejectedAsync(
+            "Upgrade the Runner before deploying",
+            expectedGenericRuntimeDeployed: false,
+            expectedStatus: DeploymentTargetStatus.Failed);
     }
 
     [Test]
@@ -114,40 +102,14 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task AcceptingPackage_PersistsOperationBeforeReturning()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
-        var routesPath = Path.GetDirectoryName(fixture.RouteFilePath)!;
-        var environment = new TestWebHostEnvironment
-        {
-            ContentRootPath = Directory.GetParent(routesPath)!.FullName
-        };
-        var userContext = new UserContextService(new HttpContextAccessor());
-        var authorization = new ResourceAuthorizationService(fixture.Db, userContext);
-        var publisher = new RecordingEventPublisher();
-        var operations = new DeploymentOperationService(
-            fixture.Db,
-            authorization,
-            new ImmediateTransactionExecutor(),
-            publisher,
-            new DeploymentPackageStore(environment),
-            null!,
-            fixture.ApiIdentity,
-            null!,
-            null!);
-
-        var response = await operations.AcceptAsync(
-            fixture.AppId,
-            fixture.OwnerId,
-            fixture.Target.Slug,
-            fixture.CreatePackage(hasRuntime: true),
-            clean: false,
-            CancellationToken.None);
-        var operation = await fixture.Db.DeploymentOperations.SingleAsync();
+        var acceptance = await fixture.AcceptPackageAsync();
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.Status, Is.EqualTo(DeploymentOperationStatuses.Pending));
-            Assert.That(operation.Id, Is.EqualTo(response.OperationId));
-            Assert.That(File.Exists(operation.PackagePath), Is.True);
-            Assert.That(publisher.OperationId, Is.EqualTo(response.OperationId));
+            Assert.That(acceptance.Status, Is.EqualTo(DeploymentOperationStatuses.Pending));
+            Assert.That(acceptance.PersistedOperationId, Is.EqualTo(acceptance.ResponseOperationId));
+            Assert.That(acceptance.PackageExists, Is.True);
+            Assert.That(acceptance.PublishedOperationId, Is.EqualTo(acceptance.ResponseOperationId));
         });
     }
 
@@ -213,44 +175,12 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task InterruptedRunningOperation_IsReclaimedByANewApiInstance()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
-        var operation = new DeploymentOperation
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.AppId,
-            OwnerUserId = fixture.OwnerId,
-            Status = DeploymentOperationStatuses.Running,
-            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
-            ExecutorInstanceId = "previous-api-instance",
-            LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1),
-            StartedAtUtc = DateTime.UtcNow.AddMinutes(-1),
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
-        };
-        fixture.Db.DeploymentOperations.Add(operation);
-        await fixture.Db.SaveChangesAsync();
-
-        var environment = new TestWebHostEnvironment
-        {
-            ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-        };
-        var operations = new DeploymentOperationService(
-            fixture.Db,
-            null!,
-            null!,
-            null!,
-            new DeploymentPackageStore(environment),
-            null!,
-            fixture.ApiIdentity,
-            null!,
-            null!);
-
-        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
-        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
-
+        var result = await fixture.ReclaimExpiredOperationAsync();
         Assert.Multiple(() =>
         {
-            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Failed));
-            Assert.That(completed.ExecutorInstanceId, Is.Not.EqualTo("previous-api-instance"));
-            Assert.That(completed.ErrorMessage, Does.Contain("missing-deployment.zip"));
+            Assert.That(result.Status, Is.EqualTo(DeploymentOperationStatuses.Failed));
+            Assert.That(result.Reclaimed, Is.True);
+            Assert.That(result.ErrorMessage, Does.Contain("missing-deployment.zip"));
         });
     }
 
@@ -258,35 +188,18 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task LiveExecutionLease_PreventsDuplicateExecutionFromStealingOperation()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
-        var operation = new DeploymentOperation
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.AppId,
-            OwnerUserId = fixture.OwnerId,
-            Status = DeploymentOperationStatuses.Running,
-            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
-            ExecutorInstanceId = "another-live-api-instance",
-            ExecutionAttemptId = Guid.NewGuid(),
-            LeaseExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            StartedAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        fixture.Db.DeploymentOperations.Add(operation);
-        await fixture.Db.SaveChangesAsync();
-
-        var operations = new DeploymentOperationService(
+        var attemptId = Guid.NewGuid();
+        var operation = await DeploymentOperationTestData.CreateAsync(
             fixture.Db,
-            null!,
-            null!,
-            null!,
-            new DeploymentPackageStore(new TestWebHostEnvironment
-            {
-                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            }),
-            null!,
-            fixture.ApiIdentity,
-            null!,
-            null!);
+            fixture.AppId,
+            fixture.OwnerId,
+            DeploymentOperationStatuses.Running,
+            Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+            executorInstanceId: "another-live-api-instance",
+            executionAttemptId: attemptId,
+            leaseExpiresAtUtc: DateTime.UtcNow.AddMinutes(5));
+
+        var operations = fixture.CreateOperationService();
 
         Assert.ThrowsAsync<DeploymentOperationLeaseActiveException>(
             async () => await operations.ExecuteAsync(operation.Id, CancellationToken.None));
@@ -296,7 +209,7 @@ public sealed class ApplicationDeploymentServiceTests
         {
             Assert.That(unchanged.Status, Is.EqualTo(DeploymentOperationStatuses.Running));
             Assert.That(unchanged.ExecutorInstanceId, Is.EqualTo("another-live-api-instance"));
-            Assert.That(unchanged.ExecutionAttemptId, Is.EqualTo(operation.ExecutionAttemptId));
+            Assert.That(unchanged.ExecutionAttemptId, Is.EqualTo(attemptId));
         });
     }
 
@@ -304,53 +217,12 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task RedeliveryAfterLeaseExpiry_ReclaimsOperationWithoutManualStateReset()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
-        fixture.CreatePackage(hasRuntime: true);
-        var operation = new DeploymentOperation
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.AppId,
-            OwnerUserId = fixture.OwnerId,
-            TargetSlug = fixture.Target.Slug,
-            Status = DeploymentOperationStatuses.Running,
-            PackagePath = fixture.PackagePath,
-            Clean = false,
-            ExecutorInstanceId = "crashed-api-instance",
-            ExecutionAttemptId = Guid.NewGuid(),
-            LeaseExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            StartedAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        fixture.Db.DeploymentOperations.Add(operation);
-        await fixture.Db.SaveChangesAsync();
-
-        var operations = new DeploymentOperationService(
-            fixture.Db,
-            null!,
-            null!,
-            null!,
-            new DeploymentPackageStore(new TestWebHostEnvironment
-            {
-                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            }),
-            fixture.Service,
-            fixture.ApiIdentity,
-            null!,
-            NullLogger<DeploymentOperationService>.Instance);
-        var abandonedAttemptId = operation.ExecutionAttemptId;
-
-        Assert.ThrowsAsync<DeploymentOperationLeaseActiveException>(
-            async () => await operations.ExecuteAsync(operation.Id, CancellationToken.None));
-
-        operation.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
-        await fixture.Db.SaveChangesAsync();
-        await operations.ExecuteAsync(operation.Id, CancellationToken.None);
-
-        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
+        var result = await fixture.ReclaimAfterLeaseExpiryAsync();
         Assert.Multiple(() =>
         {
-            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
-            Assert.That(completed.ExecutorInstanceId, Is.Not.EqualTo("crashed-api-instance"));
-            Assert.That(completed.ExecutionAttemptId, Is.Not.EqualTo(abandonedAttemptId));
+            Assert.That(result.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
+            Assert.That(result.Reclaimed, Is.True);
+            Assert.That(result.AttemptChanged, Is.True);
         });
     }
 
@@ -358,32 +230,15 @@ public sealed class ApplicationDeploymentServiceTests
     public async Task TerminalOperation_IsNotReexecuted()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
-        var operation = new DeploymentOperation
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.AppId,
-            OwnerUserId = fixture.OwnerId,
-            Status = DeploymentOperationStatuses.Succeeded,
-            PackagePath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
-            CompletedAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        fixture.Db.DeploymentOperations.Add(operation);
-        await fixture.Db.SaveChangesAsync();
-
-        var operations = new DeploymentOperationService(
+        var operation = await DeploymentOperationTestData.CreateAsync(
             fixture.Db,
-            null!,
-            null!,
-            null!,
-            new DeploymentPackageStore(new TestWebHostEnvironment
-            {
-                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            }),
-            null!,
-            fixture.ApiIdentity,
-            null!,
-            null!);
+            fixture.AppId,
+            fixture.OwnerId,
+            DeploymentOperationStatuses.Succeeded,
+            Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+            completedAtUtc: DateTime.UtcNow);
+
+        var operations = fixture.CreateOperationService();
 
         await operations.ExecuteAsync(operation.Id, CancellationToken.None);
 
@@ -396,47 +251,12 @@ public sealed class ApplicationDeploymentServiceTests
     {
         await using var fixture = await DeploymentFixture.CreateAsync(
             runnerInvocationDelay: TimeSpan.FromMilliseconds(250));
-        fixture.CreatePackage(hasRuntime: true);
-        var operation = new DeploymentOperation
-        {
-            Id = Guid.NewGuid(),
-            WebAppId = fixture.AppId,
-            OwnerUserId = fixture.OwnerId,
-            TargetSlug = fixture.Target.Slug,
-            Status = DeploymentOperationStatuses.Pending,
-            PackagePath = fixture.PackagePath,
-            Clean = false,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        fixture.Db.DeploymentOperations.Add(operation);
-        await fixture.Db.SaveChangesAsync();
-
-        var operations = new DeploymentOperationService(
-            fixture.Db,
-            null!,
-            null!,
-            null!,
-            new DeploymentPackageStore(new TestWebHostEnvironment
-            {
-                ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            }),
-            fixture.Service,
-            fixture.ApiIdentity,
-            null!,
-            NullLogger<DeploymentOperationService>.Instance);
-        using var cancellation = new CancellationTokenSource();
-        var execution = operations.ExecuteAsync(operation.Id, cancellation.Token);
-
-        await fixture.RunnerInvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        cancellation.Cancel();
-        await execution;
-
-        var completed = await fixture.Db.DeploymentOperations.SingleAsync();
+        var result = await fixture.CancelRunnerExecutionAsync();
         Assert.Multiple(() =>
         {
-            Assert.That(completed.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
-            Assert.That(completed.ErrorMessage, Is.Null);
-            Assert.That(completed.ExecutionAttemptId, Is.Not.Null);
+            Assert.That(result.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
+            Assert.That(result.ErrorMessage, Is.Null);
+            Assert.That(result.HasAttempt, Is.True);
         });
     }
 
@@ -806,6 +626,179 @@ public sealed class ApplicationDeploymentServiceTests
                 apiIdentity);
         }
 
+        public DeploymentOperationService CreateOperationService(
+            ApplicationDeploymentService? deploymentService = null,
+            ILogger<DeploymentOperationService>? logger = null)
+            => new(
+                Db,
+                null!,
+                null!,
+                null!,
+                new DeploymentPackageStore(new TestWebHostEnvironment { ContentRootPath = rootPath }),
+                deploymentService ?? Service,
+                ApiIdentity,
+                null!,
+                logger ?? NullLogger<DeploymentOperationService>.Instance);
+
+        public async Task<OperationExecutionSnapshot> ReclaimExpiredOperationAsync()
+        {
+            var operation = await DeploymentOperationTestData.CreateAsync(
+                Db,
+                AppId,
+                OwnerId,
+                DeploymentOperationStatuses.Running,
+                Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-deployment.zip"),
+                executorInstanceId: "previous-api-instance",
+                leaseExpiresAtUtc: DateTime.UtcNow.AddSeconds(-1),
+                startedAtUtc: DateTime.UtcNow.AddMinutes(-1));
+
+            await CreateOperationService().ExecuteAsync(operation.Id, CancellationToken.None);
+            var result = await Db.DeploymentOperations.SingleAsync();
+            return new OperationExecutionSnapshot(
+                result.Status,
+                result.ExecutorInstanceId != "previous-api-instance",
+                false,
+                result.ErrorMessage);
+        }
+
+        public async Task<OperationExecutionSnapshot> ReclaimAfterLeaseExpiryAsync()
+        {
+            CreatePackage(hasRuntime: true);
+            var operation = await DeploymentOperationTestData.CreateAsync(
+                Db,
+                AppId,
+                OwnerId,
+                DeploymentOperationStatuses.Running,
+                PackagePath,
+                Target.Slug,
+                executorInstanceId: "crashed-api-instance",
+                executionAttemptId: Guid.NewGuid(),
+                leaseExpiresAtUtc: DateTime.UtcNow.AddMinutes(5));
+            var operations = CreateOperationService(
+                Service,
+                NullLogger<DeploymentOperationService>.Instance);
+            var abandonedAttemptId = operation.ExecutionAttemptId;
+
+            Assert.ThrowsAsync<DeploymentOperationLeaseActiveException>(
+                async () => await operations.ExecuteAsync(operation.Id, CancellationToken.None));
+
+            operation.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+            await Db.SaveChangesAsync();
+            await operations.ExecuteAsync(operation.Id, CancellationToken.None);
+
+            var result = await Db.DeploymentOperations.SingleAsync();
+            return new OperationExecutionSnapshot(
+                result.Status,
+                result.ExecutorInstanceId != "crashed-api-instance",
+                result.ExecutionAttemptId != abandonedAttemptId,
+                result.ErrorMessage);
+        }
+
+        public async Task<OperationExecutionSnapshot> CancelRunnerExecutionAsync()
+        {
+            CreatePackage(hasRuntime: true);
+            var operation = await DeploymentOperationTestData.CreateAsync(
+                Db,
+                AppId,
+                OwnerId,
+                DeploymentOperationStatuses.Pending,
+                PackagePath,
+                Target.Slug);
+            var operations = CreateOperationService(
+                Service,
+                NullLogger<DeploymentOperationService>.Instance);
+            using var cancellation = new CancellationTokenSource();
+            var execution = operations.ExecuteAsync(operation.Id, cancellation.Token);
+
+            await RunnerInvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await cancellation.CancelAsync();
+            await execution;
+
+            var result = await Db.DeploymentOperations.SingleAsync();
+            return new OperationExecutionSnapshot(
+                result.Status,
+                false,
+                false,
+                result.ErrorMessage,
+                result.ExecutionAttemptId is not null);
+        }
+
+        public sealed record OperationExecutionSnapshot(
+            string Status,
+            bool Reclaimed,
+            bool AttemptChanged,
+            string? ErrorMessage,
+            bool HasAttempt = false);
+
+        public async Task<AcceptanceSnapshot> AcceptPackageAsync()
+        {
+            var (operations, publisher) = CreateAcceptanceService();
+            var response = await operations.AcceptAsync(
+                AppId,
+                OwnerId,
+                Target.Slug,
+                CreatePackage(hasRuntime: true),
+                clean: false,
+                CancellationToken.None);
+            var persisted = await Db.DeploymentOperations.SingleAsync();
+            return new AcceptanceSnapshot(
+                response.Status,
+                response.OperationId,
+                persisted.Id,
+                File.Exists(persisted.PackagePath),
+                publisher.OperationId);
+        }
+
+        public async Task AssertIncompatibleRunnerIsRejectedAsync(
+            string expectedMessage,
+            bool expectedGenericRuntimeDeployed,
+            DeploymentTargetStatus expectedStatus)
+        {
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await Service.DeployPackageAsync(
+                    AppId,
+                    OwnerId,
+                    Target.Slug,
+                    CreatePackage(hasRuntime: true),
+                    clean: true,
+                    CancellationToken.None));
+            var target = await Db.AppDeploymentTargets.SingleAsync(item => item.Id == Target.Id);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exception!.Message, Does.Contain(expectedMessage));
+                Assert.That(RunnerInvocationStarted.Task.IsCompleted, Is.False);
+                Assert.That(target.GenericRuntimeDeployed, Is.EqualTo(expectedGenericRuntimeDeployed));
+                Assert.That(target.Status, Is.EqualTo(expectedStatus));
+            });
+        }
+
+        private (DeploymentOperationService Operations, RecordingEventPublisher Publisher) CreateAcceptanceService()
+        {
+            var environment = new TestWebHostEnvironment { ContentRootPath = rootPath };
+            var userContext = new UserContextService(new HttpContextAccessor());
+            var authorization = new ResourceAuthorizationService(Db, userContext);
+            var publisher = new RecordingEventPublisher();
+            var operations = new DeploymentOperationService(
+                Db,
+                authorization,
+                new ImmediateTransactionExecutor(),
+                publisher,
+                new DeploymentPackageStore(environment),
+                null!,
+                ApiIdentity,
+                null!,
+                null!);
+            return (operations, publisher);
+        }
+
+        public sealed record AcceptanceSnapshot(
+            string Status,
+            Guid ResponseOperationId,
+            Guid PersistedOperationId,
+            bool PackageExists,
+            Guid PublishedOperationId);
+
         public IFormFile CreatePackage(bool hasRuntime, IReadOnlyDictionary<string, string>? sourceFiles = null)
         {
             var contract = new ApplicationContract();
@@ -855,202 +848,4 @@ public sealed class ApplicationDeploymentServiceTests
         }
     }
 
-    private sealed class FixedTargetResolver(AppDeploymentTarget target) : IAppDeploymentTargetResolver
-    {
-        public Task<AppDeploymentTarget> ResolveAsync(Guid appId, string? targetSlug, Guid userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(target);
-
-        public Task<AppDeploymentTarget> ResolveByIdAsync(Guid appId, Guid deploymentTargetId, Guid userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(target);
-    }
-
-    private sealed class PackageHubContext : IHubContext<AutomatonHub>
-    {
-        public PackageHubContext(
-            FileUploadRegistry uploadRegistry,
-            string packagePath,
-            DeployAppPackageResult runnerResult,
-            TaskCompletionSource<bool> runnerInvocationStarted,
-            TimeSpan? runnerInvocationDelay)
-        {
-            RunnerResult = runnerResult;
-            Clients = new PackageHubClients(
-                uploadRegistry,
-                packagePath,
-                runnerResult,
-                runnerInvocationStarted,
-                runnerInvocationDelay);
-        }
-
-        public DeployAppPackageResult RunnerResult { get; }
-        public IHubClients Clients { get; }
-        public IGroupManager Groups { get; } = null!;
-    }
-
-    private sealed class PackageHubClients : IHubClients
-    {
-        private readonly PackageClientProxy clientProxy;
-
-        public PackageHubClients(
-            FileUploadRegistry uploadRegistry,
-            string packagePath,
-            DeployAppPackageResult runnerResult,
-            TaskCompletionSource<bool> runnerInvocationStarted,
-            TimeSpan? runnerInvocationDelay)
-        {
-            clientProxy = new PackageClientProxy(
-                uploadRegistry,
-                packagePath,
-                runnerResult,
-                runnerInvocationStarted,
-                runnerInvocationDelay);
-        }
-
-        public IClientProxy All => throw new NotSupportedException();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => clientProxy;
-        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => clientProxy;
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => throw new NotSupportedException();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-        public IClientProxy User(string userId) => throw new NotSupportedException();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-    }
-
-    private sealed class PackageClientProxy(
-        FileUploadRegistry uploadRegistry,
-        string packagePath,
-        DeployAppPackageResult runnerResult,
-        TaskCompletionSource<bool> runnerInvocationStarted,
-        TimeSpan? runnerInvocationDelay) : ISingleClientProxy
-    {
-        public async Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
-        {
-            if (method == AutomatonHubMethods.DeployAppPackage)
-            {
-                runnerInvocationStarted.TrySetResult(true);
-                if (runnerInvocationDelay is { } delay)
-                    await Task.Delay(delay, CancellationToken.None);
-                return (T)(object)runnerResult;
-            }
-
-            if (method == AutomatonHubMethods.SynchronizeApplicationManagedArtifacts)
-            {
-                var request = (SynchronizeApplicationManagedArtifactsRequest)args[0]!;
-                return (T)(object)new SynchronizeApplicationManagedArtifactsResult(
-                    request.AppId,
-                    request.DeploymentTargetId,
-                    true);
-            }
-
-            throw new NotSupportedException($"Unexpected invoke method: {method}");
-        }
-
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
-        {
-            if (method == AutomatonHubMethods.ReceiveFileChunk && args.Length > 0 && args[0] is FileUploadChunk chunk && chunk.IsLast)
-            {
-                uploadRegistry.TryComplete(new FileUploadCompleteMessage
-                {
-                    SessionId = chunk.SessionId,
-                    LocalPath = packagePath
-                });
-                return Task.CompletedTask;
-            }
-
-            if (method == AutomatonHubMethods.ReceiveFileChunk)
-                return Task.CompletedTask;
-
-            throw new NotSupportedException($"Unexpected send method: {method}");
-        }
-    }
-
-    private sealed class ConflictRouteConfigService : BackendRouteConfigService
-    {
-        private readonly ApplicationDbContext db;
-        private readonly Guid targetId;
-
-        public ConflictRouteConfigService(
-            ApplicationDbContext db,
-            IOptions<PublishedAppsConfig> options,
-            IWebHostEnvironment environment,
-            Guid targetId)
-            : base(db, options, environment, NullLogger<BackendRouteConfigService>.Instance)
-        {
-            this.db = db;
-            this.targetId = targetId;
-        }
-
-        public override async Task RefreshAsync(
-            CancellationToken cancellationToken = default,
-            Guid? pendingGenericRuntimeTargetId = null,
-            bool? pendingGenericRuntimeDeployed = null)
-        {
-            var target = await db.AppDeploymentTargets.SingleAsync(item => item.Id == targetId, cancellationToken);
-            target.Status = DeploymentTargetStatus.Running;
-            await db.SaveChangesAsync(cancellationToken);
-            throw new InvalidOperationException("route refresh failed");
-        }
-    }
-
-    private sealed class RouteThenStateConflictConfigService : BackendRouteConfigService
-    {
-        private readonly ApplicationDbContext db;
-        private readonly Guid targetId;
-
-        public RouteThenStateConflictConfigService(
-            ApplicationDbContext db,
-            IOptions<PublishedAppsConfig> options,
-            IWebHostEnvironment environment,
-            Guid targetId)
-            : base(db, options, environment, NullLogger<BackendRouteConfigService>.Instance)
-        {
-            this.db = db;
-            this.targetId = targetId;
-        }
-
-        public override async Task RefreshAsync(
-            CancellationToken cancellationToken = default,
-            Guid? pendingGenericRuntimeTargetId = null,
-            bool? pendingGenericRuntimeDeployed = null)
-        {
-            await base.RefreshAsync(
-                cancellationToken,
-                pendingGenericRuntimeTargetId,
-                pendingGenericRuntimeDeployed);
-
-            var target = await db.AppDeploymentTargets.SingleAsync(item => item.Id == targetId, cancellationToken);
-            target.Status = DeploymentTargetStatus.Running;
-            await db.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private sealed class TestWebHostEnvironment : IWebHostEnvironment
-    {
-        public string ApplicationName { get; set; } = "Automaton.Api.Tests";
-        public IFileProvider WebRootFileProvider { get; set; } = null!;
-        public string WebRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = "Testing";
-        public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = null!;
-    }
-
-    private sealed class ImmediateTransactionExecutor : ITransactionalEventExecutor
-    {
-        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default) =>
-            operation(cancellationToken);
-    }
-
-    private sealed class RecordingEventPublisher : IEventPublisher
-    {
-        public Guid OperationId { get; private set; }
-
-        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
-            where T : class
-        {
-            OperationId = ((DeploymentPackageRequestedEvent)(object)message).OperationId;
-            return Task.CompletedTask;
-        }
-    }
 }
