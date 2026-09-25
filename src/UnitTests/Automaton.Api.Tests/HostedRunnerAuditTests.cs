@@ -37,12 +37,19 @@ public partial class HostedRunnerAuditTests
         var runnerService = new RunnerService(
             db,
             userContext,
-            automatonHub: null!,
             authorizationService: null!,
-            new ApiInstanceIdentityService(),
-            new NoOpAuditEventService(),
-            applicationEventService: null!,
-            managedRunnerAppAssignmentService: null!);
+            runnerRegistrationService: new RunnerRegistrationService(
+                db, userContext, new RunnerAuditService(new NoOpAuditEventService())),
+            runnerDeletionService: new RunnerDeletionService(db, new RunnerDeletionPolicy(db, null!), new NoOpAuditEventService(), userContext),
+            connectionSessionService: new RunnerConnectionSessionService(db, null!, userContext),
+            runnerQueryService: new RunnerQueryService(
+                db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)),
+            restartCompletionService: new HostedRunnerRestartCompletionService(db, new NoOpAuditEventService()),
+            flowExecutionService: new RunnerFlowExecutionService(
+                new RunnerQueryService(db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)), null!),
+            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            connectionLifecycleService: new RunnerConnectionLifecycleService(
+                db, null!, null!, null!, null!, null!, null!));
 
         await runnerService.Add(new RunnerDetails
         {
@@ -530,12 +537,18 @@ public partial class HostedRunnerAuditTests
         var runnerService = new RunnerService(
             db,
             userContext,
-            automatonHub: null!,
             authorizationService: null!,
-            new ApiInstanceIdentityService(),
-            audit,
-            applicationEventService: null!,
-            managedRunnerAppAssignmentService: null!);
+            runnerRegistrationService: new RunnerRegistrationService(db, userContext, new RunnerAuditService(audit)),
+            runnerDeletionService: new RunnerDeletionService(db, new RunnerDeletionPolicy(db, null!), audit, userContext),
+            connectionSessionService: new RunnerConnectionSessionService(db, null!, userContext),
+            runnerQueryService: new RunnerQueryService(
+                db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)),
+            restartCompletionService: new HostedRunnerRestartCompletionService(db, audit),
+            flowExecutionService: new RunnerFlowExecutionService(
+                new RunnerQueryService(db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)), null!),
+            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            connectionLifecycleService: new RunnerConnectionLifecycleService(
+                db, null!, null!, null!, null!, null!, null!));
 
         await runnerService.Add(new RunnerDetails
         {
@@ -593,10 +606,20 @@ public partial class HostedRunnerAuditTests
 
         var httpContextAccessor = CreateHttpContextAccessor(userId, "runner-owner@automaton.test");
         var userContext = new UserContextService(httpContextAccessor);
+        var auditEventService = new AuditEventService(db, userContext, httpContextAccessor);
         var runnerService = new RunnerService(
-            db, userContext, automatonHub: null!, authorizationService: null!,
-            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, httpContextAccessor),
-            applicationEventService: null!, managedRunnerAppAssignmentService: null!);
+            db, userContext, authorizationService: null!,
+            runnerRegistrationService: new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService)),
+            runnerDeletionService: new RunnerDeletionService(db, new RunnerDeletionPolicy(db, null!), auditEventService, userContext),
+            connectionSessionService: new RunnerConnectionSessionService(db, null!, userContext),
+            runnerQueryService: new RunnerQueryService(
+                db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)),
+            restartCompletionService: new HostedRunnerRestartCompletionService(db, auditEventService),
+            flowExecutionService: new RunnerFlowExecutionService(
+                new RunnerQueryService(db, null!, userContext, new RunnerConnectionSessionService(db, null!, userContext)), null!),
+            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            connectionLifecycleService: new RunnerConnectionLifecycleService(
+                db, null!, null!, null!, null!, null!, null!));
 
         await runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None);
         Assert.That(operation.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
@@ -775,9 +798,20 @@ public partial class HostedRunnerAuditTests
             VALUES ({Guid.NewGuid()}, {runner.Id}, {runner.ConnectionId}, {now});
             """);
         var runnerService = new RunnerService(
-            db, userContextService: null!, automatonHub: null!, authorizationService: null!,
-            new ApiInstanceIdentityService(), new NoOpAuditEventService(),
-            applicationEventService: null!, managedRunnerAppAssignmentService: null!);
+            db, userContextService: null!, authorizationService: null!,
+            runnerRegistrationService: new RunnerRegistrationService(
+                db, null!, new RunnerAuditService(new NoOpAuditEventService())),
+            runnerDeletionService: new RunnerDeletionService(
+                db, new RunnerDeletionPolicy(db, null!), new NoOpAuditEventService(), null!),
+            connectionSessionService: new RunnerConnectionSessionService(db, null!, null!),
+            runnerQueryService: new RunnerQueryService(
+                db, null!, null!, new RunnerConnectionSessionService(db, null!, null!)),
+            restartCompletionService: new HostedRunnerRestartCompletionService(db, new NoOpAuditEventService()),
+            flowExecutionService: new RunnerFlowExecutionService(
+                new RunnerQueryService(db, null!, null!, new RunnerConnectionSessionService(db, null!, null!)), null!),
+            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            connectionLifecycleService: new RunnerConnectionLifecycleService(
+                db, null!, null!, null!, null!, null!, null!));
 
         Assert.ThrowsAsync<InvalidOperationException>(() =>
             runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None));

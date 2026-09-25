@@ -147,9 +147,24 @@ public class ManagedRunnerAppAssignmentServiceTests
         await routes.RefreshAsync();
         var routeFile = Path.Combine(routeRoot, "managed-runtime-routes.yml");
         Assert.That(await File.ReadAllTextAsync(routeFile), Does.Not.Contain(hosted.RuntimeEndpoint));
-        var runners = new RunnerService(db, userContext, null!, authorization,
-            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, new HttpContextAccessor()),
-            new ApplicationEventService(db), service);
+        var auditEventService = new AuditEventService(db, userContext, new HttpContextAccessor());
+        var applicationEventService = new ApplicationEventService(db);
+        var sessionService = new RunnerConnectionSessionService(db, applicationEventService, userContext);
+        var registrationService = new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService));
+        var restartService = new HostedRunnerRestartCompletionService(db, auditEventService);
+        var runners = new RunnerService(db, userContext, authorization,
+            registrationService,
+            new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext),
+            sessionService,
+            new RunnerQueryService(db, authorization, userContext,
+                sessionService),
+            restartService,
+            new RunnerFlowExecutionService(new RunnerQueryService(db, authorization, userContext,
+                sessionService), null!),
+            new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            new RunnerConnectionLifecycleService(
+                db, authorization, new ApiInstanceIdentityService(), sessionService,
+                registrationService, service, restartService));
 
         for (var connection = 0; connection < 2; connection++)
         {
@@ -170,9 +185,24 @@ public class ManagedRunnerAppAssignmentServiceTests
     [Test]
     public async Task DisconnectOfSupersededConnection_CannotClobberCurrentConnection()
     {
-        var runners = new RunnerService(db, userContext, null!, authorization,
-            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, new HttpContextAccessor()),
-            new ApplicationEventService(db), service);
+        var auditEventService = new AuditEventService(db, userContext, new HttpContextAccessor());
+        var applicationEventService = new ApplicationEventService(db);
+        var sessionService = new RunnerConnectionSessionService(db, applicationEventService, userContext);
+        var registrationService = new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService));
+        var restartService = new HostedRunnerRestartCompletionService(db, auditEventService);
+        var runners = new RunnerService(db, userContext, authorization,
+            registrationService,
+            new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext),
+            sessionService,
+            new RunnerQueryService(db, authorization, userContext,
+                sessionService),
+            restartService,
+            new RunnerFlowExecutionService(new RunnerQueryService(db, authorization, userContext,
+                sessionService), null!),
+            new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            new RunnerConnectionLifecycleService(
+                db, authorization, new ApiInstanceIdentityService(), sessionService,
+                registrationService, service, restartService));
 
         await runners.UpdateConnection(hosted.RunnerId!.Value, hosted.UserId, new RunnerDetails
         {
@@ -207,9 +237,24 @@ public class ManagedRunnerAppAssignmentServiceTests
         var failingRoutes = new FailingRouteService(db);
         var failingService = new ManagedRunnerAppAssignmentService(db, null!, authorization,
             failingRoutes, NullLogger<ManagedRunnerAppAssignmentService>.Instance);
-        var runners = new RunnerService(db, userContext, null!, authorization,
-            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, new HttpContextAccessor()),
-            new ApplicationEventService(db), failingService);
+        var auditEventService = new AuditEventService(db, userContext, new HttpContextAccessor());
+        var applicationEventService = new ApplicationEventService(db);
+        var sessionService = new RunnerConnectionSessionService(db, applicationEventService, userContext);
+        var registrationService = new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService));
+        var restartService = new HostedRunnerRestartCompletionService(db, auditEventService);
+        var runners = new RunnerService(db, userContext, authorization,
+            registrationService,
+            new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext),
+            sessionService,
+            new RunnerQueryService(db, authorization, userContext,
+                sessionService),
+            restartService,
+            new RunnerFlowExecutionService(new RunnerQueryService(db, authorization, userContext,
+                sessionService), null!),
+            new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
+            new RunnerConnectionLifecycleService(
+                db, authorization, new ApiInstanceIdentityService(), sessionService,
+                registrationService, failingService, restartService));
 
         await runners.UpdateConnection(hosted.RunnerId!.Value, hosted.UserId, new RunnerDetails
         {
