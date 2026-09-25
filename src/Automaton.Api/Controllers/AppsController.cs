@@ -1,12 +1,9 @@
 using Automaton.Api.Constants;
-using Automaton.Api.Config;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System.IO.Compression;
 
 namespace Automaton.Api.Controllers;
 
@@ -15,14 +12,7 @@ public class AppsController : BaseController
     private readonly AppsService appsService;
     private readonly ILogger<AppsController> logger;
     private readonly UserContextService userContextService;
-    private readonly AppVersionService appVersionService;
-    private readonly AppRuntimeArchiveUploadService runtimeArchiveUploadService;
-    private readonly AppArchiveService appArchiveService;
-    private readonly SettingsService settingsService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
-    private readonly RuntimeCookieService runtimeCookieService;
-    private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly IApplicationEventService applicationEventService;
     private readonly AppImageManagementService appImageManagementService;
 
@@ -30,28 +20,14 @@ public class AppsController : BaseController
         AppsService appsService,
         ILogger<AppsController> logger,
         UserContextService userContextService,
-        AppVersionService appVersionService,
-        AppRuntimeArchiveUploadService runtimeArchiveUploadService,
-        AppArchiveService appArchiveService,
-        SettingsService settingsService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
-        PrivateAppLaunchService privateAppLaunchService,
-        RuntimeCookieService runtimeCookieService,
-        IOptions<PublishedAppsConfig> publishedAppsConfig,
         IApplicationEventService applicationEventService,
         AppImageManagementService appImageManagementService)
     {
         this.appsService = appsService;
         this.logger = logger;
         this.userContextService = userContextService;
-        this.appVersionService = appVersionService;
-        this.runtimeArchiveUploadService = runtimeArchiveUploadService;
-        this.appArchiveService = appArchiveService;
-        this.settingsService = settingsService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
-        this.privateAppLaunchService = privateAppLaunchService;
-        this.runtimeCookieService = runtimeCookieService;
-        this.publishedAppsConfig = publishedAppsConfig.Value;
         this.applicationEventService = applicationEventService;
         this.appImageManagementService = appImageManagementService;
     }
@@ -229,77 +205,6 @@ public class AppsController : BaseController
         }
     }
 
-    /// <summary>
-    /// Export an app as a portable zip bundle.
-    /// Includes app files and a manifest with transferable metadata.
-    /// </summary>
-    [HttpGet("{id}/export")]
-    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var archive = await appArchiveService.ExportAsync(id, cancellationToken);
-            if (archive is null)
-            {
-                return NotFound(new { message = "App not found" });
-            }
-
-            return File(archive.Content, "application/zip", archive.FileName);
-        }
-        catch (OperationCanceledException)
-        {
-            return StatusCode(StatusCodes.Status499ClientClosedRequest);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "[AppsController] Error exporting app {AppId}", id);
-            return StatusCode(500, new { message = "Failed to export app" });
-        }
-    }
-
-    /// <summary>
-    /// Import an exported app bundle into the current user's account.
-    /// </summary>
-    [HttpPost("import")]
-    [RequestSizeLimit(52_428_800)]
-    [Consumes("multipart/form-data")]
-    public async Task<ActionResult<AppModel>> Import(IFormFile file, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest(new { message = "No file uploaded or file is empty" });
-            }
-
-            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest(new { message = "Only .zip archives are supported" });
-            }
-
-            await using var stream = file.OpenReadStream();
-            var result = await appArchiveService.ImportAsync(stream, file.FileName, cancellationToken);
-            return CreatedAtAction(nameof(Get), new { id = result.App.Id }, result.App);
-        }
-        catch (InvalidDataException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (AppTagValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (OperationCanceledException)
-        {
-            return StatusCode(StatusCodes.Status499ClientClosedRequest);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "[AppsController] Error importing app archive {FileName}", file?.FileName);
-            return StatusCode(500, new { message = "Failed to import app" });
-        }
-    }
-
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Post(NewApp app)
@@ -402,47 +307,6 @@ public class AppsController : BaseController
         return NoContent();
     }
 
-    [HttpPost("{id}/runtime-launch")]
-    [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> CreateRuntimeLaunch(Guid id)
-    {
-        var app = await appsService.GetAccessibleAppInfoByIdAsync(id);
-        if (app == null)
-        {
-            return NotFound(new { message = "App not found" });
-        }
-
-        var userId = userContextService.GetUserId();
-        var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
-        var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
-        Response.Cookies.Append(
-            RuntimeCookieConstants.GetCookieName(id),
-            runtimeCookie,
-            runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
-
-        return Ok(new { runtimeToken = string.Empty });
-    }
-
-    [HttpGet("{id}/launch-runtime")]
-    public async Task<IActionResult> LaunchRuntime(Guid id)
-    {
-        var app = await appsService.GetAccessibleAppInfoByIdAsync(id);
-        if (app == null)
-        {
-            return NotFound(new { message = "App not found" });
-        }
-
-        var userId = userContextService.GetUserId();
-        var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
-        var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
-        Response.Cookies.Append(
-            RuntimeCookieConstants.GetCookieName(id),
-            runtimeCookie,
-            runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
-
-        return Redirect(BuildRestrictedRuntimeUrl(id));
-    }
-
     [HttpPut("{id}/runner")]
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> UpdateRunner(Guid id, [FromBody] UpdateRunnerRequest request)
@@ -491,70 +355,6 @@ public class AppsController : BaseController
             StatusCodes.Status400BadRequest => BadRequest(new { message = result.ErrorMessage }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = result.ErrorMessage ?? failureMessage })
         };
-
-    /// <summary>
-    /// Upload a zip archive of deployed live files.
-    /// Files are merged into the app live directory.
-    /// Use <c>?clean=true</c> to delete all current live files first (full replace).
-    /// For delta / incremental updates, include only changed files in the zip (clean=false).
-    /// Supported via API key authentication — no browser session required.
-    /// </summary>
-    /// <remarks>
-    /// curl example:
-    ///   curl -X POST https://your-server/api/apps/{id}/upload \
-    ///     -H "X-API-Key: ak_developer_xxx" \
-    ///     -F "file=@myapp.zip"
-    /// </remarks>
-    [HttpPost("{id}/upload")]
-    [Authorize(Policy = "AllowApiKey")]
-    [RequestSizeLimit(52_428_800)] // 50 MB
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadZip(Guid id, IFormFile file, [FromQuery] bool clean = false)
-    {
-        try
-        {
-            if (file is null || file.Length == 0)
-                return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
-
-            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
-                return BadRequest(new { success = false, message = "Only .zip archives are supported" });
-
-            var result = await runtimeArchiveUploadService.UploadAsync(id, file, clean);
-            if (result is null)
-                return NotFound(new { success = false, message = "App not found" });
-
-            return Ok(new { success = true, result.Written, result.Skipped, result.Errors });
-        }
-        catch (InvalidDataException)
-        {
-            return BadRequest(new { success = false, message = "Invalid or corrupt zip archive" });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to upload zip for app {AppId}", id);
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    private string BuildRestrictedRuntimeUrl(Guid appId)
-    {
-        var configuredBaseUrl = publishedAppsConfig.PublicBaseUrl?.Trim().TrimEnd('/');
-        var baseUri = Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var configuredUri)
-            ? configuredUri
-            : new Uri($"{Request.Scheme}://{Request.Host}");
-        var rootDomain = baseUri.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
-            ? baseUri.Host["apps.".Length..]
-            : baseUri.Host;
-        var builder = new UriBuilder(baseUri)
-        {
-            Host = $"app-{appId:N}.apps.{rootDomain}",
-            Path = "/",
-            Query = string.Empty,
-            Fragment = string.Empty
-        };
-        return builder.Uri.ToString();
-    }
-
 }
 
 public static class AppFileSystemScopes
