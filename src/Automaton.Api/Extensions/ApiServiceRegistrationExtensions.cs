@@ -509,6 +509,7 @@ internal static class ApiAppCatalogRegistration
     internal static IServiceCollection AddApiAppCatalogServices(this IServiceCollection services)
     {
         services.AddScoped<CustomStepsService>();
+        services.AddScoped<CustomStepRunnerExecutionService>();
         services.AddScoped<AppsService>();
         services.AddScoped<AppImageManagementService>();
         services.AddScoped<AppRuntimeArchiveUploadService>();
