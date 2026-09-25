@@ -905,17 +905,42 @@ public class AppAuthorizationRegressionTests
             environment,
             NullLogger<BackendRouteConfigService>.Instance);
 
+        var recentActivityService = new RecentActivityService(dbContext, userContextService);
+        var auditEventService = new NoOpAuditEventService();
+        var applicationEventService = new NoOpApplicationEventService();
         return new AppsService(
             dbContext,
             userContextService,
-            new RecentActivityService(dbContext, userContextService),
             authorizationService,
             fileStorageService,
-            environment,
-            new NoOpAuditEventService(),
-            new NoOpApplicationEventService(),
-            backendRouteConfigService,
-            runnerAssignmentPolicy);
+            new AppMetadataService(dbContext, userContextService, fileStorageService, auditEventService),
+            new AppMutationService(
+                dbContext,
+                userContextService,
+                authorizationService,
+                fileStorageService,
+                environment,
+                new AppMutationAuditService(userContextService, recentActivityService, auditEventService),
+                backendRouteConfigService,
+                runnerAssignmentPolicy,
+                new AppDeletionService(dbContext, fileStorageService)),
+            new AppPublicationService(
+                dbContext,
+                userContextService,
+                authorizationService,
+                runnerAssignmentPolicy,
+                auditEventService,
+                applicationEventService,
+                recentActivityService,
+                backendRouteConfigService),
+            new AppForkingService(
+                dbContext,
+                userContextService,
+                fileStorageService,
+                runnerAssignmentPolicy,
+                recentActivityService,
+                auditEventService),
+            new AppQueryService(dbContext, userContextService, authorizationService, fileStorageService));
     }
 
     private static UserContextService CreateUserContextService(Guid userId)

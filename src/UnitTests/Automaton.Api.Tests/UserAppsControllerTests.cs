@@ -178,17 +178,41 @@ public class UserAppsControllerTests
             runnerAuthorizationPolicy,
             new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
 
+        var auditEventService = new NoOpAuditEventService();
+        var applicationEventService = new NoOpApplicationEventService();
         return new AppsService(
             dbContext,
             userContextService,
-            null!,
             authorizationService,
             null!,
-            new StubWebHostEnvironment(),
-            new NoOpAuditEventService(),
-            new NoOpApplicationEventService(),
-            null!,
-            runnerAssignmentPolicy);
+            new AppMetadataService(dbContext, userContextService, null!, auditEventService),
+            new AppMutationService(
+                dbContext,
+                userContextService,
+                authorizationService,
+                null!,
+                new StubWebHostEnvironment(),
+                new AppMutationAuditService(userContextService, null!, auditEventService),
+                null!,
+                runnerAssignmentPolicy,
+                new AppDeletionService(dbContext, null!)),
+            new AppPublicationService(
+                dbContext,
+                userContextService,
+                authorizationService,
+                runnerAssignmentPolicy,
+                auditEventService,
+                applicationEventService,
+                null!,
+                null!),
+            new AppForkingService(
+                dbContext,
+                userContextService,
+                null!,
+                runnerAssignmentPolicy,
+                null!,
+                auditEventService),
+            new AppQueryService(dbContext, userContextService, authorizationService, null!));
     }
 
     private static PrivateAppLaunchService CreatePrivateAppLaunchService()
