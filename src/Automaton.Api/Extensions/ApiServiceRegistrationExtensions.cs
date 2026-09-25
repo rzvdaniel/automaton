@@ -546,6 +546,8 @@ internal static class ApiAppExecutionRegistration
         services.AddSingleton<FileDownloadRegistry>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
+        services.AddScoped<DeploymentPackageFinalizationService>();
+        services.AddScoped<DeploymentPackageRunnerService>();
         services.AddScoped<DeploymentPackageStore>();
         services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<DeploymentOperationService>();

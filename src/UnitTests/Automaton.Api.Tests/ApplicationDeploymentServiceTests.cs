@@ -781,17 +781,16 @@ public sealed class ApplicationDeploymentServiceTests
                     NullLogger<BackendRouteConfigService>.Instance);
             var runnerPolicy = new AppRunnerAssignmentPolicy(db, null!, null!, resolver);
             var service = new ApplicationDeploymentService(
-                db,
-                storage,
-                hub,
-                uploadRegistry,
+                new DeploymentPackageRunnerService(db, hub, uploadRegistry, apiIdentity),
                 null!,
                 runnerPolicy,
                 resolver,
                 new AppDeploymentTargetStateService(db),
-                routeService,
-                new ConnectedFlowArtifactService(storage, null!, hub),
-                apiIdentity);
+                new DeploymentPackageFinalizationService(
+                    db,
+                    storage,
+                    new ConnectedFlowArtifactService(storage, null!, hub),
+                    routeService));
 
             return new DeploymentFixture(
                 db,
@@ -1055,5 +1054,3 @@ public sealed class ApplicationDeploymentServiceTests
         }
     }
 }
-
-
