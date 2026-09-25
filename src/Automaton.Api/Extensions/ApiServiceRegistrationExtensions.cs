@@ -114,11 +114,11 @@ internal static class ApiCoreOptionRegistration
     internal static IServiceCollection AddApiCoreOptions(this IServiceCollection services, WebApplicationBuilder applicationBuilder)
     {
         services.AddDatabaseDeveloperPageExceptionFilter();
-        
+
         // Register AI Providers Configuration
         services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
         services.AddSingleton<IAiProvidersSettingsService, AiProvidersSettingsService>();
-        
+
         services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
         services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSection("PublishedApps"));
         services.Configure<MediaStorageOptions>(applicationBuilder.Configuration.GetSection(MediaStorageOptions.SectionName));
@@ -158,9 +158,9 @@ internal static class ApiIdentityRegistration
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
-        
+
         services.AddAutomatonIdentity();
-        
+
         var dataProtectionKeysPath = configurationManager["DataProtection:KeysPath"];
         if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
         {
@@ -168,7 +168,7 @@ internal static class ApiIdentityRegistration
                 .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
                 .SetApplicationName("Automaton.Api");
         }
-        
+
         return services;
     }
 }
@@ -202,7 +202,7 @@ internal static class ApiCookieRegistration
                 return Task.CompletedTask;
             };
         });
-        
+
         services.AddMvc();
         return services;
     }
@@ -214,11 +214,11 @@ internal static class ApiAuthenticationRegistration
     {
         services.AddAccessTokenValidator();
         services.AddJwtAuthentication(applicationBuilder.Configuration);
-        
+
         services.AddAuthentication()
             .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
-                ApiKeyAuthenticationSchemeOptions.DefaultScheme, 
-                options => 
+                ApiKeyAuthenticationSchemeOptions.DefaultScheme,
+                options =>
                 {
                     options.HeaderName = "X-API-Key";
                     options.QueryParameterName = "api_key";
@@ -231,7 +231,7 @@ internal static class ApiAuthenticationRegistration
                     options.QueryParameterName = string.Empty;
                 })
             .AddGitHubOAuth(applicationBuilder.Configuration);
-        
+
         // Define specific authorization policies for different access levels
         return services;
     }
@@ -243,12 +243,12 @@ internal static class ApiAuthorizationRegistration
     {
         services.AddAuthorization(options =>
         {
-            // Default policy for web users (Blazor UI) - only Identity and JWT
+            // Default policy for web users (Blazor UI) - only Identity and JW
             options.DefaultPolicy = new AuthorizationPolicyBuilder()
                 .AddAuthenticationSchemes("Identity.Application", JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .Build();
-        
+
             // Policy for API endpoints that should support API keys (runner operations)
             // This policy accepts EITHER API Key OR JWT/Identity authentication
             options.AddPolicy("AllowApiKey", policy =>
@@ -260,35 +260,35 @@ internal static class ApiAuthorizationRegistration
                   return !Enum.TryParse<Automaton.Core.Enums.ApiKeyScope>(scopeClaim, out var scope)
                       || scope != Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll;
               }));
-        
+
             options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
                     .RequireAuthenticatedUser()
                     .RequireAssertion(context => SelfHostedRunnerInstallationAuthorization.IsAllowed(context.User)));
-        
+
             // Policy for anonymous endpoints (validation, etc.)
             options.AddPolicy("AllowAnonymous", policy =>
                 policy.RequireAssertion(_ => true));
-        
+
             options.AddPolicy("InfrastructureRunnerEnrollment", policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.InfrastructureRunnerEnrollmentScheme)
                     .RequireAuthenticatedUser()
                     .RequireClaim("api_key_scope", Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll.ToString()));
-        
+
             // Admin policy for users with Admin or SysAdmin roles
             options.AddPolicy("Administrators", policy =>
                 policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
-        
+
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>
                 policy.Requirements.Add(new ProjectAdminRequirement()));
-        
+
             options.AddPolicy("ProjectResourceManager", policy =>
                 policy.Requirements.Add(new ProjectResourceManagerRequirement()));
-        
+
             options.AddPolicy("ProjectAppExecutor", policy =>
                 policy.Requirements.Add(new ProjectAppExecutorRequirement()));
-        
+
             options.AddPolicy("ProjectMember", policy =>
                 policy.Requirements.Add(new ProjectMemberRequirement(
                     ProjectRole.ProjectAdmin,
@@ -334,12 +334,12 @@ internal static class ApiMessagingRegistration
                 ?? throw new InvalidOperationException("RabbitMq:Username is required.");
             var rabbitMqPassword = configurationManager["RabbitMq:Password"]
                 ?? throw new InvalidOperationException("RabbitMq:Password is required.");
-        
+
             options.UseRabbitMQ(rabbitMq =>
             {
                 rabbitMq.HostName = rabbitMqHost;
                 rabbitMq.Port = int.TryParse(configurationManager["RabbitMq:Port"], out var rabbitMqPort)
-                    ? rabbitMqPort
+                    ? rabbitMqPor
                     : 5672;
                 rabbitMq.UserName = rabbitMqUsername;
                 rabbitMq.Password = rabbitMqPassword;
@@ -481,7 +481,7 @@ internal static class ApiHangfireRegistration
         {
             object handler = configurationService.DatabaseType switch
             {
-                ConfigurationService.MySqlDatabaseType => 
+                ConfigurationService.MySqlDatabaseType =>
                     x.UseStorage(new MySqlStorage(configurationManager.GetConnectionString("MySqlConnection"),
                         new MySqlStorageOptions
                         {
@@ -494,11 +494,11 @@ internal static class ApiHangfireRegistration
                             TransactionTimeout = TimeSpan.FromMinutes(1),
                             TablesPrefix = "hangfire."
                         })),
-        
+
                 _ => throw new Exception($"Unsupported hangfire provider: {configurationService.DatabaseType}")
             };
-        });  
-        
+        });
+
         services.AddHangfireServer();
         return services;
     }
@@ -670,7 +670,7 @@ internal static class ApiAiPromptRegistration
 {
     internal static IServiceCollection AddApiAiPromptServices(this IServiceCollection services)
     {
-        // System Prompt Builders for AI Chat
+        // System Prompt Builders for AI Cha
         services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();
         services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.ContinuousVerificationPromptStrategy>();
         services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.BalancedVerificationPromptStrategy>();
@@ -720,13 +720,13 @@ internal static class ApiAiClientRegistration
 {
     internal static IServiceCollection AddApiAiClientServices(this IServiceCollection services, WebApplicationBuilder applicationBuilder)
     {
-        // AI providers + MCP client
+        // AI providers + MCP clien
         services.AddAutomatonAi();
         services.AddAutomatonMcp();
         // Replace the default IAiProviderRegistry with the dynamic decorator that lazy-loads
         // OpenAI-compatible providers from the database on first use — no restart needed.
         services.AddSingleton<Automaton.Ai.IAiProviderRegistry, DynamicAiProviderRegistry>();
-        
+
         // AI Chat History Service
         services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
         services.AddScoped<ITokenBudgetService, TokenBudgetService>();
@@ -751,7 +751,7 @@ internal static class ApiProjectRegistration
         services.AddScoped<UserSettingsService>();
         services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddScoped<OrganizationInvitationNotificationService>();
-        
+
         // Project authorization handlers
         services.AddScoped<IAuthorizationHandler, ProjectMemberHandler>();
         services.AddScoped<IAuthorizationHandler, ProjectAdminHandler>();
@@ -766,7 +766,7 @@ internal static class ApiFoundationRegistration
     internal static IServiceCollection AddApiFoundationServices(this IServiceCollection services, ConfigurationService configurationService)
     {
         services.AddScoped(service => configurationService);
-        
+
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options =>
@@ -775,11 +775,11 @@ internal static class ApiFoundationRegistration
             // when multiple types have the same class name in different namespaces
             options.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
         });
-        
+
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
-        
+
         services.AddFluentValidation(fv => fv.RegisterValidatorsFromAssemblyContaining<Program>());
-        
+
         services.AddScripting();
         services.AddAutomatonSteps();
         services.AddAutomatonCore();
@@ -806,4 +806,3 @@ internal static class ApiCorsRegistration
         return services;
     }
 }
-
