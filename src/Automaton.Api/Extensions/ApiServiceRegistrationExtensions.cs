@@ -514,6 +514,9 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppImageManagementService>();
         services.AddScoped<AppRuntimeArchiveUploadService>();
         services.AddScoped<IAppDeploymentTargetResolver, AppDeploymentTargetResolver>();
+        services.AddScoped<AppFileRunnerResolver>();
+        services.AddScoped<AppFileUploadService>();
+        services.AddScoped<AppFileDownloadService>();
         services.AddScoped<AppDeploymentTargetStateService>();
         services.AddScoped<AppDeploymentTargetManagementService>();
         services.AddScoped<AppDeploymentTargetRuntimeCleanupService>();
