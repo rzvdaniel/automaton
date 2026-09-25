@@ -389,6 +389,7 @@ services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
 services.AddSingleton<TunnelRequestRegistry>();
 services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
+services.AddScoped<RuntimeTunnelRequestSender>();
 services.AddScoped<RuntimeTunnelService>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();

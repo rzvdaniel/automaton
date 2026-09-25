@@ -220,11 +220,14 @@ public class RuntimeTunnelPolicyTests
         await dbContext.SaveChangesAsync();
 
         var registry = new TunnelRequestRegistry();
-        var service = new RuntimeTunnelService(
-            dbContext,
+        var requestSender = new RuntimeTunnelRequestSender(
             new CompletingHubContext(registry),
             registry,
             Options.Create(new RuntimeTunnelConfig()),
+            NullLogger<RuntimeTunnelRequestSender>.Instance);
+        var service = new RuntimeTunnelService(
+            dbContext,
+            requestSender,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             identity,
             NullLogger<RuntimeTunnelService>.Instance);
