@@ -6,9 +6,12 @@ namespace Automaton.Api.Tests;
 
 internal static class HostedRunnerProfileTestServiceFactory
 {
-    public static RunnerService Create(ApplicationDbContext db, UserContextService userContext)
+    public static RunnerService Create(
+        ApplicationDbContext db,
+        UserContextService userContext,
+        IAuditEventService? auditEventService = null)
     {
-        var audit = new HostedRunnerAuditTests.NoOpAuditEventService();
+        var audit = auditEventService ?? new HostedRunnerAuditNoOpAuditEventService();
         var sessions = CreateSessions(db, userContext);
         var queries = new RunnerQueryService(db, null!, userContext, sessions);
 
@@ -35,6 +38,13 @@ internal static class HostedRunnerProfileTestServiceFactory
                 null!,
                 null!,
                 null!));
+    }
+
+    public static RunnerService CreateWithAudit(ApplicationDbContext db, Guid userId)
+    {
+        var httpContextAccessor = HostedRunnerAuditTestHttpContext.Create(userId, "runner-owner@automaton.test");
+        var userContext = new UserContextService(httpContextAccessor);
+        return Create(db, userContext, new AuditEventService(db, userContext, httpContextAccessor));
     }
 
     private static RunnerConnectionSessionService CreateSessions(
