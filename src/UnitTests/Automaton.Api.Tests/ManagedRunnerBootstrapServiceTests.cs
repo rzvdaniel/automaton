@@ -359,46 +359,49 @@ public class ManagedRunnerBootstrapServiceTests
         RecordingEventPublisher publisher,
         RecordingApplicationEventService applicationEvents)
     {
-        var hostedRunnerOptions = new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
-        {
-            Enabled = true,
-            RuntimePort = 8080
-        });
+        var hostedRunnerOptions = CreateHostedRunnerOptions();
         var auditEventService = new NoOpAuditEventService();
+        var provisioningService = CreateProvisioningService(db, publisher, auditEventService, hostedRunnerOptions);
+        var runnerAssignmentPolicy = CreateRunnerAssignmentPolicy(db);
+
+        return new ManagedRunnerBootstrapService(db, provisioningService, publisher, applicationEvents, runnerAssignmentPolicy);
+    }
+
+    private static TestOptionsSnapshot<HostedRunnerOptions> CreateHostedRunnerOptions()
+        => new(new HostedRunnerOptions { Enabled = true, RuntimePort = 8080 });
+
+    private static HostedRunnerProvisioningService CreateProvisioningService(
+        ApplicationDbContext db,
+        RecordingEventPublisher publisher,
+        IAuditEventService auditEventService,
+        IOptionsSnapshot<HostedRunnerOptions> hostedRunnerOptions)
+    {
+        var enrollmentService = TestRunnerEnrollmentFactory.Create(db, auditEventService);
         var hostPlacementService = new HostedRunnerHostPlacementService(db, hostedRunnerOptions);
         var preparationService = new HostedRunnerProvisioningPreparationService(
-            db,
-            TestRunnerEnrollmentFactory.Create(db, auditEventService),
-            auditEventService,
-            hostedRunnerOptions,
-            hostPlacementService,
+            db, enrollmentService, auditEventService, hostedRunnerOptions, hostPlacementService,
             NullLogger<HostedRunnerProvisioningPreparationService>.Instance);
-        var provisioningService = new HostedRunnerProvisioningService(
+        var provisioningPolicy = new HostedRunnerProvisioningPolicyService(
             db,
-            publisher,
-            hostedRunnerOptions,
-            new HostedRunnerProvisioningPolicyService(
-                db,
-                new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
-                NullLogger<HostedRunnerProvisioningPolicyService>.Instance),
+            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
+            NullLogger<HostedRunnerProvisioningPolicyService>.Instance);
+        return new HostedRunnerProvisioningService(
+            db, publisher, hostedRunnerOptions, provisioningPolicy,
             new AccountStorageProjectAllocationService(db),
-            NullLogger<HostedRunnerProvisioningService>.Instance,
-            preparationService);
+            NullLogger<HostedRunnerProvisioningService>.Instance, preparationService);
+    }
+
+    private static AppRunnerAssignmentPolicy CreateRunnerAssignmentPolicy(ApplicationDbContext db)
+    {
         var userContextService = new UserContextService(new HttpContextAccessor());
         var authorizationService = new ResourceAuthorizationService(db, userContextService);
         var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(db, authorizationService);
-        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+        var deploymentTargetResolver = new AppDeploymentTargetResolver(db, authorizationService, runnerAuthorizationPolicy);
+        return new AppRunnerAssignmentPolicy(
             db,
             new HostedRunnerAppCapacityService(db),
             runnerAuthorizationPolicy,
-            new AppDeploymentTargetResolver(db, authorizationService, runnerAuthorizationPolicy));
-
-        return new ManagedRunnerBootstrapService(
-            db,
-            provisioningService,
-            publisher,
-            applicationEvents,
-            runnerAssignmentPolicy);
+            deploymentTargetResolver);
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -624,23 +627,6 @@ public class ManagedRunnerBootstrapServiceTests
             bool failOnError = false,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
-    }
-
-    private sealed class FakeHostedRunnerRemoteCommandExecutor
-    {
-        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
-
-        public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
-            RunnerHost host,
-            string script,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, "ok", string.Empty));
-
-        public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
-            RunnerHost host,
-            string script,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, "ok", string.Empty));
     }
 
     private sealed class TestOptionsSnapshot<T>(T value) : IOptionsSnapshot<T>

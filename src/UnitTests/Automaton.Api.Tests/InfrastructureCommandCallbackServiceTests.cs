@@ -19,145 +19,68 @@ public sealed class InfrastructureCommandCallbackServiceTests
     [Test]
     public async Task FailedResultIsAppliedOnceAndConflictsBecomeTerminalStale()
     {
-        await using var db = CreateDb();
-        var apiKeyId = Guid.NewGuid();
-        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
-        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
-        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Provisioning };
-        var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Restart, Status = HostedRunnerDeploymentStatuses.Queued };
-        db.AddRange(runner, host, hosted, deployment);
-        await db.SaveChangesAsync();
-        var service = CreateService(db);
-        var request = Request(deployment.Id, host.Id, runner.Id, "failed");
+        await using var fixture = await CreateCallbackFixtureAsync();
+        var db = fixture.Db;
+        var deployment = fixture.Deployment;
+        var service = fixture.Service;
+        var request = Request(deployment.Id, fixture.Host.Id, fixture.Runner.Id, "failed");
 
-        var first = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
-        var duplicate = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
+        var first = await service.ApplyResultAsync(fixture.ApiKeyId, deployment.Id, request, CancellationToken.None);
+        var duplicate = await service.ApplyResultAsync(fixture.ApiKeyId, deployment.Id, request, CancellationToken.None);
 
         Assert.That(first.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
         Assert.That(duplicate.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.AlreadyApplied));
         Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
         Assert.That((await db.AppModuleExecutions.SingleAsync()).Id, Is.EqualTo(deployment.Id));
-        var stale = await service.ApplyResultAsync(apiKeyId, deployment.Id,
-            Request(deployment.Id, host.Id, runner.Id, "different failure"), CancellationToken.None);
+        var stale = await service.ApplyResultAsync(fixture.ApiKeyId, deployment.Id,
+            Request(deployment.Id, fixture.Host.Id, fixture.Runner.Id, "different failure"), CancellationToken.None);
         Assert.That(stale.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
     }
 
     [Test]
     public async Task FailedStorageMeasurementTerminalizesVerificationWithoutFailingRunnerLifecycle()
     {
-        await using var db = CreateDb();
-        var apiKeyId = Guid.NewGuid();
-        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
-        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
-        var hosted = new HostedRunner
-        {
-            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
-            RunnerHostId = host.Id, Status = HostedRunnerStatuses.Running, StorageState = HostedRunnerStorageStates.Healthy
-        };
-        var deployment = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
-            Action = HostedRunnerDeploymentActions.VerifyStorage, Status = HostedRunnerDeploymentStatuses.Dispatching
-        };
-        db.AddRange(runner, host, hosted, deployment);
-        db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
-        {
-            Id = deployment.Id, HostedRunnerId = hosted.Id, IdempotencyKey = "verification",
-            Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
-        });
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
-            Request(deployment.Id, host.Id, runner.Id, "expected volume is not provisioned") with
+        await using var fixture = await CreateCallbackFixtureAsync(
+            hostedRunnerStatus: HostedRunnerStatuses.Running,
+            deploymentAction: HostedRunnerDeploymentActions.VerifyStorage,
+            deploymentStatus: HostedRunnerDeploymentStatuses.Dispatching,
+            storageState: HostedRunnerStorageStates.Healthy,
+            addStorageVerification: true);
+        var result = await fixture.Service.ApplyResultAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            Request(fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "expected volume is not provisioned") with
             { ActionKey = StorageTelemetryActions.MeasureHostedRunnerStorage }, CancellationToken.None);
 
-        var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
-        var persistedRunner = await db.HostedRunners.SingleAsync();
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
-            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Failed));
-            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
-            Assert.That(verification.Error, Is.EqualTo("expected volume is not provisioned"));
-            Assert.That(persistedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Running));
-            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
-            Assert.That(persistedRunner.StorageState, Is.EqualTo(HostedRunnerStorageStates.MeasurementFailed));
-        });
+        await AssertFailedStorageMeasurementAsync(fixture, result);
     }
 
     [Test]
     public async Task SuccessfulStorageMeasurementCompletesVerification()
     {
-        await using var db = CreateDb();
-        var apiKeyId = Guid.NewGuid();
-        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
-        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
-        var hosted = new HostedRunner
-        {
-            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
-            RunnerHostId = host.Id, Status = HostedRunnerStatuses.Running, StorageAllowanceBytes = 1_000
-        };
-        var deployment = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
-            Action = HostedRunnerDeploymentActions.VerifyStorage, Status = HostedRunnerDeploymentStatuses.Dispatching
-        };
-        db.AddRange(runner, host, hosted, deployment);
-        db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
-        {
-            Id = deployment.Id, HostedRunnerId = hosted.Id, IdempotencyKey = "verification",
-            Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow, Reason = "AdministratorRequested"
-        });
-        await db.SaveChangesAsync();
-
-        var lifecycle = new InfrastructureActionProvisioningHandler(
-            db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
-        var service = CreateService(db, lifecycle: lifecycle);
-        var request = new InfrastructureCommandResultRequest(
-            deployment.Id, host.Id, runner.Id, StorageTelemetryActions.MeasureHostedRunnerStorage, [],
-            new AppActionExecutionResult
-            {
-                ExecutionId = deployment.Id, Status = AppModuleExecutionStatuses.Succeeded,
-                StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow
-            },
-            new AppModuleExecutionArtifactResponse(true,
-                "{\"success\":true,\"systemBytes\":0,\"userBytes\":100,\"totalBytes\":100,\"usageSource\":\"xfs-project-quota\"}", null, null));
-
-        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
-        var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
-        var persistedDeployment = await db.HostedRunnerDeployments.SingleAsync();
-        var persistedRunner = await db.HostedRunners.SingleAsync();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
-            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Succeeded));
-            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
-            Assert.That(persistedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
-            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Succeeded));
-        });
+        await using var fixture = await CreateCallbackFixtureAsync(
+            hostedRunnerStatus: HostedRunnerStatuses.Running,
+            deploymentAction: HostedRunnerDeploymentActions.VerifyStorage,
+            deploymentStatus: HostedRunnerDeploymentStatuses.Dispatching,
+            storageAllowanceBytes: 1_000,
+            addStorageVerification: true,
+            completeStorageLifecycle: true);
+        var result = await fixture.Service.ApplyResultAsync(
+            fixture.ApiKeyId,
+            fixture.Deployment.Id,
+            CreateSuccessfulStorageMeasurementResult(fixture),
+            CancellationToken.None);
+        await AssertSuccessfulStorageMeasurementAsync(fixture, result);
     }
 
     [Test]
     public async Task TerminalDeploymentWithoutExecutionIsTerminalStaleWithoutMutation()
     {
-        await using var db = CreateDb();
-        var apiKeyId = Guid.NewGuid();
-        var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure };
-        var host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner };
-        var hosted = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted", RunnerHostId = host.Id, Status = HostedRunnerStatuses.Failed };
-        var deployment = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
-            Action = HostedRunnerDeploymentActions.Reprovision, Status = HostedRunnerDeploymentStatuses.Failed
-        };
-        db.AddRange(runner, host, hosted, deployment);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-        var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
-            Request(deployment.Id, host.Id, runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
+        await using var fixture = await CreateCallbackFixtureAsync(
+            hostedRunnerStatus: HostedRunnerStatuses.Failed,
+            deploymentAction: HostedRunnerDeploymentActions.Reprovision,
+            deploymentStatus: HostedRunnerDeploymentStatuses.Failed);
+        var db = fixture.Db;
+        var result = await fixture.Service.ApplyResultAsync(fixture.ApiKeyId, fixture.Deployment.Id,
+            Request(fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
             CancellationToken.None);
 
         Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
@@ -489,6 +412,125 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
+
+    private static async Task<CallbackFixture> CreateCallbackFixtureAsync(
+        string hostedRunnerStatus = HostedRunnerStatuses.Provisioning,
+        string deploymentAction = HostedRunnerDeploymentActions.Restart,
+        string deploymentStatus = HostedRunnerDeploymentStatuses.Queued,
+        string? storageState = null,
+        bool addStorageVerification = false,
+        long storageAllowanceBytes = 0,
+        bool completeStorageLifecycle = false)
+    {
+        var db = CreateDb();
+        var apiKeyId = Guid.NewGuid();
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), ApiKeyId = apiKeyId, Name = "infra", Purpose = RunnerPurposes.Infrastructure
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(), Name = "host", Provider = "test",
+            InfrastructureRunnerId = runner.Id, InfrastructureRunner = runner
+        };
+        var hosted = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
+            RunnerHostId = host.Id, Status = hostedRunnerStatus,
+            StorageState = storageState ?? HostedRunnerStorageStates.Unknown,
+            StorageAllowanceBytes = storageAllowanceBytes
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted,
+            Action = deploymentAction, Status = deploymentStatus
+        };
+        db.AddRange(runner, host, hosted, deployment);
+        if (addStorageVerification)
+        {
+            db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+            {
+                Id = deployment.Id, HostedRunnerId = hosted.Id, IdempotencyKey = "verification",
+                Status = StorageVerificationStatuses.Dispatching, StartedAtUtc = DateTime.UtcNow,
+                Reason = "AdministratorRequested"
+            });
+        }
+
+        await db.SaveChangesAsync();
+        var lifecycle = completeStorageLifecycle ? CreateStorageProvisioningHandler(db) : null;
+        return new CallbackFixture(db, apiKeyId, runner, host, hosted, deployment,
+            CreateService(db, lifecycle: lifecycle));
+    }
+
+    private static InfrastructureActionProvisioningHandler CreateStorageProvisioningHandler(ApplicationDbContext db)
+        => new(db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()));
+
+    private static InfrastructureCommandResultRequest CreateSuccessfulStorageMeasurementResult(CallbackFixture fixture)
+        => new(
+            fixture.Deployment.Id,
+            fixture.Host.Id,
+            fixture.Runner.Id,
+            StorageTelemetryActions.MeasureHostedRunnerStorage,
+            [],
+            new AppActionExecutionResult
+            {
+                ExecutionId = fixture.Deployment.Id,
+                Status = AppModuleExecutionStatuses.Succeeded,
+                StartedAtUtc = DateTime.UtcNow,
+                CompletedAtUtc = DateTime.UtcNow
+            },
+            new AppModuleExecutionArtifactResponse(true,
+                "{\"success\":true,\"systemBytes\":0,\"userBytes\":100,\"totalBytes\":100,\"usageSource\":\"xfs-project-quota\"}",
+                null,
+                null));
+
+    private static async Task AssertFailedStorageMeasurementAsync(
+        CallbackFixture fixture,
+        InfrastructureCommandResultResponse result)
+    {
+        var verification = await fixture.Db.HostedRunnerStorageVerifications.SingleAsync();
+        var persistedRunner = await fixture.Db.HostedRunners.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
+            Assert.That(verification.Error, Is.EqualTo("expected volume is not provisioned"));
+            Assert.That(persistedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Running));
+            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
+            Assert.That(persistedRunner.StorageState, Is.EqualTo(HostedRunnerStorageStates.MeasurementFailed));
+        });
+    }
+
+    private static async Task AssertSuccessfulStorageMeasurementAsync(
+        CallbackFixture fixture,
+        InfrastructureCommandResultResponse result)
+    {
+        var verification = await fixture.Db.HostedRunnerStorageVerifications.SingleAsync();
+        var persistedDeployment = await fixture.Db.HostedRunnerDeployments.SingleAsync();
+        var persistedRunner = await fixture.Db.HostedRunners.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
+            Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Succeeded));
+            Assert.That(verification.CompletedAtUtc, Is.Not.Null);
+            Assert.That(persistedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
+            Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Succeeded));
+        });
+    }
+
+    private sealed record CallbackFixture(
+        ApplicationDbContext Db,
+        Guid ApiKeyId,
+        Runner Runner,
+        RunnerHost Host,
+        HostedRunner HostedRunner,
+        HostedRunnerDeployment Deployment,
+        InfrastructureCommandCallbackService Service) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => Db.DisposeAsync();
+    }
 
     private sealed record ResolutionFixture(
         Guid ApiKeyId,
