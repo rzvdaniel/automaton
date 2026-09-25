@@ -27,7 +27,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Restart, Status = HostedRunnerDeploymentStatuses.Queued };
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         var request = Request(deployment.Id, host.Id, runner.Id, "failed");
 
         var first = await service.ApplyResultAsync(apiKeyId, deployment.Id, request, CancellationToken.None);
@@ -67,7 +67,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         });
         await db.SaveChangesAsync();
 
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
             Request(deployment.Id, host.Id, runner.Id, "expected volume is not provisioned") with
             { ActionKey = StorageTelemetryActions.MeasureHostedRunnerStorage }, CancellationToken.None);
@@ -113,7 +113,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
 
         var lifecycle = new InfrastructureActionProvisioningHandler(
             db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
-        var service = new InfrastructureCommandCallbackService(db, null!, lifecycle);
+        var service = CreateService(db, lifecycle: lifecycle);
         var request = new InfrastructureCommandResultRequest(
             deployment.Id, host.Id, runner.Id, StorageTelemetryActions.MeasureHostedRunnerStorage, [],
             new AppActionExecutionResult
@@ -155,7 +155,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
 
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         var result = await service.ApplyResultAsync(apiKeyId, deployment.Id,
             Request(deployment.Id, host.Id, runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
             CancellationToken.None);
@@ -176,7 +176,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
 
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyResultAsync(Guid.NewGuid(), deployment.Id,
             Request(deployment.Id, host.Id, runner.Id, "failed"), CancellationToken.None));
     }
@@ -193,7 +193,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
 
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         await service.ApplyResultAsync(apiKeyId, deployment.Id,
             Request(deployment.Id, host.Id, runner.Id, "delete failed") with { ActionKey = "delete-hosted-runner" },
             CancellationToken.None);
@@ -224,7 +224,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Restart, Status = HostedRunnerDeploymentStatuses.Queued };
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         var wrongSecrets = new InfrastructureCommandSecretsRequest(deployment.Id, host.Id, runner.Id, "delete-hosted-runner", []);
         var wrongResult = Request(deployment.Id, host.Id, runner.Id, "failed") with { ActionKey = "delete-hosted-runner" };
 
@@ -245,7 +245,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = "unknown-action" };
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyResultAsync(apiKeyId, deployment.Id,
             Request(deployment.Id, host.Id, runner.Id, "failed"), CancellationToken.None));
     }
@@ -261,7 +261,7 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, HostedRunner = hosted, Action = HostedRunnerDeploymentActions.Provision };
         db.AddRange(runner, host, hosted, deployment);
         await db.SaveChangesAsync();
-        var service = new InfrastructureCommandCallbackService(db, null!, null!);
+        var service = CreateService(db);
         var secrets = new InfrastructureCommandSecretsRequest(deployment.Id, host.Id, runner.Id, "reprovision-hosted-runner", []);
         var result = Request(deployment.Id, host.Id, runner.Id, "failed") with { ActionKey = "reprovision-hosted-runner" };
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ResolveSecretsAsync(apiKeyId, deployment.Id, secrets, CancellationToken.None));
@@ -464,13 +464,28 @@ public sealed class InfrastructureCommandCallbackServiceTests
         var lifecycle = new InfrastructureActionProvisioningHandler(
             db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()), Options.Create(new StorageTelemetryOptions()));
         return new(apiKeyId, runner, host, hosted, deployment, grantId,
-            new InfrastructureCommandCallbackService(db, grants, lifecycle, transactionalEventExecutor));
+            CreateService(db, grants, lifecycle, transactionalEventExecutor));
     }
 
     private static InfrastructureCommandResultRequest Request(Guid operationId, Guid hostId, Guid runnerId, string failure) => new(
         operationId, hostId, runnerId, "restart-hosted-runner", [],
         new AppActionExecutionResult { ExecutionId = operationId, Status = AppModuleExecutionStatuses.Failed, FailureSummary = failure, StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow },
         new AppModuleExecutionArtifactResponse(false, null, null, null));
+
+    private static InfrastructureCommandCallbackService CreateService(
+        ApplicationDbContext db,
+        IExecutionSecretGrantService? secretGrants = null,
+        InfrastructureActionProvisioningHandler? lifecycle = null,
+        ITransactionalEventExecutor? transactionalEventExecutor = null)
+    {
+        var resultService = new InfrastructureCommandResultService(db, secretGrants!, lifecycle!);
+        return new InfrastructureCommandCallbackService(
+            db,
+            secretGrants!,
+            lifecycle!,
+            resultService,
+            transactionalEventExecutor);
+    }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);

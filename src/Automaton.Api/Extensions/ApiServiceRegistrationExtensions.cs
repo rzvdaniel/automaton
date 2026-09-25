@@ -313,6 +313,7 @@ internal static class ApiMessagingRegistration
         services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
         services.AddScoped<InfrastructureActionProvisioningHandler>();
         services.AddScoped<InfrastructureCommandCallbackService>();
+        services.AddScoped<InfrastructureCommandResultService>();
         services.AddScoped<HostedRunnerRestartReconciler>();
         services.AddScoped<HostedRunnerLifecycleReconciler>();
         services.AddScoped<TrustedInfrastructureActionDeploymentService>();
