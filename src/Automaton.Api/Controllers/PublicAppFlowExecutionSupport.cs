@@ -8,6 +8,44 @@ namespace Automaton.Api.Controllers;
 
 internal static class PublicAppFlowExecutionSupport
 {
+    public static async Task<FlowExecutionAttempt> ExecuteAsync(
+        FlowsService flowsService,
+        RunnerService runnerService,
+        string flowIdentifier,
+        Guid ownerId,
+        WebAppFlowExecutionRequest request,
+        string? headerTestRunId,
+        Guid? executionRunnerId,
+        ILogger logger,
+        bool isPreview,
+        CancellationToken cancellationToken)
+    {
+        var resolution = await ResolveFlowAsync(
+            flowsService, flowIdentifier, ownerId, logger, isPreview, cancellationToken);
+        if (resolution.NotFoundMessage is not null)
+        {
+            return new FlowExecutionAttempt(null, resolution.NotFoundMessage, [], false, null, null);
+        }
+
+        var run = await RunAsync(
+            flowsService,
+            runnerService,
+            resolution.Flow!,
+            resolution.FlowId!.Value,
+            request,
+            headerTestRunId,
+            executionRunnerId,
+            cancellationToken);
+
+        return new FlowExecutionAttempt(
+            resolution.FlowId,
+            null,
+            run.MissingInputs,
+            run.HasOnlineRunners,
+            run.RunnerSelectionError,
+            run.Response);
+    }
+
     public static async Task<FlowRunOutcome> RunAsync(
         FlowsService flowsService,
         RunnerService runnerService,
@@ -234,6 +272,13 @@ internal static class PublicAppFlowExecutionSupport
     public sealed record FlowResolution(Guid? FlowId, Flow? Flow, string? NotFoundMessage);
     public sealed record RunnerSelection(List<Guid> RunnerIds, bool HasOnlineRunners, string? ErrorMessage);
     public sealed record FlowRunOutcome(
+        List<string> MissingInputs,
+        bool HasOnlineRunners,
+        string? RunnerSelectionError,
+        WebAppFlowExecutionResponse? Response);
+    public sealed record FlowExecutionAttempt(
+        Guid? FlowId,
+        string? NotFoundMessage,
         List<string> MissingInputs,
         bool HasOnlineRunners,
         string? RunnerSelectionError,

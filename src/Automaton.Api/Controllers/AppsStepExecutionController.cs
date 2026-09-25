@@ -77,16 +77,11 @@ public class AppsStepExecutionController : ControllerBase
             }
 
             // 3. Execute the step
-            var inputs = request.Inputs != null
-                ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId, testRunIdHeaders?.FirstOrDefault());
-
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
                 stepIdentifier,
-                inputs,
-                request.RunnerNames,
+                request,
+                testRunIdHeaders?.FirstOrDefault(),
                 cancellationToken);
 
             return Ok(result);
@@ -148,16 +143,11 @@ public class AppsStepExecutionController : ControllerBase
             }
 
             // 2. Execute the step
-            var inputs = request.Inputs != null
-                ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ApplyTestRunIdInput(inputs, request.TestRunId, testRunIdHeaders?.FirstOrDefault());
-
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
                 stepIdentifier,
-                inputs,
-                request.RunnerNames,
+                request,
+                testRunIdHeaders?.FirstOrDefault(),
                 cancellationToken);
 
             return Ok(result);
@@ -272,23 +262,4 @@ public class AppsStepExecutionController : ControllerBase
         return ListStepsPreview(appId);
     }
 
-    private static void ApplyTestRunIdInput(
-        Dictionary<string, string> inputs,
-        string? bodyTestRunId,
-        string? headerTestRunId)
-    {
-        var testRunId = ResolveTestRunId(bodyTestRunId, headerTestRunId);
-        if (string.IsNullOrWhiteSpace(testRunId))
-            return;
-
-        inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
-    }
-
-    private static string? ResolveTestRunId(string? bodyTestRunId, string? headerTestRunId)
-    {
-        if (!string.IsNullOrWhiteSpace(bodyTestRunId))
-            return bodyTestRunId.Trim();
-
-        return string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
-    }
 }

@@ -91,29 +91,12 @@ public class GitHubAuthController : ControllerBase
                 return Redirect(BuildFrontendErrorRedirect("GitHub did not return a username."));
             }
 
-            var user = await _usersService.FindByEmailAsync(verifiedEmail);
-            if (user?.IsDeleted == true)
+            var userResolution = await ResolveUserAsync(verifiedEmail, githubUsername, githubDisplayName);
+            if (userResolution.Error is not null)
             {
-                return Redirect(BuildFrontendErrorRedirect("This account is no longer available."));
+                return Redirect(BuildFrontendErrorRedirect(userResolution.Error));
             }
-
-            if (user == null)
-            {
-                var publicUsername = await _usersService.GenerateUniquePublicUsernameFromCandidateAsync(githubUsername);
-                user = new ApplicationUser
-                {
-                    Id = Guid.NewGuid(),
-                    Email = verifiedEmail,
-                    UserName = verifiedEmail,
-                    Name = string.IsNullOrWhiteSpace(githubDisplayName) ? githubUsername : githubDisplayName,
-                    PublicUsername = publicUsername,
-                    SecurityStamp = Guid.NewGuid().ToString(),
-                    RegisteredAtUtc = DateTime.UtcNow,
-                    RegistrationProvider = RegistrationProviders.GitHub
-                };
-
-                await _usersService.CreateUserWithoutPasswordAsync(user);
-            }
+            var user = userResolution.User!;
 
             await _usersService.MarkSuccessfulLoginAsync(user);
             await _signInManager.SignInAsync(user, isPersistent: false);
@@ -136,6 +119,39 @@ public class GitHubAuthController : ControllerBase
         {
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
         }
+    }
+
+    private async Task<(ApplicationUser? User, string? Error)> ResolveUserAsync(
+        string email,
+        string githubUsername,
+        string? githubDisplayName)
+    {
+        var user = await _usersService.FindByEmailAsync(email);
+        if (user?.IsDeleted == true)
+        {
+            return (null, "This account is no longer available.");
+        }
+
+        if (user is not null)
+        {
+            return (user, null);
+        }
+
+        var publicUsername = await _usersService.GenerateUniquePublicUsernameFromCandidateAsync(githubUsername);
+        user = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            UserName = email,
+            Name = string.IsNullOrWhiteSpace(githubDisplayName) ? githubUsername : githubDisplayName,
+            PublicUsername = publicUsername,
+            SecurityStamp = Guid.NewGuid().ToString(),
+            RegisteredAtUtc = DateTime.UtcNow,
+            RegistrationProvider = RegistrationProviders.GitHub
+        };
+
+        await _usersService.CreateUserWithoutPasswordAsync(user);
+        return (user, null);
     }
 
     private string BuildFrontendSuccessRedirect(JsonWebToken jwt, string returnUrl)
