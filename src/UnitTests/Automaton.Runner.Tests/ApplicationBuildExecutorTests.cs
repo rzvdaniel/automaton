@@ -203,13 +203,17 @@ public sealed class ApplicationBuildExecutorTests
             root);
 
         var childPid = ParseChildPid(result.StandardOutput);
+        var buildProcessAlive = await IsProcessAliveAsync(result.ProcessId!.Value);
+        var childProcessAlive = await IsProcessAliveAsync(childPid);
         Assert.Multiple(() =>
         {
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.TimedOut, Is.True);
             Assert.That(result.ProcessId, Is.Not.Null);
-            Assert.That(IsProcessAlive(result.ProcessId!.Value), Is.False);
-            Assert.That(IsProcessAlive(childPid), Is.False);
+            Assert.That(buildProcessAlive, Is.False,
+                $"Build process {result.ProcessId.Value} should have exited.");
+            Assert.That(childProcessAlive, Is.False,
+                $"Child process {childPid} should have exited.");
         });
     }
 
@@ -288,14 +292,24 @@ public sealed class ApplicationBuildExecutorTests
         return int.Parse(line["child:".Length..]);
     }
 
-    private static bool IsProcessAlive(int processId)
+    private static async Task<bool> IsProcessAliveAsync(int processId)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
+            if (OperatingSystem.IsLinux())
+            {
+                var stat = await File.ReadAllTextAsync($"/proc/{processId}/stat");
+                var processNameEnd = stat.LastIndexOf(')');
+                if (processNameEnd >= 0
+                    && processNameEnd + 2 < stat.Length
+                    && stat[processNameEnd + 2] == 'Z')
+                    return false;
+            }
+
             return !process.HasExited;
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException)
         {
             return false;
         }
