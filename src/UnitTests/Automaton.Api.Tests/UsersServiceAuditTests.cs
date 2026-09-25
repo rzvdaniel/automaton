@@ -26,17 +26,7 @@ public class UsersServiceAuditTests
         dbContext.Users.Add(targetUser);
         await dbContext.SaveChangesAsync();
 
-        var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
-        var userContextService = new UserContextService(httpContextAccessor);
-        IAuditEventService auditEventService = new AuditEventService(dbContext, userContextService, httpContextAccessor);
-        var userManager = new TestUserManager(targetUser);
-        var service = new UsersService(
-            userManager,
-            new TestRoleManager(),
-            dbContext,
-            userContextService,
-            auditEventService,
-            new UserHardDeleteService(userManager, dbContext, auditEventService));
+        var service = CreateService(dbContext, actorUserId, targetUser);
 
         await service.SetDisabledAsync(targetUserId, disabled: true, CancellationToken.None);
 
@@ -62,17 +52,7 @@ public class UsersServiceAuditTests
         dbContext.Users.Add(targetUser);
         await dbContext.SaveChangesAsync();
 
-        var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
-        var userContextService = new UserContextService(httpContextAccessor);
-        IAuditEventService auditEventService = new AuditEventService(dbContext, userContextService, httpContextAccessor);
-        var userManager = new TestUserManager(targetUser);
-        var service = new UsersService(
-            userManager,
-            new TestRoleManager(),
-            dbContext,
-            userContextService,
-            auditEventService,
-            new UserHardDeleteService(userManager, dbContext, auditEventService));
+        var service = CreateService(dbContext, actorUserId, targetUser);
 
         await service.AddRole(targetUserId, UserRole.Administrator);
 
@@ -94,6 +74,24 @@ public class UsersServiceAuditTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private static UsersService CreateService(
+        ApplicationDbContext dbContext,
+        Guid actorUserId,
+        ApplicationUser targetUser)
+    {
+        var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
+        var userContextService = new UserContextService(httpContextAccessor);
+        IAuditEventService auditEventService = new AuditEventService(dbContext, userContextService, httpContextAccessor);
+        var userManager = new TestUserManager(targetUser);
+        return new UsersService(
+            userManager,
+            new TestRoleManager(),
+            dbContext,
+            userContextService,
+            auditEventService,
+            new UserHardDeleteService(userManager, dbContext, auditEventService));
     }
 
     private static ApplicationUser CreateUser(Guid userId, string email)

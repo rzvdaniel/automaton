@@ -16,6 +16,26 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class HostContainerRelayServiceTests
 {
+    private static readonly IReadOnlyDictionary<string, AuthorizationFailureCase> AuthorizationFailures =
+        new Dictionary<string, AuthorizationFailureCase>
+        {
+            ["stale"] = new("caller_not_managed_runner", (fixture, caller, request) => { caller.ConnectionId = "stale"; return request; }),
+            ["profile"] = new("caller_not_managed_runner", (fixture, caller, request) => { fixture.HostedRunnerEntity.ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost; return request; }),
+            ["purpose"] = new("caller_not_managed_runner", (fixture, caller, request) => { caller.Purpose = RunnerPurposes.Infrastructure; return request; }),
+            ["hosted"] = new("hosted_runner_binding_mismatch", (fixture, caller, request) => { fixture.HostedRunner.DeletedAt = DateTime.UtcNow; return request; }),
+            ["host"] = new("runner_host_binding_mismatch", (fixture, caller, request) => { caller.RunnerHostId = Guid.NewGuid(); return request; }),
+            ["scope-hosted"] = new("hosted_runner_binding_mismatch", (fixture, caller, request) => request with { Scope = request.Scope with { HostedRunnerId = Guid.NewGuid() } }),
+            ["scope-host"] = new("runner_host_binding_mismatch", (fixture, caller, request) => request with { Scope = request.Scope with { RunnerHostId = Guid.NewGuid() } }),
+            ["target"] = new("deployment_target_mismatch", (fixture, caller, request) => request with { Scope = request.Scope with { DeploymentTargetId = Guid.NewGuid() } }),
+            ["app"] = new("deployment_target_mismatch", (fixture, caller, request) => request with { Scope = request.Scope with { AppId = Guid.NewGuid() } }),
+            ["assignment"] = new("app_assignment_mismatch", (fixture, caller, request) => { fixture.Target.ExecutionRunnerId = null; return request; }),
+            ["infra"] = new("infrastructure_runner_missing", (fixture, caller, request) => { fixture.Host.InfrastructureRunnerId = null; return request; }),
+            ["offline"] = new("infrastructure_runner_offline", (fixture, caller, request) => { fixture.Infrastructure.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-1); return request; }),
+            ["protocol"] = new("host_container_protocol_unsupported", (fixture, caller, request) => { fixture.Infrastructure.ApiCompatibilityVersion = "3"; return request; }),
+            ["capability"] = new("host_container_capability_missing", (fixture, caller, request) => { fixture.Infrastructure.CapabilitiesJson = "[\"ApplicationHosting\"]"; return request; }),
+            ["api"] = new("infrastructure_runner_wrong_api_instance", (fixture, caller, request) => { fixture.Infrastructure.ApiInstanceId = "other"; return request; })
+        };
+
     [Test]
     public async Task ResolveImage_BindsPersistedStandardHostedRunnerAndForwardsTrustedScope()
     {
@@ -272,14 +292,8 @@ public sealed class HostContainerRelayServiceTests
         using var fixture = RelayFixture.Create();
         var attemptId = Guid.NewGuid();
         fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
-        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), new HostContainerExecutionRequest
-        {
-            Operation = HostContainerOperationKinds.RunBuild,
-            RequestedImage = "dotnet/sdk:9.0",
-            Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
-            Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
-            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
-        }, CancellationToken.None);
+        var result = await fixture.Service.ExecuteAsync(
+            fixture.Caller(), CreateBuildRequest(fixture, attemptId), CancellationToken.None);
 
         Assert.That(result.Success, Is.True);
         Assert.That(fixture.Transport.Request, Is.Not.Null);
@@ -292,6 +306,16 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(fixture.Transport.Request.Environment["BUILD_MODE"], Is.EqualTo("release"));
         });
     }
+
+    private static HostContainerExecutionRequest CreateBuildRequest(RelayFixture fixture, Guid attemptId)
+        => new()
+        {
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "dotnet/sdk:9.0",
+            Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
+            Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
+            Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
+        };
 
     private static readonly string[] RuntimeOperations =
     [
@@ -335,50 +359,22 @@ public sealed class HostContainerRelayServiceTests
     [TestCaseSource(nameof(RuntimeOperations))]
     public async Task RuntimeOperations_PreserveAuthorizationMatrix(string operation)
     {
-        string[] failures = ["stale", "profile", "purpose", "hosted", "host", "scope-hosted", "scope-host",
-            "target", "app", "assignment", "infra", "offline", "protocol", "capability", "api"];
-        foreach (var failure in failures)
+        foreach (var (failure, failureCase) in AuthorizationFailures)
         {
             using var fixture = RelayFixture.Create();
             var caller = fixture.Caller();
             var request = fixture.RuntimeRequest(operation);
-            var expected = failure switch
-            {
-                "stale" or "profile" or "purpose" => "caller_not_managed_runner",
-                "hosted" or "scope-hosted" => "hosted_runner_binding_mismatch",
-                "host" or "scope-host" => "runner_host_binding_mismatch",
-                "target" or "app" => "deployment_target_mismatch",
-                "assignment" => "app_assignment_mismatch",
-                "infra" => "infrastructure_runner_missing",
-                "offline" => "infrastructure_runner_offline",
-                "protocol" => "host_container_protocol_unsupported",
-                "capability" => "host_container_capability_missing",
-                _ => "infrastructure_runner_wrong_api_instance"
-            };
-            switch (failure)
-            {
-                case "stale": caller.ConnectionId = "stale"; break;
-                case "profile": fixture.HostedRunnerEntity.ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost; break;
-                case "purpose": caller.Purpose = RunnerPurposes.Infrastructure; break;
-                case "hosted": fixture.HostedRunner.DeletedAt = DateTime.UtcNow; break;
-                case "host": caller.RunnerHostId = Guid.NewGuid(); break;
-                case "scope-hosted": request = request with { Scope = request.Scope with { HostedRunnerId = Guid.NewGuid() } }; break;
-                case "scope-host": request = request with { Scope = request.Scope with { RunnerHostId = Guid.NewGuid() } }; break;
-                case "target": request = request with { Scope = request.Scope with { DeploymentTargetId = Guid.NewGuid() } }; break;
-                case "app": request = request with { Scope = request.Scope with { AppId = Guid.NewGuid() } }; break;
-                case "assignment": fixture.Target.ExecutionRunnerId = null; break;
-                case "infra": fixture.Host.InfrastructureRunnerId = null; break;
-                case "offline": fixture.Infrastructure.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-1); break;
-                case "protocol": fixture.Infrastructure.ApiCompatibilityVersion = "3"; break;
-                case "capability": fixture.Infrastructure.CapabilitiesJson = "[\"ApplicationHosting\"]"; break;
-                case "api": fixture.Infrastructure.ApiInstanceId = "other"; break;
-            }
+            request = failureCase.Apply(fixture, caller, request);
             await fixture.Db.SaveChangesAsync();
             var result = await fixture.Service.ExecuteAsync(caller, request, CancellationToken.None);
-            Assert.That(result.ErrorCode, Is.EqualTo(expected), failure);
+            Assert.That(result.ErrorCode, Is.EqualTo(failureCase.ErrorCode), failure);
             Assert.That(fixture.Transport.Invocations, Is.Zero, failure);
         }
     }
+
+    private sealed record AuthorizationFailureCase(
+        string ErrorCode,
+        Func<RelayFixture, RunnerDetails, HostContainerExecutionRequest, HostContainerExecutionRequest> Apply);
 
     [TestCaseSource(nameof(RuntimeOperations))]
     public async Task RuntimeOperations_RejectCallerResourcesAndHostPort(string operation)

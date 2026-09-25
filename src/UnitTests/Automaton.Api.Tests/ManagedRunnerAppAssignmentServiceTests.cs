@@ -6,6 +6,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
+using Automaton.Core.Constants;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -311,6 +312,8 @@ public class ManagedRunnerAppAssignmentServiceTests
     {
         var target = AddTarget(null);
         target.GenericRuntimeDeployed = false;
+        db.Runners.Single(runner => runner.Id == hosted.RunnerId).ApiCompatibilityVersion =
+            RunnerApiCompatibilityVersions.ContainerApplicationExecution;
         target.WebApp.ApplicationContractJson = ApplicationContractSerialization.Serialize(new ApplicationContract
         {
             Runtime = new ApplicationRuntimeSpec { Image = "test/runtime:1", Command = new ApplicationCommandSpec { Executable = "server" } }

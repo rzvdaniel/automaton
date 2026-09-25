@@ -752,6 +752,7 @@ public class AppAuthorizationRegressionTests
             Definition = "{}",
             PublicUrl = "project-app",
             IsPublished = true,
+            RuntimeVisibility = AppRuntimeVisibilities.Public,
             AccessStatus = AppAccessStatuses.Active,
             ProjectId = projectId,
             Scope = AccessScope.Project,

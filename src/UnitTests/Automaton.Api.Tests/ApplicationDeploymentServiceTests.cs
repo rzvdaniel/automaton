@@ -127,7 +127,7 @@ public sealed class ApplicationDeploymentServiceTests
             authorization,
             new ImmediateTransactionExecutor(),
             publisher,
-            environment,
+            new DeploymentPackageStore(environment),
             null!,
             fixture.ApiIdentity,
             null!,
@@ -237,7 +237,7 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             null!,
             null!,
-            environment,
+            new DeploymentPackageStore(environment),
             null!,
             fixture.ApiIdentity,
             null!,
@@ -279,10 +279,10 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             null!,
             null!,
-            new TestWebHostEnvironment
+            new DeploymentPackageStore(new TestWebHostEnvironment
             {
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            },
+            }),
             null!,
             fixture.ApiIdentity,
             null!,
@@ -328,10 +328,10 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             null!,
             null!,
-            new TestWebHostEnvironment
+            new DeploymentPackageStore(new TestWebHostEnvironment
             {
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            },
+            }),
             fixture.Service,
             fixture.ApiIdentity,
             null!,
@@ -376,10 +376,10 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             null!,
             null!,
-            new TestWebHostEnvironment
+            new DeploymentPackageStore(new TestWebHostEnvironment
             {
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            },
+            }),
             null!,
             fixture.ApiIdentity,
             null!,
@@ -416,10 +416,10 @@ public sealed class ApplicationDeploymentServiceTests
             null!,
             null!,
             null!,
-            new TestWebHostEnvironment
+            new DeploymentPackageStore(new TestWebHostEnvironment
             {
                 ContentRootPath = Directory.GetParent(Path.GetDirectoryName(fixture.RouteFilePath)!)!.FullName
-            },
+            }),
             fixture.Service,
             fixture.ApiIdentity,
             null!,

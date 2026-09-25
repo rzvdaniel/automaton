@@ -110,6 +110,7 @@ public class OrganizationInvitationSecurityTests
             dbContext,
             userContextService,
             null!,
+            null!,
             new NoOpAuditEventService());
     }
 

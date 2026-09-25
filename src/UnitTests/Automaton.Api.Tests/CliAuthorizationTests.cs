@@ -31,20 +31,7 @@ public class CliAuthorizationTests
     [Test]
     public async Task ApprovalRejectsUnconfirmedEmailBeforeAuthorizingRequest()
     {
-        var userId = Guid.NewGuid();
-        var httpContext = new DefaultHttpContext
-        {
-            User = new System.Security.Claims.ClaimsPrincipal(
-                new System.Security.Claims.ClaimsIdentity(
-                    [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId.ToString())],
-                    "test"))
-        };
-        var userContext = new UserContextService(new HttpContextAccessor { HttpContext = httpContext });
-        var controller = new CliAuthorizationController(
-            null!,
-            null!,
-            userContext,
-            new UnconfirmedEmailGuard());
+        var controller = CreateController(Guid.NewGuid());
 
         var result = await controller.Approve(
             Guid.NewGuid(),
@@ -53,6 +40,23 @@ public class CliAuthorizationTests
 
         Assert.That(result, Is.TypeOf<ObjectResult>());
         Assert.That(((ObjectResult)result).StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
+    }
+
+    private static CliAuthorizationController CreateController(Guid userId)
+    {
+        var httpContext = new DefaultHttpContext
+        {
+            User = new System.Security.Claims.ClaimsPrincipal(
+                new System.Security.Claims.ClaimsIdentity(
+                    [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId.ToString())],
+                    "test"))
+        };
+        var userContext = new UserContextService(new HttpContextAccessor { HttpContext = httpContext });
+        return new CliAuthorizationController(
+            null!,
+            null!,
+            userContext,
+            new UnconfirmedEmailGuard());
     }
 
     private sealed class UnconfirmedEmailGuard : ConfirmedEmailGuardService

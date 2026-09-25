@@ -114,6 +114,7 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
+        target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -197,6 +198,7 @@ public class AppDeploymentTargetManagementServiceTests
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
         target.Status = DeploymentTargetStatus.Running;
+        target.GenericRuntimeDeployed = true;
         await fixture.Db.SaveChangesAsync();
 
         Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
@@ -229,6 +231,7 @@ public class AppDeploymentTargetManagementServiceTests
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
         target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -237,7 +240,7 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
-            Assert.That(summary.GenericRuntimeDeployed, Is.False);
+            Assert.That(summary.GenericRuntimeDeployed, Is.True);
             Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
         });
     }

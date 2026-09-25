@@ -284,24 +284,46 @@ public class AdminSubscriptionPlansControllerAuditTests
         var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
         var userContextService = new UserContextService(httpContextAccessor);
         auditEventService ??= new AuditEventService(dbContext, userContextService, httpContextAccessor);
-        var apiKeyService = new ApiKeyService(
-            dbContext,
-            NullLogger<ApiKeyService>.Instance,
-            authorizationService: null!,
-            auditEventService);
+        var planOperations = CreatePlanOperations(dbContext, auditEventService, transactionalEventExecutor);
+        return new AdminSubscriptionPlansController(dbContext, new TestUserManager(), planOperations);
+    }
+
+    private static AdminSubscriptionPlanOperationsService CreatePlanOperations(
+        ApplicationDbContext dbContext,
+        IAuditEventService auditEventService,
+        ITransactionalEventExecutor? transactionalEventExecutor)
+    {
         var hostedRunnerOptions = new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
         {
             Enabled = false
         });
-        var hostPlacementService = new HostedRunnerHostPlacementService(dbContext, hostedRunnerOptions);
-        var preparationService = new HostedRunnerProvisioningPreparationService(
+        var preparationService = CreateProvisioningPreparation(dbContext, auditEventService, hostedRunnerOptions);
+        var provisioningService = CreateProvisioningService(dbContext, hostedRunnerOptions, preparationService);
+        return new AdminSubscriptionPlanOperationsService(
+            dbContext,
+            provisioningService,
+            new HostedRunnerPlanCapabilityValidator(new HostedRunnerSpecificationResolver(dbContext)),
+            auditEventService,
+            transactionalEventExecutor ?? new InlineTransactionalEventExecutor());
+    }
+
+    private static HostedRunnerProvisioningPreparationService CreateProvisioningPreparation(
+        ApplicationDbContext dbContext,
+        IAuditEventService auditEventService,
+        IOptionsSnapshot<HostedRunnerOptions> hostedRunnerOptions)
+        => new(
             dbContext,
             TestRunnerEnrollmentFactory.Create(dbContext, auditEventService),
             auditEventService,
             hostedRunnerOptions,
-            hostPlacementService,
+            new HostedRunnerHostPlacementService(dbContext, hostedRunnerOptions),
             NullLogger<HostedRunnerProvisioningPreparationService>.Instance);
-        var hostedRunnerProvisioningService = new HostedRunnerProvisioningService(
+
+    private static HostedRunnerProvisioningService CreateProvisioningService(
+        ApplicationDbContext dbContext,
+        IOptionsSnapshot<HostedRunnerOptions> hostedRunnerOptions,
+        HostedRunnerProvisioningPreparationService preparationService)
+        => new(
             dbContext,
             new NoOpEventPublisher(),
             hostedRunnerOptions,
@@ -312,16 +334,6 @@ public class AdminSubscriptionPlansControllerAuditTests
             new AccountStorageProjectAllocationService(dbContext),
             NullLogger<HostedRunnerProvisioningService>.Instance,
             preparationService);
-
-        var planOperations = new AdminSubscriptionPlanOperationsService(
-            dbContext,
-            hostedRunnerProvisioningService,
-            new HostedRunnerPlanCapabilityValidator(new HostedRunnerSpecificationResolver(dbContext)),
-            auditEventService,
-            transactionalEventExecutor ?? new InlineTransactionalEventExecutor());
-
-        return new AdminSubscriptionPlansController(dbContext, new TestUserManager(), planOperations);
-    }
 
     private static IAuditEventService CreateAuditEventService(ApplicationDbContext dbContext, Guid actorUserId)
     {
@@ -443,27 +455,6 @@ public class AdminSubscriptionPlansControllerAuditTests
         {
             HttpContext = httpContext
         };
-    }
-
-    private sealed class FakeHostedRunnerRemoteCommandExecutor
-    {
-        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
-
-        public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
-            RunnerHost host,
-            string script,
-            CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, string.Empty, string.Empty));
-        }
-
-        public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
-            RunnerHost host,
-            string script,
-            CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, string.Empty, string.Empty));
-        }
     }
 
     private sealed class InlineTransactionalEventExecutor : ITransactionalEventExecutor

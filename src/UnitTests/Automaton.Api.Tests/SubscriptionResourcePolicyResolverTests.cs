@@ -115,7 +115,7 @@ public sealed class SubscriptionResourcePolicyResolverTests
     [Test]
     public void ProvisioningDependsOnPolicyResolverAndNormalProvisionRequestHasNoResourceOverrides()
     {
-        var constructor = typeof(HostedRunnerProvisioningService).GetConstructors().Single();
+        var constructor = typeof(HostedRunnerProvisioningPolicyService).GetConstructors().Single();
         var parameters = constructor.GetParameters().Select(x => x.ParameterType).ToArray();
 
         Assert.That(parameters, Does.Contain(typeof(ISubscriptionResourcePolicyResolver)));

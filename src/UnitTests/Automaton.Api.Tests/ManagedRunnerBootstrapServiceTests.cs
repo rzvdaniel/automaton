@@ -168,7 +168,11 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         SeedUser(db, ownerId, planId: null);
         var runner = SeedSelfHostedRunner(db, ownerId, RunnerApplicationProfiles.PrivilegedHost);
-        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
+        var target = app.DeploymentTargets.Single(target => target.IsDefault);
+        target.ExecutionRunnerId = runner.Id;
+        target.PrivilegedHostAccessApproved = true;
+        target.PrivilegedHostAccessApprovedAtUtc = DateTime.UtcNow;
+        target.PrivilegedHostAccessApprovedByUserId = ownerId;
         db.SaveChanges();
 
         var result = await CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService())
@@ -266,7 +270,7 @@ public class ManagedRunnerBootstrapServiceTests
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
         Assert.That(result.IsReady, Is.False);
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.Null);
     }
 
