@@ -20,7 +20,7 @@ public sealed class DeploymentOperationService(
     ResourceAuthorizationService authorizationService,
     ITransactionalEventExecutor transactionalEventExecutor,
     IEventPublisher eventPublisher,
-    IWebHostEnvironment webHostEnvironment,
+    DeploymentPackageStore packageStore,
     ApplicationDeploymentService deploymentService,
     ApiInstanceIdentityService apiInstanceIdentityService,
     IServiceScopeFactory scopeFactory,
@@ -48,23 +48,10 @@ public sealed class DeploymentOperationService(
         _ = await DeployPackageContractService.ReadAsync(file, appId, cancellationToken);
 
         var operationId = Guid.NewGuid();
-        var packageDirectory = GetPackageDirectory();
-        Directory.CreateDirectory(packageDirectory);
-        var packagePath = Path.Combine(packageDirectory, $"{operationId:N}.zip");
+        var packagePath = await packageStore.StoreAsync(operationId, file, cancellationToken);
 
         try
         {
-            await using (var package = new FileStream(
-                packagePath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 128 * 1024,
-                useAsync: true))
-            {
-                await file.CopyToAsync(package, cancellationToken);
-            }
-
             await transactionalEventExecutor.ExecuteAsync(async transactionCancellationToken =>
             {
                 dataContext.DeploymentOperations.Add(new DeploymentOperation
@@ -92,7 +79,7 @@ public sealed class DeploymentOperationService(
         }
         catch
         {
-            TryDeletePackage(packagePath);
+            packageStore.TryDelete(packagePath);
             throw;
         }
     }
@@ -139,13 +126,7 @@ public sealed class DeploymentOperationService(
 
         try
         {
-            await using var package = new FileStream(
-                operation.PackagePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 128 * 1024,
-                useAsync: true);
+            await using var package = packageStore.OpenRead(operation.PackagePath);
             var file = new FormFile(package, 0, package.Length, "file", "deploy-package.zip");
             var result = await deploymentService.DeployPackageAsync(
                 operation.WebAppId,
@@ -218,7 +199,7 @@ public sealed class DeploymentOperationService(
                 .Select(item => item.Status)
                 .SingleOrDefaultAsync(CancellationToken.None);
             if (current is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed)
-                TryDeletePackage(operation.PackagePath);
+                packageStore.TryDelete(operation.PackagePath);
         }
     }
 
@@ -446,19 +427,4 @@ public sealed class DeploymentOperationService(
         };
     }
 
-    private string GetPackageDirectory() =>
-        Path.Combine(webHostEnvironment.ContentRootPath, "AppData", "deployment-operations");
-
-    private static void TryDeletePackage(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch
-        {
-            // Package cleanup is best effort and must not change operation state.
-        }
-    }
 }
