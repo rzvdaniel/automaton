@@ -1,6 +1,6 @@
 # Code quality and maintainability implementation plan
 
-Status: Stage 0's all-project analyzer inventory and Stage 1's build-time analyzer enforcement are implemented on `codex/complexity-quality-gate`. `Automaton.All.sln` now includes all 22 tracked C# projects, and `CA1502`, `CA1506`, and `S3776` are build errors. The Studio Server pipeline runs the all-project build. Existing analyzer debt remains and intentionally keeps that build red until cleanup resolves it; the initial inventory and largest method hotspots are listed in [complexity-baseline.md](complexity-baseline.md). Azure execution and required branch-policy enforcement are not yet verified.
+Status: Stage 0's all-project analyzer inventory and Stage 1's build-time analyzer enforcement are implemented on `codex/complexity-quality-gate`. `Automaton.All.sln` includes all 22 tracked C# projects, and `CA1502`, `CA1506`, and `S3776` are build errors. The Studio Server Azure pipeline builds and tests that solution on pushes and pull requests targeting `main`; it also publishes the API artifact. GitHub's branch-protection API rejected access because the private repository's current plan does not support that feature, so required-check enforcement remains unavailable.
 
 Date: 2026-09-23. Repository inspection baseline: `3eb1c2cd`.
 
@@ -24,8 +24,8 @@ The following observations come from repository inspection, not a completed stat
 | Broad dependency surface | `AppsService` has 11 constructor dependencies | Inspect whether query, mutation, authorization, storage, and runtime concerns have distinct owners. |
 | Supporting types mixed with services | Public result records follow `RunnerService`; `StripeOptions` is declared in `StripeService.cs`; `AppsTunnelConfig` lives under `Services` | Establish ownership and placement conventions before moving files. |
 | Existing dependency safeguards | `src/UnitTests/Automaton.Architecture.Tests/DistributedPlatformArchitectureTests.cs` checks project references | Extend the existing test project rather than creating another architecture framework by default. |
-| Potential CI coverage gap | Architecture tests appear in `Automaton.All.sln`; `azure-pipelines-studio-server.yml` uses `Automaton.Server.sln` | Invoke the architecture test project explicitly and verify the actual required PR checks. Other external CI configuration has not been audited. |
-| No explicit central complexity policy found | No tracked root `.editorconfig`, `Directory.Build.props`, or Sonar integration found in the inspection | Add a deliberate rule set; do not assume the SDK has no analyzers merely because central configuration is absent. |
+| CI and branch enforcement | `azure-pipelines-studio-server.yml` builds and tests `Automaton.All.sln` on pushes and pull requests targeting `main`; GitHub branch protection APIs are unavailable for this private repository on its current plan | Keep the all-project build/test status visible. Required checks need a repository policy mechanism supported by the current plan. |
+| Analyzer configuration | Root `.editorconfig` promotes CA1502, CA1506, and S3776 to errors; `src/Directory.Build.targets` adds SonarAnalyzer.CSharp to the tracked projects | Review and clear findings before promoting more rules or tightening thresholds. |
 | Frontend checks exist | Studio has type checking, ESLint, and Vitest; the Vue pipeline runs type checking, lint, and build | Reuse them and ensure quality checks do not modify source. The current `lint` script uses `--fix`. |
 
 Actual method complexity, coupling, duplication, test adequacy, and change frequency remain to be measured. Candidate cleanup order must follow that evidence.
