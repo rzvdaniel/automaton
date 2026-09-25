@@ -480,6 +480,8 @@ services.AddScoped<HostContainerRelayService>();
 services.AddScoped<HostContainerRelayStateResolver>();
 services.AddScoped<IHostContainerTransport, SignalRHostContainerTransport>();
 services.AddScoped<HostedRunnerProvisioningService>();
+services.AddScoped<HostedRunnerPlanCapabilityValidator>();
+services.AddScoped<AdminSubscriptionPlanOperationsService>();
 services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
 services.AddScoped<ISubscriptionResourcePolicyResolver, SubscriptionResourcePolicyResolver>();
 services.AddScoped<IAccountStorageProjectAllocationService, AccountStorageProjectAllocationService>();

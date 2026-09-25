@@ -23,25 +23,16 @@ public class AdminSubscriptionPlansController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
-    private readonly IHostedRunnerSpecificationResolver _hostedRunnerSpecificationResolver;
-    private readonly IAuditEventService _auditEventService;
-    private readonly ITransactionalEventExecutor _transactionalEventExecutor;
+    private readonly AdminSubscriptionPlanOperationsService _planOperations;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
-        HostedRunnerProvisioningService hostedRunnerProvisioningService,
-        IHostedRunnerSpecificationResolver hostedRunnerSpecificationResolver,
-        IAuditEventService auditEventService,
-        ITransactionalEventExecutor transactionalEventExecutor)
+        AdminSubscriptionPlanOperationsService planOperations)
     {
         _db = db;
         _userManager = userManager;
-        _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
-        _hostedRunnerSpecificationResolver = hostedRunnerSpecificationResolver;
-        _auditEventService = auditEventService;
-        _transactionalEventExecutor = transactionalEventExecutor;
+        _planOperations = planOperations;
     }
 
     #region Plans CRUD
@@ -70,69 +61,10 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SubscriptionPlanResponse>> CreatePlan([FromBody] CreateSubscriptionPlanRequest req, CancellationToken cancellationToken)
     {
-        var capabilityError = await ValidateHostedRunnerCapabilityAsync(req.Capabilities, cancellationToken);
-        if (capabilityError != null) return BadRequest(new { message = capabilityError });
+        var (plan, capabilityError) = await _planOperations.CreateAsync(req, cancellationToken);
+        if (capabilityError is not null) return BadRequest(new { message = capabilityError });
 
-        var isActive = req.IsActive;
-        var isDefault = isActive && req.IsDefault;
-
-        await using var transaction = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(
-                isDefault ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted,
-                cancellationToken)
-            : null;
-
-        // Only one default plan at a time
-        if (isDefault)
-            await _db.SubscriptionPlans
-                .Where(p => p.IsDefault)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsDefault, false), cancellationToken);
-
-        var plan = new SubscriptionPlan
-        {
-            Id                     = Guid.NewGuid(),
-            Name                   = req.Name,
-            Description            = req.Description,
-            PriceUsd               = req.PriceUsd,
-            StripeProductId        = req.StripeProductId,
-            StripePriceId          = req.StripePriceId,
-            IsDefault              = isDefault,
-            IsActive               = isActive,
-            CapabilitiesJson       = PlanCapabilitiesSerializer.Serialize(req.Capabilities),
-            SortOrder              = req.SortOrder,
-            CreatedAt              = DateTime.UtcNow
-        };
-
-        _db.SubscriptionPlans.Add(plan);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        await _auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            EventType = AuditEventTypes.SubscriptionPlanCreated,
-            Action = AuditActions.Created,
-            EntityType = AuditEntityTypes.SubscriptionPlan,
-            EntityId = plan.Id,
-            Message = $"Subscription plan '{plan.Name}' was created",
-            Metadata = new
-            {
-                plan.Name,
-                plan.Description,
-                plan.PriceUsd,
-                plan.IsDefault,
-                plan.IsActive,
-                plan.SortOrder,
-                HasStripeProductId = !string.IsNullOrWhiteSpace(plan.StripeProductId),
-                HasStripePriceId = !string.IsNullOrWhiteSpace(plan.StripePriceId)
-            },
-            FailOnError = true
-        }, cancellationToken);
-
-        if (transaction != null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-        }
-
-        return CreatedAtAction(nameof(GetPlan), new { id = plan.Id }, ToResponse(plan));
+        return CreatedAtAction(nameof(GetPlan), new { id = plan!.Id }, ToResponse(plan));
     }
 
     [HttpPut("{id:guid}")]
@@ -143,7 +75,7 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         if (req.Capabilities != null)
         {
-            var capabilityError = await ValidateHostedRunnerCapabilityAsync(req.Capabilities, cancellationToken);
+            var capabilityError = await _planOperations.ValidateCapabilitiesAsync(req.Capabilities, cancellationToken);
             if (capabilityError != null) return BadRequest(new { message = capabilityError });
         }
 
@@ -171,21 +103,6 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     #endregion
-
-    private async Task<string?> ValidateHostedRunnerCapabilityAsync(PlanCapabilities capabilities, CancellationToken cancellationToken)
-    {
-        var capability = capabilities.HostedRunner;
-        if (!capability.Enabled) return null;
-
-        var resolution = await _hostedRunnerSpecificationResolver.ValidateAsync(capability, cancellationToken);
-        return resolution.Failure switch
-        {
-            HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured => "A hosted runner specification is required when hosted runners are enabled.",
-            HostedRunnerSpecificationResolutionFailure.SpecificationNotFound => "The selected hosted runner specification does not exist.",
-            HostedRunnerSpecificationResolutionFailure.SpecificationInactive => "The selected hosted runner specification is inactive.",
-            _ => null
-        };
-    }
 
     #region User Plan Assignments
 
@@ -223,89 +140,22 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost("users/{userId:guid}/assign")]
     public async Task<IActionResult> AssignPlan(Guid userId, [FromBody] AssignPlanRequest req, CancellationToken cancellationToken)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        if (user == null) return NotFound("User not found.");
-
-        SubscriptionPlan? plan = null;
-        if (req.PlanId.HasValue)
+        var result = await _planOperations.AssignAsync(userId, req.PlanId, cancellationToken);
+        return result.Failure switch
         {
-            plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == req.PlanId.Value, cancellationToken);
-            if (plan == null) return NotFound("Subscription plan not found.");
-
-            var capabilityError = await ValidateHostedRunnerCapabilityAsync(
-                PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson),
-                cancellationToken);
-            if (capabilityError != null) return BadRequest(new { message = capabilityError });
-        }
-
-        var hostedRunnerCapability = plan == null
-            ? null
-            : PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
-
-        await _transactionalEventExecutor.ExecuteAsync(async durableCancellationToken =>
-        {
-            user.SubscriptionPlanId = req.PlanId;
-            await _db.SaveChangesAsync(durableCancellationToken);
-
-            if (hostedRunnerCapability?.Enabled == true)
-            {
-                await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId, durableCancellationToken);
-            }
-            else
-            {
-                await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
-                    userId, "Admin removed subscription plan.", durableCancellationToken);
-            }
-
-            await _auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                EventType = AuditEventTypes.SubscriptionPlanAssignedToUser,
-                Action = AuditActions.Assigned,
-                EntityType = AuditEntityTypes.User,
-                EntityId = user.Id,
-                TargetUserId = user.Id,
-                Message = req.PlanId.HasValue
-                    ? $"Subscription plan '{plan!.Name}' was assigned to user '{user.Email ?? user.Id.ToString()}'"
-                    : $"Subscription plan was removed from user '{user.Email ?? user.Id.ToString()}'",
-                Metadata = new
-                {
-                    user.Email,
-                    PlanId = req.PlanId,
-                    PlanName = plan?.Name,
-                    HostedRunnerProvisioningTriggered = req.PlanId.HasValue
-                },
-                FailOnError = true
-            }, durableCancellationToken);
-        }, CancellationToken.None);
-
-        return NoContent();
+            PlanAssignmentFailure.UserNotFound => NotFound("User not found."),
+            PlanAssignmentFailure.PlanNotFound => NotFound("Subscription plan not found."),
+            PlanAssignmentFailure.InvalidCapability => BadRequest(new { message = result.Error }),
+            _ => NoContent()
+        };
     }
 
     [HttpPost("users/{userId:guid}/hosted-runner-test-access")]
     public async Task<IActionResult> SetHostedRunnerTestAccess(Guid userId, [FromBody] SetHostedRunnerTestAccessRequest req)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
-        if (user == null) return NotFound("User not found.");
-
-        user.CanAccessHostedRunnerTestPlans = req.Enabled;
-        await _db.SaveChangesAsync();
-
-        await _auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            EventType = AuditEventTypes.HostedRunnerTestPlanAccessChanged,
-            Action = AuditActions.Changed,
-            EntityType = AuditEntityTypes.User,
-            EntityId = user.Id,
-            TargetUserId = user.Id,
-            Message = $"Hosted runner test-plan access for user '{user.Email ?? user.Id.ToString()}' was set to {req.Enabled}",
-            Metadata = new
-            {
-                user.Email,
-                req.Enabled
-            }
-        });
-
-        return NoContent();
+        return await _planOperations.SetHostedRunnerTestAccessAsync(userId, req.Enabled)
+            ? NoContent()
+            : NotFound("User not found.");
     }
 
     #endregion
@@ -328,65 +178,3 @@ public class AdminSubscriptionPlansController : ControllerBase
 }
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
-
-public record SubscriptionPlanResponse
-{
-    public Guid    Id                     { get; init; }
-    public string  Name                   { get; init; } = string.Empty;
-    public string? Description            { get; init; }
-    public decimal PriceUsd               { get; init; }
-    public string? StripeProductId        { get; init; }
-    public string? StripePriceId          { get; init; }
-    public bool    IsDefault              { get; init; }
-    public bool    IsActive               { get; init; }
-    public PlanCapabilities Capabilities  { get; init; } = PlanCapabilities.Default;
-    public int     SortOrder              { get; init; }
-    public DateTime  CreatedAt            { get; init; }
-    public DateTime? UpdatedAt            { get; init; }
-}
-
-public record CreateSubscriptionPlanRequest
-{
-    public string  Name                   { get; init; } = string.Empty;
-    public string? Description            { get; init; }
-    public decimal PriceUsd               { get; init; } = 0m;
-    public string? StripeProductId        { get; init; }
-    public string? StripePriceId          { get; init; }
-    public bool    IsDefault              { get; init; } = false;
-    public bool    IsActive               { get; init; } = true;
-    public PlanCapabilities Capabilities  { get; init; } = PlanCapabilities.Default;
-    public int     SortOrder              { get; init; } = 0;
-}
-
-public record UpdateSubscriptionPlanRequest
-{
-    public string?  Name                   { get; init; }
-    public string?  Description            { get; init; }
-    public decimal? PriceUsd               { get; init; }
-    public string?  StripeProductId        { get; init; }
-    public string?  StripePriceId          { get; init; }
-    public bool?    IsDefault              { get; init; }
-    public bool?    IsActive               { get; init; }
-    public PlanCapabilities? Capabilities  { get; init; }
-    public int?     SortOrder              { get; init; }
-}
-
-public record UserPlanResponse
-{
-    public Guid    UserId              { get; init; }
-    public string  Email               { get; init; } = string.Empty;
-    public string  Name                { get; init; } = string.Empty;
-    public Guid?   SubscriptionPlanId  { get; init; }
-    public string? PlanName            { get; init; }
-    public bool    CanAccessHostedRunnerTestPlans { get; init; }
-}
-
-public record AssignPlanRequest
-{
-    public Guid? PlanId { get; init; }
-}
-
-public record SetHostedRunnerTestAccessRequest
-{
-    public bool Enabled { get; init; }
-}

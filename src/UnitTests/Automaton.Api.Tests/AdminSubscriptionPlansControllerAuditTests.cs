@@ -302,13 +302,14 @@ public class AdminSubscriptionPlansControllerAuditTests
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
 
-        return new AdminSubscriptionPlansController(
+        var planOperations = new AdminSubscriptionPlanOperationsService(
             dbContext,
-            new TestUserManager(),
             hostedRunnerProvisioningService,
-            new HostedRunnerSpecificationResolver(dbContext),
+            new HostedRunnerPlanCapabilityValidator(new HostedRunnerSpecificationResolver(dbContext)),
             auditEventService,
             transactionalEventExecutor ?? new InlineTransactionalEventExecutor());
+
+        return new AdminSubscriptionPlansController(dbContext, new TestUserManager(), planOperations);
     }
 
     private static IAuditEventService CreateAuditEventService(ApplicationDbContext dbContext, Guid actorUserId)
