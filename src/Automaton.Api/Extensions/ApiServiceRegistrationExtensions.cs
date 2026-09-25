@@ -339,7 +339,7 @@ internal static class ApiMessagingRegistration
             {
                 rabbitMq.HostName = rabbitMqHost;
                 rabbitMq.Port = int.TryParse(configurationManager["RabbitMq:Port"], out var rabbitMqPort)
-                    ? rabbitMqPor
+                    ? rabbitMqPort
                     : 5672;
                 rabbitMq.UserName = rabbitMqUsername;
                 rabbitMq.Password = rabbitMqPassword;
@@ -732,6 +732,7 @@ internal static class ApiAiClientRegistration
         services.AddScoped<ITokenBudgetService, TokenBudgetService>();
         services.AddScoped<IAppVerificationStrategyResolver, AppVerificationStrategyResolver>();
         services.Configure<StripeOptions>(applicationBuilder.Configuration.GetSection("Stripe"));
+        services.AddScoped<StripeWebhookService>();
         services.AddScoped<StripeService>();
         return services;
     }
