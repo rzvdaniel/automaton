@@ -758,6 +758,7 @@ internal static class ApiProjectRegistration
         services.AddScoped<SensitiveVariableService>();
         services.AddScoped<UserSettingsService>();
         services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddScoped<OrganizationAiPolicySettingsService>();
         services.AddScoped<OrganizationInvitationNotificationService>();
 
         // Project authorization handlers
