@@ -24,24 +24,10 @@ public sealed class InfrastructureRunnerRabbitMqConfigurationService(
         string? enrollmentToken = null,
         CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(apiKey))
+        var apiKeyResolution = await ResolveApiKeyEnvironmentAsync(apiKey, cancellationToken);
+        if (apiKeyResolution.Accepted)
         {
-            var key = await apiKeyService.ValidateApiKeyAsync(apiKey);
-            if (key != null && key.Scope is (ApiKeyScope.InfrastructureRunnerEnroll or ApiKeyScope.Runner))
-            {
-                if (key.Scope != ApiKeyScope.Runner || await db.Runners.AnyAsync(
-                        runner => runner.ApiKeyId == key.Id
-                            && runner.Purpose == RunnerPurposes.Infrastructure,
-                        cancellationToken))
-                {
-                    return TryBuildEnvironment(
-                        rabbitMqOptions.Value,
-                        infrastructureRunnerRabbitMqOptions.Value,
-                        out var environment)
-                        ? environment
-                        : null;
-                }
-            }
+            return apiKeyResolution.Environment;
         }
 
         if (!await runnerEnrollmentService.IsInfrastructureEnrollmentTokenValidAsync(
@@ -57,6 +43,34 @@ public sealed class InfrastructureRunnerRabbitMqConfigurationService(
             out var enrollmentEnvironment)
             ? enrollmentEnvironment
             : null;
+    }
+
+    private async Task<(bool Accepted, string? Environment)> ResolveApiKeyEnvironmentAsync(
+        string? apiKey,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            var key = await apiKeyService.ValidateApiKeyAsync(apiKey);
+            if (key != null && key.Scope is (ApiKeyScope.InfrastructureRunnerEnroll or ApiKeyScope.Runner))
+            {
+                if (key.Scope != ApiKeyScope.Runner || await db.Runners.AnyAsync(
+                        runner => runner.ApiKeyId == key.Id
+                            && runner.Purpose == RunnerPurposes.Infrastructure,
+                        cancellationToken))
+                {
+                    var environment = TryBuildEnvironment(
+                        rabbitMqOptions.Value,
+                        infrastructureRunnerRabbitMqOptions.Value,
+                        out var builtEnvironment)
+                        ? builtEnvironment
+                        : null;
+                    return (true, environment);
+                }
+            }
+        }
+
+        return (false, null);
     }
 
     internal static bool TryBuildEnvironment(

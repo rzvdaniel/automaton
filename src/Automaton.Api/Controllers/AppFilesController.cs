@@ -1,12 +1,8 @@
 using Automaton.Api.Data;
-using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Services;
-using Automaton.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -36,34 +32,21 @@ namespace Automaton.Api.Controllers;
 [Route("api")]
 public class AppFilesController : ControllerBase
 {
-    private const int ChunkSize = 256 * 1024; // 256 KB
-    private const int UploadTimeoutMinutes = 10;
-    private const int DownloadChunkTimeoutSeconds = 30;
-
     private readonly ApplicationDbContext dataContext;
-    private readonly IHubContext<AutomatonHub> automatonHub;
-    private readonly FileUploadRegistry uploadRegistry;
-    private readonly FileDownloadRegistry downloadRegistry;
-    private readonly ILogger<AppFilesController> logger;
+    private readonly AppFileUploadService uploadService;
+    private readonly AppFileDownloadService downloadService;
     private readonly PrivateAppLaunchService privateAppLaunchService;
-    private readonly IAppDeploymentTargetResolver targetResolver;
 
     public AppFilesController(
         ApplicationDbContext dataContext,
-        IHubContext<AutomatonHub> automatonHub,
-        FileUploadRegistry uploadRegistry,
-        FileDownloadRegistry downloadRegistry,
-        ILogger<AppFilesController> logger,
-        PrivateAppLaunchService privateAppLaunchService,
-        IAppDeploymentTargetResolver targetResolver)
+        AppFileUploadService uploadService,
+        AppFileDownloadService downloadService,
+        PrivateAppLaunchService privateAppLaunchService)
     {
         this.dataContext = dataContext;
-        this.automatonHub = automatonHub;
-        this.uploadRegistry = uploadRegistry;
-        this.downloadRegistry = downloadRegistry;
-        this.logger = logger;
+        this.uploadService = uploadService;
+        this.downloadService = downloadService;
         this.privateAppLaunchService = privateAppLaunchService;
-        this.targetResolver = targetResolver;
     }
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -81,7 +64,7 @@ public class AppFilesController : ControllerBase
         if (ownerId == Guid.Empty)
             return Unauthorized();
 
-        return await UploadInternal(appId, ownerId, file, ct);
+        return await uploadService.UploadAsync(appId, ownerId, file, ct);
     }
 
     [HttpPost("web-apps/app/{appId}/files/upload")]
@@ -100,16 +83,12 @@ public class AppFilesController : ControllerBase
         if (userId == Guid.Empty)
             return Unauthorized();
 
-        var app = await dataContext.WebApps
-            .Include(a => a.WebAppUsers)
-            .Where(a => a.Id == appId && a.WebAppUsers.Any(x => x.UserId == userId))
-            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
-            .FirstOrDefaultAsync(ct);
+        var app = await FindOwnedAppAsync(appId, userId, ct);
 
         if (app is null || app.OwnerId is null)
             return NotFound(new { error = "App not found." });
 
-        return await UploadInternal(app.Id, app.OwnerId.Value, file, ct);
+        return await uploadService.UploadAsync(app.Id, app.OwnerId.Value, file, ct);
     }
 
     /// <summary>
@@ -133,7 +112,7 @@ public class AppFilesController : ControllerBase
         if (app.OwnerId is null)
             return BadRequest(new { error = "App has no owner configured." });
 
-        return await UploadInternal(app.Id, app.OwnerId.Value, file, ct);
+        return await uploadService.UploadAsync(app.Id, app.OwnerId.Value, file, ct);
     }
 
     // ── Download ──────────────────────────────────────────────────────────────
@@ -152,7 +131,7 @@ public class AppFilesController : ControllerBase
             return;
         }
 
-        await DownloadInternal(appId, ownerId, sessionId, ct);
+        await downloadService.DownloadAsync(appId, ownerId, sessionId, Response, ct);
     }
 
     [HttpGet("web-apps/app/{appId}/files/{sessionId}")]
@@ -173,11 +152,7 @@ public class AppFilesController : ControllerBase
             return;
         }
 
-        var app = await dataContext.WebApps
-            .Include(a => a.WebAppUsers)
-            .Where(a => a.Id == appId && a.WebAppUsers.Any(x => x.UserId == userId))
-            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
-            .FirstOrDefaultAsync(ct);
+        var app = await FindOwnedAppAsync(appId, userId, ct);
 
         if (app is null || app.OwnerId is null)
         {
@@ -186,7 +161,7 @@ public class AppFilesController : ControllerBase
             return;
         }
 
-        await DownloadInternal(app.Id, app.OwnerId.Value, sessionId, ct);
+        await downloadService.DownloadAsync(app.Id, app.OwnerId.Value, sessionId, Response, ct);
     }
 
     /// <summary>
@@ -216,205 +191,7 @@ public class AppFilesController : ControllerBase
             return;
         }
 
-        await DownloadInternal(app.Id, app.OwnerId.Value, sessionId, ct);
-    }
-
-    // ── Internal helpers ──────────────────────────────────────────────────────
-
-    private async Task<IActionResult> UploadInternal(Guid appId, Guid ownerId, IFormFile file, CancellationToken ct)
-    {
-        if (file is null || file.Length == 0)
-            return BadRequest(new { error = "No file provided." });
-
-        var runnerError = await GetRunnerErrorAsync(ownerId, appId);
-        if (runnerError is not null)
-            return BadRequest(new { error = runnerError });
-
-        var runner = await ResolveRunnerAsync(ownerId, appId);
-        if (runner is null)
-            return BadRequest(new { error = "Runner is no longer available. Please try again." });
-
-        var (sessionId, completionTask) = uploadRegistry.Register(
-            TimeSpan.FromMinutes(UploadTimeoutMinutes), ct);
-
-        var fileName = SanitizeFileName(file.FileName);
-        var contentType = file.ContentType ?? "application/octet-stream";
-
-        logger.LogDebug(
-            "[AppFilesController] Upload started: SessionId={SessionId} AppId={AppId} Runner={Runner} File={File} Size={Size}",
-            sessionId, appId, runner.Name, fileName, file.Length);
-
-        try
-        {
-            using var stream = file.OpenReadStream();
-            var buffer = new byte[ChunkSize];
-            int chunkIndex = 0;
-            int bytesRead;
-
-            while ((bytesRead = await stream.ReadAsync(buffer, ct)) > 0)
-            {
-                var isLast = stream.Position >= stream.Length;
-                var chunkData = bytesRead == ChunkSize ? buffer : buffer[..bytesRead];
-
-                var chunk = new FileUploadChunk
-                {
-                    SessionId = sessionId,
-                    ChunkIndex = chunkIndex++,
-                    Data = chunkData,
-                    IsLast = isLast,
-                    FileName = fileName,
-                    ContentType = contentType
-                };
-
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, ct);
-            }
-
-            // Wait for runner to ACK that all chunks are written to disk
-            await completionTask;
-
-            logger.LogDebug(
-                "[AppFilesController] Upload complete: SessionId={SessionId} Chunks={ChunkCount}",
-                sessionId, chunkIndex);
-
-            return Ok(new { session_id = sessionId });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "[AppFilesController] Upload failed: SessionId={SessionId} AppId={AppId}", sessionId, appId);
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }
-
-    private async Task DownloadInternal(Guid appId, Guid ownerId, string sessionId, CancellationToken ct)
-    {
-        var runner = await ResolveRunnerAsync(ownerId, appId);
-        if (runner is null)
-        {
-            Response.StatusCode = 400;
-            await Response.WriteAsJsonAsync(new { error = "No runner available." }, ct);
-            return;
-        }
-
-        var channel = downloadRegistry.Register(sessionId);
-
-        logger.LogDebug(
-            "[AppFilesController] Download started: SessionId={SessionId} AppId={AppId} Runner={Runner}",
-            sessionId, appId, runner.Name);
-
-        try
-        {
-            long offset = 0;
-            bool headerWritten = false;
-
-            while (true)
-            {
-                var request = new FetchFileChunkRequest
-                {
-                    SessionId = sessionId,
-                    Offset = offset,
-                    ChunkSize = ChunkSize
-                };
-
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.FetchFileChunk, request, ct);
-
-                using var chunkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                chunkCts.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
-
-                FileChunkReadyMessage chunk;
-                try
-                {
-                    chunk = await channel.Reader.ReadAsync(chunkCts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    logger.LogWarning("[AppFilesController] Download chunk timeout: SessionId={SessionId}", sessionId);
-                    break;
-                }
-
-                if (!headerWritten)
-                {
-                    Response.ContentType = chunk.ContentType;
-                    Response.Headers.ContentDisposition =
-                        $"attachment; filename=\"{Uri.EscapeDataString(chunk.FileName)}\"";
-                    headerWritten = true;
-                }
-
-                await Response.Body.WriteAsync(chunk.Data, ct);
-                await Response.Body.FlushAsync(ct);
-
-                if (chunk.IsLast)
-                    break;
-
-                offset += chunk.Data.Length;
-            }
-
-            logger.LogDebug(
-                "[AppFilesController] Download complete: SessionId={SessionId}", sessionId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "[AppFilesController] Download failed: SessionId={SessionId} AppId={AppId}", sessionId, appId);
-        }
-        finally
-        {
-            downloadRegistry.Complete(sessionId);
-        }
-    }
-
-    /// <summary>
-    /// Returns a user-facing error string explaining why no runner is available, or null if a runner can be resolved.
-    /// </summary>
-    private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId)
-    {
-        try
-        {
-            var target = await targetResolver.ResolveAsync(appId, null, ownerId);
-            var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
-                runner.LastHeartbeatAtUtc,
-                DateTime.UtcNow)
-                ? null
-                : $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
-        }
-        catch (KeyNotFoundException)
-        {
-            return "The configured app or deployment target no longer exists.";
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return "The runner configured for this app is not accessible by this app's owner.";
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ex.Message;
-        }
-    }
-
-    private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId)
-    {
-        try
-        {
-            var target = await targetResolver.ResolveAsync(appId, null, ownerId);
-            var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
-                runner.LastHeartbeatAtUtc,
-                DateTime.UtcNow)
-                ? runner
-                : null;
-        }
-        catch (Exception ex) when (
-            ex is KeyNotFoundException or
-                UnauthorizedAccessException or
-                InvalidOperationException)
-        {
-            return null;
-        }
+        await downloadService.DownloadAsync(app.Id, app.OwnerId.Value, sessionId, Response, ct);
     }
 
     private Guid GetUserId()
@@ -424,10 +201,19 @@ public class AppFilesController : ControllerBase
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 
-    private static string SanitizeFileName(string? raw)
+    private Task<OwnedApp?> FindOwnedAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return "download";
-        var name = Path.GetFileName(raw.Replace('\0', '_').Trim());
-        return string.IsNullOrWhiteSpace(name) ? "download" : name;
+        return dataContext.WebApps
+            .Include(app => app.WebAppUsers)
+            .Where(app => app.Id == appId && app.WebAppUsers.Any(appUser => appUser.UserId == userId))
+            .Select(app => new OwnedApp(
+                app.Id,
+                app.WebAppUsers.FirstOrDefault() == null
+                    ? null
+                    : app.WebAppUsers.FirstOrDefault()!.UserId))
+            .FirstOrDefaultAsync(cancellationToken);
     }
+
+    private sealed record OwnedApp(Guid Id, Guid? OwnerId);
+
 }

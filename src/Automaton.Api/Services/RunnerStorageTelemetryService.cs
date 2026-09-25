@@ -28,14 +28,7 @@ public sealed class RunnerStorageTelemetryService
 
     public async Task ReportHostedRunnerAsync(RunnerDetails authenticatedRunner, HostedRunnerStorageTelemetry report, CancellationToken cancellationToken)
     {
-        if (authenticatedRunner.Purpose != RunnerPurposes.Managed ||
-            authenticatedRunner.HostedRunnerId != report.HostedRunnerId)
-            throw new UnauthorizedAccessException("The authenticated Runner cannot report storage for this hosted Runner.");
-        ValidateTimestamp(report.MeasuredAtUtc);
-        ValidateText(report.Error, 2000, nameof(report.Error));
-        ValidateText(report.RunnerVersion, 80, nameof(report.RunnerVersion));
-        var values = new[] { report.SystemBytes, report.WorkspaceBytes, report.LogsBytes, report.HomeBytes, report.UserStorageBytes, report.TotalBytes, report.MeasurementDurationMs };
-        if (values.Any(x => x < 0)) throw new ArgumentException("Storage telemetry values cannot be negative.");
+        ValidateHostedRunnerReport(authenticatedRunner, report);
 
         var hostedRunner = await db.HostedRunners.SingleOrDefaultAsync(
             x => x.Id == report.HostedRunnerId && x.RunnerId == authenticatedRunner.Id, cancellationToken)
@@ -49,7 +42,48 @@ public sealed class RunnerStorageTelemetryService
         var calculatedUser = checked(report.WorkspaceBytes + report.LogsBytes + report.HomeBytes);
         var calculatedTotal = checked(report.SystemBytes + calculatedUser);
         var now = DateTime.UtcNow;
-        var observation = new HostedRunnerStorageObservation
+        db.HostedRunnerStorageObservations.Add(CreateHostedRunnerObservation(hostedRunner, report, calculatedUser, calculatedTotal, now));
+        var previousSelfTotal = hostedRunner.StorageSelfReportedTotalBytes;
+        UpdateSelfReportedState(hostedRunner, report, calculatedUser, calculatedTotal);
+
+        var authoritativeIsRecent = hostedRunner.StorageVerifiedAtUtc >= now.AddMinutes(-options.AuthoritativeValidityMinutes);
+        var materiallyConflicts = HasMaterialDiscrepancy(report.Success, calculatedTotal, hostedRunner.StorageVerifiedTotalBytes);
+        var suspiciousDrop = HasSuspiciousDrop(report.Success, calculatedTotal, previousSelfTotal);
+        if (materiallyConflicts || suspiciousDrop)
+            await RequestVerificationAsync(hostedRunner, materiallyConflicts ? "AuthoritativeDiscrepancy" : "SuspiciousDrop", now, cancellationToken);
+        if (authoritativeIsRecent && (!report.Success || materiallyConflicts))
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        ApplyLatestHostedRunnerMeasurement(hostedRunner, report, calculatedUser, calculatedTotal, now);
+        var newState = StorageTelemetryPolicy.EvaluateHostedRunner(
+            hostedRunner.StorageAllowanceBytes, calculatedTotal, report.Success, options);
+        TrackPolicyChange(hostedRunner, newState, now);
+        hostedRunner.StorageState = newState;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void ValidateHostedRunnerReport(RunnerDetails authenticatedRunner, HostedRunnerStorageTelemetry report)
+    {
+        if (authenticatedRunner.Purpose != RunnerPurposes.Managed ||
+            authenticatedRunner.HostedRunnerId != report.HostedRunnerId)
+            throw new UnauthorizedAccessException("The authenticated Runner cannot report storage for this hosted Runner.");
+        ValidateTimestamp(report.MeasuredAtUtc);
+        ValidateText(report.Error, 2000, nameof(report.Error));
+        ValidateText(report.RunnerVersion, 80, nameof(report.RunnerVersion));
+        var values = new[] { report.SystemBytes, report.WorkspaceBytes, report.LogsBytes, report.HomeBytes, report.UserStorageBytes, report.TotalBytes, report.MeasurementDurationMs };
+        if (values.Any(x => x < 0)) throw new ArgumentException("Storage telemetry values cannot be negative.");
+    }
+
+    private static HostedRunnerStorageObservation CreateHostedRunnerObservation(
+        HostedRunner hostedRunner,
+        HostedRunnerStorageTelemetry report,
+        long calculatedUser,
+        long calculatedTotal,
+        DateTime now)
+        => new()
         {
             Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
             Source = StorageMeasurementSources.RunnerSelfReported,
@@ -60,8 +94,13 @@ public sealed class RunnerStorageTelemetryService
             Success = report.Success, Error = Truncate(report.Error, 2000),
             RunnerVersion = Truncate(report.RunnerVersion, 80)
         };
-        db.HostedRunnerStorageObservations.Add(observation);
-        var previousSelfTotal = hostedRunner.StorageSelfReportedTotalBytes;
+
+    private static void UpdateSelfReportedState(
+        HostedRunner hostedRunner,
+        HostedRunnerStorageTelemetry report,
+        long calculatedUser,
+        long calculatedTotal)
+    {
         hostedRunner.StorageSelfReportedAtUtc = report.MeasuredAtUtc;
         hostedRunner.StorageSelfReportedStatus = report.Success ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
         hostedRunner.StorageSelfReportedError = report.Success ? null : Truncate(report.Error ?? "Storage measurement failed.", 2000);
@@ -71,20 +110,24 @@ public sealed class RunnerStorageTelemetryService
             hostedRunner.StorageSelfReportedUserBytes = calculatedUser;
             hostedRunner.StorageSelfReportedTotalBytes = calculatedTotal;
         }
+    }
 
-        var authoritativeIsRecent = hostedRunner.StorageVerifiedAtUtc >= now.AddMinutes(-options.AuthoritativeValidityMinutes);
-        var materiallyConflicts = report.Success && hostedRunner.StorageVerifiedTotalBytes.HasValue &&
-            Math.Abs(calculatedTotal - hostedRunner.StorageVerifiedTotalBytes.Value) >
-            Math.Max(64L * 1024 * 1024, hostedRunner.StorageVerifiedTotalBytes.Value / 10);
-        var suspiciousDrop = report.Success && previousSelfTotal.HasValue && calculatedTotal < previousSelfTotal.Value &&
-            previousSelfTotal.Value - calculatedTotal > Math.Max(256L * 1024 * 1024, previousSelfTotal.Value / 2);
-        if (materiallyConflicts || suspiciousDrop)
-            await RequestVerificationAsync(hostedRunner, materiallyConflicts ? "AuthoritativeDiscrepancy" : "SuspiciousDrop", now, cancellationToken);
-        if (authoritativeIsRecent && (!report.Success || materiallyConflicts))
-        {
-            await db.SaveChangesAsync(cancellationToken);
-            return;
-        }
+    private static bool HasMaterialDiscrepancy(bool succeeded, long calculatedTotal, long? verifiedTotal)
+        => succeeded && verifiedTotal.HasValue &&
+            Math.Abs(calculatedTotal - verifiedTotal.Value) >
+            Math.Max(64L * 1024 * 1024, verifiedTotal.Value / 10);
+
+    private static bool HasSuspiciousDrop(bool succeeded, long calculatedTotal, long? previousTotal)
+        => succeeded && previousTotal.HasValue && calculatedTotal < previousTotal.Value &&
+           previousTotal.Value - calculatedTotal > Math.Max(256L * 1024 * 1024, previousTotal.Value / 2);
+
+    private static void ApplyLatestHostedRunnerMeasurement(
+        HostedRunner hostedRunner,
+        HostedRunnerStorageTelemetry report,
+        long calculatedUser,
+        long calculatedTotal,
+        DateTime now)
+    {
         hostedRunner.StorageMeasuredAtUtc = report.MeasuredAtUtc;
         hostedRunner.StorageReceivedAtUtc = now;
         hostedRunner.StorageMeasurementSource = StorageMeasurementSources.RunnerSelfReported;
@@ -98,14 +141,29 @@ public sealed class RunnerStorageTelemetryService
             hostedRunner.StorageUsagePercent = hostedRunner.StorageAllowanceBytes > 0
                 ? calculatedTotal * 100m / hostedRunner.StorageAllowanceBytes : null;
         }
-        var newState = StorageTelemetryPolicy.EvaluateHostedRunner(
-            hostedRunner.StorageAllowanceBytes, calculatedTotal, report.Success, options);
-        TrackPolicyChange(hostedRunner, newState, now);
-        hostedRunner.StorageState = newState;
-        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task ReportRunnerHostAsync(RunnerDetails authenticatedRunner, RunnerHostStorageTelemetry report, CancellationToken cancellationToken)
+    {
+        ValidateRunnerHostReport(authenticatedRunner, report);
+
+        var host = await db.RunnerHosts.SingleOrDefaultAsync(
+            x => x.Id == report.RunnerHostId && x.InfrastructureRunnerId == authenticatedRunner.Id, cancellationToken)
+            ?? throw new UnauthorizedAccessException("The Runner Host is not linked to the authenticated Infrastructure Runner.");
+        if (host.StorageMeasuredAtUtc >= report.MeasuredAtUtc) return;
+
+        var now = DateTime.UtcNow;
+        UpdateRunnerHostMeasurement(host, report, now);
+        var newState = StorageTelemetryPolicy.EvaluateHost(
+            report.Success ? report.DockerDataRootTotalBytes!.Value : 0,
+            report.Success ? report.DockerDataRootAvailableBytes!.Value : 0,
+            report.Success, options);
+        TrackRunnerHostPolicyChange(host, newState, now);
+        host.StorageState = newState;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void ValidateRunnerHostReport(RunnerDetails authenticatedRunner, RunnerHostStorageTelemetry report)
     {
         if (authenticatedRunner.Purpose != RunnerPurposes.Infrastructure ||
             authenticatedRunner.RunnerHostId != report.RunnerHostId)
@@ -124,12 +182,10 @@ public sealed class RunnerStorageTelemetryService
         if (report.Success && (!report.DockerDataRootTotalBytes.HasValue || !report.DockerDataRootAvailableBytes.HasValue ||
             report.DockerDataRootAvailableBytes > report.DockerDataRootTotalBytes))
             throw new ArgumentException("Successful host telemetry must include internally consistent Docker data-root capacity.");
+    }
 
-        var host = await db.RunnerHosts.SingleOrDefaultAsync(
-            x => x.Id == report.RunnerHostId && x.InfrastructureRunnerId == authenticatedRunner.Id, cancellationToken)
-            ?? throw new UnauthorizedAccessException("The Runner Host is not linked to the authenticated Infrastructure Runner.");
-        if (host.StorageMeasuredAtUtc >= report.MeasuredAtUtc) return;
-        var now = DateTime.UtcNow;
+    private void UpdateRunnerHostMeasurement(RunnerHost host, RunnerHostStorageTelemetry report, DateTime now)
+    {
         host.StorageMeasuredAtUtc = report.MeasuredAtUtc;
         host.StorageReceivedAtUtc = now;
         host.StorageMeasurementStatus = report.Success ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
@@ -147,10 +203,10 @@ public sealed class RunnerStorageTelemetryService
             host.StorageAvailableBytes = dockerAvailable;
             host.StorageReserveRequiredBytes = StorageTelemetryPolicy.RequiredHostReserve(dockerTotal, options);
         }
-        var newState = StorageTelemetryPolicy.EvaluateHost(
-            report.Success ? report.DockerDataRootTotalBytes!.Value : 0,
-            report.Success ? report.DockerDataRootAvailableBytes!.Value : 0,
-            report.Success, options);
+    }
+
+    private void TrackRunnerHostPolicyChange(RunnerHost host, string newState, DateTime now)
+    {
         if (!string.Equals(host.StorageState, newState, StringComparison.Ordinal))
         {
             db.AuditEvents.Add(new AuditEvent
@@ -163,8 +219,6 @@ public sealed class RunnerStorageTelemetryService
                 CreatedAtUtc = now
             });
         }
-        host.StorageState = newState;
-        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static void ValidateTimestamp(DateTime value)

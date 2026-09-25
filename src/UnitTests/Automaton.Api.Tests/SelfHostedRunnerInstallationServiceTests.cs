@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
@@ -19,9 +20,9 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task Create_StoresOnlyHashAndBuildsIsolatedStandardCommand()
     {
-        await using var db = CreateDbContext();
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
         var userId = Guid.NewGuid();
-        var service = CreateService(db, userId);
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, userId);
 
         var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
@@ -47,8 +48,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task PrivilegedInstallation_UsesHostArgumentsButRemainsApplicationRunner()
     {
-        await using var db = CreateDbContext();
-        var service = CreateService(db, Guid.NewGuid());
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
 
         var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
@@ -97,8 +98,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task MultiplePrivilegedInstallations_UseDistinctIdentityAndNoHostPorts()
     {
-        await using var db = CreateDbContext();
-        var service = CreateService(db, Guid.NewGuid());
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
 
         var first = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
@@ -126,8 +127,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task Installer_VerifiesStartupAndReportsBoundedFailureWithoutTracingSecrets()
     {
-        await using var db = CreateDbContext();
-        var service = CreateService(db, Guid.NewGuid());
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
 
         var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
@@ -155,69 +156,30 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task Status_DistinguishesPendingEnrolledConnectedExpiredAndOffline()
     {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var service = CreateService(db, userId);
-        var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        await using var scenario = await StatusScenario.CreateAsync();
+        var statuses = await scenario.ReadTransitionsAsync();
+        Assert.That(statuses, Is.EqualTo(new[]
         {
-            RunnerName = "status-runner",
-            ApplicationProfile = RunnerApplicationProfiles.Standard
-        }, CancellationToken.None);
-
-        var pending = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
-        Assert.That(pending!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.WaitingForEnrollment));
-
-        var enrollment = await db.SelfHostedRunnerEnrollments.SingleAsync();
-        var runner = new Automaton.Api.Entities.Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = enrollment.RunnerName,
-            Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.Standard,
-            InstallationId = enrollment.InstallationId,
-            Status = RunnerConnectivityStatuses.Unknown
-        };
-        db.Runners.Add(runner);
-        enrollment.Status = RunnerEnrollmentStatuses.Completed;
-        enrollment.RunnerId = runner.Id;
-        await db.SaveChangesAsync();
-
-        var enrolled = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
-        Assert.That(enrolled!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.RunnerEnrolled));
-
-        runner.ConnectionId = "connection";
-        runner.LastConnectedAtUtc = DateTime.UtcNow;
-        runner.LastHeartbeatAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        var connected = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
-        Assert.That(connected!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.RunnerConnected));
-
-        runner.ConnectionId = null;
-        runner.LastHeartbeatAtUtc = DateTime.UtcNow.Subtract(RunnerPresenceEvaluator.OfflineThreshold).AddSeconds(-1);
-        await db.SaveChangesAsync();
-        var offline = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
-        Assert.That(offline!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment));
-
-        enrollment.Status = RunnerEnrollmentStatuses.Pending;
-        enrollment.RunnerId = null;
-        enrollment.ExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
-        await db.SaveChangesAsync();
-        var expired = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
-        Assert.That(expired!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.Expired));
+            SelfHostedRunnerInstallationStatuses.WaitingForEnrollment,
+            SelfHostedRunnerInstallationStatuses.RunnerEnrolled,
+            SelfHostedRunnerInstallationStatuses.RunnerConnected,
+            SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment,
+            SelfHostedRunnerInstallationStatuses.Expired
+        }));
     }
 
     [Test]
     public async Task Status_DoesNotExposeAnotherUsersInstallation()
     {
-        await using var db = CreateDbContext();
-        var ownerService = CreateService(db, Guid.NewGuid());
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var ownerService = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
         var installation = await ownerService.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
             RunnerName = "private-status",
             ApplicationProfile = RunnerApplicationProfiles.Standard
         }, CancellationToken.None);
 
-        var otherUserService = CreateService(db, Guid.NewGuid());
+        var otherUserService = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
         var status = await otherUserService.GetStatusAsync(installation.InstallationId, CancellationToken.None);
 
         Assert.That(status, Is.Null);
@@ -227,8 +189,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [TestCase("Infrastructure")]
     public async Task Create_RejectsNonApplicationProfiles(string profile)
     {
-        await using var db = CreateDbContext();
-        var service = CreateService(db, Guid.NewGuid());
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
 
         Assert.That(
             async () => await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
@@ -242,61 +204,192 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     [Test]
     public async Task Exchange_AssignsEnrollmentProfileAndNormalCapabilities_AndCannotBeReplayed()
     {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var service = CreateService(db, userId);
-        var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
-        {
-            RunnerName = "registered-self-hosted",
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
-        }, CancellationToken.None);
-        var token = Regex.Match(installation.InstallationCommand, "AUTOMATON_ENROLLMENT_TOKEN='([^']+)'").Groups[1].Value;
-
-        var response = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
-        {
-            EnrollmentToken = token,
-            RunnerName = "registered-self-hosted",
-            RunnerVersion = "test",
-            MachineName = "user-host"
-        }, CancellationToken.None);
-
-        Assert.That(response, Is.Not.Null);
-        var runner = await db.Runners.SingleAsync();
-        Assert.That(runner.Purpose, Is.EqualTo(RunnerPurposes.Managed));
-        Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
-        Assert.That(runner.CapabilitiesJson, Does.Contain(RunnerCapabilities.ApplicationHosting));
-        Assert.That(runner.CapabilitiesJson, Does.Contain(RunnerCapabilities.WorkflowExecution));
-        Assert.That(runner.CapabilitiesJson, Does.Not.Contain(RunnerCapabilities.DockerManagement));
-        Assert.That(await db.HostedRunners.CountAsync(), Is.EqualTo(0));
-        Assert.That(await db.RunnerHosts.CountAsync(), Is.EqualTo(0));
-        Assert.That(await db.RunnerUsers.AnyAsync(x => x.RunnerId == runner.Id && x.UserId == userId), Is.True);
-        Assert.That(response!.ApiKey, Does.StartWith("ak_runner_"));
-        Assert.That(await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest { EnrollmentToken = token }, CancellationToken.None), Is.Null);
+        await using var scenario = await EnrollmentExchangeScenario.CreateAsync();
+        var result = await scenario.ExchangeAndReadResultAsync();
+        AssertEnrollmentResult(result);
     }
 
-    private static SelfHostedRunnerInstallationService CreateService(ApplicationDbContext db, Guid userId)
+    private static void AssertEnrollmentResult(EnrollmentExchangeResult result)
     {
-        var context = new DefaultHttpContext();
-        var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "test");
-        context.User = new ClaimsPrincipal(identity);
-        var userContext = new UserContextService(new HttpContextAccessor { HttpContext = context });
-        var audit = new RecordingAuditEventService();
-        var apiKeys = new ApiKeyService(db, NullLogger<ApiKeyService>.Instance, null!, audit);
-        return new SelfHostedRunnerInstallationService(
-            db, apiKeys, userContext, audit,
-            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(new HostedRunnerOptions { DockerImage = "automaton/runner:test", ServerUrl = "https://api.example.test" }),
-            NullLogger<SelfHostedRunnerInstallationService>.Instance);
+        Assert.That(result.Purpose, Is.EqualTo(RunnerPurposes.Managed));
+        Assert.That(result.Profile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.ApplicationHosting));
+        Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.WorkflowExecution));
+        Assert.That(result.Capabilities, Does.Not.Contain(RunnerCapabilities.DockerManagement));
+        Assert.That(result.HostedRunners, Is.Zero);
+        Assert.That(result.RunnerHosts, Is.Zero);
+        Assert.That(result.UserLinked, Is.True);
+        Assert.That(result.ApiKey, Does.StartWith("ak_runner_"));
+        Assert.That(result.ReplayWasRejected, Is.True);
     }
 
-    private static ApplicationDbContext CreateDbContext() => new(
-        new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase($"self-hosted-{Guid.NewGuid()}").Options);
-
-    private sealed class RecordingAuditEventService : IAuditEventService
+    private sealed class StatusScenario : IAsyncDisposable
     {
-        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null,
-            string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        private readonly ApplicationDbContext db;
+        private readonly SelfHostedRunnerInstallationService service;
+        private readonly string installationId;
+        private readonly SelfHostedRunnerEnrollment enrollment;
+
+        private StatusScenario(
+            ApplicationDbContext db,
+            SelfHostedRunnerInstallationService service,
+            string installationId,
+            SelfHostedRunnerEnrollment enrollment)
+        {
+            this.db = db;
+            this.service = service;
+            this.installationId = installationId;
+            this.enrollment = enrollment;
+        }
+
+        public static async Task<StatusScenario> CreateAsync()
+        {
+            var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+            var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
+            var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+            {
+                RunnerName = "status-runner",
+                ApplicationProfile = RunnerApplicationProfiles.Standard
+            }, CancellationToken.None);
+            var enrollment = await db.SelfHostedRunnerEnrollments.SingleAsync();
+            return new StatusScenario(db, service, installation.InstallationId, enrollment);
+        }
+
+        public async Task<string[]> ReadTransitionsAsync()
+        {
+            var statuses = new List<string>
+            {
+                (await service.GetStatusAsync(installationId, CancellationToken.None))!.Status
+            };
+            await CompleteEnrollmentAsync();
+            statuses.Add((await service.GetStatusAsync(installationId, CancellationToken.None))!.Status);
+            await ConnectRunnerAsync();
+            statuses.Add((await service.GetStatusAsync(installationId, CancellationToken.None))!.Status);
+            await MakeRunnerOfflineAsync();
+            statuses.Add((await service.GetStatusAsync(installationId, CancellationToken.None))!.Status);
+            await ExpireEnrollmentAsync();
+            statuses.Add((await service.GetStatusAsync(installationId, CancellationToken.None))!.Status);
+            return [.. statuses];
+        }
+
+        private async Task CompleteEnrollmentAsync()
+        {
+            var runner = new Automaton.Api.Entities.Runner
+            {
+                Id = Guid.NewGuid(),
+                Name = enrollment.RunnerName,
+                Purpose = RunnerPurposes.Managed,
+                ApplicationProfile = RunnerApplicationProfiles.Standard,
+                InstallationId = installationId,
+                Status = RunnerConnectivityStatuses.Unknown
+            };
+            db.Runners.Add(runner);
+            enrollment.Status = RunnerEnrollmentStatuses.Completed;
+            enrollment.RunnerId = runner.Id;
+            await db.SaveChangesAsync();
+        }
+
+        private async Task ConnectRunnerAsync()
+        {
+            var runner = await db.Runners.SingleAsync();
+            runner.ConnectionId = "connection";
+            runner.LastConnectedAtUtc = DateTime.UtcNow;
+            runner.LastHeartbeatAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        private async Task MakeRunnerOfflineAsync()
+        {
+            var runner = await db.Runners.SingleAsync();
+            runner.ConnectionId = null;
+            runner.LastHeartbeatAtUtc = DateTime.UtcNow.Subtract(RunnerPresenceEvaluator.OfflineThreshold).AddSeconds(-1);
+            await db.SaveChangesAsync();
+        }
+
+        private async Task ExpireEnrollmentAsync()
+        {
+            enrollment.Status = RunnerEnrollmentStatuses.Pending;
+            enrollment.RunnerId = null;
+            enrollment.ExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        }
+
+        public ValueTask DisposeAsync() => db.DisposeAsync();
     }
+
+    private sealed class EnrollmentExchangeScenario : IAsyncDisposable
+    {
+        private readonly ApplicationDbContext db;
+        private readonly SelfHostedRunnerInstallationService service;
+        private readonly Guid userId;
+        private readonly string token;
+
+        private EnrollmentExchangeScenario(ApplicationDbContext db, SelfHostedRunnerInstallationService service, Guid userId, string token)
+        {
+            this.db = db;
+            this.service = service;
+            this.userId = userId;
+            this.token = token;
+        }
+
+        public static async Task<EnrollmentExchangeScenario> CreateAsync()
+        {
+            var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+            var userId = Guid.NewGuid();
+            var service = SelfHostedRunnerInstallationTestServices.CreateService(db, userId);
+            var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+            {
+                RunnerName = "registered-self-hosted",
+                ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
+            }, CancellationToken.None);
+            var token = Regex.Match(
+                installation.InstallationCommand,
+                "AUTOMATON_ENROLLMENT_TOKEN='([^']+)'").Groups[1].Value;
+            return new EnrollmentExchangeScenario(db, service, userId, token);
+        }
+
+        public async Task<EnrollmentExchangeResult> ExchangeAndReadResultAsync()
+        {
+            var response = await ExchangeAsync();
+            var runner = await db.Runners.SingleAsync();
+            var userLinked = await db.RunnerUsers.AnyAsync(x => x.RunnerId == runner.Id && x.UserId == userId);
+            var result = new EnrollmentExchangeResult(
+                runner.Purpose,
+                runner.ApplicationProfile,
+                runner.CapabilitiesJson,
+                await db.HostedRunners.CountAsync(),
+                await db.RunnerHosts.CountAsync(),
+                userLinked,
+                response?.ApiKey);
+            var replayWasRejected = await ReplayAsync() is null;
+            return result with { ReplayWasRejected = replayWasRejected };
+        }
+
+        private Task<RunnerEnrollmentExchangeResponse?> ExchangeAsync()
+            => service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
+            {
+                EnrollmentToken = token,
+                RunnerName = "registered-self-hosted",
+                RunnerVersion = "test",
+                MachineName = "user-host"
+            }, CancellationToken.None);
+
+        private Task<RunnerEnrollmentExchangeResponse?> ReplayAsync()
+            => service.ExchangeAsync(
+                new RunnerEnrollmentExchangeRequest { EnrollmentToken = token },
+                CancellationToken.None);
+
+        public ValueTask DisposeAsync() => db.DisposeAsync();
+    }
+
+    private sealed record EnrollmentExchangeResult(
+        string Purpose,
+        string? Profile,
+        string Capabilities,
+        int HostedRunners,
+        int RunnerHosts,
+        bool UserLinked,
+        string? ApiKey,
+        bool ReplayWasRejected = false);
+
 }

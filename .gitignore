@@ -121,6 +121,8 @@ __pycache__/
 !.agents/skills/studio-design/**
 !.agents/skills/distributed-platform-architecture/
 !.agents/skills/distributed-platform-architecture/**
+!.agents/skills/maintainability/
+!.agents/skills/maintainability/**
 .vitepress/
 !src/automaton-vue/docs/.vitepress/
 src/automaton-vue/docs/.vitepress/cache/

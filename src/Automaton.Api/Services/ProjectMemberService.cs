@@ -144,77 +144,25 @@ public class ProjectMemberService
             logger.Debug("Created new user {UserId} ({Email}) for project invitation", user.Id, user.Email);
         }
 
-        // Generate invitation token and send email (for both new and existing users)
-        try
-        {
-            if (invitationService != null && project != null)
-            {
-                var token = await invitationService.GenerateInvitationToken(projectId, request.Email, request.Role.ToString(), UserId);
+        await SendInvitationEmailAsync(projectId, project, user, request, createdNewUser, cancellationToken);
 
-                var invitationUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/projects/invite/{token}";
+        return await SaveMembershipAndAuditAsync(projectId, user, request, createdNewUser, cancellationToken);
+    }
 
-                // decide if we should include setup password link
-                var requirePasswordSetup = createdNewUser || !(await userManager.HasPasswordAsync(user));
-                string? setupPasswordUrl = null;
-
-                if (requirePasswordSetup)
-                {
-                    var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-                    var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-                    setupPasswordUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}";
-                }
-
-                var variables = new Dictionary<string, string>
-                {
-                    { "Name", user.Name ?? request.Email },
-                    { "ProjectName", project.DisplayName },
-                    { "ProjectDescription", project.Description ?? string.Empty },
-                    { "InviterName", userContextService.GetUserName() ?? string.Empty },
-                    { "Role", request.Role.ToString() },
-                    { "InviteUrl", invitationUrl },
-                    { "ExpirationHours", "24" },
-                    { "SupportEmail", configurationService.EmailConfig.SupportEmail },
-                    { "RequirePasswordSetup", requirePasswordSetup ? "true" : "false" }
-                };
-
-                if (requirePasswordSetup && setupPasswordUrl != null)
-                {
-                    variables["SetupPasswordUrl"] = setupPasswordUrl;
-                }
-
-                var emailDetails = new EmailData
-                {
-                    Template = "AutomatonProjectInvitation",
-                    From = new EmailAccount
-                    {
-                        Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
-                            ? configurationService.EmailConfig.EmailAccount
-                            : configurationService.EmailConfig.FromEmail
-                    },
-                    To = new[] { new EmailAccount { Email = request.Email, Name = user.Name } },
-                    Variables = variables
-                };
-
-                await emailService.Send(emailDetails, cancellationToken);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to generate or send invitation email to {Email}", request.Email);
-        }
-
-        // Check if user is already a member
+    private async Task<ProjectMemberDto> SaveMembershipAndAuditAsync(
+        Guid projectId,
+        ApplicationUser user,
+        AddProjectMemberRequest request,
+        bool createdNewUser,
+        CancellationToken cancellationToken)
+    {
         var existingMembership = await dbContext.ProjectMembers
             .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == user.Id, cancellationToken);
+        if (existingMembership?.IsActive == true)
+            throw new InvalidOperationException($"User '{request.Email}' is already a member of this project");
 
         if (existingMembership != null)
         {
-            if (existingMembership.IsActive)
-            {
-                throw new InvalidOperationException($"User '{request.Email}' is already a member of this project");
-            }
-
-            // Reactivate membership
             existingMembership.IsActive = true;
             existingMembership.Role = request.Role;
             existingMembership.InvitedBy = UserId;
@@ -222,8 +170,7 @@ public class ProjectMemberService
         }
         else
         {
-            // Create new membership
-            var membership = new ProjectMember
+            dbContext.ProjectMembers.Add(new ProjectMember
             {
                 ProjectId = projectId,
                 UserId = user.Id,
@@ -231,13 +178,10 @@ public class ProjectMemberService
                 JoinedAt = DateTime.UtcNow,
                 InvitedBy = UserId,
                 IsActive = true
-            };
-
-            dbContext.ProjectMembers.Add(membership);
+            });
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-
         await auditEventService.WriteAsync(
             action: createdNewUser ? "Invited" : "AddedMember",
             entityType: "ProjectMember",
@@ -254,7 +198,6 @@ public class ProjectMemberService
             },
             cancellationToken: cancellationToken);
 
-
         return new ProjectMemberDto
         {
             ProjectId = projectId,
@@ -267,6 +210,81 @@ public class ProjectMemberService
             InvitedByName = userContextService.GetUserName(),
             IsActive = true,
             IsOwner = false
+        };
+    }
+
+    private async Task SendInvitationEmailAsync(
+        Guid projectId,
+        Project? project,
+        ApplicationUser user,
+        AddProjectMemberRequest request,
+        bool createdNewUser,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (invitationService == null || project == null)
+                return;
+
+            var token = await invitationService.GenerateInvitationToken(
+                projectId, request.Email, request.Role.ToString(), UserId);
+            var invitationUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/projects/invite/{token}";
+            var requirePasswordSetup = createdNewUser || !(await userManager.HasPasswordAsync(user));
+            var setupPasswordUrl = requirePasswordSetup
+                ? await CreatePasswordSetupUrlAsync(user)
+                : null;
+            var emailDetails = CreateInvitationEmail(project, user, request, invitationUrl,
+                requirePasswordSetup, setupPasswordUrl);
+            await emailService.Send(emailDetails, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to generate or send invitation email to {Email}", request.Email);
+        }
+    }
+
+    private async Task<string> CreatePasswordSetupUrlAsync(ApplicationUser user)
+    {
+        var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
+        return $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}";
+    }
+
+    private EmailData CreateInvitationEmail(
+        Project project,
+        ApplicationUser user,
+        AddProjectMemberRequest request,
+        string invitationUrl,
+        bool requirePasswordSetup,
+        string? setupPasswordUrl)
+    {
+        var variables = new Dictionary<string, string>
+        {
+            { "Name", user.Name ?? request.Email },
+            { "ProjectName", project.DisplayName },
+            { "ProjectDescription", project.Description ?? string.Empty },
+            { "InviterName", userContextService.GetUserName() ?? string.Empty },
+            { "Role", request.Role.ToString() },
+            { "InviteUrl", invitationUrl },
+            { "ExpirationHours", "24" },
+            { "SupportEmail", configurationService.EmailConfig.SupportEmail },
+            { "RequirePasswordSetup", requirePasswordSetup ? "true" : "false" }
+        };
+
+        if (requirePasswordSetup && setupPasswordUrl != null)
+            variables["SetupPasswordUrl"] = setupPasswordUrl;
+
+        return new EmailData
+        {
+            Template = "AutomatonProjectInvitation",
+            From = new EmailAccount
+            {
+                Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
+                    ? configurationService.EmailConfig.EmailAccount
+                    : configurationService.EmailConfig.FromEmail
+            },
+            To = new[] { new EmailAccount { Email = request.Email, Name = user.Name } },
+            Variables = variables
         };
     }
 

@@ -6,6 +6,7 @@ using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using System.Threading.Channels;
 
 namespace Automaton.Api.Services;
 
@@ -71,37 +72,24 @@ public class AppMediaStorageService
         }
 
         var relativePath = AppMediaStoragePolicy.BuildStorageRelativePath(file.FileName, DateTime.UtcNow);
+        return await UploadValidatedFileAsync(appId, file!, contentType, relativePath, runner, ct);
+    }
+
+    private async Task<(bool Success, int StatusCode, object Payload)> UploadValidatedFileAsync(
+        Guid appId,
+        IFormFile file,
+        string contentType,
+        string relativePath,
+        Runner runner,
+        CancellationToken cancellationToken)
+    {
         var publicPath = AppMediaPathHelper.ToPublicPath(relativePath);
-        var (sessionId, completionTask) = uploadRegistry.Register(TimeSpan.FromMinutes(UploadTimeoutMinutes), ct);
+        var (sessionId, completionTask) = uploadRegistry.Register(TimeSpan.FromMinutes(UploadTimeoutMinutes), cancellationToken);
 
         try
         {
             using var stream = file.OpenReadStream();
-            var buffer = new byte[ChunkSize];
-            var chunkIndex = 0;
-            int bytesRead;
-
-            while ((bytesRead = await stream.ReadAsync(buffer, ct)) > 0)
-            {
-                var isLast = stream.Position >= stream.Length;
-                var chunkData = bytesRead == ChunkSize ? buffer : buffer[..bytesRead];
-
-                var chunk = new FileUploadChunk
-                {
-                    SessionId = sessionId,
-                    ChunkIndex = chunkIndex++,
-                    Data = chunkData,
-                    IsLast = isLast,
-                    FileName = Path.GetFileName(relativePath),
-                    ContentType = contentType,
-                    AppId = appId,
-                    RelativePath = relativePath,
-                    StorageScope = FileTransferStorageScopes.Media
-                };
-
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, ct);
-            }
+            await SendUploadChunksAsync(stream, sessionId, appId, contentType, relativePath, runner, cancellationToken);
 
             await completionTask;
 
@@ -118,6 +106,38 @@ public class AppMediaStorageService
         {
             logger.LogError(ex, "Failed to upload media for app {AppId}", appId);
             return (false, StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    private async Task SendUploadChunksAsync(
+        Stream stream,
+        string sessionId,
+        Guid appId,
+        string contentType,
+        string relativePath,
+        Runner runner,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[ChunkSize];
+        var chunkIndex = 0;
+        int bytesRead;
+        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            var chunk = new FileUploadChunk
+            {
+                SessionId = sessionId,
+                ChunkIndex = chunkIndex++,
+                Data = bytesRead == ChunkSize ? buffer : buffer[..bytesRead],
+                IsLast = stream.Position >= stream.Length,
+                FileName = Path.GetFileName(relativePath),
+                ContentType = contentType,
+                AppId = appId,
+                RelativePath = relativePath,
+                StorageScope = FileTransferStorageScopes.Media
+            };
+
+            await automatonHub.Clients.Client(runner.ConnectionId!)
+                .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
         }
     }
 
@@ -162,7 +182,19 @@ public class AppMediaStorageService
 
         var sessionId = Guid.NewGuid().ToString("N");
         var channel = downloadRegistry.Register(sessionId);
+        return await StreamMediaFileAsync(appId, normalizedPath, runner, metadata, sessionId, channel, response, ct);
+    }
 
+    private async Task<int> StreamMediaFileAsync(
+        Guid appId,
+        string normalizedPath,
+        Runner runner,
+        AppMediaFileMetadataResponse metadata,
+        string sessionId,
+        Channel<FileChunkReadyMessage> channel,
+        HttpResponse response,
+        CancellationToken cancellationToken)
+    {
         try
         {
             long offset = 0;
@@ -173,31 +205,16 @@ public class AppMediaStorageService
 
             while (true)
             {
-                var request = new FetchFileChunkRequest
-                {
-                    SessionId = sessionId,
-                    Offset = offset,
-                    ChunkSize = ChunkSize,
-                    AppId = appId,
-                    RelativePath = normalizedPath,
-                    StorageScope = FileTransferStorageScopes.Media
-                };
-
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.FetchFileChunk, request, ct);
-
-                using var chunkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                chunkCts.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
-
-                FileChunkReadyMessage chunk;
-                try
-                {
-                    chunk = await channel.Reader.ReadAsync(chunkCts.Token);
-                }
-                catch (OperationCanceledException)
-                {
+                var chunk = await RequestNextChunkAsync(
+                    appId,
+                    normalizedPath,
+                    runner,
+                    sessionId,
+                    offset,
+                    channel,
+                    cancellationToken);
+                if (chunk is null)
                     return StatusCodes.Status504GatewayTimeout;
-                }
 
                 if (chunk.StatusCode != StatusCodes.Status200OK)
                 {
@@ -211,8 +228,8 @@ public class AppMediaStorageService
 
                 if (chunk.Data.Length > 0)
                 {
-                    await response.Body.WriteAsync(chunk.Data, ct);
-                    await response.Body.FlushAsync(ct);
+                    await response.Body.WriteAsync(chunk.Data, cancellationToken);
+                    await response.Body.FlushAsync(cancellationToken);
                     offset += chunk.Data.Length;
                 }
 
@@ -225,6 +242,40 @@ public class AppMediaStorageService
         finally
         {
             downloadRegistry.Complete(sessionId);
+        }
+    }
+
+    private async Task<FileChunkReadyMessage?> RequestNextChunkAsync(
+        Guid appId,
+        string normalizedPath,
+        Runner runner,
+        string sessionId,
+        long offset,
+        Channel<FileChunkReadyMessage> channel,
+        CancellationToken cancellationToken)
+    {
+        var request = new FetchFileChunkRequest
+        {
+            SessionId = sessionId,
+            Offset = offset,
+            ChunkSize = ChunkSize,
+            AppId = appId,
+            RelativePath = normalizedPath,
+            StorageScope = FileTransferStorageScopes.Media
+        };
+
+        await automatonHub.Clients.Client(runner.ConnectionId!)
+            .SendAsync(AutomatonHubMethods.FetchFileChunk, request, cancellationToken);
+
+        using var chunkCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        chunkCancellation.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
+        try
+        {
+            return await channel.Reader.ReadAsync(chunkCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
     }
 

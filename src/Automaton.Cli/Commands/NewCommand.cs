@@ -1,6 +1,4 @@
-using Automaton.Cli.Models;
 using Automaton.Cli.Services;
-using Spectre.Console;
 using System.CommandLine;
 
 namespace Automaton.Cli.Commands;
@@ -16,83 +14,16 @@ public static class NewCommand
         var nameOption = new Option<string?>(["--name", "-n"], "App name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var environmentOption = new Option<string?>("--env", "Local project profile to link, for example local or live");
-
-        var cmd = new Command("new", "Create a new Automaton app and link this directory")
+        var command = new Command("new", "Create a new Automaton app and link this directory")
         {
             nameArgument,
             nameOption,
             jsonOption,
             environmentOption
         };
-
-        cmd.SetHandler(async (string? nameArgumentValue, string? nameOptionValue, bool asJson, string? environmentName) =>
-        {
-            var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(
-                directory: cwd,
-                environmentName: environmentName,
-                allowMissingEnvironment: true);
-
-            var resolvedName = string.IsNullOrWhiteSpace(nameOptionValue)
-                ? nameArgumentValue
-                : nameOptionValue;
-
-            if (!asJson && string.IsNullOrWhiteSpace(resolvedName))
-            {
-                Console.Write("App name: ");
-                resolvedName = Console.ReadLine()?.Trim();
-            }
-
-            var newAppService = new NewAppService(config);
-            var result = await newAppService.CreateAsync(cwd, resolvedName, server, apiKey, environmentName);
-
-            if (asJson)
-            {
-                CliJson.Write(new
-                {
-                    success = result.Success,
-                    summary = result.Summary,
-                    checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                    nextSteps = result.NextSteps,
-                    appId = result.AppId,
-                    name = result.Name,
-                    server = result.Server,
-                    configPath = result.ConfigPath
-                });
-                Environment.ExitCode = result.Success ? 0 : 1;
-                return;
-            }
-
-            if (!result.Success)
-            {
-                if (result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success)
-                    && result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success))
-                {
-                    var remoteFailure = result.Checks.Last(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success);
-                    AnsiConsole.MarkupLine("[yellow]Local scaffold created successfully.[/]");
-                    AnsiConsole.MarkupLine($"[red]Remote app creation failed:[/] {remoteFailure.Message}");
-                    AnsiConsole.MarkupLine("[grey]Your project is still usable locally.[/]");
-                    AnsiConsole.WriteLine();
-                }
-
-                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
-                {
-                    Success = result.Success,
-                    Summary = result.Summary,
-                    Checks = result.Checks,
-                    NextSteps = result.NextSteps
-                });
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{result.Name}[/]");
-            AnsiConsole.MarkupLine($"[grey]App ID:[/] {result.AppId}");
-            AnsiConsole.MarkupLine($"[grey]Local project:[/] {Spectre.Console.Markup.Escape(cwd)}");
-            AnsiConsole.MarkupLine("[grey]automaton.json written. Build or edit the app locally, then run 'automaton deploy'.[/]");
-            Environment.ExitCode = 0;
-        }, nameArgument, nameOption, jsonOption, environmentOption);
-
-        return cmd;
+        command.SetHandler((string? name, string? nameOverride, bool asJson, string? environmentName) =>
+            NewCommandHandler.HandleAsync(config, name, nameOverride, asJson, environmentName),
+            nameArgument, nameOption, jsonOption, environmentOption);
+        return command;
     }
 }

@@ -736,46 +736,7 @@ public class AppFileStorageService
 
         foreach (var rawRule in rules)
         {
-            var rule = rawRule?.Replace('\\', '/').Trim();
-            if (string.IsNullOrWhiteSpace(rule))
-            {
-                continue;
-            }
-
-            if (rule.EndsWith("/**", StringComparison.Ordinal))
-            {
-                var prefix = rule[..^3].Trim('/');
-                if (normalized.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                continue;
-            }
-
-            if (rule.StartsWith("*.", StringComparison.Ordinal))
-            {
-                if (fileName.EndsWith(rule[1..], StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                continue;
-            }
-
-            if (rule.Contains('/', StringComparison.Ordinal))
-            {
-                if (string.Equals(normalized, rule.Trim('/'), StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                continue;
-            }
-
-            if (string.Equals(fileName, rule, StringComparison.OrdinalIgnoreCase) ||
-                segments.Any(segment => string.Equals(segment, rule, StringComparison.OrdinalIgnoreCase)))
+            if (MatchesExcludePattern(normalized, fileName, segments, rawRule))
             {
                 return true;
             }
@@ -783,6 +744,39 @@ public class AppFileStorageService
 
         return false;
     }
+
+    private static bool MatchesExcludePattern(
+        string normalizedPath,
+        string fileName,
+        IReadOnlyCollection<string> segments,
+        string? rawRule)
+    {
+        var rule = rawRule?.Replace('\\', '/').Trim();
+        if (string.IsNullOrWhiteSpace(rule))
+            return false;
+
+        if (rule.EndsWith("/**", StringComparison.Ordinal))
+            return MatchesDirectoryPrefix(normalizedPath, rule);
+
+        if (rule.StartsWith("*.", StringComparison.Ordinal))
+            return fileName.EndsWith(rule[1..], StringComparison.OrdinalIgnoreCase);
+
+        if (rule.Contains('/', StringComparison.Ordinal))
+            return string.Equals(normalizedPath, rule.Trim('/'), StringComparison.OrdinalIgnoreCase);
+
+        return MatchesPathSegment(fileName, segments, rule);
+    }
+
+    private static bool MatchesDirectoryPrefix(string normalizedPath, string rule)
+    {
+        var prefix = rule[..^3].Trim('/');
+        return normalizedPath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalizedPath, prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesPathSegment(string fileName, IEnumerable<string> segments, string rule)
+        => string.Equals(fileName, rule, StringComparison.OrdinalIgnoreCase) ||
+            segments.Any(segment => string.Equals(segment, rule, StringComparison.OrdinalIgnoreCase));
 
     private Task CopyDirectoryFilesAsync(
         string srcPath,

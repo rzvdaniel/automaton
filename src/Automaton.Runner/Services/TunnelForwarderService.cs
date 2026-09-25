@@ -44,104 +44,128 @@ public class TunnelForwarderService
 
     public async Task<TunnelResponse> ForwardAsync(TunnelRequest request)
     {
-        var tunnelResponse = new TunnelResponse { RequestId = request.RequestId };
-
         try
         {
-            var isRuntimeGateway = string.Equals(
-                request.Destination,
-                TunnelDestinations.RuntimeGateway,
-                StringComparison.Ordinal);
-            var client = isRuntimeGateway ? _runtimeGatewayClient : _fastApiClient;
-            var runtimeGatewayPath = string.Empty;
+            var route = ResolveRoute(request);
+            if (route is null)
+                return InvalidRuntimeDestination(request.RequestId);
 
-            if (isRuntimeGateway && !TryBuildRuntimeGatewayPath(request, out runtimeGatewayPath))
-            {
-                tunnelResponse.StatusCode = 400;
-                tunnelResponse.Error = "Runtime tunnel destination is invalid.";
-                return tunnelResponse;
-            }
-
-            var requestPath = isRuntimeGateway ? runtimeGatewayPath : request.Path;
-            using var httpRequest = new HttpRequestMessage(
-                new HttpMethod(request.Method),
-                requestPath);
-
-            if (request.BodyBytes != null)
-                httpRequest.Content = new ByteArrayContent(request.BodyBytes);
-            else if (request.Body != null)
-                httpRequest.Content = new StringContent(request.Body, Encoding.UTF8, "application/json");
-
-            foreach (var (k, v) in request.Headers)
-                AddHeader(httpRequest, k, [v]);
-            foreach (var (k, values) in request.HeaderValues)
-                AddHeader(httpRequest, k, values);
-
-            _logger.Debug("Forwarding through {Destination}: {Method} {Path}",
-                isRuntimeGateway ? "runtime gateway" : "FastAPI", request.Method, requestPath);
-
-            using var httpResponse = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
-
-            tunnelResponse.StatusCode = (int)httpResponse.StatusCode;
-            var bodyBytes = await httpResponse.Content.ReadAsByteArrayAsync();
-
-            if (bodyBytes.Length > _maxBodyBytes)
-            {
-                _logger.Warning("FastAPI response body too large ({Bytes} bytes) for {Path}", bodyBytes.Length, request.Path);
-                tunnelResponse.StatusCode = 413;
-                tunnelResponse.Error = $"Response body ({bodyBytes.Length} bytes) exceeds SignalR message limit ({_maxBodyBytes} bytes). Return less data or paginate.";
-            }
-            else
-            {
-                tunnelResponse.HeaderValues = httpResponse.Headers
-                    .Concat(httpResponse.Content.Headers)
-                    .Where(header => IsForwardableResponseHeader(header.Key))
-                    .GroupBy(header => header.Key, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => group.Key, group => group.SelectMany(header => header.Value).ToArray(), StringComparer.OrdinalIgnoreCase);
-
-                if (isRuntimeGateway)
-                    tunnelResponse.BodyBytes = bodyBytes;
-                else
-                    tunnelResponse.Body = Encoding.UTF8.GetString(bodyBytes);
-
-                if (tunnelResponse.StatusCode < 200 || tunnelResponse.StatusCode >= 300)
-                {
-                    // Extract a human-readable error from the response body so callers
-                    // can surface it in logs instead of showing Error=null.
-                    var bodyText = (tunnelResponse.Body ?? Encoding.UTF8.GetString(bodyBytes)).Trim();
-                    if (!string.IsNullOrEmpty(bodyText))
-                    {
-                        try
-                        {
-                            using var doc = JsonDocument.Parse(bodyText);
-                            if (doc.RootElement.TryGetProperty("error", out var errEl))
-                                tunnelResponse.Error = errEl.GetString();
-                            else if (doc.RootElement.TryGetProperty("detail", out var detEl))
-                                tunnelResponse.Error = detEl.GetString();
-                        }
-                        catch { /* not JSON */ }
-
-                        if (tunnelResponse.Error == null)
-                            tunnelResponse.Error = bodyText.Length > 500 ? bodyText[..500] + "..." : bodyText;
-                    }
-                    _logger.Warning("FastAPI responded {StatusCode} for {Method} {Path}: {Error}",
-                        tunnelResponse.StatusCode, request.Method, request.Path, tunnelResponse.Error);
-                }
-                else
-                {
-                    _logger.Debug("FastAPI responded {StatusCode} for {Method} {Path}", tunnelResponse.StatusCode, request.Method, request.Path);
-                }
-            }
+            using var httpRequest = CreateHttpRequest(request, route.Value.Path);
+            LogForwarding(route.Value.IsRuntimeGateway, request, route.Value.Path);
+            using var httpResponse = await route.Value.Client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+            return await CreateTunnelResponseAsync(request, httpResponse, route.Value.IsRuntimeGateway);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Tunnel call failed: {Method} {Path}", request.Method, request.Path);
-            tunnelResponse.StatusCode = 502;
-            tunnelResponse.Error = ex.Message;
+            return new TunnelResponse { RequestId = request.RequestId, StatusCode = 502, Error = ex.Message };
         }
-
-        return tunnelResponse;
     }
+
+    private (HttpClient Client, string Path, bool IsRuntimeGateway)? ResolveRoute(TunnelRequest request)
+    {
+        var isRuntimeGateway = string.Equals(request.Destination, TunnelDestinations.RuntimeGateway, StringComparison.Ordinal);
+        if (!isRuntimeGateway) return (_fastApiClient, request.Path, false);
+        return TryBuildRuntimeGatewayPath(request, out var path)
+            ? (_runtimeGatewayClient, path, true)
+            : null;
+    }
+
+    private static TunnelResponse InvalidRuntimeDestination(string requestId)
+        => new() { RequestId = requestId, StatusCode = 400, Error = "Runtime tunnel destination is invalid." };
+
+    private static HttpRequestMessage CreateHttpRequest(TunnelRequest request, string requestPath)
+    {
+        var httpRequest = new HttpRequestMessage(new HttpMethod(request.Method), requestPath);
+        if (request.BodyBytes != null)
+            httpRequest.Content = new ByteArrayContent(request.BodyBytes);
+        else if (request.Body != null)
+            httpRequest.Content = new StringContent(request.Body, Encoding.UTF8, "application/json");
+        foreach (var (name, value) in request.Headers)
+            AddHeader(httpRequest, name, [value]);
+        foreach (var (name, values) in request.HeaderValues)
+            AddHeader(httpRequest, name, values);
+        return httpRequest;
+    }
+
+    private static void LogForwarding(bool isRuntimeGateway, TunnelRequest request, string requestPath)
+        => _logger.Debug("Forwarding through {Destination}: {Method} {Path}",
+            isRuntimeGateway ? "runtime gateway" : "FastAPI", request.Method, requestPath);
+
+    private async Task<TunnelResponse> CreateTunnelResponseAsync(
+        TunnelRequest request,
+        HttpResponseMessage httpResponse,
+        bool isRuntimeGateway)
+    {
+        var bodyBytes = await httpResponse.Content.ReadAsByteArrayAsync();
+        var response = new TunnelResponse { RequestId = request.RequestId, StatusCode = (int)httpResponse.StatusCode };
+        if (bodyBytes.Length > _maxBodyBytes)
+            return CreateOversizedResponse(request, response, bodyBytes.Length);
+
+        CopyResponseHeaders(httpResponse, response);
+        CopyResponseBody(bodyBytes, response, isRuntimeGateway);
+        AddErrorSummary(request, response, bodyBytes);
+        return response;
+    }
+
+    private TunnelResponse CreateOversizedResponse(TunnelRequest request, TunnelResponse response, int bodyLength)
+    {
+        _logger.Warning("FastAPI response body too large ({Bytes} bytes) for {Path}", bodyLength, request.Path);
+        response.StatusCode = 413;
+        response.Error = $"Response body ({bodyLength} bytes) exceeds SignalR message limit ({_maxBodyBytes} bytes). Return less data or paginate.";
+        return response;
+    }
+
+    private static void CopyResponseHeaders(HttpResponseMessage httpResponse, TunnelResponse response)
+        => response.HeaderValues = httpResponse.Headers
+            .Concat(httpResponse.Content.Headers)
+            .Where(header => IsForwardableResponseHeader(header.Key))
+            .GroupBy(header => header.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.SelectMany(header => header.Value).ToArray(), StringComparer.OrdinalIgnoreCase);
+
+    private static void CopyResponseBody(byte[] bodyBytes, TunnelResponse response, bool isRuntimeGateway)
+    {
+        if (isRuntimeGateway)
+            response.BodyBytes = bodyBytes;
+        else
+            response.Body = Encoding.UTF8.GetString(bodyBytes);
+    }
+
+    private static void AddErrorSummary(TunnelRequest request, TunnelResponse response, byte[] bodyBytes)
+    {
+        var bodyText = (response.Body ?? Encoding.UTF8.GetString(bodyBytes)).Trim();
+        if (response.StatusCode < 200 || response.StatusCode >= 300)
+        {
+            response.Error = ExtractError(bodyText);
+            _logger.Warning("FastAPI responded {StatusCode} for {Method} {Path}: {Error}",
+                response.StatusCode, request.Method, request.Path, response.Error);
+        }
+        else
+        {
+            _logger.Debug("FastAPI responded {StatusCode} for {Method} {Path}", response.StatusCode, request.Method, request.Path);
+        }
+    }
+
+    private static string? ExtractError(string bodyText)
+    {
+        if (string.IsNullOrEmpty(bodyText)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(bodyText);
+            if (document.RootElement.TryGetProperty("error", out var error) && error.GetString() is { } errorText)
+                return errorText;
+            if (document.RootElement.TryGetProperty("detail", out var detail) && detail.GetString() is { } detailText)
+                return detailText;
+        }
+        catch (JsonException)
+        {
+            return LimitErrorSummary(bodyText);
+        }
+        return LimitErrorSummary(bodyText);
+    }
+
+    private static string LimitErrorSummary(string bodyText)
+        => bodyText.Length > 500 ? bodyText[..500] + "..." : bodyText;
 
     internal static bool TryBuildRuntimeGatewayPath(TunnelRequest request, out string runtimeGatewayPath)
     {

@@ -15,14 +15,21 @@ public sealed class LogoutAntiforgeryTests
     [Test]
     public async Task LogoutPost_WithoutAntiforgeryToken_ReturnsBadRequest()
     {
-        using var host = await new HostBuilder()
+        using var host = await CreateHostAsync();
+
+        using var response = await host.GetTestClient().PostAsync(
+            "/Identity/Account/Logout", new StringContent(string.Empty));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    private static Task<IHost> CreateHostAsync()
+        => new HostBuilder()
             .ConfigureWebHost(webBuilder =>
             {
                 webBuilder.UseTestServer();
                 webBuilder.ConfigureServices(services =>
-                {
-                    services.AddRazorPages().AddApplicationPart(typeof(ErrorModel).Assembly);
-                });
+                    services.AddRazorPages().AddApplicationPart(typeof(ErrorModel).Assembly));
                 webBuilder.Configure(app =>
                 {
                     app.UseRouting();
@@ -30,10 +37,4 @@ public sealed class LogoutAntiforgeryTests
                 });
             })
             .StartAsync();
-
-        using var response = await host.GetTestClient().PostAsync(
-            "/Identity/Account/Logout", new StringContent(string.Empty));
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-    }
 }

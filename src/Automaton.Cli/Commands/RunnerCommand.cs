@@ -39,70 +39,10 @@ public static class RunnerCommand
             nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption
         };
 
-        cmd.SetHandler(async (string? name, string? server, string? key, bool native, bool replace, bool? autoStart, string? image, bool asJson) =>
-        {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new List<string>();
-
-            try
-            {
-                var cwd = Directory.GetCurrentDirectory();
-                var (_, storedApiKey) = config.ResolveCredentials(directory: cwd);
-
-                var runnerName = string.IsNullOrWhiteSpace(name) && !asJson
-                    ? PromptForValue("Enter runner name")
-                    : name?.Trim();
-                var resolvedServer = string.IsNullOrWhiteSpace(server)
-                    ? runnerService.GetDefaultServer(null)
-                    : runnerService.GetDefaultServer(server);
-                var resolvedKey = string.IsNullOrWhiteSpace(key) ? storedApiKey : key.Trim();
-
-                if (string.IsNullOrWhiteSpace(runnerName))
-                {
-                    throw new InvalidOperationException("Runner name is required.");
-                }
-
-                if (string.IsNullOrWhiteSpace(resolvedKey))
-                {
-                    if (asJson)
-                    {
-                        throw new InvalidOperationException("Runner API key is required. Run automaton login first or pass --key.");
-                    }
-
-                    resolvedKey = ReadSecretFromConsole("Enter runner API key");
-                }
-
-                var resolvedAutoStart = autoStart ?? (asJson
-                    ? true
-                    : !native
-                        ? PromptForYesNo("Start automatically when Docker restarts?", true)
-                        : PromptForYesNo("Start automatically on machine boot?", true));
-
-                var request = new RunnerInstallRequest
-                {
-                    RunnerName = runnerName!,
-                    ApiServerUrl = resolvedServer,
-                    ApiKey = resolvedKey!,
-                    Mode = native ? RunnerInstallModes.Native : RunnerInstallModes.Docker,
-                    AutoStart = resolvedAutoStart,
-                    DockerImage = image,
-                    ReplaceExisting = replace,
-                    ProgressReporter = asJson ? null : message => Console.WriteLine(message)
-                };
-
-                var result = await runnerService.InstallAsync(request);
-                WriteResult(result, asJson);
-                Environment.ExitCode = result.Success ? 0 : 1;
-            }
-            catch (Exception ex)
-            {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, false, ex.Message));
-                nextSteps.Add("Run automaton login if server URL or API key has not been configured yet");
-                var failure = new RunnerCommandResult { Success = false, Summary = "Runner install failed", Checks = checks, NextSteps = nextSteps };
-                WriteResult(failure, asJson);
-                Environment.ExitCode = 1;
-            }
-        }, nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption);
+        cmd.SetHandler((string? name, string? server, string? key, bool native, bool replace, bool? autoStart, string? image, bool asJson) =>
+            RunnerInstallCommandHandler.HandleAsync(
+                config, runnerService, name, server, key, native, replace, autoStart, image, asJson),
+            nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption);
 
         cmd.AddAlias("up");
 
@@ -222,26 +162,6 @@ public static class RunnerCommand
         return cmd;
     }
 
-    private static string PromptForValue(string label, string? defaultValue = null)
-    {
-        if (string.IsNullOrWhiteSpace(defaultValue))
-        {
-            Console.Write($"{label}: ");
-        }
-        else
-        {
-            Console.Write($"{label} [{defaultValue}]: ");
-        }
-
-        var value = Console.ReadLine()?.Trim();
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return defaultValue?.Trim() ?? string.Empty;
-        }
-
-        return value;
-    }
-
     private static bool PromptForYesNo(string label, bool defaultValue)
     {
         Console.Write($"{label} [{(defaultValue ? "Y/n" : "y/N")}]: ");
@@ -253,41 +173,6 @@ public static class RunnerCommand
 
         return value.Equals("y", StringComparison.OrdinalIgnoreCase)
             || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ReadSecretFromConsole(string label)
-    {
-        Console.Write($"{label}: ");
-        var buffer = new List<char>();
-
-        while (true)
-        {
-            var key = Console.ReadKey(intercept: true);
-            if (key.Key == ConsoleKey.Enter)
-            {
-                Console.WriteLine();
-                break;
-            }
-
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (buffer.Count > 0)
-                {
-                    buffer.RemoveAt(buffer.Count - 1);
-                    Console.Write("\b \b");
-                }
-
-                continue;
-            }
-
-            if (!char.IsControl(key.KeyChar))
-            {
-                buffer.Add(key.KeyChar);
-                Console.Write("*");
-            }
-        }
-
-        return new string(buffer.ToArray()).Trim();
     }
 
     public static void WriteResult(RunnerCommandResult result, bool asJson)

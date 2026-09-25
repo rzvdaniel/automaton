@@ -1,7 +1,3 @@
-using System.Net;
-using System.Net.Http;
-using System.Net.Sockets;
-using System.Text.Json;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,10 +8,12 @@ namespace Automaton.Runner.Console.Services;
 /// Supervises managed application containers. The Runner owns lifecycle and
 /// readiness; the application image owns the process and its HTTP behavior.
 /// </summary>
-public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, IHostedService, IDisposable
+public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
 {
-    private const string MetadataFileName = "deployment.json";
     private readonly RunnerWorkspaceService workspace;
+    private readonly RunnerRuntimeMetadataStore metadataStore;
+    private readonly RunnerRuntimeNetworkPolicy networkPolicy;
+    private readonly RunnerRuntimeContainerArtifactStore artifactStore;
     private readonly RunnerRuntimeRegistry registry;
     private readonly IApplicationContainerRuntime containers;
     private readonly ILogger<RunnerRuntimeContainerManager> logger;
@@ -26,11 +24,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
     private int disposed;
     private volatile bool acceptingLifecycleWork;
     private Task? supervisionTask;
-    private readonly int portStart = ReadPort("AUTOMATON_RUNTIME_PORT_START", 18000);
-    private readonly int portEnd = ReadPort("AUTOMATON_RUNTIME_PORT_END", 18999);
-    private readonly string runtimeHostAddress = RunnerRuntimeEndpointConfiguration.HostAddress;
-    private readonly bool canProbeRuntimeHost;
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public RunnerRuntimeContainerManager(
         RunnerWorkspaceService workspace,
@@ -39,10 +32,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         ILogger<RunnerRuntimeContainerManager> logger)
     {
         this.workspace = workspace;
+        metadataStore = new RunnerRuntimeMetadataStore(workspace);
+        artifactStore = new RunnerRuntimeContainerArtifactStore(workspace);
         this.registry = registry;
+        networkPolicy = new RunnerRuntimeNetworkPolicy(registry);
         this.containers = containers;
         this.logger = logger;
-        canProbeRuntimeHost = IPAddress.IsLoopback(IPAddress.Parse(runtimeHostAddress));
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -52,9 +47,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         // their recovery until supervision is running so host startup can
         // complete and establish that connection first.
         var deferReconciliation = containers is IScopedApplicationContainerRuntime;
-        foreach (var metadataPath in Directory.Exists(workspace.AppsRoot)
-            ? Directory.EnumerateFiles(workspace.AppsRoot, MetadataFileName, SearchOption.AllDirectories)
-            : [])
+        foreach (var metadataPath in artifactStore.EnumerateDeploymentMetadataPaths())
         {
             if (deferReconciliation)
             {
@@ -76,104 +69,127 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
 
     private async Task ReconcileMetadataAsync(string metadataPath, CancellationToken cancellationToken)
     {
-        var metadata = await ReadMetadataAsync(metadataPath, cancellationToken);
+        var metadata = await metadataStore.ReadAsync(metadataPath, cancellationToken);
         if (metadata is null)
             return;
+        var (appId, targetId) = ParseDeploymentIdentifiers(metadata);
+        var currentIsOci = RunnerRuntimeMetadataPolicy.IsOciContainer(metadata);
+        var candidateIsOci = RunnerRuntimeMetadataPolicy.IsOciCandidate(metadata.Candidate);
+        if (!candidateIsOci && !currentIsOci) return;
+        if (await ReconcileCandidateAsync(metadata, appId, targetId, currentIsOci, cancellationToken)) return;
+        await ReconcileCurrentContainerAsync(metadata, appId, targetId, currentIsOci, cancellationToken);
+    }
+
+    private static (Guid AppId, Guid TargetId) ParseDeploymentIdentifiers(RunnerRuntimeDeploymentMetadata metadata)
+    {
         if (!Guid.TryParse(metadata.AppId, out var appId)
             || !Guid.TryParse(metadata.DeploymentTargetId, out var targetId))
             throw new InvalidOperationException("Runtime deployment metadata contains invalid identifiers.");
+        return (appId, targetId);
+    }
 
-        var candidateIsOci = IsOciCandidateMetadata(metadata.Candidate);
-        var currentIsOci = IsOciContainerMetadata(metadata);
-        if (!candidateIsOci && !currentIsOci)
-            return;
-
+    private async Task<bool> ReconcileCandidateAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        Guid appId,
+        Guid targetId,
+        bool currentIsOci,
+        CancellationToken cancellationToken)
+    {
         var candidate = metadata.Candidate;
-        if (candidateIsOci && candidate is not null)
-        {
-            var candidateIdentity = await InspectAsync(appId, targetId, candidate.ContainerId ?? candidate.ContainerName!, cancellationToken);
-            if (candidateIdentity.Exists
-                && candidateIdentity.Running
-                && HasExpectedIdentity(candidateIdentity, appId, targetId)
-                && string.Equals(candidate.State, RuntimeReadinessState.Ready, StringComparison.Ordinal))
-            {
-                if (candidateIdentity.HostPort is > 0)
-                    candidate.EffectivePort = candidateIdentity.HostPort;
-                if (currentIsOci
-                    && !string.IsNullOrWhiteSpace(metadata.ContainerId)
-                    && !string.Equals(metadata.ContainerId, candidate.ContainerId, StringComparison.Ordinal))
-                {
-                    var previousIdentity = await InspectAsync(appId, targetId, metadata.ContainerId, cancellationToken);
-                    if (previousIdentity.Exists && HasExpectedIdentity(previousIdentity, appId, targetId))
-                        await StopAndRemoveAsync(appId, targetId, previousIdentity.Id, CancellationToken.None);
-                    else
-                        logger.LogWarning("Preserving previous runtime container {ContainerId} because its Automaton ownership labels could not be verified.", metadata.ContainerId);
-                }
-                var promoted = CloneMetadata(candidate);
-                promoted.Candidate = null;
-                promoted.State = RuntimeReadinessState.Ready;
-                await WriteMetadataAsync(promoted, cancellationToken);
-                Register(appId, targetId, candidateIdentity.Id, promoted.ContainerName, promoted.EffectivePort);
-                return;
-            }
+        if (!RunnerRuntimeMetadataPolicy.IsOciCandidate(candidate) || candidate is null) return false;
+        var identity = await InspectAsync(appId, targetId, candidate.ContainerId ?? candidate.ContainerName!, cancellationToken);
+        if (await PromoteReconciledCandidateAsync(metadata, candidate, identity, appId, targetId, currentIsOci, cancellationToken))
+            return true;
+        await DiscardInvalidCandidateAsync(metadata, candidate, identity, appId, targetId, cancellationToken);
+        return false;
+    }
 
-            if (candidateIdentity.Exists && HasExpectedIdentity(candidateIdentity, appId, targetId))
+    private async Task<bool> PromoteReconciledCandidateAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        RunnerRuntimeDeploymentMetadata candidate,
+        DockerContainerIdentity identity,
+        Guid appId,
+        Guid targetId,
+        bool currentIsOci,
+        CancellationToken cancellationToken)
+    {
+        if (!identity.Exists || !identity.Running || !RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId)
+            || !string.Equals(candidate.State, RuntimeReadinessState.Ready, StringComparison.Ordinal))
+            return false;
+        if (identity.HostPort is > 0) candidate.EffectivePort = identity.HostPort;
+        await RemovePreviousCandidateContainerAsync(metadata, candidate, appId, targetId, currentIsOci, cancellationToken);
+        var promoted = metadataStore.Clone(candidate);
+        promoted.Candidate = null;
+        promoted.State = RuntimeReadinessState.Ready;
+        await metadataStore.WriteAsync(promoted, cancellationToken);
+        Register(appId, targetId, identity.Id, promoted.ContainerName, promoted.EffectivePort);
+        return true;
+    }
+
+    private async Task RemovePreviousCandidateContainerAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        RunnerRuntimeDeploymentMetadata candidate,
+        Guid appId,
+        Guid targetId,
+        bool currentIsOci,
+        CancellationToken cancellationToken)
+    {
+        if (!currentIsOci || string.IsNullOrWhiteSpace(metadata.ContainerId)
+            || string.Equals(metadata.ContainerId, candidate.ContainerId, StringComparison.Ordinal)) return;
+        var previous = await InspectAsync(appId, targetId, metadata.ContainerId, cancellationToken);
+        if (previous.Exists && RunnerRuntimeMetadataPolicy.HasExpectedIdentity(previous, appId, targetId))
+            await StopAndRemoveAsync(appId, targetId, previous.Id, CancellationToken.None);
+        else
+            logger.LogWarning("Preserving previous runtime container {ContainerId} because its Automaton ownership labels could not be verified.", metadata.ContainerId);
+    }
+
+    private async Task DiscardInvalidCandidateAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        RunnerRuntimeDeploymentMetadata candidate,
+        DockerContainerIdentity identity,
+        Guid appId,
+        Guid targetId,
+        CancellationToken cancellationToken)
+    {
+        if (identity.Exists && !RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
+            throw new InvalidOperationException($"Refusing to reconcile candidate container '{candidate.ContainerId}' without verified Automaton ownership labels.");
+        if (identity.Exists)
+        {
+            logger.LogWarning("Discarding an uncommitted managed runtime candidate {ContainerId}.", candidate.ContainerId);
+            try
             {
-                logger.LogWarning("Discarding an uncommitted managed runtime candidate {ContainerId}.", candidate.ContainerId);
-                try
-                {
-                    await StopAndRemoveAsync(appId, targetId, candidateIdentity.Id, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Could not remove invalid managed runtime candidate {ContainerId}; retaining metadata for retry.", candidateIdentity.Id);
-                    throw;
-                }
-                metadata.Candidate = null;
-                await WriteMetadataAsync(metadata, cancellationToken);
+                await StopAndRemoveAsync(appId, targetId, identity.Id, CancellationToken.None);
             }
-            else if (candidateIdentity.Exists)
+            catch (Exception ex)
             {
-                throw new InvalidOperationException($"Refusing to reconcile candidate container '{candidate.ContainerId}' without verified Automaton ownership labels.");
-            }
-            else
-            {
-                metadata.Candidate = null;
-                await WriteMetadataAsync(metadata, cancellationToken);
+                logger.LogWarning(ex, "Could not remove invalid managed runtime candidate {ContainerId}; retaining metadata for retry.", identity.Id);
+                throw;
             }
         }
+        metadata.Candidate = null;
+        await metadataStore.WriteAsync(metadata, cancellationToken);
+    }
 
-        if (!currentIsOci || string.IsNullOrWhiteSpace(metadata.ContainerId))
-            return;
-
-        var recorded = metadata.ContainerId;
-        var identity = await InspectAsync(appId, targetId, recorded, cancellationToken);
-        if (identity.Exists
-            && identity.Running
-            && HasExpectedIdentity(identity, appId, targetId))
+    private async Task ReconcileCurrentContainerAsync(
+        RunnerRuntimeDeploymentMetadata metadata,
+        Guid appId,
+        Guid targetId,
+        bool currentIsOci,
+        CancellationToken cancellationToken)
+    {
+        if (!currentIsOci || string.IsNullOrWhiteSpace(metadata.ContainerId)) return;
+        var identity = await InspectAsync(appId, targetId, metadata.ContainerId, cancellationToken);
+        if (identity.Exists && identity.Running && RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
         {
-            if (identity.HostPort is > 0)
-                metadata.EffectivePort = identity.HostPort;
-            await WriteMetadataAsync(metadata, cancellationToken);
+            if (identity.HostPort is > 0) metadata.EffectivePort = identity.HostPort;
+            await metadataStore.WriteAsync(metadata, cancellationToken);
             Register(appId, targetId, identity.Id, metadata.ContainerName, metadata.EffectivePort);
             return;
         }
-        logger.LogWarning("Refusing to adopt container {ContainerId}: it is missing, stopped, or does not have the expected Automaton identity.", recorded);
-
-        if (string.IsNullOrWhiteSpace(metadata.ArtifactRoot) || !Directory.Exists(metadata.ArtifactRoot))
-            return;
-        await ApplyAsync(
-            appId,
-            targetId,
-            new ApplicationContract
-            {
-                Runtime = CloneRuntimeWithResolvedImage(metadata.Runtime, metadata.ResolvedRuntimeImage),
-                Health = metadata.Health ?? new ApplicationHealthSpec(),
-                Storage = metadata.Storage ?? new ApplicationStorageSpec()
-            },
-            cancellationToken,
-            metadata.ArtifactRoot,
-            metadata.CandidateId);
+        logger.LogWarning("Refusing to adopt container {ContainerId}: it is missing, stopped, or does not have the expected Automaton identity.", metadata.ContainerId);
+        if (!artifactStore.Exists(metadata.ArtifactRoot)) return;
+        await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
+            metadata.ArtifactRoot, metadata.CandidateId);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -206,164 +222,255 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         string? artifactRoot = null,
         Guid? candidateId = null)
     {
+        ValidateApplyRequest(contract);
+        var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
+        var previous = await ReadExistingMetadataAsync(metadataPath, cancellationToken);
+        if (contract.Runtime.Command is null)
+            return await StopConfiguredRuntimeAsync(appId, deploymentTargetId, contract, cancellationToken);
+
+        var attempt = await PrepareRuntimeCandidateAsync(
+            appId, deploymentTargetId, contract, previous, metadataPath, artifactRoot, candidateId, cancellationToken);
+        return await StartAndPromoteCandidateAsync(attempt, previous, cancellationToken);
+    }
+
+    private void ValidateApplyRequest(ApplicationContract contract)
+    {
         if (!acceptingLifecycleWork)
             throw new InvalidOperationException("The managed runtime container manager is stopping and is not accepting new lifecycle work.");
         ApplicationContractValidator.EnsureDeployable(contract);
         if (contract.Health.Port is not null && contract.Health.Port != contract.Runtime.Port)
             throw new InvalidOperationException("A health.port different from runtime.port is not supported by the isolated application-container network boundary.");
-        var metadataPath = GetMetadataPath(appId, deploymentTargetId);
-        var previous = File.Exists(metadataPath)
-            ? await ReadMetadataAsync(metadataPath, cancellationToken)
-            : null;
+    }
 
-        if (contract.Runtime.Command is null)
-        {
-            await StopAsync(appId, deploymentTargetId);
-            await WriteMetadataAsync(new RunnerRuntimeDeploymentMetadata
-            {
-                AppId = appId.ToString(),
-                DeploymentTargetId = deploymentTargetId.ToString(),
-                Runtime = contract.Runtime,
-                Health = contract.Health,
-                Storage = contract.Storage,
-                State = RuntimeReadinessState.Stopped
-            }, cancellationToken);
-            return new RuntimeApplyResult();
-        }
+    private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
+        string metadataPath,
+        CancellationToken cancellationToken)
+        => File.Exists(metadataPath) ? await metadataStore.ReadAsync(metadataPath, cancellationToken) : null;
 
-        var runtimeImage = contract.Runtime.Image!;
-        var containerPort = contract.Runtime.Port;
-        var scopedRuntime = containers as IScopedApplicationContainerRuntime;
-        var effectivePort = scopedRuntime is null ? AllocatePort(containerPort) : 0;
-        var resolvedCandidateId = candidateId ?? Guid.NewGuid();
-        var artifact = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(
-            appId, deploymentTargetId, resolvedCandidateId);
-        artifact = ValidateArtifactRoot(appId, deploymentTargetId, artifact);
-        Directory.CreateDirectory(artifact);
-        var storage = workspace.PrepareApplicationStorage(appId, contract.Storage);
-        var containerName = $"automaton-app-{appId:N}-{deploymentTargetId:N}-{Guid.NewGuid():N}";
-        var candidate = new RunnerRuntimeDeploymentMetadata
+    private async Task<RuntimeApplyResult> StopConfiguredRuntimeAsync(
+        Guid appId,
+        Guid targetId,
+        ApplicationContract contract,
+        CancellationToken cancellationToken)
+    {
+        await StopAsync(appId, targetId);
+        await metadataStore.WriteAsync(CreateStoppedMetadata(appId, targetId, contract), cancellationToken);
+        return new RuntimeApplyResult();
+    }
+
+    private static RunnerRuntimeDeploymentMetadata CreateStoppedMetadata(
+        Guid appId,
+        Guid targetId,
+        ApplicationContract contract)
+        => new()
         {
             AppId = appId.ToString(),
-            DeploymentTargetId = deploymentTargetId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = contract.Runtime,
+            Health = contract.Health,
+            Storage = contract.Storage,
+            State = RuntimeReadinessState.Stopped
+        };
+
+    private async Task<RuntimeApplyAttempt> PrepareRuntimeCandidateAsync(
+        Guid appId,
+        Guid targetId,
+        ApplicationContract contract,
+        RunnerRuntimeDeploymentMetadata? previous,
+        string metadataPath,
+        string? artifactRoot,
+        Guid? candidateId,
+        CancellationToken cancellationToken)
+    {
+        var runtimeImage = contract.Runtime.Image!;
+        var scopedRuntime = containers as IScopedApplicationContainerRuntime;
+        var effectivePort = scopedRuntime is null ? networkPolicy.AllocatePort(contract.Runtime.Port) : 0;
+        var resolvedCandidateId = candidateId ?? Guid.NewGuid();
+        var artifact = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, resolvedCandidateId);
+        artifact = artifactStore.ValidateRoot(appId, targetId, artifact);
+        artifactStore.CreateRoot(artifact);
+        var storage = workspace.PrepareApplicationStorage(appId, contract.Storage);
+        var candidate = CreateCandidateMetadata(appId, targetId, contract, artifact, resolvedCandidateId, runtimeImage, effectivePort);
+        var pending = CreatePendingMetadata(appId, targetId, contract, previous, candidate);
+        await metadataStore.WriteAsync(pending, cancellationToken);
+        return new RuntimeApplyAttempt(
+            appId, targetId, contract, metadataPath, artifact, storage, runtimeImage, effectivePort,
+            resolvedCandidateId, scopedRuntime, candidate, pending, previous);
+    }
+
+    private RunnerRuntimeDeploymentMetadata CreateCandidateMetadata(
+        Guid appId,
+        Guid targetId,
+        ApplicationContract contract,
+        string artifact,
+        Guid candidateId,
+        string runtimeImage,
+        int effectivePort)
+        => new()
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
             Runtime = contract.Runtime,
             Health = contract.Health,
             Storage = contract.Storage,
             ArtifactRoot = artifact,
-            ArtifactId = Path.GetFileName(Path.GetDirectoryName(artifact) ?? artifact),
-            CandidateId = resolvedCandidateId,
-            ContainerName = containerName,
+            ArtifactId = artifactStore.GetArtifactId(artifact),
+            CandidateId = candidateId,
+            ContainerName = $"automaton-app-{appId:N}-{targetId:N}-{Guid.NewGuid():N}",
             RequestedRuntimeImage = runtimeImage,
             EffectivePort = effectivePort,
             State = RuntimeReadinessState.Starting
         };
+
+    private RunnerRuntimeDeploymentMetadata CreatePendingMetadata(
+        Guid appId,
+        Guid targetId,
+        ApplicationContract contract,
+        RunnerRuntimeDeploymentMetadata? previous,
+        RunnerRuntimeDeploymentMetadata candidate)
+    {
         var pending = previous is null
             ? new RunnerRuntimeDeploymentMetadata
             {
                 AppId = appId.ToString(),
-                DeploymentTargetId = deploymentTargetId.ToString(),
+                DeploymentTargetId = targetId.ToString(),
                 Runtime = contract.Runtime,
                 Health = contract.Health,
                 Storage = contract.Storage,
                 State = RuntimeReadinessState.Starting
             }
-            : CloneMetadata(previous);
+            : metadataStore.Clone(previous);
         pending.Candidate = candidate;
         pending.State = RuntimeReadinessState.Starting;
-        await WriteMetadataAsync(pending, cancellationToken);
+        return pending;
+    }
 
+    private async Task<RuntimeApplyResult> StartAndPromoteCandidateAsync(
+        RuntimeApplyAttempt attempt,
+        RunnerRuntimeDeploymentMetadata? previous,
+        CancellationToken cancellationToken)
+    {
         DockerApplicationContainer? started = null;
         try
         {
-            if (containers is not IStagedApplicationContainerRuntime stagedContainers)
-                throw new InvalidOperationException("Managed application lifecycle requires the staged Docker container boundary.");
-            started = await stagedContainers.CreateApplicationAsync(
-                new DockerApplicationContainerRequest(
-                    containerName,
-                    runtimeImage,
-                    artifact,
-                    contract.Runtime.Command.WorkingDirectory,
-                    contract.Runtime.Command,
-                    containerPort,
-                    effectivePort,
-                    storage.DataDirectory,
-                    storage.Mounts,
-                    appId,
-                    deploymentTargetId,
-                    resolvedCandidateId,
-                    contract.Storage),
-                cancellationToken);
-            candidate.ContainerId = started.Id;
-            candidate.ContainerName = started.Name;
-            candidate.RequestedRuntimeImage = started.Image.RequestedReference;
-            candidate.ResolvedRuntimeImage = started.Image.ResolvedReference;
-            await WriteMetadataAsync(pending, cancellationToken);
-
-            if (scopedRuntime is not null)
-            {
-                var endpoint = await scopedRuntime.StartApplicationAsync(new(appId, deploymentTargetId), started.Id, cancellationToken);
-                effectivePort = endpoint.HostPort;
-                candidate.EffectivePort = effectivePort;
-                await WriteMetadataAsync(pending, cancellationToken);
-            }
-            else
-                await stagedContainers.StartApplicationAsync(started.Id, cancellationToken);
-            await WaitForReadinessAsync(effectivePort, contract.Health, cancellationToken);
-            if (!await IsRunningAsync(appId, deploymentTargetId, started.Id, cancellationToken))
+            started = await CreateCandidateContainerAsync(attempt, cancellationToken);
+            await StartCandidateRuntimeAsync(attempt, started, cancellationToken);
+            await networkPolicy.WaitForReadinessAsync(attempt.EffectivePort, attempt.Contract.Health, cancellationToken);
+            if (!await IsRunningAsync(attempt.AppId, attempt.TargetId, started.Id, cancellationToken))
                 throw new InvalidOperationException("The runtime container exited after readiness and before promotion.");
-            var warning = await PromoteAsync(appId, deploymentTargetId, previous, candidate, cancellationToken);
+            var warning = await PromoteAsync(attempt.AppId, attempt.TargetId, previous, attempt.Candidate, cancellationToken);
             return new RuntimeApplyResult { PromotionIrreversible = true, Warning = warning };
         }
         catch (Exception deploymentError)
         {
-            if (started is not null)
-            {
-                try
-                {
-                    var logs = await GetLogsAsync(appId, deploymentTargetId, started.Id, CancellationToken.None);
-                    logger.LogWarning(
-                        "Managed application container {ContainerId} failed before promotion. Logs: {Logs}",
-                        started.Id,
-                        logs);
-                }
-                catch (Exception cleanupError)
-                {
-                    logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
-                }
-            }
-            var candidateCleanupWarnings = new List<string>();
-            var candidateCleanupConfirmed = await TryStopOwnedContainerAsync(
-                started?.Id ?? candidate.ContainerName!,
-                appId,
-                deploymentTargetId,
-                candidateCleanupWarnings,
-                "failed runtime candidate");
-            foreach (var warning in candidateCleanupWarnings)
-                logger.LogWarning("{Warning}", warning);
-            try
-            {
-                if (candidateCleanupConfirmed && previous is not null)
-                    await WriteMetadataAsync(previous, CancellationToken.None);
-                else if (candidateCleanupConfirmed && File.Exists(metadataPath))
-                    File.Delete(metadataPath);
-                else
-                {
-                    candidate.State = RuntimeReadinessState.Failed;
-                    candidate.LastError = deploymentError.Message;
-                    var retained = previous is null
-                        ? CloneMetadata(pending)
-                        : CloneMetadata(previous);
-                    retained.Candidate = candidate;
-                    retained.State = previous?.State ?? RuntimeReadinessState.Failed;
-                    await WriteMetadataAsync(retained, CancellationToken.None);
-                }
-            }
-            catch (Exception restoreError)
-            {
-                logger.LogWarning(restoreError, "Could not restore managed runtime metadata after deployment failure for {AppId}/{TargetId}.", appId, deploymentTargetId);
-            }
+            await RestoreFailedCandidateAsync(attempt, previous, started, deploymentError);
             throw;
         }
+    }
+
+    private async Task<DockerApplicationContainer> CreateCandidateContainerAsync(
+        RuntimeApplyAttempt attempt,
+        CancellationToken cancellationToken)
+    {
+        if (containers is not IStagedApplicationContainerRuntime stagedContainers)
+            throw new InvalidOperationException("Managed application lifecycle requires the staged Docker container boundary.");
+        var command = attempt.Contract.Runtime.Command!;
+        var started = await stagedContainers.CreateApplicationAsync(
+            new DockerApplicationContainerRequest(
+                attempt.Candidate.ContainerName!, attempt.RuntimeImage, attempt.Artifact,
+                command.WorkingDirectory, command, attempt.Contract.Runtime.Port, attempt.EffectivePort,
+                attempt.Storage.DataDirectory, attempt.Storage.Mounts, attempt.AppId, attempt.TargetId,
+                attempt.CandidateId, attempt.Contract.Storage),
+            cancellationToken);
+        attempt.Candidate.ContainerId = started.Id;
+        attempt.Candidate.ContainerName = started.Name;
+        attempt.Candidate.RequestedRuntimeImage = started.Image.RequestedReference;
+        attempt.Candidate.ResolvedRuntimeImage = started.Image.ResolvedReference;
+        await metadataStore.WriteAsync(attempt.Pending, cancellationToken);
+        return started;
+    }
+
+    private async Task StartCandidateRuntimeAsync(
+        RuntimeApplyAttempt attempt,
+        DockerApplicationContainer started,
+        CancellationToken cancellationToken)
+    {
+        if (attempt.ScopedRuntime is null)
+        {
+            var stagedContainers = (IStagedApplicationContainerRuntime)containers;
+            await stagedContainers.StartApplicationAsync(started.Id, cancellationToken);
+        }
+        else
+        {
+            var endpoint = await attempt.ScopedRuntime.StartApplicationAsync(
+                new(attempt.AppId, attempt.TargetId), started.Id, cancellationToken);
+            attempt.Candidate.EffectivePort = endpoint.HostPort;
+            attempt.EffectivePort = endpoint.HostPort;
+            await metadataStore.WriteAsync(attempt.Pending, cancellationToken);
+        }
+    }
+
+    private async Task RestoreFailedCandidateAsync(
+        RuntimeApplyAttempt attempt,
+        RunnerRuntimeDeploymentMetadata? previous,
+        DockerApplicationContainer? started,
+        Exception deploymentError)
+    {
+        await LogFailedCandidateAsync(attempt, started);
+        var cleanupWarnings = new List<string>();
+        var cleaned = await TryStopOwnedContainerAsync(
+            started?.Id ?? attempt.Candidate.ContainerName!, attempt.AppId, attempt.TargetId,
+            cleanupWarnings, "failed runtime candidate");
+        foreach (var warning in cleanupWarnings) logger.LogWarning("{Warning}", warning);
+        try
+        {
+            await RestoreMetadataAfterFailureAsync(attempt, previous, cleaned, deploymentError);
+        }
+        catch (Exception restoreError)
+        {
+            logger.LogWarning(restoreError,
+                "Could not restore managed runtime metadata after deployment failure for {AppId}/{TargetId}.",
+                attempt.AppId, attempt.TargetId);
+        }
+    }
+
+    private async Task LogFailedCandidateAsync(RuntimeApplyAttempt attempt, DockerApplicationContainer? started)
+    {
+        if (started is null) return;
+        try
+        {
+            var logs = await GetLogsAsync(attempt.AppId, attempt.TargetId, started.Id, CancellationToken.None);
+            logger.LogWarning("Managed application container {ContainerId} failed before promotion. Logs: {Logs}", started.Id, logs);
+        }
+        catch (Exception cleanupError)
+        {
+            logger.LogWarning(cleanupError, "Could not collect logs for failed managed runtime container {ContainerId}.", started.Id);
+        }
+    }
+
+    private async Task RestoreMetadataAfterFailureAsync(
+        RuntimeApplyAttempt attempt,
+        RunnerRuntimeDeploymentMetadata? previous,
+        bool candidateCleanupConfirmed,
+        Exception deploymentError)
+    {
+        if (candidateCleanupConfirmed && previous is not null)
+        {
+            await metadataStore.WriteAsync(previous, CancellationToken.None);
+            return;
+        }
+        if (candidateCleanupConfirmed && File.Exists(attempt.MetadataPath))
+        {
+            File.Delete(attempt.MetadataPath);
+            return;
+        }
+
+        attempt.Candidate.State = RuntimeReadinessState.Failed;
+        attempt.Candidate.LastError = deploymentError.Message;
+        var retained = previous is null ? metadataStore.Clone(attempt.Pending) : metadataStore.Clone(previous);
+        retained.Candidate = attempt.Candidate;
+        retained.State = previous?.State ?? RuntimeReadinessState.Failed;
+        await metadataStore.WriteAsync(retained, CancellationToken.None);
     }
 
     public async Task StopAsync(Guid appId, Guid deploymentTargetId)
@@ -375,9 +482,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
             active.Remove(key, out current);
         }
         registry.Remove(appId, deploymentTargetId);
-        var metadataPath = GetMetadataPath(appId, deploymentTargetId);
+        var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var metadata = File.Exists(metadataPath)
-            ? await ReadMetadataAsync(metadataPath, CancellationToken.None)
+            ? await metadataStore.ReadAsync(metadataPath, CancellationToken.None)
             : null;
         var ids = new HashSet<string>(StringComparer.Ordinal);
         if (!string.IsNullOrWhiteSpace(current?.ContainerId)) ids.Add(current.ContainerId);
@@ -400,61 +507,104 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         RunnerRuntimeDeploymentMetadata candidate,
         CancellationToken cancellationToken)
     {
-        var key = new DeploymentRuntimeKey(appId, targetId);
-        var readyCandidate = CloneMetadata(candidate);
+        var readyCandidate = metadataStore.Clone(candidate);
         readyCandidate.State = RuntimeReadinessState.Ready;
         readyCandidate.Candidate = null;
+        await WritePromotionCheckpointAsync(appId, targetId, previous, readyCandidate, cancellationToken);
+        var old = PromoteInMemory(appId, targetId, previous, readyCandidate);
+        var warnings = await RemovePreviousRuntimeAsync(appId, targetId, old, previous, candidate);
+        await CompactReadyMetadataAsync(readyCandidate, cancellationToken, warnings);
+        return warnings.Count == 0 ? null : string.Join(" ", warnings);
+    }
+
+    private async Task WritePromotionCheckpointAsync(
+        Guid appId,
+        Guid targetId,
+        RunnerRuntimeDeploymentMetadata? previous,
+        RunnerRuntimeDeploymentMetadata readyCandidate,
+        CancellationToken cancellationToken)
+    {
         // This durable candidate record is the recovery point immediately before
         // the irreversible registry/color transition.
         var checkpoint = previous is null
-            ? new RunnerRuntimeDeploymentMetadata
-            {
-                AppId = appId.ToString(),
-                DeploymentTargetId = targetId.ToString(),
-                Runtime = readyCandidate.Runtime,
-                Health = readyCandidate.Health,
-                Storage = readyCandidate.Storage,
-                State = RuntimeReadinessState.Starting
-            }
-            : CloneMetadata(previous);
+            ? CreateStartingMetadata(appId, targetId, readyCandidate)
+            : metadataStore.Clone(previous);
         checkpoint.Candidate = readyCandidate;
         checkpoint.State = RuntimeReadinessState.Starting;
-        await WriteMetadataAsync(checkpoint, cancellationToken);
-        ActiveContainer? old;
+        await metadataStore.WriteAsync(checkpoint, cancellationToken);
+    }
+
+    private static RunnerRuntimeDeploymentMetadata CreateStartingMetadata(
+        Guid appId,
+        Guid targetId,
+        RunnerRuntimeDeploymentMetadata readyCandidate)
+        => new()
+        {
+            AppId = appId.ToString(),
+            DeploymentTargetId = targetId.ToString(),
+            Runtime = readyCandidate.Runtime,
+            Health = readyCandidate.Health,
+            Storage = readyCandidate.Storage,
+            State = RuntimeReadinessState.Starting
+        };
+
+    private ActiveContainer? PromoteInMemory(
+        Guid appId,
+        Guid targetId,
+        RunnerRuntimeDeploymentMetadata? previous,
+        RunnerRuntimeDeploymentMetadata readyCandidate)
+    {
+        var key = new DeploymentRuntimeKey(appId, targetId);
         lock (gate)
         {
-            active.TryGetValue(key, out old);
-            if (old is null && !string.IsNullOrWhiteSpace(previous?.ContainerId))
-                old = new ActiveContainer(appId, targetId, previous.ContainerId!, previous.ContainerName ?? previous.ContainerId!, previous.EffectivePort ?? 0);
-            active[key] = new ActiveContainer(appId, targetId, readyCandidate.ContainerId!, readyCandidate.ContainerName!, readyCandidate.EffectivePort!.Value);
+            active.TryGetValue(key, out var old);
+            old ??= CreatePreviousRuntime(appId, targetId, previous);
+            active[key] = new ActiveContainer(
+                appId, targetId, readyCandidate.ContainerId!, readyCandidate.ContainerName!, readyCandidate.EffectivePort!.Value);
             registry.Register(appId, targetId, readyCandidate.EffectivePort.Value);
+            return old;
         }
+    }
 
-        var warnings = new List<string>();
-        var oldRemoved = string.IsNullOrWhiteSpace(old?.ContainerId);
-        if (!string.IsNullOrWhiteSpace(old?.ContainerId))
-        {
-            oldRemoved = await TryStopOwnedContainerAsync(
-                old.ContainerId,
+    private static ActiveContainer? CreatePreviousRuntime(
+        Guid appId,
+        Guid targetId,
+        RunnerRuntimeDeploymentMetadata? previous)
+        => string.IsNullOrWhiteSpace(previous?.ContainerId)
+            ? null
+            : new ActiveContainer(
                 appId,
                 targetId,
-                warnings,
-                "previous runtime");
-            if (oldRemoved && previous?.ArtifactRoot is not null
-                && !string.Equals(previous.ArtifactRoot, candidate.ArtifactRoot, StringComparison.OrdinalIgnoreCase)
-                && Directory.Exists(previous.ArtifactRoot))
-            {
-                try { Directory.Delete(previous.ArtifactRoot, recursive: true); }
-                catch (Exception ex) { warnings.Add($"Previous runtime artifact cleanup deferred: {ex.Message}"); }
-            }
-        }
+                previous.ContainerId!,
+                previous.ContainerName ?? previous.ContainerId!,
+                previous.EffectivePort ?? 0);
 
-        try { await WriteMetadataAsync(readyCandidate, cancellationToken); }
+    private async Task<List<string>> RemovePreviousRuntimeAsync(
+        Guid appId,
+        Guid targetId,
+        ActiveContainer? old,
+        RunnerRuntimeDeploymentMetadata? previous,
+        RunnerRuntimeDeploymentMetadata candidate)
+    {
+        var warnings = new List<string>();
+        if (string.IsNullOrWhiteSpace(old?.ContainerId)) return warnings;
+        var oldRemoved = await TryStopOwnedContainerAsync(old.ContainerId, appId, targetId, warnings, "previous runtime");
+        if (oldRemoved && previous?.ArtifactRoot is not null
+            && !string.Equals(previous.ArtifactRoot, candidate.ArtifactRoot, StringComparison.OrdinalIgnoreCase))
+            RunnerRuntimeContainerArtifactStore.TryDeletePrevious(previous.ArtifactRoot, warnings);
+        return warnings;
+    }
+
+    private async Task CompactReadyMetadataAsync(
+        RunnerRuntimeDeploymentMetadata readyCandidate,
+        CancellationToken cancellationToken,
+        ICollection<string> warnings)
+    {
+        try { await metadataStore.WriteAsync(readyCandidate, cancellationToken); }
         catch (Exception ex)
         {
             warnings.Add($"Runtime metadata compaction deferred until Runner reconciliation: {ex.Message}");
         }
-        return warnings.Count == 0 ? null : string.Join(" ", warnings);
     }
 
     private async Task<bool> TryStopOwnedContainerAsync(
@@ -476,7 +626,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         }
         if (!identity.Exists)
             return true;
-        if (!HasExpectedIdentity(identity, appId, targetId))
+        if (!RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
         {
             warnings.Add($"Preserved {description} container {containerIdOrName}; Automaton ownership labels did not match.");
             return false;
@@ -504,50 +654,66 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
                 ActiveContainer[] runtimes;
                 lock (gate) runtimes = active.Values.ToArray();
                 foreach (var runtime in runtimes)
-                {
-                    DockerContainerIdentity identity;
-                    try { identity = await InspectAsync(runtime.AppId, runtime.TargetId, runtime.ContainerId, cancellationToken); }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return; }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Could not inspect managed runtime container {ContainerId}.", runtime.ContainerId);
-                        continue;
-                    }
-
-                    if (identity.Exists && identity.Running)
-                        continue;
-
-                    var key = new DeploymentRuntimeKey(runtime.AppId, runtime.TargetId);
-                    lock (gate)
-                    {
-                        if (!active.TryGetValue(key, out var current)
-                            || !string.Equals(current.ContainerId, runtime.ContainerId, StringComparison.Ordinal))
-                            continue;
-                        active.Remove(key);
-                    }
-                    registry.Remove(runtime.AppId, runtime.TargetId);
-                    try
-                    {
-                        var path = GetMetadataPath(runtime.AppId, runtime.TargetId);
-                        var metadata = await ReadMetadataAsync(path, CancellationToken.None);
-                        if (metadata is not null
-                            && string.Equals(metadata.ContainerId, runtime.ContainerId, StringComparison.Ordinal))
-                        {
-                            metadata.State = RuntimeReadinessState.Failed;
-                            metadata.EffectivePort = null;
-                            metadata.LastError = "The managed runtime container exited unexpectedly.";
-                            await WriteMetadataAsync(metadata, CancellationToken.None);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Could not persist failed state for exited runtime {ContainerId}.", runtime.ContainerId);
-                    }
-                }
+                    if (!await SuperviseRuntimeAsync(runtime, cancellationToken)) return;
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+    }
+
+    private async Task<bool> SuperviseRuntimeAsync(ActiveContainer runtime, CancellationToken cancellationToken)
+    {
+        DockerContainerIdentity identity;
+        try
+        {
+            identity = await InspectAsync(runtime.AppId, runtime.TargetId, runtime.ContainerId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not inspect managed runtime container {ContainerId}.", runtime.ContainerId);
+            return true;
+        }
+
+        if (identity.Exists && identity.Running) return true;
+        if (!RemoveCurrentRuntime(runtime)) return true;
+        await PersistExitedRuntimeAsync(runtime);
+        return true;
+    }
+
+    private bool RemoveCurrentRuntime(ActiveContainer runtime)
+    {
+        var key = new DeploymentRuntimeKey(runtime.AppId, runtime.TargetId);
+        lock (gate)
+        {
+            if (!active.TryGetValue(key, out var current)
+                || !string.Equals(current.ContainerId, runtime.ContainerId, StringComparison.Ordinal))
+                return false;
+            active.Remove(key);
+        }
+        registry.Remove(runtime.AppId, runtime.TargetId);
+        return true;
+    }
+
+    private async Task PersistExitedRuntimeAsync(ActiveContainer runtime)
+    {
+        try
+        {
+            var path = metadataStore.GetPath(runtime.AppId, runtime.TargetId);
+            var metadata = await metadataStore.ReadAsync(path, CancellationToken.None);
+            if (metadata is null || !string.Equals(metadata.ContainerId, runtime.ContainerId, StringComparison.Ordinal)) return;
+            metadata.State = RuntimeReadinessState.Failed;
+            metadata.EffectivePort = null;
+            metadata.LastError = "The managed runtime container exited unexpectedly.";
+            await metadataStore.WriteAsync(metadata, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not persist failed state for exited runtime {ContainerId}.", runtime.ContainerId);
         }
     }
 
@@ -573,155 +739,11 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager, I
         }
     }
 
-    private async Task WaitForReadinessAsync(int port, ApplicationHealthSpec health, CancellationToken cancellationToken)
-    {
-        var healthPort = port;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(health.StartupTimeoutSeconds));
-        using var client = health.Path is null ? null : new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-        while (!timeout.IsCancellationRequested)
-        {
-            try
-            {
-                if (health.Path is null)
-                {
-                    using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(runtimeHostAddress, healthPort, timeout.Token);
-                    return;
-                }
-                using var response = await client!.GetAsync(
-                    new UriBuilder("http", runtimeHostAddress, healthPort) { Path = health.Path }.Uri,
-                    timeout.Token);
-                if ((int)response.StatusCode is >= 200 and < 300)
-                    return;
-            }
-            catch (Exception ex) when ((ex is SocketException or HttpRequestException or TaskCanceledException) && !timeout.IsCancellationRequested)
-            {
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
-            {
-            }
-            try
-            {
-                await Task.Delay(100, timeout.Token);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
-            {
-                break;
-            }
-        }
-        throw new TimeoutException($"Runtime container did not become ready on {runtimeHostAddress}:{healthPort}.");
-    }
-
-    private string GetMetadataPath(Guid appId, Guid targetId)
-        => Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), MetadataFileName);
-
-    private async Task<RunnerRuntimeDeploymentMetadata?> ReadMetadataAsync(string path, CancellationToken cancellationToken)
-    {
-        if (!File.Exists(path)) return null;
-        return JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
-            await File.ReadAllTextAsync(path, cancellationToken), JsonOptions);
-    }
-
-    private async Task WriteMetadataAsync(RunnerRuntimeDeploymentMetadata metadata, CancellationToken cancellationToken)
-    {
-        var path = GetMetadataPath(Guid.Parse(metadata.AppId), Guid.Parse(metadata.DeploymentTargetId));
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temporary = $"{path}.{Guid.NewGuid():N}.tmp";
-        await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(metadata, JsonOptions), cancellationToken);
-        File.Move(temporary, path, overwrite: true);
-    }
-
-    private static RunnerRuntimeDeploymentMetadata CloneMetadata(RunnerRuntimeDeploymentMetadata metadata)
-        => JsonSerializer.Deserialize<RunnerRuntimeDeploymentMetadata>(
-            JsonSerializer.Serialize(metadata, JsonOptions), JsonOptions)
-            ?? throw new InvalidOperationException("Could not clone runtime metadata.");
-
     private void Register(Guid appId, Guid targetId, string id, string? name, int? port)
     {
         if (port is not > 0) return;
         lock (gate) active[new DeploymentRuntimeKey(appId, targetId)] = new ActiveContainer(appId, targetId, id, name ?? id, port.Value);
         registry.Register(appId, targetId, port.Value);
-    }
-
-    private int AllocatePort(int requested)
-    {
-        if (requested is >= 1 and <= 65535
-            && requested != RunnerPlatformPorts.GetRuntimeGatewayPort()
-            && !registry.IsPortRegistered(requested)
-            && CanBind(requested))
-            return requested;
-        for (var port = portStart; port <= portEnd; port++)
-        {
-            if (port != RunnerPlatformPorts.GetRuntimeGatewayPort()
-                && !registry.IsPortRegistered(port)
-                && CanBind(port)) return port;
-        }
-        throw new InvalidOperationException("No managed runtime ports are available.");
-    }
-
-    private bool CanBind(int port)
-    {
-        if (!canProbeRuntimeHost)
-            return true;
-        try
-        {
-            using var listener = new TcpListener(IPAddress.Parse(runtimeHostAddress), port);
-            listener.Start();
-            listener.Stop();
-            return true;
-        }
-        catch (SocketException)
-        {
-            return false;
-        }
-    }
-
-    private string ValidateArtifactRoot(Guid appId, Guid targetId, string path)
-    {
-        var candidateRoot = Path.GetFullPath(workspace.GetAppRuntimeCandidateDirectory(appId, targetId, Guid.NewGuid()));
-        var artifact = Path.GetFullPath(path);
-        var candidatesRoot = Path.GetDirectoryName(candidateRoot)!;
-        if (!artifact.StartsWith(candidatesRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Application artifact is outside the managed candidate boundary.");
-        return artifact;
-    }
-
-    private static int ReadPort(string name, int fallback)
-        => int.TryParse(Environment.GetEnvironmentVariable(name), out var value) ? value : fallback;
-
-    private static bool HasExpectedIdentity(DockerContainerIdentity identity, Guid appId, Guid targetId)
-        => identity.Labels.TryGetValue("com.automaton.managed", out var managed)
-            && string.Equals(managed, "true", StringComparison.OrdinalIgnoreCase)
-            && identity.Labels.TryGetValue("com.automaton.app-id", out var actualApp)
-            && string.Equals(actualApp, appId.ToString(), StringComparison.OrdinalIgnoreCase)
-            && identity.Labels.TryGetValue("com.automaton.deployment-target-id", out var actualTarget)
-            && string.Equals(actualTarget, targetId.ToString(), StringComparison.OrdinalIgnoreCase)
-            && identity.Labels.TryGetValue("com.automaton.runtime-kind", out var kind)
-            && string.Equals(kind, "generic", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsOciContainerMetadata(RunnerRuntimeDeploymentMetadata? metadata)
-        => metadata is not null
-            && !string.IsNullOrWhiteSpace(metadata.ContainerId)
-            && !string.IsNullOrWhiteSpace(metadata.Runtime?.Image);
-
-    private static bool IsOciCandidateMetadata(RunnerRuntimeDeploymentMetadata? metadata)
-        => metadata is not null
-            && (!string.IsNullOrWhiteSpace(metadata.ContainerId) || !string.IsNullOrWhiteSpace(metadata.ContainerName))
-            && !string.IsNullOrWhiteSpace(metadata.Runtime?.Image);
-
-    private static ApplicationRuntimeSpec CloneRuntimeWithResolvedImage(
-        ApplicationRuntimeSpec? runtime,
-        string? resolvedImage)
-    {
-        if (runtime is null)
-            throw new InvalidOperationException("Persisted runtime metadata is incomplete.");
-        return new ApplicationRuntimeSpec
-        {
-            Image = string.IsNullOrWhiteSpace(resolvedImage) ? runtime.Image : resolvedImage,
-            Command = runtime.Command,
-            Port = runtime.Port
-        };
     }
 
     private Task<DockerContainerIdentity> InspectAsync(Guid appId, Guid targetId, string id, CancellationToken cancellationToken)

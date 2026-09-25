@@ -60,200 +60,23 @@ public static class DeployCommand
             environmentOption
         };
 
-        cmd.SetHandler(async (InvocationContext context) =>
-        {
-            var targetSlug = context.ParseResult.GetValueForArgument(targetArgument);
-            var runner = context.ParseResult.GetValueForOption(runnerOption);
-            var clean = context.ParseResult.GetValueForOption(cleanOption);
-            var dir = context.ParseResult.GetValueForOption(dirOption);
-            var asJson = context.ParseResult.GetValueForOption(jsonOption);
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var publish = context.ParseResult.GetValueForOption(publishOption);
-            var open = context.ParseResult.GetValueForOption(openOption);
-            var nonInteractiveFlag = context.ParseResult.GetValueForOption(nonInteractiveOption);
-            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
-
-            var publishService = new PublishService(config);
-            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
-            var headingWritten = false;
-            var deployService = new DeployService(
-                config,
-                message => WriteProgress(message, asJson, nonInteractive),
-                check => WriteCheck(check, asJson, nonInteractive));
-            try
-            {
-                var cwd = Directory.GetCurrentDirectory();
-                if (!string.IsNullOrWhiteSpace(runner))
-                {
-                    var localValidation = deployService.ValidateLocalProject(
-                        cwd,
-                        clean,
-                        dir,
-                        environmentName);
-                    if (localValidation is not null)
-                    {
-                        WriteResult(localValidation, asJson, verbose, nonInteractive);
-                        context.ExitCode = 1;
-                        return;
-                    }
-                }
-
-                var projectConfig = config.TryLoadProjectConfig(cwd);
-                var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
-                var targetService = new DeploymentTargetService(config);
-                var allTargets = (await targetService.ListAsync(cwd, environmentName, context.GetCancellationToken())).Targets;
-                var target = !string.IsNullOrWhiteSpace(runner)
-                    ? DeploymentTargetService.SelectEnvironment(allTargets, targetSlug, nonInteractive)
-                    : DeploymentTargetService.SelectForDeploy(allTargets, targetSlug, nonInteractive);
-                if (!string.IsNullOrWhiteSpace(runner) && target.Status == "Deploying")
-                {
-                    throw new InvalidOperationException($"Environment '{target.Slug}' is already Deploying and cannot be reassigned.");
-                }
-                if (!string.IsNullOrWhiteSpace(runner))
-                {
-                    target = await targetService.AssignRunnerAsync(
-                        cwd,
-                        target,
-                        runner,
-                        environmentName,
-                        context.GetCancellationToken());
-                }
-                DeploymentTargetService.EnsureDeployable(target);
-                if (!target.IsDefault && target.Runner == null)
-                {
-                    throw new InvalidOperationException(
-                        $"Environment '{target.Slug}' has no assigned Runner. " +
-                        $"Assign one with 'automaton deploy {target.Slug} --runner <runner-id-or-name>'.");
-                }
-                if (!target.IsDefault && (publish || open))
-                {
-                    throw new InvalidOperationException(
-                        "--publish and --open apply only to the Live target.");
-                }
-                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, target, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
-                var preparation = new DeployPreparationResult
-                {
-                    Success = true,
-                    RunnerId = target.Runner?.Id,
-                    RunnerName = target.Runner?.Name,
-                    Checks = target.Runner == null
-                        ? []
-                        : [new DeployCheckResult(
-                            DeployCheckNames.RunnerAssignment,
-                            true,
-                            $"environment '{target.Slug}' assigned to Runner {target.Runner.Name}")]
-                };
-
-                if (!preparation.Success)
-                {
-                    var failure = new DeployResult
-                    {
-                        Success = false,
-                        Summary = "Deploy failed",
-                        Checks = preparation.Checks,
-                        NextSteps = preparation.NextSteps
-                    };
-
-                    WriteResult(failure, asJson, verbose, nonInteractive);
-                    context.ExitCode = 1;
-                    return;
-                }
-
-                var result = await deployService.DeployAsync(
-                    cwd,
-                    clean,
-                    dir,
-                    environmentName,
-                    target,
-                    context.GetCancellationToken());
-                if (result.Success)
-                {
-                    target = await targetService.ResolveAsync(
-                        cwd,
-                        target.Slug,
-                        environmentName,
-                        context.GetCancellationToken());
-                    result = ApplyTargetIdentity(result, target);
-                }
-                result = MergePreparation(result, preparation);
-
-                if (result.Success)
-                {
-                    if (publish)
-                    {
-                        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true, environmentName: environmentName);
-                        if (asJson)
-                        {
-                            WriteCombinedJson(result, publishResult);
-                        }
-                        else
-                        {
-                            WriteResult(result, asJson, verbose, nonInteractive);
-                            PublishCommand.WriteResult(publishResult, asJson, nonInteractive);
-                        }
-                        if (!publishResult.Success)
-                        {
-                            context.ExitCode = 1;
-                            return;
-                        }
-
-                        if (open)
-                        {
-                            CliBrowserService.OpenUrl(publishResult.Url!);
-                        }
-                    }
-                    else
-                    {
-                        result = AppendDefaultSuccessNextSteps(result);
-                        WriteResult(result, asJson, verbose, nonInteractive);
-
-                        if (open)
-                        {
-                            var (client, server) = CreateApiClient(config, cwd, environmentName);
-                            using (client)
-                            {
-                            var launchCode = await client.CreateRuntimeLaunchAsync(result.AppId!);
-                            CliBrowserService.OpenUrl(CliAppUrlBuilder.BuildRuntimeLaunchUrl(server, result.AppId, launchCode));
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    WriteResult(result, asJson, verbose, nonInteractive);
-                }
-
-                context.ExitCode = result.Success ? 0 : 1;
-            }
-            catch (Exception ex)
-            {
-                if (asJson)
-                {
-                    CliJson.Write(new
-                    {
-                        success = false,
-                        summary = "Deploy failed",
-                        error = ex.Message,
-                        target = targetSlug
-                    });
-                }
-                else if (nonInteractive)
-                {
-                    Console.Error.WriteLine($"Error: {ex.Message}");
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine(
-                        $"[red]Error:[/] {Markup.Escape(ex.Message)}");
-                }
-                context.ExitCode = 1;
-            }
-        });
-
+        cmd.SetHandler(context => DeployCommandHandler.HandleAsync(
+            config,
+            context,
+            targetArgument,
+            runnerOption,
+            cleanOption,
+            dirOption,
+            jsonOption,
+            verboseOption,
+            publishOption,
+            openOption,
+            nonInteractiveOption,
+            environmentOption));
         return cmd;
     }
 
-    private static DeployResult MergePreparation(DeployResult result, DeployPreparationResult preparation)
+    internal static DeployResult MergePreparation(DeployResult result, DeployPreparationResult preparation)
     {
         if (preparation.Checks.Count == 0 && preparation.NextSteps.Count == 0)
         {
@@ -292,7 +115,7 @@ public static class DeployCommand
         };
     }
 
-    private static DeployResult ApplyTargetIdentity(
+    internal static DeployResult ApplyTargetIdentity(
         DeployResult result,
         DeploymentTargetInfo target) =>
         new()
@@ -318,7 +141,7 @@ public static class DeployCommand
             RuntimeRunning = result.RuntimeRunning
         };
 
-    private static DeployResult AppendDefaultSuccessNextSteps(DeployResult result)
+    internal static DeployResult AppendDefaultSuccessNextSteps(DeployResult result)
     {
         if (!result.Success ||
             string.Equals(result.DeploymentMode, "named", StringComparison.Ordinal))
@@ -364,7 +187,7 @@ public static class DeployCommand
         nextSteps.Add(value);
     }
 
-    private static void WriteResult(DeployResult result, bool asJson, bool verbose, bool nonInteractive)
+    internal static void WriteResult(DeployResult result, bool asJson, bool verbose, bool nonInteractive)
     {
         if (asJson)
         {
@@ -437,44 +260,49 @@ public static class DeployCommand
         }
     }
 
-    private static void WriteProgress(string message, bool asJson, bool nonInteractive)
+    internal static void WriteProgress(string message, bool asJson, bool nonInteractive)
     {
-        if (asJson || string.IsNullOrWhiteSpace(message))
-        {
-            return;
-        }
-
+        if (asJson || string.IsNullOrWhiteSpace(message)) return;
         if (nonInteractive)
         {
-            if (message.Contains("Managed runtime is being prepared", StringComparison.OrdinalIgnoreCase))
-            {
-                managedRunnerWaitTimer.Restart();
-                managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
-                Console.WriteLine(message);
-                return;
-            }
+            WritePlainProgress(message);
+            return;
+        }
+        WriteInteractiveProgress(message);
+    }
 
-            if (message.Contains("Waiting for managed runner", StringComparison.OrdinalIgnoreCase))
-            {
-                if (DateTime.UtcNow - managedRunnerLastNonInteractiveUpdateUtc >= TimeSpan.FromSeconds(15))
-                {
-                    managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
-                    Console.WriteLine($"Still waiting for managed runner... {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s");
-                }
-                return;
-            }
-
-            if (message.Contains("Managed runner connected", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"Managed runner connected after {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s.");
-                managedRunnerWaitTimer.Stop();
-                return;
-            }
-
+    private static void WritePlainProgress(string message)
+    {
+        if (message.Contains("Managed runtime is being prepared", StringComparison.OrdinalIgnoreCase))
+        {
+            managedRunnerWaitTimer.Restart();
+            managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
             Console.WriteLine(message);
             return;
         }
+        if (message.Contains("Waiting for managed runner", StringComparison.OrdinalIgnoreCase))
+        {
+            WritePlainWaitProgress();
+            return;
+        }
+        if (message.Contains("Managed runner connected", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"Managed runner connected after {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s.");
+            managedRunnerWaitTimer.Stop();
+            return;
+        }
+        Console.WriteLine(message);
+    }
 
+    private static void WritePlainWaitProgress()
+    {
+        if (DateTime.UtcNow - managedRunnerLastNonInteractiveUpdateUtc < TimeSpan.FromSeconds(15)) return;
+        managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
+        Console.WriteLine($"Still waiting for managed runner... {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s");
+    }
+
+    private static void WriteInteractiveProgress(string message)
+    {
         if (message.Contains("Managed runtime is being prepared", StringComparison.OrdinalIgnoreCase))
         {
             managedRunnerWaitTimer.Restart();
@@ -505,7 +333,7 @@ public static class DeployCommand
         AnsiConsole.MarkupLine($"[grey]{Markup.Escape(message)}[/]");
     }
 
-    private static void WriteCheck(DeployCheckResult check, bool asJson, bool nonInteractive)
+    internal static void WriteCheck(DeployCheckResult check, bool asJson, bool nonInteractive)
     {
         if (asJson)
         {
@@ -528,7 +356,7 @@ public static class DeployCommand
         AnsiConsole.MarkupLine($"[bold]{Markup.Escape(check.Name)}[/] {markupStatus} {Markup.Escape(check.Message)}");
     }
 
-    private static void WriteDeployHeading(
+    internal static void WriteDeployHeading(
         string? appName,
         string? appId,
         string? profileName,
@@ -538,33 +366,41 @@ public static class DeployCommand
         bool nonInteractive,
         ref bool headingWritten)
     {
-        if (asJson || headingWritten || string.IsNullOrWhiteSpace(appName) || string.IsNullOrWhiteSpace(appId))
-        {
-            return;
-        }
-
+        if (!CanWriteHeading(appName, appId, asJson, headingWritten)) return;
         if (nonInteractive)
         {
-            Console.WriteLine($"Deploying {appName} ({appId})");
-            Console.WriteLine($"Local profile: {profileName ?? "default credentials"}");
-            Console.WriteLine($"Deployment target: {target.Name} ({target.Slug})");
-            if (!string.IsNullOrWhiteSpace(server))
-            {
-                Console.WriteLine($"Server: {server}");
-            }
+            WritePlainHeading(appName!, appId!, profileName, target, server);
         }
         else
         {
-            AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
-            AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName ?? "default credentials")}");
-            AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(target.Name)} ({Markup.Escape(target.Slug)})");
-            if (!string.IsNullOrWhiteSpace(server))
-            {
-                AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
-            }
+            WriteRichHeading(appName!, appId!, profileName, target, server);
         }
-
         headingWritten = true;
+    }
+
+    private static bool CanWriteHeading(string? appName, string? appId, bool asJson, bool alreadyWritten)
+        => !asJson && !alreadyWritten &&
+           !string.IsNullOrWhiteSpace(appName) && !string.IsNullOrWhiteSpace(appId);
+
+    private static void WritePlainHeading(
+        string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
+    {
+        Console.WriteLine($"Deploying {appName} ({appId})");
+        Console.WriteLine($"Local profile: {profileName ?? "default credentials"}");
+        Console.WriteLine($"Deployment target: {target.Name} ({target.Slug})");
+        if (!string.IsNullOrWhiteSpace(server)) Console.WriteLine($"Server: {server}");
+    }
+
+    private static void WriteRichHeading(
+        string appName, string appId, string? profileName, DeploymentTargetInfo target, string? server)
+    {
+        AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
+        AnsiConsole.MarkupLine($"[bold]Local profile:[/] {Markup.Escape(profileName ?? "default credentials")}");
+        AnsiConsole.MarkupLine($"[bold]Deployment target:[/] {Markup.Escape(target.Name)} ({Markup.Escape(target.Slug)})");
+        if (!string.IsNullOrWhiteSpace(server))
+        {
+            AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
+        }
     }
 
     private static void WriteVerboseSkippedEntries(DeployResult result, bool verbose)
@@ -644,7 +480,7 @@ public static class DeployCommand
         }
     }
 
-    private static void WriteCombinedJson(DeployResult deployResult, PublishResult publishResult)
+    internal static void WriteCombinedJson(DeployResult deployResult, PublishResult publishResult)
     {
         CliJson.Write(new
         {
@@ -677,7 +513,7 @@ public static class DeployCommand
         });
     }
 
-    private static (AutomatonApiClient Client, string Server) CreateApiClient(ConfigService config, string cwd, string? environmentName)
+    internal static (AutomatonApiClient Client, string Server) CreateApiClient(ConfigService config, string cwd, string? environmentName)
     {
         var appConfig = config.TryLoadProjectConfig(cwd);
         var (server, apiKey) = config.ResolveCredentials(appConfig, cwd, environmentName);

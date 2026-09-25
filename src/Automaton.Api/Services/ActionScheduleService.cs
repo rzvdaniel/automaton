@@ -4,7 +4,6 @@ using Automaton.Api.Models;
 using Automaton.Api.Constants;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
-using Cronos;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -89,7 +88,7 @@ public sealed class ActionScheduleService
             var capability = await GetCapabilityAsync(validationUserId, administrator && system, ct);
             if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
             await ValidateEffectiveAsync(schedule, validationUserId, administrator, capability, DateTime.UtcNow, ct);
-            schedule.NextRunAtUtc = CalculateNextRun(schedule, DateTime.UtcNow)
+            schedule.NextRunAtUtc = ActionSchedulePolicy.CalculateNextRun(schedule, DateTime.UtcNow)
                 ?? throw new InvalidOperationException("The schedule has no future occurrence.");
         }
         else
@@ -134,7 +133,7 @@ public sealed class ActionScheduleService
         AppActionManifestParser.ValidateKey(request.ActionKey);
         if (request.ConcurrencyPolicy is not (ActionScheduleConcurrencyPolicies.Allow or ActionScheduleConcurrencyPolicies.SkipIfRunning or ActionScheduleConcurrencyPolicies.Queue))
             throw new InvalidOperationException("Concurrency policy is invalid.");
-        ValidateMisfirePolicy(request.MisfirePolicy);
+        ActionSchedulePolicy.ValidateMisfirePolicy(request.MisfirePolicy);
         var inputJson = request.Input.ValueKind == JsonValueKind.Undefined ? "{}" : request.Input.GetRawText();
 
         schedule.ApplicationId = request.ApplicationId;
@@ -142,7 +141,7 @@ public sealed class ActionScheduleService
         schedule.Name = request.Name.Trim();
         schedule.Description = request.Description?.Trim();
         schedule.ExecutionScope = request.ExecutionScope;
-        ApplyTimingFields(schedule, request);
+        ActionSchedulePolicy.ApplyTimingFields(schedule, request);
         schedule.TimeZone = request.TimeZone;
         schedule.Enabled = request.Enabled;
         schedule.ConcurrencyPolicy = request.ConcurrencyPolicy;
@@ -151,18 +150,13 @@ public sealed class ActionScheduleService
         schedule.UpdatedAtUtc = DateTime.UtcNow;
 
         await ValidateEffectiveAsync(schedule, userId, administrator, capability, DateTime.UtcNow, ct);
-        schedule.NextRunAtUtc = schedule.Enabled ? CalculateNextRun(schedule, DateTime.UtcNow) : null;
+        schedule.NextRunAtUtc = schedule.Enabled ? ActionSchedulePolicy.CalculateNextRun(schedule, DateTime.UtcNow) : null;
         if (schedule.Enabled && !schedule.NextRunAtUtc.HasValue)
             throw new InvalidOperationException("The schedule has no future occurrence.");
     }
 
     internal static void ApplyTimingFields(ActionSchedule schedule, SaveActionScheduleRequest request)
-    {
-        schedule.ScheduleType = request.ScheduleType;
-        schedule.RunAtUtc = request.ScheduleType == ActionScheduleTypes.OneTime ? request.RunAtUtc?.UtcDateTime : null;
-        schedule.IntervalSeconds = request.ScheduleType == ActionScheduleTypes.Interval ? request.IntervalSeconds : null;
-        schedule.CronExpression = request.ScheduleType == ActionScheduleTypes.Cron ? request.CronExpression?.Trim() : null;
-    }
+        => ActionSchedulePolicy.ApplyTimingFields(schedule, request);
 
     private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, bool administrator, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct)
     {
@@ -174,7 +168,7 @@ public sealed class ActionScheduleService
             throw new UnauthorizedAccessException("User schedules may target only AppRunner.");
         if (schedule.ExecutionScope is not (ActionExecutionScopes.AppRunner or ActionExecutionScopes.Worker or ActionExecutionScopes.InfrastructureRunner))
             throw new InvalidOperationException("Execution scope is invalid.");
-        ValidateMisfirePolicy(schedule.MisfirePolicy);
+        ActionSchedulePolicy.ValidateMisfirePolicy(schedule.MisfirePolicy);
 
         var manifest = system
             ? await trustedSystemSchedules.ValidateAsync(schedule, ct)
@@ -185,78 +179,23 @@ public sealed class ActionScheduleService
         using var input = JsonDocument.Parse(schedule.InputJson);
         var schemaError = AppActionSchemaValidator.Validate(input.RootElement, manifest.Spec.Input);
         if (schemaError != null) throw new InvalidOperationException($"Action input is invalid: {schemaError}");
-        ValidateSchedule(schedule, Math.Max(capability.MinimumIntervalSeconds, manifest.Spec.MinimumIntervalSeconds), nowUtc);
+        ActionSchedulePolicy.ValidateSchedule(
+            schedule,
+            Math.Max(capability.MinimumIntervalSeconds, manifest.Spec.MinimumIntervalSeconds),
+            nowUtc);
     }
 
     internal static void ValidateSchedule(ActionSchedule schedule, int minimumIntervalSeconds, DateTime nowUtc)
-    {
-        _ = GetTimeZone(schedule.TimeZone);
-        if (schedule.ScheduleType == ActionScheduleTypes.OneTime)
-        {
-            if (!schedule.RunAtUtc.HasValue || schedule.RunAtUtc <= nowUtc) throw new InvalidOperationException("One-time run must be in the future.");
-        }
-        else if (schedule.ScheduleType == ActionScheduleTypes.Interval)
-        {
-            if (!schedule.IntervalSeconds.HasValue || schedule.IntervalSeconds < minimumIntervalSeconds)
-                throw new InvalidOperationException($"Interval must be at least {minimumIntervalSeconds} seconds.");
-        }
-        else if (schedule.ScheduleType == ActionScheduleTypes.Cron)
-        {
-            ValidateCronCadence(schedule.CronExpression, schedule.TimeZone, minimumIntervalSeconds, nowUtc);
-        }
-        else throw new InvalidOperationException("Schedule type is invalid.");
-    }
+        => ActionSchedulePolicy.ValidateSchedule(schedule, minimumIntervalSeconds, nowUtc);
 
     internal static void ValidateCronCadence(string? expression, string timeZoneId, int minimumIntervalSeconds, DateTime nowUtc)
-    {
-        var cron = GetCron(expression);
-        var timeZone = GetTimeZone(timeZoneId);
-        var cursor = DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc);
-        var previous = cron.GetNextOccurrence(cursor, timeZone, inclusive: false)
-            ?? throw new InvalidOperationException("The cron expression has no future occurrence.");
-        var horizon = cursor.AddDays(366);
-        const int maximumOccurrences = 100_000;
-        for (var count = 1; count < maximumOccurrences && previous <= horizon; count++)
-        {
-            var next = cron.GetNextOccurrence(previous, timeZone, inclusive: false);
-            if (!next.HasValue) return;
-            if (next.Value - previous < TimeSpan.FromSeconds(minimumIntervalSeconds))
-                throw new InvalidOperationException($"Cron occurrences must be at least {minimumIntervalSeconds} seconds apart.");
-            previous = next.Value;
-        }
-    }
+        => ActionSchedulePolicy.ValidateCronCadence(expression, timeZoneId, minimumIntervalSeconds, nowUtc);
 
     internal static void ValidateMisfirePolicy(string policy)
-    {
-        if (policy == ActionScheduleMisfirePolicies.CatchUp)
-            throw new InvalidOperationException("CatchUp schedules are not supported until bounded catch-up is implemented.");
-        if (policy is not (ActionScheduleMisfirePolicies.Skip or ActionScheduleMisfirePolicies.RunOnceNow))
-            throw new InvalidOperationException("Misfire policy is invalid.");
-    }
+        => ActionSchedulePolicy.ValidateMisfirePolicy(policy);
 
     internal static DateTime? CalculateNextRun(ActionSchedule schedule, DateTime afterUtc)
-        => schedule.ScheduleType switch
-        {
-            ActionScheduleTypes.OneTime => schedule.RunAtUtc > afterUtc ? schedule.RunAtUtc : null,
-            ActionScheduleTypes.Interval => afterUtc.AddSeconds(schedule.IntervalSeconds!.Value),
-            ActionScheduleTypes.Cron => GetCron(schedule.CronExpression).GetNextOccurrence(
-                DateTime.SpecifyKind(afterUtc, DateTimeKind.Utc), GetTimeZone(schedule.TimeZone), inclusive: false),
-            _ => null
-        };
-
-    private static CronExpression GetCron(string? expression)
-    {
-        try { return CronExpression.Parse(expression ?? string.Empty, CronFormat.Standard); }
-        catch (CronFormatException ex) { throw new InvalidOperationException("Cron expression must use five fields: minute hour day-of-month month day-of-week.", ex); }
-    }
-
-    private static TimeZoneInfo GetTimeZone(string id)
-    {
-        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-        catch (TimeZoneNotFoundException ex) { throw new InvalidOperationException("Time zone must be a supported IANA identifier.", ex); }
-        catch (InvalidTimeZoneException ex) { throw new InvalidOperationException("Time zone is invalid.", ex); }
-        catch (ArgumentException ex) { throw new InvalidOperationException("Time zone must be a supported IANA identifier.", ex); }
-    }
+        => ActionSchedulePolicy.CalculateNextRun(schedule, afterUtc);
 
     private async Task<ScheduledActionsCapability> GetCapabilityAsync(Guid userId, bool administrator, CancellationToken ct)
     {

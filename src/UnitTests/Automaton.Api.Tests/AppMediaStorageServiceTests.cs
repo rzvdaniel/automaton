@@ -22,61 +22,8 @@ public class AppMediaStorageServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
 
-        await using var dbContext = CreateDbContext();
-        dbContext.WebApps.Add(new WebApp
-        {
-            Id = appId,
-            Name = "Media App",
-            Summary = string.Empty,
-            Description = string.Empty,
-            Definition = "{}",
-            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) },
-            Created = DateTime.UtcNow,
-            Updated = DateTime.UtcNow
-        });
-        dbContext.Runners.Add(new Runner
-        {
-            Id = runnerId,
-            Name = "runner-1",
-            ConnectionId = "runner-connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow,
-            RunnerUsers = new List<RunnerUser>
-            {
-                new() { RunnerId = runnerId, UserId = ownerId }
-            }
-        });
-        await dbContext.SaveChangesAsync();
-
-        var downloadRegistry = new FileDownloadRegistry();
-        var hubContext = new FakeHubContext(
-            (_, relativePath) => new AppMediaFileMetadataResponse
-            {
-                Success = true,
-                StatusCode = StatusCodes.Status200OK,
-                FileName = Path.GetFileName(relativePath),
-                ContentType = "image/png",
-                Length = 3
-            },
-            request =>
-            {
-                downloadRegistry.TryWrite(new FileChunkReadyMessage
-                {
-                    SessionId = request.SessionId,
-                    StatusCode = StatusCodes.Status200OK,
-                    ContentType = "image/png",
-                    FileName = "photo.png",
-                    Data = [1, 2, 3],
-                    IsLast = true
-                });
-            });
-
-        var service = new AppMediaStorageService(
-            hubContext,
-            new FileUploadRegistry(),
-            downloadRegistry,
-            Options.Create(new MediaStorageOptions()),
-            NullLogger<AppMediaStorageService>.Instance,
-            new StubTargetResolver(dbContext));
+        await using var dbContext = await CreateAppWithRunnerAsync(ownerId, appId, runnerId);
+        var service = CreateSuccessfulReadService(dbContext);
 
         var httpContext = new DefaultHttpContext();
         httpContext.Response.Body = new MemoryStream();
@@ -97,45 +44,8 @@ public class AppMediaStorageServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
 
-        await using var dbContext = CreateDbContext();
-        dbContext.WebApps.Add(new WebApp
-        {
-            Id = appId,
-            Name = "Media App",
-            Summary = string.Empty,
-            Description = string.Empty,
-            Definition = "{}",
-            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) },
-            Created = DateTime.UtcNow,
-            Updated = DateTime.UtcNow
-        });
-        dbContext.Runners.Add(new Runner
-        {
-            Id = runnerId,
-            Name = "runner-1",
-            ConnectionId = "runner-connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow,
-            RunnerUsers = new List<RunnerUser>
-            {
-                new() { RunnerId = runnerId, UserId = ownerId }
-            }
-        });
-        await dbContext.SaveChangesAsync();
-
-        var service = new AppMediaStorageService(
-            new FakeHubContext(
-                (_, _) => new AppMediaFileMetadataResponse
-                {
-                    Success = false,
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Error = "File not found."
-                },
-                _ => { }),
-            new FileUploadRegistry(),
-            new FileDownloadRegistry(),
-            Options.Create(new MediaStorageOptions()),
-            NullLogger<AppMediaStorageService>.Instance,
-            new StubTargetResolver(dbContext));
+        await using var dbContext = await CreateAppWithRunnerAsync(ownerId, appId, runnerId);
+        var service = CreateMissingFileReadService(dbContext);
 
         var httpContext = new DefaultHttpContext();
         httpContext.Response.Body = new MemoryStream();
@@ -154,6 +64,84 @@ public class AppMediaStorageServiceTests
 
         return new ApplicationDbContext(options);
     }
+
+    private static async Task<ApplicationDbContext> CreateAppWithRunnerAsync(
+        Guid ownerId,
+        Guid appId,
+        Guid runnerId)
+    {
+        var dbContext = CreateDbContext();
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Media App",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) },
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow
+        });
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "runner-1",
+            ConnectionId = "runner-connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow,
+            RunnerUsers = [new RunnerUser { RunnerId = runnerId, UserId = ownerId }]
+        });
+        await dbContext.SaveChangesAsync();
+        return dbContext;
+    }
+
+    private static AppMediaStorageService CreateSuccessfulReadService(ApplicationDbContext dbContext)
+    {
+        var downloadRegistry = new FileDownloadRegistry();
+        var hubContext = new FakeHubContext(
+            (_, relativePath) => new AppMediaFileMetadataResponse
+            {
+                Success = true,
+                StatusCode = StatusCodes.Status200OK,
+                FileName = Path.GetFileName(relativePath),
+                ContentType = "image/png",
+                Length = 3
+            },
+            request => downloadRegistry.TryWrite(new FileChunkReadyMessage
+            {
+                SessionId = request.SessionId,
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "image/png",
+                FileName = "photo.png",
+                Data = [1, 2, 3],
+                IsLast = true
+            }));
+        return CreateService(dbContext, hubContext, downloadRegistry);
+    }
+
+    private static AppMediaStorageService CreateMissingFileReadService(ApplicationDbContext dbContext)
+    {
+        var hubContext = new FakeHubContext(
+            (_, _) => new AppMediaFileMetadataResponse
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status404NotFound,
+                Error = "File not found."
+            },
+            _ => { });
+        return CreateService(dbContext, hubContext, new FileDownloadRegistry());
+    }
+
+    private static AppMediaStorageService CreateService(
+        ApplicationDbContext dbContext,
+        IHubContext<AutomatonHub> hubContext,
+        FileDownloadRegistry downloadRegistry)
+        => new(
+            hubContext,
+            new FileUploadRegistry(),
+            downloadRegistry,
+            Options.Create(new MediaStorageOptions()),
+            NullLogger<AppMediaStorageService>.Instance,
+            new StubTargetResolver(dbContext));
 
     private sealed class StubTargetResolver(ApplicationDbContext dbContext)
         : IAppDeploymentTargetResolver

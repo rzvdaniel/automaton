@@ -213,14 +213,42 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         if (code != null && (string.IsNullOrWhiteSpace(code) || code.Length > 80)) return "Code is required and must be at most 80 characters.";
         if (string.IsNullOrWhiteSpace(name) || name.Length > 160) return "Name is required and must be at most 160 characters.";
+        return ValidateResourceLimits(resources);
+    }
+
+    private static string? ValidateResourceLimits(HostedRunnerResources resources)
+    {
+        return ValidateComputeResources(resources)
+            ?? ValidateExecutionResources(resources)
+            ?? ValidateLoggingResources(resources)
+            ?? ValidateApplicationLimit(resources);
+    }
+
+    private static string? ValidateComputeResources(HostedRunnerResources resources)
+    {
         if (resources.CpuLimit is < HostedRunnerSpecificationLimits.MinimumCpuLimit or > HostedRunnerSpecificationLimits.MaximumCpuLimit) return "CPU limit is outside the supported range.";
         if (resources.MemoryLimitMb is < HostedRunnerSpecificationLimits.MinimumMemoryLimitMb or > HostedRunnerSpecificationLimits.MaximumMemoryLimitMb) return "Memory limit is outside the supported range.";
         if (resources.MemoryReservationMb < HostedRunnerSpecificationLimits.MinimumMemoryReservationMb || resources.MemoryReservationMb > resources.MemoryLimitMb) return "Memory reservation must be no greater than the memory limit.";
         if (resources.DiskLimitMb is < HostedRunnerSpecificationLimits.MinimumDiskLimitMb or > HostedRunnerSpecificationLimits.MaximumDiskLimitMb) return "Disk limit is outside the supported range.";
+        return null;
+    }
+
+    private static string? ValidateExecutionResources(HostedRunnerResources resources)
+    {
         if (resources.PidsLimit is < HostedRunnerSpecificationLimits.MinimumPidsLimit or > HostedRunnerSpecificationLimits.MaximumPidsLimit) return "PID limit is outside the supported range.";
         if (resources.SharedMemoryMb is < HostedRunnerSpecificationLimits.MinimumSharedMemoryMb or > HostedRunnerSpecificationLimits.MaximumSharedMemoryMb) return "Shared memory limit is outside the supported range.";
+        return null;
+    }
+
+    private static string? ValidateLoggingResources(HostedRunnerResources resources)
+    {
         if (resources.DockerLogMaxSizeMb is < HostedRunnerSpecificationLimits.MinimumDockerLogMaxSizeMb or > HostedRunnerSpecificationLimits.MaximumDockerLogMaxSizeMb) return "Docker log size limit is outside the supported range.";
         if (resources.DockerLogMaxFiles is < HostedRunnerSpecificationLimits.MinimumDockerLogMaxFiles or > HostedRunnerSpecificationLimits.MaximumDockerLogMaxFiles) return "Docker log file count is outside the supported range.";
+        return null;
+    }
+
+    private static string? ValidateApplicationLimit(HostedRunnerResources resources)
+    {
         if (resources.MaximumApps is < HostedRunnerSpecificationLimits.MinimumApps or > HostedRunnerSpecificationLimits.MaximumApps) return "Maximum applications is outside the supported range.";
         return null;
     }

@@ -27,7 +27,7 @@ public sealed class RunnerStartupTests
         Assert.That(host.Services.GetRequiredService<RunnerHostService>(), Is.Not.Null);
         Assert.That(
             host.Services.GetServices<IHostedService>(),
-            Has.Some.TypeOf<RunnerRuntimeContainerManager>());
+            Has.Some.TypeOf<RunnerRuntimeContainerHostedService>());
         await host.StopAsync();
     }
 
@@ -41,15 +41,7 @@ public sealed class RunnerStartupTests
             .Build();
         await host.StartAsync();
         using var enrollmentClient = new HttpClient(handler);
-
-        var runner = new RunnerHostService(
-            host.Services.GetRequiredService<ConfigurationService>(),
-            host.Services.GetRequiredService<FileStorageService>(),
-            host.Services.GetRequiredService<ApiKeyAuthenticationService>(),
-            host.Services.GetRequiredService<HubService>(),
-            enrollmentClient,
-            host.Services.GetRequiredService<ScriptEngineSettingsReporter>(),
-            host.Services.GetRequiredService<RunnerWorkspaceService>());
+        var runner = ManagedRunnerEnrollmentFixture.CreateRunner(host, enrollmentClient);
 
         Assert.That(await runner.EnrollAsync(), Is.True);
         Assert.That(handler.RequestUri?.AbsolutePath, Is.EqualTo("/api/runner-enrollments/exchange"));

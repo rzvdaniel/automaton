@@ -169,7 +169,23 @@ public class AppDeploymentTargetStateServiceTests
         var databasePath = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             $"deployment-target-claims-{Guid.NewGuid():N}.db");
-        var connectionString = new SqliteConnectionStringBuilder
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        try
+        {
+            var connectionString = CreateSqliteConnectionString(databasePath);
+            await CreateSqliteTargetAsync(connectionString, appId, targetId);
+            await AssertSingleConcurrentClaimAsync(connectionString, appId, targetId);
+        }
+        finally
+        {
+            File.Delete(databasePath);
+        }
+    }
+
+    private static string CreateSqliteConnectionString(string databasePath)
+        => new SqliteConnectionStringBuilder
         {
             DataSource = databasePath,
             Mode = SqliteOpenMode.ReadWriteCreate,
@@ -177,62 +193,56 @@ public class AppDeploymentTargetStateServiceTests
             DefaultTimeout = 30,
             Pooling = false
         }.ToString();
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
 
-        try
+    private static async Task CreateSqliteTargetAsync(string connectionString, Guid appId, Guid targetId)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE AppDeploymentTargets (
+                Id TEXT NOT NULL PRIMARY KEY,
+                WebAppId TEXT NOT NULL,
+                Status INTEGER NOT NULL,
+                LastDeploymentAt TEXT NULL,
+                ActiveDeploymentOperationId TEXT NULL,
+                ActiveDeploymentExecutionAttemptId TEXT NULL,
+                UpdatedAt TEXT NOT NULL
+            );
+            INSERT INTO AppDeploymentTargets (Id, WebAppId, Status, UpdatedAt)
+            VALUES ($targetId, $appId, $status, $updatedAt);
+            """;
+        command.Parameters.AddWithValue("$targetId", targetId.ToString().ToUpperInvariant());
+        command.Parameters.AddWithValue("$appId", appId.ToString().ToUpperInvariant());
+        command.Parameters.AddWithValue("$status", (int)DeploymentTargetStatus.NotDeployed);
+        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task AssertSingleConcurrentClaimAsync(
+        string connectionString,
+        Guid appId,
+        Guid targetId)
+    {
+        await using var firstDb = CreateSqliteDbContext(connectionString);
+        await using var secondDb = CreateSqliteDbContext(connectionString);
+        var claims = await Task.WhenAll(
+            TryStartAsync(new AppDeploymentTargetStateService(firstDb), appId, targetId),
+            TryStartAsync(new AppDeploymentTargetStateService(secondDb), appId, targetId));
+
+        Assert.Multiple(() =>
         {
-            await using (var setupConnection = new SqliteConnection(connectionString))
-            {
-                await setupConnection.OpenAsync();
-                await using var createCommand = setupConnection.CreateCommand();
-                createCommand.CommandText =
-                    """
-                    CREATE TABLE AppDeploymentTargets (
-                        Id TEXT NOT NULL PRIMARY KEY,
-                        WebAppId TEXT NOT NULL,
-                        Status INTEGER NOT NULL,
-                        LastDeploymentAt TEXT NULL,
-                        ActiveDeploymentOperationId TEXT NULL,
-                        ActiveDeploymentExecutionAttemptId TEXT NULL,
-                        UpdatedAt TEXT NOT NULL
-                    );
-                    INSERT INTO AppDeploymentTargets (Id, WebAppId, Status, UpdatedAt)
-                    VALUES ($targetId, $appId, $status, $updatedAt);
-                    """;
-                createCommand.Parameters.AddWithValue("$targetId", targetId.ToString().ToUpperInvariant());
-                createCommand.Parameters.AddWithValue("$appId", appId.ToString().ToUpperInvariant());
-                createCommand.Parameters.AddWithValue("$status", (int)DeploymentTargetStatus.NotDeployed);
-                createCommand.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow);
-                await createCommand.ExecuteNonQueryAsync();
-            }
+            Assert.That(claims.Count(result => result), Is.EqualTo(1));
+            Assert.That(claims.Count(result => !result), Is.EqualTo(1));
+        });
 
-            {
-                await using var firstDb = CreateSqliteDbContext(connectionString);
-                await using var secondDb = CreateSqliteDbContext(connectionString);
-                var claims = await Task.WhenAll(
-                    TryStartAsync(new AppDeploymentTargetStateService(firstDb), appId, targetId),
-                    TryStartAsync(new AppDeploymentTargetStateService(secondDb), appId, targetId));
-
-                Assert.Multiple(() =>
-                {
-                    Assert.That(claims.Count(result => result), Is.EqualTo(1));
-                    Assert.That(claims.Count(result => !result), Is.EqualTo(1));
-                });
-
-                await using var verificationDb = CreateSqliteDbContext(connectionString);
-                Assert.That(
-                    await verificationDb.AppDeploymentTargets
-                        .Where(target => target.Id == targetId && target.WebAppId == appId)
-                        .Select(target => target.Status)
-                        .SingleAsync(),
-                    Is.EqualTo(DeploymentTargetStatus.Deploying));
-            }
-        }
-        finally
-        {
-            File.Delete(databasePath);
-        }
+        await using var verificationDb = CreateSqliteDbContext(connectionString);
+        var status = await verificationDb.AppDeploymentTargets
+            .Where(target => target.Id == targetId && target.WebAppId == appId)
+            .Select(target => target.Status)
+            .SingleAsync();
+        Assert.That(status, Is.EqualTo(DeploymentTargetStatus.Deploying));
     }
 
     [Test]

@@ -113,29 +113,9 @@ public sealed class DeployService
             ReportProgress($"Restore point warning: {ex.Message}");
         }
 
-        // Every deployed app uses the configured generic runtime contract. The
-        // runner assignment is not inferred from source files or technology.
-        if (ensureManagedRuntimeReadyAsync != null && target?.IsDefault != false)
-        {
-            var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
-            if (!readiness.Ready)
-            {
-                nextSteps.Add(readiness.NextStep);
-                AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message));
-                if (readiness.State is DeployStateManagedRunnerProvisionFailed
-                    or DeployStateManagedRunnerWaitingForConnection
-                    or DeployStateManagedRuntimeUnavailable
-                    or DeployStatePreparingManagedRuntime)
-                {
-                    AddManagedRuntimeNextSteps(
-                        nextSteps,
-                        new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true));
-                }
-
-                runtimeResult = new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true);
-                return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
-            }
-        }
+        var readinessFailure = await CheckManagedRuntimeReadinessAsync(
+            preflight, clean, target, uploadResult, cancellationToken);
+        if (readinessFailure != null) return readinessFailure;
 
         try
         {
@@ -181,6 +161,55 @@ public sealed class DeployService
             true, checks, nextSteps, projectConfig, appId, server, clean,
             deployDirectory, uploadResult, runtimeResult, target);
     }
+
+    private async Task<DeployResult?> CheckManagedRuntimeReadinessAsync(
+        LocalDeployPreflight preflight,
+        bool clean,
+        DeploymentTargetInfo? target,
+        DeployUploadResult? uploadResult,
+        CancellationToken cancellationToken)
+    {
+        // Every deployed app uses the configured generic runtime contract. The
+        // runner assignment is not inferred from source files or technology.
+        if (ensureManagedRuntimeReadyAsync == null || target?.IsDefault == false) return null;
+        var readiness = await WaitForManagedRuntimeAsync(
+            preflight.Server!, preflight.ApiKey!, preflight.AppId!, cancellationToken);
+        if (readiness.Ready) return null;
+        preflight.NextSteps.Add(readiness.NextStep);
+        AddCheck(preflight.Checks, new DeployCheckResult(
+            DeployCheckNames.RunnerAssignment, false, readiness.Message));
+        AddReadinessNextSteps(preflight.NextSteps, readiness);
+        var runtime = new DeployRuntimeResult(
+            false, 0, readiness.Message, readiness.State, RequiresRetry: true);
+        return CreateResult(
+            false,
+            preflight.Checks,
+            preflight.NextSteps,
+            preflight.ProjectConfig,
+            preflight.AppId,
+            preflight.Server,
+            clean,
+            preflight.DeployDirectory,
+            uploadResult,
+            runtime,
+            target);
+    }
+
+    private static void AddReadinessNextSteps(
+        ISet<string> nextSteps,
+        (bool Ready, string Message, string NextStep, string State) readiness)
+    {
+        if (!IsManagedRuntimeFailureState(readiness.State)) return;
+        AddManagedRuntimeNextSteps(
+            nextSteps,
+            new DeployRuntimeResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true));
+    }
+
+    private static bool IsManagedRuntimeFailureState(string state)
+        => state is DeployStateManagedRunnerProvisionFailed
+            or DeployStateManagedRunnerWaitingForConnection
+            or DeployStateManagedRuntimeUnavailable
+            or DeployStatePreparingManagedRuntime;
 
     public DeployResult? ValidateLocalProject(
         string directory,
@@ -239,7 +268,7 @@ public sealed class DeployService
             return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
         }
 
-        var actionsCheck = ValidateActions(directory, nextSteps, out var actionCount);
+        var actionsCheck = DeployActionValidator.Validate(directory, nextSteps, out var actionCount);
         checks.Add(actionsCheck);
         if (!actionsCheck.Success)
         {
@@ -421,30 +450,6 @@ public sealed class DeployService
         return copy;
     }
 
-    private static DeployCheckResult ValidateActions(string directory, ISet<string> nextSteps, out int actionCount)
-    {
-        try
-        {
-            var actions = AppActionManifestParser.Discover(directory);
-            foreach (var action in actions)
-            {
-                var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
-                var actionRoot = Path.GetFullPath(action.DirectoryPath);
-                if (!entrypoint.StartsWith(actionRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-                    || !File.Exists(entrypoint))
-                    throw new InvalidOperationException($"Action '{action.Key}' entrypoint '{action.Manifest.Spec.Entrypoint}' does not exist.");
-            }
-            actionCount = actions.Count;
-            return new DeployCheckResult("actions", true, actionCount == 0 ? "no Actions found" : $"validated {actionCount} Action module(s)");
-        }
-        catch (Exception ex)
-        {
-            actionCount = 0;
-            nextSteps.Add("Fix Action manifests under actions/{action-key}/action.yaml and rerun automaton deploy");
-            return new DeployCheckResult("actions", false, ex.Message);
-        }
-    }
-
     private static DeployResult CreateResult(
         bool success,
         IReadOnlyList<DeployCheckResult> checks,
@@ -461,9 +466,7 @@ public sealed class DeployService
         return new DeployResult
         {
             Success = success,
-            Summary = success
-                ? checks.Any(check => !check.Success && check.IsWarning) ? "Deploy complete with warnings" : "Deploy complete"
-                : "Deploy failed",
+            Summary = BuildSummary(success, checks),
             AppId = appId,
             AppName = projectConfig?.Name,
             TargetSlug = target?.Slug,
@@ -481,6 +484,14 @@ public sealed class DeployService
             HasWarnings = checks.Any(check => !check.Success && check.IsWarning),
             RuntimeRunning = runtimeResult?.Success == true && runtimeResult.RunnerCount > 0
         };
+    }
+
+    private static string BuildSummary(bool success, IEnumerable<DeployCheckResult> checks)
+    {
+        if (!success) return "Deploy failed";
+        return checks.Any(check => !check.Success && check.IsWarning)
+            ? "Deploy complete with warnings"
+            : "Deploy complete";
     }
 
     internal static System.Diagnostics.ProcessStartInfo CreateBuildProcessStartInfo(
@@ -505,12 +516,7 @@ public sealed class DeployService
         var runtimeFiles = deployResult.TryGetProperty("runtimeFilesDeployed", out var runtimeProperty) ? runtimeProperty.GetInt32() : 0;
         var success = deployResult.TryGetProperty("success", out var successProperty) && successProperty.GetBoolean();
         var message = deployResult.TryGetProperty("message", out var messageProperty) ? messageProperty.GetString() : null;
-        if (deployResult.TryGetProperty("actions", out var actionsProperty) && actionsProperty.ValueKind == JsonValueKind.Array)
-        {
-            var actionSummary = string.Join("; ", actionsProperty.EnumerateArray().Select(action =>
-                $"Action {action.GetProperty("actionKey").GetString()}: {action.GetProperty("status").GetString()}"));
-            if (!string.IsNullOrWhiteSpace(actionSummary)) message = string.IsNullOrWhiteSpace(message) ? actionSummary : $"{message} {actionSummary}";
-        }
+        message = AppendActionSummary(deployResult, message);
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
         var state = deployResult.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
         var requiresRetry = deployResult.TryGetProperty("requiresRetry", out var requiresRetryProperty) && requiresRetryProperty.GetBoolean();
@@ -525,6 +531,19 @@ public sealed class DeployService
         return (
             new DeployUploadResult(sourceFiles + runtimeFiles, 0, sizeMb),
             new DeployRuntimeResult(success, runnerCount, message, state, requiresRetry, logs));
+    }
+
+    private static string? AppendActionSummary(JsonElement deployResult, string? message)
+    {
+        if (!deployResult.TryGetProperty("actions", out var actions) ||
+            actions.ValueKind != JsonValueKind.Array)
+        {
+            return message;
+        }
+        var actionSummary = string.Join("; ", actions.EnumerateArray().Select(action =>
+            $"Action {action.GetProperty("actionKey").GetString()}: {action.GetProperty("status").GetString()}"));
+        if (string.IsNullOrWhiteSpace(actionSummary)) return message;
+        return string.IsNullOrWhiteSpace(message) ? actionSummary : $"{message} {actionSummary}";
     }
 
     private static async Task<JsonElement> EnsureManagedRuntimeReadyAsync(

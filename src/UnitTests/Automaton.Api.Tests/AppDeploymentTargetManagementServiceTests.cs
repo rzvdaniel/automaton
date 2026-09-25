@@ -114,28 +114,6 @@ public class AppDeploymentTargetManagementServiceTests
         var target = await fixture.Db.AppDeploymentTargets
             .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
         target.ExecutionRunnerId = oldRunner.Id;
-        target.Status = DeploymentTargetStatus.Running;
-        await fixture.Db.SaveChangesAsync();
-
-        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
-            async () => await fixture.Service.AssignRunnerAsync(
-                fixture.App.Id,
-                target.Id,
-                new AssignAppDeploymentTargetRunnerRequest { RunnerId = newRunner.Id },
-                fixture.UserId));
-
-        Assert.That(exception!.Message, Does.Contain("Explicit runtime cleanup"));
-    }
-
-    [Test]
-    public async Task AssignRunner_GenericRuntimeOnlyAlsoRequiresExplicitCleanup()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var oldRunner = fixture.AddRunner(online: true);
-        var newRunner = fixture.AddRunner(online: true);
-        var target = await fixture.Db.AppDeploymentTargets
-            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
-        target.ExecutionRunnerId = oldRunner.Id;
         target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
@@ -184,20 +162,10 @@ public class AppDeploymentTargetManagementServiceTests
     public async Task CleanupFailure_IsRecordedAndCanBeRetried()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
-        var runner = fixture.AddRunner(online: false);
-        await fixture.Db.SaveChangesAsync();
-        var created = await fixture.Service.CreateAsync(
-            fixture.App.Id,
-            new CreateAppDeploymentTargetRequest
-            {
-                Name = "Offline target",
-                Slug = "offline-target",
-                RunnerId = runner.Id
-            },
-            fixture.UserId);
-        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
-        target.Status = DeploymentTargetStatus.Running;
-        await fixture.Db.SaveChangesAsync();
+        var target = await AppDeploymentTargetTestScenarios.CreateRunningTargetAsync(
+            fixture,
+            "Offline target",
+            "offline-target");
 
         Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
             async () => await fixture.Service.DeleteAsync(
@@ -229,6 +197,7 @@ public class AppDeploymentTargetManagementServiceTests
             fixture.UserId);
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
         target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        target.GenericRuntimeDeployed = true;
         target.Status = DeploymentTargetStatus.Running;
         await fixture.Db.SaveChangesAsync();
 
@@ -237,7 +206,7 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
-            Assert.That(summary.GenericRuntimeDeployed, Is.False);
+            Assert.That(summary.GenericRuntimeDeployed, Is.True);
             Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
         });
     }
@@ -438,7 +407,7 @@ public class AppDeploymentTargetManagementServiceTests
         Assert.That(foreignKey.DeleteBehavior, Is.EqualTo(DeleteBehavior.SetNull));
     }
 
-    private sealed class TestFixtureContext : IAsyncDisposable
+    internal sealed class TestFixtureContext : IAsyncDisposable
     {
         private readonly string routeRoot;
 
@@ -463,11 +432,17 @@ public class AppDeploymentTargetManagementServiceTests
 
         public static async Task<TestFixtureContext> CreateAsync(bool successfulCleanup = false)
         {
+            var state = await CreatePersistentStateAsync();
+            var service = CreateService(state.Db, state.UserId, successfulCleanup, out var routeRoot);
+            return new TestFixtureContext(state.Db, state.App, service, routeRoot, state.UserId);
+        }
+
+        private static async Task<PersistentState> CreatePersistentStateAsync()
+        {
             var db = new ApplicationDbContext(
                 new DbContextOptionsBuilder<ApplicationDbContext>()
                     .UseInMemoryDatabase($"target-management-{Guid.NewGuid():N}")
                     .Options);
-
             var userId = Guid.NewGuid();
             var appId = Guid.NewGuid();
             var app = new WebApp
@@ -484,7 +459,33 @@ public class AppDeploymentTargetManagementServiceTests
             db.WebApps.Add(app);
             db.WebAppUsers.Add(new WebAppUser { WebAppId = appId, UserId = userId });
             await db.SaveChangesAsync();
+            return new PersistentState(db, app, userId);
+        }
 
+        private static AppDeploymentTargetManagementService CreateService(
+            ApplicationDbContext db,
+            Guid userId,
+            bool successfulCleanup,
+            out string routeRoot)
+        {
+            var authorization = CreateAuthorizationService(db, userId);
+            var routeService = CreateRouteService(db, out routeRoot);
+            IHubContext<AutomatonHub> cleanupHub = successfulCleanup
+                ? new SuccessfulCleanupHubContext()
+                : new RejectingHubContext();
+            return new AppDeploymentTargetManagementService(
+                db,
+                authorization,
+                new AppRunnerAuthorizationPolicy(db, authorization),
+                routeService,
+                new AppDeploymentTargetStateService(db),
+                new AppDeploymentTargetRuntimeCleanupService(db, cleanupHub));
+        }
+
+        private static ResourceAuthorizationService CreateAuthorizationService(
+            ApplicationDbContext db,
+            Guid userId)
+        {
             var accessor = new HttpContextAccessor
             {
                 HttpContext = new DefaultHttpContext
@@ -494,24 +495,22 @@ public class AppDeploymentTargetManagementServiceTests
                         "Test"))
                 }
             };
-            var authorization = new ResourceAuthorizationService(
-                db, new UserContextService(accessor), accessor);
-            var routeRoot = Path.Combine(
-                Path.GetTempPath(), "automaton-tests", Guid.NewGuid().ToString("N"));
-            var routeService = new BackendRouteConfigService(
+            return new ResourceAuthorizationService(db, new UserContextService(accessor), accessor);
+        }
+
+        private static BackendRouteConfigService CreateRouteService(
+            ApplicationDbContext db,
+            out string routeRoot)
+        {
+            routeRoot = Path.Combine(Path.GetTempPath(), "automaton-tests", Guid.NewGuid().ToString("N"));
+            return new BackendRouteConfigService(
                 db,
                 Options.Create(new PublishedAppsConfig { TraefikDynamicConfigRoot = routeRoot }),
                 new StubWebHostEnvironment(),
                 NullLogger<BackendRouteConfigService>.Instance);
-            var service = new AppDeploymentTargetManagementService(
-                db,
-                authorization,
-                new AppRunnerAuthorizationPolicy(db, authorization),
-                successfulCleanup ? new SuccessfulCleanupHubContext() : new RejectingHubContext(),
-                routeService,
-                new AppDeploymentTargetStateService(db));
-            return new TestFixtureContext(db, app, service, routeRoot, userId);
         }
+
+        private sealed record PersistentState(ApplicationDbContext Db, WebApp App, Guid UserId);
 
         public Runner AddRunner(
             bool online,
@@ -533,6 +532,7 @@ public class AppDeploymentTargetManagementServiceTests
             Db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = UserId });
             return runner;
         }
+
 
         public HostedRunner AddHostedRunner(Guid runnerId, DateTime? deletedAt = null) => new()
         {
@@ -585,7 +585,7 @@ public class AppDeploymentTargetManagementServiceTests
 
     private sealed class SuccessfulCleanupClientProxy : ISingleClientProxy
     {
-        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken = default)
+        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken)
         {
             if (method == AutomatonHubMethods.CleanupAppDeploymentTarget &&
                 args.Length > 0 && args[0] is CleanupAppDeploymentTargetRequest request)
@@ -625,5 +625,31 @@ public class AppDeploymentTargetManagementServiceTests
         public string EnvironmentName { get; set; } = "Production";
         public string ContentRootPath { get; set; } = string.Empty;
         public IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+}
+
+internal static class AppDeploymentTargetTestScenarios
+{
+    public static async Task<AppDeploymentTarget> CreateRunningTargetAsync(
+        AppDeploymentTargetManagementServiceTests.TestFixtureContext fixture,
+        string name,
+        string slug)
+    {
+        var runner = fixture.AddRunner(online: false);
+        await fixture.Db.SaveChangesAsync();
+        var created = await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = name,
+                Slug = slug,
+                RunnerId = runner.Id
+            },
+            fixture.UserId);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
+        target.Status = DeploymentTargetStatus.Running;
+        target.GenericRuntimeDeployed = true;
+        await fixture.Db.SaveChangesAsync();
+        return target;
     }
 }

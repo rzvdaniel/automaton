@@ -1,6 +1,6 @@
 # Code quality and maintainability implementation plan
 
-Status: proposed; implementation has not started.
+Status: Stage 0's all-project analyzer inventory and Stage 1's build-time analyzer enforcement are implemented on `codex/complexity-quality-gate`. `Automaton.All.sln` now includes all 22 tracked C# projects, and `CA1502`, `CA1506`, and `S3776` are build errors. The Studio Server pipeline runs the all-project build. Existing analyzer debt remains and intentionally keeps that build red until cleanup resolves it; the initial inventory and largest method hotspots are listed in [complexity-baseline.md](complexity-baseline.md). Azure execution and required branch-policy enforcement are not yet verified.
 
 Date: 2026-09-23. Repository inspection baseline: `3eb1c2cd`.
 
@@ -8,7 +8,7 @@ Date: 2026-09-23. Repository inspection baseline: `3eb1c2cd`.
 
 Restore clear responsibility boundaries, reduce difficult control flow, and prevent new maintenance debt in both human-written and Codex-written code. Deliver this through executable checks, specific repository guidance, and small refactoring changes that preserve behavior.
 
-This document is an implementation plan, not a statement that its rules or commands are already active. Implement only the stage named by a subsequent task. Recording this plan does not authorize a repository-wide rewrite, production deployment, paid service adoption, or changes to external branch policies.
+This document records the staged implementation and remaining work. The status above identifies completed stages; implement later cleanup stages only when explicitly requested. Recording this plan does not authorize a repository-wide rewrite, production deployment, paid service adoption, or changes to external branch policies.
 
 Start with the C# API, Runner, Worker, and shared infrastructure. Include Core, Messaging, Identity, and CLI in dependency and analyzer coverage as appropriate to their projects. Extend the same workflow to Studio and the website using their existing TypeScript and ESLint tooling. Do not impose Automaton implementation conventions on user-hosted application source.
 
@@ -65,7 +65,7 @@ Do not create a global `Utilities` or `Models` dumping ground, promote every res
 
 ## Tooling and enforcement decision
 
-Use existing .NET analyzers plus a pinned `SonarAnalyzer.CSharp` package for local feedback. Centralize package/configuration policy for applicable projects without replacing project-specific settings. Choose the exact compatible version during implementation and record it with the baseline.
+Use existing .NET analyzers plus a pinned `SonarAnalyzer.CSharp` package for local feedback. Centralize package/configuration policy for every C# project under `src/` without replacing project-specific settings. Pin the analyzer version and metric thresholds in repository configuration.
 
 Configure selected diagnostic severities through `.editorconfig`; configure analyzer-specific numeric parameters through the supported mechanism for the pinned analyzer version. Prove configuration with a deliberately violating sample. Do not assume an arbitrary EditorConfig key changes a Sonar threshold.
 
@@ -73,39 +73,30 @@ SonarQube Server or Cloud is optional for history, PR reporting, and centralized
 
 ### Initial thresholds
 
-These are proposed starting values. Stage 0 calibrates them against representative production code; Stage 1 records the adopted values before enforcement.
+These values were calibrated against the initial inventory. Stage 1 promotes the three measured complexity/coupling diagnostics to build errors so the cleanup backlog is visible in normal builds.
 
 | Signal | Initial value | Treatment |
 | --- | --- | --- |
-| Cognitive complexity | Greater than 15 per method | Block new violations after baseline; prevent existing violating methods from worsening |
-| Cyclomatic complexity | Greater than 10 per method | Advisory initially; consider promotion after the pilot |
+| Cognitive complexity | Greater than 15 per method | Build error until historical violations are resolved |
+| Cyclomatic complexity | Greater than 15 per method | Build error until historical violations are resolved |
+| Type/method coupling | Existing analyzer threshold | Build error until historical violations are resolved |
 | Control-flow nesting | More than 3 levels | Review signal; choose a supported analyzer rather than count braces |
 | Method size | More than about 60 logical lines | Review signal; document the measurement convention |
 | Constructor dependencies | More than 7 injected dependencies | Responsibility review, not a demand for a dependency-bag object |
 | File size | More than about 500 lines | Triage signal, not a merge gate |
 | Forbidden project/type dependency | Any new violation | Block |
 | Duplication | Baseline and inspect changed regions | Advisory until measurement and exclusions are reliable |
-| Selected correctness diagnostics | Explicit rule list | Block new violations; no blanket conversion of all warnings to errors |
+| Selected correctness diagnostics | Explicit rule list | Build errors when findings are clear and reviewed |
 
 Use one authoritative diagnostic for each blocking concept. For example, avoid simultaneously failing multiple analyzers for the same complexity issue. Exclude generated code using explicit, reviewed paths or generated-code metadata. Apply appropriate separate settings to tests and fixtures rather than excluding all tests from correctness analysis.
 
-### Existing-debt baseline and comparison
+### Build-time error policy
 
-Do not turn the repository red for all historical findings or hide all legacy folders behind exclusions.
-
-1. Record a reviewed baseline at a specific commit with tool versions, rule configuration, exclusions, and a digest of those settings.
-2. Identify findings by rule, project-relative path, and stable symbol identity including overload signature. Line numbers are display information, not identity.
-3. Fail on new blocking findings. For existing complexity findings, fail when their measured score increases. Report resolved findings separately and remove their exemptions when accepted.
-4. Compare whole affected symbols, not only changed lines. A method-level diagnostic may appear on a declaration outside the diff.
-5. Treat copied code as new code. Treat renamed/moved findings as new unless a reviewer explicitly approves a baseline identity migration with unchanged or lower debt.
-6. Fail clearly on missing baseline, missing merge-base history, incompatible configuration, or failed analysis. Never interpret an empty or incomplete report as a pass.
-7. Baseline additions, rule weakening, exclusions, and suppressions require explicit rationale and review. Do not regenerate the baseline automatically during normal verification.
-
-Prefer standard analyzer output and an existing report comparator. If none supports the required comparison, add only a small deterministic adapter under ordinary tooling such as `scripts/quality/`. This is build tooling, not an agent evaluation system; do not add orchestration loops or metrics harnesses under `.agents/` or `AgentRuns/`.
-
-Verify whether the selected analyzer emits numeric scores. If not, use a compatible Roslyn-based measurement tool for the non-worsening comparison. Do not approximate complexity with regular expressions. Until numeric comparison is available, explicitly label non-worsening as a review requirement; do not claim it is automatically enforced.
-
-Baseline membership is not a general suppression. Exceptions need a narrow symbol/rule scope, reason, responsible maintainer, and review date or removal condition. Prefer short-lived exceptions for analyzer limitations over accepting new design debt.
+1. Keep the analyzer package and thresholds centrally configured so every project under `src/` runs the same rules during ordinary builds.
+2. Treat `CA1502`, `CA1506`, and `S3776` as compiler build errors. Do not grandfather existing findings behind a baseline or suppress them just to restore a green build.
+3. Build the affected project during focused work so diagnostics identify the relevant symbols. Build `Automaton.All.sln` before handoff and in CI to cover all projects, tests, and fixtures.
+4. Fix the historical errors in reviewable, behavior-preserving batches. Use the analyzer's diagnostic IDs, locations, and measured scores to guide each batch; do not approximate scores or refactor solely to lower numbers.
+5. If an analyzer finding is demonstrably false-positive or incompatible with required behavior, document the exact rule/symbol and removal condition and request review for a narrow exception.
 
 ## Delivery stages
 
@@ -121,50 +112,50 @@ Deliverables:
 Work:
 
 1. Capture a clean or explicitly described working-tree state; preserve unrelated changes.
-2. Run analysis initially in report-only mode across the affected production projects. Keep raw generated reports out of source control; retain compact reviewed baseline metadata if needed for the gate.
+2. Run the all-project build with analyzers in warning mode to capture the initial inventory. Keep the raw build log out of source control and retain the compact reviewed counts and hotspot queue in the architecture documentation.
 3. Rank complexity together with frequency of change and behavioral risk. Do not rank solely by file length.
 4. Inspect the top candidates manually for mixed responsibilities, duplicated decisions, and public contracts.
 5. Confirm existing tests and identify missing characterization cases before selecting the first refactor.
 
 Candidate areas include `AppsService`, `RunnerService`, `RunnerHostService`, and hosted-runner lifecycle reconciliation. They are candidates, not a pre-approved rewrite list. `HostedRunnerLifecycleReconcilerTests` and deployment-target tests provide potential starting coverage, but their existence does not establish completeness.
 
-Exit criteria: another developer can reproduce the report; actual method scores replace guesses; thresholds, exclusions, and the pilot have a documented rationale. No production behavior changes in this stage.
+Exit criteria: another developer can reproduce the inventory; actual method scores replace guesses; thresholds, exclusions, and the pilot have a documented rationale. No production behavior changes in this stage.
 
-### Stage 1 — Local quality command and gradual gate
+### Stage 1 — Build-time analyzer errors across all projects
 
 Depends on Stage 0.
 
-Deliverables: central analyzer settings, scoped analyzer references, a reviewed baseline, and a documented non-mutating quality command under `scripts/quality/`.
+Deliverables: central analyzer settings and references, an all-project solution, direct compiler diagnostics in local builds, and the same build in CI.
 
 Work:
 
-1. Add central configuration, taking care that `Directory.Build.props` settings may affect every descendant project and fixture. Preserve nullable settings, target frameworks, and existing warnings policy.
-2. Pin analysis tooling and define a small initial diagnostic allowlist. Ensure both local and CI invocations use it.
-3. Implement report-only and enforcement modes. Support an explicit base ref and project/scope selection; define how changed shared projects include dependent projects.
-4. Build with analyzers, collect machine-readable findings, compare to the reviewed baseline, and return a nonzero exit code for blocking violations or failed prerequisites.
+1. Add central configuration, taking care that `Directory.Build.props` settings may affect every descendant project and fixture. Preserve nullable settings and target frameworks; keep unrelated warning severities unchanged.
+2. Pin analysis tooling and define the selected diagnostics as build errors in `.editorconfig`.
+3. Ensure `Automaton.All.sln` includes every tracked C# project, including tests and fixtures.
+4. Build the affected project locally and the all-project solution in CI. Let standard MSBuild analyzer diagnostics fail the build directly.
 5. Always run the architecture test project for backend/boundary changes. Run behavioral tests appropriate to the selected scope; support an explicit full verification mode for CI.
 6. Add separate frontend `lint:check` scripts without `--fix`. Retain an explicit fixing command for developers. Use existing type checks and tests.
 7. Document the exact installed commands and failure output. Avoid host-specific paths, credentials, or implicit downloads of unpinned tools.
 
-The entry point must run on the Windows development environment and Linux CI, either through PowerShell Core where provisioned or a small portable existing runtime. Verify prerequisites rather than assuming a shell is installed.
+The same `dotnet build` commands must run on developer machines and Linux CI. No custom script runtime or remote Sonar service is required for analyzer diagnostics.
 
-Exit criteria: clean baseline passes; deliberate complexity and dependency violations fail; unchanged legacy debt passes; increased legacy scores fail if advertised as automated; analysis failures fail; source remains unchanged after verification. Cover rename, overload, deleted symbol, and configuration-change cases in meaningful comparator tests.
+Exit criteria: deliberate complexity/coupling violations fail a build; all tracked projects are in the all-project solution; local and CI commands display standard analyzer errors; historical debt is being removed in scoped batches.
 
 ### Stage 2 — Required CI and architecture coverage
 
 Depends on Stage 1.
 
-Deliverables: CI quality job(s), published reports, explicit architecture-test execution, and documented required-check configuration.
+Deliverables: CI all-project build, explicit architecture-test execution, and documented required-check configuration.
 
 Work:
 
-1. Wire the local command into the relevant Azure pipeline entry points. Determine coverage across API, Runner, Worker, CLI, Studio, and shared projects; do not assume the server solution covers everything.
+1. Wire the all-project solution build into the relevant Azure pipeline entry points. Determine coverage across API, Runner, Worker, CLI, Studio, and shared projects; do not assume the server solution covers everything.
 2. Invoke `src/UnitTests/Automaton.Architecture.Tests/Automaton.Architecture.Tests.csproj` explicitly, avoiding dependence on incidental solution membership.
 3. Align restore/build/test configuration so `--no-build` never consumes a mismatched output. Keep unrelated pipeline modernization out of scope.
 4. Include shared configuration, scripts, and architecture tests in path triggers. Establish actual PR behavior for the repository provider and target branch; YAML alone is not proof of branch-policy enforcement.
-5. Fetch enough history to resolve the comparison base. Publish reports even when the quality gate fails, without exposing source secrets or runtime data.
+5. Keep the analyzer build output visible in pipeline logs so developers and coding agents can inspect diagnostic IDs and locations.
 6. Make the check required through the repository's actual branch protection/build-validation mechanism when authorized. Record any external configuration still outstanding.
-7. Test a deliberate violating PR or equivalent disposable CI change, then remove it. Verify that the required check blocks integration and a clean change passes.
+7. Verify a deliberate violation fails the build. As cleanup reaches zero for the selected rules, verify the all-project build passes.
 
 Extend type-level architecture tests only for agreed seams. Use reflection, compiler symbols, or an established architecture library if it provides a clear benefit. Keep XML project-reference tests where they already express the intended rule well. Avoid source substring checks and blanket rules inferred only from class suffixes.
 
@@ -178,11 +169,11 @@ Deliverables: a concise `AGENTS.md` update and one focused repository skill, pro
 
 This stage names the new skill work intentionally. Follow the skill-creator guidance when implementing it. Do not expand unrelated developer-local skills or add agent roles, loops, or orchestration machinery.
 
-Put durable rules and the quality command in `AGENTS.md`. Put the detailed refactoring procedure and examples in the skill. Avoid duplicating the entire plan in both places. Add the pilot's verified before/after example after Stage 4.
+Put durable rules and the build commands in `AGENTS.md`. Put the detailed refactoring procedure and examples in the skill. Avoid duplicating the entire plan in both places. Add the pilot's verified before/after example after Stage 4.
 
 Proposed contract:
 
-> Before extending a service, identify the responsibility being added and its owner. Keep business decisions cohesive and orchestration readable. Follow the owning feature's placement conventions. Preserve observable behavior during cleanup. Run the documented quality command and affected behavioral tests. Do not weaken rules, expand the baseline, or introduce suppressions merely to finish a task. Explain any justified exception explicitly.
+> Before extending a service, identify the responsibility being added and its owner. Keep business decisions cohesive and orchestration readable. Follow the owning feature's placement conventions. Preserve observable behavior during cleanup. Run the affected project build, all-project analyzer build, and relevant behavioral tests. Do not weaken rules or introduce suppressions merely to finish a task. Explain any justified exception explicitly.
 
 The skill should require a short responsibility map for substantial refactors, characterization coverage, small steps, and a final diff review. Routine small edits should not require a design essay.
 
@@ -210,11 +201,11 @@ Work:
 3. Draw a short responsibility map: orchestration, decisions, persistence, integration, and transport models. Choose the smallest useful split.
 4. Move public supporting types to appropriate files without changing public contracts. Separate mechanical moves from substantive refactoring where practical.
 5. Extract cohesive policies or collaborators; preserve cancellation, DI lifetimes, event ordering, query semantics, and transaction/concurrency boundaries.
-6. Run the smallest relevant verification after each change, then the quality gate and the affected integration/acceptance checks.
+6. Run the smallest relevant project build after each change, then the all-project analyzer build and affected integration/acceptance checks.
 7. Record before/after complexity and dependency evidence together with a readable design explanation. Check total responsibilities and call flow, not only the entry method's score.
 8. Document the resulting convention and a compact example in the maintainability skill.
 
-Exit criteria: behavior and public contracts remain stable; the targeted complexity/responsibility problem is reduced; no replacement god-service or helper sprawl appears; the gate passes without new exemptions; review confirms the design is easier to follow.
+Exit criteria: behavior and public contracts remain stable; the targeted complexity/responsibility problem is reduced; no replacement god-service or helper sprawl appears; the affected project reports fewer relevant errors without new suppressions; review confirms the design is easier to follow.
 
 ### Stage 5 — Incremental cleanup batches
 
@@ -229,18 +220,18 @@ Suggested sequence:
 5. Runner process/container integration boundaries, retaining generic-runtime guarantees.
 6. Studio composables, service modules, and component responsibility where analysis shows equivalent problems; apply Vue and Studio design skills for those changes.
 
-Each PR should address one coherent responsibility boundary, include its verification evidence, and remove baseline entries it resolves. Keep feature additions and broad formatting changes separate. Do not move unrelated models just because a folder is being edited.
+Each PR should address one coherent responsibility boundary and include its verification evidence. Keep feature additions and broad formatting changes separate. Do not move unrelated models just because a folder is being edited.
 
-Exit criteria per batch: defined behavior preserved, selected debt reduced, no new blocking findings, appropriate regression tests pass, and remaining work is recorded in the backlog.
+Exit criteria per batch: defined behavior preserved, selected debt reduced, no new analyzer errors introduced, appropriate regression tests pass, and remaining work is recorded in the backlog.
 
 ### Stage 6 — Routine maintenance
 
 Depends on active enforcement and at least one completed cleanup batch.
 
 - Reserve a small explicit cleanup allocation per development cycle; initially one bounded hotspot or roughly 10% of engineering capacity, adjusted after observing actual cost.
-- When changing a violating method, improve or preserve its complexity and clarify nearby ownership within the task's scope. Do not trigger a whole-service rewrite for a small bug fix.
-- Review hotspot movement, new exceptions, analyzer noise, and unresolved baseline entries monthly. This cadence is a team practice, not an automation created by this plan.
-- Upgrade analyzer versions in dedicated changes with baseline/configuration review; avoid surprise diagnostic changes during feature work.
+- When changing a violating method, reduce its analyzer errors and clarify nearby ownership within the task's scope. Do not trigger a whole-service rewrite for a small bug fix.
+- Review remaining hotspots, new exceptions, and analyzer noise monthly. This cadence is a team practice, not an automation created by this plan.
+- Upgrade analyzer versions in dedicated changes with rule/configuration review; avoid surprise diagnostic changes during feature work.
 - Promote advisory rules only after they produce actionable findings with acceptable noise.
 - Track unresolved blocking debt, complexity of the highest-risk methods, new exceptions, and quality-check duration. Avoid class-count or line-count targets.
 
@@ -273,21 +264,21 @@ dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Rele
 git diff --check
 ```
 
-These examples are not a complete verification suite. The unified quality command, baseline comparison, and new frontend check scripts are Stage 1 deliverables and do not exist merely because this plan describes them.
+These examples are not a complete verification suite. The all-project analyzer build is part of Stage 1; frontend checks remain separate work in the relevant frontend pipelines.
 
 ## Change boundaries, handoff, and recovery
 
 - Use the existing checkout and preserve unrelated working-tree changes. Follow the branch instruction for each implementation task.
-- Every stage handoff lists implemented files, exact checks and outcomes, unavailable checks, baseline/exemption changes, and remaining acceptance criteria.
+- Every stage handoff lists implemented files, exact checks and outcomes, unavailable checks, analyzer errors resolved or remaining, and acceptance criteria.
 - Keep configuration/gate changes and application refactors independently reviewable. Revert a faulty refactor without removing the safeguards.
-- If a diagnostic is defective, isolate the smallest justified exception with a removal condition. Do not disable the entire quality job or rebaseline all findings.
+- If a diagnostic is defective, isolate the smallest justified exception with a removal condition. Do not disable the all-project build or suppress whole rule categories.
 - Do not change production state, deploy, or publish Runner images as part of cleanup unless a separate request authorizes it and the production skill is followed.
 - Do not claim behavior preservation from compilation alone, or claim CI enforcement from a successful local run alone.
 
 ## Completion checklist
 
 - [ ] Stage 0: measured baseline and prioritized backlog recorded.
-- [ ] Stage 1: reproducible local analysis and baseline comparison verified, with non-mutating frontend checks.
+- [ ] Stage 1: reproducible local all-project analyzer build verified; selected diagnostics fail builds.
 - [ ] Stage 2: all relevant CI paths and required-check behavior verified.
 - [ ] Stage 3: concise Codex contract and focused maintainability skill installed in the repository contract.
 - [ ] Stage 4: one pilot demonstrates simpler ownership and stable behavior without new exemptions.

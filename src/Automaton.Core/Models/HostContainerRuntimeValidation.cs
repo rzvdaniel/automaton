@@ -25,17 +25,24 @@ public static class HostContainerRuntimeValidation
         if (request.Environment is null)
             return "The environment must be an object.";
 
-        if (request.Operation != HostContainerOperationKinds.CreateApplicationContainer)
-        {
-            if (!IsContainerReference(request.ContainerId))
-                return "A valid container ID or name is required.";
-            if (request.RequestedImage is not null || request.Command is not null || request.Storage is not null
-                || request.Resources is not null || request.CandidateId != Guid.Empty
-                || request.ContainerPort != 0 || request.Environment.Count != 0)
-                return "Existing-container operations accept only scope and container identity.";
-            return null;
-        }
+        return request.Operation == HostContainerOperationKinds.CreateApplicationContainer
+            ? ValidateCreateRequest(request)
+            : ValidateExistingContainerRequest(request);
+    }
 
+    private static string? ValidateExistingContainerRequest(HostContainerExecutionRequest request)
+    {
+        if (!IsContainerReference(request.ContainerId))
+            return "A valid container ID or name is required.";
+        if (request.RequestedImage is not null || request.Command is not null || request.Storage is not null
+            || request.Resources is not null || request.CandidateId != Guid.Empty
+            || request.ContainerPort != 0 || request.Environment!.Count != 0)
+            return "Existing-container operations accept only scope and container identity.";
+        return null;
+    }
+
+    private static string? ValidateCreateRequest(HostContainerExecutionRequest request)
+    {
         if (request.ContainerId is not null || request.CandidateId == Guid.Empty
             || request.Command is null || request.Storage is null)
             return "Create requires a candidate ID, command, and storage semantics, without a container ID.";
@@ -49,10 +56,13 @@ public static class HostContainerRuntimeValidation
         });
         if (errors.Count != 0)
             return string.Join("; ", errors);
-        if (request.Environment.Any(pair => string.IsNullOrWhiteSpace(pair.Key)
-            || pair.Key.Contains('=') || pair.Key.Contains('\0')
-            || pair.Value is null || pair.Value.Contains('\0')))
+        if (HasInvalidEnvironmentEntry(request.Environment!))
             return "The environment contains an invalid name or value.";
         return null;
     }
+
+    private static bool HasInvalidEnvironmentEntry(IReadOnlyDictionary<string, string> environment) =>
+        environment.Any(pair => string.IsNullOrWhiteSpace(pair.Key)
+            || pair.Key.Contains('=') || pair.Key.Contains('\0')
+            || pair.Value is null || pair.Value.Contains('\0'));
 }

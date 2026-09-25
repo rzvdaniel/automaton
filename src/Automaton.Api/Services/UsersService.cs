@@ -17,6 +17,7 @@ public class UsersService
     private readonly ApplicationDbContext _db;
     private readonly UserContextService _userContextService;
     private readonly IAuditEventService _auditEventService;
+    private readonly UserHardDeleteService _hardDeleteService;
 
     private Guid ActorUserId => _userContextService.GetUserId();
 
@@ -25,13 +26,15 @@ public class UsersService
         RoleManager<ApplicationRole> roleManager,
         ApplicationDbContext db,
         UserContextService userContextService,
-        IAuditEventService auditEventService)
+        IAuditEventService auditEventService,
+        UserHardDeleteService hardDeleteService)
     {
         _userManager         = userManager;
         _roleManager         = roleManager;
         _db                  = db;
         _userContextService  = userContextService;
         _auditEventService   = auditEventService;
+        _hardDeleteService   = hardDeleteService;
     }
 
     public async Task CreateUser(ApplicationUser user, string password)
@@ -215,78 +218,23 @@ public class UsersService
 
     public async Task<ApplicationUserPageResult> GetUsers(UserFilter filter)
     {
-        var searchTerm = filter.Search?.Trim();
         var safePageIndex = Math.Max(0, filter.PageIndex);
         var safePageSize = filter.PageSize <= 0 ? 100 : filter.PageSize;
         var now = DateTimeOffset.UtcNow;
-        var sortField = filter.SortField?.Trim();
-        var sortDescending = filter.SortOrder == -1;
         var todayUtc = DateTime.UtcNow.Date;
         var weekStartUtc = todayUtc.AddDays(-7);
         var monthStartUtc = new DateTime(todayUtc.Year, todayUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        var query = _userManager.Users
-            .AsNoTracking()
-            .Include(u => u.UserRoles)
-            .ThenInclude(ur => ur.Role)
-            .Where(u =>
-                !u.IsDeleted &&
-                (string.IsNullOrWhiteSpace(searchTerm) ||
-                    (u.Name != null && u.Name.Contains(searchTerm)) ||
-                    (u.Email != null && u.Email.Contains(searchTerm)) ||
-                    (u.PublicUsername != null && u.PublicUsername.Contains(searchTerm))) &&
-                (string.IsNullOrWhiteSpace(filter.Name) || (u.Name != null && u.Name.StartsWith(filter.Name))) &&
-                (string.IsNullOrWhiteSpace(filter.Email) || u.Email == filter.Email) &&
-                (string.IsNullOrWhiteSpace(filter.RegistrationProvider) || u.RegistrationProvider == filter.RegistrationProvider) &&
-                (!filter.EmailConfirmed.HasValue || u.EmailConfirmed == filter.EmailConfirmed.Value) &&
-                (!filter.IsLocked.HasValue || ((u.LockoutEnd.HasValue && u.LockoutEnd.Value > now) == filter.IsLocked.Value)) &&
-                (!filter.RegisteredFromUtc.HasValue || u.RegisteredAtUtc >= filter.RegisteredFromUtc.Value) &&
-                (!filter.RegisteredToUtc.HasValue || u.RegisteredAtUtc <= filter.RegisteredToUtc.Value)
-            );
-
-        var totalCount = await query.CountAsync();
-        var verifiedCount = await query.CountAsync(u => u.EmailConfirmed);
-        var activeCount = await query.CountAsync(u => !u.LockoutEnd.HasValue || u.LockoutEnd.Value <= now);
-        var joinedTodayCount = await query.CountAsync(u => u.RegisteredAtUtc >= todayUtc);
-        var joinedThisWeekCount = await query.CountAsync(u => u.RegisteredAtUtc >= weekStartUtc);
-        var joinedThisMonthCount = await query.CountAsync(u => u.RegisteredAtUtc >= monthStartUtc);
-
-        query = sortField switch
-        {
-            "name" => sortDescending ? query.OrderByDescending(u => u.Name) : query.OrderBy(u => u.Name),
-            "lastLoginAtUtc" => sortDescending
-                ? query.OrderByDescending(u => u.LastLoginAtUtc != null)
-                    .ThenByDescending(u => u.LastLoginAtUtc)
-                    .ThenByDescending(u => u.RegisteredAtUtc)
-                : query.OrderBy(u => u.LastLoginAtUtc == null ? 1 : 0)
-                    .ThenBy(u => u.LastLoginAtUtc)
-                    .ThenBy(u => u.RegisteredAtUtc),
-            "registeredAtUtc" => sortDescending ? query.OrderByDescending(u => u.RegisteredAtUtc) : query.OrderBy(u => u.RegisteredAtUtc),
-            _ => query.OrderByDescending(u => u.LastLoginAtUtc != null)
-                .ThenByDescending(u => u.LastLoginAtUtc)
-                .ThenByDescending(u => u.RegisteredAtUtc)
-        };
-
-        var items = await query
-            .Skip(safePageIndex * safePageSize)
-            .Take(safePageSize)
-            .ToListAsync();
+        var query = UserListingQuery.Create(_userManager.Users, filter, now);
+        var summary = await UserListingQuery.GetSummaryAsync(query, now, todayUtc, weekStartUtc, monthStartUtc);
+        var items = await UserListingQuery.GetPageAsync(query, filter, safePageIndex, safePageSize);
 
         return new ApplicationUserPageResult
         {
             Items = items,
-            TotalCount = totalCount,
+            TotalCount = summary.TotalCount,
             Page = safePageIndex + 1,
             PageSize = safePageSize,
-            Summary = new UserListSummary
-            {
-                TotalCount = totalCount,
-                VerifiedCount = verifiedCount,
-                ActiveCount = activeCount,
-                JoinedTodayCount = joinedTodayCount,
-                JoinedThisWeekCount = joinedThisWeekCount,
-                JoinedThisMonthCount = joinedThisMonthCount,
-            },
+            Summary = summary,
         };
     }
 
@@ -615,119 +563,8 @@ public class UsersService
         }
     }
 
-    public async Task HardDeleteAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var user = await FindByIdIncludingDeletedAsync(userId);
-        if (user == null)
-        {
-            throw new Exception($"User with userId {userId} not found!");
-        }
-
-        var auditMetadata = new
-        {
-            user.Email,
-            user.UserName,
-            user.Name,
-            user.PublicUsername,
-            user.RegisteredAtUtc
-        };
-
-        var blockers = await GetHardDeleteBlockersAsync(userId, cancellationToken);
-        if (blockers.Count > 0)
-        {
-            var blockerSummary = string.Join(
-                Environment.NewLine,
-                blockers.Select(x => $"- {x.Count} {x.Label}"));
-
-            throw new InvalidOperationException(
-                $"Cannot delete this user.{Environment.NewLine}{Environment.NewLine}" +
-                $"This account still owns:{Environment.NewLine}" +
-                $"{blockerSummary}{Environment.NewLine}{Environment.NewLine}" +
-                "Disable the account instead, or remove or transfer these resources first.");
-        }
-
-        var refreshTokens = await _db.RefreshTokens.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userGitHubTokens = await _db.UserGitHubTokens.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userSettings = await _db.UserSettings.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var recentActivities = await _db.RecentActivities.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userClaims = await _db.Set<IdentityUserClaim<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userLogins = await _db.Set<IdentityUserLogin<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userTokens = await _db.Set<IdentityUserToken<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var userRoles = await _db.Set<ApplicationUserRole>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var apiKeyLinks = await _db.ApiKeyUsers.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
-        var ownedApiKeyIds = apiKeyLinks.Select(x => x.ApiKeyId).Distinct().ToList();
-        var ownedApiKeys = await _db.ApiKeys
-            .Where(x => ownedApiKeyIds.Contains(x.Id))
-            .ToListAsync(cancellationToken);
-
-        _db.RefreshTokens.RemoveRange(refreshTokens);
-        _db.UserGitHubTokens.RemoveRange(userGitHubTokens);
-        _db.UserSettings.RemoveRange(userSettings);
-        _db.RecentActivities.RemoveRange(recentActivities);
-        _db.ApiKeyUsers.RemoveRange(apiKeyLinks);
-        _db.ApiKeys.RemoveRange(ownedApiKeys);
-        _db.RemoveRange(userClaims);
-        _db.RemoveRange(userLogins);
-        _db.RemoveRange(userTokens);
-        _db.RemoveRange(userRoles);
-
-        await _db.SaveChangesAsync(cancellationToken);
-
-        var result = await _userManager.DeleteAsync(user);
-        if (!result.Succeeded)
-        {
-            var errorMessage = string.Join("; ", result.Errors.Select(error => error.Description));
-            throw new InvalidOperationException(
-                $"Hard delete failed for user {user.Email ?? user.Id.ToString()}: {errorMessage}");
-        }
-
-        await _auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Deleted,
-            EntityType = AuditEntityTypes.User,
-            EntityId = userId,
-            EventType = AuditEventTypes.UserDeleted,
-            Message = $"User '{user.Email ?? user.UserName ?? userId.ToString()}' was deleted",
-            Outcome = AuditOutcomes.Success,
-            ActorUserId = ActorUserId,
-            TargetUserId = userId,
-            Metadata = auditMetadata
-        }, cancellationToken);
-    }
-
-    private async Task<List<(string Label, int Count)>> GetHardDeleteBlockersAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        var blockers = new List<(string Label, int Count)>();
-
-        await AddHardDeleteBlockerAsync(blockers, "apps", _db.WebAppUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "flows", _db.FlowUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "runners", _db.RunnerUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "custom steps", _db.CustomStepUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "schedules", _db.ScheduleUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "sensitive variables", _db.SensitiveVariableUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "project memberships", _db.ProjectMembers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "organization memberships", _db.OrganizationMembers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "organization app assignments", _db.OrganizationAppAssignments.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "chat sessions", _db.AiChatSessionUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "hosted runners", _db.HostedRunners.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "account storage allocations", _db.AccountStorageAllocations.AsNoTracking().CountAsync(x => x.AccountId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "owned projects", _db.Projects.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
-        await AddHardDeleteBlockerAsync(blockers, "owned organizations", _db.Organizations.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
-
-        return blockers;
-    }
-
-    private static async Task AddHardDeleteBlockerAsync(
-        ICollection<(string Label, int Count)> blockers,
-        string label,
-        Task<int> countTask)
-    {
-        var count = await countTask;
-        if (count > 0)
-        {
-            blockers.Add((label, count));
-        }
-    }
+    public Task HardDeleteAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _hardDeleteService.DeleteAsync(userId, ActorUserId, cancellationToken);
 
     public async Task<bool> IsInRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default)
     {

@@ -35,55 +35,9 @@ public static class PublishCommand
             nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool open, bool asJson, bool nonInteractiveFlag) =>
-        {
-            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
-
-            if (makePrivate && makePublic)
-            {
-                var failure = new PublishResult
-                {
-                    Success = false,
-                    Summary = "Publish failed",
-                    Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "choose either --public or --private, not both")],
-                    NextSteps = ["Rerun automaton publish with at most one access flag"]
-                };
-                WriteResult(failure, asJson, nonInteractive);
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            try
-            {
-                var cwd = Directory.GetCurrentDirectory();
-                var publishService = new PublishService(config);
-                var result = await publishService.PublishAsync(
-                    cwd,
-                    slug,
-                    makePrivate ? true : makePublic ? false : null,
-                    forkable ? true : null,
-                    yes,
-                    nonInteractive: nonInteractive);
-                WriteResult(result, asJson, nonInteractive);
-                if (result.Success && open && !string.IsNullOrWhiteSpace(result.Url))
-                {
-                    CliBrowserService.OpenUrl(result.Url);
-                }
-                Environment.ExitCode = result.Success ? 0 : 1;
-            }
-            catch (Exception ex)
-            {
-                var failure = new PublishResult
-                {
-                    Success = false,
-                    Summary = "Publish failed",
-                    Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, ex.Message)],
-                    NextSteps = ["Run automaton whoami to confirm the current server and identity"]
-                };
-                WriteResult(failure, asJson, nonInteractive);
-                Environment.ExitCode = 1;
-            }
-        }, slugOption, privateOption, publicOption, forkableOption, yesOption, openOption, jsonOption, nonInteractiveOption);
+        cmd.SetHandler((string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool open, bool asJson, bool nonInteractiveFlag) =>
+            PublishCommandHandler.HandleAsync(config, slug, makePrivate, makePublic, forkable, yes, open, asJson, nonInteractiveFlag),
+            slugOption, privateOption, publicOption, forkableOption, yesOption, openOption, jsonOption, nonInteractiveOption);
 
         return cmd;
     }

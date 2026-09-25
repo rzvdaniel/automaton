@@ -145,6 +145,14 @@ public static class AppActionManifestParser
     private static void Validate(AppActionManifest manifest, string actionKey, bool allowPrivilegedCapabilities)
     {
         ValidateKey(actionKey);
+        ValidateIdentity(manifest, actionKey);
+        ValidateExecutionSettings(manifest.Spec);
+        ValidateCapabilities(manifest.Spec, allowPrivilegedCapabilities);
+        ValidateScheduling(manifest.Spec);
+    }
+
+    private static void ValidateIdentity(AppActionManifest manifest, string actionKey)
+    {
         if (!string.Equals(manifest.ApiVersion, "automaton.dev/v1", StringComparison.Ordinal))
             throw new InvalidOperationException("Action apiVersion must be 'automaton.dev/v1'.");
         if (!string.Equals(manifest.Kind, "Action", StringComparison.Ordinal))
@@ -152,24 +160,36 @@ public static class AppActionManifestParser
         if (!string.IsNullOrWhiteSpace(manifest.Metadata.Key)
             && !string.Equals(manifest.Metadata.Key, actionKey, StringComparison.Ordinal))
             throw new InvalidOperationException($"Action metadata.key must match its folder name '{actionKey}'.");
-        if (manifest.Spec.Runtime is not (AppActionRuntimes.Python or AppActionRuntimes.Bash))
+    }
+
+    private static void ValidateExecutionSettings(AppActionSpec spec)
+    {
+        if (spec.Runtime is not (AppActionRuntimes.Python or AppActionRuntimes.Bash))
             throw new InvalidOperationException("Action runtime must be 'python' or 'bash'.");
-        if (manifest.Spec.TimeoutSeconds is < MinimumTimeoutSeconds or > MaximumTimeoutSeconds)
+        if (spec.TimeoutSeconds is < MinimumTimeoutSeconds or > MaximumTimeoutSeconds)
             throw new InvalidOperationException($"Action timeoutSeconds must be between {MinimumTimeoutSeconds} and {MaximumTimeoutSeconds}.");
 
-        ValidateRelativePath(manifest.Spec.Entrypoint, "entrypoint");
-        var unsupportedCapability = manifest.Spec.Capabilities.FirstOrDefault(capability => !AppActionCapabilities.Supported.Contains(capability));
+        ValidateRelativePath(spec.Entrypoint, "entrypoint");
+    }
+
+    private static void ValidateCapabilities(AppActionSpec spec, bool allowPrivilegedCapabilities)
+    {
+        var unsupportedCapability = spec.Capabilities.FirstOrDefault(capability => !AppActionCapabilities.Supported.Contains(capability));
         if (unsupportedCapability != null)
             throw new InvalidOperationException($"Action capability '{unsupportedCapability}' is not supported.");
-        if (!allowPrivilegedCapabilities && manifest.Spec.Capabilities.Any(AppActionCapabilities.Privileged.Contains))
+        if (!allowPrivilegedCapabilities && spec.Capabilities.Any(AppActionCapabilities.Privileged.Contains))
             throw new InvalidOperationException("Normal App Actions cannot request privileged host or Docker capabilities.");
-        if (manifest.Spec.MinimumIntervalSeconds < 1)
+    }
+
+    private static void ValidateScheduling(AppActionSpec spec)
+    {
+        if (spec.MinimumIntervalSeconds < 1)
             throw new InvalidOperationException("Action minimumIntervalSeconds must be positive.");
-        if (!AppActionConcurrencyPolicies.Supported.Contains(manifest.Spec.DefaultConcurrencyPolicy))
+        if (!AppActionConcurrencyPolicies.Supported.Contains(spec.DefaultConcurrencyPolicy))
             throw new InvalidOperationException("Action defaultConcurrencyPolicy is invalid.");
-        if (manifest.Spec.AllowedExecutionScopes.Any(scope => !AppActionExecutionScopes.Supported.Contains(scope)))
+        if (spec.AllowedExecutionScopes.Any(scope => !AppActionExecutionScopes.Supported.Contains(scope)))
             throw new InvalidOperationException("Action allowedExecutionScopes contains an invalid scope.");
-        if (manifest.Spec.Schedulable && manifest.Spec.AllowedExecutionScopes.Count == 0)
+        if (spec.Schedulable && spec.AllowedExecutionScopes.Count == 0)
             throw new InvalidOperationException("Schedulable Actions must declare allowedExecutionScopes.");
     }
 
@@ -202,39 +222,62 @@ public static class AppActionSchemaValidator
 {
     public static string? Validate(JsonElement value, Dictionary<string, object?>? schema, string path = "$")
     {
-        if (schema == null) return null;
+        if (schema == null)
+            return null;
+
         var type = GetString(schema, "type");
-        if (type != null && !MatchesType(value, type)) return $"{path} must be of type {type}.";
-        if (type == "object" && value.ValueKind == JsonValueKind.Object)
+        if (type != null && !MatchesType(value, type))
+            return $"{path} must be of type {type}.";
+
+        return type switch
         {
-            var required = GetList(schema, "required").Select(item => item?.ToString()).Where(item => !string.IsNullOrWhiteSpace(item));
-            foreach (var name in required)
-                if (!value.TryGetProperty(name!, out _)) return $"{path}.{name} is required.";
-            var properties = GetMap(schema, "properties");
-            if (properties != null)
-            {
-                foreach (var property in properties)
-                {
-                    if (!value.TryGetProperty(property.Key, out var propertyValue)) continue;
-                    var propertySchema = ToStringMap(property.Value);
-                    var error = Validate(propertyValue, propertySchema, $"{path}.{property.Key}");
-                    if (error != null) return error;
-                }
-            }
-        }
-        if (type == "array" && value.ValueKind == JsonValueKind.Array)
+            "object" when value.ValueKind == JsonValueKind.Object => ValidateObject(value, schema, path),
+            "array" when value.ValueKind == JsonValueKind.Array => ValidateArray(value, schema, path),
+            _ => null
+        };
+    }
+
+    private static string? ValidateObject(JsonElement value, Dictionary<string, object?> schema, string path)
+    {
+        foreach (var name in GetList(schema, "required")
+                     .Select(item => item?.ToString())
+                     .Where(item => !string.IsNullOrWhiteSpace(item)))
         {
-            var itemSchema = ToStringMap(GetValue(schema, "items"));
-            if (itemSchema != null)
-            {
-                var index = 0;
-                foreach (var item in value.EnumerateArray())
-                {
-                    var error = Validate(item, itemSchema, $"{path}[{index++}]");
-                    if (error != null) return error;
-                }
-            }
+            if (!value.TryGetProperty(name!, out _))
+                return $"{path}.{name} is required.";
         }
+
+        var properties = GetMap(schema, "properties");
+        if (properties == null)
+            return null;
+
+        foreach (var property in properties)
+        {
+            if (!value.TryGetProperty(property.Key, out var propertyValue))
+                continue;
+
+            var error = Validate(propertyValue, ToStringMap(property.Value), $"{path}.{property.Key}");
+            if (error != null)
+                return error;
+        }
+
+        return null;
+    }
+
+    private static string? ValidateArray(JsonElement value, Dictionary<string, object?> schema, string path)
+    {
+        var itemSchema = ToStringMap(GetValue(schema, "items"));
+        if (itemSchema == null)
+            return null;
+
+        var index = 0;
+        foreach (var item in value.EnumerateArray())
+        {
+            var error = Validate(item, itemSchema, $"{path}[{index++}]");
+            if (error != null)
+                return error;
+        }
+
         return null;
     }
 

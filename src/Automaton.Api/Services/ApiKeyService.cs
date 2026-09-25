@@ -254,6 +254,17 @@ public class ApiKeyService
         if (apiKey == null)
             return false;
 
+        dbContext.ApiKeys.Remove(apiKey);
+        await dbContext.SaveChangesAsync();
+
+        await WriteApiKeyDeletedAuditAsync(apiKey, userId);
+
+        logger.LogDebug("API key deleted for user {UserId}", userId);
+        return true;
+    }
+
+    private Task WriteApiKeyDeletedAuditAsync(ApiKey apiKey, Guid userId)
+    {
         var auditMetadata = new
         {
             apiKey.Name,
@@ -263,10 +274,7 @@ public class ApiKeyService
             ProjectIds = apiKey.ProjectApiKeys.Select(x => x.ProjectId).ToList()
         };
 
-        dbContext.ApiKeys.Remove(apiKey);
-        await dbContext.SaveChangesAsync();
-
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        return auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Deleted,
             EntityType = AuditEntityTypes.ApiKey,
@@ -277,9 +285,6 @@ public class ApiKeyService
             ActorUserId = userId,
             Metadata = auditMetadata
         });
-
-        logger.LogDebug("API key deleted for user {UserId}", userId);
-        return true;
     }
 
     public Task<List<ApiKey>> GetInfrastructureRunnerEnrollmentKeysAsync(CancellationToken cancellationToken = default)

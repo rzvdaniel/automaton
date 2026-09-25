@@ -4,7 +4,6 @@ using Polly;
 using Polly.Retry;
 using System.IO;
 using System.Net.Http;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -17,14 +16,16 @@ namespace Automaton.Ai.Providers;
 public class GoogleProvider : IAiProvider
 {
     private readonly ILogger _logger;
+    private readonly GoogleConversationEventEmitter eventEmitter;
+    private readonly GeminiRequestFactory requestFactory;
+    private readonly GeminiStreamingClient streamingClient;
+    private readonly GeminiToolCallExecutor toolCallExecutor;
 
     /// <summary>
     /// Maximum number of conversation messages to keep in history (sliding window).
     /// Prevents unbounded token growth. Each turn = 2 messages (user + assistant).
     /// 10 messages = last 5 turns, typically 2,000-5,000 tokens saved per call.
     /// </summary>
-    private const int MaxConversationHistoryMessages = 10;
-
     /// <inheritdoc />
     public string ProviderName => "Google";
 
@@ -33,18 +34,13 @@ public class GoogleProvider : IAiProvider
 
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
-    /// <summary>
-    /// Shared HttpClient with infinite timeout for streaming Gemini calls.
-    /// CancellationToken controls actual request lifetime — not the client timeout.
-    /// </summary>
-    private static readonly HttpClient GeminiHttpClient = new()
-    {
-        Timeout = System.Threading.Timeout.InfiniteTimeSpan
-    };
-
     public GoogleProvider(ILogger logger)
     {
         _logger = logger;
+        eventEmitter = new GoogleConversationEventEmitter(updated => ConversationUpdated?.Invoke(this, updated));
+        requestFactory = new GeminiRequestFactory(logger);
+        streamingClient = new GeminiStreamingClient(logger, requestFactory);
+        toolCallExecutor = new GeminiToolCallExecutor(logger, eventEmitter);
     }
 
     public async Task<ProviderResult> CallAsync(
@@ -76,7 +72,7 @@ public class GoogleProvider : IAiProvider
         CancellationToken cancellationToken)
     {
         var toolList = tools.ToList();
-        var contents = BuildContents(request);
+        var contents = requestFactory.BuildContents(request);
         var responseBuilder = new StringBuilder();
 
         var maxIterations = ProviderIterationLimits.Resolve(request.MaxIterations);
@@ -102,202 +98,38 @@ public class GoogleProvider : IAiProvider
                 break;
             }
 
-            // Stream the response, collecting text and function calls
-            var currentText = new StringBuilder();
-            var functionCalls = new List<GeminiFunctionCall>();
-            var rawModelParts = new List<JsonElement>(); // preserve all parts verbatim (incl. thought_signature)
-            int? iterInputTokens = null;
-            int? iterOutputTokens = null;
-            var lastEmitTime = DateTime.UtcNow;
-            const int emitIntervalMs = 100;
-
-            // Rate-limit retry pipeline — same strategy as Anthropic/OpenAI providers
-            var retryPipeline = new ResiliencePipelineBuilder()
-                .AddRetry(new RetryStrategyOptions
-                {
-                    MaxRetryAttempts = request.MaxRateLimitRetries,
-                    Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
-                    BackoffType       = DelayBackoffType.Exponential,
-                    UseJitter         = true,
-                    ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
-                    DelayGenerator    = static args =>
-                    {
-                        if (TryParseRetryAfter(args.Outcome.Exception, out var retryAfter))
-                            return ValueTask.FromResult<TimeSpan?>(retryAfter);
-                        return ValueTask.FromResult<TimeSpan?>(null);
-                    },
-                    OnRetry           = args =>
-                    {
-                        var delaySecs = (int)args.RetryDelay.TotalSeconds;
-                        _logger.LogWarning(
-                            "Gemini rate limit hit (attempt {Retry}/{MaxRetries}). Model={Model}, Retrying in {Delay}s. Reason: {Error}",
-                            args.AttemptNumber + 1, request.MaxRateLimitRetries,
-                            request.Model, delaySecs, args.Outcome.Exception?.Message);
-                        EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
-                        return ValueTask.CompletedTask;
-                    }
-                })
-                .Build();
-
-            // Reset per-iteration accumulators before each retry
-            currentText.Clear();
-            functionCalls.Clear();
-            rawModelParts.Clear();
-            iterInputTokens = null;
-            iterOutputTokens = null;
-
-            await retryPipeline.ExecuteAsync(async ct =>
-            {
-                currentText.Clear();
-                functionCalls.Clear();
-                rawModelParts.Clear();
-                iterInputTokens = null;
-                iterOutputTokens = null;
-
-                await foreach (var chunk in StreamGenerateContentAsync(
-                    request.Model ?? DefaultModel,
-                    request.ApiKey,
-                    request.SystemPromptParts,
-                    request.SystemPrompt,
-                    request.MaxTokens,
-                    contents,
-                    breakAfterPlanPresentation ? [] : toolList,
-                    ct))
-                {
-                    if (chunk.InputTokens.HasValue) iterInputTokens = chunk.InputTokens;
-                    if (chunk.OutputTokens.HasValue) iterOutputTokens = chunk.OutputTokens;
-                    if (chunk.ModelVersion != null) modelVersion = chunk.ModelVersion;
-
-                    if (!string.IsNullOrEmpty(chunk.TextDelta))
-                    {
-                        currentText.Append(chunk.TextDelta);
-
-                        var now = DateTime.UtcNow;
-                        if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
-                        {
-                            EmitStreamingTextUpdate(request.ConversationId, currentText.ToString(), isComplete: false);
-                            lastEmitTime = now;
-                        }
-                    }
-
-                    functionCalls.AddRange(chunk.FunctionCalls);
-                    rawModelParts.AddRange(chunk.RawParts);
-                }
-            }, cancellationToken);
+            var streamResult = await StreamGeminiIterationAsync(
+                request, contents, toolList, breakAfterPlanPresentation, cancellationToken);
+            modelVersion = streamResult.ModelVersion ?? modelVersion;
 
             // Accumulate tokens across all iterations — input and output are per-call values.
             // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
-            tokenUsage.Add(iterInputTokens, iterOutputTokens);
+            tokenUsage.Add(streamResult.InputTokens, streamResult.OutputTokens);
 
-            var textContent = currentText.ToString();
+            var textContent = streamResult.Text;
 
-            if (functionCalls.Count == 0)
+            if (streamResult.FunctionCalls.Count == 0)
             {
-                // No tool calls — emit final text and finish
-                if (!string.IsNullOrWhiteSpace(textContent))
-                {
-                    EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                        inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: modelVersion ?? request.Model);
-                    responseBuilder.AppendLine(textContent);
-                }
-                else if (tokenUsage.HasAny)
-                {
-                    // Final turn can be tool-only with no assistant text; emit token-only usage.
-                    EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
-                        inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: modelVersion ?? request.Model);
-                }
+                EmitFinalTurn(request, textContent, tokenUsage, modelVersion, responseBuilder);
                 break;
             }
 
-            // Emit text portion before tool calls (if any).
-            // Tokens are intentionally omitted here — they are reported only on the final turn so
-            // the server's += accumulator receives the complete billing total exactly once.
-            if (!string.IsNullOrWhiteSpace(textContent))
-            {
-                EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                    inputTokens: null, outputTokens: null, model: modelVersion ?? request.Model);
-            }
+            EmitToolCallTurn(request, contents, streamResult, textContent, modelVersion);
+            var toolOutcome = await toolCallExecutor.ExecuteAsync(
+                request.ConversationId,
+                streamResult.FunctionCalls,
+                executeToolAsync,
+                consecutiveFailures,
+                maxConsecutiveFailures);
+            contents.Add(BuildFunctionResponseTurn(toolOutcome.ResponseParts));
 
-            // Add model response back to contents using raw parts verbatim.
-            // This preserves thought_signature fields required by Gemini thinking models.
-            contents.Add(new Dictionary<string, object>
-            {
-                ["role"] = "model",
-                ["parts"] = rawModelParts.Count > 0 ? (object)rawModelParts : new List<object>()
-            });
-
-            // Execute all tool calls concurrently — results are order-independent
-            var functionResponseParts = new List<object>();
-            var shouldStop              = false;
-            var shouldBreakForApproval  = false;
-
-            var toolTasks = functionCalls.Select(async funcCall =>
-            {
-                var callId   = $"call_{Guid.NewGuid():N}";
-                var argsJson = funcCall.Args.ValueKind != JsonValueKind.Undefined
-                    ? JsonSerializer.Serialize(funcCall.Args)
-                    : "{}";
-
-                EmitToolCallStarted(request.ConversationId, callId, funcCall.Name, argsJson);
-                var toolResult = await executeToolAsync(callId, funcCall.Name, argsJson);
-                EmitToolCallCompleted(request.ConversationId, callId, funcCall.Name, argsJson, toolResult);
-
-                return (funcCall, callId, argsJson, toolResult);
-            });
-
-            var toolResults = await Task.WhenAll(toolTasks);
-
-            foreach (var (funcCall, callId, argsJson, toolResult) in toolResults)
-            {
-                var isFailure = toolResult.StartsWith("Tool execution failed:") ||
-                                toolResult.StartsWith("Error executing tool") ||
-                                toolResult.Contains("A second operation was started");
-
-                if (isFailure)
-                {
-                    consecutiveFailures.TryGetValue(funcCall.Name, out var current);
-                    consecutiveFailures[funcCall.Name] = current + 1;
-
-                    if (consecutiveFailures[funcCall.Name] >= maxConsecutiveFailures)
-                    {
-                        _logger.LogWarning(
-                            "Tool {ToolName} failed {FailCount} consecutive times, stopping",
-                            funcCall.Name, consecutiveFailures[funcCall.Name]);
-                        shouldStop = true;
-                    }
-                }
-                else
-                {
-                    consecutiveFailures[funcCall.Name] = 0;
-                }
-
-                if (ProviderHelpers.ToolResultAwaitsApproval(funcCall.Name, toolResult))
-                    shouldBreakForApproval = true;
-
-                functionResponseParts.Add(new Dictionary<string, object>
-                {
-                    ["functionResponse"] = new Dictionary<string, object>
-                    {
-                        ["name"]     = funcCall.Name,
-                        ["response"] = new Dictionary<string, object> { ["result"] = toolResult }
-                    }
-                });
-            }
-
-            // Add tool results as a user turn
-            contents.Add(new Dictionary<string, object>
-            {
-                ["role"] = "user",
-                ["parts"] = functionResponseParts
-            });
-
-            if (shouldStop)
+            if (toolOutcome.ShouldStop)
             {
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 break;
             }
 
-            if (shouldBreakForApproval)
+            if (toolOutcome.ShouldBreakForApproval)
             {
                 breakAfterPlanPresentation = true;
                 continue;
@@ -307,275 +139,164 @@ public class GoogleProvider : IAiProvider
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
-    /// <summary>
-    /// Streams the Gemini response via SSE (streamGenerateContent?alt=sse).
-    /// Yields parsed chunks containing text deltas, function calls, and usage metadata.
-    /// </summary>
-    private async IAsyncEnumerable<GeminiStreamChunk> StreamGenerateContentAsync(
-        string model,
-        string apiKey,
-        SystemPromptParts? promptParts,
-        string? systemPromptFallback,
-        int? maxTokens,
+    private void EmitFinalTurn(
+        ConversationRequest request,
+        string textContent,
+        TokenUsageAccumulator tokenUsage,
+        string? modelVersion,
+        StringBuilder responseBuilder)
+    {
+        if (!string.IsNullOrWhiteSpace(textContent))
+        {
+            eventEmitter.EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
+                inputTokens: tokenUsage.InputTokens,
+                outputTokens: tokenUsage.OutputTokensOrNull,
+                model: modelVersion ?? request.Model);
+            responseBuilder.AppendLine(textContent);
+        }
+        else if (tokenUsage.HasAny)
+        {
+            eventEmitter.EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
+                inputTokens: tokenUsage.InputTokens,
+                outputTokens: tokenUsage.OutputTokensOrNull,
+                model: modelVersion ?? request.Model);
+        }
+    }
+
+    private void EmitToolCallTurn(
+        ConversationRequest request,
         List<Dictionary<string, object>> contents,
-        List<ProviderTool> tools,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        GeminiIterationResult streamResult,
+        string textContent,
+        string? modelVersion)
     {
-        var requestBody = BuildRequestBody(promptParts, systemPromptFallback, maxTokens, contents, tools);
-        var json = JsonSerializer.Serialize(requestBody);
-
-        using var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
-        var url = new Uri($"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:streamGenerateContent?key={Uri.EscapeDataString(apiKey)}&alt=sse");
-
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = requestContent
-        };
-
-        using var response = await GeminiHttpClient.SendAsync(
-            requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogError("Gemini streaming API error: {Status} {Body}", response.StatusCode, errorBody);
-
-            string errorDetail = errorBody;
-            try
-            {
-                using var errDoc = JsonDocument.Parse(errorBody);
-                if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
-                    errEl.TryGetProperty("message", out var msgEl))
-                {
-                    errorDetail = msgEl.GetString() ?? errorBody;
-                }
-            }
-            catch { /* fall back to raw body */ }
-
-            throw new InvalidOperationException($"Gemini API error: {response.StatusCode} - {errorDetail}");
-        }
-
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new StreamReader(stream);
-
-        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
-        {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line == null) break;
-
-            // SSE format: lines starting with "data: " contain JSON payloads
-            if (!line.StartsWith("data: ", StringComparison.Ordinal)) continue;
-
-            var jsonData = line.Substring(6).Trim();
-            if (string.IsNullOrEmpty(jsonData) || jsonData == "[DONE]") break;
-
-            GeminiStreamChunk? chunk = null;
-            try
-            {
-                using var doc = JsonDocument.Parse(jsonData);
-                chunk = ParseChunk(doc.RootElement);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse Gemini SSE chunk: {Data}", jsonData);
-                continue;
-            }
-
-            if (chunk != null)
-                yield return chunk;
-        }
-    }
-
-    private GeminiStreamChunk ParseChunk(JsonElement root)
-    {
-        var chunk = new GeminiStreamChunk();
-
-        // Extract usage metadata (present in final chunks)
-        if (root.TryGetProperty("usageMetadata", out var usage))
-        {
-            if (usage.TryGetProperty("promptTokenCount", out var inp))
-                chunk.InputTokens = inp.GetInt32();
-
-            // candidatesTokenCount = text output tokens
-            // thoughtsTokenCount = reasoning tokens (thinking models)
-            // Sum both to get the full output token count charged by the API
-            var candidateTokens = 0;
-            var thoughtTokens = 0;
-            if (usage.TryGetProperty("candidatesTokenCount", out var outp))
-                candidateTokens = outp.GetInt32();
-            if (usage.TryGetProperty("thoughtsTokenCount", out var thoughts_))
-                thoughtTokens = thoughts_.GetInt32();
-            if (candidateTokens > 0 || thoughtTokens > 0)
-                chunk.OutputTokens = candidateTokens + thoughtTokens;
-        }
-
-        if (root.TryGetProperty("modelVersion", out var mv))
-            chunk.ModelVersion = mv.GetString();
-
-        // Extract content parts from the first candidate
-        if (!root.TryGetProperty("candidates", out var candidates) ||
-            candidates.ValueKind != JsonValueKind.Array ||
-            candidates.GetArrayLength() == 0)
-        {
-            return chunk;
-        }
-
-        var candidate = candidates[0];
-
-        if (!candidate.TryGetProperty("content", out var content) ||
-            !content.TryGetProperty("parts", out var parts) ||
-            parts.ValueKind != JsonValueKind.Array)
-        {
-            return chunk;
-        }
-
-        foreach (var part in parts.EnumerateArray())
-        {
-            // Preserve every part verbatim (thought, functionCall, text) so thought_signature
-            // is included when we echo the model turn back for thinking models.
-            chunk.RawParts.Add(part.Clone());
-
-            if (part.TryGetProperty("text", out var textEl))
-            {
-                // Only emit visible text (skip thought parts which have "thought: true")
-                var isThought = part.TryGetProperty("thought", out var thoughtEl) && thoughtEl.ValueKind == JsonValueKind.True;
-                if (!isThought)
-                    chunk.TextDelta = textEl.GetString() ?? string.Empty;
-            }
-            else if (part.TryGetProperty("functionCall", out var funcCallEl))
-            {
-                chunk.FunctionCalls.Add(new GeminiFunctionCall
-                {
-                    Name = funcCallEl.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                    Args = funcCallEl.TryGetProperty("args", out var a) ? a.Clone() : default
-                });
-            }
-        }
-
-        return chunk;
-    }
-
-    private List<Dictionary<string, object>> BuildContents(ConversationRequest request)
-    {
-        var contents = new List<Dictionary<string, object>>();
-
-        if (request.ConversationHistory?.Any() == true)
-        {
-            var history = request.ConversationHistory;
-
-            if (history.Count > MaxConversationHistoryMessages)
-            {
-                var skip = history.Count - MaxConversationHistoryMessages;
-                history = history.Skip(skip).ToList();
-
-                _logger.LogDebug(
-                    "Conversation history truncated: {Total} -> {Kept} messages (sliding window)",
-                    request.ConversationHistory.Count, history.Count);
-            }
-
-            foreach (var msg in history)
-            {
-                // Gemini uses "user" and "model" roles (not "assistant")
-                var role = msg.Role.ToLowerInvariant() == "assistant" ? "model" : "user";
-                contents.Add(new Dictionary<string, object>
-                {
-                    ["role"] = role,
-                    ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = msg.Content } }
-                });
-            }
-        }
+        if (!string.IsNullOrWhiteSpace(textContent))
+            eventEmitter.EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
+                inputTokens: null, outputTokens: null, model: modelVersion ?? request.Model);
 
         contents.Add(new Dictionary<string, object>
         {
-            ["role"] = "user",
-            ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = request.InitialMessage } }
+            ["role"] = "model",
+            ["parts"] = streamResult.RawModelParts.Count > 0
+                ? (object)streamResult.RawModelParts
+                : new List<object>()
         });
-
-        return contents;
     }
 
-    private static Dictionary<string, object?> BuildRequestBody(
-        SystemPromptParts? promptParts,
-        string? systemPromptFallback,
-        int? maxTokens,
+    private static Dictionary<string, object> BuildFunctionResponseTurn(List<object> responseParts) =>
+        new() { ["role"] = "user", ["parts"] = responseParts };
+
+    private async Task<GeminiIterationResult> StreamGeminiIterationAsync(
+        ConversationRequest request,
         List<Dictionary<string, object>> contents,
-        List<ProviderTool> tools)
+        List<ProviderTool> toolList,
+        bool breakAfterPlanPresentation,
+        CancellationToken cancellationToken)
     {
-        // Gemini's system_instruction is a single block — put only the stable BasePrompt here.
-        // InstructionBlock + MemoryBlock are prepended as the first user turn so they sit
-        // after the cached system_instruction prefix (implicit caching on Gemini 2.5+).
-        string? basePrompt   = promptParts?.BasePrompt ?? systemPromptFallback;
-        string? extraContext = BuildExtraContext(promptParts);
+        var currentText = new StringBuilder();
+        var functionCalls = new List<GeminiFunctionCall>();
+        var rawModelParts = new List<JsonElement>();
+        int? inputTokens = null;
+        int? outputTokens = null;
+        string? modelVersion = null;
+        var lastEmitTime = DateTime.UtcNow;
+        var retryPipeline = CreateRetryPipeline(request);
 
-        var effectiveContents = contents;
-        if (!string.IsNullOrWhiteSpace(extraContext))
+        await retryPipeline.ExecuteAsync(async ct =>
         {
-            // Inject a preamble user turn with per-app/session context before conversation history
-            effectiveContents = new List<Dictionary<string, object>>
-            {
-                new() { ["role"] = "user",  ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = extraContext } } },
-                new() { ["role"] = "model", ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = "Understood." } } }
-            };
-            effectiveContents.AddRange(contents);
-        }
+            currentText.Clear();
+            functionCalls.Clear();
+            rawModelParts.Clear();
+            inputTokens = null;
+            outputTokens = null;
 
-        var requestBody = new Dictionary<string, object?>
-        {
-            ["contents"] = effectiveContents
-        };
-
-        if (!string.IsNullOrWhiteSpace(basePrompt))
-        {
-            requestBody["system_instruction"] = new Dictionary<string, object>
+            await foreach (var chunk in streamingClient.StreamAsync(
+                request.Model ?? DefaultModel,
+                request.ApiKey,
+                request.SystemPromptParts,
+                request.SystemPrompt,
+                request.MaxTokens,
+                contents,
+                breakAfterPlanPresentation ? [] : toolList,
+                ct))
             {
-                ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = basePrompt } }
-            };
-        }
+                UpdateUsage(chunk, ref inputTokens, ref outputTokens, ref modelVersion);
+                EmitTextDelta(request.ConversationId, chunk.TextDelta, currentText, ref lastEmitTime);
+                functionCalls.AddRange(chunk.FunctionCalls);
+                rawModelParts.AddRange(chunk.RawParts);
+            }
+        }, cancellationToken);
 
-        if (tools.Count > 0)
-        {
-            var functionDeclarations = tools.Select(tool => new Dictionary<string, object?>
-            {
-                ["name"] = tool.Name,
-                ["description"] = tool.Description,
-                ["parameters"] = BuildParameterSchema(tool.InputSchemaJson)
-            }).ToList();
-
-            requestBody["tools"] = new List<object>
-            {
-                new Dictionary<string, object> { ["function_declarations"] = functionDeclarations }
-            };
-            requestBody["tool_config"] = new Dictionary<string, object>
-            {
-                ["function_calling_config"] = new Dictionary<string, object> { ["mode"] = "AUTO" }
-            };
-
-            // Disable thinking when tools are involved. Thinking models (gemini-2.5+) embed a
-            // thought_signature in function calls that must be echoed verbatim. Since streaming
-            // can split parts across chunks making faithful reconstruction unreliable, we simply
-            // turn thinking off for tool-calling turns — matching OpenAI/Anthropic behaviour.
-            requestBody["generationConfig"] = new Dictionary<string, object?>
-            {
-                ["thinkingConfig"] = new Dictionary<string, object> { ["thinkingBudget"] = 0 },
-                ["maxOutputTokens"] = maxTokens > 0 ? (object?)maxTokens : null
-            };
-        }
-        else if (maxTokens > 0)
-        {
-            requestBody["generationConfig"] = new Dictionary<string, object?> { ["maxOutputTokens"] = maxTokens };
-        }
-
-        return requestBody;
+        return new GeminiIterationResult(
+            currentText.ToString(), functionCalls, rawModelParts,
+            inputTokens, outputTokens, modelVersion);
     }
 
-    private static string? BuildExtraContext(SystemPromptParts? parts)
+    private ResiliencePipeline CreateRetryPipeline(ConversationRequest request)
     {
-        if (parts == null) return null;
-        var segments = new[] { parts.InstructionBlock, parts.MemoryBlock }
-            .Where(s => !string.IsNullOrWhiteSpace(s));
-        var joined = string.Join("\n\n", segments);
-        return string.IsNullOrWhiteSpace(joined) ? null : joined;
+        return new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                MaxRetryAttempts = request.MaxRateLimitRetries,
+                Delay = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
+                DelayGenerator = static args =>
+                    TryParseRetryAfter(args.Outcome.Exception, out var retryAfter)
+                        ? ValueTask.FromResult<TimeSpan?>(retryAfter)
+                        : ValueTask.FromResult<TimeSpan?>(null),
+                OnRetry = args =>
+                {
+                    var delaySecs = (int)args.RetryDelay.TotalSeconds;
+                    _logger.LogWarning(
+                        "Gemini rate limit hit (attempt {Retry}/{MaxRetries}). Model={Model}, Retrying in {Delay}s. Reason: {Error}",
+                        args.AttemptNumber + 1, request.MaxRateLimitRetries,
+                        request.Model, delaySecs, args.Outcome.Exception?.Message);
+                    eventEmitter.EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1,
+                        request.MaxRateLimitRetries, delaySecs);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .Build();
     }
+
+    private void UpdateUsage(
+        GeminiStreamChunk chunk,
+        ref int? inputTokens,
+        ref int? outputTokens,
+        ref string? modelVersion)
+    {
+        if (chunk.InputTokens.HasValue) inputTokens = chunk.InputTokens;
+        if (chunk.OutputTokens.HasValue) outputTokens = chunk.OutputTokens;
+        if (chunk.ModelVersion is not null) modelVersion = chunk.ModelVersion;
+    }
+
+    private void EmitTextDelta(
+        string conversationId,
+        string? textDelta,
+        StringBuilder currentText,
+        ref DateTime lastEmitTime)
+    {
+        if (string.IsNullOrEmpty(textDelta))
+            return;
+
+        currentText.Append(textDelta);
+        var now = DateTime.UtcNow;
+        if ((now - lastEmitTime).TotalMilliseconds < 100)
+            return;
+
+        eventEmitter.EmitStreamingTextUpdate(conversationId, currentText.ToString(), isComplete: false);
+        lastEmitTime = now;
+    }
+
+    private sealed record GeminiIterationResult(
+        string Text,
+        List<GeminiFunctionCall> FunctionCalls,
+        List<JsonElement> RawModelParts,
+        int? InputTokens,
+        int? OutputTokens,
+        string? ModelVersion);
 
     private static bool IsRateLimitException(Exception ex)
     {
@@ -610,137 +331,4 @@ public class GoogleProvider : IAiProvider
         @"retry[- ](?:after|in)\D*(?<secs>\d+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
-    {
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = [new ConversationMessage("assistant",
-                $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/{maxRetries})...")],
-            ToolCalls = [],
-            ToolResults = []
-        });
-    }
-
-    private static object BuildParameterSchema(string inputSchemaJson)
-    {
-        if (string.IsNullOrEmpty(inputSchemaJson) || inputSchemaJson == "{}")
-        {
-            return new Dictionary<string, object>
-            {
-                ["type"] = "object",
-                ["properties"] = new Dictionary<string, object>()
-            };
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(inputSchemaJson);
-            return doc.RootElement.Clone();
-        }
-        catch
-        {
-            return new Dictionary<string, object>
-            {
-                ["type"] = "object",
-                ["properties"] = new Dictionary<string, object>()
-            };
-        }
-    }
-
-    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete,
-        int? inputTokens = null, int? outputTokens = null, string? model = null)
-    {
-        if (string.IsNullOrEmpty(conversationId))
-            return;
-
-        if (string.IsNullOrEmpty(text) &&
-            (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue)))
-            return;
-
-        var message = new ConversationMessage("assistant", text)
-        {
-            IsStreaming = !isComplete,
-            InputTokens = isComplete ? inputTokens : null,
-            OutputTokens = isComplete ? outputTokens : null,
-            Model = isComplete ? model : null
-        };
-
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage> { message },
-            ToolCalls = new List<ToolCall>(),
-            ToolResults = new List<ToolResult>()
-        });
-    }
-
-    private void EmitToolCallStarted(string conversationId, string toolCallId, string toolName, string argsJson)
-    {
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage>(),
-            ToolCalls = new List<ToolCall>
-            {
-                new ToolCall { Id = toolCallId, Name = toolName, Arguments = ParseToolArguments(argsJson) }
-            },
-            ToolResults = new List<ToolResult>()
-        });
-    }
-
-    private void EmitToolCallCompleted(string conversationId, string toolCallId, string toolName, string argsJson, string result)
-    {
-        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-        {
-            ConversationId = conversationId,
-            Messages = new List<ConversationMessage>(),
-            ToolCalls = new List<ToolCall>
-            {
-                new ToolCall { Id = toolCallId, Name = toolName, Arguments = ParseToolArguments(argsJson) }
-            },
-            ToolResults = new List<ToolResult>
-            {
-                new ToolResult
-                {
-                    ToolCallId = toolCallId,
-                    Result = result,
-                    IsSuccess = !result.StartsWith("Tool execution failed:") && !result.StartsWith("Error executing tool"),
-                    ErrorMessage = result.StartsWith("Tool execution failed:") || result.StartsWith("Error executing tool") ? result : null
-                }
-            }
-        });
-    }
-
-    private static Dictionary<string, object?> ParseToolArguments(string argsJson)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(argsJson) || argsJson == "{}")
-                return new Dictionary<string, object?>();
-
-            return JsonDocument.Parse(argsJson).RootElement.EnumerateObject()
-                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString());
-        }
-        catch
-        {
-            return new Dictionary<string, object?>();
-        }
-    }
-
-    private class GeminiStreamChunk
-    {
-        public string? TextDelta { get; set; }
-        public List<GeminiFunctionCall> FunctionCalls { get; set; } = new();
-        public List<JsonElement> RawParts { get; set; } = new();
-        public int? InputTokens { get; set; }
-        public int? OutputTokens { get; set; }
-        public string? ModelVersion { get; set; }
-    }
-
-    private class GeminiFunctionCall
-    {
-        public string Name { get; set; } = string.Empty;
-        public JsonElement Args { get; set; }
-    }
 }

@@ -238,108 +238,123 @@ public class AiApiKeyService
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false, bool allProviders = false)
     {
-        var providers = new List<AiProviderInfo>();
+        var environmentKeys = includeEnvironment
+            ? GetEnvironmentApiKeys()
+            : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var providers = await LoadConfiguredProvidersAsync(userId, environmentKeys);
+        await AddCustomProvidersAsync(providers, userId);
+        return allProviders
+            ? providers
+            : providers.Where(HasConfiguredKey).ToList();
+    }
 
-        // Get system-level keys (admin) and the current user's own keys only
+    private async Task<List<AiProviderInfo>> LoadConfiguredProvidersAsync(
+        Guid userId,
+        IReadOnlyDictionary<string, string?> environmentKeys)
+    {
         var storedKeys = await dbContext.AiApiKeys
-            .Where(k => k.IsActive && (k.CreatedByUserId == null || k.CreatedByUserId == userId))
+            .Where(key => key.IsActive && (key.CreatedByUserId == null || key.CreatedByUserId == userId))
             .ToListAsync();
-        var groupedKeys = storedKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase);
-
-        // Get environment keys (for desktop)
-        var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-
-        // Get active AI providers from database with their models
-        var dbProviders = await dbContext.AiProviders
-            .Where(p => p.IsActive)
-            .Include(p => p.Models.Where(m => m.IsActive))
-            .OrderBy(p => p.SortOrder)
+        var keysByProvider = storedKeys
+            .GroupBy(key => key.ProviderName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var databaseProviders = await dbContext.AiProviders
+            .Where(provider => provider.IsActive)
+            .Include(provider => provider.Models.Where(model => model.IsActive))
+            .OrderBy(provider => provider.SortOrder)
             .ToListAsync();
 
-        foreach (var dbProvider in dbProviders)
-        {
-            var allKeysForProvider = groupedKeys
-                .FirstOrDefault(g => string.Equals(g.Key, dbProvider.Name, StringComparison.OrdinalIgnoreCase))
-                ?.ToList() ?? new List<AiApiKey>();
-            var userKeysForProvider = allKeysForProvider.Where(k => k.CreatedByUserId == userId).ToList();
-            var systemKeysForProvider = allKeysForProvider.Where(k => k.CreatedByUserId == null).ToList();
-            var hasEnvironmentKey = envKeys.TryGetValue(dbProvider.Name, out var envKey) && !string.IsNullOrEmpty(envKey);
-
-            providers.Add(new AiProviderInfo
-            {
-                ProviderName = dbProvider.Name,
-                DisplayName = dbProvider.DisplayName,
-                Description = dbProvider.Description,
-                IconName = dbProvider.IconName,
-                ApiKeyHelpUrl = dbProvider.ApiKeyHelpUrl,
-                IsActive = dbProvider.IsActive,
-                HasStoredKeys = userKeysForProvider.Any(),
-                HasSystemKey = systemKeysForProvider.Any(),
-                StoredKeyCount = userKeysForProvider.Count,
-                HasEnvironmentKey = hasEnvironmentKey,
-                StoredKeys = userKeysForProvider.Select(k => new AiApiKeyModel
-                {
-                    Id = k.Id,
-                    Name = k.Name,
-                    ProviderName = k.ProviderName,
-                    Description = k.Description,
-                    CreatedAt = k.CreatedAt,
-                    LastUsedAt = k.LastUsedAt,
-                    IsActive = k.IsActive
-                }).ToList(),
-                SupportedModels = dbProvider.Models
-                    .OrderByDescending(m => m.IsDefault)
-                    .ThenBy(m => m.SortOrder)
-                    .Select(m => m.ModelId)
-                    .ToList(),
-                ModelDisplayNames = dbProvider.Models
-                    .Where(m => !string.IsNullOrWhiteSpace(m.ModelId))
-                    .GroupBy(m => m.ModelId)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => string.IsNullOrWhiteSpace(g.First().DisplayName) ? g.Key : g.First().DisplayName
-                    ),
-                DefaultModel = dbProvider.Models
-                    .Where(m => m.IsDefault)
-                    .Select(m => m.ModelId)
-                    .FirstOrDefault()
-            });
-        }
-
-        // Add virtual provider entries from the user's own custom keys (BaseUrl set, not in AiProviders table).
-        // This keeps the AiProviders table admin-only while still letting users run their custom providers.
-        var userCustomKeys = await dbContext.AiApiKeys
-            .Where(k => k.IsActive && k.CreatedByUserId == userId && k.BaseUrl != null && k.DefaultModel != null)
-            .ToListAsync();
-
-        foreach (var group in userCustomKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase))
-        {
-            // Skip if an admin-configured AiProvider already covers this name
-            if (providers.Any(p => string.Equals(p.ProviderName, group.Key, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            var firstKey = group.First();
-            providers.Add(new AiProviderInfo
-            {
-                ProviderName = group.Key,
-                DisplayName = group.Key,
-                IsActive = true,
-                HasStoredKeys = true,
-                StoredKeyCount = group.Count(),
-                SupportedModels = group.Select(k => k.DefaultModel!).Distinct().ToList(),
-                DefaultModel = firstKey.DefaultModel
-            });
-        }
-
-        // Only return providers that have keys configured (stored or environment)
-        // unless allProviders is true (used in key-management pages where users need to see all active providers)
-        if (allProviders)
-            return providers;
-
-        return providers
-            .Where(p => p.HasStoredKeys || p.HasSystemKey || p.HasEnvironmentKey)
+        return databaseProviders
+            .Select(provider => MapConfiguredProvider(provider, keysByProvider, userId, environmentKeys))
             .ToList();
     }
+
+    private static AiProviderInfo MapConfiguredProvider(
+        AiProvider provider,
+        IReadOnlyCollection<IGrouping<string, AiApiKey>> keysByProvider,
+        Guid userId,
+        IReadOnlyDictionary<string, string?> environmentKeys)
+    {
+        var allKeys = keysByProvider
+            .FirstOrDefault(group => string.Equals(group.Key, provider.Name, StringComparison.OrdinalIgnoreCase))
+            ?.ToList() ?? [];
+        var userKeys = allKeys.Where(key => key.CreatedByUserId == userId).ToList();
+        var systemKeys = allKeys.Where(key => key.CreatedByUserId == null).ToList();
+        var hasEnvironmentKey = environmentKeys.TryGetValue(provider.Name, out var environmentKey)
+            && !string.IsNullOrEmpty(environmentKey);
+
+        return new AiProviderInfo
+        {
+            ProviderName = provider.Name,
+            DisplayName = provider.DisplayName,
+            Description = provider.Description,
+            IconName = provider.IconName,
+            ApiKeyHelpUrl = provider.ApiKeyHelpUrl,
+            IsActive = provider.IsActive,
+            HasStoredKeys = userKeys.Any(),
+            HasSystemKey = systemKeys.Any(),
+            StoredKeyCount = userKeys.Count,
+            HasEnvironmentKey = hasEnvironmentKey,
+            StoredKeys = userKeys.Select(key => new AiApiKeyModel
+            {
+                Id = key.Id,
+                Name = key.Name,
+                ProviderName = key.ProviderName,
+                Description = key.Description,
+                CreatedAt = key.CreatedAt,
+                LastUsedAt = key.LastUsedAt,
+                IsActive = key.IsActive
+            }).ToList(),
+            SupportedModels = provider.Models
+                .OrderByDescending(model => model.IsDefault)
+                .ThenBy(model => model.SortOrder)
+                .Select(model => model.ModelId)
+                .ToList(),
+            ModelDisplayNames = provider.Models
+                .Where(model => !string.IsNullOrWhiteSpace(model.ModelId))
+                .GroupBy(model => model.ModelId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => string.IsNullOrWhiteSpace(group.First().DisplayName) ? group.Key : group.First().DisplayName),
+            DefaultModel = provider.Models
+                .Where(model => model.IsDefault)
+                .Select(model => model.ModelId)
+                .FirstOrDefault()
+        };
+    }
+
+    private async Task AddCustomProvidersAsync(List<AiProviderInfo> providers, Guid userId)
+    {
+        var userCustomKeys = await dbContext.AiApiKeys
+            .Where(key => key.IsActive && key.CreatedByUserId == userId && key.BaseUrl != null && key.DefaultModel != null)
+            .ToListAsync();
+
+        foreach (var group in userCustomKeys.GroupBy(key => key.ProviderName, StringComparer.OrdinalIgnoreCase))
+        {
+            if (providers.Any(provider => string.Equals(provider.ProviderName, group.Key, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            providers.Add(MapCustomProvider(group));
+        }
+    }
+
+    private static AiProviderInfo MapCustomProvider(IGrouping<string, AiApiKey> group)
+    {
+        var firstKey = group.First();
+        return new AiProviderInfo
+        {
+            ProviderName = group.Key,
+            DisplayName = group.Key,
+            IsActive = true,
+            HasStoredKeys = true,
+            StoredKeyCount = group.Count(),
+            SupportedModels = group.Select(key => key.DefaultModel!).Distinct().ToList(),
+            DefaultModel = firstKey.DefaultModel
+        };
+    }
+
+    private static bool HasConfiguredKey(AiProviderInfo provider)
+        => provider.HasStoredKeys || provider.HasSystemKey || provider.HasEnvironmentKey;
 
     public async Task<string?> GetFirstProviderWithActiveKeyAsync()
     {

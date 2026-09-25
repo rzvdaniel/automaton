@@ -15,8 +15,8 @@ public sealed class AppListProjectionTests
     [Test]
     public void ParsesPresentationTagsWithoutNormalizingStoredValue()
     {
-        Assert.That(AppsService.ParseTags(" games, strategy ,, "), Is.EqualTo(new[] { "games", "strategy" }));
-        Assert.That(AppsService.ParseTags(null), Is.Empty);
+        Assert.That(AppTagNormalizer.Normalize(" games, strategy ,, "), Is.EqualTo(new[] { "games", "strategy" }));
+        Assert.That(AppTagNormalizer.Normalize((string?)null), Is.Empty);
     }
 
     [Test]

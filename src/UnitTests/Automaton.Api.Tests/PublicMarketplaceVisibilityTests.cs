@@ -2,6 +2,8 @@ using Automaton.Api.Controllers;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -54,7 +56,7 @@ public sealed class PublicMarketplaceVisibilityTests
             .Options);
 
     private static PublicMarketplaceController CreateController(ApplicationDbContext db)
-        => new(db, null!, null!)
+        => new(db, null!, null!, new PublicMarketplaceCreatorAppsQuery(db), new PublicMarketplaceCatalogQuery(db))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

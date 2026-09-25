@@ -1,10 +1,6 @@
-using Automaton.Api.Data;
-using Automaton.Api.Models;
 using Automaton.Api.Services;
-using Automaton.Mcp.Tools;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace Automaton.Api.Controllers;
@@ -57,28 +53,19 @@ public class ExternalMcpController : ControllerBase
         "SystemPrompts/ExternalMcpInstructions.md",
     ];
 
-    private readonly AppsService _appsService;
-    private readonly AppFileStorageService _fileStorageService;
-    private readonly FileIoTool _fileIoTool;
+    private readonly ExternalMcpToolExecutionService _toolExecutionService;
     private readonly UserContextService _userContext;
-    private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ExternalMcpController> _logger;
 
     public ExternalMcpController(
-        AppsService appsService,
-        AppFileStorageService fileStorageService,
-        FileIoTool fileIoTool,
+        ExternalMcpToolExecutionService toolExecutionService,
         UserContextService userContext,
-        ApplicationDbContext db,
         IWebHostEnvironment env,
         ILogger<ExternalMcpController> logger)
     {
-        _appsService = appsService;
-        _fileStorageService = fileStorageService;
-        _fileIoTool = fileIoTool;
+        _toolExecutionService = toolExecutionService;
         _userContext = userContext;
-        _db = db;
         _env = env;
         _logger = logger;
     }
@@ -170,7 +157,7 @@ public class ExternalMcpController : ControllerBase
             var result = method switch
             {
                 "initialize" => HandleInitialize(req, apiKeyHeaders?.FirstOrDefault(), authorizationHeaders?.FirstOrDefault()),
-                "tools/list" => HandleToolsList(),
+                "tools/list" => ExternalMcpToolCatalog.List(),
                 "tools/call" => await HandleToolCall(req, userId, ct),
                 "ping"       => new { },
                 _ => throw new NotSupportedException($"Method not found: {method}")
@@ -216,53 +203,6 @@ public class ExternalMcpController : ControllerBase
         return null;
     }
 
-    private static object HandleToolsList() => new
-    {
-        tools = new object[]
-        {
-            ToolDef("create_app",
-                "Create a new Automaton app. Returns the appId. Immediately write the returned appId to 'automaton.json' in the project root using your local file tools so it persists across sessions.",
-                Props(
-                    Prop("name", "string", "Human-readable name for the app")),
-                ["name"]),
-
-            ToolDef("list_user_apps",
-                "List the current user's accessible apps so you can find an existing appId before using read_file or list_files.",
-                new { type = "object", properties = new { }, required = Array.Empty<string>() }),
-
-            ToolDef("read_file",
-                "Read a file (or a line range within it) from the Automaton app. Always returns a header showing total lines.",
-                new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        appId     = new { type = "string",  description = "App ID — read from automaton.json" },
-                        path      = new { type = "string",  description = "Relative file path" },
-                        startLine = new { type = "integer", description = "1-based first line to return (default: 1)" },
-                        endLine   = new { type = "integer", description = "1-based last line to return, inclusive (default: end of file)" }
-                    },
-                    required = new[] { "appId", "path" }
-                }),
-
-            ToolDef("list_files",
-                "List editable source files currently stored for the Automaton app.",
-                Props(
-                    Prop("appId", "string", "App ID — read from automaton.json")),
-                ["appId"]),
-
-            ToolDef("get_file_tree",
-                "Return the editable source file tree for the Automaton app as hierarchical JSON with folders and files.",
-                Props(
-                    Prop("appId", "string", "App ID — read from automaton.json")),
-                ["appId"]),
-
-            ToolDef("list_runners",
-                "List the runners available to the current user.",
-                new { type = "object", properties = new { }, required = Array.Empty<string>() })
-        }
-    };
-
     private async Task<object> HandleToolCall(JsonElement req, Guid userId, CancellationToken ct)
     {
         if (!req.TryGetProperty("params", out var p))
@@ -274,149 +214,14 @@ public class ExternalMcpController : ControllerBase
 
         try
         {
-            var text = name switch
-            {
-                "create_app" => await ExecCreateApp(args, userId),
-                "list_user_apps" => await ExecListUserApps(),
-                "get_file_tree" => await ExecGetFileTree(args),
-                "read_file" or
-                "list_files" => await ExecFileTool(name, args),
-                "list_runners" => await ExecListRunners(userId),
-                _ => throw new InvalidOperationException($"Unknown tool: {name}")
-            };
+            var serverUrl = $"{Request.Scheme}://{Request.Host}";
+            var text = await _toolExecutionService.ExecuteAsync(name, args, userId, serverUrl);
             return ToolResult(text);
         }
         catch (Exception ex)
         {
             return ToolError(ex.Message);
         }
-    }
-
-    // ── Tool implementations ──────────────────────────────────────────────────
-
-    private async Task<string> ExecCreateApp(JsonElement args, Guid userId)
-    {
-        var name   = RequireString(args, "name");
-        var appId  = await _appsService.Create(new NewApp { Name = name });
-        var server = $"{Request.Scheme}://{Request.Host}";
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-
-        // Also fetch available runners so the AI can prompt the user immediately.
-        var runners = await _db.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
-            .OrderBy(r => r.Name)
-            .Select(r => new
-            {
-                r.Name,
-                Connected = r.ConnectionId != null
-                    && r.LastHeartbeatAtUtc.HasValue
-                    && r.LastHeartbeatAtUtc.Value >= thresholdUtc
-            })
-            .ToListAsync();
-
-        var runnerSection = runners.Count == 0
-            ? "No runners are registered on this account. Register a Runner before deploying an application that requires one."
-            : "Available runners:\n" + string.Join("\n", runners.Select(r =>
-                $"- {r.Name} ({(r.Connected ? "connected" : "offline")})"));
-
-        return $$"""
-            App '{{name}}' created with ID: {{appId}}
-
-            IMPORTANT: Overwrite (replace entirely) 'automaton.json' in the project root with ONLY this content — do not append to any existing content:
-            {
-              "appId": "{{appId}}",
-              "name": "{{name}}",
-              "server": "{{server}}"
-            }
-            The file must contain exactly one JSON object. Delete any previous content.
-
-            {{runnerSection}}
-
-            NEXT STEPS:
-            - If the application requires a Runner, assign one before deploying.
-            - Run 'automaton set-runner <runnerName>' from the CLI to assign a runner.
-            - Run 'automaton deploy' to upload files and deploy the application.
-            """;
-    }
-
-    private async Task<string> ExecFileTool(string toolName, JsonElement args)
-    {
-        var result = await _fileIoTool.ExecuteToolAsync(toolName, args, null);
-        if (!result.Success)
-            throw new InvalidOperationException(result.Error ?? "Tool execution failed");
-        return result.Content ?? string.Empty;
-    }
-
-    private Task<string> ExecListUserApps()
-    {
-        var apps = _appsService.ListForMcp()
-            .OrderByDescending(app => app.Updated)
-            .Select(app => new
-            {
-                appId = app.Id,
-                name = app.Name,
-                summary = app.Summary,
-                isPublished = app.IsPublished,
-                publicUrl = app.PublicUrl,
-                updatedAt = app.Updated,
-                createdAt = app.Created,
-                sourceAvailable = app.SourceAvailable,
-                runtimeSource = app.RuntimeSource
-            })
-            .ToList();
-
-        return Task.FromResult(JsonSerializer.Serialize(apps, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        }));
-    }
-
-    private string GetAppSourceRootPath(Guid appId)
-    {
-        var app = _appsService.Get(appId)
-            ?? throw new InvalidOperationException($"App {appId} not found or not accessible.");
-
-        var ownerId = app.UserId ?? _userContext.GetUserId();
-        return _fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
-    }
-
-    private Task<string> ExecGetFileTree(JsonElement args)
-    {
-        var appId = RequireAppId(args);
-        var rootPath = GetAppSourceRootPath(appId);
-
-        if (!Directory.Exists(rootPath))
-        {
-            return Task.FromResult("{\n  \"type\": \"folder\",\n  \"name\": \".\",\n  \"path\": \"\",\n  \"children\": []\n}");
-        }
-
-        var tree = BuildFileTree(rootPath, rootPath, ".");
-        return Task.FromResult(JsonSerializer.Serialize(tree, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        }));
-    }
-
-    private async Task<string> ExecListRunners(Guid userId)
-    {
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-        var runners = await _db.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
-            .OrderBy(r => r.Name)
-            .Select(r => new
-            {
-                r.Name,
-                Connected = r.ConnectionId != null
-                    && r.LastHeartbeatAtUtc.HasValue
-                    && r.LastHeartbeatAtUtc.Value >= thresholdUtc
-            })
-            .ToListAsync();
-
-        if (!runners.Any())
-            return "No runners found. Register a runner first via the Automaton Studio Runners page.";
-
-        var lines = runners.Select(r => $"- {r.Name} ({(r.Connected ? "connected" : "offline")})");
-        return "Available runners:\n" + string.Join("\n", lines);
     }
 
     // ExecSetAppRunner, ExecDeployBackend, ExecPublishApp removed.
@@ -438,71 +243,4 @@ public class ExternalMcpController : ControllerBase
     private static object RpcError(object? id, int code, string message) =>
         new { jsonrpc = "2.0", id, error = new { code, message } };
 
-    // ── Tool schema helpers ───────────────────────────────────────────────────
-
-    private static object ToolDef(string name, string description, object inputSchema) =>
-        new { name, description, inputSchema };
-
-    private static object ToolDef(string name, string description, object properties, string[] required) =>
-        new { name, description, inputSchema = new { type = "object", properties, required } };
-
-    private static object Props(params object[] props) => MergeProps(props);
-
-    private static object Prop(string name, string type, string description) =>
-        new { name, schema = new { type, description } };
-
-    private static Dictionary<string, object> MergeProps(object[] props)
-    {
-        var dict = new Dictionary<string, object>();
-        foreach (dynamic p in props)
-            dict[p.name] = p.schema;
-        return dict;
-    }
-
-    private static Guid RequireAppId(JsonElement args)
-    {
-        var raw = RequireString(args, "appId");
-        if (!Guid.TryParse(raw, out var appId))
-            throw new ArgumentException($"'appId' is not a valid GUID: {raw}");
-        return appId;
-    }
-
-    private static string RequireString(JsonElement args, string key)
-    {
-        if (!args.TryGetProperty(key, out var val) || val.ValueKind != JsonValueKind.String)
-            throw new ArgumentException($"Missing required argument '{key}'");
-        return val.GetString()!;
-    }
-
-    private static object BuildFileTree(string rootPath, string currentPath, string name)
-    {
-        var relativePath = Path.GetRelativePath(rootPath, currentPath)
-            .Replace('\\', '/');
-
-        if (relativePath == ".")
-        {
-            relativePath = string.Empty;
-        }
-
-        var directories = Directory.GetDirectories(currentPath)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => BuildFileTree(rootPath, path, Path.GetFileName(path)));
-
-        var files = Directory.GetFiles(currentPath)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => new
-            {
-                type = "file",
-                name = Path.GetFileName(path),
-                path = Path.GetRelativePath(rootPath, path).Replace('\\', '/')
-            });
-
-        return new
-        {
-            type = "folder",
-            name,
-            path = relativePath,
-            children = directories.Concat<object>(files).ToArray()
-        };
-    }
 }

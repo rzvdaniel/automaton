@@ -20,70 +20,7 @@ public class AdminLogsControllerTests
         var runnerEntityId = Guid.NewGuid();
         var now = DateTime.UtcNow;
 
-        dbContext.AuditEvents.AddRange(
-            new AuditEvent
-            {
-                Id = Guid.NewGuid(),
-                Category = "Audit",
-                Action = AuditActions.Created,
-                EntityType = AuditEntityTypes.ApiKey,
-                EntityId = Guid.NewGuid(),
-                UserId = Guid.NewGuid(),
-                UserName = "other@automaton.test",
-                Outcome = AuditOutcomes.Success,
-                EventType = AuditEventTypes.ApiKeyCreated,
-                Message = "Other event",
-                MetadataJson = "{\"name\":\"Other\"}",
-                CreatedAtUtc = now.AddMinutes(-20)
-            },
-            new AuditEvent
-            {
-                Id = Guid.NewGuid(),
-                Category = "Audit",
-                Action = AuditActions.Published,
-                EntityType = AuditEntityTypes.App,
-                EntityId = appEntityId,
-                UserId = Guid.NewGuid(),
-                TargetUserId = targetUserId,
-                UserName = "admin@automaton.test",
-                Outcome = AuditOutcomes.Success,
-                EventType = AuditEventTypes.AppPublished,
-                Message = "App was published for release",
-                MetadataJson = "{\"name\":\"Space Invaders\"}",
-                CreatedAtUtc = now.AddMinutes(-10)
-            },
-            new AuditEvent
-            {
-                Id = Guid.NewGuid(),
-                Category = "Audit",
-                Action = AuditActions.Published,
-                EntityType = AuditEntityTypes.App,
-                EntityId = Guid.NewGuid(),
-                UserId = Guid.NewGuid(),
-                TargetUserId = targetUserId,
-                UserName = "admin@automaton.test",
-                Outcome = AuditOutcomes.Failed,
-                EventType = AuditEventTypes.AppPublished,
-                Message = "App publish failed",
-                MetadataJson = "{\"name\":\"Broken App\"}",
-                CreatedAtUtc = now.AddMinutes(-5)
-            },
-            new AuditEvent
-            {
-                Id = Guid.NewGuid(),
-                Category = "Audit",
-                Action = AuditActions.Assigned,
-                EntityType = AuditEntityTypes.Runner,
-                EntityId = runnerEntityId,
-                UserId = Guid.NewGuid(),
-                TargetUserId = targetUserId,
-                UserName = "admin@automaton.test",
-                Outcome = AuditOutcomes.Success,
-                EventType = AuditEventTypes.RunnerAssignedToApp,
-                Message = "Runner assigned",
-                MetadataJson = "{\"runnerName\":\"Local\"}",
-                CreatedAtUtc = now.AddMinutes(-2)
-            });
+        SeedFilteredAuditEvents(dbContext, targetUserId, appEntityId, runnerEntityId, now);
 
         await dbContext.SaveChangesAsync();
 
@@ -128,24 +65,7 @@ public class AdminLogsControllerTests
         await using var dbContext = CreateDbContext();
         var now = DateTime.UtcNow;
 
-        for (var i = 0; i < 3; i++)
-        {
-            dbContext.AuditEvents.Add(new AuditEvent
-            {
-                Id = Guid.NewGuid(),
-                Category = "Audit",
-                Action = AuditActions.Created,
-                EntityType = AuditEntityTypes.App,
-                EntityId = Guid.NewGuid(),
-                UserId = Guid.NewGuid(),
-                UserName = $"user{i}@automaton.test",
-                Outcome = AuditOutcomes.Success,
-                EventType = AuditEventTypes.AppCreated,
-                Message = $"App {i} created",
-                MetadataJson = $"{{\"name\":\"App {i}\"}}",
-                CreatedAtUtc = now.AddMinutes(-i)
-            });
-        }
+        SeedPagingAuditEvents(dbContext, now);
 
         await dbContext.SaveChangesAsync();
 
@@ -172,6 +92,72 @@ public class AdminLogsControllerTests
         });
     }
 
+    private static void SeedFilteredAuditEvents(
+        ApplicationDbContext dbContext,
+        Guid targetUserId,
+        Guid appEntityId,
+        Guid runnerEntityId,
+        DateTime now)
+    {
+        dbContext.AuditEvents.AddRange(
+            CreateAuditEvent(AuditActions.Created, AuditEntityTypes.ApiKey, AuditOutcomes.Success,
+                AuditEventTypes.ApiKeyCreated, "Other event", "{\"name\":\"Other\"}", now.AddMinutes(-20)),
+            new AuditEvent
+            {
+                Id = Guid.NewGuid(), Category = "Audit", Action = AuditActions.Published,
+                EntityType = AuditEntityTypes.App, EntityId = appEntityId, UserId = Guid.NewGuid(),
+                TargetUserId = targetUserId, UserName = "admin@automaton.test", Outcome = AuditOutcomes.Success,
+                EventType = AuditEventTypes.AppPublished, Message = "App was published for release",
+                MetadataJson = "{\"name\":\"Space Invaders\"}", CreatedAtUtc = now.AddMinutes(-10)
+            },
+            new AuditEvent
+            {
+                Id = Guid.NewGuid(), Category = "Audit", Action = AuditActions.Published,
+                EntityType = AuditEntityTypes.App, EntityId = Guid.NewGuid(), UserId = Guid.NewGuid(),
+                TargetUserId = targetUserId, UserName = "admin@automaton.test", Outcome = AuditOutcomes.Failed,
+                EventType = AuditEventTypes.AppPublished, Message = "App publish failed",
+                MetadataJson = "{\"name\":\"Broken App\"}", CreatedAtUtc = now.AddMinutes(-5)
+            },
+            new AuditEvent
+            {
+                Id = Guid.NewGuid(), Category = "Audit", Action = AuditActions.Assigned,
+                EntityType = AuditEntityTypes.Runner, EntityId = runnerEntityId, UserId = Guid.NewGuid(),
+                TargetUserId = targetUserId, UserName = "admin@automaton.test", Outcome = AuditOutcomes.Success,
+                EventType = AuditEventTypes.RunnerAssignedToApp, Message = "Runner assigned",
+                MetadataJson = "{\"runnerName\":\"Local\"}", CreatedAtUtc = now.AddMinutes(-2)
+            });
+    }
+
+    private static AuditEvent CreateAuditEvent(
+        string action,
+        string entityType,
+        string outcome,
+        string eventType,
+        string message,
+        string metadataJson,
+        DateTime createdAtUtc)
+        => new()
+        {
+            Id = Guid.NewGuid(), Category = "Audit", Action = action, EntityType = entityType,
+            EntityId = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "other@automaton.test",
+            Outcome = outcome, EventType = eventType, Message = message, MetadataJson = metadataJson,
+            CreatedAtUtc = createdAtUtc
+        };
+
+    private static void SeedPagingAuditEvents(ApplicationDbContext dbContext, DateTime now)
+    {
+        for (var index = 0; index < 3; index++)
+        {
+            dbContext.AuditEvents.Add(CreateAuditEvent(
+                AuditActions.Created,
+                AuditEntityTypes.App,
+                AuditOutcomes.Success,
+                AuditEventTypes.AppCreated,
+                $"App {index} created",
+                $"{{\"name\":\"App {index}\"}}",
+                now.AddMinutes(-index)));
+        }
+    }
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -1,5 +1,4 @@
-﻿using Automaton.Core.Enums;
-using Microsoft.AspNetCore.SignalR;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
@@ -7,7 +6,6 @@ using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Data;
-using Automaton.Api.Hubs;
 using CustomStep = Automaton.Api.Models.CustomStep;
 
 namespace Automaton.Api.Services;
@@ -16,7 +14,7 @@ public class CustomStepsService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
-    private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly CustomStepRunnerExecutionService runnerExecutionService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly SensitiveVariableService sensitiveVariableService;
     private readonly Guid userId;
@@ -29,14 +27,14 @@ public class CustomStepsService
         ApplicationDbContext dataContext,
         UserContextService userContextService,
         RecentActivityService recentActivityService,
-        IHubContext<AutomatonHub> automatonHub,
+        CustomStepRunnerExecutionService runnerExecutionService,
         ResourceAuthorizationService authorizationService,
         SensitiveVariableService sensitiveVariableService
     )
     {
         this.dataContext = dataContext;
         this.recentActivityService = recentActivityService;
-        this.automatonHub = automatonHub;
+        this.runnerExecutionService = runnerExecutionService;
         this.authorizationService = authorizationService;
         this.sensitiveVariableService = sensitiveVariableService;
         this.userId = userContextService.GetUserId();
@@ -80,7 +78,7 @@ public class CustomStepsService
     }
 
     public async Task<Guid> Create(NewCustomStep step)
-    { 
+    {
         var entity = new Entities.CustomStep
         {
             Id = Guid.NewGuid(),
@@ -202,145 +200,24 @@ public class CustomStepsService
     }
 
     /// <summary>
-    /// Execute a custom step on specified runners via SignalR
+    /// Execute a custom step on specified runners via SignalR.
     /// </summary>
-    public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
+    public async Task<IEnumerable<RunnerCustomStepResult>> Execute(
+        Guid customStepId,
+        IEnumerable<Guid> runnerIds,
+        CancellationToken cancellationToken)
     {
-        var results = new List<RunnerCustomStepResult>();
-        var selectedRunnerIds = runnerIds.Distinct().ToList();
+        var selectedRunnerIds = runnerIds.Distinct().ToArray();
+        await runnerExecutionService.EnsureCanExecuteAsync(selectedRunnerIds, userId, cancellationToken);
 
-        var selectedRunners = await dataContext.Runners
-            .Where(r => selectedRunnerIds.Contains(r.Id))
-            .Select(r => new { r.CapabilitiesJson, r.Purpose })
-            .ToListAsync(cancellationToken);
-        var infrastructureRunnerSelected = selectedRunners.Any(r =>
-            RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
-        if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
-        {
-            throw new UnauthorizedAccessException("Only administrators may execute custom steps on Infrastructure Runners.");
-        }
-        
-        // Get the custom step with decrypted values
         var customStep = await GetForExecutionAsync(customStepId);
-        
-        if (customStep == null)
+        if (customStep is null)
         {
             throw new InvalidOperationException($"Custom step {customStepId} not found");
         }
 
-        foreach (var runnerId in selectedRunnerIds)
-        {
-            RunnerCustomStepResult result;
-            
-            try
-            {
-                var runner = GetRunner(runnerId, userId);
-                
-                if (runner == null)
-                {
-                    logger.Warning("Runner {RunnerId} not found for user {UserId}", runnerId, userId);
-                    result = new RunnerCustomStepResult
-                    {
-                        CustomStepId = customStepId,
-                        RunnerId = runnerId,
-                        Success = false,
-                        Error = "Runner not found",
-                        Started = DateTime.UtcNow,
-                        Finished = DateTime.UtcNow
-                    };
-                }
-                else if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-                {
-                    logger.Warning("Runner {RunnerId} ({RunnerName}) is not connected", runnerId, runner.Name);
-                    result = new RunnerCustomStepResult
-                    {
-                        CustomStepId = customStepId,
-                        RunnerId = runnerId,
-                        Success = false,
-                        Error = "Runner is not connected",
-                        Started = DateTime.UtcNow,
-                        Finished = DateTime.UtcNow
-                    };
-                }
-                else
-                {
-                    var client = automatonHub.Clients.Client(runner.ConnectionId);
-                    
-                    logger.Debug("Executing custom step {CustomStepId} ({CustomStepName}) on runner {RunnerId} ({RunnerName})", 
-                        customStepId, customStep.Name, runnerId, runner.Name);
-
-                    // Map to runner payload format
-                    var payload = new
-                    {
-                        Id = customStep.Id,
-                        Name = customStep.Name,
-                        Code = customStep.Definition.Code,
-                        Language = customStep.Definition.Language,
-                        CodeInputVariables = customStep.Definition.CodeInputVariables,
-                        CodeOutputVariables = customStep.Definition.CodeOutputVariables
-                    };
-
-                    var response = await client.InvokeAsync<CustomStepExecutionResponse>(
-                        AutomatonHubMethods.RunCustomStep, 
-                        payload, 
-                        cancellationToken);
-
-                    result = new RunnerCustomStepResult
-                    {
-                        CustomStepId = customStepId,
-                        RunnerId = runnerId,
-                        Success = response.Success,
-                        Output = response.Output,
-                        Error = response.Error,
-                        Started = response.Started,
-                        Finished = response.Finished,
-                        OutputVariables = response.OutputVariables
-                    };
-
-                    if (response.Success)
-                    {
-                        logger.Debug(
-                            "Custom step {CustomStepId} completed successfully on runner {RunnerId}",
-                            customStepId,
-                            runnerId);
-                    }
-                    else
-                    {
-                        logger.Warning(
-                            "Custom step {CustomStepId} failed on runner {RunnerId}: {Error}",
-                            customStepId,
-                            runnerId,
-                            response.Error);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ex, "Error executing custom step {CustomStepId} on runner {RunnerId}", customStepId, runnerId);
-                
-                result = new RunnerCustomStepResult
-                {
-                    CustomStepId = customStepId,
-                    RunnerId = runnerId,
-                    Success = false,
-                    Error = $"Execution failed: {ex.Message}",
-                    Started = DateTime.UtcNow,
-                    Finished = DateTime.UtcNow
-                };
-            }
-
-            results.Add(result);
-        }
-
-        return results;
+        return await runnerExecutionService.ExecuteOnRunnersAsync(customStep, selectedRunnerIds, userId, cancellationToken);
     }
-
-    private Task<bool> IsAdministratorAsync(CancellationToken cancellationToken)
-        => dataContext.UserRoles
-            .Join(dataContext.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { userRole.UserId, role.Name })
-            .AnyAsync(x => x.UserId == userId &&
-                           (x.Name == UserRole.Administrator || x.Name == UserRole.SystemAdministrator), cancellationToken);
-
     /// <summary>
     /// Get custom step with decrypted sensitive variables for UI editing
     /// </summary>
@@ -370,7 +247,7 @@ public class CustomStepsService
     {
         var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefault(x => x.Id == id);
-        
+
         if (stepEntity == null)
         {
             return null;
@@ -404,19 +281,6 @@ public class CustomStepsService
         await DecryptSensitiveVariablesAsync(step.Definition);
 
         return step;
-    }
-
-    private Runner GetRunner(Guid id, Guid userId)
-    {
-        var runner = dataContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
-
-        // Reload to get current ConnectionId (same pattern as ScheduleService)
-        if (runner != null)
-        {
-            dataContext.Entry(runner).Reload();
-        }
-
-        return runner;
     }
 
     #region Sensitive Variables Handling
@@ -463,12 +327,12 @@ public class CustomStepsService
                         // Replace value with reference
                         variable.Value = $"${{sensitive:{sensitiveVar.Id}}}";
 
-                        logger.Debug("Encrypted sensitive variable '{Name}' for custom step {CustomStepId}", 
+                        logger.Debug("Encrypted sensitive variable '{Name}' for custom step {CustomStepId}",
                             variable.Name, customStepId);
                     }
                     catch (Exception ex)
                     {
-                        logger.Error(ex, "Failed to encrypt sensitive variable '{Name}' for custom step {CustomStepId}", 
+                        logger.Error(ex, "Failed to encrypt sensitive variable '{Name}' for custom step {CustomStepId}",
                             variable.Name, customStepId);
                         throw;
                     }
@@ -551,7 +415,7 @@ public class CustomStepsService
                 await sensitiveVariableService.DeleteSensitiveVariableAsync(sensitiveVar.Id, userId);
             }
 
-            logger.Debug("Deleted {Count} sensitive variables for custom step {CustomStepId}", 
+            logger.Debug("Deleted {Count} sensitive variables for custom step {CustomStepId}",
                 sensitiveVars.Count, customStepId);
         }
         catch (Exception ex)

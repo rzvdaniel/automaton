@@ -82,6 +82,17 @@ public class AppVersionService
 
         dataContext.AppVersions.Add(appVersion);
 
+        await AddLinkedStepSnapshotsAsync(appVersion.Id, appId);
+
+        await dataContext.SaveChangesAsync();
+
+        logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
+
+        return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
+    }
+
+    private async Task AddLinkedStepSnapshotsAsync(Guid appVersionId, Guid appId)
+    {
         var linkedSteps = await dataContext.WebAppSteps
             .Where(was => was.WebAppId == appId)
             .Include(was => was.CustomStep)
@@ -92,33 +103,23 @@ public class AppVersionService
         {
             var definition = JsonSerializer.Deserialize<CustomStepDefinition>(step.Definition)
                 ?? new CustomStepDefinition();
-
             var variablesSnapshot = JsonSerializer.Serialize(new
             {
                 inputVariables = definition.CodeInputVariables ?? new List<Core.Models.StepVariable>(),
                 outputVariables = definition.CodeOutputVariables ?? new List<Core.Models.StepVariable>()
             });
-
-            var stepSnapshot = new AppVersionStep
+            dataContext.AppVersionSteps.Add(new AppVersionStep
             {
                 Id = Guid.NewGuid(),
-                AppVersionId = appVersion.Id,
+                AppVersionId = appVersionId,
                 StepId = step.Id,
                 StepName = step.Name,
                 Action = AppVersionStepAction.Linked,
                 Language = definition.Language,
                 CodeSnapshot = definition.Code ?? string.Empty,
                 VariablesSnapshot = variablesSnapshot
-            };
-
-            dataContext.AppVersionSteps.Add(stepSnapshot);
+            });
         }
-
-        await dataContext.SaveChangesAsync();
-
-        logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
-
-        return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
     }
 
     /// <summary>
@@ -141,48 +142,8 @@ public class AppVersionService
                 .Include(v => v.Steps)
                 .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == prevVersionNumber);
 
-            // Parse file changes if available
-            if (!string.IsNullOrEmpty(filesChangeSummary))
-            {
-                try
-                {
-                    var fileChanges = JsonSerializer.Deserialize<JsonElement>(filesChangeSummary);
-                    if (fileChanges.ValueKind == JsonValueKind.Object)
-                    {
-                        var added = fileChanges.GetProperty("added").GetArrayLength();
-                        var modified = fileChanges.GetProperty("modified").GetArrayLength();
-                        var deleted = fileChanges.GetProperty("deleted").GetArrayLength();
-
-                        if (added > 0 || modified > 0 || deleted > 0)
-                        {
-                            summaryParts.Add($"{added + modified + deleted} file(s) changed");
-                            if (added > 0) summaryParts.Add($"{added} added");
-                            if (modified > 0) summaryParts.Add($"{modified} modified");
-                            if (deleted > 0) summaryParts.Add($"{deleted} removed");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.Warning(ex, "Could not parse file changes summary");
-                }
-            }
-
-            // Track step changes
-            var currentSteps = currentVersion?.Steps ?? new List<AppVersionStep>();
-            var prevSteps = prevVersion?.Steps ?? new List<AppVersionStep>();
-
-            var addedSteps = currentSteps.Where(cs => !prevSteps.Any(ps => ps.StepId == cs.StepId)).ToList();
-            var removedSteps = prevSteps.Where(ps => !currentSteps.Any(cs => cs.StepId == ps.StepId)).ToList();
-
-            if (addedSteps.Any())
-            {
-                summaryParts.Add($"{addedSteps.Count} step(s) added");
-            }
-            if (removedSteps.Any())
-            {
-                summaryParts.Add($"{removedSteps.Count} step(s) removed");
-            }
+            AppendFileChangeSummary(summaryParts, filesChangeSummary);
+            AppendStepChangeSummary(summaryParts, currentVersion?.Steps, prevVersion?.Steps);
 
             // Fallback if no changes detected
             if (!summaryParts.Any())
@@ -197,6 +158,52 @@ public class AppVersionService
             logger.Warning(ex, "Failed to generate version summary for app {AppId} version {Version}", appId, versionNumber);
             return $"Version {versionNumber} snapshot";
         }
+    }
+
+    private void AppendFileChangeSummary(List<string> summaryParts, string? filesChangeSummary)
+    {
+        if (string.IsNullOrEmpty(filesChangeSummary))
+            return;
+
+        try
+        {
+            AddFileChangeCounts(summaryParts, JsonSerializer.Deserialize<JsonElement>(filesChangeSummary));
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Could not parse file changes summary");
+        }
+    }
+
+    private static void AddFileChangeCounts(List<string> summaryParts, JsonElement fileChanges)
+    {
+        if (fileChanges.ValueKind != JsonValueKind.Object)
+            return;
+
+        var added = fileChanges.GetProperty("added").GetArrayLength();
+        var modified = fileChanges.GetProperty("modified").GetArrayLength();
+        var deleted = fileChanges.GetProperty("deleted").GetArrayLength();
+        if (added == 0 && modified == 0 && deleted == 0)
+            return;
+
+        summaryParts.Add($"{added + modified + deleted} file(s) changed");
+        if (added > 0) summaryParts.Add($"{added} added");
+        if (modified > 0) summaryParts.Add($"{modified} modified");
+        if (deleted > 0) summaryParts.Add($"{deleted} removed");
+    }
+
+    private static void AppendStepChangeSummary(
+        List<string> summaryParts,
+        ICollection<AppVersionStep>? currentSteps,
+        ICollection<AppVersionStep>? previousSteps)
+    {
+        var current = currentSteps ?? Array.Empty<AppVersionStep>();
+        var previous = previousSteps ?? Array.Empty<AppVersionStep>();
+        var addedCount = current.Count(step => previous.All(previousStep => previousStep.StepId != step.StepId));
+        var removedCount = previous.Count(step => current.All(currentStep => currentStep.StepId != step.StepId));
+
+        if (addedCount > 0) summaryParts.Add($"{addedCount} step(s) added");
+        if (removedCount > 0) summaryParts.Add($"{removedCount} step(s) removed");
     }
 
     /// <summary>

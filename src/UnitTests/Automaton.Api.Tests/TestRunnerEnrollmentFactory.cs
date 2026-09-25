@@ -14,6 +14,12 @@ internal static class TestRunnerEnrollmentFactory
         ApplicationDbContext db,
         IAuditEventService auditEventService,
         HostedRunnerOptions? hostedRunnerOptions = null)
+        => CreateWithSecretGrantService(db, auditEventService, hostedRunnerOptions).Service;
+
+    public static RunnerEnrollmentTestServices CreateWithSecretGrantService(
+        ApplicationDbContext db,
+        IAuditEventService auditEventService,
+        HostedRunnerOptions? hostedRunnerOptions = null)
     {
         var apiKeyService = new ApiKeyService(
             db,
@@ -21,14 +27,36 @@ internal static class TestRunnerEnrollmentFactory
             authorizationService: null!,
             auditEventService);
         var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        return new RunnerEnrollmentService(
+        var hostedOptions = Options.Create(hostedRunnerOptions ?? new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" });
+        var grants = new ExecutionSecretGrantService(db, protector);
+        var service = new RunnerEnrollmentService(
             db,
-            apiKeyService,
-            auditEventService,
-            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(hostedRunnerOptions ?? new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
-            new SecretStore(db, protector),
-            new ExecutionSecretGrantService(db, protector),
-            NullLogger<RunnerEnrollmentService>.Instance);
+            new HostedRunnerEnrollmentExchangeService(
+                db,
+                apiKeyService,
+                auditEventService,
+                NullLogger<HostedRunnerEnrollmentExchangeService>.Instance),
+            new InfrastructureRunnerEnrollmentExchangeService(
+                db,
+                apiKeyService,
+                auditEventService,
+                NullLogger<InfrastructureRunnerEnrollmentExchangeService>.Instance),
+            new RunnerEnrollmentAdministrationService(
+                db,
+                auditEventService,
+                Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+                hostedOptions),
+            new HostedRunnerEnrollmentProvisioningService(
+                db,
+                apiKeyService,
+                auditEventService,
+                Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+                new SecretStore(db, protector),
+                grants));
+        return new RunnerEnrollmentTestServices(service, grants);
     }
 }
+
+internal sealed record RunnerEnrollmentTestServices(
+    RunnerEnrollmentService Service,
+    ExecutionSecretGrantService SecretGrants);

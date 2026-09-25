@@ -1,5 +1,6 @@
 ﻿using Automaton.Api.Application.Queries;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using MediatR;
@@ -21,7 +22,16 @@ namespace Automaton.Api.Application.Queries.Handlers
         public async Task<AdminUserListResponse> Handle(FilterUserQuery request,
             CancellationToken cancellationToken)
         {
-            var res = await _userManagerService.GetUsers(new UserFilter
+            var res = await _userManagerService.GetUsers(CreateUserFilter(request));
+            var userIds = res.Items.Select(user => user.Id).ToList();
+            var appCounts = await LoadAppCountsAsync(userIds, cancellationToken);
+            var runnerCounts = await LoadRunnerCountsAsync(userIds, cancellationToken);
+            var registrationProviders = await _userManagerService.ResolveRegistrationProvidersAsync(res.Items, cancellationToken);
+            return CreateResponse(res, registrationProviders, appCounts, runnerCounts);
+        }
+
+        private static UserFilter CreateUserFilter(FilterUserQuery request)
+            => new()
             {
                 Search = request.Search,
                 Name = request.Name,
@@ -35,27 +45,48 @@ namespace Automaton.Api.Application.Queries.Handlers
                 SortOrder = request.SortOrder,
                 PageIndex = request.PageIndex,
                 PageSize = request.PageSize
-            });
+            };
 
-            var userIds = res.Items.Select(user => user.Id).ToList();
-
-            var appCounts = await _db.WebAppUsers
+        private Task<Dictionary<Guid, int>> LoadAppCountsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+            => _db.WebAppUsers
                 .AsNoTracking()
                 .Where(webAppUser => userIds.Contains(webAppUser.UserId))
                 .GroupBy(webAppUser => webAppUser.UserId)
                 .Select(group => new { UserId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
 
-            var runnerCounts = await _db.RunnerUsers
+        private Task<Dictionary<Guid, int>> LoadRunnerCountsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+            => _db.RunnerUsers
                 .AsNoTracking()
                 .Where(runnerUser => userIds.Contains(runnerUser.UserId))
                 .GroupBy(runnerUser => runnerUser.UserId)
                 .Select(group => new { UserId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
 
-            var registrationProviders = await _userManagerService.ResolveRegistrationProvidersAsync(res.Items, cancellationToken);
+        private static AdminUserListResponse CreateResponse(
+            ApplicationUserPageResult result,
+            IReadOnlyDictionary<Guid, string> registrationProviders,
+            IReadOnlyDictionary<Guid, int> appCounts,
+            IReadOnlyDictionary<Guid, int> runnerCounts)
+            => new()
+            {
+                Items = result.Items.Select(user => MapUser(user, registrationProviders, appCounts, runnerCounts)).ToList(),
+                TotalCount = result.TotalCount,
+                Page = result.Page,
+                PageSize = result.PageSize,
+                Summary = result.Summary
+            };
 
-            var items = res.Items.Select(user => new UserDetails
+        private static UserDetails MapUser(
+            ApplicationUser user,
+            IReadOnlyDictionary<Guid, string> registrationProviders,
+            IReadOnlyDictionary<Guid, int> appCounts,
+            IReadOnlyDictionary<Guid, int> runnerCounts)
+            => new()
             {
                 Id = user.Id,
                 Name = user.Name,
@@ -74,16 +105,6 @@ namespace Automaton.Api.Application.Queries.Handlers
                     .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
                     .Cast<string>()
                     .ToList()
-            }).ToList();
-
-            return new AdminUserListResponse
-            {
-                Items = items,
-                TotalCount = res.TotalCount,
-                Page = res.Page,
-                PageSize = res.PageSize,
-                Summary = res.Summary,
             };
-        }
     }
 }

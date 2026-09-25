@@ -26,25 +26,7 @@ public sealed class InfrastructureRunnerHostApprovalService(
         {
             host = await LoadHostAsync(hostId, cancellationToken)
                 ?? throw new KeyNotFoundException("The Runner host was not found.");
-
-            if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.AwaitingApproval)
-                throw new InvalidOperationException("Only a host awaiting approval can be approved.");
-            if (!host.ValidatedAtUtc.HasValue)
-                throw new InvalidOperationException("The Runner host must pass validation before approval.");
-            if (host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort &&
-                !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
-                throw new InvalidOperationException(addressError);
-            if (host.InfrastructureRunner == null || host.InfrastructureRunnerId != host.InfrastructureRunner.Id)
-                throw new InvalidOperationException("The Runner host has no correctly bound Infrastructure Runner.");
-            if (!string.Equals(host.InfrastructureRunner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("The linked Runner is not an Infrastructure Runner.");
-            if (host.InfrastructureRunner.ApiKey == null || !host.InfrastructureRunner.ApiKey.IsActive)
-                throw new InvalidOperationException("The Infrastructure Runner credential is not active.");
-            if (!RunnerPresenceEvaluator.IsOnline(
-                    host.InfrastructureRunner.ConnectionId,
-                    host.InfrastructureRunner.LastHeartbeatAtUtc,
-                    now))
-                throw new InvalidOperationException("The Infrastructure Runner must be online before approval.");
+            ValidateApprovalRequirements(host, now);
 
             host.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
             host.HostedRunnerSchedulingEnabled = true;
@@ -67,6 +49,28 @@ public sealed class InfrastructureRunnerHostApprovalService(
         }, cancellationToken);
 
         return host!;
+    }
+
+    private static void ValidateApprovalRequirements(RunnerHost host, DateTime now)
+    {
+        if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.AwaitingApproval)
+            throw new InvalidOperationException("Only a host awaiting approval can be approved.");
+        if (!host.ValidatedAtUtc.HasValue)
+            throw new InvalidOperationException("The Runner host must pass validation before approval.");
+        if (host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort &&
+            !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
+            throw new InvalidOperationException(addressError);
+        if (host.InfrastructureRunner == null || host.InfrastructureRunnerId != host.InfrastructureRunner.Id)
+            throw new InvalidOperationException("The Runner host has no correctly bound Infrastructure Runner.");
+        if (!string.Equals(host.InfrastructureRunner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The linked Runner is not an Infrastructure Runner.");
+        if (host.InfrastructureRunner.ApiKey == null || !host.InfrastructureRunner.ApiKey.IsActive)
+            throw new InvalidOperationException("The Infrastructure Runner credential is not active.");
+        if (!RunnerPresenceEvaluator.IsOnline(
+                host.InfrastructureRunner.ConnectionId,
+                host.InfrastructureRunner.LastHeartbeatAtUtc,
+                now))
+            throw new InvalidOperationException("The Infrastructure Runner must be online before approval.");
     }
 
     public async Task<RunnerHost?> DisableSchedulingAsync(Guid hostId, Guid adminUserId, CancellationToken cancellationToken)
@@ -103,47 +107,73 @@ public sealed class InfrastructureRunnerHostApprovalService(
         var connectionId = runner.ConnectionId;
         await ExecuteAtomicallyAsync(async () =>
         {
-            if (runner.ApiKey != null)
-                runner.ApiKey.IsActive = false;
-            runner.ConnectionId = null;
-            runner.LastDisconnectedAtUtc = DateTime.UtcNow;
-            runner.Status = RunnerConnectivityStatuses.Offline;
-            var assignedTargets = await db.AppDeploymentTargets
-                .Where(target => target.ExecutionRunnerId == runner.Id)
-                .ToListAsync(cancellationToken);
-            foreach (var target in assignedTargets)
-            {
-                target.ExecutionRunnerId = null;
-                target.ExecutionRunner = null;
-                target.GenericRuntimeDeployed = false;
-                target.Status = DeploymentTargetStatus.Unassigned;
-                target.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-            host.HostedRunnerSchedulingEnabled = false;
-            host.Status = RunnerHostStatuses.Disabled;
-            host.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
+            await RevokeWithinTransactionAsync(host, runner, cancellationToken);
         }, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(connectionId))
-        {
-            try
-            {
-                await automatonHub.Clients.Client(connectionId)
-                    .SendAsync("ReconnectWhenIdle", "Infrastructure Runner credential revoked.", cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug(ex, "Could not signal revoked Infrastructure Runner {RunnerId} to disconnect", runner.Id);
-            }
-        }
+        await SignalRunnerRevocationAsync(connectionId, runner.Id, cancellationToken);
 
         logger.LogInformation(
             "Infrastructure Runner {RunnerId} revoked for host {RunnerHostId}; previous connection present: {HadConnection}",
             runner.Id,
             host.Id,
             !string.IsNullOrWhiteSpace(connectionId));
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        await WriteRevocationAuditAsync(host, runner, adminUserId, cancellationToken);
+
+        return host;
+    }
+
+    private async Task RevokeWithinTransactionAsync(
+        RunnerHost host,
+        Runner runner,
+        CancellationToken cancellationToken)
+    {
+        if (runner.ApiKey is not null)
+            runner.ApiKey.IsActive = false;
+        runner.ConnectionId = null;
+        runner.LastDisconnectedAtUtc = DateTime.UtcNow;
+        runner.Status = RunnerConnectivityStatuses.Offline;
+        var assignedTargets = await db.AppDeploymentTargets
+            .Where(target => target.ExecutionRunnerId == runner.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var target in assignedTargets)
+        {
+            target.ExecutionRunnerId = null;
+            target.ExecutionRunner = null;
+            target.GenericRuntimeDeployed = false;
+            target.Status = DeploymentTargetStatus.Unassigned;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        host.HostedRunnerSchedulingEnabled = false;
+        host.Status = RunnerHostStatuses.Disabled;
+        host.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SignalRunnerRevocationAsync(
+        string? connectionId,
+        Guid runnerId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(connectionId))
+            return;
+
+        try
+        {
+            await automatonHub.Clients.Client(connectionId)
+                .SendAsync("ReconnectWhenIdle", "Infrastructure Runner credential revoked.", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Could not signal revoked Infrastructure Runner {RunnerId} to disconnect", runnerId);
+        }
+    }
+
+    private Task WriteRevocationAuditAsync(
+        RunnerHost host,
+        Runner runner,
+        Guid adminUserId,
+        CancellationToken cancellationToken)
+        => auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Disabled,
             EntityType = AuditEntityTypes.Runner,
@@ -154,9 +184,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
             ActorUserId = adminUserId,
             Metadata = new { HostId = host.Id, RunnerId = runner.Id }
         }, cancellationToken);
-
-        return host;
-    }
 
     private Task<RunnerHost?> LoadHostAsync(Guid hostId, CancellationToken cancellationToken)
         => db.RunnerHosts

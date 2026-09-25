@@ -79,33 +79,32 @@ public class CustomStep : WorkflowStep
         Language = GetInputString(nameof(Language));
 
         var inputsVariable = Inputs.Values.FirstOrDefault(v => v.Name == nameof(CodeInputVariables));
-        
-        if (inputsVariable != null && inputsVariable.Value != null)
+        if (inputsVariable?.Value is string json)
+            AddCodeInputVariables(json, context.Workflow);
+    }
+
+    private void AddCodeInputVariables(string json, Workflow workflow)
+    {
+        var trimmedJson = json.TrimStart();
+        if (trimmedJson.StartsWith("{"))
         {
-            if (inputsVariable.Value is string s && s.TrimStart().StartsWith("{"))
-            {
-                var dict = JsonConvert.DeserializeObject<Dictionary<string, StepVariable>>(s);
-                if (dict != null)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        var variable = kvp.Value;
-                        var variableValue = StepVariableParser.Parse(variable, context.Workflow);
-                        variable.Value = variableValue;
-                        CodeInputVariables.Add(variable);
-                    }
-                }
-            }
-            else if (inputsVariable.Value is string json && json.TrimStart().StartsWith("["))
-            {
-                var list = JsonConvert.DeserializeObject<IList<StepVariable>>(json) ?? [];
-                foreach (var variable in list)
-                {
-                    var variableValue = StepVariableParser.Parse(variable, context.Workflow);
-                    variable.Value = variableValue;
-                    CodeInputVariables.Add(variable);
-                }
-            }
+            AddCodeInputVariables(JsonConvert.DeserializeObject<Dictionary<string, StepVariable>>(json)?.Values, workflow);
+        }
+        else if (trimmedJson.StartsWith("["))
+        {
+            AddCodeInputVariables(JsonConvert.DeserializeObject<IList<StepVariable>>(json), workflow);
+        }
+    }
+
+    private void AddCodeInputVariables(IEnumerable<StepVariable>? variables, Workflow workflow)
+    {
+        if (variables == null)
+            return;
+
+        foreach (var variable in variables)
+        {
+            variable.Value = StepVariableParser.Parse(variable, workflow);
+            CodeInputVariables.Add(variable);
         }
     }
 

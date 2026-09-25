@@ -20,14 +20,7 @@ public sealed class InfrastructureCommandHostedService(
         var hostId = profile?.RunnerHostId ?? (Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var parsedHostId) ? parsedHostId : Guid.Empty);
         if (!ShouldStart(purpose, storage.GetRunnerId(), hostId))
             return;
-        var missing = new List<string>();
-        if (string.IsNullOrWhiteSpace(configuration["RabbitMq:Host"])) missing.Add("RabbitMq:Host");
-        if (string.IsNullOrWhiteSpace(configuration["RabbitMq:Username"])) missing.Add("RabbitMq:Username");
-        if (string.IsNullOrWhiteSpace(configuration["RabbitMq:Password"])) missing.Add("RabbitMq:Password");
-        if (string.IsNullOrWhiteSpace(await storage.LoadApiKeyAsync())) missing.Add("API key");
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL")
-                ?? await storage.LoadServerUrlAsync()
-                ?? configuration["AppConfig:BaseUrl"])) missing.Add("API URL");
+        var missing = await GetMissingConfigurationAsync();
         if (missing.Count > 0)
         {
             logger.LogWarning("Infrastructure command consumer disabled: incomplete RabbitMQ/API configuration ({MissingConfiguration}).", string.Join(", ", missing));
@@ -56,6 +49,25 @@ public sealed class InfrastructureCommandHostedService(
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
+    }
+
+    private async Task<List<string>> GetMissingConfigurationAsync()
+    {
+        var missing = new List<string>();
+        AddMissingSetting(missing, "RabbitMq:Host", configuration["RabbitMq:Host"]);
+        AddMissingSetting(missing, "RabbitMq:Username", configuration["RabbitMq:Username"]);
+        AddMissingSetting(missing, "RabbitMq:Password", configuration["RabbitMq:Password"]);
+        AddMissingSetting(missing, "API key", await storage.LoadApiKeyAsync());
+        var serverUrl = Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL")
+            ?? await storage.LoadServerUrlAsync()
+            ?? configuration["AppConfig:BaseUrl"];
+        AddMissingSetting(missing, "API URL", serverUrl);
+        return missing;
+    }
+
+    private static void AddMissingSetting(List<string> missing, string settingName, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) missing.Add(settingName);
     }
 
     internal static bool ShouldStart(string? purpose, string? runnerId, Guid hostId)

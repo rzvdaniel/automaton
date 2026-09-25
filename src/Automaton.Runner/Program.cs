@@ -53,7 +53,7 @@ public class Program
                 CreateServerCommand(),
                 CreateServiceCommand(),
                 CreateCleanupCommand(),
-                CreateInfrastructureCommandProbe(),
+                RunnerInfrastructureCommandProbe.Create(),
                 CreateExecuteAppFlowCommand()
             };
 
@@ -84,27 +84,6 @@ public class Program
         {
             await Log.CloseAndFlushAsync();
         }
-    }
-
-    private static Command CreateInfrastructureCommandProbe()
-    {
-        var command = new Command("infrastructure-command-probe", "Consume one local infrastructure command without acknowledging it. Development only.");
-        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
-        {
-            if (!string.Equals(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Development", StringComparison.Ordinal))
-                throw new InvalidOperationException("The infrastructure command probe requires DOTNET_ENVIRONMENT=Development.");
-            var identity = await InfrastructureCommandIdentity.LoadAsync(new FileStorageService());
-            var workspace = new RunnerWorkspaceService();
-            var coordinator = new AppActionExecutionCoordinator();
-            var configuration = GetConfiguration(Array.Empty<string>());
-            var api = new InfrastructureCommandApiClient(configuration, new FileStorageService());
-            var executor = new TrustedInfrastructureActionExecutor(
-                new AppActionDeploymentService(workspace, coordinator), new AppActionExecutionService(workspace, coordinator), api);
-            var consumer = new InfrastructureCommandConsumer(identity, executor, api);
-            var result = await consumer.ConsumeOneAsync(configuration, context.GetCancellationToken());
-            WriteLine(System.Text.Json.JsonSerializer.Serialize(new { result.Execution, result.Result }, jsonSerializerOptions));
-        });
-        return command;
     }
 
     private static Command CreateAuthCommand()
@@ -359,110 +338,8 @@ public class Program
             .Build();
     }
 
-    internal static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .UseSerilog()
-            .ConfigureServices((context, services) =>
-            {
-                services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
-                services.Configure<TunnelForwarderConfig>(context.Configuration.GetSection("TunnelForwarder"));
-
-                // Register configuration services
-                services.AddSingleton<ConfigurationService>();
-                services.AddSingleton<FileStorageService>();
-                services.AddSingleton<ApiKeyAuthenticationService>();
-                services.AddSingleton<RunnerWorkspaceService>();
-                services.AddSingleton<AppActionDeploymentService>();
-                services.AddSingleton<AppActionExecutionService>();
-                services.AddSingleton<AppActionExecutionCoordinator>();
-                services.AddHostedService<AppActionArtifactCleanupService>();
-                services.AddSingleton<RunnerDeploymentService>();
-                services.AddSingleton<RunnerRuntimeRegistry>();
-                services.AddSingleton<IApplicationContainerRuntime>(sp =>
-                    RunnerApplicationContainerRuntimeSelection.UsesBroker(
-                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
-                        Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
-                        Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"))
-                        ? new BrokeredApplicationContainerRuntime(
-                            // Keep the Hub relay lazy: resolving it while the hosted
-                            // runtime manager starts would cycle through RunnerDeploymentService.
-                            (Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>>)((request, cancellationToken) =>
-                                sp.GetRequiredService<HubService>().RequestHostContainerExecutionAsync(request, cancellationToken)),
-                            (Func<Task<RunnerInstallationProfile?>>)(() =>
-                                sp.GetRequiredService<FileStorageService>().LoadInstallationProfileAsync()))
-                        : new DockerContainerRuntime());
-                services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
-                services.AddSingleton<RunnerRuntimeContainerManager>();
-                services.AddSingleton<IAppRuntimeProcessManager>(sp => sp.GetRequiredService<RunnerRuntimeContainerManager>());
-                services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeContainerManager>());
-                services.AddSingleton<RunnerRuntimeProcessManager>();
-                services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
-                services.AddSingleton<HubService>();
-                services.AddHostedService<StorageTelemetryBackgroundService>();
-                services.AddSingleton<FlowExecutionService>();
-                services.AddSingleton<AppFlowExecutionService>();
-                services.AddSingleton<RunnerHostService>();
-                services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
-                services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
-
-                // Register runner settings service for loading script engine configuration
-                services.AddScoped<RunnerSettingsService>();
-
-                // Register custom step handler as transient (uses scoped ScriptEngineHost)
-                services.AddTransient<CustomStepExecuteService>();
-                services.AddSingleton<InfrastructureCommandService>();
-                services.AddSingleton<HostContainerExecutionService>();
-                services.AddSingleton<TunnelForwarderService>();
-                services.AddHostedService<InfrastructureCommandHostedService>();
-
-                // Add HTTP client for RunnerHostService
-                services.AddHttpClient<RunnerHostService>();
-
-                // Add HTTP client for RunnerSettingsService
-                services.AddHttpClient<RunnerSettingsService>();
-
-                // Add HTTP client for ScriptEngineSettingsReporter
-                services.AddHttpClient<ScriptEngineSettingsReporter>();
-
-                // Add default HTTP client
-                services.AddHttpClient();
-
-                // The runtime gateway is a transparent proxy. It must not follow
-                // application redirects on the runner's behalf.
-                services.AddHttpClient<RunnerRuntimeGatewayService>()
-                    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-                    {
-                        AllowAutoRedirect = false
-                    });
-
-                // Register MediatR - scan current assembly and Core assembly
-                services.AddMediatR(cfg =>
-                {
-                    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
-                    cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
-                });
-
-                // Register Automaton services with runner-specific script engine settings
-                // Settings will be loaded at execution time to avoid deadlocks
-                services.AddScriptingForRunner();
-                services.AddAutomatonCore();
-                services.AddAutomatonSteps();
-
-                // Override FlowExecuteService with proper application name for console runner
-                services.AddTransient<FlowExecuteService>(provider =>
-                {
-                    var flowConvertService = provider.GetRequiredService<FlowConvertService>();
-                    var configService = provider.GetRequiredService<ConfigurationService>();
-                    var notificationService = provider.GetService<IExecutionNotificationService>();
-                    var persistenceService = provider.GetService<IWorkflowExecutionPersistenceService>();
-
-                    return new FlowExecuteService(
-                        flowConvertService,
-                        configService.ApplicationName, // Use the proper application name from config
-                        notificationService,
-                        persistenceService);
-                });
-            });
+    internal static IHostBuilder CreateHostBuilder(string[] args)
+        => RunnerHostBuilder.Create(args);
 
     private static void PressAnyKeyToExit()
     {

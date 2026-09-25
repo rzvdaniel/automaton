@@ -34,34 +34,22 @@ public class UserAppsController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
     private readonly AppsService appsService;
-    private readonly AppFileStorageService fileStorageService;
-    private readonly AppMediaStorageService mediaStorageService;
     private readonly RuntimeFileProxyService runtimeFileProxyService;
     private readonly ILogger<UserAppsController> logger;
-    private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public UserAppsController(
         ApplicationDbContext dbContext,
         AppsService appsService,
-        AppFileStorageService fileStorageService,
-        AppMediaStorageService mediaStorageService,
         RuntimeFileProxyService runtimeFileProxyService,
         ILogger<UserAppsController> logger,
-        IWebHostEnvironment environment,
-        IOptions<WebAppConfig> webAppConfig,
-        PrivateAppLaunchService privateAppLaunchService)
+        IOptions<WebAppConfig> webAppConfig)
     {
         this.dbContext = dbContext;
         this.appsService = appsService;
-        this.fileStorageService = fileStorageService;
-        this.mediaStorageService = mediaStorageService;
         this.runtimeFileProxyService = runtimeFileProxyService;
         this.logger = logger;
-        this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
-        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     /// <summary>
@@ -135,11 +123,6 @@ public class UserAppsController : ControllerBase
             return null;
         }
 
-        if (privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
-        {
-            return await appsService.GetAccessibleAppInfoByIdAsync(appId);
-        }
-
         return await appsService.GetAccessibleAppInfoByIdAsync(appId);
     }
 
@@ -165,49 +148,6 @@ public class UserAppsController : ControllerBase
             .FirstOrDefaultAsync();
 
         return app;
-    }
-
-    [HttpGet("apps/{slug}/media/{*path}")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServeStudioHostedAppMedia(string slug, string path, CancellationToken cancellationToken)
-    {
-        return await ServePublishedAppMedia(slug, path, cancellationToken);
-    }
-
-    [HttpGet("{slug}/media/{*path}")]
-    [AppsHostOnly]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServeDedicatedAppsHostAppMedia(string slug, string path, CancellationToken cancellationToken)
-    {
-        return await ServePublishedAppMedia(slug, path, cancellationToken);
-    }
-
-    private async Task<IActionResult> ServePublishedAppMedia(string slug, string path, CancellationToken cancellationToken)
-    {
-        var app = await appsService.GetPublishedAppInfoAsync(slug, cancellationToken);
-        if (app == null)
-        {
-            return NotFound();
-        }
-
-        if (app.RequiresAuthentication && User.Identity?.IsAuthenticated != true)
-        {
-            logger.LogWarning("Unauthenticated access to protected app media: {Slug}", slug);
-            return Unauthorized();
-        }
-
-        if (app.OwnerId == null)
-        {
-            return NotFound();
-        }
-
-        var statusCode = await mediaStorageService.ProxyReadAsync(app.Id, app.OwnerId.Value, path, Response, cancellationToken);
-        if (statusCode == StatusCodes.Status200OK)
-        {
-            return new EmptyResult();
-        }
-
-        return StatusCode(statusCode);
     }
 
     private async Task<IActionResult> ServeRuntimeFileAsync(

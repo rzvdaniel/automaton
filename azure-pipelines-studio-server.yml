@@ -3,6 +3,12 @@
 # Add steps that publish symbols, save build artifacts, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
 
+trigger:
+  - main
+
+pr:
+  - main
+
 parameters:
     - name: isRelease
       displayName: Is a release build
@@ -24,10 +30,17 @@ jobs:
 
   steps:
   - task: UseDotNet@2 
-    displayName: ".NET 9.x"
+    displayName: ".NET 9.0.318"
     inputs:
-      version: '9.x'
+      version: '9.0.318'
       packageType: sdk
+
+  - task: DotNetCoreCLI@2
+    displayName: "Build all C# projects with analyzer errors"
+    inputs:
+      command: build
+      projects: '$(System.DefaultWorkingDirectory)/Automaton.All.sln'
+      arguments: '--configuration $(buildConfiguration) --no-incremental --verbosity minimal'
 
   - task: DotNetCoreCLI@2
     displayName: "Test"

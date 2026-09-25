@@ -1,5 +1,3 @@
-using System.IO.Compression;
-using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
@@ -8,8 +6,6 @@ using Automaton.Api.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
@@ -19,43 +15,28 @@ namespace Automaton.Api.Services;
 /// </summary>
 public sealed class ApplicationDeploymentService
 {
-    private readonly ApplicationDbContext dataContext;
-    private readonly AppFileStorageService fileStorageService;
-    private readonly IHubContext<AutomatonHub> automatonHub;
-    private readonly FileUploadRegistry uploadRegistry;
+    private readonly DeploymentPackageRunnerService packageRunnerService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppDeploymentTargetStateService deploymentTargetStateService;
-    private readonly BackendRouteConfigService backendRouteConfigService;
-    private readonly ConnectedFlowArtifactService connectedFlowArtifactService;
+    private readonly DeploymentPackageFinalizationService packageFinalizationService;
     private readonly Serilog.ILogger logger;
-    private readonly ApiInstanceIdentityService apiInstanceIdentityService;
 
     public ApplicationDeploymentService(
-        ApplicationDbContext dataContext,
-        AppFileStorageService fileStorageService,
-        IHubContext<AutomatonHub> automatonHub,
-        FileUploadRegistry uploadRegistry,
+        DeploymentPackageRunnerService packageRunnerService,
         ManagedRunnerBootstrapService managedRunnerBootstrapService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppDeploymentTargetStateService deploymentTargetStateService,
-        BackendRouteConfigService backendRouteConfigService,
-        ConnectedFlowArtifactService connectedFlowArtifactService,
-        ApiInstanceIdentityService apiInstanceIdentityService)
+        DeploymentPackageFinalizationService packageFinalizationService)
     {
-        this.dataContext = dataContext;
-        this.fileStorageService = fileStorageService;
-        this.automatonHub = automatonHub;
-        this.uploadRegistry = uploadRegistry;
+        this.packageRunnerService = packageRunnerService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.deploymentTargetStateService = deploymentTargetStateService;
-        this.backendRouteConfigService = backendRouteConfigService;
-        this.connectedFlowArtifactService = connectedFlowArtifactService;
-        this.apiInstanceIdentityService = apiInstanceIdentityService;
+        this.packageFinalizationService = packageFinalizationService;
         logger = Serilog.Log.ForContext<ApplicationDeploymentService>();
     }
 
@@ -105,28 +86,16 @@ public sealed class ApplicationDeploymentService
             if (runner is null || string.IsNullOrWhiteSpace(runner.ConnectionId))
                 throw new InvalidOperationException("No connected runner is assigned to this app.");
 
-            await EnsureRunnerOwnershipAsync(runner, cancellationToken);
-            RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
-            if (packageApplication.Runtime.Command is not null || packageApplication.Build.Command is not null)
-                RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(runner);
-
-            var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
-            await EnsureRunnerOwnershipAsync(runner, cancellationToken);
-            var result = await automatonHub.Clients.Client(runner.ConnectionId)
-                .InvokeAsync<DeployAppPackageResult>(
-                    AutomatonHubMethods.DeployAppPackage,
-                    new DeployAppPackageRequest
-                    {
-                        AppId = appId,
-                        DeploymentTargetId = target.Id,
-                        PackagePath = completion.LocalPath,
-                        Clean = clean,
-                        DeploymentOperationId = deploymentOperationId,
-                        ExecutionAttemptId = executionAttemptId,
-                        SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
-                            && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
-                    },
-                    CancellationToken.None);
+            var result = await packageRunnerService.DeployAsync(
+                appId,
+                target.Id,
+                runner,
+                file,
+                packageApplication,
+                clean,
+                deploymentOperationId,
+                executionAttemptId,
+                cancellationToken);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
             if (!result.Success)
@@ -143,23 +112,14 @@ public sealed class ApplicationDeploymentService
 
             if (result.Success)
             {
-                await connectedFlowArtifactService.SynchronizeAsync(
+                await packageFinalizationService.FinalizeAsync(
                     appId,
                     target.Id,
                     ownerId,
-                    [runner],
+                    runner,
+                    file,
+                    packageApplication,
                     cancellationToken);
-                await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
-                await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
-                await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
-                {
-                    metadata.DevelopmentMode = AppDevelopmentModes.Local;
-                });
-
-                await backendRouteConfigService.RefreshAsync(
-                    cancellationToken,
-                    target.Id,
-                    packageApplication.Runtime.Command is not null);
                 pendingRouteApplied = true;
 
                 await deploymentTargetStateService.MarkCompletedAsync(
@@ -195,141 +155,77 @@ public sealed class ApplicationDeploymentService
         }
         catch (Exception deploymentException)
         {
-            if (!targetStateFinalized)
-            {
-                try
-                {
-                    await deploymentTargetStateService.MarkCompletedAsync(
-                        appId,
-                        target.Id,
-                        success: false,
-                        cancellationToken: CancellationToken.None,
-                        deploymentOperationId: deploymentOperationId,
-                        executionAttemptId: executionAttemptId);
-                }
-                catch (Exception completionException)
-                {
-                    logger.Error(completionException,
-                        "Failed to finalize failed generic deployment for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                        appId, target.Id);
-                }
-            }
-
-            if (pendingRouteApplied && !targetStateFinalized)
-            {
-                try
-                {
-                    await backendRouteConfigService.RefreshAsync(CancellationToken.None);
-                }
-                catch (Exception compensationException)
-                {
-                    logger.Error(compensationException,
-                        "Failed to compensate generic route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                        appId, target.Id);
-                }
-            }
-
-            logger.Error(deploymentException,
-                "Generic package deployment failed for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
-                appId, target.Id);
+            await HandleDeploymentFailureAsync(
+                appId,
+                target.Id,
+                deploymentOperationId,
+                executionAttemptId,
+                targetStateFinalized,
+                pendingRouteApplied,
+                deploymentException);
             throw;
         }
     }
 
-    private async Task PersistDeployPackageSourceAsync(
+    private async Task HandleDeploymentFailureAsync(
         Guid appId,
-        Guid ownerId,
-        IFormFile file,
-        CancellationToken cancellationToken)
+        Guid deploymentTargetId,
+        Guid? deploymentOperationId,
+        Guid? executionAttemptId,
+        bool targetStateFinalized,
+        bool pendingRouteApplied,
+        Exception deploymentException)
     {
-        await fileStorageService.ClearSourceAsync(ownerId, appId);
-        var sourceRoot = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
-        Directory.CreateDirectory(sourceRoot);
-
-        using var stream = file.OpenReadStream();
-        using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-        foreach (var entry in archive.Entries)
+        if (!targetStateFinalized)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(entry.Name))
-                continue;
-
-            var normalizedPath = entry.FullName.Replace('\\', '/').TrimStart('/');
-            if (!normalizedPath.StartsWith("source/", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var relativeSourcePath = normalizedPath["source/".Length..];
-            if (string.IsNullOrWhiteSpace(relativeSourcePath))
-                continue;
-
-            var destinationPath = Path.GetFullPath(Path.Combine(sourceRoot, relativeSourcePath));
-            var fullSourceRoot = Path.GetFullPath(sourceRoot);
-            if (!destinationPath.StartsWith(fullSourceRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"Deploy package source entry '{relativeSourcePath}' escapes the app source directory.");
-
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            await using var entryStream = entry.Open();
-            await using var outputStream = File.Create(destinationPath);
-            await entryStream.CopyToAsync(outputStream, cancellationToken);
+            await TryMarkDeploymentFailedAsync(appId, deploymentTargetId, deploymentOperationId, executionAttemptId);
         }
+
+        if (pendingRouteApplied && !targetStateFinalized)
+        {
+            await TryRestoreRouteAsync(appId, deploymentTargetId);
+        }
+
+        logger.Error(deploymentException,
+            "Generic package deployment failed for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+            appId, deploymentTargetId);
     }
 
-    private async Task EnsureRunnerOwnershipAsync(Runner runner, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(runner.ApiInstanceId))
-            throw new DeploymentOperationRunnerOwnershipChangedException(runner.Id);
-
-        var current = await dataContext.Runners.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == runner.Id, cancellationToken);
-        if (current is null
-            || !string.Equals(current.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId, StringComparison.Ordinal)
-            || !string.Equals(current.ConnectionId, runner.ConnectionId, StringComparison.Ordinal))
-        {
-            throw new DeploymentOperationRunnerOwnershipChangedException(runner.Id);
-        }
-    }
-
-    private async Task<FileUploadCompleteMessage> UploadPackageToRunnerAsync(
+    private async Task TryMarkDeploymentFailedAsync(
         Guid appId,
-        Runner runner,
-        IFormFile file,
-        CancellationToken cancellationToken)
+        Guid deploymentTargetId,
+        Guid? deploymentOperationId,
+        Guid? executionAttemptId)
     {
-        const int chunkSize = 256 * 1024;
-        var (sessionId, completionTask) = uploadRegistry.Register(TimeSpan.FromMinutes(10), cancellationToken);
-        using var stream = file.OpenReadStream();
-        var buffer = new byte[chunkSize];
-        var chunkIndex = 0;
         try
         {
-            int bytesRead;
-            while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-            {
-                await EnsureRunnerOwnershipAsync(runner, cancellationToken);
-                var chunk = new FileUploadChunk
-                {
-                    SessionId = sessionId,
-                    ChunkIndex = chunkIndex++,
-                    Data = bytesRead == chunkSize ? buffer : buffer[..bytesRead],
-                    IsLast = stream.Position >= stream.Length,
-                    FileName = $"{appId:N}.zip",
-                    ContentType = "application/zip",
-                    AppId = appId
-                };
-                await automatonHub.Clients.Client(runner.ConnectionId!)
-                    .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
-            }
-            while (true)
-            {
-                var completed = await Task.WhenAny(completionTask, Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken));
-                if (completed == completionTask)
-                    return await completionTask;
-                await EnsureRunnerOwnershipAsync(runner, cancellationToken);
-            }
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId,
+                deploymentTargetId,
+                success: false,
+                cancellationToken: CancellationToken.None,
+                deploymentOperationId: deploymentOperationId,
+                executionAttemptId: executionAttemptId);
         }
-        finally
+        catch (Exception completionException)
         {
-            uploadRegistry.TryCancel(sessionId);
+            logger.Error(completionException,
+                "Failed to finalize failed generic deployment for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+                appId, deploymentTargetId);
+        }
+    }
+
+    private async Task TryRestoreRouteAsync(Guid appId, Guid deploymentTargetId)
+    {
+        try
+        {
+            await packageFinalizationService.RestoreRoutesAsync();
+        }
+        catch (Exception compensationException)
+        {
+            logger.Error(compensationException,
+                "Failed to compensate generic route reconciliation for AppId={AppId}, DeploymentTargetId={DeploymentTargetId}",
+                appId, deploymentTargetId);
         }
     }
 

@@ -54,53 +54,13 @@ public class InternalRuntimeControllerTests
         var userId = Guid.NewGuid();
 
         await using var dbContext = CreateDbContext();
-        dbContext.WebApps.Add(new WebApp
-        {
-            Id = appId,
-            Name = "Restricted App",
-            Summary = string.Empty,
-            Description = string.Empty,
-            Definition = "{}",
-            PublicUrl = "restricted-app",
-            AccessStatus = AppAccessStatuses.Active,
-            RequiresAuthentication = true,
-            Created = DateTime.UtcNow,
-            Updated = DateTime.UtcNow
-        });
-        dbContext.WebAppUsers.Add(new WebAppUser
-        {
-            WebAppId = appId,
-            UserId = userId
-        });
-        await dbContext.SaveChangesAsync();
-
-        var runtimeCookieService = CreateRuntimeCookieService();
-        var cookie = runtimeCookieService.CreateRuntimeCookie(appId, userId, DateTimeOffset.UtcNow.AddMinutes(5));
-        var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader] = "expected-proxy-key";
-        httpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader] = appId.ToString();
-        httpContext.Request.Headers.Cookie = $"{RuntimeCookieConstants.GetCookieName(appId)}={cookie}";
-
-        var userContextService = CreateUserContextService(Guid.NewGuid());
-        var controller = new InternalRuntimeController(
-            dbContext,
-            new ResourceAuthorizationService(dbContext, userContextService),
-            runtimeCookieService,
-            NullLogger<InternalRuntimeController>.Instance,
-            Options.Create(new PublishedAppsConfig
-            {
-                RuntimeProxyAuthKey = "expected-proxy-key"
-            }))
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = httpContext
-            }
-        };
+        await SeedRestrictedAppAsync(dbContext, appId, userId);
+        var request = CreateAuthorizedRequest(appId, userId);
+        var controller = CreateController(dbContext, request.HttpContext, request.CookieService);
 
         var result = await controller.AuthorizeRuntimeRequest(
-            httpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
-            httpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
             CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<NoContentResult>());
@@ -114,6 +74,61 @@ public class InternalRuntimeControllerTests
 
         return new ApplicationDbContext(options);
     }
+
+    private static async Task SeedRestrictedAppAsync(
+        ApplicationDbContext dbContext,
+        Guid appId,
+        Guid userId)
+    {
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Restricted App",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            PublicUrl = "restricted-app",
+            AccessStatus = AppAccessStatuses.Active,
+            RequiresAuthentication = true,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow
+        });
+        dbContext.WebAppUsers.Add(new WebAppUser { WebAppId = appId, UserId = userId });
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static AuthorizedRuntimeRequest CreateAuthorizedRequest(Guid appId, Guid userId)
+    {
+        var cookieService = CreateRuntimeCookieService();
+        var cookie = cookieService.CreateRuntimeCookie(appId, userId, DateTimeOffset.UtcNow.AddMinutes(5));
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader] = "expected-proxy-key";
+        httpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader] = appId.ToString();
+        httpContext.Request.Headers.Cookie = $"{RuntimeCookieConstants.GetCookieName(appId)}={cookie}";
+        return new AuthorizedRuntimeRequest(httpContext, cookieService);
+    }
+
+    private static InternalRuntimeController CreateController(
+        ApplicationDbContext dbContext,
+        DefaultHttpContext httpContext,
+        RuntimeCookieService cookieService)
+    {
+        var userContextService = CreateUserContextService(Guid.NewGuid());
+        var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        return new InternalRuntimeController(
+            dbContext,
+            authorizationService,
+            cookieService,
+            NullLogger<InternalRuntimeController>.Instance,
+            Options.Create(new PublishedAppsConfig { RuntimeProxyAuthKey = "expected-proxy-key" }))
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
+    }
+
+    private sealed record AuthorizedRuntimeRequest(
+        DefaultHttpContext HttpContext,
+        RuntimeCookieService CookieService);
 
     private static UserContextService CreateUserContextService(Guid userId)
     {

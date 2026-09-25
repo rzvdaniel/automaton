@@ -18,7 +18,17 @@ public sealed class AppListMvcSerializationTests
     [Test]
     public async Task GetApps_SerializesRunnerConnectivityAsString()
     {
-        using var host = await new HostBuilder().ConfigureWebHost(webBuilder =>
+        using var host = await CreateHostAsync();
+
+        var response = await host.GetTestClient().GetAsync("/api/apps");
+        var json = await response.Content.ReadAsStringAsync();
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(json, Does.Contain("\"connectivityStatus\":\"Online\""));
+    }
+
+    private static Task<IHost> CreateHostAsync()
+        => new HostBuilder().ConfigureWebHost(webBuilder =>
         {
             webBuilder.UseTestServer();
             webBuilder.ConfigureServices(services => services.AddControllers()
@@ -30,13 +40,6 @@ public sealed class AppListMvcSerializationTests
                 app.UseEndpoints(endpoints => endpoints.MapControllers());
             });
         }).StartAsync();
-
-        var response = await host.GetTestClient().GetAsync("/api/apps");
-        var json = await response.Content.ReadAsStringAsync();
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        Assert.That(json, Does.Contain("\"connectivityStatus\":\"Online\""));
-    }
 }
 
 [ApiController]

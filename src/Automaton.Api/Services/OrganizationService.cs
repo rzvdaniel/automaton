@@ -1,11 +1,6 @@
 
-using Automaton.Mcp.SystemPrompts;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Services.Interfaces;
@@ -19,27 +14,10 @@ namespace Automaton.Api.Services;
 /// </summary>
 public class OrganizationService : IOrganizationService
 {
-    private static class OrganizationSettingKeys
-    {
-        public static string AppVerificationDefaultStrategy(Guid organizationId) =>
-            $"organization:{organizationId}:ai.verification.defaultStrategy";
-
-        public static string AppVerificationAllowUserOverride(Guid organizationId) =>
-            $"organization:{organizationId}:ai.verification.allowUserOverride";
-
-        public static string AppExecutionDefaultPolicy(Guid organizationId) =>
-            $"organization:{organizationId}:ai.execution.defaultPolicy";
-
-        public static string AppExecutionAllowUserOverride(Guid organizationId) =>
-            $"organization:{organizationId}:ai.execution.allowUserOverride";
-    }
-
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
-    private readonly IEmailService emailService;
-    private readonly ConfigurationService configurationService;
-    private readonly UserManager<ApplicationUser> userManager;
-    private readonly UsersService usersService;
+    private readonly OrganizationInvitationNotificationService invitationNotificationService;
+    private readonly OrganizationAiPolicySettingsService aiPolicySettingsService;
     private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
@@ -48,18 +26,14 @@ public class OrganizationService : IOrganizationService
     public OrganizationService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IEmailService emailService,
-        ConfigurationService configurationService,
-        UserManager<ApplicationUser> userManager,
-        UsersService usersService,
+        OrganizationInvitationNotificationService invitationNotificationService,
+        OrganizationAiPolicySettingsService aiPolicySettingsService,
         IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
-        this.emailService = emailService;
-        this.configurationService = configurationService;
-        this.userManager = userManager;
-        this.usersService = usersService;
+        this.invitationNotificationService = invitationNotificationService;
+        this.aiPolicySettingsService = aiPolicySettingsService;
         this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<OrganizationService>();
     }
@@ -114,8 +88,8 @@ public class OrganizationService : IOrganizationService
 
         // Get user's role in the organization
         var userRole = await GetUserRoleAsync(organizationId, UserId, cancellationToken);
-        var verificationSettings = await GetOrganizationVerificationPolicyAsync(organizationId, cancellationToken);
-        var executionSettings = await GetOrganizationExecutionPolicyAsync(organizationId, cancellationToken);
+        var verificationSettings = await aiPolicySettingsService.GetVerificationPolicyAsync(organizationId, cancellationToken);
+        var executionSettings = await aiPolicySettingsService.GetExecutionPolicyAsync(organizationId, cancellationToken);
 
         return new OrganizationDto
         {
@@ -245,29 +219,7 @@ public class OrganizationService : IOrganizationService
         organization.PrimaryColor = request.PrimaryColor;
         organization.UpdatedAt = DateTime.UtcNow;
 
-        await UpsertJsonSettingAsync(
-            OrganizationSettingKeys.AppVerificationDefaultStrategy(organizationId),
-            NormalizeVerificationStrategy(request.AppVerificationDefaultStrategy),
-            "Organization-level default app verification strategy",
-            cancellationToken);
-
-        await UpsertJsonSettingAsync(
-            OrganizationSettingKeys.AppVerificationAllowUserOverride(organizationId),
-            request.AppVerificationAllowUserOverride,
-            "Organization-level toggle for allowing user verification strategy overrides",
-            cancellationToken);
-
-        await UpsertJsonSettingAsync(
-            OrganizationSettingKeys.AppExecutionDefaultPolicy(organizationId),
-            NormalizeExecutionPolicy(request.AppExecutionDefaultPolicy),
-            "Organization-level default app execution policy",
-            cancellationToken);
-
-        await UpsertJsonSettingAsync(
-            OrganizationSettingKeys.AppExecutionAllowUserOverride(organizationId),
-            request.AppExecutionAllowUserOverride,
-            "Organization-level toggle for allowing user execution policy overrides",
-            cancellationToken);
+        await aiPolicySettingsService.ApplyAsync(organizationId, request, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -288,116 +240,6 @@ public class OrganizationService : IOrganizationService
 
 
         return await GetOrganizationAsync(organizationId, cancellationToken);
-    }
-
-    private async Task<(string? DefaultStrategy, bool AllowUserOverride)> GetOrganizationVerificationPolicyAsync(
-        Guid organizationId,
-        CancellationToken cancellationToken)
-    {
-        var defaultStrategy = await ReadJsonSettingAsync<string>(
-            OrganizationSettingKeys.AppVerificationDefaultStrategy(organizationId),
-            cancellationToken);
-
-        var allowUserOverride = await ReadJsonSettingAsync<bool?>(
-            OrganizationSettingKeys.AppVerificationAllowUserOverride(organizationId),
-            cancellationToken);
-
-        return (
-            NormalizeVerificationStrategy(defaultStrategy),
-            allowUserOverride ?? true);
-    }
-
-    private async Task<(string? DefaultPolicy, bool AllowUserOverride)> GetOrganizationExecutionPolicyAsync(
-        Guid organizationId,
-        CancellationToken cancellationToken)
-    {
-        var defaultPolicy = await ReadJsonSettingAsync<string>(
-            OrganizationSettingKeys.AppExecutionDefaultPolicy(organizationId),
-            cancellationToken);
-
-        var allowUserOverride = await ReadJsonSettingAsync<bool?>(
-            OrganizationSettingKeys.AppExecutionAllowUserOverride(organizationId),
-            cancellationToken);
-
-        return (
-            NormalizeExecutionPolicy(defaultPolicy),
-            allowUserOverride ?? true);
-    }
-
-    private async Task<T?> ReadJsonSettingAsync<T>(string key, CancellationToken cancellationToken)
-    {
-        var setting = await dbContext.Settings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
-
-        if (setting == null)
-            return default;
-
-        try
-        {
-            return JsonSerializer.Deserialize<T>(setting.Value);
-        }
-        catch
-        {
-            return default;
-        }
-    }
-
-    private async Task UpsertJsonSettingAsync<T>(
-        string key,
-        T value,
-        string description,
-        CancellationToken cancellationToken)
-    {
-        var existing = await dbContext.Settings.FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
-        var json = JsonSerializer.Serialize(value);
-
-        if (existing == null)
-        {
-            dbContext.Settings.Add(new Setting
-            {
-                Key = key,
-                Value = json,
-                Description = description,
-                UpdatedAt = DateTime.UtcNow
-            });
-            return;
-        }
-
-        existing.Value = json;
-        existing.Description = description;
-        existing.UpdatedAt = DateTime.UtcNow;
-    }
-
-    private static string? NormalizeVerificationStrategy(string? strategy)
-    {
-        if (string.IsNullOrWhiteSpace(strategy))
-            return null;
-
-        if (strategy.Equals(AppVerificationStrategyNames.Continuous, StringComparison.OrdinalIgnoreCase))
-            return AppVerificationStrategyNames.Continuous;
-
-        if (strategy.Equals(AppVerificationStrategyNames.FinalGate, StringComparison.OrdinalIgnoreCase))
-            return AppVerificationStrategyNames.FinalGate;
-
-        if (strategy.Equals(AppVerificationStrategyNames.Balanced, StringComparison.OrdinalIgnoreCase))
-            return AppVerificationStrategyNames.Balanced;
-
-        return null;
-    }
-
-    private static string? NormalizeExecutionPolicy(string? policy)
-    {
-        if (string.IsNullOrWhiteSpace(policy))
-            return null;
-
-        if (policy.Equals(AppExecutionPolicyNames.LeanTools, StringComparison.OrdinalIgnoreCase))
-            return AppExecutionPolicyNames.LeanTools;
-
-        if (policy.Equals(AppExecutionPolicyNames.Default, StringComparison.OrdinalIgnoreCase))
-            return AppExecutionPolicyNames.Default;
-
-        return null;
     }
 
     public async Task<bool> DeleteOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)
@@ -547,110 +389,7 @@ public class OrganizationService : IOrganizationService
             cancellationToken: cancellationToken);
 
 
-        // Send invitation email
-        try
-        {
-            // Get or create user account
-            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);
-            var createdNewUser = false;
-            
-            if (user == null)
-            {
-                // Create a new user account without password
-                // Use email prefix as name initially, safely handling edge cases
-                var emailParts = request.Email.Split('@');
-                var userName = emailParts.Length > 0 ? emailParts[0] : request.Email;
-                
-                // Generate unique PublicUsername using UsersService
-                var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(userName);
-                
-                user = new ApplicationUser
-                {
-                    UserName = request.Email,
-                    Email = request.Email,
-                    EmailConfirmed = false,
-                    Name = userName,
-                    PublicUsername = publicUsername
-                };
-                
-                var createResult = await userManager.CreateAsync(user);
-                if (!createResult.Succeeded)
-                {
-                    logger.Warning("Failed to create user account for {Email}: {Errors}", 
-                        request.Email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
-                }
-                else
-                {
-                    createdNewUser = true;
-                    logger.Debug("Created new user account for organization invitation: {Email}", request.Email);
-                }
-            }
-
-            // Generate invitation URL
-            var invitationUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/organizations/invitations/accept?token={token}";
-
-            // Determine if user needs to set up a password (new users or users without passwords)
-            var userNeedsPasswordSetup = user != null && (createdNewUser || !(await userManager.HasPasswordAsync(user)));
-            string? setupPasswordUrl = null;
-
-            if (userNeedsPasswordSetup && user != null)
-            {
-                var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-                var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-                setupPasswordUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}&create=true";
-            }
-
-            // Get inviter name
-            var inviter = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == UserId, cancellationToken);
-            var inviterName = inviter?.Name ?? inviter?.UserName ?? "Someone";
-
-            // Calculate expiration hours
-            var expirationHours = (int)Math.Ceiling((invitation.ExpiresAt - DateTime.UtcNow).TotalHours);
-
-            // Build email template variables
-            var variables = new Dictionary<string, string>
-            {
-                { "OrganizationName", organization.Name },
-                { "InviterName", inviterName },
-                { "Role", request.Role.ToString() },
-                { "ExpirationHours", expirationHours.ToString() },
-                { "SupportEmail", configurationService.EmailConfig.SupportEmail }
-            };
-
-            // If user needs to set a password, only send password setup link
-            // They'll accept the invitation from dashboard after logging in
-            if (!string.IsNullOrEmpty(setupPasswordUrl))
-            {
-                variables["SetupPasswordUrl"] = setupPasswordUrl;
-            }
-            else
-            {
-                // User already has password, send invitation link
-                variables["InvitationUrl"] = invitationUrl;
-            }
-
-            var emailDetails = new EmailData
-            {
-                Template = "AutomatonOrganizationInvitation",
-                From = new EmailAccount
-                {
-                    Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
-                        ? configurationService.EmailConfig.EmailAccount
-                        : configurationService.EmailConfig.FromEmail
-                },
-                To = new[] { new EmailAccount { Email = request.Email, Name = user?.Name ?? request.Email } },
-                Variables = variables
-            };
-
-            await emailService.Send(emailDetails, cancellationToken);
-            logger.Debug("Invitation email sent to {Email} for organization {OrganizationId}", request.Email, organizationId);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to send invitation email to {Email} for organization {OrganizationId}", 
-                request.Email, organizationId);
-            // Don't fail the invitation creation if email fails
-        }
+        await invitationNotificationService.SendAsync(invitation, organization, request, UserId, cancellationToken);
 
         return invitation;
     }

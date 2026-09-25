@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Automaton.Api.Config;
@@ -16,12 +15,11 @@ namespace Automaton.Api.Services;
 
 public sealed class SelfHostedRunnerInstallationService(
     ApplicationDbContext db,
-    ApiKeyService apiKeyService,
     UserContextService userContextService,
     IAuditEventService auditEventService,
+    SelfHostedRunnerEnrollmentExchangeService enrollmentExchangeService,
     IOptions<RunnerEnrollmentOptions> enrollmentOptions,
-    IOptions<HostedRunnerOptions> hostedRunnerOptions,
-    ILogger<SelfHostedRunnerInstallationService> logger)
+    IOptions<HostedRunnerOptions> hostedRunnerOptions)
 {
     private static readonly string HostAccessWarning =
         "Privileged Host applications may read and modify host files, inspect host processes, " +
@@ -128,84 +126,10 @@ public sealed class SelfHostedRunnerInstallationService(
         };
     }
 
-    public async Task<RunnerEnrollmentExchangeResponse?> ExchangeAsync(
+    public Task<RunnerEnrollmentExchangeResponse?> ExchangeAsync(
         RunnerEnrollmentExchangeRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.EnrollmentToken)) return null;
-        if (db.Database.IsRelational())
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-            var response = await ExchangeCoreAsync(request, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return response;
-        }
-        return await ExchangeCoreAsync(request, cancellationToken);
-    }
-
-    private async Task<RunnerEnrollmentExchangeResponse?> ExchangeCoreAsync(
-        RunnerEnrollmentExchangeRequest request, CancellationToken cancellationToken)
-    {
-        var hash = HashToken(request.EnrollmentToken.Trim());
-        var enrollment = await db.SelfHostedRunnerEnrollments
-            .FirstOrDefaultAsync(x => x.EnrollmentTokenHash == hash, cancellationToken);
-        if (enrollment == null || enrollment.Status != RunnerEnrollmentStatuses.Pending) return null;
-        var now = DateTime.UtcNow;
-        if (enrollment.ExpiresAtUtc <= now)
-        {
-            enrollment.Status = RunnerEnrollmentStatuses.Expired;
-            await db.SaveChangesAsync(cancellationToken);
-            return null;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.RunnerName)
-            && !string.Equals(request.RunnerName.Trim(), enrollment.RunnerName, StringComparison.Ordinal))
-            throw new InvalidOperationException("The Runner name does not match the self-hosted installation enrollment.");
-
-        var capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
-        var existing = await db.Runners.Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.InstallationId == enrollment.InstallationId, cancellationToken);
-        if (existing != null && (!existing.RunnerUsers.Any(x => x.UserId == enrollment.UserId)
-            || !string.Equals(existing.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("The self-hosted installation identity belongs to another Runner.");
-
-        var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
-            enrollment.UserId, $"Self-hosted Runner - {enrollment.RunnerName}", ApiKeyScope.Runner,
-            "Issued after one-time self-hosted Runner enrollment.", saveChanges: false,
-            source: ApiKeySource.RunnerProvisioning);
-        var runner = existing ?? new Runner { Id = Guid.NewGuid(), InstallationId = enrollment.InstallationId };
-        runner.Name = enrollment.RunnerName;
-        runner.Status = RunnerConnectivityStatuses.Unknown;
-        runner.Version = request.RunnerVersion;
-        runner.MachineName = request.MachineName;
-        runner.Purpose = RunnerPurposes.Managed;
-        runner.ApplicationProfile = enrollment.ApplicationProfile;
-        runner.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed);
-        runner.ApiKeyId = apiKey.Id;
-        if (existing == null)
-        {
-            db.Runners.Add(runner);
-            db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = enrollment.UserId });
-        }
-        enrollment.Status = RunnerEnrollmentStatuses.Completed;
-        enrollment.UsedAtUtc = now;
-        enrollment.RunnerId = runner.Id;
-        await db.SaveChangesAsync(cancellationToken);
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Succeeded, EntityType = AuditEntityTypes.RunnerEnrollment,
-            EntityId = enrollment.Id, EventType = AuditEventTypes.RunnerEnrollmentCompleted,
-            Message = $"Self-hosted Runner '{runner.Name}' enrolled successfully.", Outcome = AuditOutcomes.Success,
-            ActorUserId = enrollment.UserId,
-            Metadata = new { runner.Id, runner.Name, runner.Purpose, runner.ApplicationProfile, Capabilities = capabilities }
-        }, cancellationToken);
-        logger.LogInformation("Self-hosted Runner {RunnerId} enrolled from installation {InstallationId}", runner.Id, enrollment.InstallationId);
-        return new RunnerEnrollmentExchangeResponse
-        {
-            RunnerId = runner.Id, RunnerName = runner.Name, ApiKey = rawApiKey,
-            Purpose = runner.Purpose, Capabilities = capabilities, InstallationId = runner.InstallationId!
-        };
-    }
+        CancellationToken cancellationToken) =>
+        enrollmentExchangeService.ExchangeAsync(request, cancellationToken);
 
     private string BuildCommand(SelfHostedRunnerEnrollment enrollment, string token)
     {
@@ -261,20 +185,10 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
-            (isPrivilegedHost ? $"runtime_network={Quote(network)}" : string.Empty),
-            (isPrivilegedHost ? "if ! docker network create \"$runtime_network\" >/dev/null; then" : string.Empty),
-            (isPrivilegedHost ? "  echo 'The private Runner runtime network could not be created.' >&2" : string.Empty),
-            (isPrivilegedHost ? "  exit 1" : string.Empty),
-            (isPrivilegedHost ? "fi" : string.Empty),
-            (isPrivilegedHost ? "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then" : string.Empty),
-            (isPrivilegedHost ? "  echo 'The private Runner runtime network gateway could not be resolved.' >&2" : string.Empty),
-            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
-            (isPrivilegedHost ? "  exit 1" : string.Empty),
-            (isPrivilegedHost ? "fi" : string.Empty),
-            (isPrivilegedHost ? $"mkdir -p {Quote(root)} {Quote(workspace)}" : string.Empty),
+            BuildNetworkSetupCommands(isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
-            (isPrivilegedHost ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true" : string.Empty),
+            BuildNetworkCleanupCommand(isPrivilegedHost),
             "  exit 1",
             "fi",
             "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",
@@ -299,6 +213,32 @@ public sealed class SelfHostedRunnerInstallationService(
             "esac",
             "AUTOMATON_RUNNER_INSTALL");
     }
+
+    private static string BuildNetworkSetupCommands(bool isPrivilegedHost, string network, string root, string workspace)
+    {
+        if (!isPrivilegedHost)
+        {
+            return string.Join('\n', new string[11]);
+        }
+
+        return string.Join('\n',
+            $"runtime_network={Quote(network)}",
+            "if ! docker network create \"$runtime_network\" >/dev/null; then",
+            "  echo 'The private Runner runtime network could not be created.' >&2",
+            "  exit 1",
+            "fi",
+            "if ! runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\") || [ -z \"$runtime_host_address\" ]; then",
+            "  echo 'The private Runner runtime network gateway could not be resolved.' >&2",
+            "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true",
+            "  exit 1",
+            "fi",
+            $"mkdir -p {Quote(root)} {Quote(workspace)}");
+    }
+
+    private static string BuildNetworkCleanupCommand(bool isPrivilegedHost)
+        => isPrivilegedHost
+            ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true"
+            : string.Empty;
 
     private static string GenerateToken() => $"re_{Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()}";
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();

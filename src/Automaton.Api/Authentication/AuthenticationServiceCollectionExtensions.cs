@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
@@ -25,18 +26,32 @@ namespace Automaton.Api.Authentication
             services.TryAddSingleton(jwtOptions);
             services.TryAddSingleton(authSettings);
             services.TryAddSingleton<IJwtService, JwtService>();
-            var validationParameters = new TokenValidationParameters
+            var validationParameters = CreateTokenValidationParameters(jwtOptions);
+
+            services.AddAuthentication(ConfigureAuthenticationDefaults)
+                .AddJwtBearer(bearerOptions =>
+                    ConfigureBearerOptions(bearerOptions, jwtOptions, validationParameters));
+        }
+
+        private static void ConfigureAuthenticationDefaults(AuthenticationOptions options)
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        }
+
+        private static TokenValidationParameters CreateTokenValidationParameters(JwtOptions options)
+            => new()
             {
                 // Ensure the token was issued by a trusted authorization server (default true)
-                ValidateIssuer = jwtOptions.ValidateIssuer,
-                ValidIssuer = jwtOptions.Issuer,
+                ValidateIssuer = options.ValidateIssuer,
+                ValidIssuer = options.Issuer,
                 // Ensure the token audience matches our audience value (default true)
-                ValidateAudience = jwtOptions.ValidateAudience,
-                ValidAudience = jwtOptions.Audience,
+                ValidateAudience = options.ValidateAudience,
+                ValidAudience = options.Audience,
                 // Specify the key used to sign the token
                 ValidateIssuerSigningKey = true,
                 RequireSignedTokens = true,
-                IssuerSigningKey = jwtOptions.SigningCredentials.Key,
+                IssuerSigningKey = options.SigningCredentials.Key,
                 // Ensure the token hasn't expired
                 RequireExpirationTime = true,
                 ValidateLifetime = true,
@@ -44,53 +59,54 @@ namespace Automaton.Api.Authentication
                 ClockSkew = TimeSpan.FromMinutes(5)
             };
 
-            services.AddAuthentication(authOptions =>
-                {
-                    authOptions.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                    authOptions.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-                })
-                .AddJwtBearer(configurationOptions =>
-                {
-                    configurationOptions.Events = new JwtBearerEvents()
-                    {
-                        OnTokenValidated = tokenValidationContext => { return Task.CompletedTask; },
-                        OnMessageReceived = messageReceivedContext =>
-                        {
-                            var path = messageReceivedContext.HttpContext.Request.Path;
-                            var runtimeToken = messageReceivedContext.Request.Query["token"].FirstOrDefault();
-                            var hubAccessToken = messageReceivedContext.Request.Query["access_token"].FirstOrDefault();
-                            if (!string.IsNullOrWhiteSpace(runtimeToken) &&
-                                (path.StartsWithSegments("/a") || path.StartsWithSegments("/api/web-apps/app")))
-                            {
-                                messageReceivedContext.Token = runtimeToken;
-                            }
-                            else if (!string.IsNullOrWhiteSpace(hubAccessToken) &&
-                                     path.StartsWithSegments("/api/workflow/hub"))
-                            {
-                                messageReceivedContext.Token = hubAccessToken;
-                            }
-                            return Task.CompletedTask;
-                        },
-                        OnAuthenticationFailed = authenticationFailedContext =>
-                        {
-                            if (authenticationFailedContext.Exception.GetType() ==
-                                typeof(SecurityTokenExpiredException))
-                            {
-                                authenticationFailedContext.Response.Headers["Token-Expired"] = "true";
-                            }
+        private static void ConfigureBearerOptions(
+            JwtBearerOptions options,
+            JwtOptions jwtOptions,
+            TokenValidationParameters validationParameters)
+        {
+            options.Events = CreateBearerEvents();
+            options.RequireHttpsMetadata = jwtOptions.RequireHttpsMetadata;
+            //set SaveTokens to save tokens to the AuthenticationProperties
+            //https://www.jerriepelser.com/blog/aspnetcore-jwt-saving-bearer-token-as-claim/
+            //https://www.jerriepelser.com/blog/accessing-tokens-aspnet-core-2/
+            options.SaveToken = jwtOptions.SaveToken;
+            options.ClaimsIssuer = jwtOptions.Issuer;
+            options.TokenValidationParameters = validationParameters;
+        }
 
-                            return Task.CompletedTask;
-                        }
-                    };
+        private static JwtBearerEvents CreateBearerEvents()
+            => new()
+            {
+                OnTokenValidated = _ => Task.CompletedTask,
+                OnMessageReceived = SetAccessTokenFromQuery,
+                OnAuthenticationFailed = SetExpiredTokenHeader
+            };
 
-                    configurationOptions.RequireHttpsMetadata = jwtOptions.RequireHttpsMetadata;
-                    //set SaveTokens to save tokens to the AuthenticationProperties
-                    //https://www.jerriepelser.com/blog/aspnetcore-jwt-saving-bearer-token-as-claim/
-                    //https://www.jerriepelser.com/blog/accessing-tokens-aspnet-core-2/
-                    configurationOptions.SaveToken = jwtOptions.SaveToken;
-                    configurationOptions.ClaimsIssuer = jwtOptions.Issuer;
-                    configurationOptions.TokenValidationParameters = validationParameters;
-                });
+        private static Task SetAccessTokenFromQuery(MessageReceivedContext context)
+        {
+            var path = context.HttpContext.Request.Path;
+            var runtimeToken = context.Request.Query["token"].FirstOrDefault();
+            var hubAccessToken = context.Request.Query["access_token"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(runtimeToken) &&
+                (path.StartsWithSegments("/a") || path.StartsWithSegments("/api/web-apps/app")))
+            {
+                context.Token = runtimeToken;
+            }
+            else if (!string.IsNullOrWhiteSpace(hubAccessToken) &&
+                     path.StartsWithSegments("/api/workflow/hub"))
+            {
+                context.Token = hubAccessToken;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private static Task SetExpiredTokenHeader(AuthenticationFailedContext context)
+        {
+            if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+                context.Response.Headers["Token-Expired"] = "true";
+
+            return Task.CompletedTask;
         }
 
 

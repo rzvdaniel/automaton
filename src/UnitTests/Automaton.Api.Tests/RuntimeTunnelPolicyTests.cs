@@ -190,12 +190,25 @@ public class RuntimeTunnelPolicyTests
     public async Task ForwardAsync_AllowsGenericRuntimeDeploymentWithoutLegacyMarker()
     {
         var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var (target, identity) = await SeedGenericRuntimeDeploymentAsync(dbContext, appId);
+        var service = CreateRuntimeTunnelService(dbContext, identity);
+        var request = new DefaultHttpContext().Request;
+        request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
+
+        var response = await service.ForwardAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
+
+        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
+    }
+
+    private static async Task<(AppDeploymentTarget Target, ApiInstanceIdentityService Identity)> SeedGenericRuntimeDeploymentAsync(
+        ApplicationDbContext dbContext,
+        Guid appId)
+    {
         var runnerId = Guid.NewGuid();
+        var identity = new ApiInstanceIdentityService();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-
-        await using var dbContext = CreateDbContext();
-        var identity = new ApiInstanceIdentityService();
         dbContext.Runners.Add(new Runner
         {
             Id = runnerId,
@@ -218,22 +231,25 @@ public class RuntimeTunnelPolicyTests
             DeploymentTargets = { target }
         });
         await dbContext.SaveChangesAsync();
+        return (target, identity);
+    }
 
+    private static RuntimeTunnelService CreateRuntimeTunnelService(
+        ApplicationDbContext dbContext,
+        ApiInstanceIdentityService identity)
+    {
         var registry = new TunnelRequestRegistry();
-        var service = new RuntimeTunnelService(
-            dbContext,
+        var requestSender = new RuntimeTunnelRequestSender(
             new CompletingHubContext(registry),
             registry,
             Options.Create(new RuntimeTunnelConfig()),
+            NullLogger<RuntimeTunnelRequestSender>.Instance);
+        return new RuntimeTunnelService(
+            dbContext,
+            requestSender,
             Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             identity,
             NullLogger<RuntimeTunnelService>.Instance);
-        var request = new DefaultHttpContext().Request;
-        request.Host = new HostString($"app-{appId:N}.apps.automaton.monster");
-
-        var response = await service.ForwardAsync(appId, target.Id, request, string.Empty, CancellationToken.None);
-
-        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
     }
 
     private static ApplicationDbContext CreateDbContext() => new(

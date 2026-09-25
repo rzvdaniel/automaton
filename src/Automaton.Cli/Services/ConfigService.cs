@@ -349,32 +349,10 @@ public class ConfigService
         var local = LoadProjectLocalConfig(cwd);
         var global = LoadGlobalConfig();
         var resolvedEnvironmentName = ResolveEnvironmentName(cwd, environmentName);
-        var namedEnvironment = resolvedEnvironmentName == null
-            ? new GlobalConfig()
-            : LoadNamedEnvironmentConfig(cwd, resolvedEnvironmentName)
-                ?? (allowMissingEnvironment
-                    ? new GlobalConfig()
-                    : throw new InvalidOperationException(CreateMissingEnvironmentMessage(cwd, resolvedEnvironmentName)));
+        var namedEnvironment = LoadResolvedEnvironment(cwd, resolvedEnvironmentName, allowMissingEnvironment);
         var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-
-        var credentialSource = !string.IsNullOrWhiteSpace(envApiKey)
-            ? CliCredentialSource.EnvironmentVariable
-            : !string.IsNullOrWhiteSpace(namedEnvironment.ApiKey)
-                ? CliCredentialSource.NamedEnvironment
-                : !string.IsNullOrWhiteSpace(local.ApiKey)
-                    ? CliCredentialSource.ProjectLocal
-                    : !string.IsNullOrWhiteSpace(global.ApiKey)
-                        ? CliCredentialSource.Global
-                        : CliCredentialSource.None;
-
-        var selectedConfig = credentialSource switch
-        {
-            CliCredentialSource.NamedEnvironment => namedEnvironment,
-            CliCredentialSource.ProjectLocal => local,
-            CliCredentialSource.Global => global,
-            _ => null
-        };
+        var (credentialSource, selectedConfig) = SelectCredentialSource(envApiKey, namedEnvironment, local, global);
 
         var server = envServer
             ?? namedEnvironment.Server
@@ -394,6 +372,28 @@ public class ConfigService
             CredentialSource = credentialSource,
             PendingAuthorizationCompletion = selectedConfig?.PendingAuthorizationCompletion
         };
+    }
+
+    private GlobalConfig LoadResolvedEnvironment(string cwd, string? name, bool allowMissing)
+    {
+        if (name == null) return new GlobalConfig();
+        var environment = LoadNamedEnvironmentConfig(cwd, name);
+        if (environment != null) return environment;
+        if (allowMissing) return new GlobalConfig();
+        throw new InvalidOperationException(CreateMissingEnvironmentMessage(cwd, name));
+    }
+
+    private static (CliCredentialSource Source, GlobalConfig? Selected) SelectCredentialSource(
+        string? environmentApiKey,
+        GlobalConfig namedEnvironment,
+        GlobalConfig local,
+        GlobalConfig global)
+    {
+        if (!string.IsNullOrWhiteSpace(environmentApiKey)) return (CliCredentialSource.EnvironmentVariable, null);
+        if (!string.IsNullOrWhiteSpace(namedEnvironment.ApiKey)) return (CliCredentialSource.NamedEnvironment, namedEnvironment);
+        if (!string.IsNullOrWhiteSpace(local.ApiKey)) return (CliCredentialSource.ProjectLocal, local);
+        if (!string.IsNullOrWhiteSpace(global.ApiKey)) return (CliCredentialSource.Global, global);
+        return (CliCredentialSource.None, null);
     }
 
     public (string? server, string? apiKey) ResolveCredentials(

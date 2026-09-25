@@ -26,23 +26,47 @@ namespace Automaton.Api.Application.Queries.Handlers
         {
             var user = await _userManagerService.GetUserById(request.Id);
             var registrationProviders = await _userManagerService.ResolveRegistrationProvidersAsync([user], cancellationToken);
-
-            // Get user's roles
             var roles = await _userManager.GetRolesAsync(user);
-            var appCount = await _db.WebAppUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
-            var publishedAppCount = await _db.WebAppUsers
+            var appCount = await GetAppCountAsync(user.Id, cancellationToken);
+            var publishedAppCount = await GetPublishedAppCountAsync(user.Id, cancellationToken);
+            var runnerCount = await GetRunnerCountAsync(user.Id, cancellationToken);
+            var apps = await GetAppsAsync(user.Id, cancellationToken);
+            var lastAppName = await GetLastAppNameAsync(user.Id, cancellationToken);
+            var runners = await GetRunnersAsync(user.Id, cancellationToken);
+
+            return MapUser(
+                user,
+                registrationProviders,
+                roles,
+                appCount,
+                publishedAppCount,
+                runnerCount,
+                apps,
+                lastAppName,
+                runners);
+        }
+
+        private Task<int> GetAppCountAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.WebAppUsers.CountAsync(item => item.UserId == userId, cancellationToken);
+
+        private Task<int> GetPublishedAppCountAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.WebAppUsers
                 .AsNoTracking()
-                .Where(item => item.UserId == user.Id)
+                .Where(item => item.UserId == userId)
                 .Join(
                     _db.WebApps.AsNoTracking(),
                     webAppUser => webAppUser.WebAppId,
                     webApp => webApp.Id,
                     (_, webApp) => webApp)
                 .CountAsync(webApp => webApp.IsPublished, cancellationToken);
-            var runnerCount = await _db.RunnerUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
-            var apps = await _db.WebAppUsers
+
+        private Task<int> GetRunnerCountAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.RunnerUsers.CountAsync(item => item.UserId == userId, cancellationToken);
+
+        private Task<List<UserAppLink>> GetAppsAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.WebAppUsers
                 .AsNoTracking()
-                .Where(item => item.UserId == user.Id)
+                .Where(item => item.UserId == userId)
                 .Join(
                     _db.WebApps.AsNoTracking(),
                     webAppUser => webAppUser.WebAppId,
@@ -55,9 +79,11 @@ namespace Automaton.Api.Application.Queries.Handlers
                     })
                 .OrderBy(app => app.Name)
                 .ToListAsync(cancellationToken);
-            var lastAppName = await _db.WebAppUsers
+
+        private Task<string?> GetLastAppNameAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.WebAppUsers
                 .AsNoTracking()
-                .Where(item => item.UserId == user.Id)
+                .Where(item => item.UserId == userId)
                 .Join(
                     _db.WebApps.AsNoTracking(),
                     webAppUser => webAppUser.WebAppId,
@@ -67,9 +93,11 @@ namespace Automaton.Api.Application.Queries.Handlers
                 .ThenByDescending(app => app.Created)
                 .Select(app => app.Name)
                 .FirstOrDefaultAsync(cancellationToken);
-            var runners = await _db.RunnerUsers
+
+        private Task<List<UserRunnerLink>> GetRunnersAsync(Guid userId, CancellationToken cancellationToken)
+            => _db.RunnerUsers
                 .AsNoTracking()
-                .Where(item => item.UserId == user.Id)
+                .Where(item => item.UserId == userId)
                 .Join(
                     _db.Runners.AsNoTracking(),
                     runnerUser => runnerUser.RunnerId,
@@ -85,6 +113,18 @@ namespace Automaton.Api.Application.Queries.Handlers
                     })
                 .OrderBy(runner => runner.Name)
                 .ToListAsync(cancellationToken);
+
+        private static UserDetails MapUser(
+            ApplicationUser user,
+            IReadOnlyDictionary<Guid, string> registrationProviders,
+            IList<string> roles,
+            int appCount,
+            int publishedAppCount,
+            int runnerCount,
+            List<UserAppLink> apps,
+            string? lastAppName,
+            List<UserRunnerLink> runners)
+        {
             var onlineRunnerCount = runners.Count(runner => string.Equals(runner.Status, "Online", StringComparison.OrdinalIgnoreCase));
             var lastRunnerHeartbeatAtUtc = runners
                 .Where(runner => runner.LastHeartbeatAtUtc.HasValue)
@@ -92,7 +132,7 @@ namespace Automaton.Api.Application.Queries.Handlers
                 .Select(runner => runner.LastHeartbeatAtUtc)
                 .FirstOrDefault();
 
-            var userDetails = new UserDetails
+            return new UserDetails
             {
                 Id = user.Id,
                 Name = user.Name,
@@ -115,8 +155,6 @@ namespace Automaton.Api.Application.Queries.Handlers
                 Runners = runners,
                 Roles = roles.ToList()
             };
-
-            return userDetails;
         }
     }
 }

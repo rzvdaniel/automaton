@@ -33,9 +33,9 @@ public sealed class RunnerProtocolCompatibilityTests
     }
 
     [Test]
-    public void HubServiceContainsTheCanonicalManagedArtifactHandlerContract()
+    public void ExecutionHandlerRegistrarContainsTheCanonicalManagedArtifactHandlerContract()
     {
-        var handler = typeof(HubService).GetMethod(
+        var handler = typeof(HubExecutionHandlerRegistrar).GetMethod(
             "SynchronizeApplicationManagedArtifacts",
             BindingFlags.Instance | BindingFlags.NonPublic);
 

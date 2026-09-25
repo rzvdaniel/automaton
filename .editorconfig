@@ -1,14 +1,14 @@
 root = true
 
 [*.cs]
-# Report existing and new maintainability findings during ordinary builds.
-# Numeric thresholds are in src/CodeMetricsConfig.txt.
-dotnet_diagnostic.CA1502.severity = warning
-dotnet_diagnostic.CA1506.severity = warning
+# Numeric thresholds are in src/CodeMetricsConfig.txt. These rules are errors
+# so normal builds report cleanup debt directly to developers and coding agents.
+dotnet_diagnostic.CA1502.severity = error
+dotnet_diagnostic.CA1506.severity = error
 dotnet_diagnostic.CA1501.severity = warning
 
 # Sonar's cognitive complexity rule complements CA1502's cyclomatic metric.
-dotnet_diagnostic.S3776.severity = warning
+dotnet_diagnostic.S3776.severity = error
 
 # Clear correctness defects: the full-solution baseline has no findings for
 # these rules. New violations fail ordinary Debug and Release builds.

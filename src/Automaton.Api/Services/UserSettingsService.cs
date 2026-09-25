@@ -221,53 +221,53 @@ public class UserSettingsService
     /// </summary>
     public async Task<UserSettingsDto> UpdateSettingsAsync(Guid userId, UpdateUserSettingsRequest request)
     {
+        await UpdateAppearanceSettingsAsync(userId, request);
+        await UpdateAiDefaultsAsync(userId, request);
+        await UpdateAiPreferencesAsync(userId, request);
+
+        return await GetAllSettingsAsync(userId);
+    }
+
+    private async Task UpdateAppearanceSettingsAsync(Guid userId, UpdateUserSettingsRequest request)
+    {
         if (request.Theme != null)
             await SetSettingAsync(userId, Keys.AppearanceTheme, request.Theme);
 
         if (request.FontSize.HasValue)
             await SetSettingAsync(userId, Keys.EditorFontSize, request.FontSize.Value);
+    }
 
+    private async Task UpdateAiDefaultsAsync(Guid userId, UpdateUserSettingsRequest request)
+    {
         if (request.HasDefaultAiModel)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.DefaultAiModel,
-                string.IsNullOrWhiteSpace(request.DefaultAiModel) ? null : request.DefaultAiModel);
+            await SetSettingAsync<string?>(userId, Keys.DefaultAiModel, NormalizeOptionalText(request.DefaultAiModel));
 
         if (request.HasDefaultAiProvider)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.DefaultAiProvider,
-                string.IsNullOrWhiteSpace(request.DefaultAiProvider) ? null : request.DefaultAiProvider);
+            await SetSettingAsync<string?>(userId, Keys.DefaultAiProvider, NormalizeOptionalText(request.DefaultAiProvider));
 
         if (request.HasDefaultPlanningModel)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.DefaultPlanningModel,
-                string.IsNullOrWhiteSpace(request.DefaultPlanningModel) ? null : request.DefaultPlanningModel);
+            await SetSettingAsync<string?>(userId, Keys.DefaultPlanningModel, NormalizeOptionalText(request.DefaultPlanningModel));
 
         if (request.HasDefaultPlanningProvider)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.DefaultPlanningProvider,
-                string.IsNullOrWhiteSpace(request.DefaultPlanningProvider) ? null : request.DefaultPlanningProvider);
+            await SetSettingAsync<string?>(userId, Keys.DefaultPlanningProvider, NormalizeOptionalText(request.DefaultPlanningProvider));
+    }
 
+    private async Task UpdateAiPreferencesAsync(Guid userId, UpdateUserSettingsRequest request)
+    {
         if (request.HasShowAiDebugDetails && request.ShowAiDebugDetails.HasValue)
             await SetSettingAsync(userId, Keys.ShowAiDebugDetails, request.ShowAiDebugDetails.Value);
 
         if (request.HasAppVerificationStrategy)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.AppVerificationStrategy,
+            await SetSettingAsync<string?>(userId, Keys.AppVerificationStrategy,
                 NormalizeVerificationStrategy(request.AppVerificationStrategy));
 
         if (request.HasAppExecutionPolicy)
-            await SetSettingAsync<string?>(
-                userId,
-                Keys.AppExecutionPolicy,
+            await SetSettingAsync<string?>(userId, Keys.AppExecutionPolicy,
                 NormalizeExecutionPolicy(request.AppExecutionPolicy));
-
-        return await GetAllSettingsAsync(userId);
     }
+
+    private static string? NormalizeOptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
     /// Invalidate cached settings for a user

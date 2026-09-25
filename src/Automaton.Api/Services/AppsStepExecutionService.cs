@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
@@ -33,6 +34,21 @@ public class AppsStepExecutionService
     /// <summary>
     /// Execute a step for a web app
     /// </summary>
+    public Task<AppStepExecutionResponse> ExecuteStepForAppAsync(
+        PublishedAppInfo app,
+        string stepIdentifier,
+        AppStepExecutionRequest request,
+        string? headerTestRunId,
+        CancellationToken cancellationToken)
+    {
+        var inputs = request.Inputs is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase);
+        ApplyTestRunIdInput(inputs, request.TestRunId, headerTestRunId);
+
+        return ExecuteStepForAppAsync(app, stepIdentifier, inputs, request.RunnerNames, cancellationToken);
+    }
+
     public async Task<AppStepExecutionResponse> ExecuteStepForAppAsync(
         PublishedAppInfo app,
         string stepIdentifier,
@@ -107,6 +123,21 @@ public class AppsStepExecutionService
                 Logs = logs,
                 Error = ex.Message
             };
+        }
+    }
+
+    private static void ApplyTestRunIdInput(
+        Dictionary<string, string> inputs,
+        string? bodyTestRunId,
+        string? headerTestRunId)
+    {
+        var testRunId = !string.IsNullOrWhiteSpace(bodyTestRunId)
+            ? bodyTestRunId.Trim()
+            : string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
+
+        if (!string.IsNullOrWhiteSpace(testRunId))
+        {
+            inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
         }
     }
 

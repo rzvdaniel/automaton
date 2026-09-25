@@ -89,12 +89,10 @@ public sealed class ManagedRunnerAppAssignmentService
         var assignedCount = 0;
         var runner = await dbContext.Runners.AsNoTracking()
             .SingleAsync(x => x.Id == runnerId, cancellationToken);
-        var supportsContainerApplicationExecution = int.TryParse(runner.ApiCompatibilityVersion, out var protocol)
-            && protocol >= int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution);
+        var supportsContainerApplicationExecution = SupportsContainerApplicationExecution(runner.ApiCompatibilityVersion);
         foreach (var app in apps)
         {
-            var application = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
-            if (application.Runtime.Command is null)
+            if (!HasContainerExecutionCommand(app.ApplicationContractJson))
             {
                 continue;
             }
@@ -128,4 +126,11 @@ public sealed class ManagedRunnerAppAssignmentService
 
         return assignedCount;
     }
+
+    private static bool SupportsContainerApplicationExecution(string? apiCompatibilityVersion)
+        => int.TryParse(apiCompatibilityVersion, out var protocol)
+            && protocol >= int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution);
+
+    private static bool HasContainerExecutionCommand(string? applicationContractJson)
+        => ApplicationContractSerialization.Deserialize(applicationContractJson).Runtime.Command is not null;
 }

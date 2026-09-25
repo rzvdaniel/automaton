@@ -81,7 +81,7 @@ public sealed class GenericRuntimeStage3ArchitectureTests
             Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppsService.cs"),
             Path.Combine(repositoryRoot, "src", "Automaton.Api", "Controllers", "PublicMarketplaceController.cs"),
             Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "stores", "app-editor.store.ts"),
-            Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "views", "AppForkView.vue"),
+            Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppForkingService.cs"),
             Path.Combine(repositoryRoot, "src", "automaton-vue", "src", "views", "AppMarketplaceDetailView.vue")
         };
         var forbidden = new[]
@@ -103,14 +103,11 @@ public sealed class GenericRuntimeStage3ArchitectureTests
     public void RemixCreationCannotPublishOrAdvertiseADeploymentBeforeGenericDeployment()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var appsService = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppsService.cs"));
-        var forkView = File.ReadAllText(Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "views", "AppForkView.vue"));
+        var appForkingService = File.ReadAllText(Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppForkingService.cs"));
 
-        Assert.That(appsService, Does.Not.Contain("request.PublishImmediately"));
-        Assert.That(appsService, Does.Contain("IsPublished = false"));
-        Assert.That(appsService, Does.Contain("PublicUrl = null"));
-        Assert.That(forkView, Does.Not.Contain("Public immediately"));
-        Assert.That(forkView, Does.Not.Contain("To run your remix, you need your own Runner"));
+        Assert.That(appForkingService, Does.Not.Contain("request.PublishImmediately"));
+        Assert.That(appForkingService, Does.Contain("IsPublished = false"));
+        Assert.That(appForkingService, Does.Contain("PublicUrl = null"));
     }
 
     private static string FindRepositoryRoot()

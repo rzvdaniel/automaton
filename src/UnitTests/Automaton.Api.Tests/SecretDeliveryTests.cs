@@ -15,42 +15,34 @@ public sealed class SecretDeliveryTests
     [Test]
     public async Task CreateLeaseAndConsume_ProtectsValueAndEnforcesExactScope()
     {
-        await using var db = CreateDbContext();
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var store = new SecretStore(db, protector);
-        var grants = new ExecutionSecretGrantService(db, protector);
-        var ownerId = Guid.NewGuid();
-        var scope = CreateScope(ownerId);
-        const string plaintext = "re_super-sensitive-enrollment-value";
-
-        var version = await store.CreateVersionAsync(
-            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+        await using var scenario = await SecretDeliveryTestScenarios.CreateAsync(
             "hosted-runner-enrollment",
-            plaintext,
-            DateTime.UtcNow.AddMinutes(10),
-            CancellationToken.None);
-        var persisted = await db.SecretVersions.SingleAsync();
-        Assert.That(persisted.ProtectedValue, Is.Not.EqualTo(plaintext));
-        Assert.That(persisted.ProtectedValue, Does.Not.Contain(plaintext));
+            "re_super-sensitive-enrollment-value",
+            "AUTOMATON_ENROLLMENT_TOKEN");
+        await AssertProtectedValueAsync(scenario);
+        await AssertScopeConsumptionAsync(scenario);
+    }
 
-        var grantId = await grants.CreateGrantAsync(
-            version.SecretVersionId,
-            scope,
-            "AUTOMATON_ENROLLMENT_TOKEN",
-            DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None);
+    private static async Task AssertProtectedValueAsync(SecretDeliveryScenario scenario)
+    {
+        var persisted = await scenario.Db.SecretVersions.SingleAsync();
+        Assert.That(persisted.ProtectedValue, Is.Not.EqualTo(scenario.Plaintext));
+        Assert.That(persisted.ProtectedValue, Does.Not.Contain(scenario.Plaintext));
+    }
 
-        var wrongScope = scope with { RunnerId = Guid.NewGuid() };
+    private static async Task AssertScopeConsumptionAsync(SecretDeliveryScenario scenario)
+    {
+        var wrongScope = scenario.Scope with { RunnerId = Guid.NewGuid() };
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(wrongScope, [grantId], CancellationToken.None));
+            scenario.Grants.LeaseAsync(wrongScope, [scenario.GrantId], CancellationToken.None));
 
-        var lease = await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
-        Assert.That(lease.EnvironmentVariables["AUTOMATON_ENROLLMENT_TOKEN"], Is.EqualTo(plaintext));
-        await grants.MarkConsumedAsync(lease.GrantIds, CancellationToken.None);
+        var lease = await scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None);
+        Assert.That(lease.EnvironmentVariables[scenario.TargetName], Is.EqualTo(scenario.Plaintext));
+        await scenario.Grants.MarkConsumedAsync(lease.GrantIds, CancellationToken.None);
 
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+            scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None));
+        var persistedGrant = await scenario.Db.ExecutionSecretGrants.SingleAsync();
         Assert.That(persistedGrant.ConsumedAtUtc, Is.Not.Null);
         Assert.That(persistedGrant.ReadCount, Is.EqualTo(1));
     }
@@ -58,183 +50,84 @@ public sealed class SecretDeliveryTests
     [Test]
     public async Task Lease_RejectsWrongOwnerExpiredAndRevokedVersions()
     {
-        await using var db = CreateDbContext();
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var store = new SecretStore(db, protector);
-        var grants = new ExecutionSecretGrantService(db, protector);
-        var ownerId = Guid.NewGuid();
-        var scope = CreateScope(ownerId);
-        var version = await store.CreateVersionAsync(
-            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+        await using var scenario = await SecretDeliveryTestScenarios.CreateAsync(
             "temporary-credential",
             "value-never-persisted-in-plaintext",
-            DateTime.UtcNow.AddMinutes(10),
-            CancellationToken.None);
-        var grantId = await grants.CreateGrantAsync(
-            version.SecretVersionId,
-            scope,
-            "TEMPORARY_CREDENTIAL",
-            DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None);
+            "TEMPORARY_CREDENTIAL");
 
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => grants.LeaseAsync(
-            scope with { OwnerId = Guid.NewGuid() }, [grantId], CancellationToken.None));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => scenario.Grants.LeaseAsync(
+            scenario.Scope with { OwnerId = Guid.NewGuid() }, [scenario.GrantId], CancellationToken.None));
 
-        await store.RevokeVersionAsync(version.SecretVersionId, CancellationToken.None);
+        await scenario.Store.RevokeVersionAsync(scenario.SecretVersionId, CancellationToken.None);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
+            scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None));
 
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        var persistedGrant = await scenario.Db.ExecutionSecretGrants.SingleAsync();
         persistedGrant.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
-        var persistedVersion = await db.SecretVersions.SingleAsync();
+        var persistedVersion = await scenario.Db.SecretVersions.SingleAsync();
         persistedVersion.RevokedAtUtc = null;
-        await db.SaveChangesAsync();
+        await scenario.Db.SaveChangesAsync();
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
+            scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None));
     }
 
     [Test]
     public async Task Lease_PreventsConcurrentDeliveryAndAllowsRetryAfterLeaseExpiry()
     {
-        await using var db = CreateDbContext();
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var store = new SecretStore(db, protector);
-        var grants = new ExecutionSecretGrantService(db, protector);
-        var ownerId = Guid.NewGuid();
-        var scope = CreateScope(ownerId);
-        var version = await store.CreateVersionAsync(
-            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+        await using var scenario = await SecretDeliveryTestScenarios.CreateAsync(
             "retryable-credential",
             "temporary-value",
-            DateTime.UtcNow.AddMinutes(10),
-            CancellationToken.None);
-        var grantId = await grants.CreateGrantAsync(
-            version.SecretVersionId,
-            scope,
             "RETRYABLE_CREDENTIAL",
-            DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None,
             SecretDeliveryPolicies.RetryableDelivery);
 
-        await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
+        await scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
+            scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None));
 
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        var persistedGrant = await scenario.Db.ExecutionSecretGrants.SingleAsync();
         persistedGrant.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
-        await db.SaveChangesAsync();
-        var retry = await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
-        Assert.That(retry.EnvironmentVariables["RETRYABLE_CREDENTIAL"], Is.EqualTo("temporary-value"));
+        await scenario.Db.SaveChangesAsync();
+        var retry = await scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None);
+        Assert.That(retry.EnvironmentVariables[scenario.TargetName], Is.EqualTo(scenario.Plaintext));
         Assert.That(persistedGrant.ReadCount, Is.EqualTo(2));
     }
 
     [Test]
     public async Task SingleDelivery_DoesNotResolveAgainAfterAmbiguousDispatch()
     {
-        await using var db = CreateDbContext();
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var store = new SecretStore(db, protector);
-        var grants = new ExecutionSecretGrantService(db, protector);
-        var ownerId = Guid.NewGuid();
-        var scope = CreateScope(ownerId);
-        var version = await store.CreateVersionAsync(
-            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+        await using var scenario = await SecretDeliveryTestScenarios.CreateAsync(
             "single-disclosure",
             "single-delivery-value",
-            DateTime.UtcNow.AddMinutes(10),
-            CancellationToken.None);
-        var grantId = await grants.CreateGrantAsync(
-            version.SecretVersionId,
-            scope,
             "SINGLE_DELIVERY_CREDENTIAL",
-            DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None,
             SecretDeliveryPolicies.SingleDelivery);
 
-        await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        await scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None);
+        var persistedGrant = await scenario.Db.ExecutionSecretGrants.SingleAsync();
         Assert.That(persistedGrant.DeliveredAtUtc, Is.Not.Null);
         Assert.That(persistedGrant.ConsumedAtUtc, Is.Null);
         persistedGrant.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
-        await db.SaveChangesAsync();
+        await scenario.Db.SaveChangesAsync();
 
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
+            scenario.Grants.LeaseAsync(scenario.Scope, [scenario.GrantId], CancellationToken.None));
         Assert.That(persistedGrant.ReadCount, Is.EqualTo(1));
     }
 
     [Test]
     public async Task Cleanup_RevokesExpiredGrantAndVersionWithoutDeletingMetadata()
     {
-        await using var db = CreateDbContext();
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var store = new SecretStore(db, protector);
-        var grants = new ExecutionSecretGrantService(db, protector);
-        var ownerId = Guid.NewGuid();
-        var scope = CreateScope(ownerId);
-        var version = await store.CreateVersionAsync(
-            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
-            "expiring-secret",
-            "cleanup-secret",
-            DateTime.UtcNow.AddMinutes(10),
-            CancellationToken.None);
-        await grants.CreateGrantAsync(
-            version.SecretVersionId,
-            scope,
-            "AUTOMATON_TOKEN",
-            DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None);
-        var persistedVersion = await db.SecretVersions.SingleAsync();
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
-        persistedVersion.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
-        persistedGrant.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
-        for (var index = 0; index < 500; index++)
+        await using var scenario = await SecretDeliveryTestScenarios.CreateAsync("expiring-secret", "cleanup-secret", "AUTOMATON_TOKEN");
+        await SecretDeliveryTestScenarios.SeedExpiredGrantBatchAsync(scenario.Db);
+        await SecretDeliveryTestScenarios.RunCleanupAsync(scenario.Db);
+        var result = await SecretDeliveryTestScenarios.ReadCleanupResultAsync(scenario.Db);
+        Assert.Multiple(() =>
         {
-            db.ExecutionSecretGrants.Add(new ExecutionSecretGrant
-            {
-                Id = Guid.NewGuid(),
-                OperationId = Guid.NewGuid(),
-                SecretVersionId = persistedVersion.Id,
-                AppId = persistedGrant.AppId,
-                ActionKey = persistedGrant.ActionKey,
-                RunnerId = persistedGrant.RunnerId,
-                RunnerHostId = persistedGrant.RunnerHostId,
-                DeliveryType = persistedGrant.DeliveryType,
-                DeliveryPolicy = SecretDeliveryPolicies.SingleDelivery,
-                TargetName = $"BATCHED_TOKEN_{index}",
-                MaximumReads = 1,
-                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-2),
-                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1)
-            });
-        }
-        await db.SaveChangesAsync();
-
-        using var services = new ServiceCollection()
-            .AddSingleton(db)
-            .BuildServiceProvider();
-        var cleanup = new SecretGrantCleanupService(
-            services.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<SecretGrantCleanupService>.Instance);
-        await cleanup.CleanupAsync(CancellationToken.None);
-
-        Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
-        Assert.That(await db.ExecutionSecretGrants.CountAsync(x => x.RevokedAtUtc != null), Is.EqualTo(501));
-        Assert.That(await db.SecretDefinitions.CountAsync(), Is.EqualTo(1));
-        Assert.That(await db.SecretVersions.CountAsync(), Is.EqualTo(1));
-        Assert.That(await db.ExecutionSecretGrants.CountAsync(), Is.EqualTo(501));
+            Assert.That(result.VersionRevoked, Is.True);
+            Assert.That(result.RevokedGrants, Is.EqualTo(501));
+            Assert.That(result.SecretDefinitions, Is.EqualTo(1));
+            Assert.That(result.SecretVersions, Is.EqualTo(1));
+            Assert.That(result.TotalGrants, Is.EqualTo(501));
+        });
     }
 
-    private static SecretGrantScope CreateScope(Guid ownerId) => new(
-        Guid.NewGuid(),
-        Automaton.Core.Models.InfrastructureAppTrust.PlatformAppId,
-        "provision-hosted-runner",
-        Guid.NewGuid(),
-        Guid.NewGuid(),
-        SecretOwnerTypes.HostedRunner,
-        ownerId);
-
-    private static ApplicationDbContext CreateDbContext()
-        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options);
 }

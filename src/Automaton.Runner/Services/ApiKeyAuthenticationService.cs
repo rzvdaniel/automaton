@@ -66,54 +66,7 @@ public class ApiKeyAuthenticationService
                 WriteLine("✅ API key validated successfully!");
                 WriteLine();
                 WriteLine("📝 Setting API key as persistent environment variable...");
-                
-                try
-                {
-                    if (OperatingSystem.IsWindows())
-                    {
-                        // Set for current user on Windows
-                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.User);
-                        WriteLine("✅ API key saved as user environment variable (AUTOMATON_API_KEY)");
-                        WriteLine("   This will persist across sessions and can be used by services.");
-                        WriteLine();
-                        WriteLine("⚠️  IMPORTANT: Restart your terminal for the environment variable to take effect!");
-                        WriteLine("   Current session: API key is cached in memory (works for now)");
-                        WriteLine("   Future sessions: Restart terminal to automatically load the API key");
-                    }
-                    else
-                    {
-                        // For Linux/macOS, we can't directly set persistent environment variables
-                        // We need to guide the user to add it to their shell profile
-                        WriteLine("⚠️  On Linux/macOS, environment variables must be added to your shell profile.");
-                        WriteLine();
-                        WriteLine("📝 Add this line to ~/.bashrc, ~/.zshrc, or your shell's config file:");
-                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
-                        WriteLine();
-                        WriteLine("Then reload your shell:");
-                        WriteLine("   source ~/.bashrc  # or source ~/.zshrc");
-                        WriteLine();
-                        WriteLine("💡 For now, the API key is set for this session only.");
-                        
-                        // Set for current process at least
-                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.Process);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    WriteLine($"⚠️  Could not set environment variable automatically: {ex.Message}");
-                    WriteLine();
-                    WriteLine("📝 Please set it manually:");
-                    if (OperatingSystem.IsWindows())
-                    {
-                        WriteLine($"   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', '{apiKey}', 'User')");
-                    }
-                    else
-                    {
-                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
-                        WriteLine($"   echo 'export AUTOMATON_API_KEY=\"{apiKey}\"' >> ~/.bashrc");
-                    }
-                    logger.Warning(ex, "Failed to set environment variable automatically");
-                }
+                PersistApiKeyEnvironmentVariable(apiKey);
                 
                 WriteLine();
                 logger.Debug("API key validated, cached, and persisted successfully");
@@ -161,6 +114,52 @@ public class ApiKeyAuthenticationService
             logger.Error(ex, "API key validation error occurred");
             return false;
         }
+    }
+
+    private void PersistApiKeyEnvironmentVariable(string apiKey)
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.User);
+                WriteLine("✅ API key saved as user environment variable (AUTOMATON_API_KEY)");
+                WriteLine("   This will persist across sessions and can be used by services.");
+                WriteLine();
+                WriteLine("⚠️  IMPORTANT: Restart your terminal for the environment variable to take effect!");
+                WriteLine("   Current session: API key is cached in memory (works for now)");
+                WriteLine("   Future sessions: Restart terminal to automatically load the API key");
+                return;
+            }
+
+            WriteLine("⚠️  On Linux/macOS, environment variables must be added to your shell profile.");
+            WriteLine();
+            WriteLine("📝 Add this line to ~/.bashrc, ~/.zshrc, or your shell's config file:");
+            WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
+            WriteLine();
+            WriteLine("Then reload your shell:");
+            WriteLine("   source ~/.bashrc  # or source ~/.zshrc");
+            WriteLine();
+            WriteLine("💡 For now, the API key is set for this session only.");
+            Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.Process);
+        }
+        catch (Exception ex)
+        {
+            WriteManualEnvironmentSetup(apiKey);
+            WriteLine($"⚠️  Could not set environment variable automatically: {ex.Message}");
+            logger.Warning(ex, "Failed to set environment variable automatically");
+        }
+    }
+
+    private static void WriteManualEnvironmentSetup(string apiKey)
+    {
+        WriteLine();
+        WriteLine("📝 Please set it manually:");
+        var command = OperatingSystem.IsWindows()
+            ? $"   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', '{apiKey}', 'User')"
+            : $"   export AUTOMATON_API_KEY=\"{apiKey}\"";
+        WriteLine(command);
+        if (!OperatingSystem.IsWindows()) WriteLine($"   echo 'export AUTOMATON_API_KEY=\"{apiKey}\"' >> ~/.bashrc");
     }
 
     public async Task<string?> GetValidApiKeyAsync()

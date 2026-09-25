@@ -147,108 +147,34 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task RunBuildUsesLabeledHostedVolumeAndTrustedSubpaths()
     {
-        var commands = new List<IReadOnlyList<string>>();
-        var hostedId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var service = new HostContainerExecutionService((arguments, _, _) =>
-        {
-            commands.Add(arguments);
-            var output = arguments.Contains("inspect") && arguments.Contains("image")
-                ? "example/build:1@sha256:abc"
-                : arguments.Contains("volume")
-                    ? $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedId}\",\"automaton.storage-scope\":\"user\"}}"
-                    : "";
-            return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
-        });
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
-        {
-            var scope = new HostContainerScope(hostedId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
-            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-            {
-                Scope = scope,
-                Operation = HostContainerOperationKinds.RunBuild,
-                RequestedImage = "example/build:1",
-                Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
-                Command = new() { Executable = "build-tool", Arguments = ["build"] },
-                Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "test" }
-            });
+        var result = await HostContainerExecutionScenarios.RunLabeledHostedVolumeBuildAsync();
 
-            Assert.That(result.Success, Is.True);
-            Assert.That(commands.Any(x => x.Contains("volume") && x.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")), Is.True);
-            var build = string.Join(' ', commands.Single(x => string.Join(' ', x).Contains("runtime-kind=build")));
-            Assert.That(build, Does.Contain($"--cgroup-parent automaton-hosted-runner-{hostedId:N}.slice"));
-            Assert.That(build, Does.Contain("volume-subpath=workspace/runner/deployments/"));
-            Assert.That(build, Does.Contain(
-                $"volume-subpath=workspace/runner/deployments/{scope.AppId:D}/{scope.DeploymentTargetId:D}/{scope.DeploymentAttemptId:D}/source"));
-            Assert.That(build, Does.Contain("--cap-drop"));
-            Assert.That(build, Does.Not.Contain("readonly"));
-            Assert.That(build, Does.Not.Contain("/var/run/docker.sock"));
-            Assert.That(build, Does.Not.Contain("/host"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.VolumeNameRequested, Is.True);
+        Assert.That(result.BuildCommand, Does.Contain($"--cgroup-parent automaton-hosted-runner-{result.HostedRunnerId:N}.slice"));
+        Assert.That(result.BuildCommand, Does.Contain("volume-subpath=workspace/runner/deployments/"));
+        Assert.That(result.BuildCommand, Does.Contain(
+            $"volume-subpath=workspace/runner/deployments/{result.AppId:D}/{result.DeploymentTargetId:D}/{result.DeploymentAttemptId:D}/source"));
+        Assert.That(result.BuildCommand, Does.Contain("--cap-drop"));
+        Assert.That(result.BuildCommand, Does.Not.Contain("readonly"));
+        Assert.That(result.BuildCommand, Does.Not.Contain("/var/run/docker.sock"));
+        Assert.That(result.BuildCommand, Does.Not.Contain("/host"));
     }
 
     [Test]
     public async Task RunBuildPlacesEntrypointBeforeImageForPathShellAndSourceRelativeCommands()
     {
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+        var result = await HostContainerExecutionScenarios.RunEntrypointVariantsAsync();
 
-            async Task<IReadOnlyList<string>> Execute(ApplicationCommandSpec command)
-            {
-                var commands = new List<IReadOnlyList<string>>();
-                var hostedId = Guid.NewGuid();
-                var service = new HostContainerExecutionService((arguments, _, _) =>
-                {
-                    commands.Add(arguments);
-                    var output = arguments.Contains("volume")
-                        ? $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedId}\",\"automaton.storage-scope\":\"user\"}}"
-                        : arguments.Contains("inspect") ? "example/build:1@sha256:abc" : "";
-                    return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
-                });
-                var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-                {
-                    Scope = new(hostedId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-                    Operation = HostContainerOperationKinds.RunBuild,
-                    RequestedImage = "example/build:1",
-                    Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
-                    Command = command
-                });
-                Assert.That(result.Success, Is.True);
-                return commands.Single(x => x.Count > 1 && x[1] == "run");
-            }
-
-            var path = await Execute(new() { Executable = "dotnet", Arguments = ["publish", "-c", "Release"] });
-            var pathEntryPoint = path.ToList().IndexOf("--entrypoint");
-            Assert.That(path.Skip(pathEntryPoint).Take(4), Is.EqualTo(new[] { "--entrypoint", "dotnet", "example/build:1@sha256:abc", "publish" }));
-            Assert.That(path, Does.Contain("-c"));
-            Assert.That(path, Does.Contain("Release"));
-
-            var sourceRelative = await Execute(new() { Executable = "scripts/build.sh" });
-            var sourceEntryPoint = sourceRelative.ToList().IndexOf("--entrypoint");
-            Assert.That(sourceRelative.Skip(sourceEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/automaton/source/scripts/build.sh", "example/build:1@sha256:abc" }));
-
-            var shell = await Execute(new() { Executable = "echo build", UseShell = true, Arguments = ["-x"] });
-            var shellEntryPoint = shell.ToList().IndexOf("--entrypoint");
-            Assert.That(shell.Skip(shellEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/bin/sh", "example/build:1@sha256:abc" }));
-            Assert.That(shell, Does.Contain("-c"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
+        Assert.That(result.PathSucceeded, Is.True);
+        Assert.That(result.SourceRelativeSucceeded, Is.True);
+        Assert.That(result.ShellSucceeded, Is.True);
+        Assert.That(result.PathCommand.Skip(result.PathEntryPoint).Take(4), Is.EqualTo(new[] { "--entrypoint", "dotnet", "example/build:1@sha256:abc", "publish" }));
+        Assert.That(result.PathCommand, Does.Contain("-c"));
+        Assert.That(result.PathCommand, Does.Contain("Release"));
+        Assert.That(result.SourceRelativeCommand.Skip(result.SourceRelativeEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/automaton/source/scripts/build.sh", "example/build:1@sha256:abc" }));
+        Assert.That(result.ShellCommand.Skip(result.ShellEntryPoint).Take(3), Is.EqualTo(new[] { "--entrypoint", "/bin/sh", "example/build:1@sha256:abc" }));
+        Assert.That(result.ShellCommand, Does.Contain("-c"));
     }
 
     [Test]

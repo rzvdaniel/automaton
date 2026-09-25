@@ -16,6 +16,23 @@ public class ProjectInvitationSecurityTests
     public async Task Complete_WhenExistingInvitedUserAlreadyHasPassword_ReturnsBadRequest()
     {
         await using var dbContext = CreateDbContext();
+        var invitation = await CreateExistingUserInvitationAsync(dbContext);
+
+        var result = await invitation.Controller.Complete(invitation.Token, new InvitationsController.AcceptInvitationRequest
+        {
+            Password = "NewPassword1!"
+        });
+
+        Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
+        Assert.That(await dbContext.ProjectMembers.AnyAsync(), Is.False);
+
+        var persistedInvitation = await dbContext.Set<InvitationToken>().SingleAsync(item => item.Token == invitation.Token);
+        Assert.That(persistedInvitation.IsConsumed, Is.False);
+    }
+
+    private static async Task<(InvitationsController Controller, string Token)> CreateExistingUserInvitationAsync(
+        ApplicationDbContext dbContext)
+    {
         var projectId = Guid.NewGuid();
         const string token = "project-invite-token";
 
@@ -65,16 +82,7 @@ public class ProjectInvitationSecurityTests
             null!,
             null!);
 
-        var result = await controller.Complete(token, new InvitationsController.AcceptInvitationRequest
-        {
-            Password = "NewPassword1!"
-        });
-
-        Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
-        Assert.That(await dbContext.ProjectMembers.AnyAsync(), Is.False);
-
-        var invitation = await dbContext.Set<InvitationToken>().SingleAsync(i => i.Token == token);
-        Assert.That(invitation.IsConsumed, Is.False);
+        return (controller, token);
     }
 
     private static ApplicationDbContext CreateDbContext()

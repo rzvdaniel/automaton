@@ -1,19 +1,15 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
 
 namespace Automaton.Runner.Console.Services;
 
 /// <summary>Proxies deployed application traffic to the healthy runtime process.</summary>
 public sealed class RunnerRuntimeGatewayService : IHostedService
 {
-    private const string RuntimeCookiePrefix = "automaton_runtime_";
-    private readonly RunnerRuntimeRegistry runtimeRegistry;
-    private readonly HttpClient runtimeClient;
+    private readonly RunnerRuntimeGatewayProxy proxy;
     private readonly ILogger<RunnerRuntimeGatewayService> logger;
     private WebApplication? application;
 
@@ -22,8 +18,7 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         HttpClient runtimeClient,
         ILogger<RunnerRuntimeGatewayService> logger)
     {
-        this.runtimeRegistry = runtimeRegistry;
-        this.runtimeClient = runtimeClient;
+        proxy = new RunnerRuntimeGatewayProxy(runtimeRegistry, runtimeClient);
         this.logger = logger;
     }
 
@@ -61,134 +56,8 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         var runtimePath = markerIndex >= 0
             ? path[(markerIndex + targetMarker.Length)..]
             : string.Empty;
-        await ProxyRuntimeAsync(context, appId, deploymentTargetId, runtimePath);
+        await proxy.ProxyAsync(context, appId, deploymentTargetId, runtimePath);
     }
-
-    private async Task ProxyRuntimeAsync(
-        HttpContext context,
-        Guid appId,
-        Guid deploymentTargetId,
-        string? path)
-    {
-        if (!runtimeRegistry.TryGet(appId, deploymentTargetId, out var runtime))
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(
-                new { error = "Application runtime is unavailable." },
-                context.RequestAborted);
-            return;
-        }
-
-        var target = new UriBuilder("http", RunnerRuntimeEndpointConfiguration.HostAddress, runtime.Port)
-        {
-            Path = string.IsNullOrEmpty(path) ? "/" : path.StartsWith('/') ? path : "/" + path,
-            Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
-        }.Uri;
-
-        using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), target);
-        if (context.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true)
-            request.Content = new StreamContent(context.Request.Body);
-        var requestConnectionTokens = GetConnectionTokens(context.Request.Headers);
-        foreach (var header in context.Request.Headers)
-        {
-            if (IsHopByHopHeader(header.Key, requestConnectionTokens) ||
-                string.Equals(header.Key, "Host", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
-            {
-                var applicationCookies = FilterRuntimeCookies(header.Value);
-                if (applicationCookies is not null)
-                    request.Headers.TryAddWithoutValidation("Cookie", applicationCookies);
-                continue;
-            }
-
-            if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-                request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-        }
-
-        try
-        {
-            using var response = await runtimeClient.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-            context.Response.StatusCode = (int)response.StatusCode;
-            var responseConnectionTokens = GetConnectionTokens(response.Headers);
-            foreach (var header in response.Headers)
-            {
-                if (!IsHopByHopHeader(header.Key, responseConnectionTokens))
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-            }
-            foreach (var header in response.Content.Headers)
-            {
-                if (!IsHopByHopHeader(header.Key, responseConnectionTokens))
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-            }
-            await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
-        }
-        catch (HttpRequestException)
-        {
-            if (!context.Response.HasStarted)
-            {
-                context.Response.StatusCode = StatusCodes.Status502BadGateway;
-                await context.Response.WriteAsJsonAsync(new { error = "Application runtime could not be reached." }, context.RequestAborted);
-            }
-        }
-    }
-
-    private static HashSet<string> GetConnectionTokens(IHeaderDictionary headers)
-    {
-        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in headers["Connection"])
-        {
-            foreach (var token in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                tokens.Add(token);
-        }
-
-        return tokens;
-    }
-
-    private static string? FilterRuntimeCookies(IEnumerable<string> cookieHeaders)
-    {
-        var applicationCookies = cookieHeaders
-            .SelectMany(value => value.Split(';'))
-            .Select(cookie => cookie.Trim())
-            .Where(cookie => cookie.Length > 0)
-            .Where(cookie =>
-            {
-                var separator = cookie.IndexOf('=');
-                var name = separator >= 0 ? cookie[..separator].Trim() : cookie;
-                return !name.StartsWith(RuntimeCookiePrefix, StringComparison.OrdinalIgnoreCase);
-            })
-            .ToArray();
-
-        return applicationCookies.Length == 0
-            ? null
-            : string.Join("; ", applicationCookies);
-    }
-
-    private static HashSet<string> GetConnectionTokens(HttpResponseHeaders headers)
-    {
-        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in headers.Connection)
-        {
-            foreach (var token in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                tokens.Add(token);
-        }
-
-        return tokens;
-    }
-
-    private static bool IsHopByHopHeader(string name, ISet<string> connectionTokens) =>
-        connectionTokens.Contains(name) || name.Equals("Connection", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Proxy-Authenticate", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Proxy-Authorization", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("TE", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Trailer", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Upgrade", StringComparison.OrdinalIgnoreCase);
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {

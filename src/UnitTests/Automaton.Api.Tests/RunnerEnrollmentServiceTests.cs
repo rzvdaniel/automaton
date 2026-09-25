@@ -20,23 +20,12 @@ public class RunnerEnrollmentServiceTests
     public async Task Exchange_CreatesCapabilityBoundRunnerAndCredential_AndTokenCannotBeReused()
     {
         await using var db = CreateDbContext();
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "Hetzner Nuremberg",
-            Provider = RunnerHostProviders.Hetzner
-        };
-        db.RunnerHosts.Add(host);
-        await db.SaveChangesAsync();
+        var pending = await CreatePendingInfrastructureEnrollmentAsync(db);
 
-        var requestedBy = Guid.NewGuid();
-        var service = CreateService(db);
-        var created = await service.CreateAsync(host.Id, requestedBy, CancellationToken.None);
-
-        var response = await service.ExchangeAsync(
+        var response = await pending.Service.ExchangeAsync(
             new RunnerEnrollmentExchangeRequest
             {
-                EnrollmentToken = created.EnrollmentToken,
+                EnrollmentToken = pending.EnrollmentToken,
                 RunnerName = "infra-nbg-01",
                 RunnerVersion = "9.0.0",
                 MachineName = "hetzner-01"
@@ -47,15 +36,15 @@ public class RunnerEnrollmentServiceTests
         Assert.That(response!.ApiKey, Does.StartWith("ak_runner_"));
         Assert.That(response.Purpose, Is.EqualTo(Automaton.Core.Enums.RunnerPurposes.Infrastructure));
         Assert.That(response.Capabilities, Does.Contain(Automaton.Core.Enums.RunnerCapabilities.HostExecution));
-        Assert.That(response.RunnerHostId, Is.EqualTo(host.Id));
+        Assert.That(response.RunnerHostId, Is.EqualTo(pending.HostId));
 
         var runner = await db.Runners.SingleAsync();
         Assert.That(runner.InstallationId, Is.EqualTo(response.InstallationId));
         Assert.That(runner.CapabilitiesJson, Does.Contain(Automaton.Core.Enums.RunnerCapabilities.HostedRunnerProvisioning));
         Assert.That((await db.RunnerHosts.SingleAsync()).InfrastructureRunnerId, Is.EqualTo(runner.Id));
 
-        var replay = await service.ExchangeAsync(
-            new RunnerEnrollmentExchangeRequest { EnrollmentToken = created.EnrollmentToken },
+        var replay = await pending.Service.ExchangeAsync(
+            new RunnerEnrollmentExchangeRequest { EnrollmentToken = pending.EnrollmentToken },
             CancellationToken.None);
 
         Assert.That(replay, Is.Null);
@@ -119,169 +108,27 @@ public class RunnerEnrollmentServiceTests
     [Test]
     public async Task HostedRunnerEnrollment_RejectsTimedOutAttemptAndAllowsFreshOperation()
     {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var infrastructureRunner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infrastructure-host-1",
-            Purpose = RunnerPurposes.Infrastructure,
-            CapabilitiesJson = RunnerCapabilities.Serialize(
-                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
-                RunnerPurposes.Infrastructure)
-        };
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "host-1",
-            Provider = RunnerHostProviders.Hetzner,
-            InfrastructureRunnerId = infrastructureRunner.Id
-        };
-        var hostedRunner = new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            RunnerHostId = host.Id,
-            Name = "managed-user",
-            ContainerName = "automaton-managed-user",
-            Status = HostedRunnerStatuses.Provisioning
-        };
-        var priorManagedRunner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = hostedRunner.Name,
-            Purpose = RunnerPurposes.Managed,
-            InstallationId = $"hr_{hostedRunner.Id:N}"
-        };
-        var priorManagedRunnerUser = new RunnerUser
-        {
-            RunnerId = priorManagedRunner.Id,
-            UserId = userId
-        };
-        var operationId = Guid.NewGuid();
-        var priorOperation = new HostedRunnerDeployment
-        {
-            Id = Guid.NewGuid(),
-            HostedRunnerId = hostedRunner.Id,
-            Action = HostedRunnerDeploymentActions.Provision,
-            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
-            RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(15)
-        };
-        var currentOperation = new HostedRunnerDeployment
-        {
-            Id = operationId,
-            HostedRunnerId = hostedRunner.Id,
-            Action = HostedRunnerDeploymentActions.Reprovision,
-            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
-            RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(15)
-        };
-        db.Runners.AddRange(infrastructureRunner, priorManagedRunner);
-        db.RunnerUsers.Add(priorManagedRunnerUser);
-        db.RunnerHosts.Add(host);
-        db.HostedRunners.Add(hostedRunner);
-        db.HostedRunnerDeployments.AddRange(priorOperation, currentOperation);
-        await db.SaveChangesAsync();
+        using var db = CreateDbContext();
+        var result = await HostedRunnerEnrollmentScenario.RunAsync(db, new RecordingAuditEventService());
 
-        var auditService = new RecordingAuditEventService();
-        var apiKeyService = new ApiKeyService(
-            db,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ApiKeyService>.Instance,
-            authorizationService: null!,
-            auditService);
-        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
-        var grantService = new ExecutionSecretGrantService(db, protector);
-        var service = new RunnerEnrollmentService(
-            db,
-            apiKeyService,
-            auditService,
-            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
-            new SecretStore(db, protector),
-            grantService,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
-
-        var priorMaterial = await service.CreateHostedRunnerAsync(
-            hostedRunner.Id,
-            priorOperation.Id,
-            "provision-hosted-runner",
-            infrastructureRunner.Id,
-            CancellationToken.None);
-        var priorLease = await grantService.LeaseAsync(
-            new SecretGrantScope(
-                priorOperation.Id,
-                InfrastructureAppTrust.PlatformAppId,
-                "provision-hosted-runner",
-                infrastructureRunner.Id,
-                host.Id,
-                SecretOwnerTypes.HostedRunner,
-                hostedRunner.Id),
-            [priorMaterial.SecretGrantId],
-            CancellationToken.None);
-        var priorToken = priorLease.EnvironmentVariables["AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN"];
-        priorOperation.Status = HostedRunnerDeploymentStatuses.Failed;
-        priorOperation.RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(-1);
-        priorOperation.Error = HostedRunnerDeploymentErrors.RegistrationTimedOut;
-        priorOperation.FinishedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-
-        var material = await service.CreateHostedRunnerAsync(
-            hostedRunner.Id,
-            operationId,
-            "provision-hosted-runner",
-            infrastructureRunner.Id,
-            CancellationToken.None);
-        Assert.That(material.SecretGrantId, Is.Not.EqualTo(priorMaterial.SecretGrantId));
-        Assert.That(await service.ExchangeAsync(
-            new RunnerEnrollmentExchangeRequest { EnrollmentToken = priorToken },
-            CancellationToken.None), Is.Null);
-
-        var currentEnrollment = await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId);
-        var storedVersion = await db.SecretVersions.SingleAsync(x => x.Id == currentEnrollment.SecretVersionId);
-        Assert.That(storedVersion.ProtectedValue, Does.Not.StartWith("re_"));
-        var lease = await grantService.LeaseAsync(
-            new SecretGrantScope(
-                operationId,
-                InfrastructureAppTrust.PlatformAppId,
-                "provision-hosted-runner",
-                infrastructureRunner.Id,
-                host.Id,
-                SecretOwnerTypes.HostedRunner,
-                hostedRunner.Id),
-            [material.SecretGrantId],
-            CancellationToken.None);
-        var enrollmentToken = lease.EnvironmentVariables["AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN"];
-        Assert.That(enrollmentToken, Does.StartWith("re_"));
-        Assert.That(currentEnrollment.EnrollmentTokenHash, Does.Not.Contain(enrollmentToken));
-        Assert.That(currentEnrollment.OperationId, Is.EqualTo(operationId));
-
-        var exchange = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
+        Assert.Multiple(() =>
         {
-            EnrollmentToken = enrollmentToken,
-            RunnerName = hostedRunner.Name,
-            RunnerVersion = "test",
-            MachineName = "managed-host"
-        }, CancellationToken.None);
-
-        Assert.That(exchange, Is.Not.Null);
-        Assert.That(exchange!.ApiKey, Does.StartWith("ak_runner_"));
-        Assert.That(exchange.Purpose, Is.EqualTo(RunnerPurposes.Managed));
-        Assert.That(exchange.RunnerId, Is.EqualTo(priorManagedRunner.Id));
-        Assert.That(await db.Runners.CountAsync(x => x.InstallationId == priorManagedRunner.InstallationId), Is.EqualTo(1));
-        Assert.That((await db.Runners.SingleAsync(x => x.Id == priorManagedRunner.Id)).ApiKeyId, Is.Not.Null);
-        Assert.That((await db.HostedRunners.SingleAsync()).RunnerId, Is.EqualTo(exchange.RunnerId));
-        Assert.That((await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId)).Status, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
-        Assert.That((await db.SecretVersions.SingleAsync(x => x.Id == currentEnrollment.SecretVersionId)).RevokedAtUtc, Is.Not.Null);
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync(x => x.Id == material.SecretGrantId);
-        Assert.That(persistedGrant.ConsumedAtUtc, Is.Not.Null);
-        Assert.That(persistedGrant.RevokedAtUtc, Is.Not.Null);
-
-        var replay = await service.ExchangeAsync(
-            new RunnerEnrollmentExchangeRequest { EnrollmentToken = enrollmentToken },
-            CancellationToken.None);
-        Assert.That(replay, Is.Null);
-        Assert.That(await db.ApiKeys.CountAsync(), Is.EqualTo(1));
+            Assert.That(result.PriorTokenRejected, Is.True);
+            Assert.That(result.FreshGrantIssued, Is.True);
+            Assert.That(result.ProtectedSecretStored, Is.True);
+            Assert.That(result.EnrollmentTokenIsValid, Is.True);
+            Assert.That(result.StoredHashExcludesToken, Is.True);
+            Assert.That(result.EnrollmentStatus, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
+            Assert.That(result.RunnerCountForInstallation, Is.EqualTo(1));
+            Assert.That(result.RunnerHasApiKey, Is.True);
+            Assert.That(result.HostedRunnerUsesExchangedRunner, Is.True);
+            Assert.That(result.SecretWasRevoked, Is.True);
+            Assert.That(result.GrantWasConsumedAndRevoked, Is.True);
+            Assert.That(result.ExchangeSucceeded, Is.True);
+            Assert.That(result.ReplayRejected, Is.True);
+            Assert.That(result.ApiKeyCount, Is.EqualTo(1));
+        });
     }
-
     private static RunnerEnrollmentService CreateService(ApplicationDbContext db)
     {
         var httpContextAccessor = new HttpContextAccessor();
@@ -290,6 +137,28 @@ public class RunnerEnrollmentServiceTests
         var auditService = new RecordingAuditEventService();
         return TestRunnerEnrollmentFactory.Create(db, auditService);
     }
+
+    private static async Task<PendingInfrastructureEnrollment> CreatePendingInfrastructureEnrollmentAsync(
+        ApplicationDbContext db)
+    {
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hetzner Nuremberg",
+            Provider = RunnerHostProviders.Hetzner
+        };
+        db.RunnerHosts.Add(host);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var enrollment = await service.CreateAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
+        return new PendingInfrastructureEnrollment(host.Id, service, enrollment.EnrollmentToken);
+    }
+
+    private sealed record PendingInfrastructureEnrollment(
+        Guid HostId,
+        RunnerEnrollmentService Service,
+        string EnrollmentToken);
 
     private static ApplicationDbContext CreateDbContext()
     {
