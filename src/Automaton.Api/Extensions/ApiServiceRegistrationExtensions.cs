@@ -753,6 +753,8 @@ internal static class ApiProjectRegistration
         services.AddScoped<ProjectService>();
         services.AddScoped<ProjectMemberService>();
         services.AddScoped<ProjectResourceService>();
+        services.AddScoped<ProjectResourceAuthorizationService>();
+        services.AddScoped<ProjectCredentialResourceService>();
         services.AddScoped<InvitationTokenService>();
         services.AddScoped<ResourceAuthorizationService>();
         services.AddScoped<SensitiveVariableService>();

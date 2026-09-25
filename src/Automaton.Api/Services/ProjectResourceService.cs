@@ -16,6 +16,8 @@ public class ProjectResourceService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
+    private readonly ProjectResourceAuthorizationService authorizationService;
+    private readonly ProjectCredentialResourceService credentialResourceService;
     private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
@@ -24,10 +26,14 @@ public class ProjectResourceService
     public ProjectResourceService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
+        ProjectResourceAuthorizationService authorizationService,
+        ProjectCredentialResourceService credentialResourceService,
         IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
+        this.authorizationService = authorizationService;
+        this.credentialResourceService = credentialResourceService;
         this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<ProjectResourceService>();
     }
@@ -40,10 +46,10 @@ public class ProjectResourceService
     public async Task<ProjectAppDto?> AddAppToProjectAsync(Guid projectId, Guid appId, CancellationToken cancellationToken = default)
     {
         // Check permissions
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add app to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, appId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, appId, UserId, cancellationToken);
             return null;
         }
 
@@ -106,10 +112,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<bool> RemoveAppFromProjectAsync(Guid projectId, Guid appId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove app from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, appId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, appId, UserId, cancellationToken);
             return false;
         }
 
@@ -189,10 +195,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<ProjectFlowDto?> AddFlowToProjectAsync(Guid projectId, Guid flowId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add flow to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, flowId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, flowId, UserId, cancellationToken);
             return null;
         }
 
@@ -248,10 +254,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<bool> RemoveFlowFromProjectAsync(Guid projectId, Guid flowId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove flow from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, flowId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, flowId, UserId, cancellationToken);
             return false;
         }
 
@@ -319,10 +325,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<ProjectRunnerDto?> AddRunnerToProjectAsync(Guid projectId, Guid runnerId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add runner to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, runnerId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, runnerId, UserId, cancellationToken);
             return null;
         }
 
@@ -359,19 +365,7 @@ public class ProjectResourceService
         await dbContext.SaveChangesAsync(cancellationToken);
 
 
-        await auditEventService.WriteAsync(
-            new AuditEventWriteRequest
-            {
-                Action = AuditActions.Assigned,
-                EntityType = AuditEntityTypes.Runner,
-                EntityId = runnerId,
-                EventType = AuditEventTypes.RunnerAssignedToProject,
-                Message = "Runner linked to project",
-                Outcome = AuditOutcomes.Success,
-                ActorUserId = UserId,
-                Metadata = new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner" }
-            },
-            cancellationToken);
+        await LogRunnerAssignedAsync(projectId, runnerId, cancellationToken);
 
         return new ProjectRunnerDto
         {
@@ -389,10 +383,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<bool> RemoveRunnerFromProjectAsync(Guid projectId, Guid runnerId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove runner from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, runnerId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, runnerId, UserId, cancellationToken);
             return false;
         }
 
@@ -479,10 +473,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<ProjectCustomStepDto?> AddCustomStepToProjectAsync(Guid projectId, Guid customStepId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add custom step to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, customStepId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, customStepId, UserId, cancellationToken);
             return null;
         }
 
@@ -538,10 +532,10 @@ public class ProjectResourceService
     /// </summary>
     public async Task<bool> RemoveCustomStepFromProjectAsync(Guid projectId, Guid customStepId, CancellationToken cancellationToken = default)
     {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        if (!await authorizationService.CanManageResourcesAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove custom step from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, customStepId, cancellationToken);
+            await authorizationService.LogAccessDeniedAsync(projectId, customStepId, UserId, cancellationToken);
             return false;
         }
 
@@ -605,293 +599,46 @@ public class ProjectResourceService
 
     #region API Keys
 
-    /// <summary>
-    /// Add an API key to a project. Only ProjectAdmin and Developer can add API keys.
-    /// </summary>
-    public async Task<ProjectApiKeyDto?> AddApiKeyToProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
-    {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
-        {
-            logger.Warning("User {UserId} attempted to add API key to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, apiKeyId, cancellationToken);
-            return null;
-        }
+    public Task<ProjectApiKeyDto?> AddApiKeyToProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.AddApiKeyToProjectAsync(projectId, apiKeyId, UserId, userContextService.GetUserName(), cancellationToken);
 
-        var apiKey = await dbContext.ApiKeys
-            .FirstOrDefaultAsync(a => a.Id == apiKeyId && a.ApiKeyUsers.Any(u => u.UserId == UserId), cancellationToken);
+    public Task<bool> RemoveApiKeyFromProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.RemoveApiKeyFromProjectAsync(projectId, apiKeyId, UserId, cancellationToken);
 
-        if (apiKey == null)
-        {
-            throw new InvalidOperationException("API key not found or access denied");
-        }
-
-        var existingLink = await dbContext.ProjectApiKeys
-            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.ApiKeyId == apiKeyId, cancellationToken);
-
-        if (existingLink != null)
-        {
-            throw new InvalidOperationException("API key is already linked to this project");
-        }
-
-        var projectApiKey = new ProjectApiKey
-        {
-            ProjectId = projectId,
-            ApiKeyId = apiKeyId,
-            AddedAt = DateTime.UtcNow,
-            AddedBy = UserId
-        };
-
-        dbContext.ProjectApiKeys.Add(projectApiKey);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-
-        await auditEventService.WriteAsync(
-            action: "Linked",
-            entityType: "ApiKey",
-            entityId: apiKeyId,
-            message: "API key linked to project",
-            metadata: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
-            cancellationToken: cancellationToken);
-
-        return new ProjectApiKeyDto
-        {
-            ProjectId = projectId,
-            ApiKeyId = apiKeyId,
-            ApiKeyName = apiKey.Name,
-            AddedAt = projectApiKey.AddedAt,
-            AddedBy = UserId,
-            AddedByName = userContextService.GetUserName()
-        };
-    }
-
-    /// <summary>
-    /// Remove an API key from a project
-    /// </summary>
-    public async Task<bool> RemoveApiKeyFromProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
-    {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
-        {
-            logger.Warning("User {UserId} attempted to remove API key from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, apiKeyId, cancellationToken);
-            return false;
-        }
-
-        var projectApiKey = await dbContext.ProjectApiKeys
-            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.ApiKeyId == apiKeyId, cancellationToken);
-
-        if (projectApiKey == null)
-        {
-            return false;
-        }
-
-        dbContext.ProjectApiKeys.Remove(projectApiKey);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        // Audit
-        await auditEventService.WriteAsync(
-            action: "Removed",
-            entityType: "ApiKey",
-            entityId: apiKeyId,
-            message: "API key removed from project",
-            metadata: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
-            cancellationToken: cancellationToken);
-        return true;
-    }
-
-    /// <summary>
-    /// List all API keys in a project
-    /// </summary>
-    public async Task<IEnumerable<ProjectApiKeyDto>> ListProjectApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default)
-    {
-        var hasAccess = await dbContext.ProjectMembers
-            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
-
-        if (!hasAccess)
-        {
-            logger.Warning("User {UserId} attempted to list API keys in project {ProjectId} without access", UserId, projectId);
-            return Enumerable.Empty<ProjectApiKeyDto>();
-        }
-
-        var apiKeys = await dbContext.ProjectApiKeys
-            .Where(pa => pa.ProjectId == projectId)
-            .Include(pa => pa.ApiKey)
-            .Include(pa => pa.AddedByUser)
-            .Select(pa => new ProjectApiKeyDto
-            {
-                ProjectId = pa.ProjectId,
-                ApiKeyId = pa.ApiKeyId,
-                ApiKeyName = pa.ApiKey.Name,
-                AddedAt = pa.AddedAt,
-                AddedBy = pa.AddedBy,
-                AddedByName = pa.AddedByUser != null ? pa.AddedByUser.UserName ?? string.Empty : string.Empty
-            })
-            .OrderByDescending(pa => pa.AddedAt)
-            .ToListAsync(cancellationToken);
-
-        return apiKeys;
-    }
+    public Task<IEnumerable<ProjectApiKeyDto>> ListProjectApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.ListProjectApiKeysAsync(projectId, UserId, cancellationToken);
 
     #endregion
 
     #region AI API Keys
 
-    /// <summary>
-    /// Add an AI API key to a project. Only ProjectAdmin and Developer can add AI API keys.
-    /// </summary>
-    public async Task<ProjectAiApiKeyDto?> AddAiApiKeyToProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default)
-    {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
-        {
-            logger.Warning("User {UserId} attempted to add AI API key to project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, aiApiKeyId, cancellationToken);
-            return null;
-        }
+    public Task<ProjectAiApiKeyDto?> AddAiApiKeyToProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.AddAiApiKeyToProjectAsync(projectId, aiApiKeyId, UserId, userContextService.GetUserName(), cancellationToken);
 
-        var aiApiKey = await dbContext.AiApiKeys
-            .FirstOrDefaultAsync(a => a.Id == aiApiKeyId && a.IsActive, cancellationToken);
+    public Task<bool> RemoveAiApiKeyFromProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.RemoveAiApiKeyFromProjectAsync(projectId, aiApiKeyId, UserId, cancellationToken);
 
-        if (aiApiKey == null)
-        {
-            throw new InvalidOperationException("AI API key not found");
-        }
-
-        var existingLink = await dbContext.ProjectAiApiKeys
-            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.AiApiKeyId == aiApiKeyId, cancellationToken);
-
-        if (existingLink != null)
-        {
-            throw new InvalidOperationException("AI API key is already linked to this project");
-        }
-
-        var projectAiApiKey = new ProjectAiApiKey
-        {
-            ProjectId = projectId,
-            AiApiKeyId = aiApiKeyId,
-            AddedAt = DateTime.UtcNow,
-            AddedBy = UserId
-        };
-
-        dbContext.ProjectAiApiKeys.Add(projectAiApiKey);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-
-        await auditEventService.WriteAsync(
-            action: "Linked",
-            entityType: "AiApiKey",
-            entityId: aiApiKeyId,
-            message: "AI API key linked to project",
-            metadata: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
-            cancellationToken: cancellationToken);
-
-        return new ProjectAiApiKeyDto
-        {
-            ProjectId = projectId,
-            AiApiKeyId = aiApiKeyId,
-            AiApiKeyName = aiApiKey.Name,
-            AddedAt = projectAiApiKey.AddedAt,
-            AddedBy = UserId,
-            AddedByName = userContextService.GetUserName()
-        };
-    }
-
-    /// <summary>
-    /// Remove an AI API key from a project
-    /// </summary>
-    public async Task<bool> RemoveAiApiKeyFromProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default)
-    {
-        if (!await CanManageResourcesAsync(projectId, cancellationToken))
-        {
-            logger.Warning("User {UserId} attempted to remove AI API key from project {ProjectId} without permission", UserId, projectId);
-            await LogAccessDeniedAsync(projectId, aiApiKeyId, cancellationToken);
-            return false;
-        }
-
-        var projectAiApiKey = await dbContext.ProjectAiApiKeys
-            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.AiApiKeyId == aiApiKeyId, cancellationToken);
-
-        if (projectAiApiKey == null)
-        {
-            return false;
-        }
-
-        dbContext.ProjectAiApiKeys.Remove(projectAiApiKey);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        // Audit
-        await auditEventService.WriteAsync(
-            action: "Removed",
-            entityType: "AiApiKey",
-            entityId: aiApiKeyId,
-            message: "AI API key removed from project",
-            metadata: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
-            cancellationToken: cancellationToken);
-        return true;
-    }
-
-    /// <summary>
-    /// List all AI API keys in a project
-    /// </summary>
-    public async Task<IEnumerable<ProjectAiApiKeyDto>> ListProjectAiApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default)
-    {
-        var hasAccess = await dbContext.ProjectMembers
-            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
-
-        if (!hasAccess)
-        {
-            logger.Warning("User {UserId} attempted to list AI API keys in project {ProjectId} without access", UserId, projectId);
-            return Enumerable.Empty<ProjectAiApiKeyDto>();
-        }
-
-        var aiApiKeys = await dbContext.ProjectAiApiKeys
-            .Where(pa => pa.ProjectId == projectId)
-            .Include(pa => pa.AiApiKey)
-            .Include(pa => pa.AddedByUser)
-            .Select(pa => new ProjectAiApiKeyDto
-            {
-                ProjectId = pa.ProjectId,
-                AiApiKeyId = pa.AiApiKeyId,
-                AiApiKeyName = pa.AiApiKey.Name,
-                AddedAt = pa.AddedAt,
-                AddedBy = pa.AddedBy,
-                AddedByName = pa.AddedByUser != null ? pa.AddedByUser.UserName ?? string.Empty : string.Empty
-            })
-            .OrderByDescending(pa => pa.AddedAt)
-            .ToListAsync(cancellationToken);
-
-        return aiApiKeys;
-    }
+    public Task<IEnumerable<ProjectAiApiKeyDto>> ListProjectAiApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default) =>
+        credentialResourceService.ListProjectAiApiKeysAsync(projectId, UserId, cancellationToken);
 
     #endregion
-
     #region Helper Methods
 
-    /// <summary>
-    /// Check if current user can manage resources (add/remove apps/flows/runners/steps)
-    /// Only ProjectAdmin and Developer can manage resources
-    /// </summary>
-    private async Task<bool> CanManageResourcesAsync(Guid projectId, CancellationToken cancellationToken)
-    {
-        var membership = await dbContext.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
-
-        if (membership == null)
-        {
-            return false;
-        }
-
-        return membership.Role == ProjectRole.ProjectAdmin || membership.Role == ProjectRole.Developer;
-    }
-
-    private Task LogAccessDeniedAsync(Guid projectId, Guid resourceId, CancellationToken cancellationToken)
+    private Task LogRunnerAssignedAsync(Guid projectId, Guid runnerId, CancellationToken cancellationToken)
     {
         return auditEventService.WriteAsync(
-            action: "AccessDenied",
-            entityType: "ProjectResource",
-            entityId: resourceId,
-            message: "Project resource access denied",
-            metadata: new { ProjectId = projectId, ResourceId = resourceId, UserId },
-            outcome: "Denied",
-            cancellationToken: cancellationToken);
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Assigned,
+                EntityType = AuditEntityTypes.Runner,
+                EntityId = runnerId,
+                EventType = AuditEventTypes.RunnerAssignedToProject,
+                Message = "Runner linked to project",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner" }
+            },
+            cancellationToken);
     }
 
     #endregion
