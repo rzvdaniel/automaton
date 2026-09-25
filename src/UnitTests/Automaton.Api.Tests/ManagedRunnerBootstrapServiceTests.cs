@@ -355,26 +355,31 @@ public class ManagedRunnerBootstrapServiceTests
         RecordingEventPublisher publisher,
         RecordingApplicationEventService applicationEvents)
     {
+        var hostedRunnerOptions = new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
+        {
+            Enabled = true,
+            RuntimePort = 8080
+        });
+        var auditEventService = new NoOpAuditEventService();
+        var hostPlacementService = new HostedRunnerHostPlacementService(db, hostedRunnerOptions);
+        var preparationService = new HostedRunnerProvisioningPreparationService(
+            db,
+            TestRunnerEnrollmentFactory.Create(db, auditEventService),
+            auditEventService,
+            hostedRunnerOptions,
+            hostPlacementService,
+            NullLogger<HostedRunnerProvisioningPreparationService>.Instance);
         var provisioningService = new HostedRunnerProvisioningService(
             db,
-            TestRunnerEnrollmentFactory.Create(db, new NoOpAuditEventService()),
             publisher,
-            new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
-            {
-                Enabled = true,
-                RuntimePort = 8080
-            }),
-            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
-            new AccountStorageProjectAllocationService(db),
-            new NoOpAuditEventService(),
-            NullLogger<HostedRunnerProvisioningService>.Instance,
-            new HostedRunnerHostPlacementService(
+            hostedRunnerOptions,
+            new HostedRunnerProvisioningPolicyService(
                 db,
-                new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
-                {
-                    Enabled = true,
-                    RuntimePort = 8080
-                })));
+                new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
+                NullLogger<HostedRunnerProvisioningPolicyService>.Instance),
+            new AccountStorageProjectAllocationService(db),
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            preparationService);
         var userContextService = new UserContextService(new HttpContextAccessor());
         var authorizationService = new ResourceAuthorizationService(db, userContextService);
         var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(db, authorizationService);

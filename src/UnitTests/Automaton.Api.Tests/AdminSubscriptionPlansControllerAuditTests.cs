@@ -289,24 +289,29 @@ public class AdminSubscriptionPlansControllerAuditTests
             NullLogger<ApiKeyService>.Instance,
             authorizationService: null!,
             auditEventService);
-        var hostedRunnerProvisioningService = new HostedRunnerProvisioningService(
+        var hostedRunnerOptions = new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
+        {
+            Enabled = false
+        });
+        var hostPlacementService = new HostedRunnerHostPlacementService(dbContext, hostedRunnerOptions);
+        var preparationService = new HostedRunnerProvisioningPreparationService(
             dbContext,
             TestRunnerEnrollmentFactory.Create(dbContext, auditEventService),
-            new NoOpEventPublisher(),
-            new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
-            {
-                Enabled = false
-            }),
-            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(dbContext)),
-            new AccountStorageProjectAllocationService(dbContext),
             auditEventService,
-            NullLogger<HostedRunnerProvisioningService>.Instance,
-            new HostedRunnerHostPlacementService(
+            hostedRunnerOptions,
+            hostPlacementService,
+            NullLogger<HostedRunnerProvisioningPreparationService>.Instance);
+        var hostedRunnerProvisioningService = new HostedRunnerProvisioningService(
+            dbContext,
+            new NoOpEventPublisher(),
+            hostedRunnerOptions,
+            new HostedRunnerProvisioningPolicyService(
                 dbContext,
-                new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
-                {
-                    Enabled = false
-                })));
+                new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(dbContext)),
+                NullLogger<HostedRunnerProvisioningPolicyService>.Instance),
+            new AccountStorageProjectAllocationService(dbContext),
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            preparationService);
 
         var planOperations = new AdminSubscriptionPlanOperationsService(
             dbContext,

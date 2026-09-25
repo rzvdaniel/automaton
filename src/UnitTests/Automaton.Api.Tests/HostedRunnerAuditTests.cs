@@ -1262,18 +1262,27 @@ public partial class HostedRunnerAuditTests
             authorizationService: null!,
             auditEventService);
 
-        return new HostedRunnerProvisioningService(
+        var hostedRunnerOptions = new TestOptionsSnapshot<HostedRunnerOptions>(options);
+        var hostPlacementService = new HostedRunnerHostPlacementService(db, hostedRunnerOptions);
+        var preparationService = new HostedRunnerProvisioningPreparationService(
             db,
             TestRunnerEnrollmentFactory.Create(db, auditEventService, options),
-            new NoOpEventPublisher(),
-            new TestOptionsSnapshot<HostedRunnerOptions>(options),
-            new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
-            new AccountStorageProjectAllocationService(db),
             auditEventService,
-            NullLogger<HostedRunnerProvisioningService>.Instance,
-            new HostedRunnerHostPlacementService(
+            hostedRunnerOptions,
+            hostPlacementService,
+            NullLogger<HostedRunnerProvisioningPreparationService>.Instance);
+
+        return new HostedRunnerProvisioningService(
+            db,
+            new NoOpEventPublisher(),
+            hostedRunnerOptions,
+            new HostedRunnerProvisioningPolicyService(
                 db,
-                new TestOptionsSnapshot<HostedRunnerOptions>(options)));
+                new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
+                NullLogger<HostedRunnerProvisioningPolicyService>.Instance),
+            new AccountStorageProjectAllocationService(db),
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            preparationService);
     }
 
     private static HostedRunnerManagementService CreateManagementService(
