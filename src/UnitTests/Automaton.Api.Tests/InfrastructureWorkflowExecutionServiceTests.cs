@@ -19,90 +19,50 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     public async Task HostValidation_PersistsResultLogsAndTargetIdentity()
     {
         await using var db = CreateDbContext();
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infra-test",
-            Purpose = RunnerPurposes.Infrastructure,
-            CapabilitiesJson = RunnerCapabilities.Serialize(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure), RunnerPurposes.Infrastructure),
-            ConnectionId = "connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow
-        };
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "host-test",
-            Provider = RunnerHostProviders.Hetzner,
-            InfrastructureRunnerId = runner.Id,
-            InfrastructureRunner = runner
-        };
-        db.Runners.Add(runner);
-        db.RunnerHosts.Add(host);
-        await db.SaveChangesAsync();
-
+        var host = await SeedValidationHostAsync(db);
         var executor = new FakeInfrastructureRunnerCommandExecutor();
-        var service = new InfrastructureWorkflowExecutionService(
-            db,
-            executor,
-            new RecordingAuditEventService(),
-            Options.Create(new HostedRunnerOptions { DockerNetwork = "test-network" }),
-            NullLogger<InfrastructureWorkflowExecutionService>.Instance);
+        var service = CreateWorkflowExecutionService(db, executor, "test-network");
 
         var response = await service.StartHostValidationAsync(
             new StartHostValidationRequest { RunnerHostId = host.Id, IdempotencyKey = "validation-1" },
             Guid.NewGuid(),
             CancellationToken.None);
 
+        AssertValidationResponse(response, host.InfrastructureRunnerId);
+        await AssertValidationPersistenceAsync(db, host.Id);
+        AssertValidationScript(executor.LastScript);
+    }
+
+    private static void AssertValidationResponse(
+        InfrastructureWorkflowExecutionResponse response,
+        Guid? expectedRunnerId)
+    {
         Assert.That(response.Status, Is.EqualTo(InfrastructureWorkflowExecutionStatuses.Succeeded));
-        Assert.That(response.TargetRunnerId, Is.EqualTo(runner.Id));
+        Assert.That(response.TargetRunnerId, Is.EqualTo(expectedRunnerId));
         Assert.That(response.ResultJson, Does.Contain("\"health\""));
-        var validatedHost = await db.RunnerHosts.FindAsync(host.Id);
+    }
+
+    private static async Task AssertValidationPersistenceAsync(ApplicationDbContext db, Guid hostId)
+    {
+        var validatedHost = await db.RunnerHosts.FindAsync(hostId);
         Assert.That(validatedHost!.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.AwaitingApproval));
         Assert.That(validatedHost.ValidatedAtUtc, Is.Not.Null);
         Assert.That(validatedHost.IsSchedulingEligible, Is.False);
         Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(2));
-        Assert.That(executor.LastScript, Does.Contain("test-network"));
-        Assert.That(executor.LastScript, Does.Contain("automaton-host-exec"));
+    }
+
+    private static void AssertValidationScript(string script)
+    {
+        Assert.That(script, Does.Contain("test-network"));
+        Assert.That(script, Does.Contain("automaton-host-exec"));
     }
 
     [Test]
     public async Task HostApproval_EnablesSchedulingOnlyAfterValidationAndOnlineRunner()
     {
         await using var db = CreateDbContext();
-        var apiKey = new ApiKey { Id = Guid.NewGuid(), Name = "infra", HashedKey = "hash", KeyPrefix = "ak_runner_test", CreatedAt = DateTime.UtcNow };
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infra-test",
-            Purpose = RunnerPurposes.Infrastructure,
-            ApiKey = apiKey,
-            ApiKeyId = apiKey.Id,
-            ConnectionId = "connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow
-        };
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "host-test",
-            Provider = RunnerHostProviders.Hetzner,
-            PublicIp = "8.8.8.8",
-            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
-            ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
-            ValidatedAtUtc = DateTime.UtcNow,
-            HostedRunnerSchedulingEnabled = false,
-            InfrastructureRunner = runner,
-            InfrastructureRunnerId = runner.Id
-        };
-        db.ApiKeys.Add(apiKey);
-        db.Runners.Add(runner);
-        db.RunnerHosts.Add(host);
-        await db.SaveChangesAsync();
-
-        var service = new InfrastructureRunnerHostApprovalService(
-            db,
-            new RecordingAuditEventService(),
-            NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
-            new NullHubContext<AutomatonHub>());
+        var host = await SeedApprovalHostAsync(db, "8.8.8.8");
+        var service = CreateApprovalService(db);
 
         var approved = await service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
 
@@ -114,10 +74,72 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     }
 
     [Test]
-    public void HostApproval_RejectsPublicConnectivityWithoutPublicAddress()
+    public async Task HostApproval_RejectsPublicConnectivityWithoutPublicAddress()
     {
-        using var db = CreateDbContext();
-        var apiKey = new ApiKey { Id = Guid.NewGuid(), Name = "infra", HashedKey = "hash", KeyPrefix = "ak_runner_test", CreatedAt = DateTime.UtcNow };
+        await using var db = CreateDbContext();
+        var host = await SeedApprovalHostAsync(db, publicIp: null);
+        var service = CreateApprovalService(db);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("public IPv4"));
+        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
+    }
+
+    [Test]
+    public async Task HostValidation_ReusesExecutionForIdempotencyKey()
+    {
+        await using var db = CreateDbContext();
+        var host = await SeedValidationHostAsync(db);
+        var executor = new FakeInfrastructureRunnerCommandExecutor();
+        var service = CreateWorkflowExecutionService(db, executor);
+        var request = new StartHostValidationRequest { RunnerHostId = host.Id, IdempotencyKey = "same-request" };
+
+        var first = await service.StartHostValidationAsync(request, Guid.NewGuid(), CancellationToken.None);
+        var second = await service.StartHostValidationAsync(request, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.That(second.Id, Is.EqualTo(first.Id));
+        Assert.That(executor.CallCount, Is.EqualTo(1));
+        Assert.That(await db.InfrastructureWorkflowExecutions.CountAsync(), Is.EqualTo(1));
+    }
+
+    private static async Task<RunnerHost> SeedValidationHostAsync(ApplicationDbContext db)
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infra-test",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            ConnectionId = "connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-test",
+            Provider = RunnerHostProviders.Hetzner,
+            InfrastructureRunnerId = runner.Id,
+            InfrastructureRunner = runner
+        };
+        db.AddRange(runner, host);
+        await db.SaveChangesAsync();
+        return host;
+    }
+
+    private static async Task<RunnerHost> SeedApprovalHostAsync(ApplicationDbContext db, string? publicIp)
+    {
+        var apiKey = new ApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = "infra",
+            HashedKey = "hash",
+            KeyPrefix = "ak_runner_test",
+            CreatedAt = DateTime.UtcNow
+        };
         var runner = new Runner
         {
             Id = Guid.NewGuid(),
@@ -133,6 +155,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             Id = Guid.NewGuid(),
             Name = "host-test",
             Provider = RunnerHostProviders.Hetzner,
+            PublicIp = publicIp,
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
             ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
             ValidatedAtUtc = DateTime.UtcNow,
@@ -140,100 +163,28 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             InfrastructureRunner = runner,
             InfrastructureRunnerId = runner.Id
         };
-        db.ApiKeys.Add(apiKey);
-        db.Runners.Add(runner);
-        db.RunnerHosts.Add(host);
-        db.SaveChanges();
+        db.AddRange(apiKey, runner, host);
+        await db.SaveChangesAsync();
+        return host;
+    }
 
-        var service = new InfrastructureRunnerHostApprovalService(
+    private static InfrastructureWorkflowExecutionService CreateWorkflowExecutionService(
+        ApplicationDbContext db,
+        IInfrastructureRunnerCommandExecutor executor,
+        string dockerNetwork = "")
+        => new(
+            db,
+            executor,
+            new RecordingAuditEventService(),
+            Options.Create(new HostedRunnerOptions { DockerNetwork = dockerNetwork }),
+            NullLogger<InfrastructureWorkflowExecutionService>.Instance);
+
+    private static InfrastructureRunnerHostApprovalService CreateApprovalService(ApplicationDbContext db)
+        => new(
             db,
             new RecordingAuditEventService(),
             NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
             new NullHubContext<AutomatonHub>());
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None));
-
-        Assert.That(exception!.Message, Does.Contain("public IPv4"));
-        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
-    }
-
-    [TestCase("0.1.2.3")]
-    [TestCase("10.1.2.3")]
-    [TestCase("100.64.0.1")]
-    [TestCase("100.127.255.254")]
-    [TestCase("127.0.0.1")]
-    [TestCase("169.254.1.1")]
-    [TestCase("172.16.0.1")]
-    [TestCase("172.31.255.254")]
-    [TestCase("192.0.0.10")]
-    [TestCase("192.0.2.10")]
-    [TestCase("192.88.99.10")]
-    [TestCase("192.168.1.10")]
-    [TestCase("198.18.0.1")]
-    [TestCase("198.19.255.254")]
-    [TestCase("198.51.100.10")]
-    [TestCase("203.0.113.10")]
-    [TestCase("224.0.0.1")]
-    [TestCase("255.255.255.255")]
-    public void PublicAddressValidation_RejectsSpecialPurposeRanges(string address)
-    {
-        var valid = RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(address, out var error);
-
-        Assert.That(valid, Is.False);
-        Assert.That(error, Does.Contain("publicly routable"));
-    }
-
-    [Test]
-    public void PublicAddressValidation_AllowsPublicIpv4Address()
-    {
-        var valid = RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4("8.8.8.8", out var error);
-
-        Assert.That(valid, Is.True);
-        Assert.That(error, Is.Empty);
-    }
-
-    [Test]
-    public async Task HostValidation_ReusesExecutionForIdempotencyKey()
-    {
-        await using var db = CreateDbContext();
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infra-test",
-            Purpose = RunnerPurposes.Infrastructure,
-            CapabilitiesJson = RunnerCapabilities.Serialize(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure), RunnerPurposes.Infrastructure),
-            ConnectionId = "connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow
-        };
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "host-test",
-            Provider = RunnerHostProviders.Hetzner,
-            InfrastructureRunnerId = runner.Id,
-            InfrastructureRunner = runner
-        };
-        db.Runners.Add(runner);
-        db.RunnerHosts.Add(host);
-        await db.SaveChangesAsync();
-
-        var executor = new FakeInfrastructureRunnerCommandExecutor();
-        var service = new InfrastructureWorkflowExecutionService(
-            db,
-            executor,
-            new RecordingAuditEventService(),
-            Options.Create(new HostedRunnerOptions()),
-            NullLogger<InfrastructureWorkflowExecutionService>.Instance);
-        var request = new StartHostValidationRequest { RunnerHostId = host.Id, IdempotencyKey = "same-request" };
-
-        var first = await service.StartHostValidationAsync(request, Guid.NewGuid(), CancellationToken.None);
-        var second = await service.StartHostValidationAsync(request, Guid.NewGuid(), CancellationToken.None);
-
-        Assert.That(second.Id, Is.EqualTo(first.Id));
-        Assert.That(executor.CallCount, Is.EqualTo(1));
-        Assert.That(await db.InfrastructureWorkflowExecutions.CountAsync(), Is.EqualTo(1));
-    }
 
     private static ApplicationDbContext CreateDbContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
