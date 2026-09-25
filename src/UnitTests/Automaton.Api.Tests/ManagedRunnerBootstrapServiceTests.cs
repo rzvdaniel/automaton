@@ -367,7 +367,14 @@ public class ManagedRunnerBootstrapServiceTests
             new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
             new AccountStorageProjectAllocationService(db),
             new NoOpAuditEventService(),
-            NullLogger<HostedRunnerProvisioningService>.Instance);
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            new HostedRunnerHostPlacementService(
+                db,
+                new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
+                {
+                    Enabled = true,
+                    RuntimePort = 8080
+                })));
         var userContextService = new UserContextService(new HttpContextAccessor());
         var authorizationService = new ResourceAuthorizationService(db, userContextService);
         var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(db, authorizationService);

@@ -1270,7 +1270,10 @@ public partial class HostedRunnerAuditTests
             new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(db)),
             new AccountStorageProjectAllocationService(db),
             auditEventService,
-            NullLogger<HostedRunnerProvisioningService>.Instance);
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            new HostedRunnerHostPlacementService(
+                db,
+                new TestOptionsSnapshot<HostedRunnerOptions>(options)));
     }
 
     private static HostedRunnerManagementService CreateManagementService(

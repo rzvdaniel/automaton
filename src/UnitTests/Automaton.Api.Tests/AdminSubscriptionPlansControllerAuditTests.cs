@@ -300,7 +300,13 @@ public class AdminSubscriptionPlansControllerAuditTests
             new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(dbContext)),
             new AccountStorageProjectAllocationService(dbContext),
             auditEventService,
-            NullLogger<HostedRunnerProvisioningService>.Instance);
+            NullLogger<HostedRunnerProvisioningService>.Instance,
+            new HostedRunnerHostPlacementService(
+                dbContext,
+                new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
+                {
+                    Enabled = false
+                })));
 
         var planOperations = new AdminSubscriptionPlanOperationsService(
             dbContext,

@@ -671,6 +671,7 @@ internal static class ApiOperationsRegistration
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
         services.AddScoped<IHostContainerTransport, SignalRHostContainerTransport>();
+        services.AddScoped<HostedRunnerHostPlacementService>();
         services.AddScoped<HostedRunnerProvisioningService>();
         services.AddScoped<HostedRunnerPlanCapabilityValidator>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
