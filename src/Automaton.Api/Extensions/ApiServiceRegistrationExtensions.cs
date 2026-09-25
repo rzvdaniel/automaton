@@ -599,6 +599,7 @@ internal static class ApiRunnerRegistration
         services.AddScoped<UserContextService>();
         services.AddScoped<AdminAuthorizationService>();
         services.AddScoped<AppFileStorageService>();
+        services.AddScoped<ExternalMcpToolExecutionService>();
         services.AddScoped<AppMediaStorageService>();
         services.AddScoped<PublishedAppStorageService>();
         services.AddScoped<AppArchiveService>();
