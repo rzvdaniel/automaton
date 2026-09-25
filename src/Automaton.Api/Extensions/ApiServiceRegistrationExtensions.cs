@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Transactions;
 using Automaton.Api.Services;
+using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Authentication;
 using Automaton.Api.Enums;
 using Automaton.Api.Services.Interfaces;
@@ -656,6 +657,7 @@ internal static class ApiOperationsRegistration
     {
         services.AddScoped<ApiKeyService>();
         services.AddScoped<AiApiKeyService>();
+        services.AddScoped<AdminAiProviderCreationService>();
         services.AddScoped<AiProviderMetadataService>();
         services.AddScoped<AiConversationProviderResolver>();
         services.AddScoped<AiConversationHistoryPersistenceService>();
