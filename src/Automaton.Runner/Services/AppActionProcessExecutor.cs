@@ -38,7 +38,14 @@ internal static class AppActionProcessExecutor
         }
         finally
         {
-            process.StandardInput.Close();
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (IOException) when (process.HasExited)
+            {
+                // Closing also flushes the writer and can observe the same completed-process race.
+            }
         }
 
         try
