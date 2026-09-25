@@ -1,11 +1,9 @@
-using System.Security.Claims;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
@@ -22,7 +20,7 @@ public class AppDeploymentTargetResolverTests
         var app = AddApp(db, userId, runner.Id);
         await db.SaveChangesAsync();
 
-        var target = await CreateResolver(db, userId).ResolveAsync(app.Id, null, userId);
+        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId).ResolveAsync(app.Id, null, userId);
 
         Assert.Multiple(() =>
         {
@@ -44,7 +42,7 @@ public class AppDeploymentTargetResolverTests
         app.DeploymentTargets.Add(namedTarget);
         await db.SaveChangesAsync();
 
-        var target = await CreateResolver(db, userId)
+        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
             .ResolveAsync(app.Id, " SERVER-EU ", userId);
 
         Assert.Multiple(() =>
@@ -64,7 +62,7 @@ public class AppDeploymentTargetResolverTests
         await db.SaveChangesAsync();
 
         var exception = Assert.ThrowsAsync<KeyNotFoundException>(
-            async () => await CreateResolver(db, userId)
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(app.Id, "unknown", userId));
 
         Assert.That(exception!.Message, Does.Contain("unknown"));
@@ -83,7 +81,7 @@ public class AppDeploymentTargetResolverTests
         await db.SaveChangesAsync();
 
         Assert.ThrowsAsync<KeyNotFoundException>(
-            async () => await CreateResolver(db, userId)
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(firstApp.Id, "server-us", userId));
     }
 
@@ -97,7 +95,7 @@ public class AppDeploymentTargetResolverTests
         await db.SaveChangesAsync();
 
         var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await CreateResolver(db, userId)
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(app.Id, null, userId));
 
         Assert.That(exception!.Message, Does.Contain("access"));
@@ -118,7 +116,7 @@ public class AppDeploymentTargetResolverTests
         await db.SaveChangesAsync();
 
         var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await CreateResolver(db, userId)
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(app.Id, null, userId));
 
         Assert.That(exception!.Message, Does.Contain("trusted infrastructure App"));
@@ -142,7 +140,7 @@ public class AppDeploymentTargetResolverTests
             InfrastructureAppTrust.PlatformAppId);
         await db.SaveChangesAsync();
 
-        var target = await CreateResolver(db, userId, isAdministrator: true)
+        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId, isAdministrator: true)
             .ResolveAsync(app.Id, null, userId);
 
         Assert.That(target.ExecutionRunner?.Id, Is.EqualTo(runner.Id));
@@ -157,7 +155,7 @@ public class AppDeploymentTargetResolverTests
         await db.SaveChangesAsync();
 
         var exception = Assert.ThrowsAsync<AppDeploymentTargetUnassignedException>(
-            async () => await CreateResolver(db, userId)
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(app.Id, null, userId));
 
         Assert.That(exception!.Message, Does.Contain("no assigned Runner"));
@@ -171,8 +169,8 @@ public class AppDeploymentTargetResolverTests
         var runner = AddRunner(db, userId, online: false);
         var app = AddApp(db, userId, runner.Id);
         await db.SaveChangesAsync();
-        var resolver = CreateResolver(db, userId);
-        var authorizationPolicy = CreateRunnerAuthorizationPolicy(db, userId);
+        var resolver = AppDeploymentTargetResolverTestServices.CreateResolver(db, userId);
+        var authorizationPolicy = AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId);
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
             new HostedRunnerAppCapacityService(db),
@@ -209,62 +207,14 @@ public class AppDeploymentTargetResolverTests
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
             new HostedRunnerAppCapacityService(db),
-            CreateRunnerAuthorizationPolicy(db, userId),
-            CreateResolver(db, userId));
+            AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
+            AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
 
         await assignmentPolicy.AssignAsync(app, runner.Id, userId);
 
         Assert.That(
             (await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
             Is.EqualTo(runner.Id));
-    }
-
-    private static AppDeploymentTargetResolver CreateResolver(
-        ApplicationDbContext db,
-        Guid userId,
-        bool isAdministrator = false)
-    {
-        return new AppDeploymentTargetResolver(
-            db,
-            CreateResourceAuthorizationService(db, userId, isAdministrator),
-            CreateRunnerAuthorizationPolicy(db, userId, isAdministrator));
-    }
-
-    private static AppRunnerAuthorizationPolicy CreateRunnerAuthorizationPolicy(
-        ApplicationDbContext db,
-        Guid userId,
-        bool isAdministrator = false)
-    {
-        return new AppRunnerAuthorizationPolicy(
-            db,
-            CreateResourceAuthorizationService(db, userId, isAdministrator));
-    }
-
-    private static ResourceAuthorizationService CreateResourceAuthorizationService(
-        ApplicationDbContext db,
-        Guid userId,
-        bool isAdministrator = false)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId.ToString())
-        };
-        if (isAdministrator)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, UserRole.Administrator));
-        }
-
-        var accessor = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"))
-            }
-        };
-        return new ResourceAuthorizationService(
-            db,
-            new UserContextService(accessor),
-            accessor);
     }
 
     private static WebApp AddApp(

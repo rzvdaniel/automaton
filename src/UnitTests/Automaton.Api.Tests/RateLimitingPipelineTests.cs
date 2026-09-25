@@ -265,34 +265,39 @@ public class RateLimitingPipelineTests
             .ConfigureWebHost(webBuilder =>
             {
                 webBuilder.UseTestServer();
-                webBuilder.ConfigureServices(services =>
-                {
-                    services
-                        .AddAuthentication(TestAuthenticationHandler.SchemeName)
-                        .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
-                            TestAuthenticationHandler.SchemeName,
-                            _ => { });
-                    services.AddAuthorization();
-                    services.AddControllers().AddApplicationPart(typeof(TestAuthRateLimitController).Assembly);
-                    services.AddAutomatonRateLimiting();
-                    if (configureOptions is not null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-                });
-
-                webBuilder.Configure(app =>
-                {
-                    app.UseAuthentication();
-                    app.UseRouting();
-                    app.UseRateLimiter();
-                    app.UseAuthorization();
-                    app.UseEndpoints(endpoints => endpoints.MapControllers());
-                });
+                webBuilder.ConfigureServices(services => ConfigureServices(services, configureOptions));
+                webBuilder.Configure(ConfigurePipeline);
             })
             .StartAsync();
 
         return host;
+    }
+
+    private static void ConfigureServices(
+        IServiceCollection services,
+        Action<RateLimitingOptions>? configureOptions)
+    {
+        services
+            .AddAuthentication(TestAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                TestAuthenticationHandler.SchemeName,
+                _ => { });
+        services.AddAuthorization();
+        services.AddControllers().AddApplicationPart(typeof(TestAuthRateLimitController).Assembly);
+        services.AddAutomatonRateLimiting();
+        if (configureOptions is not null)
+        {
+            services.Configure(configureOptions);
+        }
+    }
+
+    private static void ConfigurePipeline(IApplicationBuilder app)
+    {
+        app.UseAuthentication();
+        app.UseRouting();
+        app.UseRateLimiter();
+        app.UseAuthorization();
+        app.UseEndpoints(endpoints => endpoints.MapControllers());
     }
 
     private static async Task AssertGenericTooManyRequestsResponse(HttpResponseMessage response)

@@ -60,18 +60,31 @@ public sealed class ApiKeyAuthenticationHandlerTests
 
         public static async Task<AuthenticationSetup> CreateAsync(string role)
         {
+            var provider = CreateServiceProvider();
+            var db = provider.GetRequiredService<ApplicationDbContext>();
+            var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = provider.GetRequiredService<RoleManager<ApplicationRole>>();
+            var user = await CreateUserAsync(userManager, roleManager, role);
+            var (apiKeyService, apiKey) = await CreateApiKeyAsync(db, user.Id);
+            return new AuthenticationSetup(provider, db, apiKeyService, apiKey);
+        }
+
+        private static ServiceProvider CreateServiceProvider()
+        {
             var services = new ServiceCollection();
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseInMemoryDatabase(Guid.NewGuid().ToString("N")));
             services.AddIdentityCore<ApplicationUser>()
                 .AddRoles<ApplicationRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>();
+            return services.BuildServiceProvider();
+        }
 
-            var provider = services.BuildServiceProvider();
-            var db = provider.GetRequiredService<ApplicationDbContext>();
-            var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
-            var roleManager = provider.GetRequiredService<RoleManager<ApplicationRole>>();
-
+        private static async Task<ApplicationUser> CreateUserAsync(
+            UserManager<ApplicationUser> userManager,
+            RoleManager<ApplicationRole> roleManager,
+            string role)
+        {
             var user = new ApplicationUser
             {
                 Id = Guid.NewGuid(),
@@ -82,15 +95,20 @@ public sealed class ApiKeyAuthenticationHandlerTests
             Assert.That((await userManager.CreateAsync(user)).Succeeded, Is.True);
             Assert.That((await roleManager.CreateAsync(new ApplicationRole { Name = role })).Succeeded, Is.True);
             Assert.That((await userManager.AddToRoleAsync(user, role)).Succeeded, Is.True);
+            return user;
+        }
 
+        private static async Task<(ApiKeyService Service, string ApiKey)> CreateApiKeyAsync(
+            ApplicationDbContext db,
+            Guid userId)
+        {
             var apiKeyService = new ApiKeyService(
                 db,
                 NullLogger<ApiKeyService>.Instance,
                 authorizationService: null!,
                 new NoOpAuditEventService());
-            var created = await apiKeyService.CreateApiKeyAsync(user.Id, "test", ApiKeyScope.Developer);
-
-            return new AuthenticationSetup(provider, db, apiKeyService, created.apiKey);
+            var created = await apiKeyService.CreateApiKeyAsync(userId, "test", ApiKeyScope.Developer);
+            return (apiKeyService, created.apiKey);
         }
 
         public async Task<AuthenticateResult> AuthenticateAsync()
