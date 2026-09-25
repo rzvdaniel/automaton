@@ -26,9 +26,21 @@ internal static class AppActionProcessExecutor
     {
         var secrets = GetSecretValues(request);
         using var process = StartActionProcess(manifest, currentDirectory, request.Secrets);
-        await process.StandardInput.WriteAsync(input.AsMemory(), executionToken);
-        process.StandardInput.Close();
         var outputTasks = DrainProcessOutput(process);
+        try
+        {
+            await process.StandardInput.WriteAsync(input.AsMemory(), executionToken);
+        }
+        catch (IOException) when (process.HasExited)
+        {
+            // A fast action can exit before consuming its request. Its exit status and output determine
+            // the result; a broken input pipe should not discard that completed execution.
+        }
+        finally
+        {
+            process.StandardInput.Close();
+        }
+
         try
         {
             await process.WaitForExitAsync(executionToken);
