@@ -52,8 +52,8 @@ public sealed class HostedRunnerStorageVerificationControllerTests
         Assert.That(verification.Reason, Is.EqualTo("AdministratorRequested"));
     }
 
-    private static AdminHostedRunnersController CreateController(ApplicationDbContext db) =>
-        new(db, null!, null!, null!, null!, null!, null!, new NoOpAuditEventService(), null!, null!);
+    private static AdminHostedRunnerStorageController CreateController(ApplicationDbContext db) =>
+        new(db, new NoOpAuditEventService(), null!, null!);
 
     private static ApplicationDbContext CreateDb() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
