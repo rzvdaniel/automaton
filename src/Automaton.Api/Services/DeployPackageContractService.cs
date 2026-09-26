@@ -16,6 +16,7 @@ internal static class DeployPackageContractService
     {
         using var stream = file.OpenReadStream();
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+        AppArchiveStorageBounds.Validate(archive);
         var manifest = archive.Entries.FirstOrDefault(entry =>
             string.Equals(entry.FullName.TrimStart('/'), "manifest.json", StringComparison.OrdinalIgnoreCase));
         if (manifest is null)

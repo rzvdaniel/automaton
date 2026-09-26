@@ -7,6 +7,9 @@ public sealed class DeploymentPackageStore(IWebHostEnvironment webHostEnvironmen
 {
     public async Task<string> StoreAsync(Guid operationId, IFormFile file, CancellationToken cancellationToken)
     {
+        if (file.Length > AppArchiveStorageBounds.MaximumUploadBytes)
+            throw new InvalidDataException($"Deployment package exceeds the {AppArchiveStorageBounds.MaximumUploadBytes}-byte upload limit.");
+
         var directory = GetPackageDirectory();
         Directory.CreateDirectory(directory);
         var packagePath = Path.Combine(directory, $"{operationId:N}.zip");
@@ -20,7 +23,13 @@ public sealed class DeploymentPackageStore(IWebHostEnvironment webHostEnvironmen
                 FileShare.None,
                 bufferSize: 128 * 1024,
                 useAsync: true);
-            await file.CopyToAsync(package, cancellationToken);
+            await using var input = file.OpenReadStream();
+            await AppArchiveStorageBounds.CopyExactlyAsync(
+                input,
+                package,
+                file.Length,
+                AppArchiveStorageBounds.MaximumUploadBytes,
+                cancellationToken);
             return packagePath;
         }
         catch

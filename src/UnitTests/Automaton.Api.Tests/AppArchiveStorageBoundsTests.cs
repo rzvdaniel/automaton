@@ -32,13 +32,24 @@ public sealed class AppArchiveStorageBoundsTests
     }
 
     [Test]
-    public async Task CopyEntryAsync_RejectsBytesPastDeclaredEntryLengthBeforeWritingThem()
+    public async Task CopyExactlyAsync_RejectsBytesPastDeclaredLengthBeforeWritingThem()
     {
         await using var input = new MemoryStream("excess"u8.ToArray());
         await using var output = new MemoryStream();
 
         Assert.ThrowsAsync<InvalidDataException>(async () =>
-            await AppArchiveStorageBounds.CopyEntryAsync(input, output, expectedBytes: 3));
+            await AppArchiveStorageBounds.CopyExactlyAsync(input, output, expectedBytes: 3, maximumBytes: 10));
+        Assert.That(output.Length, Is.Zero);
+    }
+
+    [Test]
+    public async Task CopyExactlyAsync_RejectsADeclaredLengthAboveTheConfiguredLimitBeforeWriting()
+    {
+        await using var input = new MemoryStream("data"u8.ToArray());
+        await using var output = new MemoryStream();
+
+        Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await AppArchiveStorageBounds.CopyExactlyAsync(input, output, expectedBytes: 11, maximumBytes: 10));
         Assert.That(output.Length, Is.Zero);
     }
 

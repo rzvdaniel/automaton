@@ -87,15 +87,15 @@ public class PublishedAppStorageService
 
         var rootPath = GetRootPath();
         var finalPath = Path.Combine(rootPath, slug);
-        if (!Directory.Exists(finalPath))
+        var disabledRoot = Path.Combine(rootPath, ".disabled");
+        if (Directory.Exists(finalPath))
         {
-            return Task.CompletedTask;
+            Directory.CreateDirectory(disabledRoot);
+            var disabledPath = Path.Combine(disabledRoot, $"{slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
+            Directory.Move(finalPath, disabledPath);
         }
 
-        var disabledRoot = Path.Combine(rootPath, ".disabled");
-        Directory.CreateDirectory(disabledRoot);
-        var disabledPath = Path.Combine(disabledRoot, $"{slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
-        Directory.Move(finalPath, disabledPath);
+        DeleteDisabledCopies(slug, disabledRoot);
         return Task.CompletedTask;
     }
 
@@ -144,6 +144,17 @@ public class PublishedAppStorageService
 
         Directory.CreateDirectory(rootPath);
         return Path.GetFullPath(rootPath);
+    }
+
+    private static void DeleteDisabledCopies(string slug, string disabledRoot)
+    {
+        if (!Directory.Exists(disabledRoot))
+            return;
+
+        var matchingCopies = Directory.EnumerateDirectories(disabledRoot)
+            .Where(directory => Path.GetFileName(directory).StartsWith(slug + "-", StringComparison.Ordinal));
+        foreach (var directory in matchingCopies)
+            Directory.Delete(directory, recursive: true);
     }
 
     private static void CopyPublicFiles(string sourcePath, string stagingPath)

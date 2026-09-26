@@ -110,7 +110,8 @@ public sealed class AppRuntimeArchiveUploadService(
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             using var entryStream = entry.Open();
             await using var outputStream = System.IO.File.Create(destinationPath);
-            await AppArchiveStorageBounds.CopyEntryAsync(entryStream, outputStream, entry.Length);
+            await AppArchiveStorageBounds.CopyExactlyAsync(
+                entryStream, outputStream, entry.Length, AppArchiveStorageBounds.MaximumExpandedBytes);
             result.Written.Add(relativePath);
         }
         catch (Exception exception)

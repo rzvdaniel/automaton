@@ -224,7 +224,8 @@ public class AppArchiveService
 
             await using var entryStream = entry.Open();
             await using var outStream = System.IO.File.Create(destPath);
-            await AppArchiveStorageBounds.CopyEntryAsync(entryStream, outStream, entry.Length, cancellationToken);
+            await AppArchiveStorageBounds.CopyExactlyAsync(
+                entryStream, outStream, entry.Length, AppArchiveStorageBounds.MaximumExpandedBytes, cancellationToken);
             written.Add(relativePath);
         }
 
