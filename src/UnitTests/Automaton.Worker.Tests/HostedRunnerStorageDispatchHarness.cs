@@ -68,6 +68,7 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
             Id = runnerId, UserId = userId, Name = "runner", ContainerName = "runner",
             RunnerHostId = hostId, Status = provisioning ? HostedRunnerStatuses.Provisioning : HostedRunnerStatuses.Running,
             ContainerId = provisioning ? null : "container", StorageProjectId = storageProjectId,
+            StorageAllowanceBytes = 512L * 1024 * 1024,
             StorageState = HostedRunnerStorageStates.Healthy,
             StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
             StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,

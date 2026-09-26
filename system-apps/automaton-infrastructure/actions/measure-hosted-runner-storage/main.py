@@ -132,6 +132,15 @@ def parse_project_quota_report(output: str, project_id: int) -> tuple[int, int] 
     raise RuntimeError(f"XFS project quota for project {project_id} could not be verified: output could not be parsed")
 
 
+def require_project_assignment(mountpoint: str, project_id: int) -> None:
+    result = host("xfs_io", "-c", "stat", mountpoint)
+    if result.returncode != 0:
+        raise RuntimeError(f"XFS project assignment could not be verified for managed volume {mountpoint}")
+    match = re.search(r"projid\s*[.= :]\s*(\d+)", result.stdout + result.stderr, re.IGNORECASE)
+    if match is None or int(match.group(1)) != project_id:
+        raise RuntimeError(f"XFS project {project_id} is not assigned to managed volume {mountpoint}")
+
+
 def read_project_quota(filesystem_mountpoint: str, project_id: int) -> tuple[int, int] | None:
     result = host("xfs_quota", "-x", "-c", "report -p -b -n", filesystem_mountpoint)
     return parse_project_quota_report(result.stdout + result.stderr, project_id)
@@ -142,6 +151,9 @@ def main() -> None:
     runner_uuid = uuid.UUID(str(request["hostedRunnerId"]))
     uuid.UUID(str(request["runnerHostId"]))
     project_id = require_project_id(request["xfsProjectId"])
+    storage_allowance_bytes = int(request["storageAllowanceBytes"])
+    if storage_allowance_bytes <= 0:
+        raise ValueError("storageAllowanceBytes must be positive")
     runner_id = str(runner_uuid)
     compact = runner_uuid.hex
     expected_names = {
@@ -172,10 +184,14 @@ def main() -> None:
     expected_filesystem_uuid = require_expected_filesystem_uuid(request.get("storageFilesystemUuid"))
     if expected_filesystem_uuid is not None and storage_filesystem_uuid != expected_filesystem_uuid:
         raise RuntimeError("Hosted Runner storage is on a different XFS filesystem; explicit storage migration is required")
+    for mountpoint in mountpoints.values():
+        require_project_assignment(mountpoint, project_id)
     quota = read_project_quota(filesystem_mountpoint, project_id)
     if quota is None:
         raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
-    total_bytes, _ = quota
+    total_bytes, hard_limit_bytes = quota
+    if hard_limit_bytes != storage_allowance_bytes:
+        raise RuntimeError("XFS project hard limit does not match the Hosted Runner storage allowance")
     print(json.dumps({
         "success": True,
         "systemBytes": 0,
