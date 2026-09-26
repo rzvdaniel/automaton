@@ -74,6 +74,7 @@ public class AppArchiveService
         try
         {
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read, leaveOpen: false);
+            AppArchiveStorageBounds.Validate(archive);
 
             var manifest = await ReadArchiveManifestAsync(archive, cancellationToken);
             var appName = GetImportedAppName(manifest, fileName);

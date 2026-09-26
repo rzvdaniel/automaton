@@ -23,10 +23,11 @@ public sealed class AppRuntimeArchiveUploadService(
 
         var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
         var runtimePath = fileStorageService.GetAppRuntimeDirectoryPath(ownerId, appId);
-        await PrepareRuntimeDirectoryAsync(ownerId, appId, runtimePath, clean);
-
         using var stream = file.OpenReadStream();
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        AppArchiveStorageBounds.Validate(archive);
+        await PrepareRuntimeDirectoryAsync(ownerId, appId, runtimePath, clean);
+
         var result = await CopyEntriesAsync(archive, runtimePath);
 
         logger.LogDebug(
@@ -53,7 +54,7 @@ public sealed class AppRuntimeArchiveUploadService(
         Directory.CreateDirectory(runtimePath);
     }
 
-    private async Task<RuntimeArchiveUploadResult> CopyEntriesAsync(ZipArchive archive, string runtimePath)
+    private static async Task<RuntimeArchiveUploadResult> CopyEntriesAsync(ZipArchive archive, string runtimePath)
     {
         var result = new RuntimeArchiveUploadResult([], [], []);
         foreach (var entry in archive.Entries)
