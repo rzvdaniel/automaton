@@ -143,12 +143,38 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
 
         self.assert_tmpfs_and_read_only_rootfs()
 
-        ACTION.ensure_xfs_project_quota(mountpoints, self.project_id, 64, self.runner_id, filesystem_uuid)
+        self.replace_runner_container_and_verify_data(mountpoints, filesystem_uuid)
         self.assertEqual(self.read_image_file(system, "/system/runner/marker"), "preserved-system")
         self.assertEqual(self.read_image_file(user, "/user/workspace/data/app/marker"), "preserved-user")
         usage, hard_limit = ACTION.read_project_quota(ACTION.resolve_filesystem_mountpoint(mountpoints[0]), self.project_id)
         self.assertGreater(usage, 0)
         self.assertEqual(hard_limit, 64 * 1024 * 1024)
+
+    def replace_runner_container_and_verify_data(self, mountpoints, filesystem_uuid):
+        name = f"automaton-m1-xfs-reprovision-{uuid.uuid4().hex}"
+        system = self.volumes["system"]
+        user = self.volumes["user"]
+        mount_arguments = [
+            "--mount", f"type=volume,source={system},target=/automaton/system",
+            "--mount", f"type=volume,source={user},target=/automaton/storage",
+        ]
+        try:
+            self.docker(
+                "run", "--detach", "--name", name, "--network", "none", *mount_arguments,
+                "--entrypoint", "sh", self.image, "-c", "sleep 300",
+            )
+            self.docker("rm", "--force", name)
+            ACTION.ensure_xfs_project_quota(
+                mountpoints, self.project_id, 64, self.runner_id, filesystem_uuid,
+            )
+            self.docker(
+                "run", "--detach", "--name", name, "--network", "none", *mount_arguments,
+                "--entrypoint", "sh", self.image, "-c", "sleep 300",
+            )
+            self.assertEqual(self.read_image_file(system, "/system/runner/marker"), "preserved-system")
+            self.assertEqual(self.read_image_file(user, "/user/workspace/data/app/marker"), "preserved-user")
+        finally:
+            self.remove_container_if_present(name)
 
     def assert_tmpfs_and_read_only_rootfs(self):
         name = f"automaton-m1-xfs-tmp-{uuid.uuid4().hex}"
@@ -192,6 +218,13 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
             ["docker", "container", "inspect", name], text=True, capture_output=True, check=False,
         )
         self.assertNotEqual(inspect.returncode, 0, "failed disposable containers must be removed")
+
+    def remove_container_if_present(self, name):
+        inspect = subprocess.run(
+            ["docker", "container", "inspect", name], text=True, capture_output=True, check=False,
+        )
+        if inspect.returncode == 0:
+            self.docker("rm", "--force", name)
 
     def volume_mountpoint(self, volume):
         metadata = ACTION.inspect_volume(volume)

@@ -116,6 +116,15 @@ def current_project_id(mountpoint: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def project_inheritance_enabled(mountpoint: str) -> bool:
+    result = host("xfs_io", "-c", "lsattr", mountpoint, check=False)
+    if result.returncode != 0:
+        return False
+    flag_line = next((line for line in result.stdout.splitlines() if line.strip()), "")
+    flags = flag_line.split(maxsplit=1)[0] if flag_line else ""
+    return "P" in flags
+
+
 def project_quota_enforcement_enabled(output: str) -> bool:
     lowered = output.lower()
     if "project quota state: enforcement" in lowered:
@@ -264,6 +273,8 @@ def ensure_xfs_project_quota(
     for mountpoint in mountpoints:
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to managed volume {mountpoint}")
+        if not project_inheritance_enabled(mountpoint):
+            raise RuntimeError(f"XFS project inheritance was not enabled on managed volume {mountpoint}")
 
     existing_quota = read_project_quota(filesystem_mountpoint, project_id)
     limit_bytes = disk_limit_mb * 1024 * 1024
@@ -306,6 +317,8 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
             raise RuntimeError("XFS project quota enforcement could not be verified")
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to final managed volume {mountpoint}")
+        if not project_inheritance_enabled(mountpoint):
+            raise RuntimeError(f"XFS project inheritance is not enabled on final managed volume {mountpoint}")
         filesystem_mountpoints.append(filesystem_mountpoint)
 
     if len(set(filesystem_mountpoints)) != 1:

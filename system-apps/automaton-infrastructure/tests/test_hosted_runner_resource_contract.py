@@ -178,6 +178,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         xfs_project_error: str | None = None,
         xfs_limit_error: str | None = None,
         xfs_assignment_succeeds: bool = True,
+        xfs_inheritance_succeeds: bool = True,
         xfs_quota_verification_succeeds: bool = True,
         final_quota_hard_limit_matches: bool = True,
         reset_storage_after_container: bool = False,
@@ -266,6 +267,9 @@ Project ID       Used       Soft       Hard    Warn/Grace
                         hard_blocks = 0
                     stdout = f"Project ID   Used   Soft   Hard\n#{project_id} 0 0 {hard_blocks}\n"
             elif arguments[:2] == ("xfs_io", "-c"):
+                if arguments[2] == "lsattr":
+                    flags = "--------P--------------" if xfs_inheritance_succeeds else "------------------------"
+                    return subprocess.CompletedProcess(arguments, 0, f"{flags} {arguments[3]}\n", "")
                 mountpoint = arguments[3]
                 is_other_runner_volume = any(
                     mountpoint == f"/var/lib/docker/volumes/{name}/_data"
@@ -574,12 +578,12 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 final_project_check = next(
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 )
                 self.assertGreater(final_project_check, run_index)
                 final_project_checks = [
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 ]
                 self.assertEqual(len(final_project_checks), 1)
 
@@ -594,7 +598,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 final_project_checks = [
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 ]
                 self.assertEqual(len(final_project_checks), 2)
 
@@ -615,6 +619,24 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     )
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 self.assertTrue(any(index > run_index for index, call in enumerate(calls) if call[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in call)))
+
+    def test_project_inheritance_is_required_before_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "project inheritance"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        xfs_inheritance_succeeds=False,
+                    )
+                self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
         for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
@@ -730,6 +752,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
             if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                 return subprocess.CompletedProcess(arguments, 0, "#1234567 600000 0 0\n", "")
             if arguments[:2] == ("xfs_io", "-c"):
+                if arguments[2] == "lsattr":
+                    return subprocess.CompletedProcess(arguments, 0, f"--------P-------------- {arguments[3]}\n", "")
                 project_id = 1234567 if assigned_project else 0
                 return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
             return subprocess.CompletedProcess(arguments, 0, "", "")
@@ -784,6 +808,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                         return subprocess.CompletedProcess(arguments, 0, "#1234567 0 0 524288\n", "")
                     if arguments[:2] == ("xfs_io", "-c"):
+                        if arguments[2] == "lsattr":
+                            return subprocess.CompletedProcess(arguments, 0, f"--------P-------------- {arguments[3]}\n", "")
                         project_id = 1234567 if assigned_project else 0
                         return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
                     return subprocess.CompletedProcess(arguments, 0, "", "")

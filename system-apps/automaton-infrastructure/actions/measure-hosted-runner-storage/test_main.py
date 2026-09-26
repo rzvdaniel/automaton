@@ -84,6 +84,8 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
             if args[:3] == ("findmnt", "-no", "OPTIONS"):
                 return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
             if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
                 return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(
@@ -134,6 +136,8 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
             if args[:3] == ("findmnt", "-no", "UUID"):
                 return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
             if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
                 return subprocess.CompletedProcess(
                     args, 0, f"fsxattr.projid = {request['xfsProjectId']}\n", ""
                 )
@@ -206,6 +210,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
             if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
                 project_id = 77 if args[-1].endswith("-system/_data") else request["xfsProjectId"]
                 return subprocess.CompletedProcess(args, 0, f"fsxattr.projid = {project_id}\n", "")
             return subprocess.CompletedProcess(args, 0, "#1234567 64 0 524288\n", "")
@@ -220,6 +226,15 @@ Project ID       Used       Soft       Hard    Warn/Grace
             "host",
             return_value=subprocess.CompletedProcess([], 1, "fsxattr.projid = 1234567", "xfs_io failed"),
         ), self.assertRaisesRegex(RuntimeError, "could not be verified"):
+            ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
+
+    def test_rejects_project_assignment_without_inheritance_flag(self):
+        def host(*args, **kwargs):
+            if args[2] == "stat":
+                return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
+            return subprocess.CompletedProcess(args, 0, f"------------------------ {args[3]}\n", "")
+
+        with patch.object(ACTION, "host", side_effect=host), self.assertRaisesRegex(RuntimeError, "inheritance"):
             ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
 
     def test_rejects_hard_limit_drift(self):
@@ -250,6 +265,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
             if args[:3] == ("findmnt", "-no", "UUID"):
                 return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
             if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
                 return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
