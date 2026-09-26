@@ -82,8 +82,11 @@ public sealed class AccountStorageProjectMigrationTests
         db.Database.ExecuteSqlRaw("CREATE TABLE HostedRunners (Id TEXT NOT NULL PRIMARY KEY, UserId TEXT NOT NULL, StorageProjectId INTEGER NULL)");
         db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IX_HostedRunners_StorageProjectId ON HostedRunners (StorageProjectId)");
 
+        const string storageIdentityMigration = "20260923051139_MoveStorageProjectIdentityToAccount";
         var migrations = db.Database.GetMigrations().ToArray();
-        foreach (var migration in migrations[..^1])
+        var storageIdentityMigrationIndex = Array.IndexOf(migrations, storageIdentityMigration);
+        Assert.That(storageIdentityMigrationIndex, Is.GreaterThanOrEqualTo(0));
+        foreach (var migration in migrations.Take(storageIdentityMigrationIndex))
         {
             db.Database.ExecuteSqlRaw(
                 "INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ({0}, {1})",

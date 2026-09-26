@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -24,7 +25,8 @@ public sealed class HostedRunnerStorageLocalityResolver(ApplicationDbContext db)
                 runner.StorageProjectId,
                 runner.DeletedAt,
                 runner.ContainerId,
-                runner.RunnerId))
+                runner.RunnerId,
+                runner.Runner == null ? null : runner.Runner.Purpose))
             .ToListAsync(cancellationToken);
 
         EnsureStorageLocationsHaveKnownHosts(accountId, allocation.StorageProjectId, runnerLocations);
@@ -47,6 +49,7 @@ public sealed class HostedRunnerStorageLocalityResolver(ApplicationDbContext db)
     private static bool HasStorageIdentity(HostedRunnerStorageLocation location, int storageProjectId)
         => location.ContainerId is not null
             || location.RunnerId is not null
+                && !IsInfrastructureRunner(location)
             || location.DeletedAt is not null && location.StorageProjectId == storageProjectId;
 
     private static Guid? ResolveHistoricalStorageHostId(
@@ -82,10 +85,17 @@ public sealed class HostedRunnerStorageLocalityResolver(ApplicationDbContext db)
     }
 
     private static bool IsRelevantStorageLocation(HostedRunnerStorageLocation location, int storageProjectId)
-        => location.DeletedAt is null
-            || location.StorageProjectId == storageProjectId
-            || location.ContainerId is not null
-            || location.RunnerId is not null;
+        => (!IsInfrastructureRunner(location) || HasTenantStorageEvidence(location, storageProjectId))
+            && (location.DeletedAt is null
+                || location.StorageProjectId == storageProjectId
+                || location.ContainerId is not null
+                || location.RunnerId is not null);
+
+    private static bool IsInfrastructureRunner(HostedRunnerStorageLocation location)
+        => string.Equals(location.RunnerPurpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasTenantStorageEvidence(HostedRunnerStorageLocation location, int storageProjectId)
+        => location.StorageProjectId == storageProjectId || location.ContainerId is not null;
 
     private sealed record HostedRunnerStorageLocation(
         Guid Id,
@@ -93,5 +103,6 @@ public sealed class HostedRunnerStorageLocalityResolver(ApplicationDbContext db)
         int? StorageProjectId,
         DateTime? DeletedAt,
         string? ContainerId,
-        Guid? RunnerId);
+        Guid? RunnerId,
+        string? RunnerPurpose);
 }
