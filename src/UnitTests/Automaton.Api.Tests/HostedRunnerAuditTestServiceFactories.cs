@@ -81,7 +81,6 @@ internal static class HostedRunnerManagementTestServiceFactory
             db,
             provisioningService,
             eventPublisher ?? new NoOpEventPublisher(),
-            options,
             auditEventService,
             userContextService,
             NullLogger<HostedRunnerManagementService>.Instance);

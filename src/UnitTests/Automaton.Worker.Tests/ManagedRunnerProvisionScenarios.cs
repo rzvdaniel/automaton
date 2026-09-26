@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Automaton.Worker.Config;
@@ -35,6 +36,26 @@ internal static class ManagedRunnerProvisionScenarios
         await using var fixture = await ManagedRunnerProvisionFixture.CreateAsync();
         await fixture.HandleAsync(fixture.CreateRequest(), true, "automaton/runner:latest");
         await fixture.AssertInvalidImageFailureAsync();
+    }
+
+    internal static async Task VerifyConflictingStorageHistoryFailsClosedAsync()
+    {
+        await using var fixture = await ManagedRunnerProvisionFixture.CreateAsync();
+        var otherHost = new RunnerHost
+        {
+            Id = Guid.NewGuid(), Name = "host-2", Provider = "test",
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner
+        };
+        fixture.AddConflictingStorageRunner(otherHost);
+        await fixture.HandleAsync(fixture.CreateRequest(grantId: Guid.NewGuid()), true, Image('a'));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.CommandCount, Is.Zero);
+            Assert.That(fixture.Deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+            Assert.That(fixture.Deployment.Error, Does.Contain("multiple Runner Hosts"));
+            Assert.That(fixture.StorageRunnerHostId, Is.Null);
+        });
     }
 
     private static string Image(char digestCharacter)
@@ -115,6 +136,7 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
     internal HostedRunnerDeployment Deployment { get; }
     internal List<HostedRunnerDeployment> Deployments { get; } = [];
     internal int CommandCount => publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Count();
+    internal Guid? StorageRunnerHostId => db.AccountStorageAllocations.Single().StorageRunnerHostId;
 
     private ManagedRunnerProvisionFixture(
         ApplicationDbContext db,
@@ -190,6 +212,19 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
         return deployment;
     }
 
+    internal void AddConflictingStorageRunner(RunnerHost otherHost)
+    {
+        db.RunnerHosts.Add(otherHost);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Runner.UserId, RunnerHostId = otherHost.Id, RunnerHost = otherHost,
+            StorageProjectId = Runner.StorageProjectId, ContainerId = "legacy-container",
+            Name = "legacy-runner", ContainerName = "legacy-runner", Status = HostedRunnerStatuses.Running
+        });
+        db.AccountStorageAllocations.Single().StorageRunnerHostId = null;
+        db.SaveChanges();
+    }
+
     internal ManagedRunnerProvisionRequestedEvent CreateRequest(
         HostedRunnerDeployment? deployment = null,
         Guid? grantId = null)
@@ -200,15 +235,8 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
         };
 
     internal Task HandleAsync(ManagedRunnerProvisionRequestedEvent request, bool enabled, string image)
-        => CreateHandler(enabled, image).HandleAsync(request);
-
-    private ManagedRunnerProvisionRequestedEventHandler CreateHandler(bool enabled, string image)
-        => new(db, publisher, new RollbackTransactionalEventExecutor(db),
-            new OptionsSnapshot(new HostedRunnerOptions
-            {
-                Enabled = enabled, DockerImage = image, DockerNetwork = "automaton-runtime",
-                ServerUrl = "https://api.example.test"
-            }), NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
+        => ManagedRunnerProvisionHandlerFactory.Create(
+            db, publisher, new RollbackTransactionalEventExecutor(db), enabled, image).HandleAsync(request);
 
     internal Task AssertOutboxFailureRollsBackAsync(ManagedRunnerProvisionRequestedEvent request)
     {
@@ -285,7 +313,27 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
         }
     }
 
-    private sealed class OptionsSnapshot(HostedRunnerOptions value) : IOptionsSnapshot<HostedRunnerOptions>
+}
+
+internal static class ManagedRunnerProvisionHandlerFactory
+{
+    internal static ManagedRunnerProvisionRequestedEventHandler Create(
+        ApplicationDbContext db,
+        IEventPublisher publisher,
+        ITransactionalEventExecutor transactionalEventExecutor,
+        bool enabled,
+        string image)
+        => new(db,
+            new HostedRunnerStorageLocalityAdoptionService(db, new HostedRunnerStorageLocalityResolver(db)),
+            publisher,
+            transactionalEventExecutor,
+            new HostedRunnerOptionsSnapshot(new HostedRunnerOptions
+            {
+                Enabled = enabled, DockerImage = image, DockerNetwork = "automaton-runtime",
+                ServerUrl = "https://api.example.test"
+            }), NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
+
+    private sealed class HostedRunnerOptionsSnapshot(HostedRunnerOptions value) : IOptionsSnapshot<HostedRunnerOptions>
     {
         public HostedRunnerOptions Value => value;
         public HostedRunnerOptions Get(string? name) => value;

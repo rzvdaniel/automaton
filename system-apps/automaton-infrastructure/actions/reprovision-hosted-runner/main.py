@@ -440,6 +440,7 @@ def main() -> None:
 
     response = {
         "success": True,
+        "resultVersion": 2,
         "containerId": container_id,
         "containerName": container_name,
         "storageFilesystemUuid": storage_filesystem_uuid,

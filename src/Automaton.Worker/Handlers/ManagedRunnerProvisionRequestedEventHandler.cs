@@ -2,6 +2,7 @@ using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
@@ -14,6 +15,7 @@ namespace Automaton.Worker.Handlers;
 
 public sealed class ManagedRunnerProvisionRequestedEventHandler(
     ApplicationDbContext dbContext,
+    HostedRunnerStorageLocalityAdoptionService storageLocalityAdoption,
     IEventPublisher eventPublisher,
     ITransactionalEventExecutor transactionalEventExecutor,
     IOptionsSnapshot<HostedRunnerOptions> options,
@@ -54,22 +56,17 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        var storageAllocation = await dbContext.AccountStorageAllocations
-            .SingleOrDefaultAsync(x => x.AccountId == hostedRunner.UserId, cancellationToken);
-        if (storageAllocation is null
-            || storageAllocation.StorageRunnerHostId.HasValue && storageAllocation.StorageRunnerHostId != host!.Id)
+        AccountStorageAllocation storageAllocation;
+        try
         {
-            await FailAsync(
-                hostedRunner,
-                deployment,
-                "Account storage locality is missing or does not match the selected Runner Host.",
-                message.CorrelationId,
-                cancellationToken);
+            storageAllocation = await storageLocalityAdoption.AdoptRunnerHostAsync(
+                hostedRunner.UserId, host!.Id, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            await FailAsync(hostedRunner, deployment, exception.Message, message.CorrelationId, cancellationToken);
             return;
         }
-
-        storageAllocation.StorageRunnerHostId ??= host!.Id;
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         var infrastructureRequest = CreateInfrastructureRequest(
             hostedRunner, deployment, host!, message, storageAllocation.StorageFilesystemUuid);

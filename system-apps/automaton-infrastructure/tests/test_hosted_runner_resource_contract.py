@@ -305,6 +305,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         output: list[dict[str, object]] = []
         self.run_provision_action("provision-hosted-runner", result_out=output)
 
+        self.assertEqual(output[0]["resultVersion"], 2)
         self.assertEqual(output[0]["storageFilesystemUuid"], FILESYSTEM_UUID)
 
     def test_reprovision_rejects_a_different_filesystem_before_replacing_container(self):

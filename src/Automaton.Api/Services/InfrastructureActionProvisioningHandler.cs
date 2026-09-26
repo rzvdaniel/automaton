@@ -223,32 +223,87 @@ public sealed class InfrastructureActionProvisioningHandler(
             throw new InvalidOperationException("Account storage locality does not match the Hosted Runner host.");
 
         if (allocation.StorageFilesystemUuid is not null
+            && actionResult.FilesystemUuid is not null
             && !string.Equals(allocation.StorageFilesystemUuid, actionResult.FilesystemUuid, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Infrastructure Action reported a different XFS filesystem than the account storage locality.");
-        allocation.StorageFilesystemUuid ??= actionResult.FilesystemUuid;
+        if (actionResult.FilesystemUuid is not null)
+        {
+            allocation.StorageFilesystemUuid ??= actionResult.FilesystemUuid;
+        }
+        else
+        {
+            await RequestFilesystemReverificationAsync(hostedRunner, deployment, cancellationToken);
+        }
 
         hostedRunner.ContainerId = actionResult.ContainerId;
         hostedRunner.Status = HostedRunnerStatuses.Provisioning;
         deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
-        deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+        deployment.Logs = actionResult.FilesystemUuid is null
+            ? "Legacy Infrastructure Action result accepted; storage verification will confirm filesystem identity after Runner registration."
+            : "Infrastructure Action completed; waiting for the hosted Runner to register.";
     }
 
     private static HostedRunnerProvisioningActionResult ReadProvisioningActionResult(JsonElement result)
     {
-        if (!result.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True
+        if (!IsSuccessfulProvisioningResult(result)
             || !result.TryGetProperty("containerId", out var containerId)
             || containerId.ValueKind != JsonValueKind.String
             || string.IsNullOrWhiteSpace(containerId.GetString())
             || !result.TryGetProperty("containerName", out var containerName)
             || containerName.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(containerName.GetString())
-            || !result.TryGetProperty("storageFilesystemUuid", out var filesystemUuidElement)
-            || filesystemUuidElement.ValueKind != JsonValueKind.String
-            || !Guid.TryParse(filesystemUuidElement.GetString(), out var filesystemUuid))
+            || string.IsNullOrWhiteSpace(containerName.GetString()))
             throw new InvalidOperationException("Infrastructure Action returned an invalid Hosted Runner container identity.");
 
+        var resultVersion = ReadProvisioningResultVersion(result);
+        var filesystemUuid = ReadOptionalFilesystemUuid(result);
+        if (resultVersion >= 2 && filesystemUuid is null)
+            throw new InvalidOperationException("Infrastructure Action v2 result has no XFS filesystem UUID.");
+
         return new HostedRunnerProvisioningActionResult(
-            containerId.GetString()!, filesystemUuid.ToString("D"));
+            containerId.GetString()!, filesystemUuid);
+    }
+
+    private static bool IsSuccessfulProvisioningResult(JsonElement result)
+        => result.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.True;
+
+    private static int ReadProvisioningResultVersion(JsonElement result)
+    {
+        if (!result.TryGetProperty("resultVersion", out var element))
+            return 1;
+        if (!element.TryGetInt32(out var version) || version is < 1 or > 2)
+            throw new InvalidOperationException("Infrastructure Action returned an unsupported Hosted Runner result version.");
+        return version;
+    }
+
+    private static string? ReadOptionalFilesystemUuid(JsonElement result)
+    {
+        if (!result.TryGetProperty("storageFilesystemUuid", out var element))
+            return null;
+        if (element.ValueKind != JsonValueKind.String || !Guid.TryParse(element.GetString(), out var filesystemUuid))
+            throw new InvalidOperationException("Infrastructure Action returned an invalid XFS filesystem UUID.");
+        return filesystemUuid.ToString("D");
+    }
+
+    private async Task RequestFilesystemReverificationAsync(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        CancellationToken cancellationToken)
+    {
+        var key = $"legacy-provision-result:{deployment.Id:N}";
+        if (await db.HostedRunnerStorageVerifications.AnyAsync(item => item.IdempotencyKey == key, cancellationToken))
+            return;
+
+        var requestedAt = DateTime.UtcNow;
+        db.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = hostedRunner.Id,
+            IdempotencyKey = key,
+            Reason = "LegacyProvisioningResult",
+            Status = StorageVerificationStatuses.Pending,
+            RequestedAtUtc = requestedAt
+        });
+        hostedRunner.StorageVerificationRequestedAtUtc = requestedAt;
     }
 
     private void ApplyRestartResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
@@ -339,5 +394,5 @@ public sealed class InfrastructureActionProvisioningHandler(
             _ => AuditEventTypes.HostedRunnerProvisioningFailed
         };
 
-    private sealed record HostedRunnerProvisioningActionResult(string ContainerId, string FilesystemUuid);
+    private sealed record HostedRunnerProvisioningActionResult(string ContainerId, string? FilesystemUuid);
 }

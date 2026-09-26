@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Worker.Services;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,8 @@ internal sealed class HostedRunnerStorageReconciliationFixture : IAsyncDisposabl
         var services = new ServiceCollection();
         var databaseName = Guid.NewGuid().ToString("N");
         services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        services.AddScoped<HostedRunnerStorageLocalityResolver>();
+        services.AddScoped<HostedRunnerStorageLocalityAdoptionService>();
         var provider = services.BuildServiceProvider();
         var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

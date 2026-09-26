@@ -59,7 +59,7 @@ public class HostedRunnerProvisioningIdentityAuditTests
         var handler = new InfrastructureActionProvisioningHandler(
             db, new HostedRunnerAuditNoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
             Options.Create(new StorageTelemetryOptions()));
-        using var document = JsonDocument.Parse("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\",\"storageFilesystemUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}");
+        using var document = JsonDocument.Parse("{\"success\":true,\"resultVersion\":2,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\",\"storageFilesystemUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}");
 
         await handler.ApplySuccessfulOperationAsync(
             hostedRunner, deployment, "reprovision-hosted-runner", document.RootElement, CancellationToken.None);
@@ -70,4 +70,8 @@ public class HostedRunnerProvisioningIdentityAuditTests
             HostedRunnerAuditTestData.GetAccountStorageFilesystemUuid(db, userId),
             Is.EqualTo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
     }
+
+    [Test]
+    public async Task LegacyProvisioningResultWaitsForRegistrationAndRequestsFilesystemReverification()
+        => await HostedRunnerLegacyProvisioningResultScenario.VerifyAsync();
 }

@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Automaton.Worker.Services;
@@ -37,6 +38,8 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         var services = new ServiceCollection();
         var databaseName = Guid.NewGuid().ToString("N");
         services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        services.AddScoped<HostedRunnerStorageLocalityResolver>();
+        services.AddScoped<HostedRunnerStorageLocalityAdoptionService>();
         var provider = services.BuildServiceProvider();
         var publisher = new RecordingPublisher();
         var service = new HostedRunnerStorageReconciliationService(
@@ -93,6 +96,27 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         });
         await db.SaveChangesAsync();
         return id;
+    }
+
+    internal async Task AddConflictingStorageHostAsync()
+    {
+        await using var db = await OpenDbAsync();
+        var runner = await db.HostedRunners.SingleAsync(x => x.Id == runnerId);
+        var otherHost = new RunnerHost
+        {
+            Id = Guid.NewGuid(), Name = "conflicting-host", Provider = "test",
+            InfrastructureRunnerId = Guid.NewGuid()
+        };
+        db.RunnerHosts.Add(otherHost);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = runner.UserId, Name = "legacy-runner", ContainerName = "legacy-runner",
+            RunnerHostId = otherHost.Id, ContainerId = "legacy-container", StorageProjectId = runner.StorageProjectId,
+            Status = HostedRunnerStatuses.Running
+        });
+        var allocation = await db.AccountStorageAllocations.SingleAsync(x => x.AccountId == runner.UserId);
+        allocation.StorageRunnerHostId = null;
+        await db.SaveChangesAsync();
     }
 
     internal async Task SeedOverLimitRunnerAsync()
@@ -157,6 +181,18 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
     {
         await using var db = await OpenDbAsync();
         return await db.HostedRunnerStorageVerifications.Where(x => x.Id == id).Select(x => x.Status).SingleAsync();
+    }
+
+    internal async Task<string?> VerificationErrorAsync(Guid id)
+    {
+        await using var db = await OpenDbAsync();
+        return await db.HostedRunnerStorageVerifications.Where(x => x.Id == id).Select(x => x.Error).SingleAsync();
+    }
+
+    internal async Task<Guid?> StorageRunnerHostIdAsync()
+    {
+        await using var db = await OpenDbAsync();
+        return await db.AccountStorageAllocations.Select(x => x.StorageRunnerHostId).SingleAsync();
     }
 
     internal async Task<int> PendingVerificationCountAsync()

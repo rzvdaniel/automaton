@@ -49,7 +49,8 @@ public class HostedRunnerProvisioningService
         Guid userId,
         Guid planId,
         CancellationToken cancellationToken = default,
-        bool forceProvision = false)
+        bool forceProvision = false,
+        Guid? requiredHostedRunnerId = null)
     {
         var policyResolution = await provisioningPolicyService.ResolveAsync(userId, planId, cancellationToken);
         var specification = policyResolution.Specification!;
@@ -57,13 +58,13 @@ public class HostedRunnerProvisioningService
         if (policy.MaxHostedRunners <= 0)
             throw new InvalidOperationException("The effective subscription policy does not allow a Hosted Runner.");
 
-        var storageAllocation = await storageProjectAllocationService.GetOrCreateAllocationAsync(userId, cancellationToken);
         var admissionTransaction = await BeginAdmissionTransactionAsync(cancellationToken);
         try
         {
             await LockAccountAdmissionAsync(userId, cancellationToken);
+            var storageAllocation = await storageProjectAllocationService.GetOrCreateAllocationAsync(userId, cancellationToken);
             var preparation = await PrepareUnderAdmissionLockAsync(
-                userId, specification, policy, storageAllocation, forceProvision, cancellationToken);
+                userId, specification, policy, storageAllocation, forceProvision, requiredHostedRunnerId, cancellationToken);
             await CommitAdmissionTransactionAsync(admissionTransaction, cancellationToken);
             return preparation;
         }
@@ -80,10 +81,12 @@ public class HostedRunnerProvisioningService
         SubscriptionResourcePolicy policy,
         AccountStorageAllocation storageAllocation,
         bool forceProvision,
+        Guid? requiredHostedRunnerId,
         CancellationToken cancellationToken)
     {
         var storageRunnerHostId = await storageLocalityResolver.ResolveAsync(userId, storageAllocation, cancellationToken);
-        var hostedRunner = await FindReusableHostedRunnerAsync(userId, policy.MaxHostedRunners, cancellationToken);
+        var hostedRunner = await FindReusableHostedRunnerAsync(
+            userId, policy.MaxHostedRunners, requiredHostedRunnerId, cancellationToken);
         EnsureRunnerMatchesStorageLocality(userId, hostedRunner, storageRunnerHostId);
         storageRunnerHostId ??= hostedRunner?.RunnerHostId;
         if (storageAllocation.StorageRunnerHostId is null && storageRunnerHostId.HasValue)
@@ -178,6 +181,7 @@ public class HostedRunnerProvisioningService
     private async Task<HostedRunner?> FindReusableHostedRunnerAsync(
         Guid userId,
         int maximumHostedRunners,
+        Guid? requiredHostedRunnerId,
         CancellationToken cancellationToken)
     {
         var hostedRunners = await db.HostedRunners
@@ -200,7 +204,12 @@ public class HostedRunnerProvisioningService
                 $"Account '{userId}' has {hostedRunners.Count} non-deleted Hosted Runners but the subscription allows {maximumHostedRunners}. Existing runners ({conflictingRunnerIds}) were preserved; an administrator must resolve this conflict before provisioning.");
         }
 
-        return hostedRunners.FirstOrDefault();
+        var reusableRunner = requiredHostedRunnerId.HasValue
+            ? hostedRunners.SingleOrDefault(x => x.Id == requiredHostedRunnerId.Value)
+            : hostedRunners.FirstOrDefault();
+        if (requiredHostedRunnerId.HasValue && reusableRunner is null)
+            throw new InvalidOperationException("The selected Hosted Runner is no longer eligible for reprovisioning.");
+        return reusableRunner;
     }
 
     private async Task<IDbContextTransaction?> BeginAdmissionTransactionAsync(CancellationToken cancellationToken)
@@ -263,6 +272,13 @@ public class HostedRunnerProvisioningService
     public async Task<HostedRunner?> EnsureHostedRunnerAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var preparation = await PrepareProvisioningAsync(userId, Guid.Empty, cancellationToken, forceProvision: true);
+        return await DispatchPreparedProvisioningAsync(preparation, cancellationToken);
+    }
+
+    public async Task<HostedRunner?> DispatchPreparedProvisioningAsync(
+        HostedRunnerPreparationResult preparation,
+        CancellationToken cancellationToken)
+    {
         var hostedRunner = preparation.HostedRunner;
         if (!preparation.ShouldPublishProvisionRequest)
         {
@@ -271,7 +287,7 @@ public class HostedRunnerProvisioningService
 
         if (!options.Enabled)
         {
-            logger.LogInformation("Hosted runner {HostedRunnerId} prepared in dry-run mode for user {UserId}", hostedRunner.Id, userId);
+            logger.LogInformation("Hosted runner {HostedRunnerId} prepared in dry-run mode for user {UserId}", hostedRunner.Id, hostedRunner.UserId);
             return hostedRunner;
         }
 

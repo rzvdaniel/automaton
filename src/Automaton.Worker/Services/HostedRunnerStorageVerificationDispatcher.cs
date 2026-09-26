@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,9 @@ using System.Text.Json;
 
 namespace Automaton.Worker.Services;
 
-internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher eventPublisher)
+internal sealed class HostedRunnerStorageVerificationDispatcher(
+    IEventPublisher eventPublisher,
+    HostedRunnerStorageLocalityAdoptionService storageLocalityAdoption)
 {
     internal async Task DispatchPendingAsync(
         ApplicationDbContext db,
@@ -58,18 +61,20 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
             verification.Error = "Hosted Runner storage quota identity is not initialized; reprovision is required.";
             return;
         }
-        var storageAllocation = await db.AccountStorageAllocations
-            .SingleOrDefaultAsync(x => x.AccountId == runner.UserId, cancellationToken);
-        if (storageAllocation is null
-            || storageAllocation.StorageRunnerHostId.HasValue && storageAllocation.StorageRunnerHostId != hostId)
+        AccountStorageAllocation storageAllocation;
+        try
+        {
+            storageAllocation = await storageLocalityAdoption.AdoptRunnerHostAsync(
+                runner.UserId, hostId, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
         {
             verification.Status = StorageVerificationStatuses.Failed;
             verification.CompletedAtUtc = now;
-            verification.Error = "Account storage locality is missing or does not match the Hosted Runner host.";
+            verification.Error = exception.Message;
+            await db.SaveChangesAsync(cancellationToken);
             return;
         }
-        storageAllocation.StorageRunnerHostId ??= hostId;
-        await db.SaveChangesAsync(cancellationToken);
         if (!await TryClaimDispatchAsync(db, hostId, verification.Id, maxPerHost, now, cancellationToken)) return;
         await EnsureVerificationDeploymentAsync(db, verification, cancellationToken);
         await PublishVerificationCommandAsync(

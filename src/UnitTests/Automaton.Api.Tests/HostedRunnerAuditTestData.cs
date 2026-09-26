@@ -34,7 +34,8 @@ internal static class HostedRunnerAuditTestData
         db.SaveChanges();
     }
 
-    public static Guid SeedHostedRunnerPlan(ApplicationDbContext db) => SeedPlan(db, enabled: true);
+    public static Guid SeedHostedRunnerPlan(ApplicationDbContext db, string? uniqueCodeSuffix = null)
+        => SeedPlan(db, enabled: true, uniqueCodeSuffix);
 
     public static Guid SeedDisabledHostedRunnerPlan(ApplicationDbContext db) => SeedPlan(db, enabled: false);
 
@@ -148,12 +149,13 @@ internal static class HostedRunnerAuditTestData
         return hostedRunner;
     }
 
-    private static Guid SeedPlan(ApplicationDbContext db, bool enabled)
+    private static Guid SeedPlan(ApplicationDbContext db, bool enabled, string? uniqueCodeSuffix = null)
     {
+        var codeSuffix = string.IsNullOrWhiteSpace(uniqueCodeSuffix) ? string.Empty : $"-{uniqueCodeSuffix}";
         var specification = new HostedRunnerSpecification
         {
             Id = Guid.NewGuid(),
-            Code = enabled ? "test-hosted" : "test-disabled",
+            Code = enabled ? $"test-hosted{codeSuffix}" : $"test-disabled{codeSuffix}",
             Name = enabled ? "Test Hosted Runner" : "Test Disabled Runner",
             IsActive = true
         };

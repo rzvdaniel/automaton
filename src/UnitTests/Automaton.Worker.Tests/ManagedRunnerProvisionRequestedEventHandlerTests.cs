@@ -11,4 +11,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
     [Test]
     public Task InvalidImageReferenceFailsProvisioningWithoutPublishingInfrastructureAction()
         => ManagedRunnerProvisionScenarios.VerifyInvalidImageFailsClosedAsync();
+
+    [Test]
+    public Task ConflictingStorageHistoryFailsProvisioningWithoutAdoptingAHost()
+        => ManagedRunnerProvisionScenarios.VerifyConflictingStorageHistoryFailsClosedAsync();
 }

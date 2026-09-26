@@ -180,4 +180,26 @@ public class HostedRunnerStorageReconciliationServiceTests
         });
     }
 
+    [Test]
+    public async Task PendingVerification_RejectsConflictingStorageHistoryWithoutAdoptingHost()
+    {
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync();
+        await fixture.SeedRunnerAsync();
+        var verificationId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Pending, "AdministratorRequested");
+        await fixture.AddConflictingStorageHostAsync();
+
+        await fixture.ReconcileAsync();
+        var storageHostId = await fixture.StorageRunnerHostIdAsync();
+        var verificationStatus = await fixture.VerificationStatusAsync(verificationId);
+        var verificationError = await fixture.VerificationErrorAsync(verificationId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.CommandCount, Is.Zero);
+            Assert.That(storageHostId, Is.Null);
+            Assert.That(verificationStatus, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(verificationError, Does.Contain("multiple Runner Hosts"));
+        });
+    }
+
 }
