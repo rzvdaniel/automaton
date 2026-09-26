@@ -1,4 +1,5 @@
 using Automaton.Api.Models;
+using Automaton.Api.Entities;
 
 namespace Automaton.Api.Services;
 
@@ -20,6 +21,24 @@ public static class StorageTelemetryPolicy
             createdAtUtc >= nowUtc.AddMinutes(-Math.Max(1, options.InitialTelemetryGraceMinutes)))
             return true;
         return CanScheduleHostedRunners(state, availableBytes, reserveRequiredBytes, requestedStorageBytes);
+    }
+
+    public static bool CanRunDockerStorageOperation(RunnerHost host, DateTime nowUtc, StorageTelemetryOptions options)
+    {
+        if (!host.StorageMeasuredAtUtc.HasValue)
+        {
+            return host.StorageState == RunnerHostStorageStates.Unknown
+                && host.CreatedAt >= nowUtc.AddMinutes(-Math.Max(1, options.InitialTelemetryGraceMinutes));
+        }
+
+        if (host.StorageMeasuredAtUtc.Value < nowUtc.AddMinutes(-Math.Max(1, options.FreshAfterMinutes)))
+            return false;
+
+        return CanScheduleHostedRunners(
+            host.StorageState,
+            host.StorageAvailableBytes,
+            host.StorageReserveRequiredBytes ?? long.MaxValue,
+            requestedStorageBytes: 0);
     }
 
     public static string EvaluateHostedRunner(long allowanceBytes, long totalBytes, bool success, StorageTelemetryOptions? options = null)
