@@ -98,8 +98,19 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
         self.assertTrue(filesystem_uuid)
         for mountpoint in mountpoints:
             self.assertEqual(ACTION.current_project_id(mountpoint), self.project_id)
+            self.assert_project_inheritance(mountpoint)
         self.assertEqual(
             ACTION.current_project_id(f"{mountpoints[0]}/runner/marker"), self.project_id,
+        )
+
+        self.run_image(
+            ["--mount", f"type=volume,source={user},target=/user"],
+            "mkdir -p /user/workspace/data/app/new-nested "
+            "&& printf inherited >/user/workspace/data/app/new-nested/marker",
+        )
+        self.assertEqual(
+            ACTION.current_project_id(f"{mountpoints[1]}/workspace/data/app/new-nested/marker"),
+            self.project_id,
         )
 
         self.run_image(
@@ -177,6 +188,14 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
         metadata = ACTION.inspect_volume(volume)
         self.assertIsNotNone(metadata)
         return metadata["mountpoint"]
+
+    def assert_project_inheritance(self, path):
+        result = ACTION.host("xfs_io", "-c", "lsattr", path)
+        if result.returncode:
+            self.fail(result.stderr.strip() or f"Could not inspect XFS flags for {path}")
+        flag_line = next((line for line in result.stdout.splitlines() if line.strip()), "")
+        flags = flag_line.split(maxsplit=1)[0] if flag_line else ""
+        self.assertIn("P", flags, f"XFS project inheritance is not enabled on {path}")
 
     def read_image_file(self, volume, path):
         return self.docker(
