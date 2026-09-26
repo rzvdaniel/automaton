@@ -115,30 +115,6 @@ public class HostedRunnerProvisioningPolicyAuditTests
 
 
     [Test]
-    public async Task PrepareProvisioningAsync_RejectsDifferentDiskLimitsForCoLocatedAccountRunners()
-    {
-        using var db = HostedRunnerAuditTestData.CreateDbContext();
-        var userId = Guid.NewGuid();
-        var planId = HostedRunnerAuditTestData.SeedHostedRunnerPlan(db);
-        HostedRunnerAuditTestData.SeedCoLocatedRunnersWithDifferentDiskLimits(db, userId, planId);
-
-        var service = HostedRunnerProvisioningTestServiceFactory.Create(
-            db,
-            userId,
-            new HostedRunnerOptions { Enabled = false });
-
-        var prepared = await service.PrepareProvisioningAsync(userId, Guid.Empty, forceProvision: true);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(prepared.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
-            Assert.That(prepared.HostedRunner.LastError, Does.Contain("different disk-limit snapshot"));
-        });
-        Assert.That(await db.HostedRunnerDeployments.CountAsync(x => x.Status == HostedRunnerDeploymentStatuses.Failed), Is.EqualTo(1));
-    }
-
-
-    [Test]
     public async Task PrepareProvisioningAsync_DoesNotOverallocateHostCapacity()
     {
         using var db = HostedRunnerAuditTestData.CreateDbContext();

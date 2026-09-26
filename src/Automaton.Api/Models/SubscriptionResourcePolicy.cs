@@ -15,9 +15,8 @@ public sealed record SubscriptionResourcePolicy(
     int MaxHostedRunners,
     int MaxApplications)
 {
-    // Normal provisioning reuses the user's existing non-disabled Hosted Runner.
-    // This describes that current lifecycle; this policy value does not add a new
-    // Hosted Runner admission check.
+    // One active managed Hosted Runner is allowed per user account. Provisioning
+    // enforces this limit while holding an account-scoped database lock.
     public const int CurrentMaxHostedRunnersPerUser = 1;
 
     /// <summary>

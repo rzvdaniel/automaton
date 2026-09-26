@@ -8,7 +8,9 @@ using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
+using System.Data;
 
 namespace Automaton.Api.Services;
 
@@ -48,40 +50,106 @@ public class HostedRunnerProvisioningService
     {
         var policyResolution = await provisioningPolicyService.ResolveAsync(userId, planId, cancellationToken);
         var specification = policyResolution.Specification!;
+        var policy = policyResolution.Policy!;
+        if (policy.MaxHostedRunners <= 0)
+            throw new InvalidOperationException("The effective subscription policy does not allow a Hosted Runner.");
+
         var accountStorageProjectId = await storageProjectAllocationService.GetOrCreateAsync(userId, cancellationToken);
-
-        var hostedRunner = await db.HostedRunners
-            .Include(x => x.Runner)
-            .FirstOrDefaultAsync(x => x.UserId == userId && x.DeletedAt == null && x.Status != HostedRunnerStatuses.Disabled, cancellationToken);
-
-        var now = DateTime.UtcNow;
-        var createdHostedRunner = hostedRunner == null;
-        hostedRunner ??= CreateHostedRunner(userId, now);
-        if (createdHostedRunner)
-            db.HostedRunners.Add(hostedRunner);
-
-        var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
-        requestedSnapshot.Resources = policyResolution.Policy!.ApplyTo(requestedSnapshot.Resources);
-        hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
-        var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
-        await AssignAccountStorageProjectAsync(hostedRunner, accountStorageProjectId, createdHostedRunner, cancellationToken);
-
-        if (CanSkipProvisioning(hostedRunner, forceProvision, storageProjectWasMissing, createdHostedRunner))
-            return new HostedRunnerPreparationResult(hostedRunner, [], false);
-
-        var previousHostId = hostedRunner.RunnerHostId;
-        if (createdHostedRunner)
+        var admissionTransaction = await BeginAdmissionTransactionAsync(cancellationToken);
+        try
         {
-            hostedRunner.HostedRunnerSpecificationId = specification.Id;
-            hostedRunner.SpecificationRevision = specification.Revision;
-            hostedRunner.SpecificationSnapshot = requestedSnapshot;
-        }
-        hostedRunner.UpdatedAt = now;
+            await LockAccountAdmissionAsync(userId, cancellationToken);
+            var hostedRunner = await FindReusableHostedRunnerAsync(userId, policy.MaxHostedRunners, cancellationToken);
+            var now = DateTime.UtcNow;
+            var createdHostedRunner = hostedRunner == null;
+            hostedRunner ??= CreateHostedRunner(userId, now);
+            if (createdHostedRunner)
+                db.HostedRunners.Add(hostedRunner);
 
-        return await preparationService.PrepareOnSelectedHostAsync(
-            userId, hostedRunner, requestedSnapshot, accountStorageProjectId, createdHostedRunner,
-            previousHostId, cancellationToken);
+            var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
+            requestedSnapshot.Resources = policy.ApplyTo(requestedSnapshot.Resources);
+            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
+            var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
+            await AssignAccountStorageProjectAsync(hostedRunner, accountStorageProjectId, createdHostedRunner, cancellationToken);
+
+            if (CanSkipProvisioning(hostedRunner, forceProvision, storageProjectWasMissing, createdHostedRunner))
+            {
+                await CommitAdmissionTransactionAsync(admissionTransaction, cancellationToken);
+                return new HostedRunnerPreparationResult(hostedRunner, [], false);
+            }
+
+            var previousHostId = hostedRunner.RunnerHostId;
+            if (createdHostedRunner)
+            {
+                hostedRunner.HostedRunnerSpecificationId = specification.Id;
+                hostedRunner.SpecificationRevision = specification.Revision;
+                hostedRunner.SpecificationSnapshot = requestedSnapshot;
+            }
+            hostedRunner.UpdatedAt = now;
+
+            var preparation = await preparationService.PrepareOnSelectedHostAsync(
+                userId, hostedRunner, requestedSnapshot, accountStorageProjectId, createdHostedRunner,
+                previousHostId, cancellationToken);
+            await CommitAdmissionTransactionAsync(admissionTransaction, cancellationToken);
+            return preparation;
+        }
+        finally
+        {
+            if (admissionTransaction != null)
+                await admissionTransaction.DisposeAsync();
+        }
     }
+
+    private async Task<HostedRunner?> FindReusableHostedRunnerAsync(
+        Guid userId,
+        int maximumHostedRunners,
+        CancellationToken cancellationToken)
+    {
+        var hostedRunners = await db.HostedRunners
+            .Include(x => x.Runner)
+            .Where(x => x.UserId == userId && x.DeletedAt == null && x.Status != HostedRunnerStatuses.Disabled)
+            .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (hostedRunners.Count > maximumHostedRunners)
+        {
+            var conflictingRunnerIds = string.Join(", ", hostedRunners.Select(x => x.Id));
+            logger.LogError(
+                "Hosted Runner admission blocked for account {AccountId}: {ActiveRunnerCount} active runners exceed the limit of {MaximumHostedRunners}. Existing runners: {HostedRunnerIds}",
+                userId,
+                hostedRunners.Count,
+                maximumHostedRunners,
+                conflictingRunnerIds);
+            throw new InvalidOperationException(
+                $"Account '{userId}' has {hostedRunners.Count} active Hosted Runners but the subscription allows {maximumHostedRunners}. Existing runners ({conflictingRunnerIds}) were preserved; an administrator must resolve this conflict before provisioning.");
+        }
+
+        return hostedRunners.FirstOrDefault();
+    }
+
+    private async Task<IDbContextTransaction?> BeginAdmissionTransactionAsync(CancellationToken cancellationToken)
+        => db.Database.IsRelational() && db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+    private async Task LockAccountAdmissionAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (!db.Database.IsRelational()
+            || db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) != true)
+        {
+            return;
+        }
+
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT Id FROM AspNetUsers WHERE Id = {userId} FOR UPDATE",
+            cancellationToken);
+    }
+
+    private static Task CommitAdmissionTransactionAsync(
+        IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+        => transaction is null ? Task.CompletedTask : transaction.CommitAsync(cancellationToken);
 
     private static HostedRunner CreateHostedRunner(Guid userId, DateTime now)
         => new()
