@@ -112,6 +112,15 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
             ACTION.current_project_id(f"{mountpoints[1]}/workspace/data/app/new-nested/marker"),
             self.project_id,
         )
+        self.run_image(
+            ["--mount", f"type=volume,source={user},target=/user", "-e", "TMPDIR=/user/.tmp",
+             "--tmpfs", "/tmp:size=2m,mode=1777"],
+            'mkdir -p "$TMPDIR/uploads/transfer" && printf transfer >"$TMPDIR/uploads/transfer/part"',
+        )
+        self.assertEqual(
+            ACTION.current_project_id(f"{mountpoints[1]}/.tmp/uploads/transfer/part"),
+            self.project_id,
+        )
 
         self.run_image(
             ["--mount", f"type=volume,source={system},target=/system",
