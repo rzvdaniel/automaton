@@ -15,6 +15,8 @@ namespace Automaton.Worker.Tests;
 
 internal static class ManagedRunnerProvisionScenarios
 {
+    internal const string StorageFilesystemUuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
     internal static async Task VerifyTrustedProvisionLifecycleAsync()
     {
         await using var fixture = await ManagedRunnerProvisionFixture.CreateAsync();
@@ -73,6 +75,7 @@ internal static class ManagedRunnerProvisionScenarios
             Assert.That(root.GetProperty("memoryMb").GetInt32(), Is.EqualTo(1024));
             Assert.That(root.GetProperty("diskLimitMb").GetInt32(), Is.EqualTo(4096));
             Assert.That(root.GetProperty("xfsProjectId").GetInt32(), Is.EqualTo(1234567));
+            Assert.That(root.GetProperty("storageFilesystemUuid").GetString(), Is.EqualTo(StorageFilesystemUuid));
             Assert.That(root.GetProperty("pidsLimit").GetInt32(), Is.EqualTo(256));
             Assert.That(root.GetProperty("sharedMemoryMb").GetInt32(), Is.EqualTo(96));
             Assert.That(root.GetProperty("dockerLogMaxSizeMb").GetInt32(), Is.EqualTo(20));
@@ -136,6 +139,13 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
         db.RunnerHosts.Add(host);
         db.HostedRunners.Add(runner);
         db.HostedRunnerDeployments.Add(deployment);
+        db.AccountStorageAllocations.Add(new AccountStorageAllocation
+        {
+            AccountId = runner.UserId,
+            StorageProjectId = runner.StorageProjectId!.Value,
+            StorageRunnerHostId = host.Id,
+            StorageFilesystemUuid = ManagedRunnerProvisionScenarios.StorageFilesystemUuid
+        });
         await db.SaveChangesAsync();
         return new ManagedRunnerProvisionFixture(db, host, runner, deployment);
     }

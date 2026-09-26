@@ -31,6 +31,12 @@ internal static class InfrastructureCommandCallbackTestScenarios
         var hosted = CreateHostedRunner(host, hostedRunnerStatus, storageState, storageAllowanceBytes, runtimePort);
         var deployment = CreateDeployment(hosted, deploymentAction, deploymentStatus);
         db.AddRange(runner, host, hosted, deployment);
+        db.AccountStorageAllocations.Add(new AccountStorageAllocation
+        {
+            AccountId = hosted.UserId,
+            StorageProjectId = hosted.StorageProjectId!.Value,
+            StorageRunnerHostId = host.Id
+        });
         if (addStorageVerification)
             db.HostedRunnerStorageVerifications.Add(CreateStorageVerification(deployment.Id, hosted.Id));
 
@@ -55,7 +61,7 @@ internal static class InfrastructureCommandCallbackTestScenarios
                 CompletedAtUtc = DateTime.UtcNow
             },
             new AppModuleExecutionArtifactResponse(true,
-                "{\"success\":true,\"systemBytes\":0,\"userBytes\":100,\"totalBytes\":100,\"usageSource\":\"xfs-project-quota\"}",
+                "{\"success\":true,\"systemBytes\":0,\"userBytes\":100,\"totalBytes\":100,\"usageSource\":\"xfs-project-quota\",\"storageFilesystemUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}",
                 null,
                 null));
 
@@ -84,6 +90,7 @@ internal static class InfrastructureCommandCallbackTestScenarios
         var verification = await fixture.Db.HostedRunnerStorageVerifications.SingleAsync();
         var persistedDeployment = await fixture.Db.HostedRunnerDeployments.SingleAsync();
         var persistedRunner = await fixture.Db.HostedRunners.SingleAsync();
+        var storageAllocation = await fixture.Db.AccountStorageAllocations.SingleAsync();
         Assert.Multiple(() =>
         {
             Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.Accepted));
@@ -91,6 +98,7 @@ internal static class InfrastructureCommandCallbackTestScenarios
             Assert.That(verification.CompletedAtUtc, Is.Not.Null);
             Assert.That(persistedDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
             Assert.That(persistedRunner.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Succeeded));
+            Assert.That(storageAllocation.StorageFilesystemUuid, Is.EqualTo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
         });
     }
 
@@ -126,6 +134,7 @@ internal static class InfrastructureCommandCallbackTestScenarios
         Status = status,
         StorageState = storageState ?? HostedRunnerStorageStates.Unknown,
         StorageAllowanceBytes = storageAllowanceBytes,
+        StorageProjectId = 1_000_001,
         RuntimePort = runtimePort
     };
 

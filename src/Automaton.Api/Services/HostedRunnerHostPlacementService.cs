@@ -32,12 +32,22 @@ public sealed class HostedRunnerHostPlacementService(
         HostedRunnerResources requested,
         Guid? excludedHostedRunnerId,
         int accountStorageProjectId,
+        Guid? requiredStorageHostId,
         CancellationToken cancellationToken)
     {
         var hasSharedProjectLimitConflict = false;
         var requestedStorageBytes = requested.DiskLimitMb * 1024L * 1024L;
         var now = DateTime.UtcNow;
         var hosts = await GetSchedulableHostsAsync(requestedStorageBytes, now, cancellationToken);
+        if (requiredStorageHostId.HasValue)
+        {
+            hosts = hosts.Where(host => host.Id == requiredStorageHostId.Value).ToList();
+            if (hosts.Count == 0)
+            {
+                return (null,
+                    $"Account storage is pinned to Runner Host {requiredStorageHostId.Value}, which is not currently schedulable. Storage migration must be completed explicitly before reprovisioning.");
+            }
+        }
 
         foreach (var candidate in hosts)
         {

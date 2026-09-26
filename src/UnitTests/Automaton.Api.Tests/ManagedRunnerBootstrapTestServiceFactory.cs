@@ -52,6 +52,7 @@ internal static class ManagedRunnerBootstrapTestServiceFactory
         return new HostedRunnerProvisioningService(
             db, publisher, hostedRunnerOptions, provisioningPolicy,
             new AccountStorageProjectAllocationService(db),
+            new HostedRunnerStorageLocalityResolver(db),
             NullLogger<HostedRunnerProvisioningService>.Instance, preparationService);
     }
 

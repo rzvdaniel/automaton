@@ -54,6 +54,7 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         hostId = Guid.NewGuid();
         infrastructureRunnerId = Guid.NewGuid();
         runnerId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         await using var db = await OpenDbAsync();
         db.RunnerHosts.Add(new RunnerHost
         {
@@ -61,13 +62,19 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         });
         db.HostedRunners.Add(new HostedRunner
         {
-            Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner",
+            Id = runnerId, UserId = userId, Name = "runner", ContainerName = "runner",
             RunnerHostId = hostId, Status = provisioning ? HostedRunnerStatuses.Provisioning : HostedRunnerStatuses.Running,
             ContainerId = provisioning ? null : "container", StorageProjectId = storageProjectId,
             StorageState = HostedRunnerStorageStates.Healthy,
             StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
             StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
             StorageMeasuredAtUtc = DateTime.UtcNow
+        });
+        db.AccountStorageAllocations.Add(new AccountStorageAllocation
+        {
+            AccountId = userId,
+            StorageProjectId = storageProjectId,
+            StorageRunnerHostId = hostId
         });
         await db.SaveChangesAsync();
         return runnerId;

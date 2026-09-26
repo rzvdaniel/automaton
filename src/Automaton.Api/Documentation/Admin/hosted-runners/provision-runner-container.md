@@ -26,7 +26,7 @@ Administration → Hosted Runners → Runner Containers → **Provision Runner**
 
 The current dialog selects a user. The specification is resolved from that user’s effective subscription plan, and the host is selected automatically from eligible capacity. The current UI does not expose specification, host, or force-provision overrides in the dialog.
 
-The current resource policy allows one non-deleted, non-disabled Hosted Runner record per account. Provisioning checks this under an account-scoped database lock. If an account already has more eligible records than its limit, provisioning fails with the conflicting Runner IDs and preserves all existing records; it does not choose one to delete. Review the account’s Runner state and data before resolving the conflict through the normal lifecycle, then retry provisioning.
+The current resource policy allows one non-deleted Hosted Runner record per account. If that record is **Disabled**, provisioning reuses it; soft-deleted records do not count toward admission. The check runs under an account-scoped database lock. If an account already has more non-deleted records than its limit, provisioning fails with the conflicting Runner IDs and preserves all existing records; it does not choose one to delete. Review the account’s Runner state and data before resolving the conflict through the normal lifecycle, then retry provisioning.
 
 ## Verify after provisioning
 

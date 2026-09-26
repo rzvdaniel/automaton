@@ -131,6 +131,24 @@ def resolve_filesystem_mountpoint(path: str) -> str:
     return posixpath.normpath(mountpoint)
 
 
+def resolve_filesystem_uuid(path: str) -> str:
+    result = host("findmnt", "-no", "UUID", "-T", path)
+    value = result.stdout.strip()
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError) as error:
+        raise RuntimeError("Could not resolve a stable UUID for the Hosted Runner XFS filesystem") from error
+
+
+def require_expected_filesystem_uuid(value: object) -> str | None:
+    if value is None:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError) as error:
+        raise ValueError("storageFilesystemUuid must be a valid filesystem UUID") from error
+
+
 def parse_project_quota_report(output: str, project_id: int) -> tuple[int, int] | None:
     saw_report_shape = False
     for line in output.splitlines():
@@ -204,7 +222,13 @@ def has_other_runner_volume_for_project(
     return False
 
 
-def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int, runner_id: str) -> None:
+def ensure_xfs_project_quota(
+    mountpoints: list[str],
+    project_id: int,
+    disk_limit_mb: int,
+    runner_id: str,
+    expected_filesystem_uuid: object = None,
+) -> str:
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
     docker_root = resolve_docker_root()
@@ -230,6 +254,10 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
     if len(set(filesystem_mountpoints)) != 1:
         raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
     filesystem_mountpoint = filesystem_mountpoints[0]
+    filesystem_uuid = resolve_filesystem_uuid(filesystem_mountpoint)
+    expected_uuid = require_expected_filesystem_uuid(expected_filesystem_uuid)
+    if expected_uuid is not None and filesystem_uuid != expected_uuid:
+        raise RuntimeError("Hosted Runner storage is on a different XFS filesystem; explicit storage migration is required")
     for mountpoint in mountpoints:
         host("xfs_quota", "-x", "-c", f"project -s -p {mountpoint} {project_id}", filesystem_mountpoint)
 
@@ -254,9 +282,10 @@ def ensure_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
     _, hard_limit_bytes = configured_quota
     if hard_limit_bytes != limit_bytes:
         raise RuntimeError("XFS project hard limit did not match diskLimitMb")
+    return filesystem_uuid
 
 
-def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> None:
+def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit_mb: int) -> str:
     """Verify the final Docker-backed roots after all container mutations."""
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
@@ -281,6 +310,7 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
 
     if len(set(filesystem_mountpoints)) != 1:
         raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
+    filesystem_uuid = resolve_filesystem_uuid(filesystem_mountpoints[0])
     final_quota = read_project_quota(filesystem_mountpoints[0], project_id)
     if final_quota is None:
         raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
@@ -290,6 +320,7 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
         raise RuntimeError("XFS project usage exceeds diskLimitMb")
     if hard_limit_bytes != limit_bytes:
         raise RuntimeError("XFS project hard limit did not match diskLimitMb on final volumes")
+    return filesystem_uuid
 
 
 def ensure_resource_group(runner_id: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> str:
@@ -352,7 +383,10 @@ def main() -> None:
 
     system_mountpoint = ensure_owned_volume(system_volume, runner_id, "system")
     user_mountpoint = ensure_owned_volume(user_volume, runner_id, "user")
-    ensure_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb, runner_id)
+    storage_filesystem_uuid = ensure_xfs_project_quota(
+        [system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb, runner_id,
+        request.get("storageFilesystemUuid"),
+    )
     cgroup_parent = ensure_resource_group(runner_id, cpu_limit, memory_mb, pids_limit)
 
     # Refresh mutable tags before changing any existing container. A failed
@@ -400,12 +434,15 @@ def main() -> None:
     container_id = host(*docker_arguments).stdout.strip()
     if runtime_network and runtime_network != network:
         host("docker", "network", "connect", runtime_network, container_name, check=False)
-    verify_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
+    verified_filesystem_uuid = verify_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
+    if verified_filesystem_uuid != storage_filesystem_uuid:
+        raise RuntimeError("Hosted Runner storage filesystem changed during provisioning")
 
     response = {
         "success": True,
         "containerId": container_id,
         "containerName": container_name,
+        "storageFilesystemUuid": storage_filesystem_uuid,
     }
     if published_port is not None:
         response["publishedPort"] = published_port

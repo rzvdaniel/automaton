@@ -14,6 +14,7 @@ RUNNER_ID = "2ca73341-c40b-4e1e-a8b8-586d72236475"
 RUNNER_ID_COMPACT = RUNNER_ID.replace("-", "")
 SYSTEM_VOLUME = f"automaton-hosted-runner-{RUNNER_ID_COMPACT}-system"
 USER_VOLUME = f"automaton-hosted-runner-{RUNNER_ID_COMPACT}-user"
+FILESYSTEM_UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 
 def load_action(action_key: str):
@@ -52,6 +53,7 @@ def action_request() -> dict[str, object]:
         "memoryReservationMb": 256,
         "diskLimitMb": 512,
         "xfsProjectId": 1234567,
+        "storageFilesystemUuid": None,
         "pidsLimit": 256,
         "sharedMemoryMb": 64,
         "dockerLogMaxSizeMb": 10,
@@ -179,6 +181,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         xfs_quota_verification_succeeds: bool = True,
         final_quota_hard_limit_matches: bool = True,
         reset_storage_after_container: bool = False,
+        result_out: list[dict[str, object]] | None = None,
     ):
         module = load_action(action_key)
         calls = calls_out if calls_out is not None else []
@@ -234,6 +237,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 stdout = "rw,prjquota\n"
             elif arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
                 stdout = "/var/lib/docker\n"
+            elif arguments[:2] == ("findmnt", "-no") and arguments[2] == "UUID":
+                stdout = FILESYSTEM_UUID + "\n"
             elif arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                 stdout = "Project quota state: Enforcement\n"
             elif arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
@@ -282,15 +287,37 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 stdout = "container-id\n" if arguments[:2] == ("docker", "run") else ""
             return subprocess.CompletedProcess(arguments, 0, stdout, "")
 
+        action_output = io.StringIO()
         with (
             patch.object(module, "host", side_effect=fake_host),
             patch.dict(os.environ, {"AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN": "re_test"}),
             patch.object(sys, "stdin", io.StringIO(json.dumps(request))),
-            patch.object(sys, "stdout", io.StringIO()),
+            patch.object(sys, "stdout", action_output),
         ):
             module.main()
 
+        if result_out is not None:
+            result_out.append(json.loads(action_output.getvalue()))
+
         return calls, volumes
+
+    def test_provisioning_reports_and_preserves_the_verified_filesystem_uuid(self):
+        output: list[dict[str, object]] = []
+        self.run_provision_action("provision-hosted-runner", result_out=output)
+
+        self.assertEqual(output[0]["storageFilesystemUuid"], FILESYSTEM_UUID)
+
+    def test_reprovision_rejects_a_different_filesystem_before_replacing_container(self):
+        calls: list[tuple[str, ...]] = []
+        with self.assertRaisesRegex(RuntimeError, "different XFS filesystem"):
+            self.run_provision_action(
+                "reprovision-hosted-runner",
+                calls_out=calls,
+                request_override={"storageFilesystemUuid": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"},
+            )
+
+        self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+        self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_different_snapshot_cannot_overwrite_a_shared_project_quota(self):
         existing = {
@@ -691,6 +718,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
             if arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
                 return subprocess.CompletedProcess(arguments, 0, "/var/lib/docker\n", "")
+            if arguments[:2] == ("findmnt", "-no") and arguments[2] == "UUID":
+                return subprocess.CompletedProcess(arguments, 0, FILESYSTEM_UUID + "\n", "")
             if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                 return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
             if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):
@@ -743,6 +772,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                         return subprocess.CompletedProcess(arguments, 0, "rw,prjquota\n", "")
                     if arguments[:2] == ("findmnt", "-no") and arguments[2] == "TARGET":
                         return subprocess.CompletedProcess(arguments, 0, "/var/lib/docker\n", "")
+                    if arguments[:2] == ("findmnt", "-no") and arguments[2] == "UUID":
+                        return subprocess.CompletedProcess(arguments, 0, FILESYSTEM_UUID + "\n", "")
                     if arguments[:2] == ("xfs_quota", "-x") and "state" in arguments:
                         return subprocess.CompletedProcess(arguments, 0, "Project quota state: Enforcement\n", "")
                     if arguments[:2] == ("xfs_quota", "-x") and any("project -s" in argument for argument in arguments):

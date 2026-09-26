@@ -32,7 +32,11 @@ internal static class HostedRunnerProvisioningStorageAssertions
         Guid userId)
     {
         var allocation = await db.AccountStorageAllocations.SingleAsync(x => x.AccountId == userId);
-        Assert.That(allocation.StorageProjectId, Is.EqualTo(prepared.HostedRunner.StorageProjectId));
+        Assert.Multiple(() =>
+        {
+            Assert.That(allocation.StorageProjectId, Is.EqualTo(prepared.HostedRunner.StorageProjectId));
+            Assert.That(allocation.StorageRunnerHostId, Is.EqualTo(prepared.HostedRunner.RunnerHostId));
+        });
     }
 
     public static async Task AssertReprovisionReusesAccountProjectAsync(
@@ -59,6 +63,7 @@ internal static class HostedRunnerProvisioningStorageAssertions
         {
             Assert.That(recreated.HostedRunner.Id, Is.Not.EqualTo(reprovisioned.HostedRunner.Id));
             Assert.That(recreated.HostedRunner.StorageProjectId, Is.EqualTo(originalProjectId));
+            Assert.That(recreated.HostedRunner.RunnerHostId, Is.EqualTo(reprovisioned.HostedRunner.RunnerHostId));
         });
         Assert.That(await db.HostedRunners.CountAsync(x => x.UserId == userId), Is.EqualTo(2));
         Assert.That(await db.HostedRunners.Where(x => x.UserId == userId)

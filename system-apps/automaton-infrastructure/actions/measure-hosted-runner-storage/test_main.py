@@ -17,6 +17,7 @@ SPEC.loader.exec_module(ACTION)
 class MeasureHostedRunnerStorageTests(unittest.TestCase):
     runner_id = "11111111-1111-1111-1111-111111111111"
     host_id = "22222222-2222-2222-2222-222222222222"
+    filesystem_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
     def request(self):
         compact = self.runner_id.replace("-", "")
@@ -77,6 +78,8 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, "xfs\n", "")
             if args[:3] == ("findmnt", "-no", "TARGET"):
                 return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("findmnt", "-no", "UUID"):
+                return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
             if args[:3] == ("findmnt", "-no", "OPTIONS"):
                 return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
@@ -93,6 +96,7 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
         result = self.run_action(self.request(), host)
         self.assertTrue(result["success"])
         self.assertEqual(result["totalBytes"], result["systemBytes"] + result["userBytes"])
+        self.assertEqual(result["storageFilesystemUuid"], self.filesystem_uuid)
         self.assertEqual(sum(1 for call in calls if call[:3] == ("docker", "volume", "inspect")), 2)
         self.assertEqual(sum(1 for call in calls if call[:2] == ("xfs_quota", "-x")), 3)
 
@@ -123,6 +127,8 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, "rw,relatime,inode64,prjquota\n", "")
             if args[:3] == ("findmnt", "-no", "TARGET"):
                 return subprocess.CompletedProcess(args, 0, "/srv/automaton-workloads\n", "")
+            if args[:3] == ("findmnt", "-no", "UUID"):
+                return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(
                     args,
@@ -154,6 +160,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         result = self.run_action(request, host)
 
         self.assertEqual(result["totalBytes"], 36 * 1024)
+        self.assertEqual(result["storageFilesystemUuid"], self.filesystem_uuid)
         state_calls = [call for call in calls if call[:2] == ("xfs_quota", "-x") and "state" in call]
         report_calls = [call for call in calls if call[:2] == ("xfs_quota", "-x") and "report -p -b -n" in call]
         self.assertEqual(len(state_calls), 2)

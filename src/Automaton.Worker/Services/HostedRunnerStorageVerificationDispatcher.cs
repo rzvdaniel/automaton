@@ -58,9 +58,22 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
             verification.Error = "Hosted Runner storage quota identity is not initialized; reprovision is required.";
             return;
         }
+        var storageAllocation = await db.AccountStorageAllocations
+            .SingleOrDefaultAsync(x => x.AccountId == runner.UserId, cancellationToken);
+        if (storageAllocation is null
+            || storageAllocation.StorageRunnerHostId.HasValue && storageAllocation.StorageRunnerHostId != hostId)
+        {
+            verification.Status = StorageVerificationStatuses.Failed;
+            verification.CompletedAtUtc = now;
+            verification.Error = "Account storage locality is missing or does not match the Hosted Runner host.";
+            return;
+        }
+        storageAllocation.StorageRunnerHostId ??= hostId;
+        await db.SaveChangesAsync(cancellationToken);
         if (!await TryClaimDispatchAsync(db, hostId, verification.Id, maxPerHost, now, cancellationToken)) return;
         await EnsureVerificationDeploymentAsync(db, verification, cancellationToken);
-        await PublishVerificationCommandAsync(verification, hostId, infrastructureRunnerId.Value, cancellationToken);
+        await PublishVerificationCommandAsync(
+            verification, hostId, infrastructureRunnerId.Value, storageAllocation.StorageFilesystemUuid, cancellationToken);
     }
 
     private static async Task EnsureVerificationDeploymentAsync(
@@ -83,6 +96,7 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
         HostedRunnerStorageVerification verification,
         Guid hostId,
         Guid infrastructureRunnerId,
+        string? storageFilesystemUuid,
         CancellationToken cancellationToken)
     {
         var runner = verification.HostedRunner;
@@ -98,6 +112,7 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
                 hostedRunnerId = runner.Id,
                 runnerHostId = hostId,
                 xfsProjectId = runner.StorageProjectId,
+                storageFilesystemUuid,
                 expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                 expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
             }),

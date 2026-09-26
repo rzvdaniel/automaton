@@ -54,7 +54,25 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        var infrastructureRequest = CreateInfrastructureRequest(hostedRunner, deployment, host!, message);
+        var storageAllocation = await dbContext.AccountStorageAllocations
+            .SingleOrDefaultAsync(x => x.AccountId == hostedRunner.UserId, cancellationToken);
+        if (storageAllocation is null
+            || storageAllocation.StorageRunnerHostId.HasValue && storageAllocation.StorageRunnerHostId != host!.Id)
+        {
+            await FailAsync(
+                hostedRunner,
+                deployment,
+                "Account storage locality is missing or does not match the selected Runner Host.",
+                message.CorrelationId,
+                cancellationToken);
+            return;
+        }
+
+        storageAllocation.StorageRunnerHostId ??= host!.Id;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var infrastructureRequest = CreateInfrastructureRequest(
+            hostedRunner, deployment, host!, message, storageAllocation.StorageFilesystemUuid);
         await DispatchAsync(hostedRunner, deployment, infrastructureRequest, cancellationToken);
     }
 
@@ -102,7 +120,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,
         RunnerHost host,
-        ManagedRunnerProvisionRequestedEvent message)
+        ManagedRunnerProvisionRequestedEvent message,
+        string? storageFilesystemUuid)
         => new(
             CommandId: deployment.Id,
             OperationId: deployment.Id,
@@ -111,11 +130,15 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             ActionKey: deployment.Action == HostedRunnerDeploymentActions.Reprovision
                 ? "reprovision-hosted-runner"
                 : ProvisionActionKey,
-            InputJson: CreateInfrastructureInput(hostedRunner, deployment, host),
+            InputJson: CreateInfrastructureInput(hostedRunner, deployment, host, storageFilesystemUuid),
             SecretGrantIds: message.SecretGrantIds,
             CreatedAtUtc: DateTime.UtcNow);
 
-    private string CreateInfrastructureInput(HostedRunner hostedRunner, HostedRunnerDeployment deployment, RunnerHost host)
+    private string CreateInfrastructureInput(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        RunnerHost host,
+        string? storageFilesystemUuid)
     {
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
@@ -133,6 +156,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             memoryReservationMb = resources.MemoryReservationMb,
             diskLimitMb = resources.DiskLimitMb,
             xfsProjectId = hostedRunner.StorageProjectId!.Value,
+            storageFilesystemUuid,
             pidsLimit = resources.PidsLimit,
             sharedMemoryMb = resources.SharedMemoryMb,
             dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,

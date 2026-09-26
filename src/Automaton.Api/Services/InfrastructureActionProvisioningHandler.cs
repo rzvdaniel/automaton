@@ -170,7 +170,7 @@ public sealed class InfrastructureActionProvisioningHandler(
 
         if (IsProvisioningAction(actionKey))
         {
-            ApplyProvisioningResult(hostedRunner, deployment, result);
+            await ApplyProvisioningResultAsync(hostedRunner, deployment, result, cancellationToken);
             return;
         }
 
@@ -207,10 +207,33 @@ public sealed class InfrastructureActionProvisioningHandler(
     private static bool IsProvisioningAction(string actionKey)
         => actionKey is "provision-hosted-runner" or "reprovision-hosted-runner";
 
-    private static void ApplyProvisioningResult(
+    private async Task ApplyProvisioningResultAsync(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,
-        JsonElement result)
+        JsonElement result,
+        CancellationToken cancellationToken)
+    {
+        var actionResult = ReadProvisioningActionResult(result);
+        if (!hostedRunner.RunnerHostId.HasValue)
+            throw new InvalidOperationException("Infrastructure Action completed for a Hosted Runner without a storage host.");
+        var allocation = await db.AccountStorageAllocations
+            .SingleOrDefaultAsync(x => x.AccountId == hostedRunner.UserId, cancellationToken)
+            ?? throw new InvalidOperationException("Account storage allocation was not found.");
+        if (allocation.StorageRunnerHostId != hostedRunner.RunnerHostId)
+            throw new InvalidOperationException("Account storage locality does not match the Hosted Runner host.");
+
+        if (allocation.StorageFilesystemUuid is not null
+            && !string.Equals(allocation.StorageFilesystemUuid, actionResult.FilesystemUuid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Infrastructure Action reported a different XFS filesystem than the account storage locality.");
+        allocation.StorageFilesystemUuid ??= actionResult.FilesystemUuid;
+
+        hostedRunner.ContainerId = actionResult.ContainerId;
+        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
+        deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+    }
+
+    private static HostedRunnerProvisioningActionResult ReadProvisioningActionResult(JsonElement result)
     {
         if (!result.TryGetProperty("success", out var success) || success.ValueKind != JsonValueKind.True
             || !result.TryGetProperty("containerId", out var containerId)
@@ -218,13 +241,14 @@ public sealed class InfrastructureActionProvisioningHandler(
             || string.IsNullOrWhiteSpace(containerId.GetString())
             || !result.TryGetProperty("containerName", out var containerName)
             || containerName.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(containerName.GetString()))
+            || string.IsNullOrWhiteSpace(containerName.GetString())
+            || !result.TryGetProperty("storageFilesystemUuid", out var filesystemUuidElement)
+            || filesystemUuidElement.ValueKind != JsonValueKind.String
+            || !Guid.TryParse(filesystemUuidElement.GetString(), out var filesystemUuid))
             throw new InvalidOperationException("Infrastructure Action returned an invalid Hosted Runner container identity.");
 
-        hostedRunner.ContainerId = containerId.GetString();
-        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
-        deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+        return new HostedRunnerProvisioningActionResult(
+            containerId.GetString()!, filesystemUuid.ToString("D"));
     }
 
     private void ApplyRestartResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
@@ -315,4 +339,5 @@ public sealed class InfrastructureActionProvisioningHandler(
             _ => AuditEventTypes.HostedRunnerProvisioningFailed
         };
 
+    private sealed record HostedRunnerProvisioningActionResult(string ContainerId, string FilesystemUuid);
 }

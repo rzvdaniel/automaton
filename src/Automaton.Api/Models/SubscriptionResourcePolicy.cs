@@ -15,8 +15,9 @@ public sealed record SubscriptionResourcePolicy(
     int MaxHostedRunners,
     int MaxApplications)
 {
-    // One active managed Hosted Runner is allowed per user account. Provisioning
-    // enforces this limit while holding an account-scoped database lock.
+    // One non-deleted managed Hosted Runner record is allowed per account. A
+    // sole disabled record is reused; provisioning enforces admission under an
+    // account-scoped database lock.
     public const int CurrentMaxHostedRunnersPerUser = 1;
 
     /// <summary>

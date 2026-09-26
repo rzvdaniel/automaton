@@ -70,6 +70,24 @@ internal static class HostedRunnerAuditTestData
         db.SaveChanges();
     }
 
+    public static void SeedAccountStorageAllocation(
+        ApplicationDbContext db,
+        Guid accountId,
+        int storageProjectId,
+        Guid storageRunnerHostId)
+    {
+        db.AccountStorageAllocations.Add(new AccountStorageAllocation
+        {
+            AccountId = accountId,
+            StorageProjectId = storageProjectId,
+            StorageRunnerHostId = storageRunnerHostId
+        });
+        db.SaveChanges();
+    }
+
+    public static string? GetAccountStorageFilesystemUuid(ApplicationDbContext db, Guid accountId)
+        => db.AccountStorageAllocations.Single(x => x.AccountId == accountId).StorageFilesystemUuid;
+
     public static RunnerHost SeedRunnerHost(ApplicationDbContext db)
     {
         var host = new RunnerHost

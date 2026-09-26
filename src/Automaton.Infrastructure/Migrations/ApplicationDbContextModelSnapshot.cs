@@ -56,8 +56,15 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("StorageFilesystemUuid")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
                     b.Property<int>("StorageProjectId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("StorageRunnerHostId")
+                        .HasColumnType("char(36)");
 
                     b.HasKey("AccountId");
 
