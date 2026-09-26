@@ -156,6 +156,12 @@ public sealed class HostContainerExecutionTests
         Assert.That(result.BuildCommand, Does.Contain(
             $"volume-subpath=workspace/runner/deployments/{result.AppId:D}/{result.DeploymentTargetId:D}/{result.DeploymentAttemptId:D}/source"));
         Assert.That(result.BuildCommand, Does.Contain("--cap-drop"));
+        Assert.That(result.BuildCommand, Does.Contain("--read-only"));
+        Assert.That(result.BuildCommand, Does.Contain("/tmp:rw,nosuid,nodev,size=32m,mode=1777"));
+        Assert.That(result.BuildCommand, Does.Contain("--shm-size 64m"));
+        Assert.That(result.BuildCommand, Does.Contain("--log-driver local"));
+        Assert.That(result.BuildCommand, Does.Contain("max-size=10m"));
+        Assert.That(result.BuildCommand, Does.Contain("max-file=3"));
         Assert.That(result.BuildCommand, Does.Not.Contain("readonly"));
         Assert.That(result.BuildCommand, Does.Not.Contain("/var/run/docker.sock"));
         Assert.That(result.BuildCommand, Does.Not.Contain("/host"));
@@ -202,6 +208,7 @@ public sealed class HostContainerExecutionTests
                 Operation = HostContainerOperationKinds.RunBuild,
                 RequestedImage = "example/build:1",
                 Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
                 Command = new() { Executable = "build" }
             });
 
@@ -280,6 +287,7 @@ public sealed class HostContainerExecutionTests
                 Operation = HostContainerOperationKinds.CreateApplicationContainer,
                 RequestedImage = "python:3.13-slim",
                 Command = new(),
+                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
                 Resources = new("caller-workspace", "caller-artifact", "caller-data")
             });
 

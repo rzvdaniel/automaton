@@ -41,6 +41,8 @@ public sealed partial class HostContainerExecutionService
                 RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, request.Storage!.DataDirectory),
                 "/automaton/data", readOnly: false)
         };
+        AddWritablePathArguments(
+            args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
         foreach (var label in RuntimeLabels(scope))
         {
             args.Add("--label");

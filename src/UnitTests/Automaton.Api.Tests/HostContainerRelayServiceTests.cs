@@ -302,6 +302,9 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(fixture.Transport.Request!.Resources!.SourceKind, Is.EqualTo(HostContainerResourceKinds.Source));
             Assert.That(fixture.Transport.Request.Resources.ArtifactKind, Is.EqualTo(HostContainerResourceKinds.Artifact));
             Assert.That(fixture.Transport.Request.Resources.DataKind, Is.EqualTo(HostContainerResourceKinds.ApplicationData));
+            Assert.That(fixture.Transport.Request.SharedMemoryMb, Is.EqualTo(96));
+            Assert.That(fixture.Transport.Request.DockerLogMaxSizeMb, Is.EqualTo(7));
+            Assert.That(fixture.Transport.Request.DockerLogMaxFiles, Is.EqualTo(2));
             Assert.That(fixture.Transport.Request.Command!.Executable, Is.EqualTo("dotnet"));
             Assert.That(fixture.Transport.Request.Environment["BUILD_MODE"], Is.EqualTo("release"));
         });
@@ -314,6 +317,7 @@ public sealed class HostContainerRelayServiceTests
             RequestedImage = "dotnet/sdk:9.0",
             Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
             Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
+            SharedMemoryMb = 1024, DockerLogMaxSizeMb = 1024, DockerLogMaxFiles = 20,
             Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
         };
 
@@ -353,6 +357,10 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(forwarded.HostPort, Is.Zero);
             Assert.That(forwarded.Resources, Is.EqualTo(operation == HostContainerOperationKinds.CreateApplicationContainer
                 ? new HostContainerResourceRef("source", "artifact", "data") : null));
+            var hasContainerLimits = operation is HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.RunBuild;
+            Assert.That(forwarded.SharedMemoryMb, Is.EqualTo(hasContainerLimits ? 96 : null));
+            Assert.That(forwarded.DockerLogMaxSizeMb, Is.EqualTo(hasContainerLimits ? 7 : null));
+            Assert.That(forwarded.DockerLogMaxFiles, Is.EqualTo(hasContainerLimits ? 2 : null));
         });
     }
 
@@ -462,7 +470,16 @@ public sealed class HostContainerRelayServiceTests
                 ApplicationProfile = RunnerApplicationProfiles.Standard, ConnectionId = "hosted-connection",
                 LastHeartbeatAtUtc = DateTime.UtcNow
             };
-            HostedRunner = new HostedRunner { Id = Guid.NewGuid(), RunnerId = CallerRunnerId, Runner = HostedRunnerEntity, RunnerHostId = Host.Id, RunnerHost = Host, Name = "hosted", ContainerName = "hosted", UserId = Guid.NewGuid() };
+            HostedRunner = new HostedRunner
+            {
+                Id = Guid.NewGuid(), RunnerId = CallerRunnerId, Runner = HostedRunnerEntity,
+                RunnerHostId = Host.Id, RunnerHost = Host, Name = "hosted", ContainerName = "hosted",
+                UserId = Guid.NewGuid(),
+                SpecificationSnapshot = new()
+                {
+                    Resources = new() { SharedMemoryMb = 96, DockerLogMaxSizeMb = 7, DockerLogMaxFiles = 2 }
+                }
+            };
             App = new WebApp { Id = Guid.NewGuid(), Name = "app", Summary = "", Description = "", Definition = "" };
             Target = AppDeploymentTarget.CreateLive(App.Id, CallerRunnerId);
             Db.RunnerHosts.Add(Host);
@@ -490,7 +507,8 @@ public sealed class HostContainerRelayServiceTests
             Storage = operation == HostContainerOperationKinds.CreateApplicationContainer ? new ApplicationStorageSpec() : null,
             ContainerPort = operation == HostContainerOperationKinds.CreateApplicationContainer ? 8080 : 0,
             Environment = operation == HostContainerOperationKinds.CreateApplicationContainer
-                ? new Dictionary<string, string> { ["MODE"] = "test" } : new Dictionary<string, string>()
+                ? new Dictionary<string, string> { ["MODE"] = "test" } : new Dictionary<string, string>(),
+            SharedMemoryMb = 1024, DockerLogMaxSizeMb = 1024, DockerLogMaxFiles = 20
         };
         public void Dispose()
         {

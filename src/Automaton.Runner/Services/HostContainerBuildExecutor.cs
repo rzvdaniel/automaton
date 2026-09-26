@@ -78,12 +78,17 @@ internal sealed class HostContainerBuildExecutor(
             "--label", $"automaton.app-id={scope.AppId:N}",
             "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",
             "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
+        HostContainerWritablePathPolicy.AddTo(
+            args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
         var command = request.Command!;
         args.Add("--workdir");
         try { args.Add(DockerContainerRuntime.ResolveContainerWorkingDirectory(command.WorkingDirectory)); }
         catch (InvalidOperationException ex) { return (null, Failure("command", ex.Message)); }
         var environment = new Dictionary<string, string>(command.Environment!, StringComparer.Ordinal);
         foreach (var pair in request.Environment!) environment[pair.Key] = pair.Value;
+        environment.TryAdd("HOME", "/automaton/source/.automaton-home");
+        environment.TryAdd("XDG_CACHE_HOME", "/automaton/source/.automaton-cache");
+        environment.TryAdd("TMPDIR", "/tmp");
         try { DockerContainerRuntime.AddEnvironment(args, environment); }
         catch (InvalidOperationException ex) { return (null, Failure("command", ex.Message)); }
         if (string.IsNullOrWhiteSpace(command.Executable))

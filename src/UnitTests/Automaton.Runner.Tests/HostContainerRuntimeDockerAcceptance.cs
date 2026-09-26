@@ -9,7 +9,7 @@ namespace Automaton.Runner.Console.Tests;
 
 internal sealed class HostContainerRuntimeDockerAcceptance
 {
-    private const string SeedCommand = "echo stdout-ok; echo stderr-ok >&2; echo data-ok > /automaton/data/value; if touch /automaton/app/forbidden 2>/dev/null; then echo artifact-writable; else echo artifact-readonly; fi; sleep 120";
+    private const string SeedCommand = "echo stdout-ok; echo stderr-ok >&2; echo data-ok > /automaton/data/value; if touch /automaton/app/forbidden 2>/dev/null; then echo artifact-writable; else echo artifact-readonly; fi; if touch /root/forbidden 2>/dev/null; then echo root-writable; else echo root-readonly; fi; dd if=/dev/zero of=/tmp/bounded.tmp bs=1M count=40 status=none 2>/dev/null && echo scratch-overflow-success || echo scratch-overflow-blocked; rm -f /tmp/bounded.tmp; echo scratch-ok >/tmp/scratch && echo scratch-writable; sleep 120";
     private readonly HostContainerScope scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
     private readonly Guid[] candidates = [Guid.NewGuid(), Guid.NewGuid()];
     private readonly string volume;
@@ -40,6 +40,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             await scenario.StartAndInspectContainersAsync();
             await scenario.VerifyMountsLogsAndRemovalAsync();
             await scenario.VerifyPersistentDataAsync(image);
+            await scenario.VerifyBuildContainerBoundariesAsync(image);
         }
         finally
         {
@@ -116,6 +117,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             CandidateId = candidate,
             RequestedImage = image,
             Resources = new("source", "artifact", "data"),
+            SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
             ContainerPort = 8080,
             Storage = new() { DataDirectory = "store,quoted" },
             Command = new() { Executable = "sh", Arguments = ["-c", SeedCommand] }
@@ -145,7 +147,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             await VerifyContainerMountsAsync(id);
             var logs = await service.ExecuteAsync(Operation(HostContainerOperationKinds.GetContainerLogs, id));
             Assert.That(logs.Success, Is.True);
-            Assert.That(logs.Logs, Does.Contain("stdout-ok").And.Contain("stderr-ok").And.Contain("artifact-readonly"));
+            Assert.That(logs.Logs, Does.Contain("stdout-ok").And.Contain("stderr-ok").And.Contain("artifact-readonly").And.Contain("root-readonly").And.Contain("scratch-overflow-blocked").And.Contain("scratch-writable"));
             var wrongScope = Operation(HostContainerOperationKinds.RemoveContainer, id) with
             {
                 Scope = scope with { AppId = Guid.NewGuid() }
@@ -160,8 +162,18 @@ internal sealed class HostContainerRuntimeDockerAcceptance
     private async Task VerifyContainerMountsAsync(string id)
     {
         using var document = JsonDocument.Parse(await Docker("container", "inspect", "--format", "{{json .}}", id));
-        var mounts = document.RootElement.GetProperty("Mounts").EnumerateArray().ToArray();
-        Assert.That(mounts, Has.Length.EqualTo(2));
+        var root = document.RootElement;
+        var mounts = root.GetProperty("Mounts").EnumerateArray().ToArray();
+        Assert.That(mounts.Length, Is.GreaterThanOrEqualTo(2));
+        Assert.That(root.GetProperty("HostConfig").GetProperty("ReadonlyRootfs").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("HostConfig").GetProperty("CgroupParent").GetString(),
+            Is.EqualTo(HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId)));
+        Assert.That(root.GetProperty("HostConfig").GetProperty("ShmSize").GetInt64(), Is.EqualTo(64L * 1024 * 1024));
+        Assert.That(root.GetProperty("HostConfig").GetProperty("Tmpfs").GetProperty("/tmp").GetString(), Does.Contain("size=32m"));
+        var logConfig = root.GetProperty("HostConfig").GetProperty("LogConfig");
+        Assert.That(logConfig.GetProperty("Type").GetString(), Is.EqualTo("local"));
+        Assert.That(logConfig.GetProperty("Config").GetProperty("max-size").GetString(), Is.EqualTo("10m"));
+        Assert.That(logConfig.GetProperty("Config").GetProperty("max-file").GetString(), Is.EqualTo("3"));
         Assert.That(mounts.Single(mount => mount.GetProperty("Destination").GetString() == "/automaton/app")
             .GetProperty("RW").GetBoolean(), Is.False);
         Assert.That(mounts.Single(mount => mount.GetProperty("Destination").GetString() == "/automaton/data")
@@ -174,6 +186,43 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed,readonly",
             "--entrypoint", "cat", image, $"/seed/{data}/value")).Trim();
         Assert.That(content, Is.EqualTo("data-ok"));
+    }
+
+    private async Task VerifyBuildContainerBoundariesAsync(string image)
+    {
+        var attemptId = Guid.NewGuid();
+        var sourcePath = RunnerWorkspaceService.GetDeploymentStagingVolumeSubpath(
+            scope.AppId, scope.DeploymentTargetId, attemptId) + "/source";
+        await Docker(
+            "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed",
+            "--entrypoint", "mkdir", image, "-p", $"/seed/{sourcePath}");
+
+        var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+        {
+            Scope = scope with { DeploymentAttemptId = attemptId },
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = image,
+            Resources = new("source", "artifact", "data"),
+            SharedMemoryMb = 64,
+            DockerLogMaxSizeMb = 10,
+            DockerLogMaxFiles = 3,
+            TimeoutSeconds = 60,
+            Command = new ApplicationCommandSpec
+            {
+                Executable = "sh",
+                Arguments = ["-ec", "printf build-output > /automaton/source/output; mkdir -p \"$HOME/.cache\"; printf build-cache > \"$HOME/.cache/marker\"; if touch /root/forbidden 2>/dev/null; then exit 10; fi; dd if=/dev/zero of=/tmp/overflow bs=1M count=40 status=none 2>/dev/null && exit 11 || echo scratch-bounded; rm -f /tmp/overflow"]
+            }
+        });
+
+        Assert.That(result.Success, Is.True, result.Error);
+        Assert.That(result.ContainerName, Is.Not.Empty);
+        var remainingContainers = await Docker(
+            "container", "ls", "--all", "--quiet", "--filter", $"name={result.ContainerName}");
+        Assert.That(remainingContainers, Is.Empty);
+        var content = await Docker(
+            "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/source,readonly",
+            "--entrypoint", "sh", image, "-ec", "cat /source/" + sourcePath + "/output; cat /source/" + sourcePath + "/.automaton-home/.cache/marker");
+        Assert.That(content.Replace("\r", "", StringComparison.Ordinal), Is.EqualTo("build-outputbuild-cache"));
     }
 
     private async Task CleanupAsync()

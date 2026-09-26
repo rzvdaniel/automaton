@@ -103,6 +103,7 @@ internal static class HostContainerExecutionScenarios
                     HostContainerResourceKinds.Source,
                     HostContainerResourceKinds.Artifact,
                     HostContainerResourceKinds.ApplicationData),
+                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
                 Command = command,
                 Environment = includeBuildMode
                     ? new Dictionary<string, string> { ["BUILD_MODE"] = "test" }

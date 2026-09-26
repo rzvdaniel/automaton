@@ -1,3 +1,4 @@
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
@@ -35,6 +36,8 @@ public sealed class HostContainerRelayService(
         }
 
         var state = resolution.State!;
+        var activeResources = state.Hosted.SpecificationSnapshot.Resources;
+        var requiresContainerLimits = RequiresContainerLimits(request.Operation);
         var forwarded = request with
         {
             Scope = new HostContainerScope(
@@ -44,6 +47,9 @@ public sealed class HostContainerRelayService(
                 state.Target.Id,
                 request.Scope.DeploymentAttemptId),
             Resources = GetServerResources(request.Operation),
+            SharedMemoryMb = requiresContainerLimits ? activeResources.SharedMemoryMb : null,
+            DockerLogMaxSizeMb = requiresContainerLimits ? activeResources.DockerLogMaxSizeMb : null,
+            DockerLogMaxFiles = requiresContainerLimits ? activeResources.DockerLogMaxFiles : null,
             HostPort = 0,
             Environment = new Dictionary<string, string>(request.Environment, StringComparer.Ordinal)
         };
@@ -74,6 +80,9 @@ public sealed class HostContainerRelayService(
                 HostContainerResourceKinds.Artifact,
                 HostContainerResourceKinds.ApplicationData)
             : null;
+
+    private static bool RequiresContainerLimits(string operation) =>
+        operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer;
 
     private static HostContainerExecutionResponse Failure(string code, string message) =>
         new() { ErrorCode = code, Error = message };

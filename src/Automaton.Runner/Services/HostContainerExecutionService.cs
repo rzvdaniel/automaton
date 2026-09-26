@@ -34,15 +34,19 @@ public sealed partial class HostContainerExecutionService
         var validationFailure = ValidateRequest(request);
         if (validationFailure is not null) return validationFailure;
 
+        if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer)
+            && !HasTrustedResources(request.Resources))
+            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
+
+        var runtimeLimitsFailure = ValidateRuntimeLimits(request);
+        if (runtimeLimitsFailure is not null) return runtimeLimitsFailure;
+
         if (request.Operation == HostContainerOperationKinds.ResolveImage)
             return await ResolveImageAsync(request, cancellationToken);
 
         if (request.Operation == HostContainerOperationKinds.RunBuild)
             return await buildExecutor.ExecuteAsync(request, cancellationToken);
 
-        if (request.Operation == HostContainerOperationKinds.CreateApplicationContainer
-            && !HasTrustedResources(request.Resources))
-            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
         var error = HostContainerRuntimeValidation.Validate(request);
         if (error is not null)
             return Failure("invalid_request", error);
@@ -57,6 +61,37 @@ public sealed partial class HostContainerExecutionService
             ?? ValidateScope(request)
             ?? ValidateOperation(request)
             ?? ValidateRequestedImage(request);
+
+    private static HostContainerExecutionResponse? ValidateRuntimeLimits(HostContainerExecutionRequest request)
+    {
+        if (request.Operation is not (HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer))
+            return null;
+
+        return request.SharedMemoryMb is >= 16 and <= 1024
+            && request.DockerLogMaxSizeMb is >= 1 and <= 1024
+            && request.DockerLogMaxFiles is >= 1 and <= 20
+                ? null
+                : Failure("trusted_policy_unavailable", "Valid Hosted Runner container limits are unavailable.");
+    }
+
+    private static void AddWritablePathArguments(
+        List<string> arguments,
+        int sharedMemoryMb,
+        int dockerLogMaxSizeMb,
+        int dockerLogMaxFiles)
+    {
+        arguments.Add("--read-only");
+        arguments.Add("--tmpfs");
+        arguments.Add("/tmp:rw,nosuid,nodev,size=32m,mode=1777");
+        arguments.Add("--shm-size");
+        arguments.Add($"{sharedMemoryMb}m");
+        arguments.Add("--log-driver");
+        arguments.Add("local");
+        arguments.Add("--log-opt");
+        arguments.Add($"max-size={dockerLogMaxSizeMb}m");
+        arguments.Add("--log-opt");
+        arguments.Add($"max-file={dockerLogMaxFiles}");
+    }
 
     private static HostContainerExecutionResponse? ValidateRunnerAuthorization()
     {

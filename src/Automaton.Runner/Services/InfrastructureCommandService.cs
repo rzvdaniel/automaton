@@ -150,11 +150,11 @@ public sealed class InfrastructureCommandService
         {
             if (!process.Start())
                 return Failure("Failed to start the typed Docker process.");
-            var boundedLogs = arguments.Count > 1 && arguments[1] == "logs";
-            var outputTask = boundedLogs
+            var boundedOutput = ShouldBoundDockerOutput(arguments);
+            var outputTask = boundedOutput
                 ? ReadLogTailAsync(process.StandardOutput, timeoutCts.Token)
                 : process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            var errorTask = boundedLogs
+            var errorTask = boundedOutput
                 ? ReadLogTailAsync(process.StandardError, timeoutCts.Token)
                 : process.StandardError.ReadToEndAsync(timeoutCts.Token);
             await process.WaitForExitAsync(timeoutCts.Token);
@@ -193,6 +193,9 @@ public sealed class InfrastructureCommandService
         }
         return tail.ToString();
     }
+
+    private static bool ShouldBoundDockerOutput(IReadOnlyList<string> arguments)
+        => arguments.Count > 1 && (arguments[1] is "logs" or "run");
 
     private static InfrastructureCommandResponse Failure(string message, int exitStatus = -1)
         => new()
