@@ -70,6 +70,23 @@ def resolve_filesystem_mountpoint(path: str) -> str:
     return posixpath.normpath(filesystem_mountpoint)
 
 
+def resolve_filesystem_uuid(path: str) -> str:
+    result = host("findmnt", "-no", "UUID", "-T", path)
+    try:
+        return str(uuid.UUID(result.stdout.strip()))
+    except (ValueError, AttributeError) as error:
+        raise RuntimeError("Could not resolve a stable UUID for the Hosted Runner XFS filesystem") from error
+
+
+def require_expected_filesystem_uuid(value: object) -> str | None:
+    if value is None:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError) as error:
+        raise ValueError("storageFilesystemUuid must be a valid filesystem UUID") from error
+
+
 def project_quota_enforcement_enabled(output: str) -> bool:
     lowered = output.lower()
     if "project quota state: enforcement" in lowered:
@@ -150,7 +167,12 @@ def main() -> None:
     }
     if len(set(filesystem_mountpoints.values())) != 1:
         raise RuntimeError("Hosted Runner storage volumes must share one XFS filesystem")
-    quota = read_project_quota(next(iter(filesystem_mountpoints.values())), project_id)
+    filesystem_mountpoint = next(iter(filesystem_mountpoints.values()))
+    storage_filesystem_uuid = resolve_filesystem_uuid(filesystem_mountpoint)
+    expected_filesystem_uuid = require_expected_filesystem_uuid(request.get("storageFilesystemUuid"))
+    if expected_filesystem_uuid is not None and storage_filesystem_uuid != expected_filesystem_uuid:
+        raise RuntimeError("Hosted Runner storage is on a different XFS filesystem; explicit storage migration is required")
+    quota = read_project_quota(filesystem_mountpoint, project_id)
     if quota is None:
         raise RuntimeError(f"XFS project quota for project {project_id} could not be verified")
     total_bytes, _ = quota
@@ -160,6 +182,7 @@ def main() -> None:
         "userBytes": total_bytes,
         "totalBytes": total_bytes,
         "usageSource": "xfs-project-quota",
+        "storageFilesystemUuid": storage_filesystem_uuid,
     }, separators=(",", ":")))
 
 

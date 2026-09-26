@@ -2,6 +2,7 @@ using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
@@ -14,6 +15,7 @@ namespace Automaton.Worker.Handlers;
 
 public sealed class ManagedRunnerProvisionRequestedEventHandler(
     ApplicationDbContext dbContext,
+    HostedRunnerStorageLocalityAdoptionService storageLocalityAdoption,
     IEventPublisher eventPublisher,
     ITransactionalEventExecutor transactionalEventExecutor,
     IOptionsSnapshot<HostedRunnerOptions> options,
@@ -54,7 +56,20 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        var infrastructureRequest = CreateInfrastructureRequest(hostedRunner, deployment, host!, message);
+        AccountStorageAllocation storageAllocation;
+        try
+        {
+            storageAllocation = await storageLocalityAdoption.AdoptRunnerHostAsync(
+                hostedRunner.UserId, host!.Id, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            await FailAsync(hostedRunner, deployment, exception.Message, message.CorrelationId, cancellationToken);
+            return;
+        }
+
+        var infrastructureRequest = CreateInfrastructureRequest(
+            hostedRunner, deployment, host!, message, storageAllocation.StorageFilesystemUuid);
         await DispatchAsync(hostedRunner, deployment, infrastructureRequest, cancellationToken);
     }
 
@@ -102,7 +117,8 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,
         RunnerHost host,
-        ManagedRunnerProvisionRequestedEvent message)
+        ManagedRunnerProvisionRequestedEvent message,
+        string? storageFilesystemUuid)
         => new(
             CommandId: deployment.Id,
             OperationId: deployment.Id,
@@ -111,11 +127,15 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             ActionKey: deployment.Action == HostedRunnerDeploymentActions.Reprovision
                 ? "reprovision-hosted-runner"
                 : ProvisionActionKey,
-            InputJson: CreateInfrastructureInput(hostedRunner, deployment, host),
+            InputJson: CreateInfrastructureInput(hostedRunner, deployment, host, storageFilesystemUuid),
             SecretGrantIds: message.SecretGrantIds,
             CreatedAtUtc: DateTime.UtcNow);
 
-    private string CreateInfrastructureInput(HostedRunner hostedRunner, HostedRunnerDeployment deployment, RunnerHost host)
+    private string CreateInfrastructureInput(
+        HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
+        RunnerHost host,
+        string? storageFilesystemUuid)
     {
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
@@ -133,6 +153,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             memoryReservationMb = resources.MemoryReservationMb,
             diskLimitMb = resources.DiskLimitMb,
             xfsProjectId = hostedRunner.StorageProjectId!.Value,
+            storageFilesystemUuid,
             pidsLimit = resources.PidsLimit,
             sharedMemoryMb = resources.SharedMemoryMb,
             dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,

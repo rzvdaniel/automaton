@@ -681,6 +681,7 @@ internal static class ApiOperationsRegistration
         services.AddScoped<HostedRunnerHostPlacementService>();
         services.AddScoped<HostedRunnerProvisioningPolicyService>();
         services.AddScoped<HostedRunnerProvisioningPreparationService>();
+        services.AddScoped<HostedRunnerStorageLocalityResolver>();
         services.AddScoped<HostedRunnerProvisioningService>();
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();

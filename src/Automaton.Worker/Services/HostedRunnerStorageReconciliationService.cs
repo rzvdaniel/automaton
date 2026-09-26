@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Automaton.Messaging.Abstractions;
 using System.Text.Json;
@@ -34,7 +35,9 @@ public sealed class HostedRunnerStorageReconciliationService(
         await MarkStaleHostsAsync(db, cutoff, includeHosts, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         if (includeHostedRunners)
-            await new HostedRunnerStorageVerificationDispatcher(eventPublisher)
+            await new HostedRunnerStorageVerificationDispatcher(
+                    eventPublisher,
+                    scope.ServiceProvider.GetRequiredService<HostedRunnerStorageLocalityAdoptionService>())
                 .DispatchPendingAsync(db, telemetryOptions.Value, now, cancellationToken);
         return created;
     }

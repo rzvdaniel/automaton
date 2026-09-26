@@ -9,6 +9,7 @@ namespace Automaton.Api.Services;
 public interface IAccountStorageProjectAllocationService
 {
     Task<int> GetOrCreateAsync(Guid accountId, CancellationToken cancellationToken = default);
+    Task<AccountStorageAllocation> GetOrCreateAllocationAsync(Guid accountId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -37,6 +38,15 @@ public sealed class AccountStorageProjectAllocationService(ApplicationDbContext 
             : GetInitialCandidate(accountId);
 
         return await AllocateProjectIdAsync(accountId, candidate, adoptingHistoricalId, cancellationToken);
+    }
+
+    public async Task<AccountStorageAllocation> GetOrCreateAllocationAsync(
+        Guid accountId,
+        CancellationToken cancellationToken = default)
+    {
+        await GetOrCreateAsync(accountId, cancellationToken);
+        return await db.AccountStorageAllocations
+            .SingleAsync(x => x.AccountId == accountId, cancellationToken);
     }
 
     private static void ValidateHistoricalProjectIds(Guid accountId, IReadOnlyCollection<int> historicalProjectIds)

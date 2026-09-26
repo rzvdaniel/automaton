@@ -35,6 +35,7 @@ internal static class HostedRunnerProvisioningTestServiceFactory
             hostedRunnerOptions,
             CreatePolicyService(db),
             new AccountStorageProjectAllocationService(db),
+            new HostedRunnerStorageLocalityResolver(db),
             NullLogger<HostedRunnerProvisioningService>.Instance,
             preparationService);
     }
@@ -80,7 +81,6 @@ internal static class HostedRunnerManagementTestServiceFactory
             db,
             provisioningService,
             eventPublisher ?? new NoOpEventPublisher(),
-            options,
             auditEventService,
             userContextService,
             NullLogger<HostedRunnerManagementService>.Instance);

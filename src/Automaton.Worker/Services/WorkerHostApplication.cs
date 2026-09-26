@@ -60,6 +60,8 @@ internal static class WorkerHostApplication
     private static void ConfigureServices(HostApplicationBuilder builder)
     {
         var services = builder.Services;
+        services.AddScoped<HostedRunnerStorageLocalityResolver>();
+        services.AddScoped<HostedRunnerStorageLocalityAdoptionService>();
         services.AddAutomatonInfrastructure(builder.Configuration);
         services.AddAutomatonWorkerIdentity();
         services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));

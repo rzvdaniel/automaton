@@ -51,17 +51,23 @@ public class HostedRunnerProvisioningIdentityAuditTests
     public async Task HostedRunnerProvisioningWithContainerIdentityWaitsForRegistration()
     {
         using var db = HostedRunnerAuditTestData.CreateDbContext();
-        var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Status = HostedRunnerStatuses.Provisioning };
+        var userId = Guid.NewGuid();
+        var hostId = Guid.NewGuid();
+        var hostedRunner = new HostedRunner { Id = Guid.NewGuid(), UserId = userId, RunnerHostId = hostId, Status = HostedRunnerStatuses.Provisioning };
+        HostedRunnerAuditTestData.SeedAccountStorageAllocation(db, userId, 1234567, hostId);
         var deployment = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id, Status = HostedRunnerDeploymentStatuses.Executing };
         var handler = new InfrastructureActionProvisioningHandler(
             db, new HostedRunnerAuditNoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
             Options.Create(new StorageTelemetryOptions()));
-        using var document = JsonDocument.Parse("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\"}");
+        using var document = JsonDocument.Parse("{\"success\":true,\"containerId\":\"replacement-id\",\"containerName\":\"replacement\",\"storageFilesystemUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}");
 
         await handler.ApplySuccessfulOperationAsync(
             hostedRunner, deployment, "reprovision-hosted-runner", document.RootElement, CancellationToken.None);
 
         Assert.That(hostedRunner.ContainerId, Is.EqualTo("replacement-id"));
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForRegistration));
+        Assert.That(
+            HostedRunnerAuditTestData.GetAccountStorageFilesystemUuid(db, userId),
+            Is.EqualTo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
     }
 }

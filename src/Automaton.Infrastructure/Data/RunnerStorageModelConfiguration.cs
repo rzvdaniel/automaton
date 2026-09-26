@@ -142,6 +142,7 @@ internal static class RunnerStorageModelConfiguration
             {
                 entity.HasKey(e => e.AccountId);
                 entity.Property(e => e.StorageProjectId).IsRequired();
+                entity.Property(e => e.StorageFilesystemUuid).HasMaxLength(80);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_AccountStorageAllocations_StorageProjectId_Positive",
                     "StorageProjectId > 0"));

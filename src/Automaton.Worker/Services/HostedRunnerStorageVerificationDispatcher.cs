@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,9 @@ using System.Text.Json;
 
 namespace Automaton.Worker.Services;
 
-internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher eventPublisher)
+internal sealed class HostedRunnerStorageVerificationDispatcher(
+    IEventPublisher eventPublisher,
+    HostedRunnerStorageLocalityAdoptionService storageLocalityAdoption)
 {
     internal async Task DispatchPendingAsync(
         ApplicationDbContext db,
@@ -58,9 +61,24 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
             verification.Error = "Hosted Runner storage quota identity is not initialized; reprovision is required.";
             return;
         }
+        AccountStorageAllocation storageAllocation;
+        try
+        {
+            storageAllocation = await storageLocalityAdoption.AdoptRunnerHostAsync(
+                runner.UserId, hostId, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            verification.Status = StorageVerificationStatuses.Failed;
+            verification.CompletedAtUtc = now;
+            verification.Error = exception.Message;
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
         if (!await TryClaimDispatchAsync(db, hostId, verification.Id, maxPerHost, now, cancellationToken)) return;
         await EnsureVerificationDeploymentAsync(db, verification, cancellationToken);
-        await PublishVerificationCommandAsync(verification, hostId, infrastructureRunnerId.Value, cancellationToken);
+        await PublishVerificationCommandAsync(
+            verification, hostId, infrastructureRunnerId.Value, storageAllocation.StorageFilesystemUuid, cancellationToken);
     }
 
     private static async Task EnsureVerificationDeploymentAsync(
@@ -83,6 +101,7 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
         HostedRunnerStorageVerification verification,
         Guid hostId,
         Guid infrastructureRunnerId,
+        string? storageFilesystemUuid,
         CancellationToken cancellationToken)
     {
         var runner = verification.HostedRunner;
@@ -98,6 +117,7 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(IEventPublisher 
                 hostedRunnerId = runner.Id,
                 runnerHostId = hostId,
                 xfsProjectId = runner.StorageProjectId,
+                storageFilesystemUuid,
                 expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                 expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
             }),

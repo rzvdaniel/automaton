@@ -7,6 +7,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Core.Enums;
@@ -179,4 +180,9 @@ public class HostedRunnerAdminLifecycleAuditTests
 
         Assert.That(exception!.Message, Does.Contain("does not include a hosted runner"));
     }
+
+    [TestCase(false, "subscription allows")]
+    [TestCase(true, "multiple Runner Hosts")]
+    public async Task AdminReprovisionRejection_PreservesTheWorkingRunner(bool conflictingHistory, string expectedMessage)
+        => await HostedRunnerAdminReprovisionRejectionScenario.VerifyAsync(conflictingHistory, expectedMessage);
 }

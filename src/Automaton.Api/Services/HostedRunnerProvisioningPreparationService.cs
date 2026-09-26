@@ -31,6 +31,7 @@ public sealed class HostedRunnerProvisioningPreparationService(
         int accountStorageProjectId,
         bool createdHostedRunner,
         Guid? previousHostId,
+        Guid? storageRunnerHostId,
         CancellationToken cancellationToken)
     {
         IDbContextTransaction? capacityTransaction = null;
@@ -48,6 +49,7 @@ public sealed class HostedRunnerProvisioningPreparationService(
                 requestedSnapshot.Resources,
                 createdHostedRunner ? null : hostedRunner.Id,
                 accountStorageProjectId,
+                storageRunnerHostId,
                 cancellationToken);
             var host = hostSelection.Host;
             if (host == null)

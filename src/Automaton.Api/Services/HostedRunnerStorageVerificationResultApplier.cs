@@ -28,7 +28,18 @@ internal static class HostedRunnerStorageVerificationResultApplier
         var systemBytes = ReadNonNegativeInt64(result, "systemBytes");
         var userBytes = ReadNonNegativeInt64(result, "userBytes");
         var totalBytes = ReadNonNegativeInt64(result, "totalBytes");
+        var filesystemUuid = ReadFilesystemUuid(result);
         EnsureAuthoritativeStorageResult(result, systemBytes, userBytes, totalBytes);
+        var allocation = await db.AccountStorageAllocations
+            .SingleOrDefaultAsync(item => item.AccountId == hostedRunner.UserId, cancellationToken)
+            ?? throw new InvalidOperationException("Account storage allocation was not found.");
+        if (!hostedRunner.RunnerHostId.HasValue
+            || allocation.StorageRunnerHostId != hostedRunner.RunnerHostId)
+            throw new InvalidOperationException("Account storage locality does not match the Hosted Runner host.");
+        if (allocation.StorageFilesystemUuid is not null
+            && !string.Equals(allocation.StorageFilesystemUuid, filesystemUuid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Storage verification reported a different XFS filesystem than the account storage locality.");
+        allocation.StorageFilesystemUuid ??= filesystemUuid;
 
         var now = DateTime.UtcNow;
         db.HostedRunnerStorageObservations.Add(new HostedRunnerStorageObservation
@@ -61,6 +72,15 @@ internal static class HostedRunnerStorageVerificationResultApplier
             throw new InvalidOperationException("Storage verification did not report authoritative XFS project-quota usage.");
         if (systemBytes + userBytes != totalBytes)
             throw new InvalidOperationException("Storage verification returned inconsistent totals.");
+    }
+
+    private static string ReadFilesystemUuid(JsonElement result)
+    {
+        if (!result.TryGetProperty("storageFilesystemUuid", out var element)
+            || element.ValueKind != JsonValueKind.String
+            || !Guid.TryParse(element.GetString(), out var filesystemUuid))
+            throw new InvalidOperationException("Storage verification returned an invalid XFS filesystem UUID.");
+        return filesystemUuid.ToString("D");
     }
 
     private static void ApplyMeasurement(

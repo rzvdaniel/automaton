@@ -80,6 +80,7 @@ internal static class AdminSubscriptionPlansTestServiceFactory
                 new SubscriptionResourcePolicyResolver(new HostedRunnerSpecificationResolver(dbContext)),
                 NullLogger<HostedRunnerProvisioningPolicyService>.Instance),
             new AccountStorageProjectAllocationService(dbContext),
+            new HostedRunnerStorageLocalityResolver(dbContext),
             NullLogger<HostedRunnerProvisioningService>.Instance,
             preparationService);
 

@@ -1,4 +1,3 @@
-using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -9,7 +8,6 @@ using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
@@ -18,7 +16,6 @@ public class HostedRunnerManagementService
     private readonly ApplicationDbContext db;
     private readonly HostedRunnerProvisioningService provisioningService;
     private readonly IEventPublisher eventPublisher;
-    private readonly HostedRunnerOptions options;
     private readonly IAuditEventService auditEventService;
     private readonly UserContextService userContextService;
     private readonly ILogger<HostedRunnerManagementService> logger;
@@ -29,7 +26,6 @@ public class HostedRunnerManagementService
         ApplicationDbContext db,
         HostedRunnerProvisioningService provisioningService,
         IEventPublisher eventPublisher,
-        IOptionsSnapshot<HostedRunnerOptions> options,
         IAuditEventService auditEventService,
         UserContextService userContextService,
         ILogger<HostedRunnerManagementService> logger)
@@ -37,7 +33,6 @@ public class HostedRunnerManagementService
         this.db = db;
         this.provisioningService = provisioningService;
         this.eventPublisher = eventPublisher;
-        this.options = options.Value;
         this.auditEventService = auditEventService;
         this.userContextService = userContextService;
         this.logger = logger;
@@ -190,21 +185,25 @@ public class HostedRunnerManagementService
             },
             cancellationToken);
 
-        if (hostedRunner.Runner != null)
+        var preparation = await provisioningService.PrepareProvisioningAsync(
+            hostedRunner.UserId,
+            Guid.Empty,
+            cancellationToken,
+            forceProvision: true,
+            requiredHostedRunnerId: hostedRunner.Id);
+        if (preparation.ShouldPublishProvisionRequest)
         {
-            hostedRunner.Runner.ConnectionId = null;
+            var preparedRunner = preparation.HostedRunner;
+            if (preparedRunner.Runner != null)
+                preparedRunner.Runner.ConnectionId = null;
+
+            preparedRunner.RunnerId = null;
+            preparedRunner.LastError = null;
+            preparedRunner.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        hostedRunner.RunnerId = null;
-        hostedRunner.Status = options.Enabled ? HostedRunnerStatuses.Provisioning : HostedRunnerStatuses.Pending;
-        hostedRunner.LastError = null;
-        hostedRunner.UpdatedAt = DateTime.UtcNow;
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        var reprovisioned = await provisioningService.EnsureHostedRunnerAsync(
-            hostedRunner.UserId,
-            cancellationToken);
+        var reprovisioned = await provisioningService.DispatchPreparedProvisioningAsync(preparation, cancellationToken);
 
         if (reprovisioned == null)
         {
