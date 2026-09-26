@@ -67,6 +67,7 @@ internal static class ApiApplicationPipelineExtensions
 
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
         app.MapControllers();
         app.MapBlazorHub();

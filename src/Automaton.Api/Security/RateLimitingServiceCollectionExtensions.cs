@@ -1,4 +1,5 @@
 using Automaton.Api.Constants;
+using Automaton.Api.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -18,6 +19,7 @@ public static class RateLimitingServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidation>();
+        services.AddSingleton<MultipartUploadAdmission>();
 
         services.AddOptions<RateLimiterOptions>()
             .Configure<IOptions<RateLimitingOptions>>((options, configuredOptions) =>

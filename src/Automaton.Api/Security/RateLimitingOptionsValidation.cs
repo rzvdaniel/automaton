@@ -21,6 +21,11 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
         ValidatePolicy(options.PublicAppFlowExecution, nameof(options.PublicAppFlowExecution), errors);
         ValidatePolicy(options.PublicAppStepExecution, nameof(options.PublicAppStepExecution), errors);
 
+        if (options.MaxConcurrentMultipartRequests <= 0)
+        {
+            errors.Add($"{nameof(options.MaxConcurrentMultipartRequests)} must be greater than 0.");
+        }
+
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);
