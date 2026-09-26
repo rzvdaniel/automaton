@@ -548,6 +548,11 @@ internal static class ApiAppExecutionRegistration
 {
     internal static IServiceCollection AddApiAppExecutionServices(this IServiceCollection services, WebApplicationBuilder applicationBuilder)
     {
+        services.AddOptions<DeploymentPackageStorageOptions>()
+            .BindConfiguration(DeploymentPackageStorageOptions.SectionName)
+            .Validate(options => options.MaximumStoredBytes > 0, "Deployment package storage byte limit must be positive.")
+            .Validate(options => options.MaximumStoredPackages > 0, "Deployment package file-count limit must be positive.")
+            .ValidateOnStart();
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
