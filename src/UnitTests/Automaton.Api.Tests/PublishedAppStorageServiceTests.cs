@@ -176,6 +176,31 @@ public class PublishedAppStorageServiceTests
         }
     }
 
+    [Test]
+    public async Task PromoteStagedPackage_FailedPromotionRestoresPreviousPackage()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-published-app-tests", Guid.NewGuid().ToString("N"));
+        var stagingPath = Path.Combine(root, ".staging", "missing-stage");
+        var finalPath = Path.Combine(root, "slug");
+        var backupPath = Path.Combine(root, ".staging", "backup");
+        Directory.CreateDirectory(finalPath);
+        await File.WriteAllTextAsync(Path.Combine(finalPath, "index.html"), "previous");
+
+        try
+        {
+            Assert.Throws<DirectoryNotFoundException>(() =>
+                PublishedAppStorageService.PromoteStagedPackage(stagingPath, finalPath, backupPath));
+
+            Assert.That(await File.ReadAllTextAsync(Path.Combine(finalPath, "index.html")), Is.EqualTo("previous"));
+            Assert.That(Directory.Exists(backupPath), Is.False);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void InvokeValidateIndexHtml(string html)
     {
         try

@@ -53,6 +53,7 @@ public class PublishedAppStorageService
         var rootPath = GetRootPath();
         var stagingPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-{Guid.NewGuid():N}");
         var finalPath = Path.Combine(rootPath, metadata.Slug);
+        var backupPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-backup-{Guid.NewGuid():N}");
 
         Directory.CreateDirectory(stagingPath);
 
@@ -62,20 +63,11 @@ public class PublishedAppStorageService
             await WriteRuntimeFilesAsync(stagingPath, metadata, cancellationToken);
             AppArchiveStorageBounds.ValidateDirectory(stagingPath);
 
-            if (Directory.Exists(finalPath))
-            {
-                Directory.Delete(finalPath, recursive: true);
-            }
-
-            Directory.Move(stagingPath, finalPath);
+            PromoteStagedPackage(stagingPath, finalPath, backupPath);
         }
         catch
         {
-            if (Directory.Exists(stagingPath))
-            {
-                Directory.Delete(stagingPath, recursive: true);
-            }
-
+            DeleteDirectoryIfExists(stagingPath);
             throw;
         }
     }
@@ -157,6 +149,36 @@ public class PublishedAppStorageService
             .Where(directory => Path.GetFileName(directory).StartsWith(slug + "-", StringComparison.Ordinal));
         foreach (var directory in matchingCopies)
             Directory.Delete(directory, recursive: true);
+    }
+
+    internal static void PromoteStagedPackage(string stagingPath, string finalPath, string backupPath)
+    {
+        var movedExistingPackage = false;
+        try
+        {
+            if (Directory.Exists(finalPath))
+            {
+                Directory.Move(finalPath, backupPath);
+                movedExistingPackage = true;
+            }
+
+            Directory.Move(stagingPath, finalPath);
+        }
+        catch
+        {
+            if (movedExistingPackage && Directory.Exists(backupPath) && !Directory.Exists(finalPath))
+                Directory.Move(backupPath, finalPath);
+            throw;
+        }
+
+        if (movedExistingPackage)
+            Directory.Delete(backupPath, recursive: true);
+    }
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
     }
 
     private static void CopyPublicFiles(string sourcePath, string stagingPath)
