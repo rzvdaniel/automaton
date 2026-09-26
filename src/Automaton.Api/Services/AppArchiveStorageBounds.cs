@@ -24,4 +24,25 @@ internal static class AppArchiveStorageBounds
             expandedBytes += entry.Length;
         }
     }
+
+    public static async Task CopyEntryAsync(
+        Stream input,
+        Stream output,
+        long expectedBytes,
+        CancellationToken cancellationToken = default)
+    {
+        var buffer = new byte[81920];
+        long copiedBytes = 0;
+        int read;
+        while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (read > expectedBytes - copiedBytes)
+                throw new InvalidDataException("Archive entry expanded beyond its declared size.");
+            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            copiedBytes += read;
+        }
+
+        if (copiedBytes != expectedBytes)
+            throw new InvalidDataException("Archive entry size did not match its declared size.");
+    }
 }

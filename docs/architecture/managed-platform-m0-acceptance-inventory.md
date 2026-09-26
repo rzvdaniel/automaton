@@ -1,6 +1,6 @@
 # Managed Platform M0: Resource and Storage Acceptance Inventory
 
-This document records current behavior and M0 decisions for the managed-platform completion plan. It is an implementation inventory, not a claim that aggregate account storage enforcement is complete. M1 owns closing the storage gaps listed below.
+This document records the M0 baseline and decisions for the managed-platform completion plan. The writable-path table below is the M0 snapshot; the M1 implementation update records current changes and remaining gaps. This is not a claim that aggregate account storage enforcement is complete.
 
 ## Current resource flow
 
@@ -68,7 +68,21 @@ The `AddAccountStorageLocality` migration adds nullable columns without a destru
 
 The current XFS quota covers the system and user named volumes only. Known escape paths are container writable overlays (`/tmp` included), control-plane app file and published-app storage, shared Docker image/overlay/log storage, and any transient or cache write not placed under the user volume. Infrastructure Runner storage is an intentional platform-owned exclusion.
 
-## `/tmp` and root filesystem behavior
+## M1 implementation update
+
+The current M1 branch adds these enforcement paths:
+
+- Provision and reprovision apply one XFS project quota to both Hosted Runner named volumes. They now verify the project ID and project-inheritance flag on each volume root before replacing the container and again after the container starts. Storage measurement rejects a root whose project ID, inheritance flag, filesystem identity, or hard quota no longer matches the persisted account allocation and allowance. The opt-in Linux/XFS acceptance test also checks existing data, nested-file inheritance, combined writes, overflow, and preservation across reprovision.
+- Hosted Runner temporary .NET files use `/automaton/storage/.tmp` through `TMPDIR`, so uploads, results, and temporary preparation files land in the user volume's XFS project. Direct `/tmp` is a 32 MiB tmpfs. The service still has a writable root filesystem because its startup installs app-declared system packages into the container image layer.
+- Generic app runtime and build containers use a read-only root filesystem, a 32 MiB `/tmp` tmpfs, the specification-backed shared-memory limit, and specification-backed bounded Docker logs. App data remains on the writable user-volume mounts; build source and its home/cache directories remain under the user-volume staging path. Build containers are removed on completion/failure, and failed deployment staging is covered by cleanup tests.
+- API relays for image resolution, builds, and app-container creation require fresh Runner Host storage telemetry and preserve the measured host reserve. Container inspection, log retrieval, and removal remain available during low-space recovery. This is an admission watermark, not a per-image cache quota; Docker image size and concurrent pulls can still consume available space after admission.
+- App import and runtime ZIP upload validate expanded archive content before creating an imported app or applying `clean=true`. Each archive is limited to 200 MiB expanded and 10,000 entries. This bounds a single extraction request; it does not establish an account-wide quota or retention policy for API-side source, live files, snapshots, and published assets.
+
+The following writable categories remain outside the Hosted Runner account XFS project and need an explicit bounded platform-storage contract or a later storage migration: the Hosted Runner service writable root layer (including apt-installed packages), Docker image/cache data and metadata under the Runner Host data root, API multipart temporary buffering, API app source/live/version files, published assets, app thumbnails/screenshots, and disabled published copies. Host reserve admission reduces exhaustion risk for Docker image work but does not impose a maximum cache size or guarantee a large image pull will fit. API archive extraction bounds do not cap accumulated files or version snapshots.
+
+The real-XFS acceptance remains opt-in and must run on a Linux host whose Docker volume data root is XFS with project quotas enabled. A skipped test on a non-XFS development host is not evidence of hard-quota enforcement.
+
+## M0 baseline: `/tmp` and root filesystem behavior
 
 No dedicated bounded tmpfs is mounted at `/tmp` by the Hosted Runner, app, or build Docker commands audited for this inventory. The Hosted Runner has a configured bounded `/dev/shm` via `--shm-size`; this does not bound `/tmp`. Docker commands for app and build containers omit `--read-only`, so their root filesystems are writable overlay filesystems. Writes to explicit persistent app data mounts are XFS-accounted; writes to the rest of the root filesystem are not covered by the account XFS project quota.
 

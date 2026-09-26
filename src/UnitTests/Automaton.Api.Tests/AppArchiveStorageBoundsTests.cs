@@ -31,6 +31,17 @@ public sealed class AppArchiveStorageBoundsTests
             AppArchiveStorageBounds.Validate(archive, maximumExpandedBytes: 10, maximumEntries: 1));
     }
 
+    [Test]
+    public async Task CopyEntryAsync_RejectsBytesPastDeclaredEntryLengthBeforeWritingThem()
+    {
+        await using var input = new MemoryStream("excess"u8.ToArray());
+        await using var output = new MemoryStream();
+
+        Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await AppArchiveStorageBounds.CopyEntryAsync(input, output, expectedBytes: 3));
+        Assert.That(output.Length, Is.Zero);
+    }
+
     private static ZipArchive CreateArchive(params (string Path, string Content)[] files)
     {
         var bytes = new MemoryStream();
