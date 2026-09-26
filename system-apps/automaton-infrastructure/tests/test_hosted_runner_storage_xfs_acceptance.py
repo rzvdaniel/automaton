@@ -12,6 +12,7 @@ the image environment variable is set.
 """
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -142,6 +143,7 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
         self.assertContainerRemoved(overflow_name)
 
         self.assert_tmpfs_and_read_only_rootfs()
+        self.assert_writable_root_layer_is_bounded()
 
         self.replace_runner_container_and_verify_data(mountpoints, filesystem_uuid)
         self.assertEqual(self.read_image_file(system, "/system/runner/marker"), "preserved-system")
@@ -194,6 +196,31 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
             name=name,
         )
         self.assertNotEqual(temporary.returncode, 0)
+        self.assertContainerRemoved(name)
+
+    def assert_writable_root_layer_is_bounded(self):
+        name = f"automaton-m1-xfs-root-layer-{uuid.uuid4().hex}"
+        try:
+            self.docker(
+                "run", "--detach", "--name", name, "--network", "none",
+                "--storage-opt", "size=64m", "--entrypoint", "sh", self.image,
+                "-c", "sleep 300",
+            )
+            storage_options = json.loads(self.docker(
+                "inspect", "--format", "{{json .HostConfig.StorageOpt}}", name,
+            ))
+            self.assertEqual(storage_options.get("size"), "64m")
+
+            overflow = subprocess.run(
+                ["docker", "exec", name, "sh", "-ec",
+                 "dd if=/dev/zero of=/var/tmp/overflow.bin bs=1M count=80 conv=fsync"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(overflow.returncode, 0, "writable root layer exceeded its 64 MiB cap")
+        finally:
+            self.remove_container_if_present(name)
         self.assertContainerRemoved(name)
 
     def run_host_command(self, *arguments, check=True):
