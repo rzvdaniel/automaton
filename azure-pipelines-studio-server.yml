@@ -1,7 +1,4 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+name: Automaton.AllProjects.Tests_$(Date:yyyyMMdd)$(Rev:.r)
 
 trigger:
   - main
@@ -12,67 +9,27 @@ pr:
     include:
       - main
 
-parameters:
-    - name: isRelease
-      displayName: Is a release build
-      default: false
-      type: boolean
-
 jobs:
-
-- job: AutomatonServer
-  
+- job: AllProjectsTests
+  displayName: Run all projects tests
   pool:
     vmImage: 'ubuntu-latest'
 
   variables:
     automatonAllSolution: './Automaton.All.sln'
-    automatonServerProject: './src/Automaton.Api/Automaton.Api.csproj'
     validationConfiguration: 'Debug'
-    publishConfiguration: 'Release'
 
   steps:
-  - task: UseDotNet@2 
+  - task: UseDotNet@2
     displayName: ".NET 9.0.318"
     inputs:
       version: '9.0.318'
       packageType: sdk
 
   - task: DotNetCoreCLI@2
-    displayName: "Build all C# projects with analyzer errors"
-    inputs:
-      command: build
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
-      arguments: '--configuration $(validationConfiguration) --no-incremental --verbosity minimal'
-
-  - task: DotNetCoreCLI@2
     displayName: "Test all C# projects"
     inputs:
       command: test
       projects: '$(System.DefaultWorkingDirectory)/$(automatonAllSolution)'
-      publishTestResults: true
-      arguments: '--configuration $(validationConfiguration) --no-build --no-restore --verbosity minimal'
-
-  - task: FileTransform@1
-    displayName: Transform appsettings
-    condition: eq(${{ parameters.isRelease }}, false)
-    inputs:
-      folderPath: '$(System.DefaultWorkingDirectory)/src/Automaton.Api'
-      fileType: 'json'
-      targetFiles: 'appsettings.json'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'publish'
-      publishWebProjects: false
-      projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Api/Automaton.Api.csproj'
-      arguments: '--configuration $(publishConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Api" --no-restore'
-      zipAfterPublish: false
-    displayName: 'Publish Automaton Server'
-
-  - task: PublishPipelineArtifact@1
-    displayName: Publish Automaton Server artifact
-    inputs:
-      targetPath: '$(build.artifactStagingDirectory)/Automaton.Api'
-      artifact: 'Automaton.Api'
-      publishLocation: 'pipeline'
+      publishTestResults: false
+      arguments: '--configuration $(validationConfiguration) --verbosity minimal'
