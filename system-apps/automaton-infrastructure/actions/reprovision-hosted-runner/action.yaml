@@ -37,10 +37,9 @@ spec:
       runnerName: { type: string }
   output:
     type: object
-    required: [success, resultVersion, containerId, containerName, storageFilesystemUuid]
+    required: [success, containerId, containerName, storageFilesystemUuid]
     properties:
       success: { type: boolean }
-      resultVersion: { type: integer }
       containerId: { type: string }
       containerName: { type: string }
       storageFilesystemUuid: { type: string }
