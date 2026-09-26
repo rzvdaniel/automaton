@@ -203,7 +203,8 @@ public sealed class AdminHostedRunnerSpecificationsController(
 
     private static bool ResourcesEqual(HostedRunnerResources a, HostedRunnerResources b)
         => a.CpuLimit == b.CpuLimit && a.MemoryLimitMb == b.MemoryLimitMb && a.MemoryReservationMb == b.MemoryReservationMb
-           && a.DiskLimitMb == b.DiskLimitMb && a.PidsLimit == b.PidsLimit
+           && a.DiskLimitMb == b.DiskLimitMb && a.WritableLayerLimitMb == b.WritableLayerLimitMb
+           && a.PidsLimit == b.PidsLimit
            && a.SharedMemoryMb == b.SharedMemoryMb
            && a.DockerLogMaxSizeMb == b.DockerLogMaxSizeMb
            && a.DockerLogMaxFiles == b.DockerLogMaxFiles
@@ -230,6 +231,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
         if (resources.MemoryLimitMb is < HostedRunnerSpecificationLimits.MinimumMemoryLimitMb or > HostedRunnerSpecificationLimits.MaximumMemoryLimitMb) return "Memory limit is outside the supported range.";
         if (resources.MemoryReservationMb < HostedRunnerSpecificationLimits.MinimumMemoryReservationMb || resources.MemoryReservationMb > resources.MemoryLimitMb) return "Memory reservation must be no greater than the memory limit.";
         if (resources.DiskLimitMb is < HostedRunnerSpecificationLimits.MinimumDiskLimitMb or > HostedRunnerSpecificationLimits.MaximumDiskLimitMb) return "Disk limit is outside the supported range.";
+        if (resources.WritableLayerLimitMb is < HostedRunnerSpecificationLimits.MinimumWritableLayerLimitMb or > HostedRunnerSpecificationLimits.MaximumWritableLayerLimitMb) return "Writable layer limit is outside the supported range.";
         return null;
     }
 
@@ -257,7 +259,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
         => new(settings.ProvisioningEnabled, settings.UpdatedAtUtc);
 }
 
-public sealed record HostedRunnerResourcesDto(decimal CpuLimit, int MemoryLimitMb, int MemoryReservationMb, int DiskLimitMb, int PidsLimit, int SharedMemoryMb, int DockerLogMaxSizeMb, int DockerLogMaxFiles, int MaximumApps);
+public sealed record HostedRunnerResourcesDto(decimal CpuLimit, int MemoryLimitMb, int MemoryReservationMb, int DiskLimitMb, int WritableLayerLimitMb, int PidsLimit, int SharedMemoryMb, int DockerLogMaxSizeMb, int DockerLogMaxFiles, int MaximumApps);
 public sealed record CreateHostedRunnerSpecificationRequest(string Name, string Code, string? Description, HostedRunnerResources Resources);
 public sealed record UpdateHostedRunnerSpecificationRequest(string Name, string? Description, bool IsActive, HostedRunnerResources Resources);
 public sealed record UpdateHostedRunnerPlatformSettingsRequest(bool ProvisioningEnabled);

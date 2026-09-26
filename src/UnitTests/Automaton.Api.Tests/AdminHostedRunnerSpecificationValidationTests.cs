@@ -12,6 +12,7 @@ public sealed class AdminHostedRunnerSpecificationValidationTests
     [TestCase(nameof(HostedRunnerResources.SharedMemoryMb), "Shared memory limit")]
     [TestCase(nameof(HostedRunnerResources.DockerLogMaxSizeMb), "Docker log size limit")]
     [TestCase(nameof(HostedRunnerResources.DockerLogMaxFiles), "Docker log file count")]
+    [TestCase(nameof(HostedRunnerResources.WritableLayerLimitMb), "Writable layer limit")]
     public void ValidateRejectsNonPositiveOrOutOfRangeDockerLimits(string propertyName, string expectedMessage)
     {
         var resources = new HostedRunnerResources();

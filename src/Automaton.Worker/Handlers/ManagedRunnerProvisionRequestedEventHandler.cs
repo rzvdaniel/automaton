@@ -152,6 +152,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             memoryMb = resources.MemoryLimitMb,
             memoryReservationMb = resources.MemoryReservationMb,
             diskLimitMb = resources.DiskLimitMb,
+            writableLayerSizeLimitMb = resources.WritableLayerLimitMb,
             xfsProjectId = hostedRunner.StorageProjectId!.Value,
             storageFilesystemUuid,
             pidsLimit = resources.PidsLimit,

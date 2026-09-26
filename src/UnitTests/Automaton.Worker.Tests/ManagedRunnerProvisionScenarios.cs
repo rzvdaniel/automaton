@@ -95,6 +95,7 @@ internal static class ManagedRunnerProvisionScenarios
             Assert.That(root.GetProperty("cpuLimit").GetDecimal(), Is.EqualTo(1));
             Assert.That(root.GetProperty("memoryMb").GetInt32(), Is.EqualTo(1024));
             Assert.That(root.GetProperty("diskLimitMb").GetInt32(), Is.EqualTo(4096));
+            Assert.That(root.GetProperty("writableLayerSizeLimitMb").GetInt32(), Is.EqualTo(512));
             Assert.That(root.GetProperty("xfsProjectId").GetInt32(), Is.EqualTo(1234567));
             Assert.That(root.GetProperty("storageFilesystemUuid").GetString(), Is.EqualTo(StorageFilesystemUuid));
             Assert.That(root.GetProperty("pidsLimit").GetInt32(), Is.EqualTo(256));

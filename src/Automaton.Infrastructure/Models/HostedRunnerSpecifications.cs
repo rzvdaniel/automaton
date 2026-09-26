@@ -8,6 +8,7 @@ public sealed class HostedRunnerResources
     public int MemoryLimitMb { get; set; } = 384;
     public int MemoryReservationMb { get; set; } = 256;
     public int DiskLimitMb { get; set; } = 512;
+    public int WritableLayerLimitMb { get; set; } = 512;
     public int PidsLimit { get; set; } = 256;
     public int SharedMemoryMb { get; set; } = 64;
     public int DockerLogMaxSizeMb { get; set; } = 10;
@@ -53,6 +54,7 @@ public static class HostedRunnerSpecificationSnapshotFactory
             MemoryLimitMb = resources.MemoryLimitMb,
             MemoryReservationMb = resources.MemoryReservationMb,
             DiskLimitMb = resources.DiskLimitMb,
+            WritableLayerLimitMb = resources.WritableLayerLimitMb,
             PidsLimit = resources.PidsLimit,
             SharedMemoryMb = resources.SharedMemoryMb,
             DockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,
@@ -80,6 +82,8 @@ public static class HostedRunnerSpecificationLimits
     public const int MinimumMemoryReservationMb = 64;
     public const int MinimumDiskLimitMb = 512;
     public const int MaximumDiskLimitMb = 102_400;
+    public const int MinimumWritableLayerLimitMb = 64;
+    public const int MaximumWritableLayerLimitMb = 2048;
     public const int MinimumPidsLimit = 32;
     public const int MaximumPidsLimit = 4096;
     public const int MinimumSharedMemoryMb = 16;

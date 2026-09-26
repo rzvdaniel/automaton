@@ -623,6 +623,7 @@ export interface HostedRunnerResources {
   memoryLimitMb: number
   memoryReservationMb: number
   diskLimitMb: number
+  writableLayerLimitMb: number
   pidsLimit: number
   sharedMemoryMb: number
   dockerLogMaxSizeMb: number

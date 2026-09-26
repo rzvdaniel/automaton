@@ -36,6 +36,8 @@ Capacity includes total and reserved CPU, memory, and disk. Schedulable capacity
 Available capacity = Total - Reserved - Existing runner allocations
 ```
 
+Disk admission counts each Hosted Runner's specification XFS disk limit, separately bounded writable root layer, and configured maximum Docker log storage. The root layer and Docker logs are platform overhead outside the account XFS project quota.
+
 ## Onboarding sequence
 
 Administrators normally add remote Runner Hosts by installing and enrolling an Infrastructure Runner. The Infrastructure Runner reports host capabilities to Automaton and keeps the host record updated. Follow the detailed [Infrastructure Runner installation and maintenance](./infrastructure-runners.md) guide for the generated command and host-side procedure.

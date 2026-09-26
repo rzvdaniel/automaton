@@ -35,8 +35,12 @@ public sealed class HostedRunnerHostPlacementService(
         Guid? requiredStorageHostId,
         CancellationToken cancellationToken)
     {
+        if (requested.WritableLayerLimitMb is < HostedRunnerSpecificationLimits.MinimumWritableLayerLimitMb
+            or > HostedRunnerSpecificationLimits.MaximumWritableLayerLimitMb)
+            return (null, "The Hosted Runner writable layer limit is outside the supported range.");
+
         var hasSharedProjectLimitConflict = false;
-        var requestedStorageBytes = requested.DiskLimitMb * 1024L * 1024L;
+        var requestedStorageBytes = CalculateDiskReservationMb(requested) * 1024L * 1024L;
         var now = DateTime.UtcNow;
         var hosts = await GetSchedulableHostsAsync(requestedStorageBytes, now, cancellationToken);
         if (requiredStorageHostId.HasValue)
@@ -208,7 +212,10 @@ public sealed class HostedRunnerHostPlacementService(
             && runner.StorageProjectId == accountStorageProjectId
             && (runner.PendingSpecificationSnapshot ?? runner.SpecificationSnapshot).Resources.DiskLimitMb != requestedDiskLimitMb);
 
-    private static bool HasCapacity(RunnerHost host, HostedRunnerResources requested, Guid? excludedHostedRunnerId)
+    private static bool HasCapacity(
+        RunnerHost host,
+        HostedRunnerResources requested,
+        Guid? excludedHostedRunnerId)
     {
         var assigned = host.HostedRunners.Where(runner =>
             runner.Id != excludedHostedRunnerId
@@ -217,8 +224,16 @@ public sealed class HostedRunnerHostPlacementService(
             && runner.DeletedAt == null);
         return host.ReservedCpuCores + assigned.Sum(runner => runner.SpecificationSnapshot.Resources.CpuLimit) + requested.CpuLimit <= host.TotalCpuCores
             && host.ReservedMemoryMb + assigned.Sum(runner => runner.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb
-            && host.ReservedDiskMb + assigned.Sum(runner => runner.SpecificationSnapshot.Resources.DiskLimitMb) + requested.DiskLimitMb <= host.TotalDiskMb;
+            && host.ReservedDiskMb
+                + assigned.Sum(runner => CalculateDiskReservationMb(
+                    (runner.PendingSpecificationSnapshot ?? runner.SpecificationSnapshot).Resources))
+                + CalculateDiskReservationMb(requested) <= host.TotalDiskMb;
     }
+
+    private static long CalculateDiskReservationMb(HostedRunnerResources resources)
+        => (long)resources.DiskLimitMb
+            + resources.WritableLayerLimitMb
+            + (long)resources.DockerLogMaxSizeMb * resources.DockerLogMaxFiles;
 
     private bool IsMySqlProvider()
         => db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true;

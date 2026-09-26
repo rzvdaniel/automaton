@@ -92,6 +92,8 @@ public sealed class SubscriptionResourcePolicyResolverTests
     [TestCase(nameof(HostedRunnerResources.PidsLimit), 0)]
     [TestCase(nameof(HostedRunnerResources.MemoryReservationMb), 1024)]
     [TestCase(nameof(HostedRunnerResources.DockerLogMaxFiles), 0)]
+    [TestCase(nameof(HostedRunnerResources.WritableLayerLimitMb), 0)]
+    [TestCase(nameof(HostedRunnerResources.WritableLayerLimitMb), 2049)]
     public async Task ResolveAsync_FailsForInvalidPersistedResourceValues(string propertyName, int invalidValue)
     {
         using var db = CreateDbContext();
