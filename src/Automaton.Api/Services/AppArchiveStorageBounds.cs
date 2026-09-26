@@ -26,6 +26,28 @@ internal static class AppArchiveStorageBounds
         }
     }
 
+    public static void ValidateDirectory(
+        string rootPath,
+        long maximumBytes = MaximumExpandedBytes,
+        int maximumEntries = MaximumEntries)
+    {
+        if (!Directory.Exists(rootPath))
+            return;
+
+        long totalBytes = 0;
+        var entryCount = 0;
+        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
+        {
+            if (++entryCount > maximumEntries)
+                throw new InvalidDataException($"Directory contains more than {maximumEntries} files.");
+
+            var fileLength = new FileInfo(filePath).Length;
+            if (fileLength > maximumBytes - totalBytes)
+                throw new InvalidDataException($"Directory exceeds the {maximumBytes}-byte storage limit.");
+            totalBytes += fileLength;
+        }
+    }
+
     public static async Task CopyExactlyAsync(
         Stream input,
         Stream output,

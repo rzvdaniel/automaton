@@ -32,6 +32,44 @@ public sealed class AppArchiveStorageBoundsTests
     }
 
     [Test]
+    public async Task ValidateDirectory_RejectsExpandedTreeAndPreservesTheDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-storage-bounds-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        await File.WriteAllTextAsync(Path.Combine(root, "index.html"), "content");
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(() =>
+                AppArchiveStorageBounds.ValidateDirectory(root, maximumBytes: 3, maximumEntries: 1));
+            Assert.That(File.ReadAllText(Path.Combine(root, "index.html")), Is.EqualTo("content"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task ValidateDirectory_RejectsExcessiveFileCount()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-storage-bounds-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        await File.WriteAllTextAsync(Path.Combine(root, "one.txt"), "1");
+        await File.WriteAllTextAsync(Path.Combine(root, "two.txt"), "2");
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(() =>
+                AppArchiveStorageBounds.ValidateDirectory(root, maximumBytes: 10, maximumEntries: 1));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task CopyExactlyAsync_RejectsBytesPastDeclaredLengthBeforeWritingThem()
     {
         await using var input = new MemoryStream("excess"u8.ToArray());

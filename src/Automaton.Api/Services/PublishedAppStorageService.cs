@@ -49,8 +49,9 @@ public class PublishedAppStorageService
             throw new FileNotFoundException("Publish requires a deployed frontend package with index.html.", indexPath);
         }
 
+        AppArchiveStorageBounds.ValidateDirectory(sourcePath);
         var rootPath = GetRootPath();
-        var stagingPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
+        var stagingPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-{Guid.NewGuid():N}");
         var finalPath = Path.Combine(rootPath, metadata.Slug);
 
         Directory.CreateDirectory(stagingPath);
@@ -59,6 +60,7 @@ public class PublishedAppStorageService
         {
             CopyPublicFiles(sourcePath, stagingPath);
             await WriteRuntimeFilesAsync(stagingPath, metadata, cancellationToken);
+            AppArchiveStorageBounds.ValidateDirectory(stagingPath);
 
             if (Directory.Exists(finalPath))
             {
