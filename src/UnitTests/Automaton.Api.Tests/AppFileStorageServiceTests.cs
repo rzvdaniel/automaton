@@ -74,6 +74,101 @@ public class AppFileStorageServiceTests
     }
 
     [Test]
+    public async Task PruneVersionSnapshotsAsync_KeepsTheMostRecentTenSnapshotFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var versionsPath = service.GetAppVersionDirectoryPath(userId, appId);
+            for (var version = 1; version <= 12; version++)
+            {
+                var filesPath = Path.Combine(versionsPath, $"v{version:D3}", "files");
+                Directory.CreateDirectory(filesPath);
+                await File.WriteAllTextAsync(Path.Combine(filesPath, "index.html"), $"v{version}");
+            }
+
+            await service.PruneVersionSnapshotsAsync(userId, appId);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v001")), Is.False);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v002")), Is.False);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v003")), Is.True);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v012")), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CreateVersionSnapshotAsync_StagesSnapshotAndRemovesStagingAfterCommit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<main>app</main>");
+
+            var relativeSnapshotPath = await service.CreateVersionSnapshotAsync(userId, appId, 1);
+            var snapshotPath = Path.Combine(service.GetAppRootPath(userId, appId), relativeSnapshotPath, "files");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(Path.Combine(snapshotPath, "frontend", "index.html")), Is.EqualTo("<main>app</main>"));
+                Assert.That(Directory.EnumerateDirectories(service.GetAppVersionDirectoryPath(userId, appId), ".staging-*"), Is.Empty);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CreateVersionSnapshotAsync_FailedCommitRemovesStagingAndPreservesExistingTarget()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<main>app</main>");
+            var versionsPath = service.GetAppVersionDirectoryPath(userId, appId);
+            Directory.CreateDirectory(versionsPath);
+            var conflictingTarget = Path.Combine(versionsPath, "v001");
+            await File.WriteAllTextAsync(conflictingTarget, "preserve");
+
+            Assert.ThrowsAsync<IOException>(async () =>
+                await service.CreateVersionSnapshotAsync(userId, appId, 1));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(conflictingTarget), Is.EqualTo("preserve"));
+                Assert.That(Directory.EnumerateDirectories(versionsPath, ".staging-*"), Is.Empty);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task WriteRuntimeFileAsync_AllowsWebManifest()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));

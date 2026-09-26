@@ -70,6 +70,42 @@ public sealed class AppArchiveStorageBoundsTests
     }
 
     [Test]
+    public async Task ValidateFileWrite_RejectsCumulativeGrowthBeforeChangingSource()
+    {
+        var root = CreateTestDirectory();
+        await File.WriteAllTextAsync(Path.Combine(root, "index.html"), "12345678");
+
+        try
+        {
+            Assert.Throws<InvalidDataException>(() =>
+                AppArchiveStorageBounds.ValidateFileWrite(root, "app.js", replacementBytes: 3, maximumBytes: 10));
+            Assert.That(File.Exists(Path.Combine(root, "app.js")), Is.False);
+            Assert.That(File.ReadAllText(Path.Combine(root, "index.html")), Is.EqualTo("12345678"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task ValidateFileWrite_AllowsReplacementWithoutDoubleCountingOldContents()
+    {
+        var root = CreateTestDirectory();
+        await File.WriteAllTextAsync(Path.Combine(root, "assets"), "old!!");
+
+        try
+        {
+            Assert.DoesNotThrow(() =>
+                AppArchiveStorageBounds.ValidateFileWrite(root, "assets", replacementBytes: 10, maximumBytes: 10));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task CopyExactlyAsync_RejectsBytesPastDeclaredLengthBeforeWritingThem()
     {
         await using var input = new MemoryStream("excess"u8.ToArray());
@@ -105,5 +141,12 @@ public sealed class AppArchiveStorageBoundsTests
 
         bytes.Position = 0;
         return new ZipArchive(bytes, ZipArchiveMode.Read);
+    }
+
+    private static string CreateTestDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-storage-bounds-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
     }
 }

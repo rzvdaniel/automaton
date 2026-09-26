@@ -1,5 +1,6 @@
 using Automaton.Api.Models;
 using Serilog;
+using System.Text;
 using System.Text.Json;
 
 namespace Automaton.Api.Services;
@@ -14,6 +15,7 @@ public class AppFileStorageService
     private const string SourceFolder = "source";
     private const string LiveFolder = "live";
     private const string VersionsFolder = "versions";
+    public const int MaximumRetainedVersionSnapshots = 10;
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly Serilog.ILogger logger;
     private readonly string baseStoragePath;
@@ -100,6 +102,10 @@ public class AppFileStorageService
                 var sourcePath = GetSourcePath(userId, appId);
                 Directory.CreateDirectory(sourcePath);
                 var indexPath = Path.Combine(sourcePath, "index.html");
+                AppArchiveStorageBounds.ValidateFileWrite(
+                    sourcePath,
+                    "index.html",
+                    Encoding.UTF8.GetByteCount(definition.HtmlContent));
                 await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
             }
 
@@ -125,6 +131,7 @@ public class AppFileStorageService
     /// </summary>
     public Task<string> CreateVersionSnapshotAsync(Guid userId, Guid appId, int versionNumber)
     {
+        string? stagingPath = null;
         try
         {
             var sourcePath = GetSourcePath(userId, appId);
@@ -133,16 +140,20 @@ public class AppFileStorageService
                 throw new DirectoryNotFoundException($"App source directory not found: {sourcePath}");
             }
 
+            AppArchiveStorageBounds.ValidateDirectory(sourcePath);
             var versionsPath = GetVersionsPath(userId, appId);
+            Directory.CreateDirectory(versionsPath);
             var versionFolder = $"v{versionNumber:D3}";
-            var targetPath = Path.Combine(versionsPath, versionFolder, "files");
+            var targetPath = Path.Combine(versionsPath, versionFolder);
+            stagingPath = Path.Combine(versionsPath, $".staging-{versionFolder}-{Guid.NewGuid():N}");
+            var stagingFilesPath = Path.Combine(stagingPath, "files");
 
-            Directory.CreateDirectory(targetPath);
+            Directory.CreateDirectory(stagingFilesPath);
 
             foreach (var sourceFile in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Path.GetRelativePath(sourcePath, sourceFile);
-                var targetFilePath = Path.Combine(targetPath, relativePath);
+                var targetFilePath = Path.Combine(stagingFilesPath, relativePath);
                 var targetDirectory = Path.GetDirectoryName(targetFilePath);
 
                 if (!string.IsNullOrEmpty(targetDirectory))
@@ -153,6 +164,9 @@ public class AppFileStorageService
                 File.Copy(sourceFile, targetFilePath, overwrite: true);
             }
 
+            AppArchiveStorageBounds.ValidateDirectory(stagingFilesPath);
+            Directory.Move(stagingPath, targetPath);
+            stagingPath = null;
             logger.Debug("Created app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
 
             return Task.FromResult(Path.Combine("versions", versionFolder));
@@ -161,6 +175,51 @@ public class AppFileStorageService
         {
             logger.Error(ex, "Failed to create app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
             throw;
+        }
+        finally
+        {
+            TryDeleteSnapshotStagingDirectory(stagingPath, versionNumber, appId);
+        }
+    }
+
+    public Task PruneVersionSnapshotsAsync(Guid userId, Guid appId)
+    {
+        var versionsPath = GetVersionsPath(userId, appId);
+        if (!Directory.Exists(versionsPath))
+            return Task.CompletedTask;
+
+        var oldSnapshots = Directory.EnumerateDirectories(versionsPath)
+            .Select(path => new { Path = path, Version = GetSnapshotVersion(Path.GetFileName(path)) })
+            .Where(snapshot => snapshot.Version.HasValue)
+            .OrderByDescending(snapshot => snapshot.Version)
+            .Skip(MaximumRetainedVersionSnapshots);
+
+        foreach (var snapshot in oldSnapshots)
+            Directory.Delete(snapshot.Path, recursive: true);
+
+        return Task.CompletedTask;
+    }
+
+    private static int? GetSnapshotVersion(string directoryName) =>
+        directoryName.StartsWith('v') &&
+        int.TryParse(directoryName.AsSpan(1), out var version) &&
+        version > 0
+            ? version
+            : null;
+
+    private void TryDeleteSnapshotStagingDirectory(string? stagingPath, int versionNumber, Guid appId)
+    {
+        if (stagingPath is null || !Directory.Exists(stagingPath))
+            return;
+
+        try
+        {
+            Directory.Delete(stagingPath, recursive: true);
+        }
+        catch (Exception exception)
+        {
+            logger.Warning(exception,
+                "Could not remove staging files for app {AppId} version {VersionNumber}", appId, versionNumber);
         }
     }
 
@@ -376,6 +435,7 @@ public class AppFileStorageService
     public async Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
     {
         var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        AppArchiveStorageBounds.ValidateDirectory(GetSourcePath(srcUserId, srcAppId));
         await CopyAppSubdirectoryFilesAsync(
             GetSourcePath(srcUserId, srcAppId),
             GetSourcePath(dstUserId, dstAppId),
@@ -434,7 +494,9 @@ public class AppFileStorageService
     /// </summary>
     public async Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
-        await WriteFileAsync(GetSourcePath(userId, appId), relativePath, content, validateExtension: true);
+        var sourcePath = GetSourcePath(userId, appId);
+        AppArchiveStorageBounds.ValidateFileWrite(sourcePath, relativePath, Encoding.UTF8.GetByteCount(content));
+        await WriteFileAsync(sourcePath, relativePath, content, validateExtension: true);
         await MarkSourceModifiedAsync(userId, appId, relativePath);
     }
 
@@ -503,7 +565,9 @@ public class AppFileStorageService
     /// </summary>
     public Task WriteRuntimeFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
-        return WriteFileAsync(GetLivePath(userId, appId), relativePath, content, validateExtension: true);
+        var runtimePath = GetLivePath(userId, appId);
+        AppArchiveStorageBounds.ValidateFileWrite(runtimePath, relativePath, Encoding.UTF8.GetByteCount(content));
+        return WriteFileAsync(runtimePath, relativePath, content, validateExtension: true);
     }
 
     /// <summary>
@@ -808,6 +872,7 @@ public class AppFileStorageService
             if (!string.IsNullOrEmpty(targetDirectory))
                 Directory.CreateDirectory(targetDirectory);
 
+            AppArchiveStorageBounds.ValidateFileWrite(dstPath, relativePath, new FileInfo(sourceFile).Length);
             File.Copy(sourceFile, targetFilePath, overwrite: true);
         }
 

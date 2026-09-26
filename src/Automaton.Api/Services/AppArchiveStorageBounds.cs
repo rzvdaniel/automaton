@@ -31,21 +31,29 @@ internal static class AppArchiveStorageBounds
         long maximumBytes = MaximumExpandedBytes,
         int maximumEntries = MaximumEntries)
     {
-        if (!Directory.Exists(rootPath))
-            return;
+        MeasureDirectory(rootPath, maximumBytes, maximumEntries);
+    }
 
-        long totalBytes = 0;
-        var entryCount = 0;
-        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
-        {
-            if (++entryCount > maximumEntries)
-                throw new InvalidDataException($"Directory contains more than {maximumEntries} files.");
+    public static void ValidateFileWrite(
+        string rootPath,
+        string relativePath,
+        long replacementBytes,
+        long maximumBytes = MaximumExpandedBytes,
+        int maximumEntries = MaximumEntries)
+    {
+        if (replacementBytes < 0 || replacementBytes > maximumBytes)
+            throw new InvalidDataException($"File exceeds the {maximumBytes}-byte storage limit.");
 
-            var fileLength = new FileInfo(filePath).Length;
-            if (fileLength > maximumBytes - totalBytes)
-                throw new InvalidDataException($"Directory exceeds the {maximumBytes}-byte storage limit.");
-            totalBytes += fileLength;
-        }
+        var fullRootPath = Path.GetFullPath(rootPath);
+        var fullFilePath = Path.GetFullPath(Path.Combine(fullRootPath, relativePath));
+        EnsurePathWithinRoot(fullRootPath, fullFilePath);
+
+        var usage = MeasureDirectory(fullRootPath, maximumBytes, maximumEntries, fullFilePath);
+        if (!File.Exists(fullFilePath) && usage.FileCount >= maximumEntries)
+            throw new InvalidDataException($"Directory contains more than {maximumEntries} files.");
+
+        if (replacementBytes > maximumBytes - usage.TotalBytes)
+            throw new InvalidDataException($"Directory exceeds the {maximumBytes}-byte storage limit.");
     }
 
     public static async Task CopyExactlyAsync(
@@ -72,4 +80,45 @@ internal static class AppArchiveStorageBounds
         if (copiedBytes != expectedBytes)
             throw new InvalidDataException("Stream size did not match its declared size.");
     }
+
+    private static DirectoryUsage MeasureDirectory(
+        string rootPath,
+        long maximumBytes,
+        int maximumEntries,
+        string? excludedFilePath = null)
+    {
+        if (!Directory.Exists(rootPath))
+            return new DirectoryUsage(0, 0);
+
+        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var excludedPath = excludedFilePath is null ? null : Path.GetFullPath(excludedFilePath);
+        long totalBytes = 0;
+        var fileCount = 0;
+        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
+        {
+            var fullFilePath = Path.GetFullPath(filePath);
+            if (excludedPath is not null && comparer.Equals(fullFilePath, excludedPath))
+                continue;
+
+            if (++fileCount > maximumEntries)
+                throw new InvalidDataException($"Directory contains more than {maximumEntries} files.");
+
+            var fileLength = new FileInfo(fullFilePath).Length;
+            if (fileLength > maximumBytes - totalBytes)
+                throw new InvalidDataException($"Directory exceeds the {maximumBytes}-byte storage limit.");
+            totalBytes += fileLength;
+        }
+
+        return new DirectoryUsage(totalBytes, fileCount);
+    }
+
+    private static void EnsurePathWithinRoot(string rootPath, string filePath)
+    {
+        var rootPrefix = Path.TrimEndingDirectorySeparator(rootPath) + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!filePath.StartsWith(rootPrefix, comparison))
+            throw new UnauthorizedAccessException("File path escapes the storage directory.");
+    }
+
+    private sealed record DirectoryUsage(long TotalBytes, int FileCount);
 }
