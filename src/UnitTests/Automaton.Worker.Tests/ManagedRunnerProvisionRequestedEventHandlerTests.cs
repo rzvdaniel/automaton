@@ -9,6 +9,10 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         => ManagedRunnerProvisionScenarios.VerifyTrustedProvisionLifecycleAsync();
 
     [Test]
+    public Task OmitsUnknownStorageFilesystemUuidFromInfrastructureInput()
+        => ManagedRunnerProvisionScenarios.VerifyUnknownFilesystemUuidIsOmittedAsync();
+
+    [Test]
     public Task InvalidImageReferenceFailsProvisioningWithoutPublishingInfrastructureAction()
         => ManagedRunnerProvisionScenarios.VerifyInvalidImageFailsClosedAsync();
 
