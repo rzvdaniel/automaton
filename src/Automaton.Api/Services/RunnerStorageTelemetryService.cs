@@ -155,9 +155,9 @@ public sealed class RunnerStorageTelemetryService
         var now = DateTime.UtcNow;
         UpdateRunnerHostMeasurement(host, report, now);
         var newState = StorageTelemetryPolicy.EvaluateHost(
-            report.Success ? report.DockerDataRootTotalBytes!.Value : 0,
-            report.Success ? report.DockerDataRootAvailableBytes!.Value : 0,
-            report.Success, options);
+            IsValidImageStoreMeasurement(report) ? report.DockerDataRootTotalBytes!.Value : 0,
+            IsValidImageStoreMeasurement(report) ? report.DockerDataRootAvailableBytes!.Value : 0,
+            IsValidImageStoreMeasurement(report), options);
         TrackRunnerHostPolicyChange(host, newState, now);
         host.StorageState = newState;
         await db.SaveChangesAsync(cancellationToken);
@@ -188,9 +188,12 @@ public sealed class RunnerStorageTelemetryService
     {
         host.StorageMeasuredAtUtc = report.MeasuredAtUtc;
         host.StorageReceivedAtUtc = now;
-        host.StorageMeasurementStatus = report.Success ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
-        host.StorageMeasurementError = report.Success ? null : Truncate(report.Error ?? "Host storage measurement failed.", 2000);
-        if (report.Success)
+        var imageStoreMeasurementSucceeded = IsValidImageStoreMeasurement(report);
+        host.StorageMeasurementStatus = imageStoreMeasurementSucceeded ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
+        host.StorageMeasurementError = imageStoreMeasurementSucceeded
+            ? null
+            : Truncate(GetImageStoreMeasurementError(report), 2000);
+        if (imageStoreMeasurementSucceeded)
         {
             var dockerTotal = report.DockerDataRootTotalBytes!.Value;
             var dockerAvailable = report.DockerDataRootAvailableBytes!.Value;
@@ -204,6 +207,14 @@ public sealed class RunnerStorageTelemetryService
             host.StorageReserveRequiredBytes = StorageTelemetryPolicy.RequiredHostReserve(dockerTotal, options);
         }
     }
+
+    private static bool IsValidImageStoreMeasurement(RunnerHostStorageTelemetry report)
+        => report.Success && report.ImageStoreFilesystemBounded;
+
+    private static string GetImageStoreMeasurementError(RunnerHostStorageTelemetry report)
+        => !report.Success
+            ? report.Error ?? "Host storage measurement failed."
+            : "The Infrastructure Runner did not verify Docker image/cache storage on the bounded XFS filesystem.";
 
     private void TrackRunnerHostPolicyChange(RunnerHost host, string newState, DateTime now)
     {

@@ -28,6 +28,7 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
             "expectedSystemVolumeName": f"automaton-hosted-runner-{compact}-system",
             "expectedUserVolumeName": f"automaton-hosted-runner-{compact}-user",
             "xfsProjectId": 1234567,
+            "storageAllowanceBytes": 512 * 1024 * 1024,
         }
 
     def run_action(self, request, host):
@@ -82,6 +83,10 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
             if args[:3] == ("findmnt", "-no", "OPTIONS"):
                 return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
+            if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
+                return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(
                     args,
@@ -90,7 +95,7 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                     "",
                 )
             if args[:2] == ("xfs_quota", "-x"):
-                return subprocess.CompletedProcess(args, 0, "#1234567 64 0 512\n", "")
+                return subprocess.CompletedProcess(args, 0, "#1234567 64 0 524288\n", "")
             return subprocess.CompletedProcess(args, 0, "", "")
 
         result = self.run_action(self.request(), host)
@@ -103,6 +108,7 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
     def test_real_xfs_project_output_is_accepted_and_uses_filesystem_mountpoint(self):
         request = self.request()
         request["xfsProjectId"] = 1165812734
+        request["storageAllowanceBytes"] = 2 * 1024 * 1024 * 1024
         calls = []
 
         def host(*args, **kwargs):
@@ -129,6 +135,12 @@ class MeasureHostedRunnerStorageTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, "/srv/automaton-workloads\n", "")
             if args[:3] == ("findmnt", "-no", "UUID"):
                 return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
+            if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
+                return subprocess.CompletedProcess(
+                    args, 0, f"fsxattr.projid = {request['xfsProjectId']}\n", ""
+                )
             if args[:2] == ("xfs_quota", "-x") and "state" in args:
                 return subprocess.CompletedProcess(
                     args,
@@ -166,6 +178,102 @@ Project ID       Used       Soft       Hard    Warn/Grace
         self.assertEqual(len(state_calls), 2)
         self.assertEqual(len(report_calls), 1)
         self.assertTrue(all(call[-1] == "/srv/automaton-workloads" for call in state_calls + report_calls))
+
+    def test_rejects_project_assignment_drift_before_reporting_usage(self):
+        calls = []
+        request = self.request()
+
+        def host(*args, **kwargs):
+            calls.append(args)
+            if args[:3] == ("docker", "info", "--format"):
+                return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("docker", "volume", "inspect"):
+                scope = "system" if args[3].endswith("-system") else "user"
+                metadata = [{
+                    "Labels": {
+                        "automaton.managed": "true",
+                        "automaton.resource": "hosted-runner-volume",
+                        "automaton.hosted-runner-id": self.runner_id,
+                        "automaton.storage-scope": scope,
+                    },
+                    "Mountpoint": f"/data/docker/volumes/{args[3]}/_data",
+                }]
+                return subprocess.CompletedProcess(args, 0, json.dumps(metadata), "")
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            if args[:3] == ("findmnt", "-no", "OPTIONS"):
+                return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
+            if args[:3] == ("findmnt", "-no", "TARGET"):
+                return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("findmnt", "-no", "UUID"):
+                return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
+            if args[:2] == ("xfs_quota", "-x") and "state" in args:
+                return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
+            if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
+                project_id = 77 if args[-1].endswith("-system/_data") else request["xfsProjectId"]
+                return subprocess.CompletedProcess(args, 0, f"fsxattr.projid = {project_id}\n", "")
+            return subprocess.CompletedProcess(args, 0, "#1234567 64 0 524288\n", "")
+
+        with self.assertRaisesRegex(RuntimeError, "not assigned"):
+            self.run_action(request, host)
+        self.assertFalse(any(args[:2] == ("xfs_quota", "-x") and "report -p -b -n" in args for args in calls))
+
+    def test_rejects_project_assignment_command_failure(self):
+        with patch.object(
+            ACTION,
+            "host",
+            return_value=subprocess.CompletedProcess([], 1, "fsxattr.projid = 1234567", "xfs_io failed"),
+        ), self.assertRaisesRegex(RuntimeError, "could not be verified"):
+            ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
+
+    def test_rejects_project_assignment_without_inheritance_flag(self):
+        def host(*args, **kwargs):
+            if args[2] == "stat":
+                return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
+            return subprocess.CompletedProcess(args, 0, f"------------------------ {args[3]}\n", "")
+
+        with patch.object(ACTION, "host", side_effect=host), self.assertRaisesRegex(RuntimeError, "inheritance"):
+            ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
+
+    def test_rejects_hard_limit_drift(self):
+        request = self.request()
+        request["storageAllowanceBytes"] = 1024
+
+        def host(*args, **kwargs):
+            if args[:3] == ("docker", "info", "--format"):
+                return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("docker", "volume", "inspect"):
+                scope = "system" if args[3].endswith("-system") else "user"
+                metadata = [{
+                    "Labels": {
+                        "automaton.managed": "true",
+                        "automaton.resource": "hosted-runner-volume",
+                        "automaton.hosted-runner-id": self.runner_id,
+                        "automaton.storage-scope": scope,
+                    },
+                    "Mountpoint": f"/data/docker/volumes/{args[3]}/_data",
+                }]
+                return subprocess.CompletedProcess(args, 0, json.dumps(metadata), "")
+            if args[:2] == ("stat", "-f"):
+                return subprocess.CompletedProcess(args, 0, "xfs\n", "")
+            if args[:3] == ("findmnt", "-no", "OPTIONS"):
+                return subprocess.CompletedProcess(args, 0, "rw,prjquota\n", "")
+            if args[:3] == ("findmnt", "-no", "TARGET"):
+                return subprocess.CompletedProcess(args, 0, "/data/docker\n", "")
+            if args[:3] == ("findmnt", "-no", "UUID"):
+                return subprocess.CompletedProcess(args, 0, self.filesystem_uuid + "\n", "")
+            if args[:2] == ("xfs_io", "-c"):
+                if args[2] == "lsattr":
+                    return subprocess.CompletedProcess(args, 0, f"--------P-------------- {args[3]}\n", "")
+                return subprocess.CompletedProcess(args, 0, "fsxattr.projid = 1234567\n", "")
+            if args[:2] == ("xfs_quota", "-x") and "state" in args:
+                return subprocess.CompletedProcess(args, 0, "Project quota state: Enforcement\n", "")
+            return subprocess.CompletedProcess(args, 0, "#1234567 64 0 524288\n", "")
+
+        with self.assertRaisesRegex(RuntimeError, "hard limit"):
+            self.run_action(request, host)
 
     def test_rejects_project_quota_enforcement_off(self):
         def host(*args, **kwargs):

@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
@@ -38,6 +37,7 @@ public sealed class DeploymentPackageFinalizationService(
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Local;
+            metadata.SourceModifiedAtUtc = DateTime.UtcNow;
         });
         await backendRouteConfigService.RefreshAsync(
             cancellationToken,
@@ -53,35 +53,8 @@ public sealed class DeploymentPackageFinalizationService(
         IFormFile file,
         CancellationToken cancellationToken)
     {
-        await fileStorageService.ClearSourceAsync(ownerId, appId);
         var sourceRoot = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
-        Directory.CreateDirectory(sourceRoot);
-
-        using var stream = file.OpenReadStream();
-        using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-        foreach (var entry in archive.Entries)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(entry.Name))
-                continue;
-
-            var normalizedPath = entry.FullName.Replace('\\', '/').TrimStart('/');
-            if (!normalizedPath.StartsWith("source/", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var relativeSourcePath = normalizedPath["source/".Length..];
-            if (string.IsNullOrWhiteSpace(relativeSourcePath))
-                continue;
-
-            var destinationPath = Path.GetFullPath(Path.Combine(sourceRoot, relativeSourcePath));
-            var fullSourceRoot = Path.GetFullPath(sourceRoot);
-            if (!destinationPath.StartsWith(fullSourceRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"Deploy package source entry '{relativeSourcePath}' escapes the app source directory.");
-
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-            await using var entryStream = entry.Open();
-            await using var outputStream = File.Create(destinationPath);
-            await entryStream.CopyToAsync(outputStream, cancellationToken);
-        }
+        await using var stream = file.OpenReadStream();
+        await AppSourceArchiveInstaller.InstallAsync(stream, sourceRoot, cancellationToken);
     }
 }

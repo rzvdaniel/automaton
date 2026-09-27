@@ -117,6 +117,7 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(
                 hostedRunnerId = runner.Id,
                 runnerHostId = hostId,
                 xfsProjectId = runner.StorageProjectId,
+                storageAllowanceBytes = runner.StorageAllowanceBytes,
                 storageFilesystemUuid,
                 expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                 expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"

@@ -43,6 +43,9 @@ public sealed record HostContainerExecutionRequest
     public int HostPort { get; init; }
     public int TimeoutSeconds { get; init; } = 900;
     public HostContainerResourceRef? Resources { get; init; }
+    public int? SharedMemoryMb { get; init; }
+    public int? DockerLogMaxSizeMb { get; init; }
+    public int? DockerLogMaxFiles { get; init; }
     public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
 }
 

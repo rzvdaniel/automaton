@@ -160,7 +160,7 @@ public sealed class ApplicationDeploymentServiceTests
                 ["../outside.txt"] = "must not escape"
             });
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = Assert.ThrowsAsync<InvalidDataException>(
             async () => await fixture.Service.DeployPackageAsync(
                 fixture.AppId,
                 fixture.OwnerId,

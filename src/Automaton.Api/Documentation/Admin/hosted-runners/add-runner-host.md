@@ -15,6 +15,8 @@ Prepare the target server with:
 
 - a supported operating system;
 - Docker installed and accessible to the Infrastructure Runner;
+- a fixed-capacity XFS filesystem mounted separately from `/`, with XFS project quota support enabled;
+- Docker configured with the `overlay2` storage driver and its data root on that filesystem;
 - required ports available;
 - outbound connectivity to the Automaton API;
 - sufficient CPU, memory, and disk;
@@ -23,6 +25,19 @@ Prepare the target server with:
 - permissions for the Infrastructure Runner to execute the required host operations.
 
 The exact provisioning transport and runtime connectivity mode determine which network and directory settings apply.
+
+Before enabling scheduling, verify the active paths on the host:
+
+```text
+docker info --format '{{.Driver}}'
+docker info --format '{{.DockerRootDir}}'
+findmnt --target / --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
+findmnt --target <docker-data-root> --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
+```
+
+Hosted Runner provisioning requires Docker's `overlay2` storage driver, whose image and writable-layer data resides under Docker's data root. Configure that root on the fixed-capacity XFS filesystem. Its mount must have a different filesystem UUID from `/`; a bind mount backed by the OS filesystem does not qualify. Telemetry verifies the driver, XFS type, mount identity, and project quota options. Until a current Infrastructure Runner reports a verified layout, the host cannot receive Hosted Runner placement or Docker image operations. After rollout, existing Infrastructure Runner host measurements are marked stale and must be refreshed by the updated Runner before the host is eligible again.
+
+An administrator must prepare or reuse the fixed-capacity filesystem and configure Docker's data root explicitly. Formatting, mounting, changing Docker configuration, and moving existing data are host setup operations; Automaton does not perform them as repair. Docker named volumes remain under their existing XFS project quotas. If they share this filesystem, its physical capacity bounds tenant volumes and platform image/cache storage together; it does not create a separate image-only quota. Automaton retains host free-space reserves and may prune dangling, untagged Docker images after verification; it never runs the broad `--all` prune that would remove tagged rollback images.
 
 ## Where
 
@@ -35,6 +50,8 @@ Capacity includes total and reserved CPU, memory, and disk. Schedulable capacity
 ```text
 Available capacity = Total - Reserved - Existing runner allocations
 ```
+
+Disk admission counts each Hosted Runner's specification XFS disk limit, separately bounded writable root layer, and configured maximum Docker log storage. The root layer and Docker logs are platform overhead outside the account XFS project quota.
 
 ## Onboarding sequence
 

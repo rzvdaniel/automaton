@@ -9,6 +9,7 @@ using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
 namespace Automaton.Api.Tests;
@@ -54,6 +55,46 @@ public sealed class HostContainerRelayServiceTests
         Assert.That(fixture.Transport.Request.HostPort, Is.Zero);
         Assert.That(fixture.Transport.Request.ContainerPort, Is.Zero);
         Assert.That(fixture.Transport.Request.Environment, Is.Empty);
+    }
+
+    [TestCase(HostContainerOperationKinds.ResolveImage)]
+    [TestCase(HostContainerOperationKinds.RunBuild)]
+    [TestCase(HostContainerOperationKinds.CreateApplicationContainer)]
+    public async Task ImageOperations_AreRejectedWhenHostStorageReserveIsUnavailable(string operation)
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.Host.StorageState = RunnerHostStorageStates.SchedulingBlocked;
+        var request = operation switch
+        {
+            HostContainerOperationKinds.RunBuild => CreateBuildRequest(fixture, SetActiveAttempt(fixture)),
+            HostContainerOperationKinds.CreateApplicationContainer => fixture.RuntimeRequest(operation),
+            _ => fixture.Request()
+        };
+
+        var result = await fixture.Service.ExecuteAsync(fixture.Caller(), request, CancellationToken.None);
+
+        Assert.That(result.ErrorCode, Is.EqualTo("host_storage_reserve_unavailable"));
+        Assert.That(fixture.Transport.Invocations, Is.Zero);
+    }
+
+    [Test]
+    public async Task LowHostStorageStillAllowsContainerRemoval()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.Host.StorageState = RunnerHostStorageStates.Critical;
+
+        var result = await fixture.Service.ExecuteAsync(
+            fixture.Caller(), fixture.RuntimeRequest(HostContainerOperationKinds.RemoveContainer), CancellationToken.None);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(fixture.Transport.Invocations, Is.EqualTo(1));
+    }
+
+    private static Guid SetActiveAttempt(RelayFixture fixture)
+    {
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
+        return attemptId;
     }
 
     [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard, "caller_not_managed_runner")]
@@ -302,6 +343,9 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(fixture.Transport.Request!.Resources!.SourceKind, Is.EqualTo(HostContainerResourceKinds.Source));
             Assert.That(fixture.Transport.Request.Resources.ArtifactKind, Is.EqualTo(HostContainerResourceKinds.Artifact));
             Assert.That(fixture.Transport.Request.Resources.DataKind, Is.EqualTo(HostContainerResourceKinds.ApplicationData));
+            Assert.That(fixture.Transport.Request.SharedMemoryMb, Is.EqualTo(96));
+            Assert.That(fixture.Transport.Request.DockerLogMaxSizeMb, Is.EqualTo(7));
+            Assert.That(fixture.Transport.Request.DockerLogMaxFiles, Is.EqualTo(2));
             Assert.That(fixture.Transport.Request.Command!.Executable, Is.EqualTo("dotnet"));
             Assert.That(fixture.Transport.Request.Environment["BUILD_MODE"], Is.EqualTo("release"));
         });
@@ -314,6 +358,7 @@ public sealed class HostContainerRelayServiceTests
             RequestedImage = "dotnet/sdk:9.0",
             Command = new ApplicationCommandSpec { Executable = "dotnet", Arguments = ["publish"] },
             Environment = new Dictionary<string, string> { ["BUILD_MODE"] = "release" },
+            SharedMemoryMb = 1024, DockerLogMaxSizeMb = 1024, DockerLogMaxFiles = 20,
             Scope = new HostContainerScope(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
         };
 
@@ -353,6 +398,10 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(forwarded.HostPort, Is.Zero);
             Assert.That(forwarded.Resources, Is.EqualTo(operation == HostContainerOperationKinds.CreateApplicationContainer
                 ? new HostContainerResourceRef("source", "artifact", "data") : null));
+            var hasContainerLimits = operation is HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.RunBuild;
+            Assert.That(forwarded.SharedMemoryMb, Is.EqualTo(hasContainerLimits ? 96 : null));
+            Assert.That(forwarded.DockerLogMaxSizeMb, Is.EqualTo(hasContainerLimits ? 7 : null));
+            Assert.That(forwarded.DockerLogMaxFiles, Is.EqualTo(hasContainerLimits ? 2 : null));
         });
     }
 
@@ -448,7 +497,7 @@ public sealed class HostContainerRelayServiceTests
             Environment.SetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID", "api-current");
             Db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
-            Host = new RunnerHost { Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid() };
+            Host = CreateHost();
             Infrastructure = new Runner
             {
                 Id = Host.InfrastructureRunnerId.Value, Name = "infra", Purpose = RunnerPurposes.Infrastructure,
@@ -462,7 +511,16 @@ public sealed class HostContainerRelayServiceTests
                 ApplicationProfile = RunnerApplicationProfiles.Standard, ConnectionId = "hosted-connection",
                 LastHeartbeatAtUtc = DateTime.UtcNow
             };
-            HostedRunner = new HostedRunner { Id = Guid.NewGuid(), RunnerId = CallerRunnerId, Runner = HostedRunnerEntity, RunnerHostId = Host.Id, RunnerHost = Host, Name = "hosted", ContainerName = "hosted", UserId = Guid.NewGuid() };
+            HostedRunner = new HostedRunner
+            {
+                Id = Guid.NewGuid(), RunnerId = CallerRunnerId, Runner = HostedRunnerEntity,
+                RunnerHostId = Host.Id, RunnerHost = Host, Name = "hosted", ContainerName = "hosted",
+                UserId = Guid.NewGuid(),
+                SpecificationSnapshot = new()
+                {
+                    Resources = new() { SharedMemoryMb = 96, DockerLogMaxSizeMb = 7, DockerLogMaxFiles = 2 }
+                }
+            };
             App = new WebApp { Id = Guid.NewGuid(), Name = "app", Summary = "", Description = "", Definition = "" };
             Target = AppDeploymentTarget.CreateLive(App.Id, CallerRunnerId);
             Db.RunnerHosts.Add(Host);
@@ -472,11 +530,20 @@ public sealed class HostContainerRelayServiceTests
             Db.AppDeploymentTargets.Add(Target);
             Db.SaveChanges();
             Transport.Result = new HostContainerExecutionResponse { Success = true, ResolvedImage = "python@sha256:test" };
-            var stateResolver = new HostContainerRelayStateResolver(Db, new ApiInstanceIdentityService());
-            Service = new HostContainerRelayService(stateResolver, Transport, NullLogger<HostContainerRelayService>.Instance);
+            Service = HostContainerRelayServiceTestFactory.Create(Db, Transport);
         }
 
         public static RelayFixture Create() => new();
+
+        private static RunnerHost CreateHost() => new()
+        {
+            Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = Guid.NewGuid(),
+            StorageState = RunnerHostStorageStates.Healthy,
+            StorageAvailableBytes = 20L * 1024 * 1024 * 1024,
+            StorageReserveRequiredBytes = 5L * 1024 * 1024 * 1024,
+            StorageMeasuredAtUtc = DateTime.UtcNow
+        };
+
         public RunnerDetails Caller() => new() { Id = CallerRunnerId, ConnectionId = "hosted-connection", Purpose = RunnerPurposes.Managed, HostedRunnerId = HostedRunner.Id, RunnerHostId = Host.Id };
         public HostContainerExecutionRequest Request() => new() { Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "python:3.13-slim", Scope = new HostContainerScope(Guid.Empty, Guid.Empty, App.Id, Target.Id) };
         public HostContainerExecutionRequest RuntimeRequest(string operation) => new()
@@ -490,7 +557,8 @@ public sealed class HostContainerRelayServiceTests
             Storage = operation == HostContainerOperationKinds.CreateApplicationContainer ? new ApplicationStorageSpec() : null,
             ContainerPort = operation == HostContainerOperationKinds.CreateApplicationContainer ? 8080 : 0,
             Environment = operation == HostContainerOperationKinds.CreateApplicationContainer
-                ? new Dictionary<string, string> { ["MODE"] = "test" } : new Dictionary<string, string>()
+                ? new Dictionary<string, string> { ["MODE"] = "test" } : new Dictionary<string, string>(),
+            SharedMemoryMb = 1024, DockerLogMaxSizeMb = 1024, DockerLogMaxFiles = 20
         };
         public void Dispose()
         {
@@ -517,4 +585,14 @@ public sealed class HostContainerRelayServiceTests
             return Task.FromResult(Result);
         }
     }
+}
+
+internal static class HostContainerRelayServiceTestFactory
+{
+    public static HostContainerRelayService Create(ApplicationDbContext db, IHostContainerTransport transport)
+        => new(
+            new HostContainerRelayStateResolver(db, new ApiInstanceIdentityService()),
+            transport,
+            NullLogger<HostContainerRelayService>.Instance,
+            Options.Create(new StorageTelemetryOptions()));
 }

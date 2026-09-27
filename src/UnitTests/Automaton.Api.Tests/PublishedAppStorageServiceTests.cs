@@ -149,6 +149,58 @@ public class PublishedAppStorageServiceTests
         Assert.That(result, Is.EqualTo("https://localhost:7091/apps/my-cool-app/"));
     }
 
+    [Test]
+    public async Task UnpublishAsync_RemovesPublishedOutputAndItsDisabledCopies()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-published-app-tests", Guid.NewGuid().ToString("N"));
+        var publishedRoot = Path.Combine(root, "published");
+        var livePath = Path.Combine(publishedRoot, "slug");
+        var disabledPath = Path.Combine(publishedRoot, ".disabled", "slug-previous");
+        Directory.CreateDirectory(livePath);
+        Directory.CreateDirectory(disabledPath);
+        await File.WriteAllTextAsync(Path.Combine(livePath, "index.html"), "live");
+        await File.WriteAllTextAsync(Path.Combine(disabledPath, "index.html"), "disabled");
+
+        try
+        {
+            var service = CreateService(new PublishedAppsConfig { RootPath = publishedRoot });
+
+            await service.UnpublishAsync("slug");
+
+            Assert.That(Directory.Exists(livePath), Is.False);
+            Assert.That(Directory.Exists(disabledPath), Is.False);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PromoteStagedPackage_FailedPromotionRestoresPreviousPackage()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-published-app-tests", Guid.NewGuid().ToString("N"));
+        var stagingPath = Path.Combine(root, ".staging", "missing-stage");
+        var finalPath = Path.Combine(root, "slug");
+        var backupPath = Path.Combine(root, ".staging", "backup");
+        Directory.CreateDirectory(finalPath);
+        await File.WriteAllTextAsync(Path.Combine(finalPath, "index.html"), "previous");
+
+        try
+        {
+            Assert.Throws<DirectoryNotFoundException>(() =>
+                PublishedAppStorageService.PromoteStagedPackage(stagingPath, finalPath, backupPath));
+
+            Assert.That(await File.ReadAllTextAsync(Path.Combine(finalPath, "index.html")), Is.EqualTo("previous"));
+            Assert.That(Directory.Exists(backupPath), Is.False);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void InvokeValidateIndexHtml(string html)
     {
         try

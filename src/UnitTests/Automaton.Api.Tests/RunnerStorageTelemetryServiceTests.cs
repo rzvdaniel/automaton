@@ -121,7 +121,7 @@ public class RunnerStorageTelemetryServiceTests
             RunnerHostId = host.Id
         }, new(
             host.Id, DateTime.UtcNow, "/", 200L * 1024 * 1024 * 1024, 50L * 1024 * 1024 * 1024, 150L * 1024 * 1024 * 1024,
-            "/var/lib/docker", 20L * 1024 * 1024 * 1024, 2L * 1024 * 1024 * 1024, true, null, "1"), default);
+            "/var/lib/docker", 20L * 1024 * 1024 * 1024, 2L * 1024 * 1024 * 1024, true, null, "1", true), default);
 
         Assert.Multiple(() =>
         {
@@ -129,6 +129,37 @@ public class RunnerStorageTelemetryServiceTests
             Assert.That(host.StorageAvailableBytes, Is.EqualTo(2L * 1024 * 1024 * 1024));
             Assert.That(host.RootFilesystemAvailableBytes, Is.EqualTo(150L * 1024 * 1024 * 1024));
             Assert.That(host.StorageState, Is.EqualTo(RunnerHostStorageStates.SchedulingBlocked).Or.EqualTo(RunnerHostStorageStates.Critical));
+        });
+    }
+
+    [Test]
+    public async Task ReportRunnerHost_DoesNotAdmitTelemetryWithoutBoundedImageStoreProof()
+    {
+        await using var db = CreateDb();
+        var infrastructureRunner = new Runner { Id = Guid.NewGuid(), Name = "infrastructure", Purpose = RunnerPurposes.Infrastructure };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(), Name = "host", Provider = "test", InfrastructureRunnerId = infrastructureRunner.Id,
+            StorageState = RunnerHostStorageStates.Unknown
+        };
+        db.Runners.Add(infrastructureRunner);
+        db.RunnerHosts.Add(host);
+        await db.SaveChangesAsync();
+
+        await new RunnerStorageTelemetryService(db).ReportRunnerHostAsync(new RunnerDetails
+        {
+            Id = infrastructureRunner.Id, Name = infrastructureRunner.Name, Purpose = RunnerPurposes.Infrastructure,
+            RunnerHostId = host.Id
+        }, new(
+            host.Id, DateTime.UtcNow, "/", 200L * 1024 * 1024 * 1024, 50L * 1024 * 1024 * 1024, 150L * 1024 * 1024 * 1024,
+            "/var/lib/docker", 20L * 1024 * 1024 * 1024, 15L * 1024 * 1024 * 1024, true, null, "legacy-runner"), default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(host.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
+            Assert.That(host.StorageState, Is.EqualTo(RunnerHostStorageStates.MeasurementFailed));
+            Assert.That(host.StorageMeasurementError, Does.Contain("did not verify Docker image/cache storage"));
+            Assert.That(host.IsSchedulingEligible, Is.False);
         });
     }
 

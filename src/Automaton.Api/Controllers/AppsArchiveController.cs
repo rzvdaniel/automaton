@@ -86,7 +86,11 @@ public sealed class AppsArchiveController(
     [Authorize(Policy = "AllowApiKey")]
     [RequestSizeLimit(52_428_800)]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadZip(Guid id, IFormFile file, [FromQuery] bool clean = false)
+    public async Task<IActionResult> UploadZip(
+        Guid id,
+        IFormFile file,
+        [FromQuery] bool clean = false,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -100,7 +104,7 @@ public sealed class AppsArchiveController(
                 return BadRequest(new { success = false, message = "Only .zip archives are supported" });
             }
 
-            var result = await runtimeArchiveUploadService.UploadAsync(id, file, clean);
+            var result = await runtimeArchiveUploadService.UploadAsync(id, file, clean, cancellationToken);
             if (result is null)
             {
                 return NotFound(new { success = false, message = "App not found" });

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Api.Services.Mcp.Apps;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 
@@ -14,6 +15,91 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AppFileStorageServiceTests
 {
+    [Test]
+    public async Task BoundedSourceWrites_ConcurrentWritesCannotExceedStorageLimit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        var sourcePath = Path.Combine(root, "source");
+        Directory.CreateDirectory(sourcePath);
+        File.WriteAllText(Path.Combine(sourcePath, "existing.txt"), new string('x', 50));
+
+        try
+        {
+            using var start = new ManualResetEventSlim(false);
+            var writes = Enumerable.Range(0, 2).Select(index => Task.Run(async () =>
+            {
+                start.Wait();
+                try
+                {
+                    await AppArchiveStorageBounds.WriteBoundedTextFileAsync(
+                        sourcePath, $"new-{index}.txt", new string('x', 30), maximumBytes: 100);
+                    return true;
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+            })).ToArray();
+
+            start.Set();
+            var outcomes = await Task.WhenAll(writes);
+
+            Assert.That(outcomes.Count(succeeded => succeeded), Is.EqualTo(1));
+            Assert.That(Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories)
+                .Sum(path => new FileInfo(path).Length), Is.EqualTo(80));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task McpRename_SerializesWithReplacementWriteAtStorageLimit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        var sourcePath = Path.Combine(root, "source");
+        Directory.CreateDirectory(sourcePath);
+        File.WriteAllText(Path.Combine(sourcePath, "target.txt"), new string('x', 20));
+        File.WriteAllText(Path.Combine(sourcePath, "existing.txt"), new string('x', 60));
+
+        try
+        {
+            var fileSystem = new AppScopedFileSystem(sourcePath);
+            await using var heldLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(sourcePath);
+            var renameTask = fileSystem.RenameFileAsync("target.txt", "moved.txt");
+            var replacementWriteTask = WriteReplacementAsync();
+
+            Assert.That(renameTask.IsCompleted, Is.False, "MCP rename must wait for the source-root lock.");
+            Assert.That(replacementWriteTask.IsCompleted, Is.False, "Bounded writes must use the same source-root lock.");
+
+            await heldLock.DisposeAsync();
+            await renameTask;
+            await replacementWriteTask;
+
+            var finalBytes = Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories)
+                .Sum(path => new FileInfo(path).Length);
+            Assert.That(finalBytes, Is.LessThanOrEqualTo(100));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
+        async Task WriteReplacementAsync()
+        {
+            try
+            {
+                await AppArchiveStorageBounds.WriteBoundedTextFileAsync(
+                    sourcePath, "target.txt", new string('x', 40), maximumBytes: 100);
+            }
+            catch (InvalidDataException)
+            {
+                // If the rename runs first, the old file remains in the directory and the replacement must be rejected.
+            }
+        }
+    }
+
     [Test]
     public void DirectFileEditing_AllowsNormalSourceExtensions()
     {
@@ -66,6 +152,101 @@ public class AppFileStorageServiceTests
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.env"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/secrets.json"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "README.md"), Is.EqualTo("do not remix root files"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PruneVersionSnapshotsAsync_KeepsTheMostRecentTenSnapshotFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var versionsPath = service.GetAppVersionDirectoryPath(userId, appId);
+            for (var version = 1; version <= 12; version++)
+            {
+                var filesPath = Path.Combine(versionsPath, $"v{version:D3}", "files");
+                Directory.CreateDirectory(filesPath);
+                await File.WriteAllTextAsync(Path.Combine(filesPath, "index.html"), $"v{version}");
+            }
+
+            await service.PruneVersionSnapshotsAsync(userId, appId);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v001")), Is.False);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v002")), Is.False);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v003")), Is.True);
+                Assert.That(Directory.Exists(Path.Combine(versionsPath, "v012")), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CreateVersionSnapshotAsync_StagesSnapshotAndRemovesStagingAfterCommit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<main>app</main>");
+
+            var relativeSnapshotPath = await service.CreateVersionSnapshotAsync(userId, appId, 1);
+            var snapshotPath = Path.Combine(service.GetAppRootPath(userId, appId), relativeSnapshotPath, "files");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(Path.Combine(snapshotPath, "frontend", "index.html")), Is.EqualTo("<main>app</main>"));
+                Assert.That(Directory.EnumerateDirectories(service.GetAppVersionDirectoryPath(userId, appId), ".staging-*"), Is.Empty);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CreateVersionSnapshotAsync_FailedCommitRemovesStagingAndPreservesExistingTarget()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<main>app</main>");
+            var versionsPath = service.GetAppVersionDirectoryPath(userId, appId);
+            Directory.CreateDirectory(versionsPath);
+            var conflictingTarget = Path.Combine(versionsPath, "v001");
+            await File.WriteAllTextAsync(conflictingTarget, "preserve");
+
+            Assert.ThrowsAsync<IOException>(async () =>
+                await service.CreateVersionSnapshotAsync(userId, appId, 1));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.ReadAllText(conflictingTarget), Is.EqualTo("preserve"));
+                Assert.That(Directory.EnumerateDirectories(versionsPath, ".staging-*"), Is.Empty);
+            });
         }
         finally
         {

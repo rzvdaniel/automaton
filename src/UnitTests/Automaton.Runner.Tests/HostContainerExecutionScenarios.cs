@@ -61,6 +61,58 @@ internal static class HostContainerExecutionScenarios
             IndexOfEntrypoint(shell.Command));
     }
 
+    public static async Task<BuildCleanupOutcome> RunBuildWithHostCommandExceptionAsync()
+    {
+        using var environment = InfrastructureRunnerEnvironment.Create();
+        var hostedRunnerId = Guid.NewGuid();
+        var cleanupCalls = new List<IReadOnlyList<string>>();
+        var service = new HostContainerExecutionService((arguments, _, _) =>
+        {
+            if (arguments.Contains("volume"))
+            {
+                return Task.FromResult(new InfrastructureCommandResponse
+                {
+                    Success = true,
+                    Output = $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedRunnerId}\",\"automaton.storage-scope\":\"user\"}}"
+                });
+            }
+
+            if (arguments.Contains("image"))
+                return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = Image });
+
+            if (arguments.Count > 1 && arguments[1] == "run")
+                return Task.FromException<InfrastructureCommandResponse>(new OperationCanceledException("host command canceled"));
+
+            cleanupCalls.Add(arguments);
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+        });
+        var request = new HostContainerExecutionRequest
+        {
+            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "example/build:1",
+            Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+            SharedMemoryMb = 64,
+            DockerLogMaxSizeMb = 10,
+            DockerLogMaxFiles = 3,
+            Command = new() { Executable = "build" }
+        };
+
+        var cancellationSurfaced = false;
+        try
+        {
+            await service.ExecuteAsync(request);
+        }
+        catch (OperationCanceledException)
+        {
+            cancellationSurfaced = true;
+        }
+
+        var cleanupWasRequested = cleanupCalls.Any(call =>
+            call.Count > 3 && call[0] == "docker" && call[1] == "rm" && call[2] == "-f");
+        return new(cancellationSurfaced, cleanupWasRequested);
+    }
+
     private static async Task<RunBuildOutcome> RunCommandAsync(ApplicationCommandSpec command)
     {
         var session = new HostContainerExecutionSession(Guid.NewGuid());
@@ -103,6 +155,7 @@ internal static class HostContainerExecutionScenarios
                     HostContainerResourceKinds.Source,
                     HostContainerResourceKinds.Artifact,
                     HostContainerResourceKinds.ApplicationData),
+                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
                 Command = command,
                 Environment = includeBuildMode
                     ? new Dictionary<string, string> { ["BUILD_MODE"] = "test" }
@@ -154,3 +207,5 @@ internal sealed record EntrypointVariantsOutcome(
     bool ShellSucceeded,
     IReadOnlyList<string> ShellCommand,
     int ShellEntryPoint);
+
+internal sealed record BuildCleanupOutcome(bool CancellationSurfaced, bool CleanupWasRequested);

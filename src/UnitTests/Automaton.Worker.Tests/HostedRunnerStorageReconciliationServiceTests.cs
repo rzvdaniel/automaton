@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using System.Text.Json;
 
 namespace Automaton.Worker.Tests;
 
@@ -96,6 +97,8 @@ public class HostedRunnerStorageReconciliationServiceTests
             Assert.That(command.RunnerHostId, Is.EqualTo(fixture.HostId));
             Assert.That(command.InfrastructureRunnerId, Is.EqualTo(fixture.InfrastructureRunnerId));
         });
+        using var input = JsonDocument.Parse(command.InputJson);
+        Assert.That(input.RootElement.GetProperty("storageAllowanceBytes").GetInt64(), Is.EqualTo(512L * 1024 * 1024));
     }
 
     [Test]

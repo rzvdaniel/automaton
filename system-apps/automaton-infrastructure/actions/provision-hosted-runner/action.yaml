@@ -24,6 +24,7 @@ spec:
       - memoryMb
       - memoryReservationMb
       - diskLimitMb
+      - writableLayerSizeLimitMb
       - xfsProjectId
       - pidsLimit
       - sharedMemoryMb
@@ -46,6 +47,7 @@ spec:
       memoryMb: { type: integer }
       memoryReservationMb: { type: integer }
       diskLimitMb: { type: integer }
+      writableLayerSizeLimitMb: { type: integer }
       xfsProjectId: { type: integer }
       storageFilesystemUuid: { type: string }
       pidsLimit: { type: integer }

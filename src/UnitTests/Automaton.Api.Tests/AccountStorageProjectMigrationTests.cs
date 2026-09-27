@@ -9,6 +9,8 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class AccountStorageProjectMigrationTests
 {
+    private const string StorageIdentityMigration = "20260923051139_MoveStorageProjectIdentityToAccount";
+
     [Test]
     public async Task Migration_AdoptsExistingIdsAndAllowsLazyAccountsAndSharedHostedRunnerIdentity()
     {
@@ -59,7 +61,7 @@ public sealed class AccountStorageProjectMigrationTests
 
         Assert.That(exception!.Message, Does.Contain("CHECK constraint failed"));
         Assert.That(await TableExistsAsync(db, "AccountStorageAllocations"), Is.False);
-        Assert.That(await db.Database.GetAppliedMigrationsAsync(), Does.Not.Contain("20260923051139_MoveStorageProjectIdentityToAccount"));
+        Assert.That(await db.Database.GetAppliedMigrationsAsync(), Does.Not.Contain(StorageIdentityMigration));
     }
 
     private static SqliteConnection CreateOpenConnection()
@@ -81,6 +83,7 @@ public sealed class AccountStorageProjectMigrationTests
         db.Database.ExecuteSqlRaw("CREATE TABLE AspNetUsers (Id TEXT COLLATE ascii_general_ci NOT NULL PRIMARY KEY)");
         db.Database.ExecuteSqlRaw("CREATE TABLE HostedRunners (Id TEXT NOT NULL PRIMARY KEY, UserId TEXT NOT NULL, StorageProjectId INTEGER NULL)");
         db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IX_HostedRunners_StorageProjectId ON HostedRunners (StorageProjectId)");
+        db.Database.ExecuteSqlRaw("CREATE TABLE RunnerHosts (ProvisioningTransport TEXT NOT NULL, StorageState TEXT NOT NULL, StorageMeasurementStatus TEXT NOT NULL, StorageMeasurementError TEXT NULL, StorageMeasuredAtUtc TEXT NULL, StorageReceivedAtUtc TEXT NULL)");
 
         const string storageIdentityMigration = "20260923051139_MoveStorageProjectIdentityToAccount";
         var migrations = db.Database.GetMigrations().ToArray();

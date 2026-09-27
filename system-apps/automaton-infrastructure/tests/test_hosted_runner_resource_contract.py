@@ -52,6 +52,7 @@ def action_request() -> dict[str, object]:
         "memoryMb": 384,
         "memoryReservationMb": 256,
         "diskLimitMb": 512,
+        "writableLayerSizeLimitMb": 512,
         "xfsProjectId": 1234567,
         "storageFilesystemUuid": None,
         "pidsLimit": 256,
@@ -171,6 +172,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         other_runner_volumes: dict[str, dict[str, str]] | None = None,
         missing_volume_error: str = "No such volume: {name}",
         image_pull_error: str | None = None,
+        docker_storage_driver: str = "overlay2",
         calls_out: list[tuple[str, ...]] | None = None,
         request_override: dict[str, object] | None = None,
         existing_project_quota_limit_mb: int | None = None,
@@ -178,8 +180,10 @@ Project ID       Used       Soft       Hard    Warn/Grace
         xfs_project_error: str | None = None,
         xfs_limit_error: str | None = None,
         xfs_assignment_succeeds: bool = True,
+        xfs_inheritance_succeeds: bool = True,
         xfs_quota_verification_succeeds: bool = True,
         final_quota_hard_limit_matches: bool = True,
+        writable_layer_readback_matches: bool = True,
         reset_storage_after_container: bool = False,
         result_out: list[dict[str, object]] | None = None,
     ):
@@ -230,7 +234,15 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 volumes[name] = labels
                 return subprocess.CompletedProcess(arguments, 0, f"{name}\n", "")
             if arguments[:3] == ("docker", "info", "--format"):
-                stdout = "2|systemd\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+                if "CgroupVersion" in arguments[3]:
+                    stdout = "2|systemd\n"
+                elif arguments[3] == "{{.Driver}}":
+                    stdout = f"{docker_storage_driver}\n"
+                else:
+                    stdout = "/var/lib/docker\n"
+            elif arguments[:3] == ("docker", "inspect", "--format"):
+                limit = request["writableLayerSizeLimitMb"] if writable_layer_readback_matches else 0
+                stdout = json.dumps({"size": f"{limit}m"})
             elif arguments[:2] == ("stat", "-f"):
                 stdout = "xfs\n"
             elif arguments[:2] == ("findmnt", "-no") and arguments[2] == "OPTIONS":
@@ -266,6 +278,9 @@ Project ID       Used       Soft       Hard    Warn/Grace
                         hard_blocks = 0
                     stdout = f"Project ID   Used   Soft   Hard\n#{project_id} 0 0 {hard_blocks}\n"
             elif arguments[:2] == ("xfs_io", "-c"):
+                if arguments[2] == "lsattr":
+                    flags = "--------P--------------" if xfs_inheritance_succeeds else "------------------------"
+                    return subprocess.CompletedProcess(arguments, 0, f"{flags} {arguments[3]}\n", "")
                 mountpoint = arguments[3]
                 is_other_runner_volume = any(
                     mountpoint == f"/var/lib/docker/volumes/{name}/_data"
@@ -390,6 +405,9 @@ Project ID       Used       Soft       Hard    Warn/Grace
             self.assertEqual(run[index + 1], value)
         self.assertIn("max-size=10m", run)
         self.assertIn("max-file=3", run)
+        storage_index = run.index("--storage-opt")
+        self.assertEqual(run[storage_index + 1], "size=512m")
+        self.assertIn("/tmp:rw,nosuid,nodev,size=32m,mode=1777", run)
         self.assertNotIn("--privileged", run)
         self.assertIn("--cgroup-parent", run)
         self.assertIn(f"automaton-hosted-runner-{RUNNER_ID_COMPACT}.slice", run)
@@ -415,6 +433,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         self.assertIn(f"{SYSTEM_VOLUME}:/automaton/system", run)
         self.assertIn(f"{USER_VOLUME}:/automaton/storage", run)
         self.assertIn("AUTOMATON_RUNTIME_HOST_ADDRESS=10.20.30.40", run)
+        self.assertIn("TMPDIR=/automaton/storage/.tmp", run)
         self.assertIn("AUTOMATON_RUNNER_PURPOSE=Managed", run)
         self.assertIn("AUTOMATON_RUNNER_APPLICATION_PROFILE=Standard", run)
         self.assertNotIn(f"{USER_VOLUME}:/automaton/workspace", run)
@@ -572,12 +591,12 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 final_project_check = next(
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 )
                 self.assertGreater(final_project_check, run_index)
                 final_project_checks = [
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 ]
                 self.assertEqual(len(final_project_checks), 1)
 
@@ -592,7 +611,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 final_project_checks = [
                     index for index, call in enumerate(calls[run_index + 1:], run_index + 1)
-                    if call[:2] == ("xfs_io", "-c")
+                    if call[:3] == ("xfs_io", "-c", "stat")
                 ]
                 self.assertEqual(len(final_project_checks), 2)
 
@@ -613,12 +632,79 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     )
                 run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
                 self.assertTrue(any(index > run_index for index, call in enumerate(calls) if call[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in call)))
+                self.assertTrue(any(
+                    index > run_index and call[:4] == ("docker", "rm", "-f", "automaton-hosted-runner-test")
+                    for index, call in enumerate(calls)
+                ))
+
+    def test_writable_layer_readback_mismatch_removes_unverified_container(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "writable-layer limit did not match"):
+                    self.run_provision_action(
+                        action_key,
+                        calls_out=calls,
+                        writable_layer_readback_matches=False,
+                    )
+
+                run_index = next(index for index, call in enumerate(calls) if call[:2] == ("docker", "run"))
+                cleanup_index = next(
+                    index for index, call in enumerate(calls)
+                    if index > run_index and call[:4] == ("docker", "rm", "-f", "automaton-hosted-runner-test")
+                )
+                self.assertGreater(cleanup_index, run_index)
+
+    def test_project_inheritance_is_required_before_container_replacement(self):
+        existing = {
+            SYSTEM_VOLUME: volume_labels("system"),
+            USER_VOLUME: volume_labels("user"),
+        }
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls: list[tuple[str, ...]] = []
+                with self.assertRaisesRegex(RuntimeError, "project inheritance"):
+                    self.run_provision_action(
+                        action_key,
+                        existing,
+                        calls_out=calls,
+                        xfs_inheritance_succeeds=False,
+                    )
+                self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_both_hosted_runner_actions_preserve_the_tenant_safe_contract(self):
         for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
             with self.subTest(action_key=action_key):
                 calls, _ = self.run_provision_action(action_key)
                 self.assert_resource_contract(calls)
+
+    def test_invalid_writable_layer_limit_fails_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            for invalid_limit in (0, 32, 2049):
+                with self.subTest(action_key=action_key, invalid_limit=invalid_limit):
+                    calls = []
+                    with self.assertRaisesRegex(ValueError, "writableLayerSizeLimitMb"):
+                        self.run_provision_action(
+                            action_key,
+                            calls_out=calls,
+                            request_override={"writableLayerSizeLimitMb": invalid_limit},
+                        )
+                    self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+                    self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_unsupported_docker_storage_driver_fails_before_container_replacement(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            with self.subTest(action_key=action_key):
+                calls = []
+                with self.assertRaisesRegex(RuntimeError, "require the overlay2 Docker storage driver"):
+                    self.run_provision_action(
+                        action_key,
+                        calls_out=calls,
+                        docker_storage_driver="vfs",
+                    )
+                self.assertFalse(any(call[:2] == ("docker", "rm") for call in calls))
+                self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
 
     def test_missing_volume_responses_are_recognized_case_insensitively_by_both_actions(self):
         missing_volume_errors = [
@@ -710,7 +796,12 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
                 }]), "")
             if arguments[:3] == ("docker", "info", "--format"):
-                stdout = "2|systemd\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+                if "CgroupVersion" in arguments[3]:
+                    stdout = "2|systemd\n"
+                elif arguments[3] == "{{.Driver}}":
+                    stdout = "overlay2\n"
+                else:
+                    stdout = "/var/lib/docker\n"
                 return subprocess.CompletedProcess(arguments, 0, stdout, "")
             if arguments[:2] == ("stat", "-f"):
                 return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
@@ -728,6 +819,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
             if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                 return subprocess.CompletedProcess(arguments, 0, "#1234567 600000 0 0\n", "")
             if arguments[:2] == ("xfs_io", "-c"):
+                if arguments[2] == "lsattr":
+                    return subprocess.CompletedProcess(arguments, 0, f"--------P-------------- {arguments[3]}\n", "")
                 project_id = 1234567 if assigned_project else 0
                 return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
             return subprocess.CompletedProcess(arguments, 0, "", "")
@@ -764,7 +857,12 @@ Project ID       Used       Soft       Hard    Warn/Grace
                             "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
                         }]), "")
                     if arguments[:3] == ("docker", "info", "--format"):
-                        stdout = "1|cgroupfs\n" if "CgroupVersion" in arguments[3] else "/var/lib/docker\n"
+                        if "CgroupVersion" in arguments[3]:
+                            stdout = "1|cgroupfs\n"
+                        elif arguments[3] == "{{.Driver}}":
+                            stdout = "overlay2\n"
+                        else:
+                            stdout = "/var/lib/docker\n"
                         return subprocess.CompletedProcess(arguments, 0, stdout, "")
                     if arguments[:2] == ("stat", "-f"):
                         return subprocess.CompletedProcess(arguments, 0, "xfs\n", "")
@@ -782,6 +880,8 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     if arguments[:2] == ("xfs_quota", "-x") and any("report -p" in argument for argument in arguments):
                         return subprocess.CompletedProcess(arguments, 0, "#1234567 0 0 524288\n", "")
                     if arguments[:2] == ("xfs_io", "-c"):
+                        if arguments[2] == "lsattr":
+                            return subprocess.CompletedProcess(arguments, 0, f"--------P-------------- {arguments[3]}\n", "")
                         project_id = 1234567 if assigned_project else 0
                         return subprocess.CompletedProcess(arguments, 0, f"fsxattr.projid = {project_id}\n", "")
                     return subprocess.CompletedProcess(arguments, 0, "", "")

@@ -1,8 +1,10 @@
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
@@ -10,7 +12,8 @@ namespace Automaton.Api.Services;
 public sealed class HostContainerRelayService(
     HostContainerRelayStateResolver stateResolver,
     IHostContainerTransport transport,
-    ILogger<HostContainerRelayService> logger)
+    ILogger<HostContainerRelayService> logger,
+    IOptions<StorageTelemetryOptions> storageTelemetryOptions)
 {
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
         RunnerDetails caller,
@@ -35,6 +38,18 @@ public sealed class HostContainerRelayService(
         }
 
         var state = resolution.State!;
+        if (RequiresImageStorageAdmission(request.Operation)
+            && !StorageTelemetryPolicy.CanRunDockerStorageOperation(
+                state.Hosted.RunnerHost!, DateTime.UtcNow,
+                storageTelemetryOptions.Value))
+        {
+            return Failure(
+                "host_storage_reserve_unavailable",
+                "Docker image operations are paused until the Runner Host has fresh storage telemetry and enough free space to preserve its reserve.");
+        }
+
+        var activeResources = state.Hosted.SpecificationSnapshot.Resources;
+        var requiresContainerLimits = RequiresContainerLimits(request.Operation);
         var forwarded = request with
         {
             Scope = new HostContainerScope(
@@ -44,6 +59,9 @@ public sealed class HostContainerRelayService(
                 state.Target.Id,
                 request.Scope.DeploymentAttemptId),
             Resources = GetServerResources(request.Operation),
+            SharedMemoryMb = requiresContainerLimits ? activeResources.SharedMemoryMb : null,
+            DockerLogMaxSizeMb = requiresContainerLimits ? activeResources.DockerLogMaxSizeMb : null,
+            DockerLogMaxFiles = requiresContainerLimits ? activeResources.DockerLogMaxFiles : null,
             HostPort = 0,
             Environment = new Dictionary<string, string>(request.Environment, StringComparer.Ordinal)
         };
@@ -74,6 +92,14 @@ public sealed class HostContainerRelayService(
                 HostContainerResourceKinds.Artifact,
                 HostContainerResourceKinds.ApplicationData)
             : null;
+
+    private static bool RequiresContainerLimits(string operation) =>
+        operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer;
+
+    private static bool RequiresImageStorageAdmission(string operation) =>
+        operation is HostContainerOperationKinds.ResolveImage
+            or HostContainerOperationKinds.RunBuild
+            or HostContainerOperationKinds.CreateApplicationContainer;
 
     private static HostContainerExecutionResponse Failure(string code, string message) =>
         new() { ErrorCode = code, Error = message };

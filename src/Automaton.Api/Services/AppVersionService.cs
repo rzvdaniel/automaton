@@ -85,10 +85,23 @@ public class AppVersionService
         await AddLinkedStepSnapshotsAsync(appVersion.Id, appId);
 
         await dataContext.SaveChangesAsync();
+        await TryPruneVersionSnapshotsAsync(ownerId, appId);
 
         logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
 
         return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
+    }
+
+    private async Task TryPruneVersionSnapshotsAsync(Guid ownerId, Guid appId)
+    {
+        try
+        {
+            await fileStorageService.PruneVersionSnapshotsAsync(ownerId, appId);
+        }
+        catch (Exception exception)
+        {
+            logger.Warning(exception, "Could not prune old source snapshots for app {AppId}", appId);
+        }
     }
 
     private async Task AddLinkedStepSnapshotsAsync(Guid appVersionId, Guid appId)

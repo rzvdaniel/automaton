@@ -44,6 +44,7 @@ public sealed class HostContainerRuntimeTests
         Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
         CandidateId = Guid.NewGuid(), RequestedImage = Digest, ContainerPort = 8080,
         Resources = new("source", "artifact", "data"),
+        SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
         Command = new() { Executable = "scripts/serve", WorkingDirectory = "output", Arguments = ["space separated", "--flag"] },
         Storage = new() { DataDirectory = "database", Mounts = [new() { Name = "uploads", RelativePath = "media/files" }] }
     };
@@ -71,6 +72,43 @@ public sealed class HostContainerRuntimeTests
         ["automaton.managed"] = "true", ["automaton.resource"] = "hosted-runner-volume",
         ["automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString(), ["automaton.storage-scope"] = "user"
     });
+
+    [Test]
+    public async Task ApplicationContainerHasReadOnlyRootBoundedScratchAndConfiguredLogs()
+    {
+        var result = await Service().ExecuteAsync(CreateRequest());
+        Assert.That(result.Success, Is.True);
+        var create = calls.Single(arguments => arguments.Count > 1 && arguments[1] == "create");
+        var command = string.Join(' ', create);
+        Assert.Multiple(() =>
+        {
+            Assert.That(command, Does.Contain("--read-only"));
+            Assert.That(command, Does.Contain("/tmp:rw,nosuid,nodev,size=32m,mode=1777"));
+            Assert.That(command, Does.Contain("--shm-size 64m"));
+            Assert.That(command, Does.Contain("--log-driver local"));
+            Assert.That(command, Does.Contain("max-size=10m"));
+            Assert.That(command, Does.Contain("max-file=3"));
+            Assert.That(command, Does.Contain("target=/automaton/data"));
+        });
+    }
+
+    [TestCase(HostContainerOperationKinds.CreateApplicationContainer)]
+    [TestCase(HostContainerOperationKinds.RunBuild)]
+    public async Task ApplicationAndBuildContainersRequireServerProvidedLimits(string operation)
+    {
+        var request = CreateRequest() with
+        {
+            Operation = operation,
+            SharedMemoryMb = null,
+            DockerLogMaxSizeMb = null,
+            DockerLogMaxFiles = null
+        };
+
+        var result = await Service().ExecuteAsync(request);
+
+        Assert.That(result.ErrorCode, Is.EqualTo("trusted_policy_unavailable"));
+        Assert.That(calls, Is.Empty);
+    }
 
     private JsonObject Inspection(bool running = true, string? port = "49152") => new()
     {

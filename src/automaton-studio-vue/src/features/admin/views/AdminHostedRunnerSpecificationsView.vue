@@ -29,6 +29,7 @@ const defaultResources = (): HostedRunnerResources => ({
   memoryLimitMb: 384,
   memoryReservationMb: 256,
   diskLimitMb: 512,
+  writableLayerLimitMb: 512,
   pidsLimit: 256,
   sharedMemoryMb: 64,
   dockerLogMaxSizeMb: 10,
@@ -110,7 +111,7 @@ onMounted(load)
       <Column field="name" header="Name" style="min-width: 15rem" />
       <Column field="code" header="Code" />
       <Column field="revision" header="Revision" />
-      <Column header="Resources" style="min-width: 14rem"><template #body="{ data }"><div class="flex flex-wrap gap-1"><Tag :value="`${data.resources.cpuLimit} CPU`" severity="secondary" /><Tag :value="`${data.resources.memoryLimitMb} MB`" severity="secondary" /><Tag :value="`${data.resources.maximumApps} apps`" severity="secondary" /></div></template></Column>
+      <Column header="Resources" style="min-width: 14rem"><template #body="{ data }"><div class="flex flex-wrap gap-1"><Tag :value="`${data.resources.cpuLimit} CPU`" severity="secondary" /><Tag :value="`${data.resources.memoryLimitMb} MB`" severity="secondary" /><Tag :value="`${data.resources.diskLimitMb} MB quota`" severity="secondary" /><Tag :value="`${data.resources.writableLayerLimitMb} MB root`" severity="secondary" /><Tag :value="`${data.resources.maximumApps} apps`" severity="secondary" /></div></template></Column>
       <Column header="Usage"><template #body="{ data }">{{ data.runnerCount }} runners<span v-if="data.outdatedRunnerCount"> · {{ data.outdatedRunnerCount }} outdated</span></template></Column>
       <Column header="Status"><template #body="{ data }"><Tag :value="data.isActive ? 'Active' : 'Inactive'" :severity="data.isActive ? 'success' : 'secondary'" /></template></Column>
       <Column header="" :frozen="true" align-frozen="right" style="min-width: 8rem"><template #body="{ data }"><div class="flex gap-1"><Button icon="pi pi-pencil" text size="small" @click="openEdit(data)" /><Button icon="pi pi-copy" text size="small" @click="duplicate(data)" /><Button :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" @click="toggle(data)" /></div></template></Column>
@@ -131,6 +132,7 @@ onMounted(load)
         <div class="col-6"><label class="block text-sm mb-1">Memory MB</label><InputNumber v-model="form.resources.memoryLimitMb" :min="256" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Reservation MB</label><InputNumber v-model="form.resources.memoryReservationMb" :min="64" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Storage hard quota MB</label><InputNumber v-model="form.resources.diskLimitMb" :min="512" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Writable root layer MB</label><InputNumber v-model="form.resources.writableLayerLimitMb" :min="64" :max="2048" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">PID limit</label><InputNumber v-model="form.resources.pidsLimit" :min="32" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Shared memory MB</label><InputNumber v-model="form.resources.sharedMemoryMb" :min="16" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Docker log file MB</label><InputNumber v-model="form.resources.dockerLogMaxSizeMb" :min="1" class="w-full" /></div>

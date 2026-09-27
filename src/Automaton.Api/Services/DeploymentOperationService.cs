@@ -28,6 +28,7 @@ public sealed class DeploymentOperationService(
 {
     private static readonly TimeSpan ExecutionLeaseDuration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ExecutionLeaseRenewalInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan UnreferencedPackageRetention = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string executorInstanceId = apiInstanceIdentityService.ApiInstanceId;
 
@@ -205,6 +206,7 @@ public sealed class DeploymentOperationService(
 
     public async Task DispatchOwnedOperationsAsync(CancellationToken cancellationToken)
     {
+        await CleanupUnreferencedPackagesAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var operationIds = await dataContext.DeploymentOperations
             .AsNoTracking()
@@ -233,6 +235,34 @@ public sealed class DeploymentOperationService(
             {
                 // Another API instance still owns a live attempt.
             }
+        }
+    }
+
+    private async Task CleanupUnreferencedPackagesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var activePackagePaths = await dataContext.DeploymentOperations
+                .AsNoTracking()
+                .Where(operation => operation.Status == DeploymentOperationStatuses.Pending ||
+                    operation.Status == DeploymentOperationStatuses.Running)
+                .Select(operation => operation.PackagePath)
+                .ToListAsync(cancellationToken);
+
+            var deletedCount = await packageStore.CleanupUnreferencedPackagesAsync(
+                activePackagePaths,
+                UnreferencedPackageRetention,
+                cancellationToken);
+            if (deletedCount > 0)
+                logger.LogInformation("Removed {PackageCount} stale deployment package files", deletedCount);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not clean stale deployment package files");
         }
     }
 

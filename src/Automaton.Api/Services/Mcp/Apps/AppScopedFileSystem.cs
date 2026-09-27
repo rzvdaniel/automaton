@@ -30,7 +30,7 @@ public class AppScopedFileSystem : LocalScopedFileSystem
                     $"Use path 'backend/{Path.GetFileName(relativePath)}' instead of '{relativePath}'.");
         }
 
-        await base.WriteFileAsync(relativePath, content);
+        await AppArchiveStorageBounds.WriteBoundedTextFileAsync(RootPath, relativePath, content);
     }
 
     public override Task DeleteFileAsync(string relativePath)
@@ -42,7 +42,7 @@ public class AppScopedFileSystem : LocalScopedFileSystem
         return base.DeleteFileAsync(relativePath);
     }
 
-    public override Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false)
+    public override async Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false)
     {
         var fromNormalized = fromRelativePath.Replace('\\', '/').TrimStart('/');
         var toNormalized   = toRelativePath.Replace('\\', '/').TrimStart('/');
@@ -52,12 +52,14 @@ public class AppScopedFileSystem : LocalScopedFileSystem
             throw new InvalidOperationException("Cannot replace frontend/index.html via rename. Edit frontend/index.html directly instead.");
 
         AppFileStorageService.ValidateFileExtensionPublic(toRelativePath);
-        return base.RenameFileAsync(fromRelativePath, toRelativePath, overwrite);
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(RootPath);
+        await base.RenameFileAsync(fromRelativePath, toRelativePath, overwrite);
     }
 
-    public override Task RenameFolderAsync(string fromRelativePath, string toRelativePath)
+    public override async Task RenameFolderAsync(string fromRelativePath, string toRelativePath)
     {
-        return base.RenameFolderAsync(fromRelativePath, toRelativePath);
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(RootPath);
+        await base.RenameFolderAsync(fromRelativePath, toRelativePath);
     }
 
     public override Task DeleteFolderAsync(string relativePath)

@@ -8,6 +8,7 @@ namespace Automaton.Api.Controllers;
 
 /// <summary>Generic application deployment endpoints.</summary>
 [ApiController]
+[Route("")]
 public sealed class AppDeploymentController(
     AppsService appsService,
     UserContextService userContextService,
@@ -38,6 +39,8 @@ public sealed class AppDeploymentController(
 
     [HttpPost("api/apps/{appId:guid}/deploy-package")]
     [Authorize(Policy = "AllowApiKey")]
+    [RequestSizeLimit(AppArchiveStorageBounds.MaximumUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = AppArchiveStorageBounds.MaximumUploadBytes)]
     public async Task<ActionResult<DeploymentOperationResponse>> DeployPackage(
         Guid appId, [FromForm] IFormFile? file, [FromQuery] bool clean = false,
         [FromQuery] string? targetSlug = null, CancellationToken cancellationToken = default)
@@ -52,6 +55,10 @@ public sealed class AppDeploymentController(
                 appId, userContextService.GetUserId(), targetSlug, file, clean, cancellationToken);
             return AcceptedAtAction(nameof(GetDeploymentOperation),
                 new { appId, operationId = result.OperationId }, result);
+        }
+        catch (InvalidDataException exception)
+        {
+            return BadRequest(new { error = exception.Message });
         }
         catch (Exception ex)
         {

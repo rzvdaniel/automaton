@@ -74,6 +74,7 @@ public class AppArchiveService
         try
         {
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read, leaveOpen: false);
+            AppArchiveStorageBounds.Validate(archive);
 
             var manifest = await ReadArchiveManifestAsync(archive, cancellationToken);
             var appName = GetImportedAppName(manifest, fileName);
@@ -186,6 +187,7 @@ public class AppArchiveService
     private static async Task<List<string>> ExtractImportedArchiveAsync(ZipArchive archive, string sourcePath, CancellationToken cancellationToken)
     {
         var written = new List<string>();
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(sourcePath, cancellationToken);
 
         foreach (var entry in archive.Entries)
         {
@@ -219,11 +221,13 @@ public class AppArchiveService
                 throw new InvalidDataException($"Path traversal detected for '{relativePath}'.");
             }
 
+            AppArchiveStorageBounds.ValidateFileWrite(fullSourcePath, relativePath, entry.Length);
             Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
 
             await using var entryStream = entry.Open();
             await using var outStream = System.IO.File.Create(destPath);
-            await entryStream.CopyToAsync(outStream, cancellationToken);
+            await AppArchiveStorageBounds.CopyExactlyAsync(
+                entryStream, outStream, entry.Length, AppArchiveStorageBounds.MaximumExpandedBytes, cancellationToken);
             written.Add(relativePath);
         }
 

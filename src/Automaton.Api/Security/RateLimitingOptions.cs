@@ -6,6 +6,7 @@ public class RateLimitingOptions
 
     public RateLimitPolicyOptions GlobalAnonymous { get; set; } = new(200, 60);
     public RateLimitPolicyOptions GlobalAuthenticated { get; set; } = new(1000, 60);
+    public int MaxConcurrentMultipartRequests { get; set; } = 2;
     public RateLimitPolicyOptions AuthLogin { get; set; } = new(5, 60);
     public RateLimitPolicyOptions AuthRegistration { get; set; } = new(3, 3600);
     public RateLimitPolicyOptions AuthForgotPassword { get; set; } = new(10, 3600);

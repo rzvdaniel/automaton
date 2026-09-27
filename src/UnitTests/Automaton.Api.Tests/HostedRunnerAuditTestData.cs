@@ -106,7 +106,13 @@ internal static class HostedRunnerAuditTestData
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            StorageState = RunnerHostStorageStates.Healthy,
+            StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+            StorageAvailableBytes = 60L * 1024 * 1024 * 1024,
+            StorageReserveRequiredBytes = 5L * 1024 * 1024 * 1024,
+            StorageMeasuredAtUtc = DateTime.UtcNow,
+            DockerFilesystemTotalBytes = 65536L * 1024 * 1024
         };
         db.RunnerHosts.Add(host);
         db.SaveChanges();

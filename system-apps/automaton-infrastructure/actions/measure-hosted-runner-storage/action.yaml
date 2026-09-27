@@ -11,7 +11,7 @@ spec:
   capabilities: [docker, host]
   input:
     type: object
-    required: [operationId, hostedRunnerId, runnerHostId, expectedSystemVolumeName, expectedUserVolumeName, xfsProjectId]
+    required: [operationId, hostedRunnerId, runnerHostId, expectedSystemVolumeName, expectedUserVolumeName, xfsProjectId, storageAllowanceBytes]
     properties:
       operationId: { type: string }
       hostedRunnerId: { type: string }
@@ -19,6 +19,7 @@ spec:
       expectedSystemVolumeName: { type: string }
       expectedUserVolumeName: { type: string }
       xfsProjectId: { type: integer }
+      storageAllowanceBytes: { type: integer }
       storageFilesystemUuid: { type: string }
   output:
     type: object

@@ -1,5 +1,6 @@
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Api.Entities;
 
 namespace Automaton.Api.Tests;
 
@@ -82,6 +83,60 @@ public class StorageTelemetryPolicyTests
         {
             Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(RunnerHostStorageStates.Healthy, 109, 100, 10), Is.False);
             Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(RunnerHostStorageStates.Healthy, 110, 100, 10), Is.True);
+        });
+    }
+
+    [Test]
+    public void CanScheduleHostedRunners_RequiresFreshStorageLayoutTelemetry()
+    {
+        var now = DateTime.UtcNow;
+        var options = new StorageTelemetryOptions { FreshAfterMinutes = 10 };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(
+                RunnerHostStorageStates.Unknown, 1000, 100, 10, null, now, options), Is.False);
+            Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(
+                RunnerHostStorageStates.Healthy, 1000, 100, 10, now.AddMinutes(-11), now, options), Is.False);
+            Assert.That(StorageTelemetryPolicy.CanScheduleHostedRunners(
+                RunnerHostStorageStates.Healthy, 110, 100, 10, now, now, options), Is.True);
+        });
+    }
+
+    [Test]
+    public void EffectiveDiskCapacity_UsesTheSmallerConfiguredOrMeasuredFilesystemCapacity()
+    {
+        var host = new RunnerHost
+        {
+            TotalDiskMb = 40960,
+            DockerFilesystemTotalBytes = 12L * 1024 * 1024 * 1024
+        };
+
+        Assert.That(HostedRunnerHostPlacementService.EffectiveDiskCapacityMb(host), Is.EqualTo(12 * 1024));
+    }
+
+    [Test]
+    public void CanRunDockerStorageOperation_RequiresFreshTelemetryAndHostReserve()
+    {
+        var now = DateTime.UtcNow;
+        var host = new RunnerHost
+        {
+            StorageState = RunnerHostStorageStates.Healthy,
+            StorageAvailableBytes = 110,
+            StorageReserveRequiredBytes = 100,
+            StorageMeasuredAtUtc = now
+        };
+        var options = new StorageTelemetryOptions { FreshAfterMinutes = 10 };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(StorageTelemetryPolicy.CanRunDockerStorageOperation(host, now, options), Is.True);
+            Assert.That(StorageTelemetryPolicy.CanRunDockerStorageOperation(host, now.AddMinutes(11), options), Is.False);
+            host.StorageMeasuredAtUtc = null;
+            Assert.That(StorageTelemetryPolicy.CanRunDockerStorageOperation(host, now, options), Is.False);
+            host.StorageMeasuredAtUtc = now;
+            host.StorageAvailableBytes = 99;
+            Assert.That(StorageTelemetryPolicy.CanRunDockerStorageOperation(host, now, options), Is.False);
         });
     }
 }

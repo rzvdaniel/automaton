@@ -11,6 +11,8 @@ import uuid
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
 SAFE_RUNNER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,159}$")
+MIN_WRITABLE_LAYER_LIMIT_MB = 64
+MAX_WRITABLE_LAYER_LIMIT_MB = 2048
 
 
 def require_name(value: object, field: str) -> str:
@@ -116,6 +118,15 @@ def current_project_id(mountpoint: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def project_inheritance_enabled(mountpoint: str) -> bool:
+    result = host("xfs_io", "-c", "lsattr", mountpoint, check=False)
+    if result.returncode != 0:
+        return False
+    flag_line = next((line for line in result.stdout.splitlines() if line.strip()), "")
+    flags = flag_line.split(maxsplit=1)[0] if flag_line else ""
+    return "P" in flags
+
+
 def project_quota_enforcement_enabled(output: str) -> bool:
     lowered = output.lower()
     if "project quota state: enforcement" in lowered:
@@ -140,6 +151,30 @@ def resolve_filesystem_uuid(path: str) -> str:
         raise RuntimeError("Could not resolve a stable UUID for the Hosted Runner XFS filesystem") from error
 
 
+def verify_docker_writable_layer_support(docker_root: str) -> None:
+    driver = host("docker", "info", "--format", "{{.Driver}}").stdout.strip()
+    if driver != "overlay2":
+        raise RuntimeError("Bounded Hosted Runner writable layers require the overlay2 Docker storage driver")
+    if host("stat", "-f", "-c", "%T", docker_root).stdout.strip().lower() != "xfs":
+        raise RuntimeError("Bounded Hosted Runner writable layers require an XFS Docker data-root filesystem")
+    mountpoint = resolve_filesystem_mountpoint(docker_root)
+    options = host("findmnt", "-no", "OPTIONS", "-T", docker_root)
+    quota_options = {part.strip().lower() for part in options.stdout.split(",")}
+    if not {"prjquota", "pquota"}.intersection(quota_options):
+        raise RuntimeError("Docker data-root XFS project quota accounting and enforcement are not enabled")
+    state = host("xfs_quota", "-x", "-c", "state", mountpoint)
+    if not project_quota_enforcement_enabled(state.stdout + state.stderr):
+        raise RuntimeError("Docker data-root XFS project quota enforcement could not be verified")
+
+
+def verify_writable_layer_limit(container_name: str, limit_mb: int) -> None:
+    result = host("docker", "inspect", "--format", "{{json .HostConfig.StorageOpt}}", container_name)
+    try:
+        storage_options = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Docker did not report the Hosted Runner writable-layer limit") from error
+    if not isinstance(storage_options, dict) or storage_options.get("size") != f"{limit_mb}m":
+        raise RuntimeError("Hosted Runner writable-layer limit did not match its specification")
 def require_expected_filesystem_uuid(value: object) -> str | None:
     if value is None:
         return None
@@ -232,6 +267,7 @@ def ensure_xfs_project_quota(
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
     docker_root = resolve_docker_root()
+    verify_docker_writable_layer_support(docker_root)
     filesystem_mountpoints: list[str] = []
     for mountpoint in mountpoints:
         validate_mountpoint(mountpoint, docker_root)
@@ -264,6 +300,8 @@ def ensure_xfs_project_quota(
     for mountpoint in mountpoints:
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to managed volume {mountpoint}")
+        if not project_inheritance_enabled(mountpoint):
+            raise RuntimeError(f"XFS project inheritance was not enabled on managed volume {mountpoint}")
 
     existing_quota = read_project_quota(filesystem_mountpoint, project_id)
     limit_bytes = disk_limit_mb * 1024 * 1024
@@ -290,6 +328,7 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
     if disk_limit_mb <= 0:
         raise ValueError("diskLimitMb must be positive")
     docker_root = resolve_docker_root()
+    verify_docker_writable_layer_support(docker_root)
     filesystem_mountpoints: list[str] = []
     for mountpoint in mountpoints:
         validate_mountpoint(mountpoint, docker_root)
@@ -306,6 +345,8 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
             raise RuntimeError("XFS project quota enforcement could not be verified")
         if current_project_id(mountpoint) != project_id:
             raise RuntimeError(f"XFS project {project_id} was not assigned to final managed volume {mountpoint}")
+        if not project_inheritance_enabled(mountpoint):
+            raise RuntimeError(f"XFS project inheritance is not enabled on final managed volume {mountpoint}")
         filesystem_mountpoints.append(filesystem_mountpoint)
 
     if len(set(filesystem_mountpoints)) != 1:
@@ -373,6 +414,11 @@ def main() -> None:
     pids_limit = require_positive_int(request["pidsLimit"], "pidsLimit")
     shared_memory_mb = require_positive_int(request["sharedMemoryMb"], "sharedMemoryMb")
     disk_limit_mb = require_positive_int(request["diskLimitMb"], "diskLimitMb")
+    writable_layer_size_limit_mb = require_positive_int(
+        request["writableLayerSizeLimitMb"], "writableLayerSizeLimitMb"
+    )
+    if not MIN_WRITABLE_LAYER_LIMIT_MB <= writable_layer_size_limit_mb <= MAX_WRITABLE_LAYER_LIMIT_MB:
+        raise ValueError("writableLayerSizeLimitMb is outside the supported range")
     xfs_project_id = require_positive_project_id(request["xfsProjectId"])
     log_max_size_mb = require_positive_int(request["dockerLogMaxSizeMb"], "dockerLogMaxSizeMb")
     log_max_files = require_positive_int(request["dockerLogMaxFiles"], "dockerLogMaxFiles")
@@ -404,8 +450,10 @@ def main() -> None:
         "--restart", "unless-stopped",
         "--cgroup-parent", cgroup_parent,
         "--memory-reservation", f"{reservation_mb}m",
+        "--storage-opt", f"size={writable_layer_size_limit_mb}m",
         "--shm-size", f"{shared_memory_mb}m",
         "--security-opt", "no-new-privileges=true",
+        "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m,mode=1777",
         "--log-driver", "local",
         "--log-opt", f"max-size={log_max_size_mb}m",
         "--log-opt", f"max-file={log_max_files}",
@@ -416,6 +464,7 @@ def main() -> None:
         "--label", f"automaton.specification-id={specification_id}",
         "--network", network,
         "-e", f"AUTOMATON_SERVER_URL={api_url}",
+        "-e", "TMPDIR=/automaton/storage/.tmp",
         "-e", f"AUTOMATON_ENROLLMENT_TOKEN={enrollment_token}",
         "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
         "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
@@ -432,11 +481,18 @@ def main() -> None:
     docker_arguments.append(image)
 
     container_id = host(*docker_arguments).stdout.strip()
-    if runtime_network and runtime_network != network:
-        host("docker", "network", "connect", runtime_network, container_name, check=False)
-    verified_filesystem_uuid = verify_xfs_project_quota([system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb)
-    if verified_filesystem_uuid != storage_filesystem_uuid:
-        raise RuntimeError("Hosted Runner storage filesystem changed during provisioning")
+    try:
+        verify_writable_layer_limit(container_name, writable_layer_size_limit_mb)
+        if runtime_network and runtime_network != network:
+            host("docker", "network", "connect", runtime_network, container_name, check=False)
+        verified_filesystem_uuid = verify_xfs_project_quota(
+            [system_mountpoint, user_mountpoint], xfs_project_id, disk_limit_mb
+        )
+        if verified_filesystem_uuid != storage_filesystem_uuid:
+            raise RuntimeError("Hosted Runner storage filesystem changed during provisioning")
+    except Exception:
+        host("docker", "rm", "-f", container_name, check=False)
+        raise
 
     response = {
         "success": True,

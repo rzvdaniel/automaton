@@ -12,6 +12,17 @@ public class PublishedAppsConfig
     public string RootPath { get; set; } = "AppData/published-apps";
 
     /// <summary>
+    /// Maximum combined size of published app output and in-progress staging files.
+    /// This is enforced per API process when instances share the same root path.
+    /// </summary>
+    public long MaximumTotalStorageBytes { get; set; } = 10L * 1024 * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum combined file count under the published app root.
+    /// </summary>
+    public int MaximumTotalFiles { get; set; } = 100_000;
+
+    /// <summary>
     /// Public base URL for app links, for example https://apps.automaton.monster.
     /// </summary>
     public string PublicBaseUrl { get; set; } = "http://localhost:5173";

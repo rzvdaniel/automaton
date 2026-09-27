@@ -124,10 +124,7 @@ public class RunnerHost
         ProvisioningStatus == RunnerHostProvisioningStatuses.Ready &&
         Status == RunnerHostStatuses.Active &&
         HostedRunnerSchedulingEnabled &&
-        StorageState != RunnerHostStorageStates.SchedulingBlocked &&
-        StorageState != RunnerHostStorageStates.Critical &&
+        StorageState is RunnerHostStorageStates.Healthy or RunnerHostStorageStates.LowSpace &&
         ValidatedAtUtc.HasValue &&
-        (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
-            ? true
-            : InfrastructureRunnerId.HasValue);
+        (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker || InfrastructureRunnerId.HasValue);
 }

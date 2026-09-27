@@ -86,6 +86,8 @@ public sealed class SubscriptionResourcePolicyResolver(
             && resources.MemoryReservationMb <= resources.MemoryLimitMb
             && resources.DiskLimitMb is >= HostedRunnerSpecificationLimits.MinimumDiskLimitMb
             and <= HostedRunnerSpecificationLimits.MaximumDiskLimitMb
+            && resources.WritableLayerLimitMb is >= HostedRunnerSpecificationLimits.MinimumWritableLayerLimitMb
+            and <= HostedRunnerSpecificationLimits.MaximumWritableLayerLimitMb
             && resources.PidsLimit is >= HostedRunnerSpecificationLimits.MinimumPidsLimit
             and <= HostedRunnerSpecificationLimits.MaximumPidsLimit
             && resources.SharedMemoryMb is >= HostedRunnerSpecificationLimits.MinimumSharedMemoryMb

@@ -17,9 +17,11 @@ public sealed record PublishedAppPackageMetadata(
 /// </summary>
 public class PublishedAppStorageService
 {
+    private static readonly SemaphoreSlim StorageMutationGate = new(1, 1);
     private readonly IWebHostEnvironment environment;
     private readonly AppFileStorageService fileStorageService;
     private readonly PublishedAppsConfig config;
+    private readonly PublishedAppStorageBudget storageBudget;
 
     public PublishedAppStorageService(
         IWebHostEnvironment environment,
@@ -29,6 +31,9 @@ public class PublishedAppStorageService
         this.environment = environment;
         this.fileStorageService = fileStorageService;
         this.config = config.Value;
+        storageBudget = new PublishedAppStorageBudget(
+            this.config.MaximumTotalStorageBytes,
+            this.config.MaximumTotalFiles);
     }
 
     public async Task PublishAsync(
@@ -36,6 +41,23 @@ public class PublishedAppStorageService
         Guid appId,
         PublishedAppPackageMetadata metadata,
         CancellationToken cancellationToken = default)
+    {
+        await StorageMutationGate.WaitAsync(cancellationToken);
+        try
+        {
+            await PublishUnderStorageGateAsync(ownerId, appId, metadata, cancellationToken);
+        }
+        finally
+        {
+            StorageMutationGate.Release();
+        }
+    }
+
+    private async Task PublishUnderStorageGateAsync(
+        Guid ownerId,
+        Guid appId,
+        PublishedAppPackageMetadata metadata,
+        CancellationToken cancellationToken)
     {
         var sourcePath = fileStorageService.GetAppRuntimeDirectoryPath(ownerId, appId);
         if (!Directory.Exists(sourcePath))
@@ -49,54 +71,57 @@ public class PublishedAppStorageService
             throw new FileNotFoundException("Publish requires a deployed frontend package with index.html.", indexPath);
         }
 
+        AppArchiveStorageBounds.ValidateDirectory(sourcePath);
         var rootPath = GetRootPath();
-        var stagingPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
+        var stagingPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-{Guid.NewGuid():N}");
         var finalPath = Path.Combine(rootPath, metadata.Slug);
+        var backupPath = Path.Combine(rootPath, ".staging", $"{metadata.Slug}-backup-{Guid.NewGuid():N}");
 
+        storageBudget.ValidateRoot(rootPath);
         Directory.CreateDirectory(stagingPath);
 
         try
         {
-            CopyPublicFiles(sourcePath, stagingPath);
-            await WriteRuntimeFilesAsync(stagingPath, metadata, cancellationToken);
+            CopyPublicFiles(rootPath, sourcePath, stagingPath);
+            await WriteRuntimeFilesAsync(rootPath, stagingPath, metadata, cancellationToken);
+            AppArchiveStorageBounds.ValidateDirectory(stagingPath);
+            storageBudget.ValidateRoot(rootPath);
 
-            if (Directory.Exists(finalPath))
-            {
-                Directory.Delete(finalPath, recursive: true);
-            }
-
-            Directory.Move(stagingPath, finalPath);
+            PromoteStagedPackage(stagingPath, finalPath, backupPath);
         }
         catch
         {
-            if (Directory.Exists(stagingPath))
-            {
-                Directory.Delete(stagingPath, recursive: true);
-            }
-
+            DeleteDirectoryIfExists(stagingPath);
             throw;
         }
     }
 
-    public Task UnpublishAsync(string? slug)
+    public async Task UnpublishAsync(string? slug)
     {
         if (string.IsNullOrWhiteSpace(slug))
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        var rootPath = GetRootPath();
-        var finalPath = Path.Combine(rootPath, slug);
-        if (!Directory.Exists(finalPath))
+        await StorageMutationGate.WaitAsync();
+        try
         {
-            return Task.CompletedTask;
-        }
+            var rootPath = GetRootPath();
+            var finalPath = Path.Combine(rootPath, slug);
+            var disabledRoot = Path.Combine(rootPath, ".disabled");
+            if (Directory.Exists(finalPath))
+            {
+                Directory.CreateDirectory(disabledRoot);
+                var disabledPath = Path.Combine(disabledRoot, $"{slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
+                Directory.Move(finalPath, disabledPath);
+            }
 
-        var disabledRoot = Path.Combine(rootPath, ".disabled");
-        Directory.CreateDirectory(disabledRoot);
-        var disabledPath = Path.Combine(disabledRoot, $"{slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
-        Directory.Move(finalPath, disabledPath);
-        return Task.CompletedTask;
+            DeleteDisabledCopies(slug, disabledRoot);
+        }
+        finally
+        {
+            StorageMutationGate.Release();
+        }
     }
 
     public string BuildPublicUrl(string? slug)
@@ -146,7 +171,48 @@ public class PublishedAppStorageService
         return Path.GetFullPath(rootPath);
     }
 
-    private static void CopyPublicFiles(string sourcePath, string stagingPath)
+    private static void DeleteDisabledCopies(string slug, string disabledRoot)
+    {
+        if (!Directory.Exists(disabledRoot))
+            return;
+
+        var matchingCopies = Directory.EnumerateDirectories(disabledRoot)
+            .Where(directory => Path.GetFileName(directory).StartsWith(slug + "-", StringComparison.Ordinal));
+        foreach (var directory in matchingCopies)
+            Directory.Delete(directory, recursive: true);
+    }
+
+    internal static void PromoteStagedPackage(string stagingPath, string finalPath, string backupPath)
+    {
+        var movedExistingPackage = false;
+        try
+        {
+            if (Directory.Exists(finalPath))
+            {
+                Directory.Move(finalPath, backupPath);
+                movedExistingPackage = true;
+            }
+
+            Directory.Move(stagingPath, finalPath);
+        }
+        catch
+        {
+            if (movedExistingPackage && Directory.Exists(backupPath) && !Directory.Exists(finalPath))
+                Directory.Move(backupPath, finalPath);
+            throw;
+        }
+
+        if (movedExistingPackage)
+            Directory.Delete(backupPath, recursive: true);
+    }
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
+    }
+
+    private void CopyPublicFiles(string rootPath, string sourcePath, string stagingPath)
     {
         foreach (var sourceFile in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
         {
@@ -157,6 +223,7 @@ public class PublishedAppStorageService
             }
 
             var targetPath = ResolveSafePath(stagingPath, relativePath);
+            storageBudget.ValidateWrite(rootPath, targetPath, new FileInfo(sourceFile).Length);
             var targetDirectory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrEmpty(targetDirectory))
             {
@@ -168,6 +235,7 @@ public class PublishedAppStorageService
     }
 
     private async Task WriteRuntimeFilesAsync(
+        string rootPath,
         string stagingPath,
         PublishedAppPackageMetadata metadata,
         CancellationToken cancellationToken)
@@ -175,21 +243,30 @@ public class PublishedAppStorageService
         var indexPath = Path.Combine(stagingPath, "index.html");
         var indexHtml = await File.ReadAllTextAsync(indexPath, cancellationToken);
         ValidatePortableIndexHtml(indexHtml);
-        await File.WriteAllTextAsync(indexPath, InjectRuntimeScripts(indexHtml), cancellationToken);
+        var updatedIndexHtml = InjectRuntimeScripts(indexHtml);
+        ValidateWrite(rootPath, indexPath, updatedIndexHtml);
+        await File.WriteAllTextAsync(indexPath, updatedIndexHtml, cancellationToken);
 
         var configPath = Path.Combine(stagingPath, "automaton-config.js");
-        await File.WriteAllTextAsync(configPath, CreateConfigScript(metadata), cancellationToken);
+        var configScript = CreateConfigScript(metadata);
+        ValidateWrite(rootPath, configPath, configScript);
+        await File.WriteAllTextAsync(configPath, configScript, cancellationToken);
 
         var manifestPath = Path.Combine(stagingPath, "manifest.webmanifest");
         if (!File.Exists(manifestPath))
         {
-            await File.WriteAllTextAsync(manifestPath, CreateDefaultManifest(metadata), cancellationToken);
+            var manifest = CreateDefaultManifest(metadata);
+            ValidateWrite(rootPath, manifestPath, manifest);
+            await File.WriteAllTextAsync(manifestPath, manifest, cancellationToken);
         }
         else
         {
             await ValidatePortableManifestAsync(manifestPath, cancellationToken);
         }
     }
+
+    private void ValidateWrite(string rootPath, string path, string content) =>
+        storageBudget.ValidateWrite(rootPath, path, System.Text.Encoding.UTF8.GetByteCount(content));
 
     private static string InjectRuntimeScripts(string html)
     {
