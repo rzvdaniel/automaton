@@ -20,8 +20,17 @@ public sealed class TrustedInfrastructureActionDeploymentService(
         string actionKey,
         CancellationToken cancellationToken)
     {
-        var (actionRoot, expectedHash) = GetBundledAction(actionKey);
         var deploymentTargetId = await GetPlatformDeploymentTargetIdAsync(cancellationToken);
+        return await EnsureDeployedOnTargetAsync(connectionId, deploymentTargetId, actionKey, cancellationToken);
+    }
+
+    public async Task<AppActionModuleInfo> EnsureDeployedOnTargetAsync(
+        string connectionId,
+        Guid deploymentTargetId,
+        string actionKey,
+        CancellationToken cancellationToken)
+    {
+        var (actionRoot, expectedHash) = GetBundledAction(actionKey);
         var current = await GetDeployedActionAsync(connectionId, deploymentTargetId, actionKey, cancellationToken);
         if (IsCurrentAction(current, expectedHash))
             return current!;

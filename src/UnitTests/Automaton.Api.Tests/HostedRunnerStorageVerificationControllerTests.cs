@@ -54,6 +54,7 @@ public sealed class HostedRunnerStorageVerificationControllerTests
 
         Assert.That(result, Is.TypeOf<AcceptedResult>());
         Assert.That(deployment.ConnectionId, Is.EqualTo(infrastructureRunner.ConnectionId));
+        Assert.That(deployment.DeploymentTargetId, Is.EqualTo(host.Id));
         Assert.That(deployment.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
         var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
         Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Pending));
@@ -118,12 +119,23 @@ public sealed class HostedRunnerStorageVerificationControllerTests
     private sealed class RecordingTrustedActionDeploymentService : ITrustedInfrastructureActionDeploymentService
     {
         public string? ConnectionId { get; private set; }
+        public Guid? DeploymentTargetId { get; private set; }
         public string? ActionKey { get; private set; }
 
         public Task<AppActionModuleInfo> EnsureDeployedAsync(
             string connectionId, string actionKey, CancellationToken cancellationToken)
         {
             ConnectionId = connectionId;
+            ActionKey = actionKey;
+            return Task.FromResult(new AppActionModuleInfo(
+                actionKey, null, null, "python", "main.py", 120, "sha256:test", false, [], 0, null));
+        }
+
+        public Task<AppActionModuleInfo> EnsureDeployedOnTargetAsync(
+            string connectionId, Guid deploymentTargetId, string actionKey, CancellationToken cancellationToken)
+        {
+            ConnectionId = connectionId;
+            DeploymentTargetId = deploymentTargetId;
             ActionKey = actionKey;
             return Task.FromResult(new AppActionModuleInfo(
                 actionKey, null, null, "python", "main.py", 120, "sha256:test", false, [], 0, null));
