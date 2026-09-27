@@ -121,6 +121,27 @@ public class HostedRunnerStorageReconciliationServiceTests
     }
 
     [Test]
+    public async Task StalePendingVerification_WithTerminalDeployment_IsClosedWithoutRedispatch()
+    {
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync();
+        await fixture.SeedRunnerAsync();
+        var verificationId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Pending, "AdministratorRequested",
+            requestedAt: DateTime.UtcNow.AddDays(-1));
+        await fixture.AddTerminalVerificationDeploymentAsync(verificationId, HostedRunnerDeploymentStatuses.Failed, "Previous command already failed.");
+
+        await fixture.ReconcileAsync();
+
+        var status = await fixture.VerificationStatusAsync(verificationId);
+        var error = await fixture.VerificationErrorAsync(verificationId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(status, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(error, Is.EqualTo("Previous command already failed."));
+            Assert.That(fixture.CommandCount, Is.Zero);
+        });
+    }
+
+    [Test]
     public async Task DispatchBound_IgnoresStalePendingDeploymentMirrors()
     {
         await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync(maxPerHost: 2);

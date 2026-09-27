@@ -82,14 +82,15 @@ public sealed class HostedRunnerStorageReconciliationService(
         await MarkTimedOutVerificationsAsync(db, now, timeout, cancellationToken);
 
         var dispatchingTimeout = now.AddMinutes(-Math.Max(2, timeout));
-        var abandonedIds = await db.HostedRunnerStorageVerifications
-            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < dispatchingTimeout)
+        var staleVerificationIds = await db.HostedRunnerStorageVerifications
+            .Where(x => (x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < dispatchingTimeout)
+                || (x.Status == StorageVerificationStatuses.Pending && x.RequestedAtUtc < dispatchingTimeout))
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
-        if (abandonedIds.Count == 0) return;
+        if (staleVerificationIds.Count == 0) return;
 
         var terminalDeployments = await db.HostedRunnerDeployments
-            .Where(x => abandonedIds.Contains(x.Id)
+            .Where(x => staleVerificationIds.Contains(x.Id)
                 && x.Action == HostedRunnerDeploymentActions.VerifyStorage
                 && (x.Status == HostedRunnerDeploymentStatuses.Succeeded || x.Status == HostedRunnerDeploymentStatuses.Failed))
             .Select(x => new TerminalVerificationDeployment(x.Id, x.Error))
@@ -150,8 +151,9 @@ public sealed class HostedRunnerStorageReconciliationService(
     {
         var error = GetTerminalVerificationError(deploymentError);
         return db.HostedRunnerStorageVerifications
-            .Where(x => x.Id == verificationId && x.Status == StorageVerificationStatuses.Dispatching
-                && x.StartedAtUtc < timeout)
+            .Where(x => x.Id == verificationId
+                && ((x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < timeout)
+                    || (x.Status == StorageVerificationStatuses.Pending && x.RequestedAtUtc < timeout)))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.Status, StorageVerificationStatuses.Failed)
                 .SetProperty(x => x.CompletedAtUtc, (DateTime?)now)
@@ -167,14 +169,14 @@ public sealed class HostedRunnerStorageReconciliationService(
     {
         var terminalById = terminalDeployments.ToDictionary(x => x.Id);
         var abandoned = await db.HostedRunnerStorageVerifications
-            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < timeout)
+            .Where(x => (x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < timeout)
+                || (x.Status == StorageVerificationStatuses.Pending && x.RequestedAtUtc < timeout))
             .ToListAsync(cancellationToken);
         foreach (var verification in abandoned)
         {
             if (!terminalById.TryGetValue(verification.Id, out var deployment))
             {
-                verification.Status = StorageVerificationStatuses.Pending;
-                verification.StartedAtUtc = null;
+                RecoverUnmatchedStaleVerification(verification);
                 continue;
             }
 
@@ -183,6 +185,13 @@ public sealed class HostedRunnerStorageReconciliationService(
             verification.Error = GetTerminalVerificationError(deployment.Error);
         }
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void RecoverUnmatchedStaleVerification(HostedRunnerStorageVerification verification)
+    {
+        if (verification.Status != StorageVerificationStatuses.Dispatching) return;
+        verification.Status = StorageVerificationStatuses.Pending;
+        verification.StartedAtUtc = null;
     }
 
     private static string GetTerminalVerificationError(string? deploymentError)
