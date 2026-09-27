@@ -15,6 +15,8 @@ public sealed class HostedRunnerStorageReconciliationService(
     ITransactionalEventExecutor transactionalEventExecutor,
     IOptions<StorageTelemetryOptions> telemetryOptions)
 {
+    private const int MaxVerificationErrorLength = 2000;
+
     internal Task<int> ReconcileAsync(CancellationToken cancellationToken)
         => ReconcileAsync(cancellationToken, includeHostedRunners: true, includeHosts: true);
 
@@ -77,9 +79,39 @@ public sealed class HostedRunnerStorageReconciliationService(
         CancellationToken cancellationToken)
     {
         var timeout = Math.Max(1, telemetryOptions.Value.VerificationTimeoutMinutes);
+        await MarkTimedOutVerificationsAsync(db, now, timeout, cancellationToken);
+
+        var dispatchingTimeout = now.AddMinutes(-Math.Max(2, timeout));
+        var abandonedIds = await db.HostedRunnerStorageVerifications
+            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < dispatchingTimeout)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        if (abandonedIds.Count == 0) return;
+
+        var terminalDeployments = await db.HostedRunnerDeployments
+            .Where(x => abandonedIds.Contains(x.Id)
+                && x.Action == HostedRunnerDeploymentActions.VerifyStorage
+                && (x.Status == HostedRunnerDeploymentStatuses.Succeeded || x.Status == HostedRunnerDeploymentStatuses.Failed))
+            .Select(x => new TerminalVerificationDeployment(x.Id, x.Error))
+            .ToListAsync(cancellationToken);
+        if (db.Database.IsRelational())
+        {
+            await RecoverRelationalDispatchesAsync(db, dispatchingTimeout, now, terminalDeployments, cancellationToken);
+            return;
+        }
+
+        await RecoverInMemoryDispatchesAsync(db, dispatchingTimeout, now, terminalDeployments, cancellationToken);
+    }
+
+    private static async Task MarkTimedOutVerificationsAsync(
+        ApplicationDbContext db,
+        DateTime now,
+        int timeoutMinutes,
+        CancellationToken cancellationToken)
+    {
         var timedOut = await db.HostedRunnerStorageVerifications
             .Where(x => x.Status == StorageVerificationStatuses.Running
-                && x.StartedAtUtc < now.AddMinutes(-timeout))
+                && x.StartedAtUtc < now.AddMinutes(-timeoutMinutes))
             .ToListAsync(cancellationToken);
         foreach (var verification in timedOut)
         {
@@ -87,28 +119,83 @@ public sealed class HostedRunnerStorageReconciliationService(
             verification.CompletedAtUtc = now;
             verification.Error = "Host-side storage verification timed out.";
         }
+    }
 
-        var dispatchingTimeout = now.AddMinutes(-Math.Max(2, timeout));
-        if (db.Database.IsRelational())
-        {
-            await db.HostedRunnerStorageVerifications
-                .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < dispatchingTimeout)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, StorageVerificationStatuses.Pending)
-                    .SetProperty(x => x.StartedAtUtc, (DateTime?)null), cancellationToken);
-            return;
-        }
+    private static async Task RecoverRelationalDispatchesAsync(
+        ApplicationDbContext db,
+        DateTime timeout,
+        DateTime now,
+        IReadOnlyCollection<TerminalVerificationDeployment> terminalDeployments,
+        CancellationToken cancellationToken)
+    {
+        foreach (var deployment in terminalDeployments)
+            await MarkTerminalVerificationFailedAsync(db, deployment.Id, deployment.Error, timeout, now, cancellationToken);
 
+        var terminalIds = terminalDeployments.Select(x => x.Id).ToArray();
+        await db.HostedRunnerStorageVerifications
+            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < timeout
+                && !terminalIds.Contains(x.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, StorageVerificationStatuses.Pending)
+                .SetProperty(x => x.StartedAtUtc, (DateTime?)null), cancellationToken);
+    }
+
+    private static Task<int> MarkTerminalVerificationFailedAsync(
+        ApplicationDbContext db,
+        Guid verificationId,
+        string? deploymentError,
+        DateTime timeout,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var error = GetTerminalVerificationError(deploymentError);
+        return db.HostedRunnerStorageVerifications
+            .Where(x => x.Id == verificationId && x.Status == StorageVerificationStatuses.Dispatching
+                && x.StartedAtUtc < timeout)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, StorageVerificationStatuses.Failed)
+                .SetProperty(x => x.CompletedAtUtc, (DateTime?)now)
+                .SetProperty(x => x.Error, error), cancellationToken);
+    }
+
+    private static async Task RecoverInMemoryDispatchesAsync(
+        ApplicationDbContext db,
+        DateTime timeout,
+        DateTime now,
+        IReadOnlyCollection<TerminalVerificationDeployment> terminalDeployments,
+        CancellationToken cancellationToken)
+    {
+        var terminalById = terminalDeployments.ToDictionary(x => x.Id);
         var abandoned = await db.HostedRunnerStorageVerifications
-            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < dispatchingTimeout)
+            .Where(x => x.Status == StorageVerificationStatuses.Dispatching && x.StartedAtUtc < timeout)
             .ToListAsync(cancellationToken);
-        foreach (var item in abandoned)
+        foreach (var verification in abandoned)
         {
-            item.Status = StorageVerificationStatuses.Pending;
-            item.StartedAtUtc = null;
+            if (!terminalById.TryGetValue(verification.Id, out var deployment))
+            {
+                verification.Status = StorageVerificationStatuses.Pending;
+                verification.StartedAtUtc = null;
+                continue;
+            }
+
+            verification.Status = StorageVerificationStatuses.Failed;
+            verification.CompletedAtUtc = now;
+            verification.Error = GetTerminalVerificationError(deployment.Error);
         }
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static string GetTerminalVerificationError(string? deploymentError)
+    {
+        var message = string.IsNullOrWhiteSpace(deploymentError)
+            ? "Host-side storage verification ended without a persisted result; a fresh verification is required."
+            : deploymentError;
+        return message.Length <= MaxVerificationErrorLength
+            ? message
+            : message[..MaxVerificationErrorLength];
+    }
+
+    private sealed record TerminalVerificationDeployment(Guid Id, string? Error);
 
     private async Task RemoveExpiredObservationsAsync(
         ApplicationDbContext db,

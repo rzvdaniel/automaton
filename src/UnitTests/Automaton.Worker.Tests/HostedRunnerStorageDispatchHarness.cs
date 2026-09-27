@@ -52,7 +52,10 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         return Task.FromResult(new HostedRunnerStorageDispatchHarness(provider, service, publisher, databaseName));
     }
 
-    internal async Task<Guid> SeedRunnerAsync(bool provisioning = false, int storageProjectId = 1_234_567)
+    internal async Task<Guid> SeedRunnerAsync(
+        bool provisioning = false,
+        int storageProjectId = 1_234_567,
+        string? storageFilesystemUuid = null)
     {
         hostId = Guid.NewGuid();
         infrastructureRunnerId = Guid.NewGuid();
@@ -78,13 +81,18 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         {
             AccountId = userId,
             StorageProjectId = storageProjectId,
-            StorageRunnerHostId = hostId
+            StorageRunnerHostId = hostId,
+            StorageFilesystemUuid = storageFilesystemUuid
         });
         await db.SaveChangesAsync();
         return runnerId;
     }
 
-    internal async Task<Guid> AddVerificationAsync(string status, string reason, DateTime? requestedAt = null)
+    internal async Task<Guid> AddVerificationAsync(
+        string status,
+        string reason,
+        DateTime? requestedAt = null,
+        DateTime? startedAtUtc = null)
     {
         var id = Guid.NewGuid();
         await using var db = await OpenDbAsync();
@@ -93,7 +101,7 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
             Id = id, HostedRunnerId = runnerId, IdempotencyKey = id.ToString("N"), Status = status,
             Reason = reason, RequestedAtUtc = requestedAt ?? DateTime.UtcNow,
             StartedAtUtc = status is StorageVerificationStatuses.Dispatching or StorageVerificationStatuses.Running
-                ? DateTime.UtcNow : null
+                ? startedAtUtc ?? DateTime.UtcNow : null
         });
         await db.SaveChangesAsync();
         return id;
@@ -146,6 +154,22 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
                 Id = Guid.NewGuid(), HostedRunnerId = runnerId, Action = HostedRunnerDeploymentActions.VerifyStorage,
                 Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow.AddDays(-50 - index)
             });
+        await db.SaveChangesAsync();
+    }
+
+    internal async Task AddTerminalVerificationDeploymentAsync(Guid verificationId, string status, string? error)
+    {
+        await using var db = await OpenDbAsync();
+        db.HostedRunnerDeployments.Add(new HostedRunnerDeployment
+        {
+            Id = verificationId,
+            HostedRunnerId = runnerId,
+            Action = HostedRunnerDeploymentActions.VerifyStorage,
+            Status = status,
+            Error = error,
+            StartedAt = DateTime.UtcNow.AddHours(-1),
+            FinishedAt = DateTime.UtcNow.AddMinutes(-59)
+        });
         await db.SaveChangesAsync();
     }
 

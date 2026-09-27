@@ -105,23 +105,26 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(
         CancellationToken cancellationToken)
     {
         var runner = verification.HostedRunner;
+        var input = new Dictionary<string, object?>
+        {
+            ["operationId"] = verification.Id,
+            ["hostedRunnerId"] = runner.Id,
+            ["runnerHostId"] = hostId,
+            ["xfsProjectId"] = runner.StorageProjectId,
+            ["storageAllowanceBytes"] = runner.StorageAllowanceBytes,
+            ["expectedSystemVolumeName"] = $"automaton-hosted-runner-{runner.Id:N}-system",
+            ["expectedUserVolumeName"] = $"automaton-hosted-runner-{runner.Id:N}-user"
+        };
+        if (storageFilesystemUuid != null)
+            input["storageFilesystemUuid"] = storageFilesystemUuid;
+
         return eventPublisher.PublishAsync(new InfrastructureCommandRequestedEvent(
             CommandId: verification.Id,
             OperationId: verification.Id,
             RunnerHostId: hostId,
             InfrastructureRunnerId: infrastructureRunnerId,
             ActionKey: StorageTelemetryActions.MeasureHostedRunnerStorage,
-            InputJson: JsonSerializer.Serialize(new
-            {
-                operationId = verification.Id,
-                hostedRunnerId = runner.Id,
-                runnerHostId = hostId,
-                xfsProjectId = runner.StorageProjectId,
-                storageAllowanceBytes = runner.StorageAllowanceBytes,
-                storageFilesystemUuid,
-                expectedSystemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
-                expectedUserVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
-            }),
+            InputJson: JsonSerializer.Serialize(input),
             SecretGrantIds: [],
             CreatedAtUtc: DateTime.UtcNow), cancellationToken);
     }
