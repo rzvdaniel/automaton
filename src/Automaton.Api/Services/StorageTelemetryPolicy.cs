@@ -15,23 +15,17 @@ public static class StorageTelemetryPolicy
     }
 
     public static bool CanScheduleHostedRunners(string state, long? availableBytes, long reserveRequiredBytes,
-        long requestedStorageBytes, DateTime createdAtUtc, DateTime? measuredAtUtc, DateTime nowUtc, StorageTelemetryOptions options)
+        long requestedStorageBytes, DateTime? measuredAtUtc, DateTime nowUtc, StorageTelemetryOptions options)
     {
-        if (state == RunnerHostStorageStates.Unknown && !measuredAtUtc.HasValue &&
-            createdAtUtc >= nowUtc.AddMinutes(-Math.Max(1, options.InitialTelemetryGraceMinutes)))
-            return true;
+        if (!measuredAtUtc.HasValue || measuredAtUtc.Value < nowUtc.AddMinutes(-Math.Max(1, options.FreshAfterMinutes)))
+            return false;
         return CanScheduleHostedRunners(state, availableBytes, reserveRequiredBytes, requestedStorageBytes);
     }
 
     public static bool CanRunDockerStorageOperation(RunnerHost host, DateTime nowUtc, StorageTelemetryOptions options)
     {
-        if (!host.StorageMeasuredAtUtc.HasValue)
-        {
-            return host.StorageState == RunnerHostStorageStates.Unknown
-                && host.CreatedAt >= nowUtc.AddMinutes(-Math.Max(1, options.InitialTelemetryGraceMinutes));
-        }
-
-        if (host.StorageMeasuredAtUtc.Value < nowUtc.AddMinutes(-Math.Max(1, options.FreshAfterMinutes)))
+        if (!host.StorageMeasuredAtUtc.HasValue
+            || host.StorageMeasuredAtUtc.Value < nowUtc.AddMinutes(-Math.Max(1, options.FreshAfterMinutes)))
             return false;
 
         return CanScheduleHostedRunners(

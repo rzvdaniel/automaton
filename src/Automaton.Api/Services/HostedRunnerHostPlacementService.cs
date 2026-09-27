@@ -144,7 +144,7 @@ public sealed class HostedRunnerHostPlacementService(
             .ToListAsync(cancellationToken);
         return candidates.Where(host => StorageTelemetryPolicy.CanScheduleHostedRunners(
                 host.StorageState, host.StorageAvailableBytes, host.StorageReserveRequiredBytes ?? long.MaxValue,
-                requestedStorageBytes, host.CreatedAt, host.StorageMeasuredAtUtc, now, telemetrySettings))
+                requestedStorageBytes, host.StorageMeasuredAtUtc, now, telemetrySettings))
             .ToList();
     }
 
@@ -197,7 +197,7 @@ public sealed class HostedRunnerHostPlacementService(
     private bool CanScheduleStorage(RunnerHost host, long requestedStorageBytes, DateTime now)
         => StorageTelemetryPolicy.CanScheduleHostedRunners(
             host.StorageState, host.StorageAvailableBytes, host.StorageReserveRequiredBytes ?? long.MaxValue,
-            requestedStorageBytes, host.CreatedAt, host.StorageMeasuredAtUtc, now, telemetrySettings);
+            requestedStorageBytes, host.StorageMeasuredAtUtc, now, telemetrySettings);
 
     private static bool HasIncompatibleSharedProjectLimit(
         RunnerHost host,
@@ -227,7 +227,15 @@ public sealed class HostedRunnerHostPlacementService(
             && host.ReservedDiskMb
                 + assigned.Sum(runner => CalculateDiskReservationMb(
                     (runner.PendingSpecificationSnapshot ?? runner.SpecificationSnapshot).Resources))
-                + CalculateDiskReservationMb(requested) <= host.TotalDiskMb;
+                + CalculateDiskReservationMb(requested) <= EffectiveDiskCapacityMb(host);
+    }
+
+    internal static int EffectiveDiskCapacityMb(RunnerHost host)
+    {
+        if (host.DockerFilesystemTotalBytes is not > 0)
+            return 0;
+        var measuredCapacityMb = host.DockerFilesystemTotalBytes.Value / (1024L * 1024L);
+        return (int)Math.Min(host.TotalDiskMb, Math.Min(measuredCapacityMb, int.MaxValue));
     }
 
     private static long CalculateDiskReservationMb(HostedRunnerResources resources)

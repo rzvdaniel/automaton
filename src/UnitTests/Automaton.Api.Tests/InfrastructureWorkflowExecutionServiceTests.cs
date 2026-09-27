@@ -58,7 +58,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     }
 
     [Test]
-    public async Task HostApproval_EnablesSchedulingOnlyAfterValidationAndOnlineRunner()
+    public async Task HostApproval_EnablesSchedulingAfterValidationButStorageTelemetryIsStillRequired()
     {
         await using var db = CreateDbContext();
         var host = await SeedApprovalHostAsync(db, "8.8.8.8");
@@ -70,7 +70,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         Assert.That(approved.HostedRunnerSchedulingEnabled, Is.True);
         Assert.That(approved.ApprovedAtUtc, Is.Not.Null);
         Assert.That(approved.ApprovedByUserId, Is.Not.Null);
-        Assert.That(approved.IsSchedulingEligible, Is.True);
+        Assert.That(approved.IsSchedulingEligible, Is.False);
     }
 
     [Test]

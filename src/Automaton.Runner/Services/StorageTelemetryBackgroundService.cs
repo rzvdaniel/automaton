@@ -93,12 +93,14 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
         {
             var dockerRootResult = await ExecuteHostCommandAsync(["docker", "info", "--format", "{{.DockerRootDir}}"], stoppingToken);
             var dockerRoot = ParseDockerRoot(dockerRootResult);
+            await RunnerHostImageStore.VerifyBoundedLayoutAsync(dockerRoot, ExecuteHostCommandAsync, stoppingToken);
+            await TryPruneUnusedImagesAsync(stoppingToken);
             var hostFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", "/"], stoppingToken));
             var dockerFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", dockerRoot], stoppingToken));
             await hubService.ReportRunnerHostStorageAsync(new(
                 hostId, DateTime.UtcNow, hostFilesystem.Path, hostFilesystem.TotalBytes, hostFilesystem.UsedBytes, hostFilesystem.AvailableBytes,
                 dockerRoot, dockerFilesystem.TotalBytes, dockerFilesystem.AvailableBytes, true, null,
-                typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
+                typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString(), true), stoppingToken);
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
@@ -151,5 +153,18 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
         await process.WaitForExitAsync(cancellationToken);
         if (process.ExitCode != 0) throw new InvalidOperationException(stderr.Trim() is { Length: > 0 } error ? error : "Host command failed.");
         return stdout;
+    }
+
+    private static async Task TryPruneUnusedImagesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ExecuteHostCommandAsync(
+                ["docker", "image", "prune", "--all", "--force", "--filter", "until=24h"], cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            Log.Warning(ex, "Could not prune unused Docker images on the Runner Host.");
+        }
     }
 }

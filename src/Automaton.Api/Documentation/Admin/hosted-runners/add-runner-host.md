@@ -15,6 +15,8 @@ Prepare the target server with:
 
 - a supported operating system;
 - Docker installed and accessible to the Infrastructure Runner;
+- a fixed-capacity XFS filesystem mounted separately from `/`, with XFS project quota support enabled;
+- Docker's data root and the active image-store root on that same filesystem. For Docker's containerd image store, configure and verify containerd's `root` as well as Docker's `data-root`;
 - required ports available;
 - outbound connectivity to the Automaton API;
 - sufficient CPU, memory, and disk;
@@ -23,6 +25,19 @@ Prepare the target server with:
 - permissions for the Infrastructure Runner to execute the required host operations.
 
 The exact provisioning transport and runtime connectivity mode determine which network and directory settings apply.
+
+Before enabling scheduling, verify the active paths on the host:
+
+```text
+docker info --format '{{.DockerRootDir}}'
+docker info --format '{{json .DriverStatus}}'
+findmnt --target <docker-data-root> --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
+findmnt --target <containerd-root> --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
+```
+
+If Docker uses its classic storage driver, its data root contains the image store. When Docker reports a containerd snapshotter, the image and snapshot store can use containerd's separate `root` (normally configured in `/etc/containerd/config.toml`). Both roots must resolve to the same non-root XFS mount with project quotas enabled. Configure that filesystem with a fixed capacity; telemetry verifies the XFS type, mount identity, and quota options. Automaton matches Docker's configured containerd socket to the active containerd process and checks the actual storage roots during Infrastructure Runner storage telemetry; ambiguous or unverified layouts are rejected. Until a current Infrastructure Runner reports a verified layout, the host cannot receive Hosted Runner placement or Docker image operations. After rollout, existing Infrastructure Runner host measurements are marked stale and must be refreshed by the updated Runner before the host is eligible again.
+
+An administrator must prepare or reuse the fixed-capacity filesystem and configure both roots explicitly. Formatting, mounting, changing Docker/containerd configuration, and moving existing data are host setup operations; Automaton does not perform them as repair. Docker named volumes remain under their existing XFS project quotas. If they share this filesystem, its physical capacity bounds tenant volumes and platform image/cache storage together; it does not create a separate image-only quota. Automaton retains host free-space reserves and periodically prunes unused images older than 24 hours.
 
 ## Where
 

@@ -11,7 +11,6 @@ public sealed class StorageTelemetryOptions
     public int ObservationRetentionDays { get; set; } = 30;
     public long MinimumHostReserveBytes { get; set; } = 5L * 1024 * 1024 * 1024;
     public decimal HostReservePercent { get; set; } = 15m;
-    public int InitialTelemetryGraceMinutes { get; set; } = 30;
     public int ReconciliationIntervalMinutes { get; set; } = 20;
     public int VerificationTimeoutMinutes { get; set; } = 10;
     public int VerificationWindowMinutes { get; set; } = 60;

@@ -26,4 +26,5 @@ public sealed record RunnerHostStorageTelemetry(
     long? DockerDataRootAvailableBytes,
     bool Success,
     string? Error,
-    string? InfrastructureRunnerVersion);
+    string? InfrastructureRunnerVersion,
+    bool ImageStoreFilesystemBounded = false);
