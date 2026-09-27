@@ -318,6 +318,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<HostedRunnerLifecycleReconciler>();
         services.AddScoped<TrustedInfrastructureActionDeploymentService>();
         services.AddScoped<ITrustedInfrastructureActionDeploymentService>(sp => sp.GetRequiredService<TrustedInfrastructureActionDeploymentService>());
+        services.AddScoped<HostedRunnerStorageActionDeployment>();
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();

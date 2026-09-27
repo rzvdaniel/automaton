@@ -21,7 +21,8 @@ public sealed class AdminHostedRunnerStorageController(
     ApplicationDbContext db,
     IAuditEventService auditEventService,
     IEventPublisher eventPublisher,
-    ITransactionalEventExecutor transactionalEventExecutor) : ControllerBase
+    ITransactionalEventExecutor transactionalEventExecutor,
+    HostedRunnerStorageActionDeployment hostedRunnerStorageActionDeployment) : ControllerBase
 {
     [HttpPost("runners/{id:guid}/verify-storage")]
     public async Task<ActionResult> VerifyStorage(Guid id, CancellationToken cancellationToken)
@@ -30,6 +31,9 @@ public sealed class AdminHostedRunnerStorageController(
         if (runner == null) return NotFound();
         if (runner.Status != HostedRunnerStatuses.Running || string.IsNullOrWhiteSpace(runner.ContainerId))
             return Conflict(new { message = "Storage verification is available only after the Hosted Runner is running and its container is provisioned." });
+        if (!await hostedRunnerStorageActionDeployment.TryEnsureDeployedAsync(id, cancellationToken))
+            return Conflict(new { message = "Storage verification requires an online Infrastructure Runner." });
+
         var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
         var key = $"storage-verification:{id:N}:admin:{window}";
         var existing = await db.HostedRunnerStorageVerifications
