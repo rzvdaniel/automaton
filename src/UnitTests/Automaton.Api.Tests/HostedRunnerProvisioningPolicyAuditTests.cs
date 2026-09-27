@@ -169,7 +169,13 @@ public class HostedRunnerProvisioningPolicyAuditTests
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,
-            CreatedAt = DateTime.UtcNow.AddMinutes(1)
+            CreatedAt = DateTime.UtcNow.AddMinutes(1),
+            StorageState = RunnerHostStorageStates.Healthy,
+            StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+            StorageAvailableBytes = 60L * 1024 * 1024 * 1024,
+            StorageReserveRequiredBytes = 5L * 1024 * 1024 * 1024,
+            StorageMeasuredAtUtc = DateTime.UtcNow,
+            DockerFilesystemTotalBytes = 65536L * 1024 * 1024
         };
         db.RunnerHosts.Add(remoteHost);
         db.SaveChanges();

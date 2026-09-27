@@ -89,7 +89,13 @@ public sealed class HostedRunnerWritableLayerCapacityTests
         TotalCpuCores = 8,
         TotalMemoryMb = 16384,
         TotalDiskMb = totalDiskMb,
-        CreatedAt = DateTime.UtcNow
+        CreatedAt = DateTime.UtcNow,
+        StorageState = RunnerHostStorageStates.Healthy,
+        StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded,
+        StorageAvailableBytes = 10L * 1024 * 1024 * 1024,
+        StorageReserveRequiredBytes = 0,
+        StorageMeasuredAtUtc = DateTime.UtcNow,
+        DockerFilesystemTotalBytes = (long)totalDiskMb * 1024 * 1024
     };
 
     private static HostedRunnerSpecificationSnapshot CreateSnapshot(int writableLayerLimitMb) => new()
