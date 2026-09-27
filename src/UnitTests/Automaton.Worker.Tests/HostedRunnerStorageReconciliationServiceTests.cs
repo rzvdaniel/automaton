@@ -77,6 +77,50 @@ public class HostedRunnerStorageReconciliationServiceTests
     }
 
     [Test]
+    public async Task TimedOutDispatch_WithTerminalDeployment_IsFailedInsteadOfRedispatched()
+    {
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync(maxPerHost: 2);
+        await fixture.SeedRunnerAsync();
+        var verificationId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Dispatching, "AdministratorRequested",
+            startedAtUtc: DateTime.UtcNow.AddHours(-1));
+        await fixture.AddTerminalVerificationDeploymentAsync(verificationId, HostedRunnerDeploymentStatuses.Failed, "Old action failed.");
+        var pendingId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Pending, "AdministratorRequested");
+
+        await fixture.ReconcileAsync();
+        var failedStatus = await fixture.VerificationStatusAsync(verificationId);
+        var failedError = await fixture.VerificationErrorAsync(verificationId);
+        var pendingStatus = await fixture.VerificationStatusAsync(pendingId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failedStatus, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(failedError, Is.EqualTo("Old action failed."));
+            Assert.That(pendingStatus, Is.EqualTo(StorageVerificationStatuses.Dispatching));
+            Assert.That(fixture.CommandCount, Is.EqualTo(1));
+            Assert.That(fixture.SingleCommand().CommandId, Is.EqualTo(pendingId));
+        });
+    }
+
+    [Test]
+    public async Task TimedOutDispatch_WithoutTerminalDeployment_IsRecoveredAndRepublished()
+    {
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync();
+        await fixture.SeedRunnerAsync();
+        var verificationId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Dispatching, "AdministratorRequested",
+            startedAtUtc: DateTime.UtcNow.AddHours(-1));
+
+        await fixture.ReconcileAsync();
+        var status = await fixture.VerificationStatusAsync(verificationId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(status, Is.EqualTo(StorageVerificationStatuses.Dispatching));
+            Assert.That(fixture.CommandCount, Is.EqualTo(1));
+            Assert.That(fixture.SingleCommand().CommandId, Is.EqualTo(verificationId));
+        });
+    }
+
+    [Test]
     public async Task DispatchBound_IgnoresStalePendingDeploymentMirrors()
     {
         await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync(maxPerHost: 2);
@@ -181,6 +225,22 @@ public class HostedRunnerStorageReconciliationServiceTests
             Assert.That(command.RunnerHostId, Is.EqualTo(fixture.HostId));
             Assert.That(command.InfrastructureRunnerId, Is.EqualTo(fixture.InfrastructureRunnerId));
         });
+        using var input = JsonDocument.Parse(command.InputJson);
+        Assert.That(input.RootElement.TryGetProperty("storageFilesystemUuid", out _), Is.False);
+    }
+
+    [Test]
+    public async Task PendingVerification_IncludesKnownFilesystemUuid()
+    {
+        const string filesystemUuid = "e32f7db1-0a12-4b1a-9876-d7c3e8140dc1";
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync();
+        await fixture.SeedRunnerAsync(storageFilesystemUuid: filesystemUuid);
+        await fixture.AddVerificationAsync(StorageVerificationStatuses.Pending, "AdministratorRequested");
+
+        await fixture.ReconcileAsync();
+
+        using var input = JsonDocument.Parse(fixture.SingleCommand().InputJson);
+        Assert.That(input.RootElement.GetProperty("storageFilesystemUuid").GetString(), Is.EqualTo(filesystemUuid));
     }
 
     [Test]
