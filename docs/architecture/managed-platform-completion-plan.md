@@ -85,6 +85,8 @@ These are proposed defaults for the first managed release, subject to product ap
 
 ### M1 — Complete managed storage enforcement (old Stages 4–7)
 
+**Status: implemented; live acceptance pending.** M1 implementation is merged; production acceptance still requires the reviewed Worker payload correction, runner reprovision, and the disposable Automaton flow.
+
 Reuse the existing XFS provision/reprovision actions and user-volume topology.
 
 - Verify project assignment and inheritance for system/user roots, existing files, new nested files, runtime data mounts, build source, candidate artifacts and retained caches.
