@@ -228,6 +228,21 @@ Project ID       Used       Soft       Hard    Warn/Grace
         ), self.assertRaisesRegex(RuntimeError, "could not be verified"):
             ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
 
+    def test_accepts_project_assignment_with_inheritance(self):
+        calls = []
+
+        def host(*arguments, timeout=90):
+            calls.append((arguments, timeout))
+            if arguments[2] == "stat":
+                return subprocess.CompletedProcess(arguments, 0, "fsxattr.projid = 1234567\n", "")
+            return subprocess.CompletedProcess(arguments, 0, f"--------P-------------- {arguments[3]}\n", "")
+
+        with patch.object(ACTION, "host", side_effect=host):
+            ACTION.require_project_assignment("/docker/volumes/runner/_data", 1234567)
+
+        self.assertEqual([arguments[2] for arguments, _ in calls], ["stat", "lsattr"])
+        self.assertTrue(all(timeout == 90 for _, timeout in calls))
+
     def test_rejects_project_assignment_without_inheritance_flag(self):
         def host(*args, **kwargs):
             if args[2] == "stat":

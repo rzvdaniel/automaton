@@ -139,7 +139,7 @@ def require_project_assignment(mountpoint: str, project_id: int) -> None:
     match = re.search(r"projid\s*[.= :]\s*(\d+)", result.stdout + result.stderr, re.IGNORECASE)
     if match is None or int(match.group(1)) != project_id:
         raise RuntimeError(f"XFS project {project_id} is not assigned to managed volume {mountpoint}")
-    attributes = host("xfs_io", "-c", "lsattr", mountpoint, check=False)
+    attributes = host("xfs_io", "-c", "lsattr", mountpoint)
     flag_line = next((line for line in attributes.stdout.splitlines() if line.strip()), "")
     flags = flag_line.split(maxsplit=1)[0] if flag_line else ""
     if attributes.returncode != 0 or "P" not in flags:
