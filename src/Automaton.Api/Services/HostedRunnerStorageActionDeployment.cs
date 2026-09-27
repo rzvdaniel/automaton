@@ -16,14 +16,19 @@ public sealed class HostedRunnerStorageActionDeployment(
             .Include(x => x.RunnerHost)
             .ThenInclude(x => x!.InfrastructureRunner)
             .SingleOrDefaultAsync(x => x.Id == hostedRunnerId && x.DeletedAt == null, cancellationToken);
-        var infrastructureRunner = runner?.RunnerHost?.InfrastructureRunner;
-        if (infrastructureRunner?.Purpose != RunnerPurposes.Infrastructure
+        var runnerHost = runner?.RunnerHost;
+        var infrastructureRunner = runnerHost?.InfrastructureRunner;
+        if (runnerHost is null
+            || infrastructureRunner?.Purpose != RunnerPurposes.Infrastructure
             || !RunnerPresenceEvaluator.IsOnline(
                 infrastructureRunner.ConnectionId, infrastructureRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
             return false;
 
-        await trustedActionDeployment.EnsureDeployedAsync(
-            infrastructureRunner.ConnectionId!, StorageTelemetryActions.MeasureHostedRunnerStorage, cancellationToken);
+        await trustedActionDeployment.EnsureDeployedOnTargetAsync(
+            infrastructureRunner.ConnectionId!,
+            runnerHost.Id,
+            StorageTelemetryActions.MeasureHostedRunnerStorage,
+            cancellationToken);
         return true;
     }
 }
