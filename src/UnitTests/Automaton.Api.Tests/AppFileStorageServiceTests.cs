@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Api.Services.Mcp.Apps;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 
@@ -50,6 +51,52 @@ public class AppFileStorageServiceTests
         finally
         {
             Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task McpRename_SerializesWithReplacementWriteAtStorageLimit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        var sourcePath = Path.Combine(root, "source");
+        Directory.CreateDirectory(sourcePath);
+        File.WriteAllText(Path.Combine(sourcePath, "target.txt"), new string('x', 20));
+        File.WriteAllText(Path.Combine(sourcePath, "existing.txt"), new string('x', 60));
+
+        try
+        {
+            var fileSystem = new AppScopedFileSystem(sourcePath);
+            await using var heldLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(sourcePath);
+            var renameTask = fileSystem.RenameFileAsync("target.txt", "moved.txt");
+            var replacementWriteTask = WriteReplacementAsync();
+
+            Assert.That(renameTask.IsCompleted, Is.False, "MCP rename must wait for the source-root lock.");
+            Assert.That(replacementWriteTask.IsCompleted, Is.False, "Bounded writes must use the same source-root lock.");
+
+            await heldLock.DisposeAsync();
+            await renameTask;
+            await replacementWriteTask;
+
+            var finalBytes = Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories)
+                .Sum(path => new FileInfo(path).Length);
+            Assert.That(finalBytes, Is.LessThanOrEqualTo(100));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
+        async Task WriteReplacementAsync()
+        {
+            try
+            {
+                await AppArchiveStorageBounds.WriteBoundedTextFileAsync(
+                    sourcePath, "target.txt", new string('x', 40), maximumBytes: 100);
+            }
+            catch (InvalidDataException)
+            {
+                // If the rename runs first, the old file remains in the directory and the replacement must be rejected.
+            }
         }
     }
 
