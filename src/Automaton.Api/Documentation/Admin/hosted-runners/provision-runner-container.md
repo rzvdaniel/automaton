@@ -47,7 +47,7 @@ If the container is provisioned but the Runner does not connect, inspect the dep
 In **Administration → Hosted Runners → Runner Containers**, select the existing container to inspect its current lifecycle and storage state.
 
 - **Restart** requests a canonical restart and waits for the Runner to reconnect.
-- **Verify storage** queues a host-side storage measurement only after the Hosted Runner is **Running** and its container is provisioned. While provisioning, the API rejects the request; refresh the container details after provisioning completes and then request verification.
+- **Verify storage** queues a host-side storage measurement only after the Hosted Runner is **Running** and its container is provisioned. While provisioning, the API rejects the request; refresh the container details after provisioning completes and then request verification. For this admin-triggered request, the assigned Infrastructure Runner must be online; the API synchronizes the trusted measurement action before queuing (automated Worker-triggered requests still use the already stored action module).
 - **Suspend** is available when the enforcement state is not already suspended or transitioning. Confirm the action before submitting it.
 - **Resume** is available only when the enforcement state is **Suspended**.
 - **Reprovision** replaces the managed container through the Hosted Runner lifecycle.

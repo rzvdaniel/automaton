@@ -2,7 +2,9 @@ using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,25 +37,71 @@ public sealed class HostedRunnerStorageVerificationControllerTests
     public async Task VerifyStorage_AcceptsRunningProvisionedRunner()
     {
         await using var db = CreateDb();
+        var infrastructureRunner = CreateOnlineInfrastructureRunner();
+        var host = CreateReadyHost(infrastructureRunner);
         var hostedRunner = new HostedRunner
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
-            ContainerId = "container-id", Status = HostedRunnerStatuses.Running
+            ContainerId = "container-id", Status = HostedRunnerStatuses.Running,
+            RunnerHostId = host.Id, RunnerHost = host
         };
         db.HostedRunners.Add(hostedRunner);
         await db.SaveChangesAsync();
 
-        var controller = CreateController(db);
+        var deployment = new RecordingTrustedActionDeploymentService();
+        var controller = CreateController(db, deployment);
         var result = await controller.VerifyStorage(hostedRunner.Id, CancellationToken.None);
 
         Assert.That(result, Is.TypeOf<AcceptedResult>());
+        Assert.That(deployment.ConnectionId, Is.EqualTo(infrastructureRunner.ConnectionId));
+        Assert.That(deployment.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
         var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
         Assert.That(verification.Status, Is.EqualTo(StorageVerificationStatuses.Pending));
         Assert.That(verification.Reason, Is.EqualTo("AdministratorRequested"));
     }
 
-    private static AdminHostedRunnerStorageController CreateController(ApplicationDbContext db) =>
-        new(db, new NoOpAuditEventService(), null!, null!);
+    [Test]
+    public async Task VerifyStorage_RejectsWhenInfrastructureRunnerIsOffline()
+    {
+        await using var db = CreateDb();
+        var infrastructureRunner = CreateOnlineInfrastructureRunner();
+        infrastructureRunner.ConnectionId = null;
+        var host = CreateReadyHost(infrastructureRunner);
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "hosted", ContainerName = "hosted",
+            ContainerId = "container-id", Status = HostedRunnerStatuses.Running,
+            RunnerHostId = host.Id, RunnerHost = host
+        };
+        db.HostedRunners.Add(hostedRunner);
+        await db.SaveChangesAsync();
+
+        var deployment = new RecordingTrustedActionDeploymentService();
+        var result = await CreateController(db, deployment).VerifyStorage(hostedRunner.Id, CancellationToken.None);
+
+        Assert.That(result, Is.TypeOf<ConflictObjectResult>());
+        Assert.That(deployment.ConnectionId, Is.Null);
+        Assert.That(await db.HostedRunnerStorageVerifications.CountAsync(), Is.Zero);
+    }
+
+    private static AdminHostedRunnerStorageController CreateController(
+        ApplicationDbContext db,
+        RecordingTrustedActionDeploymentService? deployment = null) =>
+        new(db, new NoOpAuditEventService(), null!, null!,
+            new HostedRunnerStorageActionDeployment(db, deployment ?? new RecordingTrustedActionDeploymentService()));
+
+    private static Runner CreateOnlineInfrastructureRunner() => new()
+    {
+        Id = Guid.NewGuid(), Name = "infrastructure", ConnectionId = "infra-connection",
+        Purpose = RunnerPurposes.Infrastructure, LastHeartbeatAtUtc = DateTime.UtcNow
+    };
+
+    private static RunnerHost CreateReadyHost(Runner infrastructureRunner) => new()
+    {
+        Id = Guid.NewGuid(), Name = "host", Provider = "test",
+        Status = RunnerHostStatuses.Active, ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
+        InfrastructureRunnerId = infrastructureRunner.Id, InfrastructureRunner = infrastructureRunner
+    };
 
     private static ApplicationDbContext CreateDb() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -65,5 +113,20 @@ public sealed class HostedRunnerStorageVerificationControllerTests
 
         public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null,
             string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingTrustedActionDeploymentService : ITrustedInfrastructureActionDeploymentService
+    {
+        public string? ConnectionId { get; private set; }
+        public string? ActionKey { get; private set; }
+
+        public Task<AppActionModuleInfo> EnsureDeployedAsync(
+            string connectionId, string actionKey, CancellationToken cancellationToken)
+        {
+            ConnectionId = connectionId;
+            ActionKey = actionKey;
+            return Task.FromResult(new AppActionModuleInfo(
+                actionKey, null, null, "python", "main.py", 120, "sha256:test", false, [], 0, null));
+        }
     }
 }
