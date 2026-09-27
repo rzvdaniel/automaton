@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IO.Compression;
+using System.Text;
 
 namespace Automaton.Api.Services;
 
@@ -54,6 +56,54 @@ internal static class AppArchiveStorageBounds
 
         if (replacementBytes > maximumBytes - usage.TotalBytes)
             throw new InvalidDataException($"Directory exceeds the {maximumBytes}-byte storage limit.");
+    }
+
+    public static async Task WriteBoundedTextFileAsync(
+        string rootPath,
+        string relativePath,
+        string content,
+        long maximumBytes = MaximumExpandedBytes,
+        CancellationToken cancellationToken = default)
+    {
+        await using var writeLock = await AcquireWriteLockAsync(rootPath, cancellationToken);
+        ValidateFileWrite(rootPath, relativePath, Encoding.UTF8.GetByteCount(content), maximumBytes);
+
+        var fullRootPath = Path.GetFullPath(rootPath);
+        var fullFilePath = Path.GetFullPath(Path.Combine(fullRootPath, relativePath));
+        var directoryPath = Path.GetDirectoryName(fullFilePath);
+        if (!string.IsNullOrEmpty(directoryPath))
+            Directory.CreateDirectory(directoryPath);
+
+        await File.WriteAllTextAsync(fullFilePath, content, cancellationToken);
+    }
+
+    public static async Task<FileStream> AcquireWriteLockAsync(
+        string rootPath,
+        CancellationToken cancellationToken = default)
+    {
+        var fullRootPath = Path.GetFullPath(rootPath);
+        var parentPath = Path.GetDirectoryName(fullRootPath)
+            ?? throw new InvalidOperationException("The bounded storage root must have a parent directory.");
+        var rootName = Path.GetFileName(fullRootPath);
+        if (string.IsNullOrWhiteSpace(rootName))
+            throw new InvalidOperationException("The bounded storage root must be a named directory.");
+
+        Directory.CreateDirectory(parentPath);
+        // Keep the lock beside the root so directory swaps preserve the same cross-process lock.
+        var lockPath = Path.Combine(parentPath, $".{rootName}.automaton-write.lock");
+        var waitStarted = Stopwatch.StartNew();
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, useAsync: true);
+            }
+            catch (IOException) when (waitStarted.Elapsed < TimeSpan.FromMinutes(2))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+            }
+        }
     }
 
     public static async Task CopyExactlyAsync(

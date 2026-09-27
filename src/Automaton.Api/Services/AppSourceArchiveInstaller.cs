@@ -14,6 +14,7 @@ internal static class AppSourceArchiveInstaller
         var parentPath = Path.GetDirectoryName(fullSourcePath)
             ?? throw new InvalidOperationException("App source path must have a parent directory.");
         Directory.CreateDirectory(parentPath);
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(fullSourcePath, cancellationToken);
 
         var token = Guid.NewGuid().ToString("N");
         var stagingPath = $"{fullSourcePath}.staging-{token}";

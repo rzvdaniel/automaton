@@ -1,5 +1,4 @@
 using Automaton.Mcp.Tools;
-using System.Text;
 
 namespace Automaton.Api.Services.Mcp.Apps;
 
@@ -18,7 +17,6 @@ public class AppScopedFileSystem : LocalScopedFileSystem
     public override async Task WriteFileAsync(string relativePath, string content)
     {
         AppFileStorageService.ValidateFileExtensionPublic(relativePath);
-        AppArchiveStorageBounds.ValidateFileWrite(RootPath, relativePath, Encoding.UTF8.GetByteCount(content));
 
         // Enforce backend-only placement for executable scripts.
         // Python and Batch files must live in backend/ — never at the root or in frontend folders.
@@ -32,7 +30,7 @@ public class AppScopedFileSystem : LocalScopedFileSystem
                     $"Use path 'backend/{Path.GetFileName(relativePath)}' instead of '{relativePath}'.");
         }
 
-        await base.WriteFileAsync(relativePath, content);
+        await AppArchiveStorageBounds.WriteBoundedTextFileAsync(RootPath, relativePath, content);
     }
 
     public override Task DeleteFileAsync(string relativePath)

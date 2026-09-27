@@ -16,7 +16,7 @@ Prepare the target server with:
 - a supported operating system;
 - Docker installed and accessible to the Infrastructure Runner;
 - a fixed-capacity XFS filesystem mounted separately from `/`, with XFS project quota support enabled;
-- Docker's data root and the active image-store root on that same filesystem. For Docker's containerd image store, configure and verify containerd's `root` as well as Docker's `data-root`;
+- Docker configured with the `overlay2` storage driver and its data root on that filesystem;
 - required ports available;
 - outbound connectivity to the Automaton API;
 - sufficient CPU, memory, and disk;
@@ -29,15 +29,15 @@ The exact provisioning transport and runtime connectivity mode determine which n
 Before enabling scheduling, verify the active paths on the host:
 
 ```text
+docker info --format '{{.Driver}}'
 docker info --format '{{.DockerRootDir}}'
-docker info --format '{{json .DriverStatus}}'
+findmnt --target / --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
 findmnt --target <docker-data-root> --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
-findmnt --target <containerd-root> --output TARGET,SOURCE,FSTYPE,UUID,OPTIONS
 ```
 
-If Docker uses its classic storage driver, its data root contains the image store. When Docker reports a containerd snapshotter, the image and snapshot store can use containerd's separate `root` (normally configured in `/etc/containerd/config.toml`). Both roots must resolve to the same non-root XFS mount with project quotas enabled. Configure that filesystem with a fixed capacity; telemetry verifies the XFS type, mount identity, and quota options. Automaton matches Docker's configured containerd socket to the active containerd process and checks the actual storage roots during Infrastructure Runner storage telemetry; ambiguous or unverified layouts are rejected. Until a current Infrastructure Runner reports a verified layout, the host cannot receive Hosted Runner placement or Docker image operations. After rollout, existing Infrastructure Runner host measurements are marked stale and must be refreshed by the updated Runner before the host is eligible again.
+Hosted Runner provisioning requires Docker's `overlay2` storage driver, whose image and writable-layer data resides under Docker's data root. Configure that root on the fixed-capacity XFS filesystem. Its mount must have a different filesystem UUID from `/`; a bind mount backed by the OS filesystem does not qualify. Telemetry verifies the driver, XFS type, mount identity, and project quota options. Until a current Infrastructure Runner reports a verified layout, the host cannot receive Hosted Runner placement or Docker image operations. After rollout, existing Infrastructure Runner host measurements are marked stale and must be refreshed by the updated Runner before the host is eligible again.
 
-An administrator must prepare or reuse the fixed-capacity filesystem and configure both roots explicitly. Formatting, mounting, changing Docker/containerd configuration, and moving existing data are host setup operations; Automaton does not perform them as repair. Docker named volumes remain under their existing XFS project quotas. If they share this filesystem, its physical capacity bounds tenant volumes and platform image/cache storage together; it does not create a separate image-only quota. Automaton retains host free-space reserves and periodically prunes unused images older than 24 hours.
+An administrator must prepare or reuse the fixed-capacity filesystem and configure Docker's data root explicitly. Formatting, mounting, changing Docker configuration, and moving existing data are host setup operations; Automaton does not perform them as repair. Docker named volumes remain under their existing XFS project quotas. If they share this filesystem, its physical capacity bounds tenant volumes and platform image/cache storage together; it does not create a separate image-only quota. Automaton retains host free-space reserves and may prune dangling, untagged Docker images after verification; it never runs the broad `--all` prune that would remove tagged rollback images.
 
 ## Where
 

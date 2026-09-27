@@ -187,6 +187,7 @@ public class AppArchiveService
     private static async Task<List<string>> ExtractImportedArchiveAsync(ZipArchive archive, string sourcePath, CancellationToken cancellationToken)
     {
         var written = new List<string>();
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(sourcePath, cancellationToken);
 
         foreach (var entry in archive.Entries)
         {
@@ -220,6 +221,7 @@ public class AppArchiveService
                 throw new InvalidDataException($"Path traversal detected for '{relativePath}'.");
             }
 
+            AppArchiveStorageBounds.ValidateFileWrite(fullSourcePath, relativePath, entry.Length);
             Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
 
             await using var entryStream = entry.Open();

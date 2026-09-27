@@ -15,6 +15,45 @@ namespace Automaton.Api.Tests;
 public class AppFileStorageServiceTests
 {
     [Test]
+    public async Task BoundedSourceWrites_ConcurrentWritesCannotExceedStorageLimit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        var sourcePath = Path.Combine(root, "source");
+        Directory.CreateDirectory(sourcePath);
+        File.WriteAllText(Path.Combine(sourcePath, "existing.txt"), new string('x', 50));
+
+        try
+        {
+            using var start = new ManualResetEventSlim(false);
+            var writes = Enumerable.Range(0, 2).Select(index => Task.Run(async () =>
+            {
+                start.Wait();
+                try
+                {
+                    await AppArchiveStorageBounds.WriteBoundedTextFileAsync(
+                        sourcePath, $"new-{index}.txt", new string('x', 30), maximumBytes: 100);
+                    return true;
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+            })).ToArray();
+
+            start.Set();
+            var outcomes = await Task.WhenAll(writes);
+
+            Assert.That(outcomes.Count(succeeded => succeeded), Is.EqualTo(1));
+            Assert.That(Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories)
+                .Sum(path => new FileInfo(path).Length), Is.EqualTo(80));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public void DirectFileEditing_AllowsNormalSourceExtensions()
     {
         Assert.DoesNotThrow(() => AppFileStorageService.ValidateFileExtensionPublic("Program.cs"));

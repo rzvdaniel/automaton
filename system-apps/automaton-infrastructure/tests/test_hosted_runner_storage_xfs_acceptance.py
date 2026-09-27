@@ -24,7 +24,6 @@ import os
 import subprocess
 import sys
 import shutil
-import shlex
 import unittest
 import uuid
 from pathlib import Path
@@ -212,67 +211,16 @@ class HostedRunnerStorageXfsAcceptanceTests(unittest.TestCase):
                 subprocess.run(["docker", "image", "rm", image], capture_output=True, check=False)
 
     def verify_shared_storage_layout(self):
+        driver = self.docker("info", "--format", "{{.Driver}}")
+        self.assertEqual(driver, "overlay2", "Hosted Runner storage requires Docker's overlay2 driver")
         docker_root = self.docker("info", "--format", "{{.DockerRootDir}}")
-        driver_status = json.loads(self.docker("info", "--format", "{{json .DriverStatus}}"))
-        image_store_type = next(
-            (row[1] for row in driver_status if len(row) >= 2 and row[0] == "driver-type"), None,
-        )
-        if image_store_type and image_store_type.startswith("io.containerd.snapshotter."):
-            containerd_root = self.containerd_image_store_root()
-        elif self.docker("info", "--format", "{{.Driver}}") in {
-            "overlay2", "overlayfs", "aufs", "btrfs", "zfs", "devicemapper", "vfs", "fuse-overlayfs",
-        }:
-            containerd_root = docker_root
-        else:
-            self.fail("Docker's active image storage backend could not be identified")
         docker_mount = self.find_mount(docker_root)
-        containerd_mount = self.find_mount(containerd_root)
+        root_mount = self.find_mount("/")
         self.assertEqual(docker_mount["fstype"], "xfs")
-        self.assertEqual(containerd_mount["fstype"], "xfs")
         self.assertTrue({"prjquota", "pquota"}.intersection(docker_mount["options"].split(",")))
-        self.assertEqual(docker_mount["target"], containerd_mount["target"])
-        self.assertEqual(docker_mount["uuid"], containerd_mount["uuid"])
         self.assertNotEqual(docker_mount["target"], "/")
+        self.assertNotEqual(docker_mount["uuid"].lower(), root_mount["uuid"].lower())
         return docker_root, docker_mount
-
-    def containerd_image_store_root(self):
-        docker_processes = self.process_arguments("dockerd")
-        if len(docker_processes) != 1:
-            self.fail("the Docker daemon connected to the active image store is ambiguous")
-        docker_socket = self.read_option(docker_processes[0], "--containerd") or "/run/containerd/containerd.sock"
-        containerd_processes = self.process_arguments("containerd")
-        active_processes = [
-            arguments for arguments in containerd_processes
-            if (self.read_option(arguments, "--address", "-a") or "/run/containerd/containerd.sock") == docker_socket
-        ]
-        if len(active_processes) != 1:
-            self.fail("the containerd process connected to Docker's image store is ambiguous or missing")
-        arguments = active_processes[0]
-        root = self.read_option(arguments, "--root", "-r")
-        if root:
-            return root
-        config_path = self.read_option(arguments, "--config", "-c") or "/etc/containerd/config.toml"
-        config = subprocess.run(
-            ["containerd", "--config", config_path, "config", "dump"],
-            text=True, capture_output=True, check=True,
-        ).stdout
-        root_line = next((line for line in config.splitlines() if line.strip().startswith("root =")), "")
-        return root_line.split("=", 1)[1].strip().strip("\"'") if root_line else "/var/lib/containerd"
-
-    @staticmethod
-    def process_arguments(name):
-        process = subprocess.run(["ps", "-C", name, "-o", "args="], text=True, capture_output=True, check=True)
-        return [shlex.split(line) for line in process.stdout.splitlines() if line.strip()]
-
-    @staticmethod
-    def read_option(arguments, *names):
-        for index, argument in enumerate(arguments):
-            for name in names:
-                if argument.startswith(f"{name}="):
-                    return argument[len(name) + 1:]
-                if argument == name and index + 1 < len(arguments):
-                    return arguments[index + 1]
-        return None
 
     @staticmethod
     def find_mount(path):

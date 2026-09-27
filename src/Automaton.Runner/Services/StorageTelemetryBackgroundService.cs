@@ -94,7 +94,7 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
             var dockerRootResult = await ExecuteHostCommandAsync(["docker", "info", "--format", "{{.DockerRootDir}}"], stoppingToken);
             var dockerRoot = ParseDockerRoot(dockerRootResult);
             await RunnerHostImageStore.VerifyBoundedLayoutAsync(dockerRoot, ExecuteHostCommandAsync, stoppingToken);
-            await TryPruneUnusedImagesAsync(stoppingToken);
+            await TryPruneDanglingImagesAsync(stoppingToken);
             var hostFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", "/"], stoppingToken));
             var dockerFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", dockerRoot], stoppingToken));
             await hubService.ReportRunnerHostStorageAsync(new(
@@ -155,16 +155,16 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
         return stdout;
     }
 
-    private static async Task TryPruneUnusedImagesAsync(CancellationToken cancellationToken)
+    private static async Task TryPruneDanglingImagesAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await ExecuteHostCommandAsync(
-                ["docker", "image", "prune", "--all", "--force", "--filter", "until=24h"], cancellationToken);
+            // Without --all, Docker only removes dangling untagged images, preserving tagged rollback images.
+            await ExecuteHostCommandAsync(["docker", "image", "prune", "--force"], cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            Log.Warning(ex, "Could not prune unused Docker images on the Runner Host.");
+            Log.Warning(ex, "Could not prune dangling Docker images on the Runner Host.");
         }
     }
 }

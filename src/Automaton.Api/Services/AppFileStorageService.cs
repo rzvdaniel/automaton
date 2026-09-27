@@ -1,6 +1,5 @@
 using Automaton.Api.Models;
 using Serilog;
-using System.Text;
 using System.Text.Json;
 
 namespace Automaton.Api.Services;
@@ -100,13 +99,7 @@ public class AppFileStorageService
             if (!string.IsNullOrEmpty(definition.HtmlContent))
             {
                 var sourcePath = GetSourcePath(userId, appId);
-                Directory.CreateDirectory(sourcePath);
-                var indexPath = Path.Combine(sourcePath, "index.html");
-                AppArchiveStorageBounds.ValidateFileWrite(
-                    sourcePath,
-                    "index.html",
-                    Encoding.UTF8.GetByteCount(definition.HtmlContent));
-                await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
+                await AppArchiveStorageBounds.WriteBoundedTextFileAsync(sourcePath, "index.html", definition.HtmlContent);
             }
 
             var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
@@ -495,8 +488,8 @@ public class AppFileStorageService
     public async Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
         var sourcePath = GetSourcePath(userId, appId);
-        AppArchiveStorageBounds.ValidateFileWrite(sourcePath, relativePath, Encoding.UTF8.GetByteCount(content));
-        await WriteFileAsync(sourcePath, relativePath, content, validateExtension: true);
+        ValidateFileExtension(relativePath);
+        await AppArchiveStorageBounds.WriteBoundedTextFileAsync(sourcePath, relativePath, content);
         await MarkSourceModifiedAsync(userId, appId, relativePath);
     }
 
@@ -566,8 +559,8 @@ public class AppFileStorageService
     public Task WriteRuntimeFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
         var runtimePath = GetLivePath(userId, appId);
-        AppArchiveStorageBounds.ValidateFileWrite(runtimePath, relativePath, Encoding.UTF8.GetByteCount(content));
-        return WriteFileAsync(runtimePath, relativePath, content, validateExtension: true);
+        ValidateFileExtension(relativePath);
+        return AppArchiveStorageBounds.WriteBoundedTextFileAsync(runtimePath, relativePath, content);
     }
 
     /// <summary>
@@ -842,7 +835,7 @@ public class AppFileStorageService
         => string.Equals(fileName, rule, StringComparison.OrdinalIgnoreCase) ||
             segments.Any(segment => string.Equals(segment, rule, StringComparison.OrdinalIgnoreCase));
 
-    private Task CopyDirectoryFilesAsync(
+    private async Task CopyDirectoryFilesAsync(
         string srcPath,
         string dstPath,
         string copyKind,
@@ -852,12 +845,13 @@ public class AppFileStorageService
         Guid dstUserId,
         Func<string, bool>? shouldSkip = null)
     {
+        await using var writeLock = await AppArchiveStorageBounds.AcquireWriteLockAsync(dstPath);
         Directory.CreateDirectory(dstPath);
 
         if (!Directory.Exists(srcPath))
         {
             logger.Warning("Source app {CopyKind} directory not found when copying: {SrcPath}", copyKind, srcPath);
-            return Task.CompletedTask;
+            return;
         }
 
         foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
@@ -878,8 +872,6 @@ public class AppFileStorageService
 
         logger.Debug("Copied app {CopyKind} from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
             copyKind, srcAppId, srcUserId, dstAppId, dstUserId);
-
-        return Task.CompletedTask;
     }
 
     private Task CopyAppSubdirectoryFilesAsync(
@@ -956,26 +948,11 @@ public class AppFileStorageService
             : null;
     }
 
-    private static async Task WriteFileAsync(string rootPath, string relativePath, string content, bool validateExtension)
-    {
-        if (validateExtension)
-        {
-            ValidateFileExtension(relativePath);
-        }
-
-        var filePath = ResolveSafePath(rootPath, relativePath);
-        var directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        await File.WriteAllTextAsync(filePath, content);
-    }
-
     public Task WriteFileAtPathAsync(string rootPath, string relativePath, string content, bool validateExtension = true)
     {
-        return WriteFileAsync(rootPath, relativePath, content, validateExtension);
+        if (validateExtension)
+            ValidateFileExtension(relativePath);
+        return AppArchiveStorageBounds.WriteBoundedTextFileAsync(rootPath, relativePath, content);
     }
 
     private static Task DeleteFileAsync(string rootPath, string relativePath)
