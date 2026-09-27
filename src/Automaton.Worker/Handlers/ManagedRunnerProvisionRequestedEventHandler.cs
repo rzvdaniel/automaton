@@ -10,6 +10,7 @@ using Automaton.Worker.Config;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Net;
+using System.Text.Json.Nodes;
 
 namespace Automaton.Worker.Handlers;
 
@@ -140,7 +141,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
         var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
             ?? hostedRunner.SpecificationSnapshot.SourceSpecificationId;
-        return JsonSerializer.Serialize(new
+        var input = JsonSerializer.SerializeToNode(new
         {
             operationId = deployment.Id,
             hostedRunnerId = hostedRunner.Id,
@@ -154,7 +155,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             diskLimitMb = resources.DiskLimitMb,
             writableLayerSizeLimitMb = resources.WritableLayerLimitMb,
             xfsProjectId = hostedRunner.StorageProjectId!.Value,
-            storageFilesystemUuid,
             pidsLimit = resources.PidsLimit,
             sharedMemoryMb = resources.SharedMemoryMb,
             dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,
@@ -170,7 +170,11 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
                 ? hostedRunner.HostedRunnerSpecificationId
                 : snapshotSpecificationId,
             runnerName = hostedRunner.Name
-        });
+        })!.AsObject();
+        if (storageFilesystemUuid is not null)
+            input["storageFilesystemUuid"] = storageFilesystemUuid;
+
+        return input.ToJsonString();
     }
 
     private async Task DispatchAsync(

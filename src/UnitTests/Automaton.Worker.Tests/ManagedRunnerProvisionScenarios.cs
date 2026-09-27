@@ -38,6 +38,20 @@ internal static class ManagedRunnerProvisionScenarios
         await fixture.AssertInvalidImageFailureAsync();
     }
 
+    internal static async Task VerifyUnknownFilesystemUuidIsOmittedAsync()
+    {
+        await using var fixture = await ManagedRunnerProvisionFixture.CreateAsync();
+        fixture.ClearStorageFilesystemUuid();
+        await fixture.HandleAsync(fixture.CreateRequest(grantId: Guid.NewGuid()), true, Image('a'));
+
+        using var input = JsonDocument.Parse(fixture.SingleCommand().InputJson);
+        Assert.Multiple(() =>
+        {
+            Assert.That(input.RootElement.TryGetProperty("storageFilesystemUuid", out _), Is.False);
+            Assert.That(input.RootElement.GetProperty("xfsProjectId").GetInt32(), Is.EqualTo(1234567));
+        });
+    }
+
     internal static async Task VerifyConflictingStorageHistoryFailsClosedAsync()
     {
         await using var fixture = await ManagedRunnerProvisionFixture.CreateAsync();
@@ -270,6 +284,9 @@ internal sealed class ManagedRunnerProvisionFixture : IAsyncDisposable
 
     internal InfrastructureCommandRequestedEvent SingleCommand()
         => publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
+
+    internal void ClearStorageFilesystemUuid()
+        => db.AccountStorageAllocations.Single().StorageFilesystemUuid = null;
 
     internal InfrastructureCommandRequestedEvent CommandFor(Guid operationId)
         => publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single(x => x.OperationId == operationId);
