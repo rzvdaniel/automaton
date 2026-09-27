@@ -168,6 +168,15 @@ public sealed class HostContainerExecutionTests
     }
 
     [Test]
+    public async Task RunBuildCleansUpContainerWhenHostCommandThrows()
+    {
+        var outcome = await HostContainerExecutionScenarios.RunBuildWithHostCommandExceptionAsync();
+
+        Assert.That(outcome.CancellationSurfaced, Is.True);
+        Assert.That(outcome.CleanupWasRequested, Is.True);
+    }
+
+    [Test]
     public async Task RunBuildPlacesEntrypointBeforeImageForPathShellAndSourceRelativeCommands()
     {
         var result = await HostContainerExecutionScenarios.RunEntrypointVariantsAsync();

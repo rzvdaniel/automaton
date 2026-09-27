@@ -117,7 +117,17 @@ internal sealed class HostContainerBuildExecutor(
         using var buildTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeout = TimeSpan.FromSeconds(request.TimeoutSeconds);
         buildTimeout.CancelAfter(timeout);
-        var result = await executor(arguments, timeout, buildTimeout.Token);
+        InfrastructureCommandResponse result;
+        try
+        {
+            result = await executor(arguments, timeout, buildTimeout.Token);
+        }
+        catch
+        {
+            await TryCleanupContainerAsync(container);
+            throw;
+        }
+
         if (result.Success)
             return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
         await TryCleanupContainerAsync(container);
