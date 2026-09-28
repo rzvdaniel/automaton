@@ -68,6 +68,22 @@ public sealed class HubServiceActivityTests
     }
 
     [Test]
+    public async Task ReconnectWhenIdle_ConsumesPendingRequestWhenActivityFinishesWithoutWakeup()
+    {
+        var service = CreateService();
+        ActiveOperationCountField.SetValue(service, 0);
+        ReconnectRequestedField.SetValue(service, 1);
+
+        var reconnectRequested = await WaitForReconnectRequestAsync(service, TimeSpan.Zero);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reconnectRequested, Is.True);
+            Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
+        });
+    }
+
+    [Test]
     public async Task StopHeartbeatLoop_CancelsAndAwaitsItsOwnedTask()
     {
         var heartbeat = new HubHeartbeatService(() => null, Serilog.Log.Logger);
@@ -101,10 +117,12 @@ public sealed class HubServiceActivityTests
         return await service.ExecuteWithRunnerActivityAsync(operation);
     }
 
-    private static Task<bool> WaitForReconnectRequestAsync(HubService service)
+    private static Task<bool> WaitForReconnectRequestAsync(
+        HubService service,
+        TimeSpan? interval = null)
         => (Task<bool>)WaitForReconnectRequestMethod.Invoke(
             service,
-            [TimeSpan.FromSeconds(30), CancellationToken.None])!;
+            [interval ?? TimeSpan.FromSeconds(30), CancellationToken.None])!;
 
     private static HubService CreateService() => new(
         null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);

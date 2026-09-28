@@ -414,6 +414,7 @@ public class HubService
 
     private void HandleReconnectWhenIdle(string? reason)
     {
+        Interlocked.Exchange(ref reconnectRequested, 1);
         var activeOperations = Math.Max(0, Volatile.Read(ref activeOperationCount));
         var message = string.IsNullOrWhiteSpace(reason)
             ? "Server requested reconnect to the new API instance."
@@ -426,12 +427,10 @@ public class HubService
 
         if (activeOperations == 0)
         {
-            Interlocked.Exchange(ref reconnectRequested, 1);
             WakeConnectionLoop();
             return;
         }
 
-        Interlocked.Exchange(ref reconnectRequested, 1);
         WriteLine($"⏳ Reconnect requested by server. Waiting for {activeOperations} active task(s) to finish.");
     }
 
@@ -439,8 +438,8 @@ public class HubService
         TimeSpan interval,
         CancellationToken cancellationToken)
     {
-        var signaled = await reconnectLoopSignal.WaitAsync(interval, cancellationToken);
-        if (!signaled || Volatile.Read(ref reconnectRequested) != 1)
+        _ = await reconnectLoopSignal.WaitAsync(interval, cancellationToken);
+        if (Volatile.Read(ref reconnectRequested) != 1)
             return false;
 
         if (Volatile.Read(ref activeOperationCount) != 0)
