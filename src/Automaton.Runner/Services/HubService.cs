@@ -34,13 +34,13 @@ public class HubService
     private readonly HubExecutionHandlerRegistrar executionHandlerRegistrar;
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
+    private readonly SemaphoreSlim reconnectLoopSignal = new(0, 1);
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
     private Task? retryTask;
     private int activeOperationCount = 0;
     private int reconnectRequested = 0;
-    private int reconnectInProgress = 0;
     private readonly HubHeartbeatService heartbeatService;
 
     public Task ReportHostedRunnerStorageAsync(HostedRunnerStorageTelemetry report, CancellationToken cancellationToken) =>
@@ -195,7 +195,14 @@ public class HubService
         if (IsConnected())
         {
             ResetAfterReconnect(state);
-            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            if (await WaitForReconnectRequestAsync(TimeSpan.FromSeconds(10), cancellationToken))
+                await DisconnectConnectionForReconnectAsync();
+            return true;
+        }
+
+        if (connection?.State == HubConnectionState.Reconnecting)
+        {
+            await WaitForConnectionLoopSignalAsync(cancellationToken);
             return true;
         }
 
@@ -204,7 +211,6 @@ public class HubService
         ReportConnectionEstablished(attempts);
         state.WasDisconnected = false;
         isReconnecting = false;
-        await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
         return true;
     }
 
@@ -280,6 +286,7 @@ public class HubService
             controlHandlerRegistrar.Register(
                 connection,
                 HandleReconnectWhenIdle,
+                WakeConnectionLoop,
                 value => isReconnecting = value,
                 () => isReconnecting,
                 HubConnectionFailureReporter.GetFriendlyErrorMessage,
@@ -388,7 +395,7 @@ public class HubService
 
         if (remaining == 0 && Volatile.Read(ref reconnectRequested) == 1)
         {
-            QueueReconnectNow("Current work finished.");
+            WakeConnectionLoop();
         }
     }
 
@@ -407,6 +414,7 @@ public class HubService
 
     private void HandleReconnectWhenIdle(string? reason)
     {
+        Interlocked.Exchange(ref reconnectRequested, 1);
         var activeOperations = Math.Max(0, Volatile.Read(ref activeOperationCount));
         var message = string.IsNullOrWhiteSpace(reason)
             ? "Server requested reconnect to the new API instance."
@@ -419,41 +427,46 @@ public class HubService
 
         if (activeOperations == 0)
         {
-            QueueReconnectNow(message);
+            WakeConnectionLoop();
             return;
         }
 
-        Interlocked.Exchange(ref reconnectRequested, 1);
         WriteLine($"⏳ Reconnect requested by server. Waiting for {activeOperations} active task(s) to finish.");
     }
 
-    private void QueueReconnectNow(string reason)
+    private async Task<bool> WaitForReconnectRequestAsync(
+        TimeSpan interval,
+        CancellationToken cancellationToken)
     {
-        if (Interlocked.CompareExchange(ref reconnectInProgress, 1, 0) != 0)
+        _ = await reconnectLoopSignal.WaitAsync(interval, cancellationToken);
+        if (Volatile.Read(ref reconnectRequested) != 1)
+            return false;
+
+        if (Volatile.Read(ref activeOperationCount) != 0)
         {
-            return;
+            return false;
         }
 
         Interlocked.Exchange(ref reconnectRequested, 0);
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                WriteLine($"🔄 Reconnect requested by server: {reason}");
-                await ForceReconnectAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.Warning(ex, "Forced reconnect request failed");
-            }
-            finally
-            {
-                Interlocked.Exchange(ref reconnectInProgress, 0);
-            }
-        });
+        return true;
     }
 
-    private async Task ForceReconnectAsync()
+    private Task WaitForConnectionLoopSignalAsync(CancellationToken cancellationToken)
+        => reconnectLoopSignal.WaitAsync(cancellationToken);
+
+    private void WakeConnectionLoop()
+    {
+        try
+        {
+            reconnectLoopSignal.Release();
+        }
+        catch (SemaphoreFullException ex)
+        {
+            logger.Debug(ex, "A reconnect wake-up is already queued for the connection loop.");
+        }
+    }
+
+    private async Task DisconnectConnectionForReconnectAsync()
     {
         var currentConnection = connection;
         if (currentConnection == null)
@@ -461,29 +474,39 @@ public class HubService
             return;
         }
 
-        await heartbeatService.StopAsync();
-
         try
         {
-            await currentConnection.StopAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.Debug(ex, "Stopping current SignalR connection during forced reconnect failed");
-        }
+            try
+            {
+                await heartbeatService.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(ex, "Stopping the heartbeat before reconnect failed");
+            }
 
-        try
-        {
-            await currentConnection.DisposeAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.Debug(ex, "Disposing current SignalR connection during forced reconnect failed");
-        }
+            try
+            {
+                await currentConnection.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(ex, "Stopping current SignalR connection during reconnect failed");
+            }
 
-        if (ReferenceEquals(connection, currentConnection))
+            try
+            {
+                await currentConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(ex, "Disposing current SignalR connection during reconnect failed");
+            }
+        }
+        finally
         {
-            connection = null;
+            if (ReferenceEquals(connection, currentConnection))
+                connection = null;
         }
     }
 

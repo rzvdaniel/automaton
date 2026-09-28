@@ -16,13 +16,20 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
     public void Register(
         HubConnection connection,
         Action<string?> handleReconnectWhenIdle,
+        Action wakeConnectionLoop,
         Action<bool> setReconnecting,
         Func<bool> isReconnecting,
         Func<Exception?, string> getFriendlyErrorMessage,
         Func<Task> sendHeartbeat)
     {
         RegisterServerCommands(connection, handleReconnectWhenIdle);
-        RegisterLifecycleEvents(connection, setReconnecting, isReconnecting, getFriendlyErrorMessage, sendHeartbeat);
+        RegisterLifecycleEvents(
+            connection,
+            wakeConnectionLoop,
+            setReconnecting,
+            isReconnecting,
+            getFriendlyErrorMessage,
+            sendHeartbeat);
     }
 
     private void RegisterServerCommands(HubConnection connection, Action<string?> handleReconnectWhenIdle)
@@ -41,7 +48,6 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
         });
         connection.On<string>(ReconnectWhenIdleMethod, async reason =>
         {
-            handleReconnectWhenIdle(reason);
             try
             {
                 await connection.InvokeAsync(ReconnectWhenIdleAcknowledgedMethod, reason);
@@ -50,11 +56,14 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
             {
                 logger.Warning(ex, "Failed to acknowledge reconnect-when-idle request");
             }
+
+            handleReconnectWhenIdle(reason);
         });
     }
 
     private void RegisterLifecycleEvents(
         HubConnection connection,
+        Action wakeConnectionLoop,
         Action<bool> setReconnecting,
         Func<bool> isReconnecting,
         Func<Exception?, string> getFriendlyErrorMessage,
@@ -73,6 +82,7 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
                 logger.Debug("Connection closed gracefully");
                 WriteLine("✅ Connection closed");
             }
+            wakeConnectionLoop();
             return Task.CompletedTask;
         };
 
@@ -88,6 +98,7 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
         connection.Reconnected += connectionId =>
         {
             setReconnecting(false);
+            wakeConnectionLoop();
             logger.Information("Reconnected to server with connection ID: {ConnectionId}", connectionId);
             WriteLine("✅ Reconnected to server successfully");
             _ = Task.Run(async () =>

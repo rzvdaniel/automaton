@@ -10,6 +10,9 @@ public sealed class HubServiceActivityTests
     private static readonly MethodInfo HandleReconnectWhenIdleMethod =
         typeof(HubService).GetMethod("HandleReconnectWhenIdle", BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new MissingMethodException(nameof(HubService), "HandleReconnectWhenIdle");
+    private static readonly MethodInfo WaitForReconnectRequestMethod =
+        typeof(HubService).GetMethod("WaitForReconnectRequestAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingMethodException(nameof(HubService), "WaitForReconnectRequestAsync");
     private static readonly FieldInfo ActiveOperationCountField =
         typeof(HubService).GetField("activeOperationCount", BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new MissingFieldException(nameof(HubService), "activeOperationCount");
@@ -32,6 +35,7 @@ public sealed class HubServiceActivityTests
         });
 
         await deploymentStarted.Task;
+        var connectionLoopWait = WaitForReconnectRequestAsync(service);
         Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
 
         HandleReconnectWhenIdleMethod.Invoke(service, ["API cutover"]);
@@ -40,23 +44,43 @@ public sealed class HubServiceActivityTests
         {
             Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
             Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(1));
+            Assert.That(connectionLoopWait.IsCompleted, Is.False);
         });
 
         releaseDeployment.SetResult(true);
         Assert.That(await deploymentTask, Is.True);
+        Assert.That(await connectionLoopWait.WaitAsync(TimeSpan.FromSeconds(1)), Is.True);
         Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
         Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
     }
 
     [Test]
-    public void ReconnectWhenIdle_StillQueuesImmediatelyWhenNoWorkIsActive()
+    public async Task ReconnectWhenIdle_WakesConnectionLoopImmediatelyWhenNoWorkIsActive()
     {
         var service = CreateService();
+        var connectionLoopWait = WaitForReconnectRequestAsync(service);
 
         HandleReconnectWhenIdleMethod.Invoke(service, ["idle"]);
 
+        Assert.That(await connectionLoopWait.WaitAsync(TimeSpan.FromSeconds(1)), Is.True);
         Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
         Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
+    }
+
+    [Test]
+    public async Task ReconnectWhenIdle_ConsumesPendingRequestWhenActivityFinishesWithoutWakeup()
+    {
+        var service = CreateService();
+        ActiveOperationCountField.SetValue(service, 0);
+        ReconnectRequestedField.SetValue(service, 1);
+
+        var reconnectRequested = await WaitForReconnectRequestAsync(service, TimeSpan.Zero);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reconnectRequested, Is.True);
+            Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
+        });
     }
 
     [Test]
@@ -92,6 +116,13 @@ public sealed class HubServiceActivityTests
     {
         return await service.ExecuteWithRunnerActivityAsync(operation);
     }
+
+    private static Task<bool> WaitForReconnectRequestAsync(
+        HubService service,
+        TimeSpan? interval = null)
+        => (Task<bool>)WaitForReconnectRequestMethod.Invoke(
+            service,
+            [interval ?? TimeSpan.FromSeconds(30), CancellationToken.None])!;
 
     private static HubService CreateService() => new(
         null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
