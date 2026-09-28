@@ -61,6 +61,9 @@ public class BackendRouteConfigServiceTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(CountLines(content, "  routers:"), Is.EqualTo(1));
+            Assert.That(CountLines(content, "  middlewares:"), Is.EqualTo(1));
+            Assert.That(CountLines(content, "  services:"), Is.EqualTo(1));
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"{Environment.NewLine}      priority: 50"));
             Assert.That(content, Does.Contain("tls: {}"));
             Assert.That(content, Does.Not.Contain("certResolver"));
@@ -80,6 +83,10 @@ public class BackendRouteConfigServiceTests
                 $"middlewares: [\"private-{appId:N}-auth-headers\", \"private-{appId:N}-auth\", \"private-{appId:N}-auth-strip\", \"private-{appId:N}-rewrite\"]"));
         });
     }
+
+    private static int CountLines(string content, string expectedLine)
+        => content.Split(Environment.NewLine, StringSplitOptions.None)
+            .Count(line => line == expectedLine);
 
     [Test]
     public async Task RefreshAsync_DoesNotAuthorizeUnrestrictedRoute()

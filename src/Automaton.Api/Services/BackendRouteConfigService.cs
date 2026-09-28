@@ -238,9 +238,7 @@ public class BackendRouteConfigService
         builder.AppendLine("http:");
 
         AppendRouters(builder, routes);
-        builder.AppendLine("  middlewares:");
         AppendMiddlewares(builder, routes);
-        builder.AppendLine("  services:");
         AppendServices(builder, routes);
 
         return builder.ToString();
