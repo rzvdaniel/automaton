@@ -14,17 +14,21 @@ internal sealed class HostedRunnerInvalidCommandRecovery(ILogger<HostedRunnerInv
         Func<bool, CancellationToken, Task> rejectDelivery,
         CancellationToken cancellationToken)
     {
+        var requeue = false;
         if (operationId is { } operation && attemptId is { } attempt)
-            await TryReportFailureAsync(operation, attempt, deliveryTag, exception, reportFailure, cancellationToken);
+            requeue = !await TryReportFailureAsync(
+                operation, attempt, deliveryTag, exception, reportFailure, cancellationToken);
         else
             logger.LogError(exception,
                 "Discarding invalid Hosted Runner command with unreadable operation metadata; delivery tag {DeliveryTag}.",
                 deliveryTag);
 
-        await rejectDelivery(false, cancellationToken);
+        await rejectDelivery(requeue, cancellationToken);
+        if (requeue)
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
     }
 
-    private async Task TryReportFailureAsync(
+    private async Task<bool> TryReportFailureAsync(
         Guid operationId,
         Guid attemptId,
         ulong deliveryTag,
@@ -38,12 +42,14 @@ internal sealed class HostedRunnerInvalidCommandRecovery(ILogger<HostedRunnerInv
             logger.LogError(exception,
                 "Rejected invalid Hosted Runner deployment command for operation {OperationId}, attempt {AttemptId}; API outcome {Outcome}.",
                 operationId, attemptId, outcome);
+            return true;
         }
         catch (Exception reportException) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogError(reportException,
-                "Could not persist rejection for invalid Hosted Runner command operation {OperationId}, attempt {AttemptId}; discarding delivery {DeliveryTag}.",
+                "Could not persist rejection for invalid Hosted Runner command operation {OperationId}, attempt {AttemptId}; retrying delivery {DeliveryTag}.",
                 operationId, attemptId, deliveryTag);
+            return false;
         }
     }
 

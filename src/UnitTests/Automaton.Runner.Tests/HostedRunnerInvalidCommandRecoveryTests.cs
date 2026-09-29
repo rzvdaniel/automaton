@@ -90,4 +90,23 @@ public sealed class HostedRunnerInvalidCommandRecoveryTests
             Assert.That(requeued, Is.False);
         });
     }
+
+    [Test]
+    public async Task InvalidCommand_WhenFailureCannotBePersisted_IsRetriedForRecovery()
+    {
+        var recovery = new HostedRunnerInvalidCommandRecovery(NullLogger<HostedRunnerInvalidCommandRecovery>.Instance);
+        bool? requeued = null;
+
+        await recovery.RejectAsync(Guid.NewGuid(), Guid.NewGuid(), 19,
+            new InvalidDataException("Invalid identity."),
+            (_, _, _, _) => throw new HttpRequestException("API unavailable."),
+            (shouldRequeue, _) =>
+            {
+                requeued = shouldRequeue;
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+
+        Assert.That(requeued, Is.True);
+    }
 }
