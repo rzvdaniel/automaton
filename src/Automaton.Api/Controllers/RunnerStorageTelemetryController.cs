@@ -19,8 +19,8 @@ public sealed class RunnerStorageTelemetryController(
         if (!TryApiKeyId(out var apiKeyId))
             return Unauthorized();
 
-        await submissionService.ReportHostedRunnerAsync(apiKeyId, report, cancellationToken);
-        return NoContent();
+        return await SubmitAsync(
+            () => submissionService.ReportHostedRunnerAsync(apiKeyId, report, cancellationToken));
     }
 
     [HttpPost("host")]
@@ -31,8 +31,25 @@ public sealed class RunnerStorageTelemetryController(
         if (!TryApiKeyId(out var apiKeyId))
             return Unauthorized();
 
-        await submissionService.ReportRunnerHostAsync(apiKeyId, report, cancellationToken);
-        return NoContent();
+        return await SubmitAsync(
+            () => submissionService.ReportRunnerHostAsync(apiKeyId, report, cancellationToken));
+    }
+
+    private async Task<IActionResult> SubmitAsync(Func<Task> submit)
+    {
+        try
+        {
+            await submit();
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, title: "Forbidden", detail: exception.Message);
+        }
+        catch (ArgumentException exception)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid storage telemetry", detail: exception.Message);
+        }
     }
 
     private bool TryApiKeyId(out Guid apiKeyId) =>

@@ -1,10 +1,14 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Controllers;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Automaton.Api.Tests;
 
@@ -239,8 +243,66 @@ public class RunnerStorageTelemetryServiceTests
                 true, null, "1", true), CancellationToken.None));
     }
 
+    [Test]
+    public async Task Controller_ReturnsForbiddenWhenApiKeyReportsAnotherHostedRunner()
+    {
+        await using var db = CreateDb();
+        var apiKey = CreateApiKey();
+        var hosted = SeedHostedRunner(db);
+        db.Runners.Add(new Runner
+        {
+            Id = hosted.RunnerId!.Value,
+            Name = "hosted-runner",
+            Purpose = RunnerPurposes.Managed,
+            ApiKeyId = apiKey.Id
+        });
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, apiKey);
+
+        var result = await controller.ReportHostedRunnerStorage(new(
+            Guid.NewGuid(), DateTime.UtcNow, 1, 1, 1, 1, 3, 4, 1, true, null, "1"), CancellationToken.None);
+
+        Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
+    }
+
+    [Test]
+    public async Task Controller_ReturnsBadRequestForMalformedTelemetry()
+    {
+        await using var db = CreateDb();
+        var apiKey = CreateApiKey();
+        var hosted = SeedHostedRunner(db);
+        db.Runners.Add(new Runner
+        {
+            Id = hosted.RunnerId!.Value,
+            Name = "hosted-runner",
+            Purpose = RunnerPurposes.Managed,
+            ApiKeyId = apiKey.Id
+        });
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, apiKey);
+
+        var result = await controller.ReportHostedRunnerStorage(new(
+            hosted.Id, DateTime.UtcNow, -1, 1, 1, 1, 3, 4, 1, true, null, "1"), CancellationToken.None);
+
+        Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
+    }
+
     private static RunnerStorageTelemetrySubmissionService CreateSubmissionService(ApplicationDbContext db)
         => new(db, new RunnerStorageTelemetryService(db));
+
+    private static RunnerStorageTelemetryController CreateController(ApplicationDbContext db, ApiKey apiKey)
+    {
+        var controller = new RunnerStorageTelemetryController(CreateSubmissionService(db));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim("api_key_id", apiKey.Id.ToString())], "test"))
+            }
+        };
+        return controller;
+    }
 
     private static ApiKey CreateApiKey() => new()
     {
