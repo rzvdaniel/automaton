@@ -1,6 +1,6 @@
 # Automaton hosting and platform completion roadmap
 
-Updated: 29 September 2026. Latest live evidence: operator report from 28 September 2026.
+Updated: 29 September 2026. Latest live evidence: production acceptance run on 29 September 2026.
 
 ## Purpose and scope
 
@@ -41,27 +41,27 @@ These are product decisions to implement and validate, not statements that every
 | Milestone / evidence | Status |
 | --- | --- |
 | Historical Stages 1–3 and M0 | Reported complete; retain account identity, atomic admission and storage locality protections. |
-| M1 storage implementation | Merged; **live acceptance pending**. |
-| Live routing and Runners | API `69e11d04` reported live on green; disposable app `/health` reachable. Both Runners reported on build #4864, source `ee4babc4`. |
-| Fresh storage verification | Healthy `InfrastructureRunnerVerified` result: 126,976 user bytes and 0 system bytes. One sample does not prove all write-path coverage. |
-| Runtime restrictions | App root read-only; `/tmp` bounded to 32 MiB; persistent data writable with the intended UID 1000. These are observed fixture settings, not new tier defaults. |
-| Persistence | A marker written directly as UID 1000 survived two Hosted Runner reprovisions. Application-originated write/read remains unproven. |
-| Remaining live blocker | Deployment failed three times with `File upload timed out`; the source change selecting the intended runtime user was not deployed. |
+| M1 storage implementation | Merged; **live acceptance complete (2026-09-29)**. The disposable app flow below completed and the app was removed through Studio. |
+| Live routing and Runners | API commit `bb5c5a38` is live on green (image digest `sha256:e744b7c88193a5e18c5a7edb9a1949a38871cc8880b98571b0b63351030446e9`); `prod-verify.sh` passed. The blue rollback color remains healthy. Both Runners drained from blue and reconnected to green. Infrastructure Runner and Hosted Runner use `rzvdaniel/automaton-runner@sha256:77d29c25b61b0aae953233db5ab0e58b7ddc3badb3581377bbd6d0d4a45435b2`. |
+| Fresh storage verification | Healthy `InfrastructureRunnerVerified` result: 0.00 GB / 2.00 GB, measured at 5:17 PM on 2026-09-29 after the app wrote its marker. This tiny marker sample verifies the flow, not large-write accounting. |
+| Runtime restrictions | The fixture container ran as UID/GID `1000:1000`, had a read-only root filesystem, `/tmp` tmpfs capped at 32 MiB, and a writable `/automaton/data` mount. These are observed fixture settings, not new tier defaults. |
+| Persistence and cleanup | The app process wrote and read `m1-marker.json`; after Hosted Runner reprovision it read the same marker. Studio then deleted the app. The Runner host had no matching app container; the marker and app-specific data directory were absent. The Hosted Runner user volume remained. |
+| Earlier upload failures | Earlier deployments on the retiring SignalR path timed out. The released RabbitMQ/HTTPS path subsequently completed CLI deployments, including this fixture after the successful API slot cutover. The in-flight old-slot command retry case remains RM acceptance work. |
 | Worker provenance | Running image is `automaton-prod-worker:latest`, digest `sha256:6bb80ed06b60f96dd1fe7d541bd61851bca11336ce28d1c6c13f0ef0d53d151f`, created 2026-09-28 07:45:37 UTC. Its image has no source-revision label, so the source commit remains unknown. This is a separate release-tracking gap; the Worker does not perform the failed API-to-Runner deployment-package transfer. |
-| Failed deployment trace | Operation `c1adda58-6c57-43cf-b6ae-1c72bd41fc60` failed at 2026-09-28 19:28:59 UTC in `DeploymentPackageRunnerService.UploadPackageAsync` while awaiting upload completion. API green had a connected Hosted Runner before the attempt. Available logs establish no completion/failure callback reached the API registry, but do not distinguish chunk delivery from callback delivery. No justified small fix was identified. |
-| RM | First Hosted Runner deployment-command and HTTPS package path implemented on the current branch; not released or live-accepted. Remaining management cutover and M1 live acceptance are pending. |
+| Failed deployment trace | The historical `File upload timed out` operation remains evidence for why RM was started; the available trace did not distinguish chunk delivery from callback delivery. The replacement deployment path now succeeds. |
+| RM | The first Hosted Runner deployment-command and HTTPS package path is released and has completed production CLI deployments. Active Runners also completed an API blue/green reconnect. A command dispatched before a slot switch and completed after it, cross-host package availability, and removal of all replaced SignalR management callers remain unproven. |
 | M2–M7 | Remaining completion/acceptance scope; audit existing mechanisms before adding code. |
 | Builder | Future functionality; outside this release's completion gates. |
 
-Reported Runner digest: `sha256:84cfa3ca55578b8f15ae4919d04ebddd5391704825543f4368187f3ea09f95bd`.
+Runner image digest observed in production: `sha256:77d29c25b61b0aae953233db5ab0e58b7ddc3badb3581377bbd6d0d4a45435b2`.
 
-Keep the disposable `M1 Live Acceptance 20260928` app until remaining checks finish, then clean it up through the supported lifecycle. Scheduling was last reported enabled; record its actual state for each maintenance operation. The isolated XFS test used a placeholder Infrastructure Runner and does not prove live control-plane reachability during disk exhaustion.
+The disposable `M1 Live Acceptance 20260928` app was deleted after its checks passed. Studio reported no apps; the Runner host had no matching container, and the marker/app-specific data directory were absent. Host scheduling was verified enabled. The isolated XFS test used a placeholder Infrastructure Runner and does not prove live control-plane reachability during disk exhaustion. A single Hosted Runner startup warning said managed application container reconciliation could not be retried from `deployment.json`; the app remained running and passed marker readback after reprovision. Track this warning if it recurs.
 
 ## Execution order
 
-1. The failed upload has been traced to the SignalR upload handoff or completion callback; the available evidence does not identify a small justified fix. The API dispatcher performs this flow directly; the deployed Worker image is a separate provenance gap.
-2. Implement RM and carry the remaining M1 checks into its acceptance. Include authenticated bounded artifact transfer in RM; do not expand work into a speculative repair of the retiring SignalR transfer path. M1 remains pending until the live checks pass.
-3. Complete RM, including removal of replaced SignalR management and a successful CLI deployment with application-originated persistence checks.
+1. The historical SignalR upload failure led to RM; its replacement RabbitMQ/HTTPS path completed production CLI deployments. The Worker image's unknown source revision remains a separate release-tracking gap.
+2. M1 live acceptance is complete. Continue RM with the in-flight cross-slot retry test, cross-host package availability assessment, and removal of replaced SignalR management callers. Do not add a new storage system solely for the first package path.
+3. Close RM only after its remaining cutover/cleanup acceptance passes; M1 no longer blocks it.
 4. Complete M2 and M3. Collect M5/M6 lifecycle and recovery evidence alongside this work.
 5. Complete M4 and the remaining M5/M6 gaps for supported hosting modes.
 6. Close M7 before enabling the corresponding paid promises. A restricted development cohort may precede broad launch, with explicit limits and known gaps.
@@ -78,7 +78,7 @@ Address security or data-loss defects when discovered. Builder is not on this cr
 
 **Exit discipline:** later milestones must preserve these contracts rather than reopen the resource-owner design.
 
-## M1 — Finish storage acceptance
+## M1 — Finish storage acceptance (**live acceptance complete 2026-09-29**)
 
 Retain the implemented storage model and review coverage against the M0/M1 inventory:
 
@@ -88,16 +88,16 @@ Retain the implemented storage model and review coverage against the M0/M1 inven
 - Explicit limits and retention for control-plane uploads, source/version copies, published assets and media outside the account XFS domain. Identify remaining per-process admission gaps under multiple API replicas.
 - Cleanup of failed/cancelled staging and disposable output while preserving durable data and the working deployment.
 
-Finish the live flow:
+The 2026-09-29 live acceptance flow completed:
 
-1. Establish deployed API/Worker/Runner provenance and trace one upload failure through its operation ID, transfer and acknowledgement.
-2. Deploy the disposable fixture through the supported CLI/API flow; require terminal `Succeeded` and reachable `/health`.
-3. Have the application process write and read a marker through its declared persistent data path. A host-side write does not satisfy this check.
-4. Measure a known bounded persistent write through fresh authoritative storage verification.
-5. Reprovision using supported operations; confirm identity, volume contents, effective bounds and application-originated marker readback.
-6. Delete the disposable fixture and verify intended cleanup without prematurely releasing the account allocation. Record final scheduling state.
+1. Released API `bb5c5a38` and Runner image digest `sha256:77d29c25…` were active. The API blue/green deployment drained both active Runners to green; production health checks passed.
+2. The disposable app deployed through the CLI and reported terminal success with `/health` reachable.
+3. The app process, running as UID/GID `1000:1000`, wrote and read its marker from `/automaton/data`.
+4. Fresh host-side storage verification reported Healthy, `InfrastructureRunnerVerified`, 0.00 GB / 2.00 GB after the marker write.
+5. Hosted Runner reprovisioning completed. The app remained running with read-only root, bounded `/tmp`, and the writable data mount; its process read back the same marker.
+6. Studio deleted the disposable app. Studio showed no remaining apps, the Runner host had no matching container, and the marker and app-specific data directory were absent. The Hosted Runner user volume remained. Host scheduling was verified enabled.
 
-**Exit:** recorded host tests establish quota coverage and exhaustion behavior; the real platform flow proves upload/deploy, app-originated persistence, measurement, reprovision and cleanup. Any missing category stays explicitly open. Broader service recovery under exhaustion belongs to M6.
+The M1 live acceptance is complete. Previously recorded isolated XFS results remain limited to their documented scope; the placeholder Infrastructure Runner did not prove management reachability during shared-filesystem exhaustion. Broader service recovery under exhaustion remains M6 work.
 
 ## RM — Simplify Runner management and remove replaced SignalR paths
 
@@ -133,7 +133,9 @@ Retain independent supported features, such as Studio live updates or BYO tunnel
 
 **First vertical-path acceptance:** a CLI deployment command survives Runner retry; the Runner retrieves its package after an API slot switch using authenticated HTTPS; the operation reaches a persisted terminal state without a SignalR completion callback. Treat the existing shared package volume as usable for the tested same-host slot arrangement only. Availability when the two slots are on different API hosts remains unestablished; do not add a storage system for this first path.
 
-After that deployment succeeds, complete the retained disposable app's M1 checks: the app process writes and reads its own persistent marker, storage usage is measured, its Hosted Runner is reprovisioned, and the marker still survives. Delete the app through the supported flow only after all checks pass. Keep M1 **implemented; live acceptance pending** until this sequence succeeds.
+Automated regression coverage now checks that an active API service instance can serve a package staged before a simulated slot switch, and that a Runner retry after a persisted successful result does not apply the runtime again. These unit tests cover shared-path and journal behavior; they do not substitute for the still-open live in-flight slot-switch test.
+
+M1's disposable app checks are complete; the app was deleted after persistence and measurement passed. RM's separate cross-slot command/retry and SignalR cleanup acceptance remains open.
 
 **Acceptance:** deploy the API while a Runner is working; restart Worker and Runner; exercise duplicate commands, lost callbacks, broker interruption and recovery; verify tenant isolation and correct artifact/action revision. Show that a completed operation remains completed and running apps remain healthy. Test reconnect recovery at a stated cohort size; a small test does not establish thousand-Runner capacity.
 

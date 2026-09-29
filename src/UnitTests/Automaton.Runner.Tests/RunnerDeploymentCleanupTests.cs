@@ -84,6 +84,42 @@ public sealed class RunnerDeploymentCleanupTests
         Assert.That(runtimeManager.ApplyCount, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task DeploymentRetryAfterRunnerInterruptionReturnsSavedResultWithoutApplyingRuntimeAgain()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var operationId = Guid.NewGuid();
+        var firstAttemptId = Guid.NewGuid();
+        var savedResult = new DeployAppPackageResult
+        {
+            DeploymentTargetId = Guid.NewGuid(),
+            Success = true,
+            Message = "promoted before Runner interruption"
+        };
+        var journal = new HostedRunnerDeploymentResultJournal(workspace);
+        await journal.SaveAsync(new DeployAppPackageRequest
+        {
+            DeploymentOperationId = operationId,
+            ExecutionAttemptId = firstAttemptId
+        }, savedResult, CancellationToken.None);
+
+        var runtimeManager = new PromotingRuntimeProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace,
+            runtimeManager,
+            new AppActionDeploymentService(workspace));
+        var retryResult = await service.DeployPackage(new DeployAppPackageRequest
+        {
+            DeploymentOperationId = operationId,
+            ExecutionAttemptId = Guid.NewGuid(),
+            PackagePath = Path.Combine(workspaceRoot, "package-must-not-be-read.zip")
+        });
+
+        Assert.That(retryResult.Success, Is.True);
+        Assert.That(retryResult.Message, Is.EqualTo(savedResult.Message));
+        Assert.That(runtimeManager.ApplyCount, Is.Zero);
+    }
+
     private string CreateBuildPackage(Guid appId)
     {
         var path = Path.Combine(workspaceRoot, $"{Guid.NewGuid():N}.zip");
