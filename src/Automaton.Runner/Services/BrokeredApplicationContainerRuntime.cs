@@ -47,7 +47,7 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         {
             Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
             CandidateId = request.CandidateId, RequestedImage = request.Image, ContainerPort = request.ContainerPort,
-            Command = request.Command, Storage = request.Storage
+            Command = request.Command, Storage = request.Storage, User = request.User
         }, cancellationToken);
         EnsureSuccess(result);
         return new DockerApplicationContainer(result.ContainerId, result.ContainerName, new(request.Image, result.ResolvedImage));

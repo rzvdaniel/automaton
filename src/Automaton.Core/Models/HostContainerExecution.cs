@@ -39,6 +39,7 @@ public sealed record HostContainerExecutionRequest
     public Guid CandidateId { get; init; }
     public ApplicationStorageSpec? Storage { get; init; }
     public ApplicationCommandSpec? Command { get; init; }
+    public string? User { get; init; }
     public int ContainerPort { get; init; }
     public int HostPort { get; init; }
     public int TimeoutSeconds { get; init; } = 900;

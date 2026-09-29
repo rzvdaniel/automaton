@@ -380,7 +380,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 attempt.Candidate.ContainerName!, attempt.RuntimeImage, attempt.Artifact,
                 command.WorkingDirectory, command, attempt.Contract.Runtime.Port, attempt.EffectivePort,
                 attempt.Storage.DataDirectory, attempt.Storage.Mounts, attempt.AppId, attempt.TargetId,
-                attempt.CandidateId, attempt.Contract.Storage),
+                attempt.CandidateId, attempt.Contract.Storage, attempt.Contract.Runtime.User),
             cancellationToken);
         attempt.Candidate.ContainerId = started.Id;
         attempt.Candidate.ContainerName = started.Name;

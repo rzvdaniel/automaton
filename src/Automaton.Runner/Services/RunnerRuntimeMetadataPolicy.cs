@@ -41,6 +41,7 @@ internal static class RunnerRuntimeMetadataPolicy
         return new ApplicationRuntimeSpec
         {
             Image = string.IsNullOrWhiteSpace(resolvedImage) ? runtime.Image : resolvedImage,
+            User = runtime.User,
             Command = runtime.Command,
             Port = runtime.Port
         };

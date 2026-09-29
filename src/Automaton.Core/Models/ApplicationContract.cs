@@ -31,6 +31,8 @@ public sealed class ApplicationRuntimeSpec
 {
     /// <summary>OCI image that owns the application runtime process.</summary>
     public string? Image { get; set; }
+    /// <summary>Optional numeric Linux UID or UID:GID for the runtime process.</summary>
+    public string? User { get; set; }
     public ApplicationCommandSpec? Command { get; set; }
     public int Port { get; set; } = 8080;
 }
@@ -161,6 +163,19 @@ public static class ApplicationContractValidator
         }
 
         ValidatePort(runtime.Port, "runtime.port", errors);
+        if (runtime.User is not null && !IsValidRuntimeUser(runtime.User))
+            errors.Add("runtime.user must be a numeric UID or UID:GID");
+    }
+
+    private static bool IsValidRuntimeUser(string value)
+    {
+        var identities = value.Split(':');
+        return identities.Length is 1 or 2
+            && identities.All(identity => uint.TryParse(
+                identity,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out _));
     }
 
     private static void ValidateHealth(ApplicationHealthSpec? health, ICollection<string> errors)
