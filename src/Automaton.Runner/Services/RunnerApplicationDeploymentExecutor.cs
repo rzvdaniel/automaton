@@ -8,7 +8,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
     RunnerWorkspaceService workspace,
     IAppRuntimeProcessManager runtimeProcessManager,
     AppActionDeploymentService actionDeploymentService,
-    IRunnerApplicationBuildExecutor buildExecutor)
+    IRunnerApplicationBuildExecutor buildExecutor,
+    HostedRunnerDeploymentResultJournal resultJournal)
 {
     private const long MaximumPackageBytes = 100L * 1024 * 1024;
     private readonly ILogger logger = Log.ForContext<RunnerApplicationDeploymentExecutor>();
@@ -26,7 +27,9 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         }
         catch (Exception exception)
         {
-            return HandleFailure(attempt, request, exception);
+            var failure = HandleFailure(attempt, request, exception);
+            await resultJournal.SaveAsync(request, failure, CancellationToken.None);
+            return failure;
         }
         finally
         {
@@ -71,7 +74,9 @@ internal sealed class RunnerApplicationDeploymentExecutor(
             candidateId: candidate.Id);
         attempt.CandidatePromoted = candidate.ArtifactRoot is not null && applyResult.PromotionIrreversible;
         if (applyResult.Warning is not null) attempt.Logs.Add(applyResult.Warning);
-        return CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
+        var result = CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
+        await resultJournal.SaveAsync(request, result, CancellationToken.None);
+        return result;
     }
 
     private static AppDeploymentPackageManifest PreparePackage(

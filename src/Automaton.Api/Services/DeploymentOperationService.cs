@@ -2,6 +2,7 @@ using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Http;
@@ -22,6 +23,7 @@ public sealed class DeploymentOperationService(
     IEventPublisher eventPublisher,
     DeploymentPackageStore packageStore,
     ApplicationDeploymentService deploymentService,
+    IHostedRunnerDeploymentCommandDispatcher hostedRunnerCommandService,
     ApiInstanceIdentityService apiInstanceIdentityService,
     IServiceScopeFactory scopeFactory,
     ILogger<DeploymentOperationService> logger)
@@ -127,6 +129,12 @@ public sealed class DeploymentOperationService(
 
         try
         {
+            if (await hostedRunnerCommandService.PublishAsync(operation, executionAttemptId, CancellationToken.None))
+            {
+                await WaitForHostedRunnerResultAsync(operationId, executionAttemptId, cancellationToken);
+                return;
+            }
+
             await using var package = packageStore.OpenRead(operation.PackagePath);
             var file = new FormFile(package, 0, package.Length, "file", "deploy-package.zip");
             var result = await deploymentService.DeployPackageAsync(
@@ -158,6 +166,12 @@ public sealed class DeploymentOperationService(
         {
             // Leave the durable lease running until expiry so the current
             // owner can reclaim the operation without a stale completion.
+            throw;
+        }
+        catch (HostedRunnerDeploymentPublishException)
+        {
+            // A confirm failure is ambiguous: retain the operation and let the
+            // durable lease expire before publishing a retry attempt.
             throw;
         }
         catch (Exception exception)
@@ -221,7 +235,8 @@ public sealed class DeploymentOperationService(
                     : target.Slug == operation.TargetSlug) &&
                 (target.ExecutionRunner == null && operation.TargetSlug == null ||
                  target.ExecutionRunner != null &&
-                 target.ExecutionRunner.ApiInstanceId == executorInstanceId)))
+                 (target.ExecutionRunner.Purpose == RunnerPurposes.Managed ||
+                  target.ExecutionRunner.ApiInstanceId == executorInstanceId))))
             .Select(operation => operation.Id)
             .ToListAsync(cancellationToken);
 
@@ -274,15 +289,39 @@ public sealed class DeploymentOperationService(
         if (operation is null)
             return false;
 
-        return await dataContext.AppDeploymentTargets.AnyAsync(target =>
+        var runner = await dataContext.AppDeploymentTargets
+            .Where(target =>
             target.WebAppId == operation.WebAppId &&
             (operation.TargetSlug == null
                 ? target.IsDefault
-                : target.Slug == operation.TargetSlug) &&
-            (target.ExecutionRunner == null && operation.TargetSlug == null ||
-             target.ExecutionRunner != null &&
-             target.ExecutionRunner.ApiInstanceId == executorInstanceId),
-            cancellationToken);
+                : target.Slug == operation.TargetSlug))
+            .Select(target => target.ExecutionRunner)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (runner is null)
+        {
+            return operation.TargetSlug is null && await dataContext.AppDeploymentTargets.AnyAsync(target =>
+                target.WebAppId == operation.WebAppId && target.IsDefault && target.ExecutionRunnerId == null,
+                cancellationToken);
+        }
+        return runner.Purpose == RunnerPurposes.Managed || runner.ApiInstanceId == executorInstanceId;
+    }
+
+    private async Task WaitForHostedRunnerResultAsync(
+        Guid operationId,
+        Guid executionAttemptId,
+        CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var state = await dataContext.DeploymentOperations.AsNoTracking()
+                .Where(item => item.Id == operationId)
+                .Select(item => new { item.Status, item.ExecutionAttemptId })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (state is null || state.Status is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed
+                || state.ExecutionAttemptId != executionAttemptId)
+                return;
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
     }
 
     private async Task<DeploymentOperationClaim> ClaimAsync(
@@ -305,6 +344,8 @@ public sealed class DeploymentOperationService(
                     .SetProperty(item => item.StartedAtUtc, now)
                     .SetProperty(item => item.ExecutorInstanceId, executorInstanceId)
                     .SetProperty(item => item.ExecutionAttemptId, executionAttemptId)
+                    .SetProperty(item => item.ErrorMessage, (string?)null)
+                    .SetProperty(item => item.ResultJson, (string?)null)
                     .SetProperty(item => item.LeaseExpiresAtUtc, leaseExpiresAt), cancellationToken) == 1;
             if (claimed)
                 return DeploymentOperationClaim.Claimed;
@@ -329,6 +370,8 @@ public sealed class DeploymentOperationService(
         operation.StartedAtUtc = now;
         operation.ExecutorInstanceId = executorInstanceId;
         operation.ExecutionAttemptId = executionAttemptId;
+        operation.ErrorMessage = null;
+        operation.ResultJson = null;
         operation.LeaseExpiresAtUtc = leaseExpiresAt;
         await dataContext.SaveChangesAsync(cancellationToken);
         return DeploymentOperationClaim.Claimed;
@@ -442,7 +485,8 @@ public sealed class DeploymentOperationService(
     private DeploymentOperationResponse ToResponse(DeploymentOperation operation)
     {
         DeployPackageResponse? result = null;
-        if (!string.IsNullOrWhiteSpace(operation.ResultJson))
+        if (operation.Status is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed
+            && !string.IsNullOrWhiteSpace(operation.ResultJson))
         {
             result = JsonSerializer.Deserialize<DeployPackageResponse>(operation.ResultJson, JsonOptions);
         }

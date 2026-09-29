@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Automaton.Api.Config;
+using System.Security.Cryptography;
 
 namespace Automaton.Api.Services;
 
@@ -50,6 +51,13 @@ public sealed class DeploymentPackageStore(
             FileShare.Read,
             bufferSize: 128 * 1024,
             useAsync: true);
+    }
+
+    public async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = OpenRead(path);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexString(hash);
     }
 
     public void TryDelete(string path)

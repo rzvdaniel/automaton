@@ -8,5 +8,6 @@
         public string Username { get; set; } = "guest";
         public string Password { get; set; } = "guest";
         public string ExchangeName { get; set; } = "cap.default.router";
+        public string? ManagementUrl { get; set; }
     }
 }

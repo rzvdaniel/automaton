@@ -40,6 +40,8 @@ x-api-common: &api-common
     HostedRunners__RuntimePort: ${HOSTED_RUNNER_RUNTIME_PORT:-8080}
     InfrastructureRunnerRabbitMq__Host: ${INFRASTRUCTURE_RABBITMQ_HOST:?INFRASTRUCTURE_RABBITMQ_HOST is required in .env}
     InfrastructureRunnerRabbitMq__Port: 5672
+    HostedRunnerRabbitMq__Host: ${INFRASTRUCTURE_RABBITMQ_HOST:?INFRASTRUCTURE_RABBITMQ_HOST is required in .env}
+    HostedRunnerRabbitMq__Port: 5672
     DataProtection__KeysPath: /app/data-protection-keys
   volumes:
     - prod-api-appdata:/app/AppData
