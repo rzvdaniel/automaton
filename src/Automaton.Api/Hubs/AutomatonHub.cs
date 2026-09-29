@@ -34,7 +34,6 @@ public class AutomatonHub : Hub
     private readonly FileUploadRegistry fileUploadRegistry;
     private readonly FileDownloadRegistry fileDownloadRegistry;
     private readonly ILogger<AutomatonHub> logger;
-    private readonly RunnerStorageTelemetryService storageTelemetryService;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly HostContainerRelayService hostContainerRelayService;
 
@@ -46,7 +45,6 @@ public class AutomatonHub : Hub
         FileUploadRegistry fileUploadRegistry,
         FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger,
-        RunnerStorageTelemetryService storageTelemetryService,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         HostContainerRelayService hostContainerRelayService)
     {
@@ -57,16 +55,9 @@ public class AutomatonHub : Hub
         this.fileUploadRegistry = fileUploadRegistry;
         this.fileDownloadRegistry = fileDownloadRegistry;
         this.logger = logger;
-        this.storageTelemetryService = storageTelemetryService;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.hostContainerRelayService = hostContainerRelayService;
     }
-
-    public Task ReportHostedRunnerStorage(HostedRunnerStorageTelemetry report) =>
-        storageTelemetryService.ReportHostedRunnerAsync(GetRunner(), report, Context.ConnectionAborted);
-
-    public Task ReportRunnerHostStorage(RunnerHostStorageTelemetry report) =>
-        storageTelemetryService.ReportRunnerHostAsync(GetRunner(), report, Context.ConnectionAborted);
 
     public Task<HostContainerExecutionResponse> RequestHostContainerExecution(HostContainerExecutionRequest request) =>
         hostContainerRelayService.ExecuteAsync(GetRunner(), request, Context.ConnectionAborted);

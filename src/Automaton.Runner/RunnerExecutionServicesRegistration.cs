@@ -26,6 +26,8 @@ internal static class RunnerExecutionServicesRegistration
         services.AddHttpClient<ScriptEngineSettingsReporter>();
         services.AddHttpClient(nameof(HostedRunnerDeploymentPackageDownloader))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHttpClient(nameof(RunnerStorageTelemetryApiClient))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient();
         services.AddHttpClient<RunnerRuntimeGatewayService>()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });

@@ -163,6 +163,90 @@ public class RunnerStorageTelemetryServiceTests
         });
     }
 
+    [Test]
+    public async Task SubmissionService_ResolvesHostedRunnerIdentityFromApiKey()
+    {
+        await using var db = CreateDb();
+        var apiKey = CreateApiKey();
+        var hosted = SeedHostedRunner(db);
+        var runner = new Runner
+        {
+            Id = hosted.RunnerId!.Value,
+            Name = "hosted-runner",
+            Purpose = RunnerPurposes.Managed,
+            ApiKeyId = apiKey.Id
+        };
+        db.Runners.Add(runner);
+        await db.SaveChangesAsync();
+        var submission = CreateSubmissionService(db);
+
+        await submission.ReportHostedRunnerAsync(apiKey.Id, new(
+            hosted.Id, DateTime.UtcNow, 10, 20, 30, 40, 0, 0, 1, true, null, "1"), CancellationToken.None);
+
+        Assert.That(db.HostedRunnerStorageObservations.Single().HostedRunnerId, Is.EqualTo(hosted.Id));
+    }
+
+    [Test]
+    public async Task SubmissionService_ResolvesInfrastructureHostFromApiKey()
+    {
+        await using var db = CreateDb();
+        var apiKey = CreateApiKey();
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-runner",
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiKeyId = apiKey.Id
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host",
+            Provider = "test",
+            InfrastructureRunnerId = runner.Id,
+            StorageState = RunnerHostStorageStates.Unknown
+        };
+        db.AddRange(apiKey, runner, host);
+        await db.SaveChangesAsync();
+        var submission = CreateSubmissionService(db);
+
+        await submission.ReportRunnerHostAsync(apiKey.Id, new(
+            host.Id, DateTime.UtcNow, "/", 1000, 500, 500, "/var/lib/docker", 800, 400,
+            true, null, "1", true), CancellationToken.None);
+
+        Assert.That(host.StorageMeasuredAtUtc, Is.Not.Null);
+        Assert.That(host.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Succeeded));
+    }
+
+    [Test]
+    public void SubmissionService_RejectsWrongRunnerPurpose()
+    {
+        using var db = CreateDb();
+        var apiKey = CreateApiKey();
+        db.Runners.Add(new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "managed-runner",
+            Purpose = RunnerPurposes.Managed,
+            ApiKeyId = apiKey.Id
+        });
+        db.ApiKeys.Add(apiKey);
+        db.SaveChanges();
+        var submission = CreateSubmissionService(db);
+
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => submission.ReportRunnerHostAsync(
+            apiKey.Id, new(Guid.NewGuid(), DateTime.UtcNow, "/", 10, 5, 5, "/docker", 10, 5,
+                true, null, "1", true), CancellationToken.None));
+    }
+
+    private static RunnerStorageTelemetrySubmissionService CreateSubmissionService(ApplicationDbContext db)
+        => new(db, new RunnerStorageTelemetryService(db));
+
+    private static ApiKey CreateApiKey() => new()
+    {
+        Id = Guid.NewGuid(), Name = "runner", HashedKey = "hash", KeyPrefix = "prefix", CreatedAt = DateTime.UtcNow
+    };
+
     private static ApplicationDbContext CreateDb() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
