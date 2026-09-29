@@ -6,6 +6,7 @@ namespace Automaton.Runner.Console.Services;
 public class RunnerDeploymentService
 {
     private readonly RunnerWorkspaceService runnerWorkspaceService;
+    private readonly HostedRunnerDeploymentResultJournal resultJournal;
     private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly RunnerApplicationDeploymentExecutor deploymentExecutor;
     private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), Guid> activeExecutionAttempts = new();
@@ -19,14 +20,19 @@ public class RunnerDeploymentService
         IRunnerApplicationBuildExecutor? buildExecutor = null)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
+        resultJournal = new HostedRunnerDeploymentResultJournal(runnerWorkspaceService);
         this.runtimeProcessManager = runtimeProcessManager;
         var resolvedBuildExecutor = buildExecutor ?? new RunnerApplicationBuildExecutor(new DockerContainerRuntime());
         deploymentExecutor = new RunnerApplicationDeploymentExecutor(
-            runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, resolvedBuildExecutor);
+            runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, resolvedBuildExecutor, resultJournal);
     }
 
     public async Task<DeployAppPackageResult> DeployPackage(DeployAppPackageRequest request)
     {
+        var completedResult = await resultJournal.TryReadAsync(request);
+        if (completedResult is not null)
+            return completedResult;
+
         if (request.ExecutionAttemptId is not Guid executionAttemptId)
             return await DeployPackageCore(request);
 
@@ -61,6 +67,14 @@ public class RunnerDeploymentService
             }
         }
     }
+
+    public void ForgetHostedRunnerDeploymentResult(Guid operationId)
+        => resultJournal.Delete(operationId);
+
+    public Task<DeployAppPackageResult?> FindHostedRunnerDeploymentResultAsync(
+        Guid operationId,
+        CancellationToken cancellationToken)
+        => resultJournal.TryReadAsync(operationId, cancellationToken);
 
     private async Task<DeployAppPackageResult> DeployPackageCore(
         DeployAppPackageRequest request,

@@ -129,6 +129,7 @@ internal static class ApiCoreOptionRegistration
         services.Configure<RunnerEnrollmentOptions>(applicationBuilder.Configuration.GetSection(RunnerEnrollmentOptions.SectionName));
         services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
         services.Configure<InfrastructureRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(InfrastructureRunnerRabbitMqOptions.SectionName));
+        services.Configure<HostedRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(HostedRunnerRabbitMqOptions.SectionName));
         services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
         services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
         services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
@@ -307,6 +308,8 @@ internal static class ApiMessagingRegistration
     {
         var configurationManager = applicationBuilder.Configuration;
         services.AddHttpClient();
+        services.AddHttpClient(nameof(HostedRunnerBrokerProvisioner))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
         services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
@@ -564,6 +567,11 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<DeploymentPackageFinalizationService>();
         services.AddScoped<DeploymentPackageRunnerService>();
         services.AddScoped<DeploymentPackageStore>();
+        services.AddScoped<HostedRunnerDeploymentCommandPublisher>();
+        services.AddScoped<HostedRunnerDeploymentCommandService>();
+        services.AddScoped<IHostedRunnerDeploymentCommandDispatcher>(provider =>
+            provider.GetRequiredService<HostedRunnerDeploymentCommandService>());
+        services.AddScoped<HostedRunnerDeploymentResultService>();
         services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<DeploymentOperationService>();
         services.AddHostedService<DeploymentOperationDispatcher>();
@@ -602,6 +610,8 @@ internal static class ApiRunnerRegistration
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
         services.AddScoped<InfrastructureRunnerRegistrationService>();
         services.AddScoped<InfrastructureRunnerRabbitMqConfigurationService>();
+        services.AddScoped<HostedRunnerBrokerConfigurationService>();
+        services.AddScoped<HostedRunnerBrokerProvisioner>();
         services.AddScoped<InfrastructureRunnerHostApprovalService>();
         services.AddScoped<AdminRunnersService>();
         services.AddScoped<FlowExecutionHistoryService>();

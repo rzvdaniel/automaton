@@ -8,7 +8,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
     RunnerWorkspaceService workspace,
     IAppRuntimeProcessManager runtimeProcessManager,
     AppActionDeploymentService actionDeploymentService,
-    IRunnerApplicationBuildExecutor buildExecutor)
+    IRunnerApplicationBuildExecutor buildExecutor,
+    HostedRunnerDeploymentResultJournal resultJournal)
 {
     private const long MaximumPackageBytes = 100L * 1024 * 1024;
     private readonly ILogger logger = Log.ForContext<RunnerApplicationDeploymentExecutor>();
@@ -20,18 +21,22 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         Action ensureAttemptIsCurrent)
     {
         var attempt = CreateAttempt(request);
+        DeployAppPackageResult result;
         try
         {
-            return await ApplyDeploymentAsync(attempt, request, cancellationToken, ensureAttemptIsCurrent);
+            result = await ApplyDeploymentAsync(attempt, request, cancellationToken, ensureAttemptIsCurrent);
         }
         catch (Exception exception)
         {
-            return HandleFailure(attempt, request, exception);
+            result = HandleFailure(attempt, request, exception);
         }
         finally
         {
             CleanupStaging(attempt);
         }
+
+        await SaveResultWithoutChangingDeploymentOutcomeAsync(request, result);
+        return result;
     }
 
     private DeploymentAttempt CreateAttempt(DeployAppPackageRequest request)
@@ -72,6 +77,22 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         attempt.CandidatePromoted = candidate.ArtifactRoot is not null && applyResult.PromotionIrreversible;
         if (applyResult.Warning is not null) attempt.Logs.Add(applyResult.Warning);
         return CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
+    }
+
+    private async Task SaveResultWithoutChangingDeploymentOutcomeAsync(
+        DeployAppPackageRequest request,
+        DeployAppPackageResult result)
+    {
+        try
+        {
+            await resultJournal.SaveAsync(request, result, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.Warning(exception,
+                "Could not persist Hosted Runner deployment result for operation {OperationId}; preserving the runtime outcome",
+                request.DeploymentOperationId);
+        }
     }
 
     private static AppDeploymentPackageManifest PreparePackage(

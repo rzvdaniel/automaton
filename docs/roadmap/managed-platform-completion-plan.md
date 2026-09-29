@@ -10,7 +10,7 @@ Finish subscription-derived resource limits and accounting, simplify Runner mana
 
 This is the current execution roadmap. It supersedes the sequence and status in the [earlier architecture assessment](../architecture/managed-platform-completion-plan.md) and the earlier discussion/downloadable plans. M0–M7 retain their meanings; RM is the separate Runner management simplification milestone.
 
-Repository baseline: `main` at [69e11d04](https://github.com/rzvdaniel/automaton/commit/69e11d04d54cedf76461bc6000ed2aec671bcc39). This revision uses the repository plans, [M0/M1 inventory](../architecture/managed-platform-m0-acceptance-inventory.md), and the latest operator report. Live results below were reported, not independently rerun for this document. Reassess each milestone against then-current code before implementing it; a listed requirement does not mean its mechanism is absent.
+Repository baseline: `main` at [eae0ea19](https://github.com/rzvdaniel/automaton/commit/eae0ea199f10a708032d0f42a1ad20804e8e92b5). This revision uses the repository plans, [M0/M1 inventory](../architecture/managed-platform-m0-acceptance-inventory.md), and the latest operator report. Live results below were reported, not independently rerun for this document. Reassess each milestone against then-current code before implementing it; a listed requirement does not mean its mechanism is absent.
 
 ## Product boundaries
 
@@ -47,8 +47,9 @@ These are product decisions to implement and validate, not statements that every
 | Runtime restrictions | App root read-only; `/tmp` bounded to 32 MiB; persistent data writable with the intended UID 1000. These are observed fixture settings, not new tier defaults. |
 | Persistence | A marker written directly as UID 1000 survived two Hosted Runner reprovisions. Application-originated write/read remains unproven. |
 | Remaining live blocker | Deployment failed three times with `File upload timed out`; the source change selecting the intended runtime user was not deployed. |
-| Worker provenance | Exact revision of the running `automaton-prod-worker:latest` image was not established. Missing labels alone do not prove it is outdated. |
-| RM | Proposed; implementation not started. |
+| Worker provenance | Running image is `automaton-prod-worker:latest`, digest `sha256:6bb80ed06b60f96dd1fe7d541bd61851bca11336ce28d1c6c13f0ef0d53d151f`, created 2026-09-28 07:45:37 UTC. Its image has no source-revision label, so the source commit remains unknown. This is a separate release-tracking gap; the Worker does not perform the failed API-to-Runner deployment-package transfer. |
+| Failed deployment trace | Operation `c1adda58-6c57-43cf-b6ae-1c72bd41fc60` failed at 2026-09-28 19:28:59 UTC in `DeploymentPackageRunnerService.UploadPackageAsync` while awaiting upload completion. API green had a connected Hosted Runner before the attempt. Available logs establish no completion/failure callback reached the API registry, but do not distinguish chunk delivery from callback delivery. No justified small fix was identified. |
+| RM | First Hosted Runner deployment-command and HTTPS package path implemented on the current branch; not released or live-accepted. Remaining management cutover and M1 live acceptance are pending. |
 | M2–M7 | Remaining completion/acceptance scope; audit existing mechanisms before adding code. |
 | Builder | Future functionality; outside this release's completion gates. |
 
@@ -58,8 +59,8 @@ Keep the disposable `M1 Live Acceptance 20260928` app until remaining checks fin
 
 ## Execution order
 
-1. Diagnose one failed upload end to end and preserve the existing M1 evidence. Apply a small justified fix if sufficient, then finish M1.
-2. If completing the upload would require substantial work on the SignalR transfer path being replaced, implement RM and carry the remaining M1 checks into its acceptance. M1 remains pending until those checks pass; avoid an open-ended repair of the retiring transport.
+1. The failed upload has been traced to the SignalR upload handoff or completion callback; the available evidence does not identify a small justified fix. The API dispatcher performs this flow directly; the deployed Worker image is a separate provenance gap.
+2. Implement RM and carry the remaining M1 checks into its acceptance. Include authenticated bounded artifact transfer in RM; do not expand work into a speculative repair of the retiring SignalR transfer path. M1 remains pending until the live checks pass.
 3. Complete RM, including removal of replaced SignalR management and a successful CLI deployment with application-originated persistence checks.
 4. Complete M2 and M3. Collect M5/M6 lifecycle and recovery evidence alongside this work.
 5. Complete M4 and the remaining M5/M6 gaps for supported hosting modes.
@@ -102,12 +103,24 @@ Finish the live flow:
 
 Use the existing RabbitMQ infrastructure for durable management commands and authenticated HTTPS for artifacts/results. Keep stable Runner identity independent of API instances. Inventory existing command consumers and callbacks first; extend them where their contract fits.
 
+### Current code audit (`main` at `eae0ea19`)
+
+- The failed CLI deployment operation is persisted by the API, then dispatched by `DeploymentOperationDispatcher` / `DeploymentOperationService` on the API instance that owns the assigned Runner connection. The API sends deployment package chunks through `AutomatonHub`; the Runner writes them under its temporary upload directory and calls back with completion/failure. `FileUploadRegistry` is in API process memory. The deployment operation and result are durable in the database, but the in-flight transfer and RPC reply depend on that API/Runner SignalR connection.
+- The Worker is not in that API-to-Runner package-transfer path. The live Worker image digest and unknown source commit are tracked separately above; rebuilding it is not an upload fix.
+- RabbitMQ command consumption currently exists only for Infrastructure Runners. It uses the `InfrastructureCommandRequestedEvent`, a durable queue per Runner Host, authenticated HTTPS for secrets/results, and acknowledges after the API accepts the result. Its configuration currently uses the shared RabbitMQ account; tenant-scoped broker credentials are not yet implemented. Hosted Runners have no RabbitMQ command consumer.
+- Deployment package files are staged under API `AppData/deployment-operations`. Production blue and green API services mount the same `prod-api-appdata` Docker volume, so the current cutover pair can read the same staged package on their configured host. Package availability when API slots run on different API hosts is **not yet established**. Do not add a new storage system for this first path; the transfer must make its current storage scope explicit and fail cleanly when the package is unavailable.
+- `AutomatonHub` also carries workflows/custom steps, app actions and action administration, managed-artifact synchronization, app file/media transfer, host-container execution, storage telemetry, reconnect/drain coordination, and runtime tunnels. Classify these callers before removing Runner SignalR; retain independent Studio updates and BYO tunnel behavior where still required.
+
+This audit narrows the first vertical path to durable Runner-addressed deployment commands over the existing RabbitMQ command infrastructure, with restricted broker credentials for Hosted Runners; authenticated HTTPS package retrieval with size/checksum/expiry/ownership checks; and a persisted idempotent result callback. Use the existing shared package volume for this first path. Availability when API slots run on different API hosts is **not yet established**; do not add a new storage system for this path. The new deployment path must not add a SignalR fallback. Expand it to the other replaceable management callers, then remove those callers and their registries during the coordinated cutover.
+
 ### Required contract
 
 - Address commands by stable Runner/operation identity, never a SignalR `ConnectionId` or API color. Use scoped broker credentials and permissions; tenant runners must not receive Infrastructure Runner authority.
+- Hosted Runners receive an individual RabbitMQ user limited to consuming their durable deployment queue. The API provisions the queue/user through the configured RabbitMQ Management API; production must provide `RabbitMq.ManagementUrl` and the Hosted Runner broker endpoint.
+- Successful Hosted Runner deprovision deletes that RabbitMQ user and queue. RabbitMQ user deletion revokes its credentials and closes connections authenticated as that user; a failed deprovision does not claim successful revocation.
 - Persist operation intent, publish reliably and make execution retry-safe. Use publisher confirmation, appropriate durable queues/messages and consumer acknowledgement only after recoverable execution/result state exists. Reuse established result-before-ack behavior where applicable.
 - Handle duplicate delivery and a crash after host-side success without repeating destructive work. Reconcile uncertain outcomes; do not promise exactly-once transport.
-- Transfer artifacts through bounded authenticated HTTP requests/downloads with ownership checks, expiry, checksums and cleanup. Artifact availability must survive API replica changes; a URL pointing only to one replica's local disk is insufficient.
+- Transfer artifacts through bounded authenticated HTTP requests/downloads with ownership checks, expiry, checksums and cleanup. The first path uses the existing package volume; availability across different API hosts is not established and must not be implied by same-host blue/green results. Do not add a new storage system solely for this path.
 - Deliver results idempotently through authenticated APIs, retrying safely after API outages. Commands reference the intended trusted action/artifact revision so stored stale modules cannot silently execute.
 - Keep one connection/recovery lifecycle with bounded backoff and jitter. RabbitMQ still has connections and broker recovery; the simplification removes dependence on API deployment connections, not all reconnects.
 - Existing apps keep running during API/Worker deployments. New management work may wait while a dependency is unavailable; expose that state truthfully.
@@ -117,6 +130,10 @@ Use the existing RabbitMQ infrastructure for durable management commands and aut
 Inventory every Runner SignalR caller before removal. Delete the replaced management hubs/clients, file-transfer paths, connection registries, cutover acknowledgements, reconnect/drain coordination, settings and obsolete tests. Remove the requirement for all Runners to register on a new API slot before API traffic can switch.
 
 Retain independent supported features, such as Studio live updates or BYO tunnel functionality, if they still require SignalR. Name those remaining uses in the final inventory. No management fallback to the retired transport; update runbooks and Admin documentation to match the implemented behavior.
+
+**First vertical-path acceptance:** a CLI deployment command survives Runner retry; the Runner retrieves its package after an API slot switch using authenticated HTTPS; the operation reaches a persisted terminal state without a SignalR completion callback. Treat the existing shared package volume as usable for the tested same-host slot arrangement only. Availability when the two slots are on different API hosts remains unestablished; do not add a storage system for this first path.
+
+After that deployment succeeds, complete the retained disposable app's M1 checks: the app process writes and reads its own persistent marker, storage usage is measured, its Hosted Runner is reprovisioned, and the marker still survives. Delete the app through the supported flow only after all checks pass. Keep M1 **implemented; live acceptance pending** until this sequence succeeds.
 
 **Acceptance:** deploy the API while a Runner is working; restart Worker and Runner; exercise duplicate commands, lost callbacks, broker interruption and recovery; verify tenant isolation and correct artifact/action revision. Show that a completed operation remains completed and running apps remain healthy. Test reconnect recovery at a stated cohort size; a small test does not establish thousand-Runner capacity.
 
@@ -219,4 +236,4 @@ For each milestone, record status, PR/source revision, deployed image digest, po
 
 Use focused PRs and repository-required checks for the affected code. Update Admin guides when actual operator behavior changes. Documentation-only roadmap changes need link/content/whitespace checks, not application builds or deployments.
 
-**Next action:** establish Worker provenance and trace one failed disposable-app upload, then follow the M1/RM decision above. Do not start Builder or expand commercial promises to work around the pending acceptance.
+**Next action:** complete focused automated validation and review of the first Hosted Runner command/package-transfer path, then release it for the stated CLI acceptance. Keep the disposable app until app-originated marker read/write, usage measurement, reprovision and supported cleanup all pass. Track Worker source provenance separately. Do not start Builder or expand commercial promises to work around the pending acceptance.
