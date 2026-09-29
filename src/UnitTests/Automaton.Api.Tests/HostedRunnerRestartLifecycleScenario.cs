@@ -87,7 +87,7 @@ internal static class HostedRunnerRestartLifecycleScenario
             db,
             new HostedRunnerAuditNoOpAuditEventService(),
             Microsoft.Extensions.Options.Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
-            Microsoft.Extensions.Options.Options.Create(new StorageTelemetryOptions()));
+            Microsoft.Extensions.Options.Options.Create(new StorageTelemetryOptions()), null!);
         using var result = System.Text.Json.JsonDocument.Parse("{}");
         await handler.ApplySuccessfulOperationAsync(
             runner, operation, "restart-hosted-runner", result.RootElement, CancellationToken.None);

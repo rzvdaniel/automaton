@@ -41,7 +41,7 @@ internal sealed class HostedRunnerCommandApiClient
         return response?.Outcome ?? throw new InvalidOperationException("The API returned no command disposition.");
     }
 
-    public async Task SubmitResultAsync(
+    public async Task<string> SubmitResultAsync(
         HostedRunnerDeploymentCommand command,
         DeployAppPackageResult result,
         CancellationToken cancellationToken)
@@ -54,8 +54,9 @@ internal sealed class HostedRunnerCommandApiClient
             cancellationToken);
         response.EnsureSuccessStatusCode();
         var outcome = await response.Content.ReadFromJsonAsync<CommandResultResponse>(cancellationToken);
-        if (outcome?.Outcome is not ("accepted" or "already-applied" or "stale"))
+        if (outcome?.Outcome is not ("accepted" or "already-applied" or "stale" or "obsolete"))
             throw new InvalidOperationException("The API did not persist this Hosted Runner deployment result.");
+        return outcome.Outcome;
     }
 
     private HttpClient CreateClient()

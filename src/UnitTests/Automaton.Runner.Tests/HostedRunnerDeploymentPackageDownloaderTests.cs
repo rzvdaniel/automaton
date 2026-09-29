@@ -68,15 +68,21 @@ public sealed class HostedRunnerDeploymentPackageDownloaderTests
     }
 
     [Test]
-    public async Task ResultJournal_ReusesPersistedOutcomeForTheSameAttempt()
+    public async Task ResultJournal_ReusesPersistedOutcomeAcrossRetryAttempts()
     {
         var fixture = CreateFixture([]);
         try
         {
             var journal = new HostedRunnerDeploymentResultJournal(new RunnerWorkspaceService());
+            var operationId = Guid.NewGuid();
             var request = new DeployAppPackageRequest
             {
-                DeploymentOperationId = Guid.NewGuid(),
+                DeploymentOperationId = operationId,
+                ExecutionAttemptId = Guid.NewGuid()
+            };
+            var retry = new DeployAppPackageRequest
+            {
+                DeploymentOperationId = operationId,
                 ExecutionAttemptId = Guid.NewGuid()
             };
             var expected = new DeployAppPackageResult
@@ -87,7 +93,7 @@ public sealed class HostedRunnerDeploymentPackageDownloaderTests
             };
 
             await journal.SaveAsync(request, expected, CancellationToken.None);
-            var restored = await journal.TryReadAsync(request);
+            var restored = await journal.TryReadAsync(retry);
 
             Assert.That(restored?.Success, Is.True);
             Assert.That(restored?.Message, Is.EqualTo(expected.Message));

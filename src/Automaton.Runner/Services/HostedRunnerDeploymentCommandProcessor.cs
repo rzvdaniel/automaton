@@ -19,6 +19,14 @@ internal sealed class HostedRunnerDeploymentCommandProcessor(
         if (File.Exists(journalPath))
             return await ReadJournalAsync(journalPath, cancellationToken);
 
+        var completedResult = await deployment.FindHostedRunnerDeploymentResultAsync(
+            command.OperationId, cancellationToken);
+        if (completedResult is not null)
+        {
+            await WriteJournalAsync(journalPath, completedResult, cancellationToken);
+            return completedResult;
+        }
+
         string packagePath;
         try
         {
@@ -27,14 +35,11 @@ internal sealed class HostedRunnerDeploymentCommandProcessor(
         }
         catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            var unavailable = new DeployAppPackageResult
-            {
-                DeploymentTargetId = command.DeploymentTargetId,
-                Success = false,
-                Message = exception.Message
-            };
-            await WriteJournalAsync(journalPath, unavailable, cancellationToken);
-            return unavailable;
+            return await CreateUnavailableResultAsync(command, journalPath, exception.Message, cancellationToken);
+        }
+        catch (InvalidDataException exception)
+        {
+            return await CreateUnavailableResultAsync(command, journalPath, exception.Message, cancellationToken);
         }
         try
         {
@@ -59,7 +64,23 @@ internal sealed class HostedRunnerDeploymentCommandProcessor(
     public void DeleteJournal(HostedRunnerDeploymentCommand command) => TryDelete(GetJournalPath(command));
 
     public void DeleteExecutionResult(HostedRunnerDeploymentCommand command)
-        => deployment.ForgetHostedRunnerDeploymentResult(command.OperationId, command.ExecutionAttemptId);
+        => deployment.ForgetHostedRunnerDeploymentResult(command.OperationId);
+
+    private static async Task<DeployAppPackageResult> CreateUnavailableResultAsync(
+        HostedRunnerDeploymentCommand command,
+        string journalPath,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var unavailable = new DeployAppPackageResult
+        {
+            DeploymentTargetId = command.DeploymentTargetId,
+            Success = false,
+            Message = message
+        };
+        await WriteJournalAsync(journalPath, unavailable, cancellationToken);
+        return unavailable;
+    }
 
     private static async Task<DeployAppPackageResult> ReadJournalAsync(
         string path,
@@ -81,7 +102,7 @@ internal sealed class HostedRunnerDeploymentCommandProcessor(
     }
 
     private string GetJournalPath(HostedRunnerDeploymentCommand command)
-        => storage.GetHostedRunnerCommandResultPath(command.OperationId, command.ExecutionAttemptId);
+        => storage.GetHostedRunnerCommandResultPath(command.OperationId);
 
     private static void TryDelete(string path)
     {

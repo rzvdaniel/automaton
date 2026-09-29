@@ -76,18 +76,29 @@ internal sealed class HostedRunnerDeploymentCommandHostedService(
                 var command = Deserialize(delivery.Body);
                 EnsureAddressedToRunner(command, runnerId);
                 var disposition = await api.GetCommandDispositionAsync(command, cancellationToken);
+                var removeOperationResult = disposition is "already-applied" or "obsolete";
                 if (disposition == "execute")
                 {
                     var result = await processor.ProcessAsync(command, api, cancellationToken);
-                    await api.SubmitResultAsync(command, result, cancellationToken);
+                    var outcome = await api.SubmitResultAsync(command, result, cancellationToken);
+                    removeOperationResult = outcome is "accepted" or "already-applied" or "obsolete";
                 }
-                else if (disposition is not ("already-applied" or "stale"))
+                else if (disposition is not ("already-applied" or "stale" or "obsolete"))
                 {
                     throw new InvalidDataException("The API returned an unknown command disposition.");
                 }
-                processor.DeleteJournal(command);
-                processor.DeleteExecutionResult(command);
+                if (removeOperationResult)
+                {
+                    processor.DeleteJournal(command);
+                    processor.DeleteExecutionResult(command);
+                }
                 await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && IsPermanentlyInvalid(exception))
+            {
+                logger.LogError(exception, "Discarding permanently invalid Hosted Runner deployment command.");
+                // The queue has no dead-letter exchange, so a non-requeued reject is terminal.
+                await channel.BasicRejectAsync(delivery.DeliveryTag, requeue: false, cancellationToken);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
@@ -118,4 +129,7 @@ internal sealed class HostedRunnerDeploymentCommandHostedService(
             || command.DeploymentTargetId == Guid.Empty || command.CreatedAtUtc.Kind != DateTimeKind.Utc)
             throw new InvalidDataException("The deployment command identity or timestamp is invalid.");
     }
+
+    private static bool IsPermanentlyInvalid(Exception exception)
+        => exception is JsonException or InvalidDataException;
 }

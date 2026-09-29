@@ -23,6 +23,22 @@ public sealed class HostedRunnerBrokerProvisionerTests
         Assert.That(requests[0].Path, Does.Contain(Uri.EscapeDataString(expectedQueue)));
     }
 
+    [Test]
+    public async Task RevokeAsync_DeletesRunnerUserAndQueue()
+    {
+        var runnerId = Guid.NewGuid();
+        var handler = new RecordingHandler();
+        var provisioner = CreateProvisioner(handler);
+
+        await provisioner.RevokeAsync(runnerId, CancellationToken.None);
+
+        Assert.That(handler.Requests, Has.Count.EqualTo(2));
+        Assert.That(handler.Requests[0].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[0].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[1].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[1].Path, Does.Contain(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId)));
+    }
+
     private static void AssertConsumeOnlyPermission(string body, string expectedQueue)
     {
         using var document = JsonDocument.Parse(body);
@@ -33,12 +49,17 @@ public sealed class HostedRunnerBrokerProvisionerTests
     }
 
     private static async Task<(Automaton.Core.Models.HostedRunnerBrokerConfiguration Result,
-        List<(string Path, string Body)> Requests)> ProvisionAsync(Guid runnerId)
+        List<(HttpMethod Method, string Path, string Body)> Requests)> ProvisionAsync(Guid runnerId)
     {
         var handler = new RecordingHandler();
-        var factory = new SingleClientFactory(new HttpClient(handler));
-        var provisioner = new HostedRunnerBrokerProvisioner(
-            factory,
+        var provisioner = CreateProvisioner(handler);
+        var result = await provisioner.ProvisionAsync(runnerId, CancellationToken.None);
+        return (result, handler.Requests);
+    }
+
+    private static HostedRunnerBrokerProvisioner CreateProvisioner(RecordingHandler handler)
+        => new(
+            new SingleClientFactory(new HttpClient(handler)),
             Options.Create(new RabbitMqOptions
             {
                 Host = "rabbitmq",
@@ -49,9 +70,6 @@ public sealed class HostedRunnerBrokerProvisionerTests
                 ManagementUrl = "http://rabbitmq:15672/"
             }),
             Options.Create(new HostedRunnerRabbitMqOptions { Host = "broker.example", Port = 5672 }));
-        var result = await provisioner.ProvisionAsync(runnerId, CancellationToken.None);
-        return (result, handler.Requests);
-    }
 
     private sealed class SingleClientFactory(HttpClient client) : IHttpClientFactory
     {
@@ -60,7 +78,7 @@ public sealed class HostedRunnerBrokerProvisionerTests
 
     private sealed class RecordingHandler : HttpMessageHandler
     {
-        public List<(string Path, string Body)> Requests { get; } = [];
+        public List<(HttpMethod Method, string Path, string Body)> Requests { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -69,7 +87,7 @@ public sealed class HostedRunnerBrokerProvisionerTests
             var body = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);
-            Requests.Add((request.RequestUri!.PathAndQuery, body));
+            Requests.Add((request.Method, request.RequestUri!.PathAndQuery, body));
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         }
     }

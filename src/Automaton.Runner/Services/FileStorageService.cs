@@ -64,11 +64,11 @@ public class FileStorageService
         }
     }
 
-    public string GetHostedRunnerCommandResultPath(Guid operationId, Guid attemptId)
+    public string GetHostedRunnerCommandResultPath(Guid operationId)
     {
         var resultDirectory = Path.Combine(configDirectory, "hosted-runner-command-results");
         Directory.CreateDirectory(resultDirectory);
-        return Path.Combine(resultDirectory, $"{operationId:N}-{attemptId:N}.json");
+        return Path.Combine(resultDirectory, $"{operationId:N}.json");
     }
 
     public async Task SaveApiKeyAsync(string apiKey)

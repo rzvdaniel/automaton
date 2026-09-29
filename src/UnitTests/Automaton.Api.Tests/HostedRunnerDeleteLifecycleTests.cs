@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Data.Common;
+using System.Net;
 using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
@@ -33,11 +34,27 @@ public class HostedRunnerDeleteLifecycleTests
     [Test]
     public async Task SuccessfulHostedRunnerDeleteReleasesRuntimePort()
     {
+        var result = await HostedRunnerDeleteLifecycleTestSupport.RunSuccessfulDeleteAsync();
+
+        Assert.That(result.RunnerDeleted, Is.True);
+        Assert.That(result.RuntimePortCleared, Is.True);
+        Assert.That(result.BrokerUserDeleted, Is.True);
+        Assert.That(result.BrokerQueueDeleted, Is.True);
+    }
+}
+
+internal static class HostedRunnerDeleteLifecycleTestSupport
+{
+    public static async Task<HostedRunnerDeleteLifecycleTestResult> RunSuccessfulDeleteAsync()
+    {
         using var db = HostedRunnerAuditTestData.CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var brokerHandler = new RecordingBrokerHandler();
         var hostedRunner = new HostedRunner
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "delete-port",
-            ContainerName = "delete-port", RuntimePort = 20000, Status = HostedRunnerStatuses.Deleting
+            RunnerId = runnerId, ContainerName = "delete-port", RuntimePort = 20000,
+            Status = HostedRunnerStatuses.Deleting
         };
         var deployment = new HostedRunnerDeployment
         {
@@ -47,13 +64,57 @@ public class HostedRunnerDeleteLifecycleTests
         };
         var handler = new InfrastructureActionProvisioningHandler(
             db, new HostedRunnerAuditNoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()));
+            Options.Create(new StorageTelemetryOptions()), CreateBrokerProvisioner(brokerHandler));
         using var document = JsonDocument.Parse("{\"success\":true}");
 
         await handler.ApplySuccessfulOperationAsync(
             hostedRunner, deployment, "delete-hosted-runner", document.RootElement, CancellationToken.None);
 
-        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Deleted));
-        Assert.That(hostedRunner.RuntimePort, Is.Null);
+        return new HostedRunnerDeleteLifecycleTestResult(
+            hostedRunner.Status == HostedRunnerStatuses.Deleted,
+            hostedRunner.RuntimePort is null,
+            brokerHandler.Requests.Count == 2
+                && brokerHandler.Requests[0].Method == HttpMethod.Delete
+                && brokerHandler.Requests[0].Path.Contains($"hosted-runner-{runnerId:N}", StringComparison.Ordinal),
+            brokerHandler.Requests.Count == 2
+                && brokerHandler.Requests[1].Method == HttpMethod.Delete
+                && brokerHandler.Requests[1].Path.Contains(
+                    HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), StringComparison.Ordinal));
+    }
+
+    private static HostedRunnerBrokerProvisioner CreateBrokerProvisioner(RecordingBrokerHandler handler)
+        => new(
+            new RecordingClientFactory(new HttpClient(handler)),
+            Options.Create(new RabbitMqOptions
+            {
+                Username = "operator",
+                Password = "operator-password",
+                VirtualHost = "/",
+                ManagementUrl = "http://rabbitmq:15672/"
+            }),
+            Options.Create(new HostedRunnerRabbitMqOptions { Host = "broker.example", Port = 5672 }));
+
+    private sealed class RecordingClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class RecordingBrokerHandler : HttpMessageHandler
+    {
+        public List<(HttpMethod Method, string Path)> Requests { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((request.Method, request.RequestUri!.PathAndQuery));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }
     }
 }
+
+internal sealed record HostedRunnerDeleteLifecycleTestResult(
+    bool RunnerDeleted,
+    bool RuntimePortCleared,
+    bool BrokerUserDeleted,
+    bool BrokerQueueDeleted);

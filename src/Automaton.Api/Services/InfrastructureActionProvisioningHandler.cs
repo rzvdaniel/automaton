@@ -18,7 +18,8 @@ public sealed class InfrastructureActionProvisioningHandler(
     ApplicationDbContext db,
     IAuditEventService auditEventService,
     IOptions<HostedRunnerOptions> hostedRunnerOptions,
-    IOptions<StorageTelemetryOptions> storageTelemetryOptions)
+    IOptions<StorageTelemetryOptions> storageTelemetryOptions,
+    HostedRunnerBrokerProvisioner brokerProvisioner)
 {
     private static readonly string[] ActiveDeploymentStatuses =
     [
@@ -163,6 +164,9 @@ public sealed class InfrastructureActionProvisioningHandler(
         JsonElement result,
         CancellationToken cancellationToken)
     {
+        if (actionKey == "delete-hosted-runner" && hostedRunner.RunnerId is Guid runnerId)
+            await brokerProvisioner.RevokeAsync(runnerId, cancellationToken);
+
         if (actionKey != StorageTelemetryActions.MeasureHostedRunnerStorage)
             hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;

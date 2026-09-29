@@ -135,7 +135,7 @@ internal static class InfrastructureCommandResolutionTestScenarioFactory
             db,
             new NoOpAuditEventService(),
             Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()));
+            Options.Create(new StorageTelemetryOptions()), null!);
         var results = new InfrastructureCommandResultService(db, grants, lifecycle);
         return new InfrastructureCommandCallbackService(
             db,

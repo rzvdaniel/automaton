@@ -11,8 +11,19 @@ internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService
         DeployAppPackageRequest request,
         CancellationToken cancellationToken = default)
     {
-        var path = GetPath(request);
-        if (path is null || !File.Exists(path))
+        if (request.DeploymentOperationId is not Guid operationId || request.ExecutionAttemptId is null)
+            return null;
+        return await TryReadAsync(operationId, cancellationToken);
+    }
+
+    public async Task<DeployAppPackageResult?> TryReadAsync(
+        Guid operationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (operationId == Guid.Empty)
+            return null;
+        var path = GetPath(operationId);
+        if (!File.Exists(path))
             return null;
         var json = await File.ReadAllTextAsync(path, cancellationToken);
         return JsonSerializer.Deserialize<DeployAppPackageResult>(json, JsonOptions)
@@ -24,7 +35,9 @@ internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService
         DeployAppPackageResult result,
         CancellationToken cancellationToken)
     {
-        var path = GetPath(request);
+        var path = request.DeploymentOperationId is Guid operationId && request.ExecutionAttemptId is not null
+            ? GetPath(operationId)
+            : null;
         if (path is null)
             return;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -33,20 +46,15 @@ internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    public void Delete(Guid operationId, Guid attemptId)
+    public void Delete(Guid operationId)
     {
-        if (operationId == Guid.Empty || attemptId == Guid.Empty)
+        if (operationId == Guid.Empty)
             return;
-        TryDelete(Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}-{attemptId:N}.json"));
+        TryDelete(Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}.json"));
     }
 
-    private string? GetPath(DeployAppPackageRequest request)
-    {
-        if (request.DeploymentOperationId is not Guid operationId
-            || request.ExecutionAttemptId is not Guid attemptId)
-            return null;
-        return Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}-{attemptId:N}.json");
-    }
+    private string GetPath(Guid operationId)
+        => Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}.json");
 
     private static void TryDelete(string path)
     {

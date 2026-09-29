@@ -109,15 +109,19 @@ public sealed class HostedRunnerDeploymentCommandService(
         var operation = await db.DeploymentOperations.AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == operationId, cancellationToken);
         if (operation is null)
-            return "stale";
+            return "obsolete";
         if (operation.Status is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed)
-            return operation.ExecutionAttemptId == attemptId ? "already-applied" : "stale";
-        if (operation.Status != DeploymentOperationStatuses.Running || operation.ExecutionAttemptId != attemptId)
-            return "stale";
+            return "already-applied";
+        if (operation.Status != DeploymentOperationStatuses.Running)
+            return "obsolete";
 
         var target = await ResolveTargetAsync(operation, cancellationToken);
-        return target?.ExecutionRunnerId == runnerId
-            && target.ActiveDeploymentOperationId == operationId
+        if (target?.ExecutionRunnerId != runnerId)
+            return "obsolete";
+        if (operation.ExecutionAttemptId != attemptId)
+            return "stale";
+
+        return target.ActiveDeploymentOperationId == operationId
             && target.ActiveDeploymentExecutionAttemptId == attemptId
                 ? "execute"
                 : "stale";

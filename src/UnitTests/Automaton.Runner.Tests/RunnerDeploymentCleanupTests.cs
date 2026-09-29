@@ -56,6 +56,34 @@ public sealed class RunnerDeploymentCleanupTests
         Assert.That(Directory.Exists(workspace.WorkspaceRoot), Is.True);
     }
 
+    [Test]
+    public async Task ResultJournalFailureDoesNotReportPromotedRuntimeAsFailed()
+    {
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var attemptId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var package = CreateRuntimePackage(appId);
+        var workspace = new RunnerWorkspaceService();
+        Directory.CreateDirectory(workspace.RunnerRoot);
+        File.WriteAllText(Path.Combine(workspace.RunnerRoot, "command-results"), "blocks journal directory");
+        var runtimeManager = new PromotingRuntimeProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace, runtimeManager, new AppActionDeploymentService(workspace));
+
+        var result = await service.DeployPackage(new DeployAppPackageRequest
+        {
+            AppId = appId,
+            DeploymentTargetId = targetId,
+            PackagePath = package,
+            DeploymentOperationId = operationId,
+            ExecutionAttemptId = attemptId
+        });
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(runtimeManager.ApplyCount, Is.EqualTo(1));
+    }
+
     private string CreateBuildPackage(Guid appId)
     {
         var path = Path.Combine(workspaceRoot, $"{Guid.NewGuid():N}.zip");
@@ -69,6 +97,24 @@ public sealed class RunnerDeploymentCleanupTests
             Command = new ApplicationCommandSpec { Executable = "build" }
         };
 
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        WriteEntry(archive, "manifest.json", JsonSerializer.Serialize(new AppDeploymentPackageManifest
+        {
+            AppId = appId.ToString(),
+            Application = application
+        }));
+        WriteEntry(archive, "source/placeholder.txt", "source");
+        WriteEntry(archive, "runtime/application/index.html", "runtime");
+        return path;
+    }
+
+    private string CreateRuntimePackage(Guid appId)
+    {
+        var path = Path.Combine(workspaceRoot, $"{Guid.NewGuid():N}.zip");
+        Directory.CreateDirectory(workspaceRoot);
+        var application = ApplicationContractDefaults.Create();
+        application.Runtime.Image = "test/runtime:1";
+        application.Runtime.Command = new ApplicationCommandSpec { Executable = "serve" };
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
         WriteEntry(archive, "manifest.json", JsonSerializer.Serialize(new AppDeploymentPackageManifest
         {
@@ -107,6 +153,25 @@ public sealed class RunnerDeploymentCleanupTests
             string? artifactRoot = null,
             Guid? candidateId = null)
             => Task.FromResult(new RuntimeApplyResult());
+
+        public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;
+    }
+
+    private sealed class PromotingRuntimeProcessManager : IAppRuntimeProcessManager
+    {
+        public int ApplyCount { get; private set; }
+
+        public Task<RuntimeApplyResult> ApplyAsync(
+            Guid appId,
+            Guid deploymentTargetId,
+            ApplicationContract contract,
+            CancellationToken cancellationToken = default,
+            string? artifactRoot = null,
+            Guid? candidateId = null)
+        {
+            ApplyCount++;
+            return Task.FromResult(new RuntimeApplyResult { PromotionIrreversible = true });
+        }
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;
     }

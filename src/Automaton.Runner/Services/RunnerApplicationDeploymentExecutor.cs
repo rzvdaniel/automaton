@@ -21,20 +21,22 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         Action ensureAttemptIsCurrent)
     {
         var attempt = CreateAttempt(request);
+        DeployAppPackageResult result;
         try
         {
-            return await ApplyDeploymentAsync(attempt, request, cancellationToken, ensureAttemptIsCurrent);
+            result = await ApplyDeploymentAsync(attempt, request, cancellationToken, ensureAttemptIsCurrent);
         }
         catch (Exception exception)
         {
-            var failure = HandleFailure(attempt, request, exception);
-            await resultJournal.SaveAsync(request, failure, CancellationToken.None);
-            return failure;
+            result = HandleFailure(attempt, request, exception);
         }
         finally
         {
             CleanupStaging(attempt);
         }
+
+        await SaveResultWithoutChangingDeploymentOutcomeAsync(request, result);
+        return result;
     }
 
     private DeploymentAttempt CreateAttempt(DeployAppPackageRequest request)
@@ -74,9 +76,23 @@ internal sealed class RunnerApplicationDeploymentExecutor(
             candidateId: candidate.Id);
         attempt.CandidatePromoted = candidate.ArtifactRoot is not null && applyResult.PromotionIrreversible;
         if (applyResult.Warning is not null) attempt.Logs.Add(applyResult.Warning);
-        var result = CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
-        await resultJournal.SaveAsync(request, result, CancellationToken.None);
-        return result;
+        return CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
+    }
+
+    private async Task SaveResultWithoutChangingDeploymentOutcomeAsync(
+        DeployAppPackageRequest request,
+        DeployAppPackageResult result)
+    {
+        try
+        {
+            await resultJournal.SaveAsync(request, result, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.Warning(exception,
+                "Could not persist Hosted Runner deployment result for operation {OperationId}; preserving the runtime outcome",
+                request.DeploymentOperationId);
+        }
     }
 
     private static AppDeploymentPackageManifest PreparePackage(

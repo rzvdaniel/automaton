@@ -68,8 +68,13 @@ public class RunnerDeploymentService
         }
     }
 
-    public void ForgetHostedRunnerDeploymentResult(Guid operationId, Guid attemptId)
-        => resultJournal.Delete(operationId, attemptId);
+    public void ForgetHostedRunnerDeploymentResult(Guid operationId)
+        => resultJournal.Delete(operationId);
+
+    public Task<DeployAppPackageResult?> FindHostedRunnerDeploymentResultAsync(
+        Guid operationId,
+        CancellationToken cancellationToken)
+        => resultJournal.TryReadAsync(operationId, cancellationToken);
 
     private async Task<DeployAppPackageResult> DeployPackageCore(
         DeployAppPackageRequest request,
