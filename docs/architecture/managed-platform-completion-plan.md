@@ -1,5 +1,7 @@
 # Managed platform completion plan
 
+> Historical assessment: the current execution order and milestone status are maintained in the [hosting and platform completion roadmap](../roadmap/managed-platform-completion-plan.md). The assessment below is retained as its original source-review baseline; it does not describe the latest rollout status.
+
 ## Assessment baseline
 
 - Assessed repository: `rzvdaniel/automaton`, `main` at [`2b41c263`](https://github.com/rzvdaniel/automaton/commit/2b41c2636ffae126d4e3dd9ec2cefe8d3577dd71).
