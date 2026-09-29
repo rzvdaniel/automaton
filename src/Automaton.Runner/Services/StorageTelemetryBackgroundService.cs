@@ -7,7 +7,7 @@ using System.Globalization;
 
 namespace Automaton.Runner.Console.Services;
 
-public sealed class StorageTelemetryBackgroundService(HubService hubService) : BackgroundService
+public sealed class StorageTelemetryBackgroundService(RunnerStorageTelemetryApiClient telemetryClient) : BackgroundService
 {
     private static readonly string[] ManagedRoots =
     [
@@ -63,7 +63,7 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
             for (var i = 0; i < ManagedRoots.Length; i++)
                 values[i] = await StorageMeasurement.MeasureDirectoryAsync(ManagedRoots[i], timeout.Token);
             var user = checked(values[1] + values[2] + values[3]);
-            await hubService.ReportHostedRunnerStorageAsync(new(
+            await telemetryClient.ReportHostedRunnerAsync(new(
                 hostedRunnerId, DateTime.UtcNow, values[0], values[1], values[2], values[3],
                 user, checked(values[0] + user), stopwatch.ElapsedMilliseconds, true, null,
                 typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
@@ -73,7 +73,7 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
         {
             try
             {
-                await hubService.ReportHostedRunnerStorageAsync(new(
+                await telemetryClient.ReportHostedRunnerAsync(new(
                     hostedRunnerId, DateTime.UtcNow, 0, 0, 0, 0, 0, 0, stopwatch.ElapsedMilliseconds,
                     false, ex.Message, typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
             }
@@ -97,7 +97,7 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
             await TryPruneDanglingImagesAsync(stoppingToken);
             var hostFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", "/"], stoppingToken));
             var dockerFilesystem = ParseDf(await ExecuteHostCommandAsync(["df", "-B1", "-P", dockerRoot], stoppingToken));
-            await hubService.ReportRunnerHostStorageAsync(new(
+            await telemetryClient.ReportRunnerHostAsync(new(
                 hostId, DateTime.UtcNow, hostFilesystem.Path, hostFilesystem.TotalBytes, hostFilesystem.UsedBytes, hostFilesystem.AvailableBytes,
                 dockerRoot, dockerFilesystem.TotalBytes, dockerFilesystem.AvailableBytes, true, null,
                 typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString(), true), stoppingToken);
@@ -107,7 +107,7 @@ public sealed class StorageTelemetryBackgroundService(HubService hubService) : B
         {
             try
             {
-                await hubService.ReportRunnerHostStorageAsync(new(
+                await telemetryClient.ReportRunnerHostAsync(new(
                     hostId, DateTime.UtcNow, string.Empty, 0, 0, 0, null, null, null, false,
                     ex.Message, typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
             }

@@ -18,8 +18,6 @@ namespace Automaton.Runner.Console.Services;
 public class HubService
 {
     internal const string CurrentRunnerApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current;
-    private const string ReportHostedRunnerStorageMethod = "ReportHostedRunnerStorage";
-    private const string ReportRunnerHostStorageMethod = "ReportRunnerHostStorage";
     private const string RequestHostContainerExecutionMethod = "RequestHostContainerExecution";
 
     private HubConnection? connection;
@@ -43,12 +41,6 @@ public class HubService
     private int reconnectRequested = 0;
     private readonly HubHeartbeatService heartbeatService;
 
-    public Task ReportHostedRunnerStorageAsync(HostedRunnerStorageTelemetry report, CancellationToken cancellationToken) =>
-        InvokeTelemetryAsync(ReportHostedRunnerStorageMethod, report, cancellationToken);
-
-    public Task ReportRunnerHostStorageAsync(RunnerHostStorageTelemetry report, CancellationToken cancellationToken) =>
-        InvokeTelemetryAsync(ReportRunnerHostStorageMethod, report, cancellationToken);
-
     public async Task<HostContainerExecutionResponse> RequestHostContainerExecutionAsync(
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken = default)
@@ -57,14 +49,6 @@ public class HubService
             throw new InvalidOperationException("Runner is not connected to the API.");
         return await connection.InvokeAsync<HostContainerExecutionResponse>(
             RequestHostContainerExecutionMethod, request, cancellationToken);
-    }
-
-    private async Task InvokeTelemetryAsync(string method, object report, CancellationToken cancellationToken)
-    {
-        var current = connection;
-        if (current?.State != HubConnectionState.Connected)
-            throw new InvalidOperationException("Runner is not connected to the API.");
-        await current.InvokeAsync(method, report, cancellationToken);
     }
 
     public HubService(
