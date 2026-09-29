@@ -49,7 +49,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         await runtime.CreateApplicationAsync(new(
             "ignored-direct-name", "example/runtime:latest", @"C:\runner\artifacts\candidate-x\application", ".",
             new() { Executable = "serve" }, 8080, 0, @"C:\runner\data", new Dictionary<string, string>(),
-            appId, targetId, candidateId, storage));
+            appId, targetId, candidateId, storage, "1000:1000"));
 
         var request = requests.Single();
         Assert.Multiple(() =>
@@ -62,6 +62,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
             Assert.That(request.Storage, Is.SameAs(storage));
             Assert.That(request.Storage!.DataDirectory, Is.EqualTo("state"));
             Assert.That(request.Storage.Mounts.Single().RelativePath, Is.EqualTo("files"));
+            Assert.That(request.User, Is.EqualTo("1000:1000"));
         });
     }
 

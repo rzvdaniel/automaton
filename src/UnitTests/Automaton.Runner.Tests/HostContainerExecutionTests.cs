@@ -308,4 +308,15 @@ public sealed class HostContainerExecutionTests
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
         }
     }
+
+    [Test]
+    public async Task CreateApplicationContainerAppliesValidatedRuntimeUser()
+    {
+        var outcome = await HostContainerRuntimeUserScenario.RunAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Success, Is.True, outcome.Error);
+            Assert.That(outcome.UserApplied, Is.True);
+        });
+    }
 }

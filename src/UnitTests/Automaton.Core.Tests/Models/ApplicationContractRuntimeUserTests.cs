@@ -1,0 +1,48 @@
+using Automaton.Core.Models;
+using NUnit.Framework;
+
+namespace Automaton.Core.Tests.Models;
+
+[TestFixture]
+public sealed class ApplicationContractRuntimeUserTests
+{
+    [TestCase("1000")]
+    [TestCase("1000:1000")]
+    public void NumericRuntimeUserIsValid(string user)
+    {
+        var errors = ApplicationContractValidator.Validate(new()
+        {
+            Runtime = new() { User = user }
+        });
+
+        Assert.That(errors, Is.Empty);
+    }
+
+    [Test]
+    public void RuntimeUserSurvivesContractSerialization()
+    {
+        var contract = new ApplicationContract { Runtime = new() { User = "1000:1000" } };
+
+        var restored = ApplicationContractSerialization.Deserialize(
+            ApplicationContractSerialization.Serialize(contract));
+
+        Assert.That(restored.Runtime.User, Is.EqualTo("1000:1000"));
+    }
+
+    [TestCase("")]
+    [TestCase("1000:")]
+    [TestCase(":1000")]
+    [TestCase("root")]
+    [TestCase("1000:1000:1000")]
+    [TestCase("4294967296")]
+    [TestCase("1000 --privileged")]
+    public void InvalidRuntimeUserIsRejected(string user)
+    {
+        var errors = ApplicationContractValidator.Validate(new()
+        {
+            Runtime = new() { User = user }
+        });
+
+        Assert.That(errors, Does.Contain("runtime.user must be a numeric UID or UID:GID"));
+    }
+}

@@ -30,7 +30,8 @@ public sealed record DockerApplicationContainerRequest(
     Guid AppId,
     Guid DeploymentTargetId,
     Guid CandidateId = default,
-    ApplicationStorageSpec? Storage = null);
+    ApplicationStorageSpec? Storage = null,
+    string? User = null);
 
 public sealed record DockerApplicationContainer(
     string Id,
@@ -206,6 +207,11 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
             "--security-opt", "no-new-privileges",
             "--cap-drop", "ALL"
         };
+        if (request.User is not null)
+        {
+            args.Add("--user");
+            args.Add(request.User);
+        }
         if (network == "bridge")
         {
             args.Add("--publish");
