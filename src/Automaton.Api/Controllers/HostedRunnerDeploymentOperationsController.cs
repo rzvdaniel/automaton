@@ -45,6 +45,16 @@ public sealed class HostedRunnerDeploymentOperationsController(
         return Ok(new HostedRunnerCommandResultResponse(outcome));
     }
 
+    [HttpPost("{operationId:guid}/reject")]
+    public async Task<ActionResult<HostedRunnerCommandResultResponse>> Reject(
+        Guid operationId,
+        [FromBody] HostedRunnerDeploymentCommandRejectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await results.RejectAsync(ApiKeyId(), operationId, request, cancellationToken);
+        return Ok(new HostedRunnerCommandResultResponse(outcome));
+    }
+
     private Guid ApiKeyId() => Guid.TryParse(User.FindFirst("api_key_id")?.Value, out var id)
         ? id
         : throw new UnauthorizedAccessException("Hosted Runner commands require API-key authentication.");

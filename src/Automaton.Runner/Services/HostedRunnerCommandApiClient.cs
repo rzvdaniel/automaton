@@ -59,6 +59,25 @@ internal sealed class HostedRunnerCommandApiClient
         return outcome.Outcome;
     }
 
+    public async Task<string> RejectCommandAsync(
+        Guid operationId,
+        Guid executionAttemptId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        using var client = CreateClient();
+        using var response = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(
+            client,
+            $"api/hosted-runner-commands/operations/{operationId:D}/reject",
+            new HostedRunnerDeploymentCommandRejectionRequest(executionAttemptId, reason),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var outcome = await response.Content.ReadFromJsonAsync<CommandResultResponse>(cancellationToken);
+        if (outcome?.Outcome is not ("accepted" or "already-applied" or "stale" or "obsolete"))
+            throw new InvalidOperationException("The API did not persist the Hosted Runner command rejection.");
+        return outcome.Outcome;
+    }
+
     private HttpClient CreateClient()
     {
         var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })

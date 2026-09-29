@@ -24,3 +24,7 @@ public sealed record HostedRunnerBrokerConfiguration(
 public sealed record HostedRunnerDeploymentResultRequest(
     Guid ExecutionAttemptId,
     DeployAppPackageResult Result);
+
+public sealed record HostedRunnerDeploymentCommandRejectionRequest(
+    Guid ExecutionAttemptId,
+    string Reason);

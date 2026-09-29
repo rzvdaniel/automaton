@@ -34,6 +34,7 @@ public sealed class HostedRunnerDeploymentCommandPublisher(IOptions<RabbitMqOpti
             Persistent = true,
             ContentType = "application/json",
             MessageId = command.OperationId.ToString("N"),
+            CorrelationId = command.ExecutionAttemptId.ToString("N"),
             Type = nameof(HostedRunnerDeploymentCommand)
         };
         var payload = JsonSerializer.SerializeToUtf8Bytes(command, JsonOptions);

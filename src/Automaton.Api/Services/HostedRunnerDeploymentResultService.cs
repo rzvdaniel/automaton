@@ -16,6 +16,42 @@ public sealed class HostedRunnerDeploymentResultService(
     AppDeploymentTargetStateService targetState)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const int MaximumRejectionReasonLength = 1000;
+
+    public async Task<string> RejectAsync(
+        Guid apiKeyId,
+        Guid operationId,
+        HostedRunnerDeploymentCommandRejectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var runnerId = await commands.GetHostedRunnerIdAsync(apiKeyId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("The API key is not assigned to a Hosted Runner.");
+        var operation = await db.DeploymentOperations.SingleOrDefaultAsync(
+            item => item.Id == operationId, cancellationToken);
+        if (operation is null)
+            return "obsolete";
+        var terminalOutcome = GetTerminalOutcome(operation, request.ExecutionAttemptId);
+        if (terminalOutcome is not null)
+            return terminalOutcome;
+        if (!IsCurrentAttempt(operation, request.ExecutionAttemptId))
+            return "stale";
+
+        var target = await commands.ResolveTargetAsync(operation, cancellationToken);
+        if (target?.ExecutionRunnerId != runnerId)
+            throw new UnauthorizedAccessException("The deployment operation is not assigned to this Runner.");
+
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "The Hosted Runner rejected an invalid deployment command."
+            : request.Reason[..Math.Min(request.Reason.Length, MaximumRejectionReasonLength)];
+        return await ApplyAsync(apiKeyId, operationId, new HostedRunnerDeploymentResultRequest(
+            request.ExecutionAttemptId,
+            new DeployAppPackageResult
+            {
+                DeploymentTargetId = target.Id,
+                Success = false,
+                Message = reason
+            }), cancellationToken);
+    }
 
     public async Task<string> ApplyAsync(
         Guid apiKeyId,
@@ -71,6 +107,9 @@ public sealed class HostedRunnerDeploymentResultService(
         bool success,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+            return await PersistResultInMemoryAsync(operationId, attemptId, response, error, success, cancellationToken);
+
         var completed = await db.DeploymentOperations
             .Where(item => item.Id == operationId
                 && item.Status == DeploymentOperationStatuses.Running
@@ -131,6 +170,19 @@ public sealed class HostedRunnerDeploymentResultService(
         string resultJson,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+        {
+            var operation = await db.DeploymentOperations.SingleOrDefaultAsync(item => item.Id == operationId,
+                cancellationToken);
+            if (operation is null || operation.Status != DeploymentOperationStatuses.Running
+                || operation.ExecutionAttemptId != attemptId
+                || operation.ResultJson is not null && operation.ResultJson != resultJson)
+                return false;
+            operation.ResultJson = resultJson;
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
         var updated = await db.DeploymentOperations
             .Where(item => item.Id == operationId
                 && item.Status == DeploymentOperationStatuses.Running
@@ -140,6 +192,28 @@ public sealed class HostedRunnerDeploymentResultService(
         return updated == 1 || await db.DeploymentOperations.AsNoTracking().AnyAsync(item =>
             item.Id == operationId && item.Status == DeploymentOperationStatuses.Running
             && item.ExecutionAttemptId == attemptId && item.ResultJson == resultJson, cancellationToken);
+    }
+
+    private async Task<bool> PersistResultInMemoryAsync(
+        Guid operationId,
+        Guid attemptId,
+        DeployPackageResponse response,
+        string? error,
+        bool success,
+        CancellationToken cancellationToken)
+    {
+        var operation = await db.DeploymentOperations.SingleOrDefaultAsync(item => item.Id == operationId,
+            cancellationToken);
+        if (operation is null || operation.Status != DeploymentOperationStatuses.Running
+            || operation.ExecutionAttemptId != attemptId)
+            return false;
+        operation.Status = success ? DeploymentOperationStatuses.Succeeded : DeploymentOperationStatuses.Failed;
+        operation.CompletedAtUtc = DateTime.UtcNow;
+        operation.LeaseExpiresAtUtc = null;
+        operation.ErrorMessage = error;
+        operation.ResultJson = JsonSerializer.Serialize(response, JsonOptions);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private async Task FinalizeTargetAsync(
