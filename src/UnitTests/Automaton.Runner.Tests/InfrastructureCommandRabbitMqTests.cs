@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Net;
+using System.Net.Http.Headers;
 using Automaton.Core.Models;
 using Automaton.Messaging.Events;
 using Automaton.Runner.Console.Services;
@@ -15,6 +17,54 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class InfrastructureCommandRabbitMqTests
 {
+    [Test]
+    public async Task Result429AndApiFailureRecoverWithOneConsumerAndEmptyQueue()
+    {
+        await using var session = await RabbitMqConsumerTestSession.CreateAsync(RabbitMqTestBehavior.TransientResults);
+        var consuming = session.StartLongLivedConsumer();
+        await session.WaitForConsumerAsync(consuming);
+        await session.PublishCommandAsync();
+        await session.WaitForCallbackCountAsync(1);
+        await session.WaitForAcknowledgementAsync();
+        Assert.That(session.ExecutedCommandCount, Is.EqualTo(2));
+        Assert.That(await session.GetConsumerCountAsync(), Is.EqualTo(1));
+        await session.CancelConsumerAsync(consuming);
+        using var verification = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        Assert.That(await session.IsQueueEmptyAsync(verification.Token), Is.True);
+    }
+
+    [Test]
+    public async Task LongLivedCallbackFailurePreservesErrorAndCompletesTeardown()
+    {
+        await using var session = await RabbitMqConsumerTestSession.CreateAsync(RabbitMqTestBehavior.CallbackFails);
+        var consuming = session.StartLongLivedConsumer();
+        await session.WaitForConsumerAsync(consuming);
+        var commandId = await session.PublishCommandAsync();
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await consuming.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.That(exception!.Message, Does.Contain("result delivery is required"));
+        var redelivery = await session.ReadRedeliveredCommandAsync();
+        Assert.That(redelivery.CommandId, Is.EqualTo(commandId));
+        Assert.That(redelivery.Redelivered, Is.True);
+    }
+
+    [Test]
+    public async Task CallbackFailureAllowsOwnerToStartExactlyOneReplacementConsumer()
+    {
+        await using var session = await RabbitMqConsumerTestSession.CreateAsync(RabbitMqTestBehavior.CallbackFails);
+        var failed = session.StartLongLivedConsumer();
+        await session.WaitForConsumerAsync(failed);
+        await session.PublishCommandAsync();
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await failed.WaitAsync(TimeSpan.FromSeconds(5)));
+        var replacement = session.StartConsumerWithResultClient();
+        await session.WaitForConsumerAsync(replacement);
+        await session.WaitForCallbackCountAsync(1);
+        Assert.That(await session.GetConsumerCountAsync(), Is.EqualTo(1));
+        await session.CancelConsumerAsync(replacement);
+        using var verification = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        Assert.That(await session.IsQueueEmptyAsync(verification.Token), Is.True);
+    }
+
     [Test]
     public async Task LocalRabbitMqLeavesDeliveryUnacknowledgedWhenCallbackFails()
     {
@@ -78,6 +128,7 @@ public sealed class InfrastructureCommandRabbitMqTests
 internal enum RabbitMqTestBehavior
 {
     CallbackFails,
+    TransientResults,
     Succeeds,
     Terminal
 }
@@ -132,7 +183,7 @@ internal sealed class RabbitMqConsumerTestSession : IAsyncDisposable
         var channel = await connection.CreateChannelAsync(cancellationToken: setupTimeout.Token);
         var identity = new InfrastructureCommandIdentity(Guid.NewGuid(), Guid.NewGuid());
         var executor = new RecordingExecutor(behavior);
-        var callbacks = new RecordingResultClient();
+        var callbacks = new RecordingResultClient(behavior);
         var consumer = behavior == RabbitMqTestBehavior.CallbackFails
             ? new InfrastructureCommandConsumer(identity, executor)
             : new InfrastructureCommandConsumer(identity, executor, callbacks);
@@ -152,6 +203,9 @@ internal sealed class RabbitMqConsumerTestSession : IAsyncDisposable
 
     public Task StartLongLivedConsumer()
         => consumer.ConsumeAsync(configuration, timeout.Token);
+
+    public Task StartConsumerWithResultClient()
+        => new InfrastructureCommandConsumer(identity, executor, callbacks).ConsumeAsync(configuration, timeout.Token);
 
     public async Task WaitForConsumerAsync(Task consuming)
     {
@@ -193,7 +247,20 @@ internal sealed class RabbitMqConsumerTestSession : IAsyncDisposable
     }
 
     public async Task<bool> IsQueueEmptyAsync()
-        => await channel.BasicGetAsync(consumer.QueueName, autoAck: true, timeout.Token) is null;
+        => await IsQueueEmptyAsync(timeout.Token);
+
+    public async Task<bool> IsQueueEmptyAsync(CancellationToken cancellationToken)
+        => await channel.BasicGetAsync(consumer.QueueName, autoAck: true, cancellationToken) is null;
+
+    public async Task<uint> GetConsumerCountAsync()
+        => (await channel.QueueDeclarePassiveAsync(consumer.QueueName, timeout.Token)).ConsumerCount;
+
+    public async Task WaitForAcknowledgementAsync()
+    {
+        // Publish/consume a following command to establish that the first delivery was acked.
+        await PublishCommandAsync();
+        await WaitForCallbackCountAsync(2);
+    }
 
     public async Task WaitForCallbackCountAsync(int count)
     {
@@ -289,18 +356,30 @@ internal sealed class RabbitMqConsumerTestSession : IAsyncDisposable
         }
     }
 
-    private sealed class RecordingResultClient : IInfrastructureCommandResultClient
+    private sealed class RecordingResultClient(RabbitMqTestBehavior behavior) : IInfrastructureCommandResultClient
     {
         public List<InfrastructureCommandRequestedEvent> Commands { get; } = [];
 
-        public Task SubmitAsync(
+        public async Task SubmitAsync(
             InfrastructureCommandRequestedEvent command,
             AppActionExecutionResult execution,
             AppModuleExecutionArtifactResponse result,
             CancellationToken cancellationToken)
         {
+            if (behavior == RabbitMqTestBehavior.TransientResults)
+            {
+                var attempts = 0;
+                using var response = await InfrastructureResultDelivery.SendAsync(_ =>
+                {
+                    attempts++;
+                    var status = attempts switch { 1 => HttpStatusCode.TooManyRequests, 2 => HttpStatusCode.ServiceUnavailable, _ => HttpStatusCode.OK };
+                    var reply = new HttpResponseMessage(status);
+                    reply.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero);
+                    return Task.FromResult(reply);
+                }, cancellationToken, (_, _) => Task.CompletedTask);
+                response.EnsureSuccessStatusCode();
+            }
             Commands.Add(command);
-            return Task.CompletedTask;
         }
     }
 }
