@@ -47,9 +47,9 @@ public sealed class InfrastructureCommandApiClient(
         AppModuleExecutionArtifactResponse result, CancellationToken cancellationToken)
     {
         using var client = await CreateClientAsync(cancellationToken);
-        using var response = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(client, $"api/infrastructure-commands/{command.CommandId}/result",
+        using var response = await InfrastructureResultDelivery.SendAsync(token => HttpClientJsonExtensions.PostAsJsonAsync(client, $"api/infrastructure-commands/{command.CommandId}/result",
             new InfrastructureCommandResultRequest(command.OperationId, command.RunnerHostId,
-                command.InfrastructureRunnerId, command.ActionKey, command.SecretGrantIds, execution, result), cancellationToken);
+                command.InfrastructureRunnerId, command.ActionKey, command.SecretGrantIds, execution, result), token), cancellationToken);
         response.EnsureSuccessStatusCode();
         var outcome = await response.Content.ReadFromJsonAsync<InfrastructureCommandResultResponse>(cancellationToken);
         if (!IsAckableResponse(response.StatusCode, outcome))
@@ -72,11 +72,11 @@ public sealed class InfrastructureCommandApiClient(
         CancellationToken cancellationToken)
     {
         using var client = await CreateClientAsync(cancellationToken);
-        using var response = await HttpClientJsonExtensions.PostAsJsonAsync(
+        using var response = await InfrastructureResultDelivery.SendAsync(token => HttpClientJsonExtensions.PostAsJsonAsync(
             client,
             $"api/host-container-executions/{command.OperationId:D}/result",
             new HostContainerExecutionResultRequest(command.RunnerHostId, command.InfrastructureRunnerId, result),
-            cancellationToken);
+            token), cancellationToken);
         response.EnsureSuccessStatusCode();
         var outcome = await response.Content.ReadFromJsonAsync<HostContainerCommandDispositionResponse>(cancellationToken);
         if (outcome?.Outcome is not ("accepted" or "already-applied"))

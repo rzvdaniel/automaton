@@ -69,11 +69,11 @@ internal sealed class InfrastructureCommandQueueConsumer(
             {
                 await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
             }
-            catch
+            catch (Exception exception)
             {
-                // Leave the delivery unacknowledged; closing the channel makes RabbitMQ redeliver it.
-                stopped.TrySetException(new InvalidOperationException("Infrastructure command callback failed; the delivery was left unacknowledged."));
-                await channel.CloseAsync(cancellationToken);
+                // The owning ConsumeAsync scope disposes the channel after this callback returns.
+                // Closing it here can wait for the same callback and prevent recovery.
+                stopped.TrySetException(exception);
             }
         };
         await channel.BasicConsumeAsync(queueName, autoAck: false, consumer, cancellationToken);

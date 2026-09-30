@@ -159,6 +159,13 @@ An earlier attempt in the same session cut over before the Runner was ready and 
 
 M1's separate disposable app checks are complete. RM's same-host package-after-switch and terminal-result check passed. The trusted host-container RabbitMQ/HTTPS slice remains under review and requires release-level deployment/cleanup and interruption acceptance. Runner retry/recovery, cross-host package availability, and the remaining SignalR caller migrations stay open.
 
+### Infrastructure result-delivery recovery follow-up
+
+The focused follow-up preserves the original delivery exception and lets the owning consumer scope tear down the channel after the callback returns. Infrastructure action and host-container result POSTs retry HTTP 408/429/5xx, transport failures and request timeouts while retaining the already computed result. `Retry-After` delta/date values control retry delay; cancellation interrupts waiting. Permanent HTTP rejection is not retried by the delivery component.
+
+Fast unit tests force 429/503, transport failure, timeout and cancellation. Opt-in broker tests use a disposable RabbitMQ instance on existing server hardware through an SSH tunnel, with isolated queues and no database bootstrap. They verify that transient result delivery does not repeat host execution, the owning loop can replace a failed consumer, exactly one consumer remains, and no delivery is left queued after acknowledgement/teardown. These are broker/HTTP-response simulation tests, not a live Automaton API failure injection.
+
+PR #329 records the earlier partial live acceptance. The retained disposable app must be reused after this fix is reviewed, merged and released through the Runner pipeline: force result-delivery failures, verify recovery to one consumer and an empty queue without manual restart, and then delete the app through the supported flow after permanent-deletion approval. RM remains open until that live check passes. No additional SignalR caller migration is included in this follow-up.
 **Acceptance:** deploy the API while a Runner is working; restart Worker and Runner; exercise duplicate commands, lost callbacks, broker interruption and recovery; verify tenant isolation and correct artifact/action revision. Show that a completed operation remains completed and running apps remain healthy. Test reconnect recovery at a stated cohort size; a small test does not establish thousand-Runner capacity.
 
 **Cutover:** pause new management work, drain or explicitly resolve old in-flight operations, deploy coordinated versions, then resume. Preserve data and identities. Close RM only after the CLI flow and any carried M1 checks pass.
