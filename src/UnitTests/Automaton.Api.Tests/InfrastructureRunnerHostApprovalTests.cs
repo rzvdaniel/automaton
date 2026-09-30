@@ -92,7 +92,7 @@ public sealed class InfrastructureRunnerHostApprovalTests
             db,
             new RecordingAuditEventService(),
             NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
-            new NullHubContext<AutomatonHub>());
+            new NullHubContext<AutomatonHub>(), RunnerExecutionTestServices.Revocation(db));
 
     private sealed class NullHubContext<THub> : IHubContext<THub> where THub : Hub
     {

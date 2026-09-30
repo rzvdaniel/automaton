@@ -32,11 +32,11 @@ internal static class ManagedRunnerConnectionTestServiceFactory
             userContext,
             authorization,
             registrationService,
-            new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext),
+            new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext, RunnerExecutionTestServices.Revocation(db)),
             sessionService,
             queryService,
             restartService,
-            new RunnerFlowExecutionService(queryService, null!),
+            new RunnerFlowExecutionService(null!),
             new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
             new RunnerConnectionLifecycleService(
                 db, authorization, new ApiInstanceIdentityService(), sessionService,

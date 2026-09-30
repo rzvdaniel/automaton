@@ -3284,6 +3284,41 @@ namespace Automaton.Api.Migrations
                     b.ToTable("RunnerEnrollments");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerExecutionOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("CancellationRequested")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ProtectedRequest")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunnerId", "CompletedAtUtc");
+
+                    b.ToTable("RunnerExecutionOperations");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
                 {
                     b.Property<Guid>("Id")

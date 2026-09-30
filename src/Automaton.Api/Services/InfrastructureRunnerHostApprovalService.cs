@@ -16,7 +16,8 @@ public sealed class InfrastructureRunnerHostApprovalService(
     ApplicationDbContext db,
     IAuditEventService auditEventService,
     ILogger<InfrastructureRunnerHostApprovalService> logger,
-    IHubContext<AutomatonHub> automatonHub)
+    IHubContext<AutomatonHub> automatonHub,
+    RunnerExecutionRevocationService executions)
 {
     public async Task<RunnerHost> ApproveAsync(Guid hostId, Guid approvedByUserId, CancellationToken cancellationToken)
     {
@@ -110,6 +111,7 @@ public sealed class InfrastructureRunnerHostApprovalService(
             await RevokeWithinTransactionAsync(host, runner, cancellationToken);
         }, cancellationToken);
 
+        await executions.RevokeAsync(runner.Id, cancellationToken);
         await SignalRunnerRevocationAsync(connectionId, runner.Id, cancellationToken);
 
         logger.LogInformation(

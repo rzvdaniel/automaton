@@ -1,10 +1,9 @@
+using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using CustomStep = Automaton.Api.Models.CustomStep;
@@ -13,7 +12,7 @@ namespace Automaton.Api.Services;
 
 public sealed class CustomStepRunnerExecutionService(
     ApplicationDbContext dataContext,
-    IHubContext<AutomatonHub> automatonHub)
+    RunnerExecutionDispatchService dispatch)
 {
     private readonly Serilog.ILogger logger = Log.ForContext<CustomStepRunnerExecutionService>();
 
@@ -82,13 +81,13 @@ public sealed class CustomStepRunnerExecutionService(
                 return CreateFailureResult(customStep.Id, runnerId, "Runner not found");
             }
 
-            if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            if ((!runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold))
             {
                 logger.Warning("Runner {RunnerId} ({RunnerName}) is not connected", runnerId, runner.Name);
                 return CreateFailureResult(customStep.Id, runnerId, "Runner is not connected");
             }
 
-            return await InvokeRunnerAsync(customStep, runner, cancellationToken);
+            return await InvokeRunnerAsync(customStep, runner, userId, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -100,6 +99,7 @@ public sealed class CustomStepRunnerExecutionService(
     private async Task<RunnerCustomStepResult> InvokeRunnerAsync(
         CustomStep customStep,
         Runner runner,
+        Guid userId,
         CancellationToken cancellationToken)
     {
         logger.Debug(
@@ -109,31 +109,29 @@ public sealed class CustomStepRunnerExecutionService(
             runner.Id,
             runner.Name);
 
-        var response = await automatonHub.Clients.Client(runner.ConnectionId).InvokeAsync<CustomStepExecutionResponse>(
-            AutomatonHubMethods.RunCustomStep,
-            CreatePayload(customStep),
-            cancellationToken);
+        var response = await dispatch.ExecuteAsync(runner.Id, userId,
+            new(null, CreatePayload(customStep)), cancellationToken);
 
         LogExecutionOutcome(customStep.Id, runner.Id, response);
         return MapResult(customStep.Id, runner.Id, response);
     }
 
-    private static object CreatePayload(CustomStep customStep)
+    internal static RunnerCustomStepPayload CreatePayload(CustomStep customStep)
     {
-        return new
+        return new RunnerCustomStepPayload
         {
             Id = customStep.Id,
             Name = customStep.Name,
-            Code = customStep.Definition.Code,
+            Code = customStep.Definition.Code ?? string.Empty,
             Language = customStep.Definition.Language,
-            CodeInputVariables = customStep.Definition.CodeInputVariables,
-            CodeOutputVariables = customStep.Definition.CodeOutputVariables
+            CodeInputVariables = customStep.Definition.CodeInputVariables?.ToList(),
+            CodeOutputVariables = customStep.Definition.CodeOutputVariables?.ToList()
         };
     }
 
-    private void LogExecutionOutcome(Guid customStepId, Guid runnerId, CustomStepExecutionResponse response)
+    private void LogExecutionOutcome(Guid customStepId, Guid runnerId, RunnerExecutionResult response)
     {
-        if (response.Success)
+        if (response.Outcome == "Succeeded")
         {
             logger.Debug("Custom step {CustomStepId} completed successfully on runner {RunnerId}", customStepId, runnerId);
             return;
@@ -142,22 +140,22 @@ public sealed class CustomStepRunnerExecutionService(
         logger.Warning("Custom step {CustomStepId} failed on runner {RunnerId}: {Error}", customStepId, runnerId, response.Error);
     }
 
-    private static RunnerCustomStepResult MapResult(Guid customStepId, Guid runnerId, CustomStepExecutionResponse response)
+    private static RunnerCustomStepResult MapResult(Guid customStepId, Guid runnerId, RunnerExecutionResult response)
     {
         return new RunnerCustomStepResult
         {
             CustomStepId = customStepId,
             RunnerId = runnerId,
-            Success = response.Success,
+            Success = response.Outcome == "Succeeded",
             Output = response.Output,
             Error = response.Error,
             Started = response.Started,
             Finished = response.Finished,
-            OutputVariables = response.OutputVariables
+            OutputVariables = response.OutputVariables.ToDictionary(p => p.Key, p => p.Value ?? string.Empty)
         };
     }
 
-    private Runner GetRunner(Guid id, Guid userId)
+    private Runner? GetRunner(Guid id, Guid userId)
     {
         var runner = dataContext.Runners.SingleOrDefault(candidate =>
             candidate.Id == id && candidate.RunnerUsers.Any(runnerUser => runnerUser.UserId == userId));

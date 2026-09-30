@@ -64,6 +64,13 @@ public class FileStorageService
         }
     }
 
+    public string GetRunnerExecutionJournalDirectory()
+    {
+        var directory = Path.Combine(configDirectory, "runner-executions");
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
     public string GetHostedRunnerCommandResultPath(Guid operationId)
     {
         var resultDirectory = Path.Combine(configDirectory, "hosted-runner-command-results");

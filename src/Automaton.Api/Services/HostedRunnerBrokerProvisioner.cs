@@ -15,6 +15,15 @@ public sealed class HostedRunnerBrokerProvisioner(
     public async Task<HostedRunnerBrokerConfiguration> ProvisionAsync(
         Guid runnerId,
         CancellationToken cancellationToken)
+        => await ProvisionQueueAsync($"hosted-runner-{runnerId:N}",
+            HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), cancellationToken);
+
+    public Task<HostedRunnerBrokerConfiguration> ProvisionExecutionAsync(Guid runnerId, CancellationToken cancellationToken)
+        => ProvisionQueueAsync($"execution-runner-{runnerId:N}",
+            RunnerExecutionCommandPublisher.QueueName(runnerId), cancellationToken);
+
+    private async Task<HostedRunnerBrokerConfiguration> ProvisionQueueAsync(string username,
+        string queueName, CancellationToken cancellationToken)
     {
         var rabbit = rabbitOptions.Value;
         var external = runnerBrokerOptions.Value;
@@ -25,8 +34,6 @@ public sealed class HostedRunnerBrokerProvisioner(
             || external.Port <= 0)
             throw new InvalidOperationException("Hosted Runner RabbitMQ management and broker endpoints must be configured.");
 
-        var username = $"hosted-runner-{runnerId:N}";
-        var queueName = HostedRunnerDeploymentCommandPublisher.QueueName(runnerId);
         var brokerPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         using var client = CreateManagementClient(rabbit, managementUrl);
 
@@ -53,9 +60,24 @@ public sealed class HostedRunnerBrokerProvisioner(
         using var client = CreateManagementClient(rabbit, managementUrl);
         var username = $"hosted-runner-{runnerId:N}";
         var encodedVhost = Uri.EscapeDataString(rabbit.VirtualHost);
+        await DeleteIfPresentAsync(client, $"api/users/execution-runner-{runnerId:N}", cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.QueueName(runnerId))}", cancellationToken);
         await DeleteIfPresentAsync(client, $"api/users/{Uri.EscapeDataString(username)}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId))}",
+            cancellationToken);
+    }
+
+    public async Task RevokeExecutionAsync(Guid runnerId, CancellationToken cancellationToken)
+    {
+        var rabbit = rabbitOptions.Value;
+        if (!Uri.TryCreate(rabbit.ManagementUrl, UriKind.Absolute, out var managementUrl))
+            throw new InvalidOperationException("Runner RabbitMQ management endpoint must be configured.");
+        using var client = CreateManagementClient(rabbit, managementUrl);
+        await DeleteIfPresentAsync(client, $"api/users/execution-runner-{runnerId:N}", cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.QueueName(runnerId))}",
             cancellationToken);
     }
 

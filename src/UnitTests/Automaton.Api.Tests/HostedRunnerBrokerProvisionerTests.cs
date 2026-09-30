@@ -32,11 +32,24 @@ public sealed class HostedRunnerBrokerProvisionerTests
 
         await provisioner.RevokeAsync(runnerId, CancellationToken.None);
 
-        Assert.That(handler.Requests, Has.Count.EqualTo(2));
-        Assert.That(handler.Requests[0].Method, Is.EqualTo(HttpMethod.Delete));
-        Assert.That(handler.Requests[0].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
-        Assert.That(handler.Requests[1].Method, Is.EqualTo(HttpMethod.Delete));
-        Assert.That(handler.Requests[1].Path, Does.Contain(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId)));
+        Assert.That(handler.Requests, Has.Count.EqualTo(4));
+        Assert.That(handler.Requests[0].Path, Does.Contain($"execution-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[1].Path, Does.Contain(RunnerExecutionCommandPublisher.QueueName(runnerId)));
+        Assert.That(handler.Requests[2].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[2].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[3].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[3].Path, Does.Contain(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId)));
+    }
+
+    [Test]
+    public async Task ExecutionCredentialCanOnlyConsumeItsOwnQueue()
+    {
+        var runnerId = Guid.NewGuid();
+        var handler = new RecordingHandler();
+        var result = await CreateProvisioner(handler).ProvisionExecutionAsync(runnerId, CancellationToken.None);
+        Assert.That(result.QueueName, Is.EqualTo(RunnerExecutionCommandPublisher.QueueName(runnerId)));
+        Assert.That(result.Username, Is.EqualTo($"execution-runner-{runnerId:N}"));
+        AssertConsumeOnlyPermission(handler.Requests[2].Body, result.QueueName);
     }
 
     private static void AssertConsumeOnlyPermission(string body, string expectedQueue)

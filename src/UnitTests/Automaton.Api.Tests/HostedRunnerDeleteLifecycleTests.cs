@@ -62,9 +62,8 @@ internal static class HostedRunnerDeleteLifecycleTestSupport
             Action = HostedRunnerDeploymentActions.Deprovision,
             Status = HostedRunnerDeploymentStatuses.Executing
         };
-        var handler = new InfrastructureActionProvisioningHandler(
-            db, new HostedRunnerAuditNoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()), CreateBrokerProvisioner(brokerHandler));
+        var handler = RunnerExecutionTestServices.Lifecycle(
+            db, new HostedRunnerAuditNoOpAuditEventService(), CreateBrokerProvisioner(brokerHandler));
         using var document = JsonDocument.Parse("{\"success\":true}");
 
         await handler.ApplySuccessfulOperationAsync(
@@ -73,12 +72,12 @@ internal static class HostedRunnerDeleteLifecycleTestSupport
         return new HostedRunnerDeleteLifecycleTestResult(
             hostedRunner.Status == HostedRunnerStatuses.Deleted,
             hostedRunner.RuntimePort is null,
-            brokerHandler.Requests.Count == 2
-                && brokerHandler.Requests[0].Method == HttpMethod.Delete
-                && brokerHandler.Requests[0].Path.Contains($"hosted-runner-{runnerId:N}", StringComparison.Ordinal),
-            brokerHandler.Requests.Count == 2
-                && brokerHandler.Requests[1].Method == HttpMethod.Delete
-                && brokerHandler.Requests[1].Path.Contains(
+            brokerHandler.Requests.Count == 4
+                && brokerHandler.Requests[2].Method == HttpMethod.Delete
+                && brokerHandler.Requests[2].Path.Contains($"hosted-runner-{runnerId:N}", StringComparison.Ordinal),
+            brokerHandler.Requests.Count == 4
+                && brokerHandler.Requests[3].Method == HttpMethod.Delete
+                && brokerHandler.Requests[3].Path.Contains(
                     HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), StringComparison.Ordinal));
     }
 

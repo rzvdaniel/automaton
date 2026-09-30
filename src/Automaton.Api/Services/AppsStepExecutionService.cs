@@ -1,10 +1,8 @@
 using Automaton.Api.Data;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -17,17 +15,17 @@ public class AppsStepExecutionService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory;
-    private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly RunnerExecutionDispatchService dispatch;
     private readonly Serilog.ILogger logger;
 
     public AppsStepExecutionService(
         ApplicationDbContext dataContext,
         UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory,
-        IHubContext<AutomatonHub> automatonHub)
+        RunnerExecutionDispatchService dispatch)
     {
         this.dataContext = dataContext;
         this.customStepsServiceFactory = customStepsServiceFactory;
-        this.automatonHub = automatonHub;
+        this.dispatch = dispatch;
         this.logger = Serilog.Log.ForContext<AppsStepExecutionService>();
     }
 
@@ -87,7 +85,7 @@ public class AppsStepExecutionService
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Using {runners.Count()} runner(s)");
 
             // 4. Execute on runners
-            var results = await ExecuteOnRunnersAsync(step, runners, cancellationToken, logs);
+            var results = await ExecuteOnRunnersAsync(step, runners, app.OwnerId ?? Guid.Empty, cancellationToken, logs);
 
             // 5. Aggregate results
             var success = results.All(r => r.Success);
@@ -200,8 +198,7 @@ public class AppsStepExecutionService
         var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
-            .Where(r => r.ConnectionId != null
-                && r.LastHeartbeatAtUtc.HasValue
+            .Where(r => r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
 
         if (runnerNames != null && runnerNames.Any())
@@ -225,6 +222,7 @@ public class AppsStepExecutionService
     private async Task<List<RunnerCustomStepResult>> ExecuteOnRunnersAsync(
         Models.CustomStep step,
         IEnumerable<Runner> runners,
+        Guid ownerId,
         CancellationToken cancellationToken,
         List<string> logs)
     {
@@ -236,38 +234,24 @@ public class AppsStepExecutionService
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
 
-                if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+                if ((!runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold))
                 {
                     throw new InvalidOperationException($"Runner '{runner.Name}' is not connected");
                 }
 
-                var client = automatonHub.Clients.Client(runner.ConnectionId);
-
-                var payload = new
-                {
-                    Id = step.Id,
-                    Name = step.Name,
-                    Code = step.Definition.Code,
-                    Language = step.Definition.Language,
-                    CodeInputVariables = step.Definition.CodeInputVariables,
-                    CodeOutputVariables = step.Definition.CodeOutputVariables
-                };
-
-                var response = await client.InvokeAsync<CustomStepExecutionResponse>(
-                    AutomatonHubMethods.RunCustomStep,
-                    payload,
-                    cancellationToken);
+                var response = await dispatch.ExecuteAsync(runner.Id, ownerId,
+                    new(null, CustomStepRunnerExecutionService.CreatePayload(step)), cancellationToken);
 
                 results.Add(new RunnerCustomStepResult
                 {
                     CustomStepId = step.Id,
                     RunnerId = runner.Id,
-                    Success = response.Success,
+                    Success = response.Outcome == "Succeeded",
                     Output = response.Output,
                     Error = response.Error,
                     Started = response.Started,
                     Finished = response.Finished,
-                    OutputVariables = response.OutputVariables
+                    OutputVariables = response.OutputVariables.ToDictionary(p => p.Key, p => p.Value ?? string.Empty)
                 });
 
                 // Add step logs

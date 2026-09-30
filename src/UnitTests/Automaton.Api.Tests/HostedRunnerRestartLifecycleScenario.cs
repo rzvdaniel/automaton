@@ -83,11 +83,10 @@ internal static class HostedRunnerRestartLifecycleScenario
         HostedRunner runner,
         HostedRunnerDeployment operation)
     {
-        var handler = new InfrastructureActionProvisioningHandler(
+        var handler = RunnerExecutionTestServices.Lifecycle(
             db,
             new HostedRunnerAuditNoOpAuditEventService(),
-            Microsoft.Extensions.Options.Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
-            Microsoft.Extensions.Options.Options.Create(new StorageTelemetryOptions()), null!);
+            hosted: new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 });
         using var result = System.Text.Json.JsonDocument.Parse("{}");
         await handler.ApplySuccessfulOperationAsync(
             runner, operation, "restart-hosted-runner", result.RootElement, CancellationToken.None);
