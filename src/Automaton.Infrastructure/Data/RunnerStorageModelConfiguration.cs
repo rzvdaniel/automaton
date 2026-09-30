@@ -18,6 +18,7 @@ internal static class RunnerStorageModelConfiguration
         ConfigureAccountStorageAllocation(modelBuilder);
         ConfigureHostedRunnerStorageObservation(modelBuilder);
         ConfigureHostedRunnerStorageVerification(modelBuilder);
+        ConfigureHostContainerExecutionOperation(modelBuilder);
         ConfigureHostedRunnerSpecification(modelBuilder);
         ConfigureHostedRunnerSpecificationRevision(modelBuilder);
         ConfigureHostedRunnerPlatformSettings(modelBuilder);
@@ -180,6 +181,19 @@ internal static class RunnerStorageModelConfiguration
                 entity.HasOne(e => e.HostedRunner).WithMany(e => e.StorageVerifications)
                     .HasForeignKey(e => e.HostedRunnerId).OnDelete(DeleteBehavior.Cascade);
             });
+    }
+
+    private static void ConfigureHostContainerExecutionOperation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<HostContainerExecutionOperation>(entity =>
+        {
+            entity.HasKey(operation => operation.Id);
+            entity.Property(operation => operation.Status).IsRequired().HasMaxLength(32);
+            entity.Property(operation => operation.RequestHash).IsRequired().HasMaxLength(64);
+            entity.Property(operation => operation.ResultJson).HasColumnType("longtext");
+            entity.HasIndex(operation => new { operation.InfrastructureRunnerId, operation.CreatedAtUtc });
+            entity.HasIndex(operation => new { operation.HostedRunnerId, operation.CreatedAtUtc });
+        });
     }
 
     private static void ConfigureHostedRunnerSpecification(ModelBuilder modelBuilder)

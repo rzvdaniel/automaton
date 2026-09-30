@@ -35,6 +35,7 @@ public abstract class ApplicationDbContextEntitySetBase1 : IdentityDbContext<App
     public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
     public virtual DbSet<HostedRunnerStorageObservation> HostedRunnerStorageObservations { get; set; }
     public virtual DbSet<HostedRunnerStorageVerification> HostedRunnerStorageVerifications { get; set; }
+    public virtual DbSet<HostContainerExecutionOperation> HostContainerExecutionOperations { get; set; }
     public virtual DbSet<CustomStep> CustomSteps { get; set; }
     public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
     public virtual DbSet<Schedule> Schedules { get; set; }

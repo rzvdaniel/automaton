@@ -103,13 +103,29 @@ The M1 live acceptance is complete. Previously recorded isolated XFS results rem
 
 Use the existing RabbitMQ infrastructure for durable management commands and authenticated HTTPS for artifacts/results. Keep stable Runner identity independent of API instances. Inventory existing command consumers and callbacks first; extend them where their contract fits.
 
-### Current code audit (`main` at `295599d7`)
+### Current code audit (`main` at `fd88d92d`; changes in this PR are identified separately)
 
 - Hosted Runner deployment operations are persisted by the API and dispatched as durable RabbitMQ commands addressed to the Runner identity. Each Hosted Runner has restricted broker credentials; the Runner retrieves the package and posts execution results through authenticated HTTPS. The Runner journal and API operation state make retries recoverable and prevent a persisted successful host action from being applied again. The path has no SignalR deployment fallback.
 - Infrastructure Runner trusted actions also use the durable command queue and authenticated HTTPS secret/result APIs. Infrastructure Runner host-validation scripts and several separate Runner operations still use SignalR; do not conflate these remaining calls with the released deployment-command path.
 - The Worker is not in the API-to-Runner deployment-package transfer path. Its live image digest and unknown source commit remain a separate release-tracking gap.
 - Deployment packages are staged under API `AppData/deployment-operations`. Production blue and green API services share the `prod-api-appdata` Docker volume on this host, so the same-host slot pair can read a shared staged package. Availability when API slots run on different API hosts is **not established**; do not add a new storage system for this first path.
-- `AutomatonHub` still carries workflows/custom steps, app actions and action administration, managed-artifact synchronization, app file/media transfer, host-container execution, reconnect/drain coordination, and runtime tunnels. PR #326 merged the storage telemetry HTTPS implementation; its live rollout was not verified in this run. Retain independent features such as Studio live updates or BYO tunnel behavior if they still require SignalR, and classify each remaining caller before removal.
+- This RM slice moves trusted host-container execution (image resolution, builds, and app-container create/inspect/start/log/remove) from SignalR to the existing durable Infrastructure Runner RabbitMQ queue. The API persists an operation, addresses its Infrastructure Runner by stable identity, reapplies the existing Hosted Runner ownership, active deployment, resource snapshot, and host-storage admission checks, and accepts the result through an API-key-authenticated HTTPS endpoint. Operation IDs, API disposition checks, deterministic app/build container identities, and build-container reconciliation make delivery retries reuse or reconcile host work. Only completed build containers are removed after the result is persisted. This is implementation work under review; it has not been released or live-accepted.
+- After this slice, `AutomatonHub` still carries workflows/custom steps, app actions and action administration, managed-artifact synchronization, app file/media transfer, reconnect/drain coordination, and runtime tunnels. The Runner still calls SignalR for workflows/custom steps, Infrastructure Runner host-validation scripts, managed-artifact synchronization, and tunnel forwarding; app-action callers and file/media transfers also still use API-to-Runner SignalR. The corresponding host-container execution caller and handler are removed in this branch. Keep reconnect/drain coordination until the remaining replaceable management callers have moved. Retain independent features such as Studio live updates or BYO tunnel behavior if they still require SignalR.
+
+### Remaining SignalR inventory after this slice
+
+| Flow | Current API caller / Runner handler | Next RM treatment |
+| --- | --- | --- |
+| Workflow execution | `RunnerFlowExecutionService`, `ScheduleService` / `RunWorkflow` | Move to durable command/result operations. |
+| Custom steps | `CustomStepRunnerExecutionService`, `AppsStepExecutionService` / `RunCustomStep` | Move with workflow execution where their result and artifact needs are understood. |
+| Infrastructure host commands | `InfrastructureRunnerRemoteCommandExecutor` / `RunInfrastructureCommand` | Migrate the remaining trusted host-management commands to the durable Infrastructure Runner queue. |
+| App actions and action administration | `AppActionExecutionDispatcher`, `AppActionRunnerGateway`, `TrustedInfrastructureActionDeploymentService` / execute, cancel, logs/results, module/version management and cleanup handlers | Move command execution and management APIs; retain action artifacts/results with authenticated, retry-safe access. |
+| Managed application artifacts | `ConnectedFlowArtifactService` / `SynchronizeApplicationManagedArtifacts` | Move synchronization to the durable artifact/command path. |
+| App, media and generic Runner deployment transfers | `AppFileUploadService`, `AppFileDownloadService`, `AppMediaStorageService`, and the generic Runner fallback in `DeploymentPackageRunnerService` / file chunks, metadata, and `DeployAppPackage` | Replace SignalR chunk transfer with authenticated HTTPS and persisted operation results. This is distinct from the Hosted Runner RabbitMQ/HTTPS deployment path already released. |
+| Runtime tunnels | `RuntimeTunnelRequestSender`, `RuntimeFileProxyService` / `TunnelRequest` and `TunnelResponse` | Keep supported BYO tunnel behavior if still required; do not use it as a management command transport. |
+| Connection and cutover lifecycle | API Runner registration/presence plus `HubControlHandlerRegistrar` / `Ping`, welcome and reconnect-when-idle coordination | Keep reconnect/drain until the replaceable management callers above have moved; remove API-slot registration gating only after that. |
+
+This inventory is based on current API hub call sites and Runner hub handlers at the branch point. Studio live updates remain an independent SignalR surface outside the Runner management migration.
 
 In the merged PR #326 implementation, the storage telemetry API resolves the Runner from its API-key identity, validates its purpose and Hosted Runner/Runner Host association, then submits the report through the existing telemetry service. The Runner posts over HTTPS with its existing API key (HTTP is allowed only for loopback development). This removes storage-measurement callbacks from `AutomatonHub`; production rollout was not verified in the 2026-09-29 slot-switch run. It does not complete RM or change storage accounting/enforcement.
 
@@ -129,7 +145,7 @@ The released deployment path uses stable Runner/operation identity, per-Hosted-R
 
 ### Cleanup in the same milestone
 
-Inventory every Runner SignalR caller before removal. Delete the replaced management hubs/clients, file-transfer paths, connection registries, cutover acknowledgements, reconnect/drain coordination, settings and obsolete tests. Remove the requirement for all Runners to register on a new API slot before API traffic can switch.
+Inventory every Runner SignalR caller before removal. This slice removes the host-container execution hub method, API transport, Runner hub handler and associated transport test. Keep connection and drain behavior while the remaining workflows/actions and management/file-transfer callers still depend on SignalR. Later, delete the replaced management hubs/clients, file-transfer paths, connection registries, cutover acknowledgements, reconnect/drain coordination, settings and obsolete tests. Remove the requirement for all Runners to register on a new API slot before API traffic can switch.
 
 Retain independent supported features, such as Studio live updates or BYO tunnel functionality, if they still require SignalR. Name those remaining uses in the final inventory. No management fallback to the retired transport; update runbooks and Admin documentation to match the implemented behavior.
 
@@ -141,7 +157,7 @@ On 2026-09-29, two CLI deployments were used to control queue ordering on the sa
 
 An earlier attempt in the same session cut over before the Runner was ready and ended with a `Runner is not connected` warning; it was not counted as a pass. A separate successful deployment also completed across the route switch while its app was starting. No cross-host package test, forced Runner retry, or lost-callback recovery test was performed. The deployed API revision was `bb5c5a38` on both colors; this run did not deploy a new API or Runner image.
 
-M1's separate disposable app checks are complete. RM's same-host package-after-switch and terminal-result check passed. Runner retry/recovery, cross-host package availability, and remaining SignalR cleanup acceptance stay open.
+M1's separate disposable app checks are complete. RM's same-host package-after-switch and terminal-result check passed. The trusted host-container RabbitMQ/HTTPS slice remains under review and requires release-level deployment/cleanup and interruption acceptance. Runner retry/recovery, cross-host package availability, and the remaining SignalR caller migrations stay open.
 
 **Acceptance:** deploy the API while a Runner is working; restart Worker and Runner; exercise duplicate commands, lost callbacks, broker interruption and recovery; verify tenant isolation and correct artifact/action revision. Show that a completed operation remains completed and running apps remain healthy. Test reconnect recovery at a stated cohort size; a small test does not establish thousand-Runner capacity.
 

@@ -65,38 +65,9 @@ internal static class HostContainerExecutionScenarios
     {
         using var environment = InfrastructureRunnerEnvironment.Create();
         var hostedRunnerId = Guid.NewGuid();
-        var cleanupCalls = new List<IReadOnlyList<string>>();
-        var service = new HostContainerExecutionService((arguments, _, _) =>
-        {
-            if (arguments.Contains("volume"))
-            {
-                return Task.FromResult(new InfrastructureCommandResponse
-                {
-                    Success = true,
-                    Output = $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedRunnerId}\",\"automaton.storage-scope\":\"user\"}}"
-                });
-            }
-
-            if (arguments.Contains("image"))
-                return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = Image });
-
-            if (arguments.Count > 1 && arguments[1] == "run")
-                return Task.FromException<InfrastructureCommandResponse>(new OperationCanceledException("host command canceled"));
-
-            cleanupCalls.Add(arguments);
-            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
-        });
-        var request = new HostContainerExecutionRequest
-        {
-            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-            Operation = HostContainerOperationKinds.RunBuild,
-            RequestedImage = "example/build:1",
-            Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
-            SharedMemoryMb = 64,
-            DockerLogMaxSizeMb = 10,
-            DockerLogMaxFiles = 3,
-            Command = new() { Executable = "build" }
-        };
+        var request = CreateInterruptedBuildRequest(hostedRunnerId);
+        var commandState = new InterruptedBuildCommandState(hostedRunnerId, request);
+        var service = new HostContainerExecutionService(commandState.ExecuteAsync);
 
         var cancellationSurfaced = false;
         try
@@ -108,10 +79,82 @@ internal static class HostContainerExecutionScenarios
             cancellationSurfaced = true;
         }
 
-        var cleanupWasRequested = cleanupCalls.Any(call =>
-            call.Count > 3 && call[0] == "docker" && call[1] == "rm" && call[2] == "-f");
-        return new(cancellationSurfaced, cleanupWasRequested);
+        var retry = await service.ExecuteAsync(request);
+        return new(cancellationSurfaced, false, retry.Success, commandState.RunCount, commandState.WaitRequested);
     }
+
+    private sealed class InterruptedBuildCommandState(Guid hostedRunnerId, HostContainerExecutionRequest request)
+    {
+        private bool containerExists;
+        public int RunCount { get; private set; }
+        public bool WaitRequested { get; private set; }
+
+        public Task<InfrastructureCommandResponse> ExecuteAsync(
+            IReadOnlyList<string> arguments, TimeSpan _, CancellationToken __)
+        {
+            if (arguments.Contains("volume")) return Task.FromResult(VolumeResponse(hostedRunnerId));
+            if (arguments.Contains("image")) return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = Image });
+            if (IsContainerInspection(arguments)) return Task.FromResult(Inspect(arguments));
+            if (IsRun(arguments)) return InterruptBuild();
+            if (IsWait(arguments)) return CompleteWait();
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+        }
+
+        private InfrastructureCommandResponse Inspect(IReadOnlyList<string> arguments)
+            => new()
+            {
+                Success = containerExists,
+                Error = containerExists ? string.Empty : $"Error: No such object: {arguments[^1]}",
+                Output = containerExists ? ExistingBuildInspection(request) : string.Empty
+            };
+
+        private Task<InfrastructureCommandResponse> InterruptBuild()
+        {
+            RunCount++;
+            containerExists = true;
+            return Task.FromException<InfrastructureCommandResponse>(new OperationCanceledException("host command canceled"));
+        }
+
+        private Task<InfrastructureCommandResponse> CompleteWait()
+        {
+            WaitRequested = true;
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = "0" });
+        }
+
+        private static InfrastructureCommandResponse VolumeResponse(Guid runnerId)
+            => new()
+            {
+                Success = true,
+                Output = $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{runnerId}\",\"automaton.storage-scope\":\"user\"}}"
+            };
+
+        private static bool IsContainerInspection(IReadOnlyList<string> args)
+            => args.Count > 2 && args[1] == "container" && args[2] == "inspect";
+        private static bool IsRun(IReadOnlyList<string> args) => args.Count > 1 && args[1] == "run";
+        private static bool IsWait(IReadOnlyList<string> args) => args.Count > 1 && args[1] == "wait";
+    }
+
+    private static HostContainerExecutionRequest CreateInterruptedBuildRequest(Guid hostedRunnerId)
+        => new()
+        {
+            OperationId = Guid.NewGuid(),
+            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "example/build:1",
+            Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+            SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+            Command = new() { Executable = "build" }
+        };
+
+    private static string ExistingBuildInspection(HostContainerExecutionRequest request)
+        => "{\"Config\":{\"Labels\":{"
+            + "\"automaton.operation-id\":\"" + request.OperationId.ToString("N") + "\","
+            + "\"automaton.hosted-runner-id\":\"" + request.Scope.HostedRunnerId.ToString("N") + "\","
+            + "\"automaton.runner-host-id\":\"" + request.Scope.RunnerHostId.ToString("N") + "\","
+            + "\"automaton.app-id\":\"" + request.Scope.AppId.ToString("N") + "\","
+            + "\"automaton.deployment-target-id\":\"" + request.Scope.DeploymentTargetId.ToString("N") + "\","
+            + "\"automaton.deployment-attempt-id\":\"" + request.Scope.DeploymentAttemptId.ToString("N") + "\","
+            + "\"automaton.resolved-image\":\"example/build:1@sha256:abc\"}}}";
 
     private static async Task<RunBuildOutcome> RunCommandAsync(ApplicationCommandSpec command)
     {
@@ -134,8 +177,14 @@ internal static class HostContainerExecutionScenarios
                 Commands.Add(arguments);
                 var output = arguments.Contains("volume")
                     ? $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{HostedRunnerId}\",\"automaton.storage-scope\":\"user\"}}"
-                    : arguments.Contains("inspect") ? Image : string.Empty;
-                return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
+                    : arguments.Contains("image") ? Image : string.Empty;
+                var missingContainer = arguments.Contains("container") && arguments.Contains("inspect");
+                return Task.FromResult(new InfrastructureCommandResponse
+                {
+                    Success = !missingContainer,
+                    Error = missingContainer ? $"Error: No such object: {arguments[^1]}" : string.Empty,
+                    Output = output
+                });
             });
         }
 
@@ -208,4 +257,5 @@ internal sealed record EntrypointVariantsOutcome(
     IReadOnlyList<string> ShellCommand,
     int ShellEntryPoint);
 
-internal sealed record BuildCleanupOutcome(bool CancellationSurfaced, bool CleanupWasRequested);
+internal sealed record BuildCleanupOutcome(bool CancellationSurfaced, bool CleanupWasRequested,
+    bool RetrySucceeded, int RunAttempts, bool WaitRequested);

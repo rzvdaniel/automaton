@@ -1,5 +1,6 @@
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using System.Text.Json;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -23,7 +24,12 @@ internal sealed class HostContainerBuildExecutor(
         if (attempt == Guid.Empty)
             return Failure("trusted_mapping_unavailable", "A server-issued deployment attempt is required.");
         var source = $"{RunnerWorkspaceService.GetDeploymentStagingVolumeSubpath(scope.AppId, scope.DeploymentTargetId, attempt)}/source";
-        var container = $"automaton-build-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{Guid.NewGuid():N}";
+        var container = HostContainerBuildContainerName.For(scope);
+        var existing = await InspectBuildContainerAsync(container, request, cancellationToken);
+        if (existing.Failure is not null) return existing.Failure;
+        if (existing.Exists)
+            return await RecoverBuildAsync(request, container, existing.Image!, cancellationToken);
+
         var imageResult = await ResolveImageAsync(request.RequestedImage!, cancellationToken);
         if (imageResult.Failure is not null) return imageResult.Failure;
 
@@ -69,7 +75,7 @@ internal sealed class HostContainerBuildExecutor(
         string container,
         string image)
     {
-        var args = new List<string> { "docker", "run", "--rm", "--name", container, "--network", "bridge",
+        var args = new List<string> { "docker", "run", "--name", container, "--network", "bridge",
             "--cgroup-parent", HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId),
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
@@ -77,6 +83,9 @@ internal sealed class HostContainerBuildExecutor(
             "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}",
             "--label", $"automaton.app-id={scope.AppId:N}",
             "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",
+            "--label", $"automaton.deployment-attempt-id={scope.DeploymentAttemptId:N}",
+            "--label", $"automaton.operation-id={request.OperationId:N}",
+            "--label", $"automaton.resolved-image={image}",
             "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
         HostContainerWritablePathPolicy.AddTo(
             args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
@@ -118,35 +127,76 @@ internal sealed class HostContainerBuildExecutor(
         var timeout = TimeSpan.FromSeconds(request.TimeoutSeconds);
         buildTimeout.CancelAfter(timeout);
         InfrastructureCommandResponse result;
-        try
-        {
-            result = await executor(arguments, timeout, buildTimeout.Token);
-        }
-        catch
-        {
-            await TryCleanupContainerAsync(container);
-            throw;
-        }
+        result = await executor(arguments, timeout, buildTimeout.Token);
 
         if (result.Success)
             return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
-        await TryCleanupContainerAsync(container);
         if (cancellationToken.IsCancellationRequested) return Failure("build_canceled", "The build was canceled.");
         if (buildTimeout.IsCancellationRequested) return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
         return Failure("build_failed", result.Error);
     }
 
-    private async Task TryCleanupContainerAsync(string container)
+    private async Task<(bool Exists, string? Image, HostContainerExecutionResponse? Failure)> InspectBuildContainerAsync(
+        string container,
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken)
     {
+        var result = await executor(["docker", "container", "inspect", "--format", "{{json .}}", container],
+            TimeSpan.FromSeconds(30), cancellationToken);
+        if (!result.Success)
+            return IsMissingContainer(result, container)
+                ? (false, null, null)
+                : (false, null, Failure("build_inspect", "Docker could not inspect the existing build operation."));
         try
         {
-            await executor(["docker", "rm", "-f", container], TimeSpan.FromSeconds(30), CancellationToken.None);
+            using var document = JsonDocument.Parse(result.Output);
+            var root = document.RootElement;
+            var labels = root.GetProperty("Config").GetProperty("Labels");
+            var expected = new Dictionary<string, string>
+            {
+                ["automaton.operation-id"] = request.OperationId.ToString("N"),
+                ["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString("N"),
+                ["automaton.runner-host-id"] = request.Scope.RunnerHostId.ToString("N"),
+                ["automaton.app-id"] = request.Scope.AppId.ToString("N"),
+                ["automaton.deployment-target-id"] = request.Scope.DeploymentTargetId.ToString("N"),
+                ["automaton.deployment-attempt-id"] = request.Scope.DeploymentAttemptId.ToString("N")
+            };
+            if (expected.Any(pair => !labels.TryGetProperty(pair.Key, out var value) || value.GetString() != pair.Value))
+                return (false, null, Failure("build_ownership", "The existing build container belongs to another operation."));
+            var image = labels.GetProperty("automaton.resolved-image").GetString();
+            if (string.IsNullOrWhiteSpace(image))
+                return (false, null, Failure("build_inspect", "The existing build container has no resolved image."));
+            return (true, image, null);
         }
-        catch
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException)
         {
-            // Cleanup is best effort and must not replace the build outcome.
+            return (false, null, Failure("build_inspect", "Docker returned invalid existing build state."));
         }
     }
+
+    private async Task<HostContainerExecutionResponse> RecoverBuildAsync(
+        HostContainerExecutionRequest request,
+        string container,
+        string image,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(request.TimeoutSeconds));
+        var wait = await executor(["docker", "wait", container], TimeSpan.FromSeconds(request.TimeoutSeconds), timeout.Token);
+        if (!wait.Success || !int.TryParse(wait.Output.Trim(), out var exitCode))
+            return Failure("build_recovery", "Docker could not recover the existing build operation.");
+        if (exitCode == 0)
+            return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
+        var logs = await executor(["docker", "logs", container], TimeSpan.FromSeconds(30), cancellationToken);
+        return Failure("build_failed", logs.Output + logs.Error);
+    }
+
+    private static bool IsMissingContainer(InfrastructureCommandResponse result, string reference)
+        => result.Error.Trim() is var error
+            && (error == $"Error response from daemon: No such container: {reference}"
+                || error == $"Error: No such container: {reference}"
+                || error == $"Error: No such object: {reference}"
+                || error == $"Error response from daemon: No such object: {reference}");
 
     private static bool HasTrustedResources(HostContainerResourceRef? resources)
         => resources is not null

@@ -168,12 +168,15 @@ public sealed class HostContainerExecutionTests
     }
 
     [Test]
-    public async Task RunBuildCleansUpContainerWhenHostCommandThrows()
+    public async Task RunBuildPreservesDeterministicContainerForRetryWhenHostCommandThrows()
     {
         var outcome = await HostContainerExecutionScenarios.RunBuildWithHostCommandExceptionAsync();
 
         Assert.That(outcome.CancellationSurfaced, Is.True);
-        Assert.That(outcome.CleanupWasRequested, Is.True);
+        Assert.That(outcome.CleanupWasRequested, Is.False);
+        Assert.That(outcome.RetrySucceeded, Is.True);
+        Assert.That(outcome.RunAttempts, Is.EqualTo(1));
+        Assert.That(outcome.WaitRequested, Is.True);
     }
 
     [Test]
@@ -196,14 +199,7 @@ public sealed class HostContainerExecutionTests
     public async Task ProductionTypedDockerPathReceivesDockerPrefixedRunBuild()
     {
         var calls = new List<IReadOnlyList<string>>();
-        var infrastructure = new InfrastructureCommandService((arguments, _, _) =>
-        {
-            calls.Add(arguments);
-            var output = arguments.Contains("volume")
-                ? "{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"00000000-0000-0000-0000-000000000001\",\"automaton.storage-scope\":\"user\"}"
-                : arguments.Contains("image") ? "example/build:1@sha256:abc" : "";
-            return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
-        });
+        var infrastructure = CreateInfrastructureCommandService(calls);
         var service = new HostContainerExecutionService(infrastructure);
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
@@ -229,6 +225,23 @@ public sealed class HostContainerExecutionTests
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
         }
     }
+
+    private static InfrastructureCommandService CreateInfrastructureCommandService(
+        ICollection<IReadOnlyList<string>> calls)
+        => new((arguments, _, _) =>
+        {
+            calls.Add(arguments);
+            var output = arguments.Contains("volume")
+                ? "{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"00000000-0000-0000-0000-000000000001\",\"automaton.storage-scope\":\"user\"}"
+                : arguments.Contains("image") ? "example/build:1@sha256:abc" : "";
+            var missingContainer = arguments.Contains("container") && arguments.Contains("inspect");
+            return Task.FromResult(new InfrastructureCommandResponse
+            {
+                Success = !missingContainer,
+                Error = missingContainer ? $"Error: No such object: {arguments[^1]}" : string.Empty,
+                Output = output
+            });
+        });
 
     [Test]
     public void BrokerStagingSubpathMatchesRunnerWorkspaceStagingSource()

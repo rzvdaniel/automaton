@@ -1,22 +1,11 @@
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Automaton.Api.Models;
 
 namespace Automaton.Api.Services;
 
 internal static class HostContainerRelayRequestValidator
 {
-    public static HostContainerExecutionResponse? ValidateCaller(RunnerDetails caller)
-    {
-        if (caller.Purpose != RunnerPurposes.Managed || caller.HostedRunnerId is null)
-        {
-            return Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner.");
-        }
-
-        return null;
-    }
-
     public static HostContainerExecutionResponse? ValidateOperation(HostContainerExecutionRequest request)
     {
         var operationFailure = ValidateOperationShape(request);
@@ -116,7 +105,7 @@ internal static class HostContainerRelayRequestValidator
             return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
         }
 
-        var command = request.Command!;
+        var command = request.Command;
         if (request.Environment is null || command.Arguments is null || command.Environment is null
             || string.IsNullOrWhiteSpace(command.Executable))
         {

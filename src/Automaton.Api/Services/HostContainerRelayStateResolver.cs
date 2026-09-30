@@ -9,14 +9,20 @@ using Microsoft.EntityFrameworkCore;
 namespace Automaton.Api.Services;
 
 public sealed class HostContainerRelayStateResolver(
-    ApplicationDbContext db,
-    ApiInstanceIdentityService apiInstanceIdentityService)
+    ApplicationDbContext db)
 {
     internal async Task<HostContainerRelayResolution> ResolveAsync(
-        RunnerDetails caller,
+        Guid apiKeyId,
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken)
     {
+        var caller = await db.Runners.SingleOrDefaultAsync(runner => runner.ApiKeyId == apiKeyId, cancellationToken);
+        if (caller is null || caller.Purpose != RunnerPurposes.Managed || !IsStandardProfile(caller.ApplicationProfile))
+        {
+            return HostContainerRelayResolution.Rejected(
+                Failure("caller_not_managed_runner", "The API key is not assigned to a standard Managed Hosted Runner."));
+        }
+
         var runnerLookup = await ResolveHostedRunnerAsync(caller, request, cancellationToken);
         if (runnerLookup.Failure is not null)
         {
@@ -30,13 +36,13 @@ public sealed class HostContainerRelayStateResolver(
             return HostContainerRelayResolution.Rejected(requestFailure);
         }
 
-        var targetLookup = await ResolveTargetAsync(caller, request, binding, cancellationToken);
+        var targetLookup = await ResolveTargetAsync(caller, request, cancellationToken);
         if (targetLookup.Failure is not null)
         {
             return HostContainerRelayResolution.Rejected(targetLookup.Failure);
         }
 
-        var infrastructureLookup = await ResolveInfrastructureRunnerAsync(binding, cancellationToken);
+        var infrastructureLookup = await ResolveInfrastructureRunnerAsync(binding.HostedRunner, cancellationToken);
         if (infrastructureLookup.Failure is not null)
         {
             return HostContainerRelayResolution.Rejected(infrastructureLookup.Failure);
@@ -50,39 +56,14 @@ public sealed class HostContainerRelayStateResolver(
     }
 
     private async Task<HostContainerRelayLookup<HostedRunnerBinding>> ResolveHostedRunnerAsync(
-        RunnerDetails caller,
+        Runner caller,
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken)
     {
-        var persistedRunner = await db.Runners.SingleOrDefaultAsync(
-            runner => runner.Id == caller.Id,
-            cancellationToken);
-        if (persistedRunner is null || !string.Equals(
-                persistedRunner.ConnectionId,
-                caller.ConnectionId,
-                StringComparison.Ordinal))
-        {
-            return HostContainerRelayLookup<HostedRunnerBinding>.Rejected(
-                Failure("caller_not_managed_runner", "The caller connection is not the persisted Runner connection."));
-        }
-
-        if (persistedRunner.Purpose != RunnerPurposes.Managed)
-        {
-            return HostContainerRelayLookup<HostedRunnerBinding>.Rejected(
-                Failure("caller_not_managed_runner", "The caller is not a Managed Hosted Runner."));
-        }
-
-        if (!IsStandardProfile(persistedRunner.ApplicationProfile))
-        {
-            return HostContainerRelayLookup<HostedRunnerBinding>.Rejected(
-                Failure("caller_not_managed_runner", "The persisted Runner application profile is not Standard."));
-        }
-
         var hostedRunner = await db.HostedRunners
             .Include(hosted => hosted.RunnerHost)
             .SingleOrDefaultAsync(
-                hosted => hosted.Id == caller.HostedRunnerId
-                    && hosted.RunnerId == caller.Id
+                hosted => hosted.RunnerId == caller.Id
                     && hosted.DeletedAt == null,
                 cancellationToken);
         if (hostedRunner?.RunnerHostId is not Guid hostId || hostedRunner.RunnerHost is null)
@@ -91,16 +72,15 @@ public sealed class HostContainerRelayStateResolver(
                 Failure("hosted_runner_binding_mismatch", "The Hosted Runner is not bound to a Runner Host."));
         }
 
-        var bindingFailure = ValidateRequestedBinding(caller, request.Scope, hostedRunner, hostId);
+        var bindingFailure = ValidateRequestedBinding(request.Scope, hostedRunner, hostId);
         return bindingFailure is null
             ? HostContainerRelayLookup<HostedRunnerBinding>.Resolved(new HostedRunnerBinding(hostedRunner, hostId))
             : HostContainerRelayLookup<HostedRunnerBinding>.Rejected(bindingFailure);
     }
 
     private async Task<HostContainerRelayLookup<AppDeploymentTarget>> ResolveTargetAsync(
-        RunnerDetails caller,
+        Runner caller,
         HostContainerExecutionRequest request,
-        HostedRunnerBinding binding,
         CancellationToken cancellationToken)
     {
         var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
@@ -120,11 +100,11 @@ public sealed class HostContainerRelayStateResolver(
     }
 
     private async Task<HostContainerRelayLookup<Runner>> ResolveInfrastructureRunnerAsync(
-        HostedRunnerBinding binding,
+        HostedRunner hostedRunner,
         CancellationToken cancellationToken)
     {
         var infrastructure = await db.Runners.SingleOrDefaultAsync(
-            runner => runner.Id == binding.HostedRunner.RunnerHost!.InfrastructureRunnerId,
+            runner => runner.Id == hostedRunner.RunnerHost!.InfrastructureRunnerId,
             cancellationToken);
         if (infrastructure is null || infrastructure.Purpose != RunnerPurposes.Infrastructure)
         {
@@ -143,16 +123,10 @@ public sealed class HostContainerRelayStateResolver(
         && string.Equals(profile, RunnerApplicationProfiles.Standard, StringComparison.Ordinal);
 
     private static HostContainerExecutionResponse? ValidateRequestedBinding(
-        RunnerDetails caller,
         HostContainerScope scope,
         HostedRunner hostedRunner,
         Guid hostId)
     {
-        if (caller.RunnerHostId is not Guid callerHostId || callerHostId != hostId)
-        {
-            return Failure("runner_host_binding_mismatch", "The caller Runner Host does not match persisted state.");
-        }
-
         if (scope.HostedRunnerId != Guid.Empty && scope.HostedRunnerId != hostedRunner.Id)
         {
             return Failure("hosted_runner_binding_mismatch", "The requested Hosted Runner does not match persisted state.");
@@ -164,7 +138,7 @@ public sealed class HostContainerRelayStateResolver(
     }
 
     private static HostContainerExecutionResponse? ValidateTarget(
-        RunnerDetails caller,
+        Runner caller,
         HostContainerExecutionRequest request,
         AppDeploymentTarget target)
     {
@@ -179,7 +153,7 @@ public sealed class HostContainerRelayStateResolver(
             : null;
     }
 
-    private HostContainerExecutionResponse? ValidateInfrastructureRunner(Runner infrastructure)
+    private static HostContainerExecutionResponse? ValidateInfrastructureRunner(Runner infrastructure)
     {
         if (!RunnerPresenceEvaluator.IsOnline(
                 infrastructure.ConnectionId,
@@ -203,11 +177,7 @@ public sealed class HostContainerRelayStateResolver(
             return Failure("host_container_capability_missing", "The Infrastructure Runner lacks HostContainerExecution capability.");
         }
 
-        return RuntimeTunnelService.IsCurrentApiInstance(
-            infrastructure.ApiInstanceId,
-            apiInstanceIdentityService.ApiInstanceId)
-            ? null
-            : Failure("infrastructure_runner_wrong_api_instance", "The Infrastructure Runner is connected to another API instance.");
+        return null;
     }
 
     private static HostContainerExecutionResponse Failure(string code, string message) =>

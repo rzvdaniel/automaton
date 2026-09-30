@@ -20,7 +20,8 @@ public sealed record InfrastructureCommandExecutionResult(
     AppActionExecutionResult? Execution,
     AppModuleExecutionArtifactResponse? Result,
     bool Terminal,
-    string? TerminalReason);
+    string? TerminalReason,
+    HostContainerExecutionResponse? HostContainerResult = null);
 
 public sealed class TrustedInfrastructureActionExecutor(
     AppActionDeploymentService deployment,
@@ -39,17 +40,35 @@ public sealed class TrustedInfrastructureActionExecutor(
             InfrastructureAppTrust.PlatformAppId, command.RunnerHostId, command.ActionKey, command.CommandId);
         var existing = execution.ReadPersistedResult(artifactRequest);
         if (existing != null)
-        {
-            var existingModule = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
-            if (existing.Status == AppModuleExecutionStatuses.Running)
-                return new(await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
-                {
-                    ExecutionId = command.CommandId, AppId = InfrastructureAppTrust.PlatformAppId,
-                    DeploymentTargetId = command.RunnerHostId, ActionKey = command.ActionKey,
-                    ExpectedDeploymentHash = existingModule.ContentHash, SystemInfrastructure = true
-                }, cancellationToken), execution.ReadResult(artifactRequest), false, null);
+            return await ReconcileExistingAsync(command, artifactRequest, existing, cancellationToken);
+
+        return await ExecuteNewAsync(command, artifactRequest, cancellationToken);
+    }
+
+    private async Task<InfrastructureCommandExecutionResult> ReconcileExistingAsync(
+        InfrastructureCommandRequestedEvent command,
+        ReadAppModuleExecutionArtifactRequest artifactRequest,
+        AppActionExecutionResult existing,
+        CancellationToken cancellationToken)
+    {
+        if (existing.Status != AppModuleExecutionStatuses.Running)
             return new(existing, execution.ReadResult(artifactRequest), false, null);
-        }
+
+        var module = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
+        var recovered = await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
+        {
+            ExecutionId = command.CommandId, AppId = InfrastructureAppTrust.PlatformAppId,
+            DeploymentTargetId = command.RunnerHostId, ActionKey = command.ActionKey,
+            ExpectedDeploymentHash = module.ContentHash, SystemInfrastructure = true
+        }, cancellationToken);
+        return new(recovered, execution.ReadResult(artifactRequest), false, null);
+    }
+
+    private async Task<InfrastructureCommandExecutionResult> ExecuteNewAsync(
+        InfrastructureCommandRequestedEvent command,
+        ReadAppModuleExecutionArtifactRequest artifactRequest,
+        CancellationToken cancellationToken)
+    {
         var secretResolution = command.SecretGrantIds.Count == 0
             ? new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Executable,
                 new Dictionary<string, string>())

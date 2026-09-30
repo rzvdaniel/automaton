@@ -55,6 +55,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         Assert.Multiple(() =>
         {
             Assert.That(request.Operation, Is.EqualTo(HostContainerOperationKinds.CreateApplicationContainer));
+            Assert.That(request.OperationId, Is.EqualTo(candidateId));
             Assert.That(request.Scope.AppId, Is.EqualTo(appId));
             Assert.That(request.Scope.DeploymentTargetId, Is.EqualTo(targetId));
             Assert.That(request.CandidateId, Is.EqualTo(candidateId));
@@ -93,6 +94,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         Assert.Multiple(() =>
         {
             Assert.That(requests.First().Scope.DeploymentAttemptId, Is.EqualTo(attemptId));
+            Assert.That(requests.First().OperationId, Is.EqualTo(attemptId));
             Assert.That(requests.All(x => x.Scope.AppId == appId && x.Scope.DeploymentTargetId == targetId), Is.True);
             Assert.That(requests.Skip(1).All(x => x.ContainerId == "full-id"), Is.True);
             Assert.That(started.HostPort, Is.EqualTo(32101));

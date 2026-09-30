@@ -35,7 +35,6 @@ public class AutomatonHub : Hub
     private readonly FileDownloadRegistry fileDownloadRegistry;
     private readonly ILogger<AutomatonHub> logger;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
-    private readonly HostContainerRelayService hostContainerRelayService;
 
     public AutomatonHub(
         RunnerService runnerService,
@@ -45,8 +44,7 @@ public class AutomatonHub : Hub
         FileUploadRegistry fileUploadRegistry,
         FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger,
-        IAppDeploymentTargetResolver deploymentTargetResolver,
-        HostContainerRelayService hostContainerRelayService)
+        IAppDeploymentTargetResolver deploymentTargetResolver)
     {
         this.runnerService = runnerService;
         this.appsService = appsService;
@@ -56,11 +54,7 @@ public class AutomatonHub : Hub
         this.fileDownloadRegistry = fileDownloadRegistry;
         this.logger = logger;
         this.deploymentTargetResolver = deploymentTargetResolver;
-        this.hostContainerRelayService = hostContainerRelayService;
     }
-
-    public Task<HostContainerExecutionResponse> RequestHostContainerExecution(HostContainerExecutionRequest request) =>
-        hostContainerRelayService.ExecuteAsync(GetRunner(), request, Context.ConnectionAborted);
 
     public override async Task OnConnectedAsync()
     {

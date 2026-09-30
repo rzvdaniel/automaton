@@ -11,7 +11,8 @@ namespace Automaton.Runner.Console.Services;
 internal sealed class InfrastructureCommandQueueConsumer(
     string queueName,
     Func<ReadOnlyMemory<byte>, CancellationToken, Task<InfrastructureCommandExecutionResult>> handle,
-    IInfrastructureCommandResultClient results)
+    IInfrastructureCommandResultClient results,
+    Func<InfrastructureCommandRequestedEvent, InfrastructureCommandExecutionResult, CancellationToken, Task>? submitHostContainerResult = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -117,9 +118,17 @@ internal sealed class InfrastructureCommandQueueConsumer(
                 "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized before Action execution: {TerminalReason}",
                 command.CommandId, command.OperationId, command.ActionKey, result.TerminalReason);
         }
+        else if (result.HostContainerResult is not null)
+        {
+            if (submitHostContainerResult is null)
+                throw new InvalidOperationException("Host-container result delivery is not configured.");
+            await submitHostContainerResult(command, result, cancellationToken);
+        }
         else
         {
-            await results.SubmitAsync(command, result.Execution!, result.Result!, cancellationToken);
+            if (result.Execution is null || result.Result is null)
+                throw new InvalidOperationException("The infrastructure command returned no Action result.");
+            await results.SubmitAsync(command, result.Execution, result.Result, cancellationToken);
         }
         await channel.BasicAckAsync(deliveryTag, multiple: false, cancellationToken);
     }

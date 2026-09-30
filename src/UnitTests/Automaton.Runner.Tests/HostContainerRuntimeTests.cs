@@ -58,9 +58,12 @@ public sealed class HostContainerRuntimeTests
         => new((args, _, _) =>
         {
             calls.Add(args.ToArray());
+            var candidateMissing = args.Count > 3 && args[1] == "container" && args[2] == "inspect"
+                && args[^1].StartsWith("automaton-app-", StringComparison.Ordinal);
             return Task.FromResult(execute?.Invoke(args) ?? new InfrastructureCommandResponse
             {
-                Success = true,
+                Success = !candidateMissing,
+                Error = candidateMissing ? $"Error: No such object: {args[^1]}" : string.Empty,
                 Output = args[1] == "volume" ? VolumeLabels()
                     : args[1] == "image" ? Digest
                     : args[1] == "create" ? ContainerId : Inspection().ToJsonString()
@@ -349,6 +352,50 @@ public sealed class HostContainerRuntimeTests
         Assert.That(creates, Has.Length.EqualTo(2));
         Assert.That(creates.All(x => x[x.IndexOf("--publish") + 1] == "172.17.0.1::8080"), Is.True);
         Assert.That(creates.Select(x => x[x.IndexOf("--name") + 1]).Distinct().Count(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task RetriedApplicationCreateReusesOwnedCandidateInsteadOfCreatingAnotherContainer()
+    {
+        var request = CreateRequest();
+        var created = false;
+        var service = Service(args =>
+        {
+            if (args[1] == "container" && args[2] == "inspect")
+            {
+                if (!created)
+                    return new() { Error = $"Error: No such object: {args[^1]}" };
+
+                var inspection = Inspection();
+                inspection["Config"]!["Labels"]!["automaton.requested-image"] = request.RequestedImage;
+                inspection["Config"]!["Labels"]!["automaton.resolved-image"] = Digest;
+                return new() { Success = true, Output = inspection.ToJsonString() };
+            }
+
+            if (args[1] == "create")
+            {
+                created = true;
+                return new() { Success = true, Output = ContainerId };
+            }
+
+            return new()
+            {
+                Success = true,
+                Output = args[1] == "volume" ? VolumeLabels() : Digest
+            };
+        });
+
+        var first = await service.ExecuteAsync(request);
+        var retry = await service.ExecuteAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Success, Is.True, first.Error);
+            Assert.That(retry.Success, Is.True, retry.Error);
+            Assert.That(retry.ContainerId, Is.EqualTo(ContainerId));
+            Assert.That(retry.ResolvedImage, Is.EqualTo(Digest));
+            Assert.That(calls.Count(arguments => arguments[1] == "create"), Is.EqualTo(1));
+        });
     }
 
 }
