@@ -17,10 +17,18 @@ public sealed class InfrastructureCommandConsumer
     public InfrastructureCommandConsumer(
         InfrastructureCommandIdentity identity,
         IInfrastructureActionExecutor executor,
+        IInfrastructureCommandResultClient results)
+        : this(identity, executor, results, null, null, null)
+    {
+    }
+
+    public InfrastructureCommandConsumer(
+        InfrastructureCommandIdentity identity,
+        IInfrastructureActionExecutor executor,
         IInfrastructureCommandResultClient results,
-        HostContainerExecutionService? hostContainerExecutor = null,
-        IHostContainerExecutionCommandClient? hostContainerResults = null,
-        HostContainerBuildCleanupService? buildCleanup = null)
+        HostContainerExecutionService? hostContainerExecutor,
+        IHostContainerExecutionCommandClient? hostContainerResults,
+        HostContainerBuildCleanupService? buildCleanup)
     {
         this.identity = identity;
         this.executor = executor;
