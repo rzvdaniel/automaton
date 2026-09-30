@@ -48,7 +48,6 @@ public class HubService
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerDeploymentService runnerDeploymentService,
-        InfrastructureCommandService infrastructureCommandService,
         AppActionExecutionService appActionExecutionService,
         AppActionDeploymentService actionDeploymentService)
     {
@@ -69,7 +68,6 @@ public class HubService
             tunnelForwarder,
             serviceProvider,
             runnerWorkspaceService,
-            infrastructureCommandService,
             logger);
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);

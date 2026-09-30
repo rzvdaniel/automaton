@@ -1,11 +1,12 @@
 using System.Text.Json;
-using Automaton.Api.Constants;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
+using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Api.Config;
-using Automaton.Api.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,12 +14,11 @@ namespace Automaton.Api.Services;
 
 public sealed class InfrastructureWorkflowExecutionService(
     ApplicationDbContext db,
-    IInfrastructureRunnerCommandExecutor commandExecutor,
-    IAuditEventService auditEventService,
-    IOptions<HostedRunnerOptions> hostedRunnerOptions,
-    ILogger<InfrastructureWorkflowExecutionService> logger)
+    IEventPublisher events,
+    ITransactionalEventExecutor transactions,
+    IOptions<HostedRunnerOptions> hostedRunnerOptions)
 {
-    private const string HostValidationWorkflowVersion = "host-validation.v1";
+    private const string HostValidationWorkflowVersion = HostValidationCommand.WorkflowVersion;
 
     public async Task<InfrastructureWorkflowExecutionResponse> StartHostValidationAsync(
         StartHostValidationRequest request,
@@ -26,18 +26,27 @@ public sealed class InfrastructureWorkflowExecutionService(
         CancellationToken cancellationToken)
     {
         ValidateHostId(request.RunnerHostId);
+        if (request.IdempotencyKey?.Trim().Length > 160)
+            throw new ArgumentException("The idempotency key must not exceed 160 characters.");
         var idempotencyKey = ResolveIdempotencyKey(request);
         var existing = await FindExistingExecutionAsync(idempotencyKey, cancellationToken);
         if (existing != null)
         {
+            if (existing.TargetRunnerHostId != request.RunnerHostId
+                || request.RunnerId.HasValue && existing.TargetRunnerId != request.RunnerId)
+                throw new ArgumentException("The idempotency key belongs to a different validation target.");
             return Map(existing);
         }
 
         var host = await LoadHostAsync(request.RunnerHostId, cancellationToken);
         var runner = ValidateRunnerForHostValidation(host, host.InfrastructureRunner, request.RunnerId);
         var execution = CreateExecution(requestedByUserId, host, runner, idempotencyKey);
-        await MarkExecutionRunningAsync(execution, cancellationToken);
-        await ExecuteAndFinalizeAsync(execution, host, requestedByUserId, cancellationToken);
+        await transactions.ExecuteAsync(async token =>
+        {
+            db.InfrastructureWorkflowExecutions.Add(execution);
+            await db.SaveChangesAsync(token);
+            await PublishAsync(execution, token);
+        }, cancellationToken);
         return Map(execution);
     }
 
@@ -75,8 +84,11 @@ public sealed class InfrastructureWorkflowExecutionService(
         if (requestedRunnerId.HasValue && requestedRunnerId != runner.Id)
             throw new InvalidOperationException("The selected Runner is not the active Infrastructure Runner for this host.");
         if (!RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.WorkflowExecution, runner.Purpose)
-            || !RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.HostExecution, runner.Purpose))
+            || !RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.HostExecution, runner.Purpose)
+            || !RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.HostedRunnerProvisioning, runner.Purpose))
             throw new InvalidOperationException("The Infrastructure Runner does not have the capabilities required for host validation.");
+        if (runner.Purpose != RunnerPurposes.Infrastructure)
+            throw new InvalidOperationException("Host validation requires an Infrastructure Runner.");
         return runner;
     }
 
@@ -97,115 +109,12 @@ public sealed class InfrastructureWorkflowExecutionService(
             CreatedAtUtc = DateTime.UtcNow
         };
 
-    private async Task MarkExecutionRunningAsync(
-        InfrastructureWorkflowExecution execution,
-        CancellationToken cancellationToken)
-    {
-        db.InfrastructureWorkflowExecutions.Add(execution);
-        await db.SaveChangesAsync(cancellationToken);
-        execution.Status = InfrastructureWorkflowExecutionStatuses.Running;
-        execution.StartedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task ExecuteAndFinalizeAsync(
-        InfrastructureWorkflowExecution execution,
-        RunnerHost host,
-        Guid requestedByUserId,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await CaptureValidationResultAsync(execution, host, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            execution.Status = InfrastructureWorkflowExecutionStatuses.Cancelled;
-            execution.Error = "Workflow execution was cancelled.";
-            throw;
-        }
-        catch (Exception ex)
-        {
-            execution.Status = InfrastructureWorkflowExecutionStatuses.Failed;
-            execution.Error = Limit(ex.Message);
-            host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
-            host.ProvisioningFailureCode = "HostValidationExecutionFailed";
-            host.ProvisioningFailureMessage = Limit(ex.Message, 2000);
-            host.HostedRunnerSchedulingEnabled = false;
-            await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
-            AppendLog(execution, "stderr", ex.Message);
-            logger.LogError(ex, "Infrastructure workflow execution {ExecutionId} failed", execution.Id);
-        }
-
-        await PersistExecutionAndAuditAsync(execution, requestedByUserId, cancellationToken);
-    }
-
-    private async Task CaptureValidationResultAsync(
-        InfrastructureWorkflowExecution execution,
-        RunnerHost host,
-        CancellationToken cancellationToken)
-    {
-        var result = await commandExecutor.ExecuteScriptAsync(
-            host,
-            BuildHostValidationScript(hostedRunnerOptions.Value.DockerNetwork),
-            cancellationToken);
-        execution.ExitCode = result.ExitStatus;
-        execution.ResultJson = result.Succeeded && LooksLikeJson(result.StandardOutput)
-            ? result.StandardOutput.Trim()
-            : null;
-        execution.Error = result.Succeeded ? null : Limit(result.StandardError);
-        execution.Status = result.Succeeded
-            ? InfrastructureWorkflowExecutionStatuses.Succeeded
-            : InfrastructureWorkflowExecutionStatuses.Failed;
-
-        if (!result.Succeeded)
-        {
-            MarkExecutionFailed(host, result.StandardError);
-            await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
-        }
-
-        if (result.Succeeded && execution.ResultJson != null)
-        {
-            ApplyHostValidationSnapshot(host, execution.ResultJson);
-            await UpdateProvisioningOperationFromValidationAsync(host, cancellationToken);
-        }
-
-        AppendLogs(execution, result.StandardOutput, "stdout");
-        AppendLogs(execution, result.StandardError, "stderr");
-    }
-
-    private static void MarkExecutionFailed(RunnerHost host, string standardError)
-    {
-        host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
-        host.ProvisioningFailureCode = "HostValidationExecutionFailed";
-        host.ProvisioningFailureMessage = Limit(standardError, 2000);
-        host.HostedRunnerSchedulingEnabled = false;
-    }
-
-    private async Task PersistExecutionAndAuditAsync(
-        InfrastructureWorkflowExecution execution,
-        Guid requestedByUserId,
-        CancellationToken cancellationToken)
-    {
-        execution.CompletedAtUtc = DateTime.UtcNow;
-        db.InfrastructureWorkflowExecutions.Update(execution);
-        db.InfrastructureWorkflowExecutionLogs.AddRange(execution.Logs);
-        await db.SaveChangesAsync(cancellationToken);
-
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Created,
-            EntityType = AuditEntityTypes.Runner,
-            EntityId = execution.TargetRunnerId,
-            EventType = AuditEventTypes.InfrastructureWorkflowExecuted,
-            Message = $"Infrastructure workflow '{execution.WorkflowVersionId}' completed with status '{execution.Status}'.",
-            Outcome = execution.Status == InfrastructureWorkflowExecutionStatuses.Succeeded
-                ? AuditOutcomes.Success
-                : AuditOutcomes.Failed,
-            ActorUserId = requestedByUserId,
-            Metadata = new { execution.Id, execution.TargetRunnerHostId, execution.TargetRunnerId, execution.Status }
-        }, cancellationToken);
-    }
+    private Task PublishAsync(InfrastructureWorkflowExecution execution, CancellationToken cancellationToken)
+        => events.PublishAsync(new InfrastructureCommandRequestedEvent(
+            execution.Id, execution.Id, execution.TargetRunnerHostId, execution.TargetRunnerId,
+            HostValidationCommand.ActionKey,
+            JsonSerializer.Serialize(new { dockerNetwork = hostedRunnerOptions.Value.DockerNetwork }),
+            [], execution.CreatedAtUtc), cancellationToken);
 
     public async Task<InfrastructureWorkflowExecutionResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
         => await db.InfrastructureWorkflowExecutions.AsNoTracking()
@@ -240,220 +149,6 @@ public sealed class InfrastructureWorkflowExecutionService(
                 Message = x.Message
             })
             .ToListAsync(cancellationToken);
-
-    private static string BuildHostValidationScript(string dockerNetwork)
-    {
-        var safeNetwork = dockerNetwork.Replace("'", "'\\\"'\\\"'", StringComparison.Ordinal);
-        return """
-        set -u
-        json_escape() {
-          printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
-        }
-        host_exec() {
-          automaton-host-exec sh -c "$1"
-        }
-        hostname_value=$(host_exec 'hostname 2>/dev/null' || printf 'unknown')
-        distribution=$(host_exec "awk -F= '\$1==\"ID\"{gsub(/\"/,\"\",\$2); print \$2}' /etc/os-release 2>/dev/null" || printf 'unknown')
-        os_version=$(host_exec "awk -F= '\$1==\"VERSION_ID\"{gsub(/\"/,\"\",\$2); print \$2}' /etc/os-release 2>/dev/null" || printf 'unknown')
-        kernel=$(host_exec 'uname -r 2>/dev/null' || printf 'unknown')
-        architecture=$(host_exec 'uname -m 2>/dev/null' || printf 'unknown')
-        cpu_count=$(host_exec 'nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null' || printf '0')
-        cpu_model=$(host_exec "awk -F: '/model name|Hardware/{gsub(/^ +/,\"\",\$2); print \$2; exit}' /proc/cpuinfo 2>/dev/null" || printf 'unknown')
-        memory=$(host_exec "free -m 2>/dev/null | awk '/^Mem:/{print \$2}'" || printf '0')
-        disk=$(host_exec "df -Pm / 2>/dev/null | awk 'NR==2{print \$2}'" || printf '0')
-        docker_version=$(host_exec "docker version --format '{{.Server.Version}}' 2>/dev/null" || printf 'unavailable')
-        docker_status=$(host_exec 'docker info >/dev/null 2>&1' && printf 'running' || printf 'unavailable')
-        docker_storage_driver=$(host_exec "docker info --format '{{.Driver}}' 2>/dev/null" || printf 'unknown')
-        docker_cgroup_version=$(host_exec "docker info --format '{{.CgroupVersion}}' 2>/dev/null" || printf 'unknown')
-        network_status=$(host_exec "docker network inspect '__DOCKER_NETWORK__' >/dev/null 2>&1" && printf 'present' || printf 'missing')
-        runner_container=$(host_exec "docker ps --filter 'name=automaton-infrastructure-runner' --format '{{.Status}}' 2>/dev/null" || printf 'unknown')
-        ports=$(host_exec "ss -lnt 2>/dev/null | awk 'NR>1{print \$4}' | head -50 | paste -sd ',' -" || printf 'unknown')
-        interfaces=$(host_exec "ip -o link show 2>/dev/null | awk -F': ' '{print \$2}' | paste -sd ',' -" || printf 'unknown')
-        private_ip=$(host_exec "ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if (\$i==\"src\") {print \$(i+1); exit}}'" || printf 'unknown')
-        timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        docker_health=$(test "$docker_status" = running && printf 'Healthy' || printf 'Unhealthy')
-        network_health=$(test "$network_status" = present && printf 'Healthy' || printf 'Unhealthy')
-        printf '{"totalCpuCores":%s,"totalMemoryMb":%s,"totalDiskMb":%s,"metadata":{"hostname":"%s","os":{"distribution":"%s","version":"%s","kernel":"%s"},"architecture":"%s","docker":{"version":"%s","status":"%s","storageDriver":"%s","cgroupVersion":"%s"},"cpu":{"model":"%s","cores":%s},"memoryMb":%s,"diskMb":%s,"network":{"privateIp":"%s","interfaces":"%s","automatonNetwork":"%s","availableRuntimePorts":"%s"},"runtime":{"infrastructureRunnerContainer":"%s"}},"health":{"validationVersion":"host-validation.v1","timestampUtc":"%s","docker":"%s","network":"%s","disk":"%s","apiConnectivity":"Healthy","warnings":[],"errors":[]}}\n' \
-          "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$hostname_value")" "$(json_escape "$distribution")" "$(json_escape "$os_version")" "$(json_escape "$kernel")" "$(json_escape "$architecture")" "$(json_escape "$docker_version")" "$(json_escape "$docker_status")" "$(json_escape "$docker_storage_driver")" "$(json_escape "$docker_cgroup_version")" "$(json_escape "$cpu_model")" "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$private_ip")" "$(json_escape "$interfaces")" "$(json_escape "$network_status")" "$(json_escape "$ports")" "$(json_escape "$runner_container")" "$(json_escape "$timestamp_utc")" "$(json_escape "$docker_health")" "$(json_escape "$network_health")" "$(test "${disk:-0}" -gt 0 2>/dev/null && printf 'Healthy' || printf 'Unhealthy')"
-        """.Replace("__DOCKER_NETWORK__", safeNetwork, StringComparison.Ordinal);
-    }
-
-    private async Task UpdateProvisioningOperationFromValidationAsync(RunnerHost host, CancellationToken cancellationToken)
-    {
-        var operation = await db.RunnerHostProvisioningOperations
-            .Where(x => x.RunnerHostId == host.Id
-                && (x.Status == RunnerHostProvisioningOperationStatuses.Running
-                    || x.Status == RunnerHostProvisioningOperationStatuses.AwaitingInfrastructureRunner))
-            .OrderByDescending(x => x.RequestedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (operation == null) return;
-
-        operation.Status = host.ProvisioningStatus is RunnerHostProvisioningStatuses.Ready
-            or RunnerHostProvisioningStatuses.AwaitingApproval
-            ? RunnerHostProvisioningOperationStatuses.Succeeded
-            : RunnerHostProvisioningOperationStatuses.Failed;
-        operation.FailureCode = host.ProvisioningFailureCode;
-        operation.Error = host.ProvisioningFailureMessage;
-        operation.FinishedAtUtc = DateTime.UtcNow;
-    }
-
-    private async Task MarkProvisioningOperationFailedAsync(RunnerHost host, string code, CancellationToken cancellationToken)
-    {
-        var operation = await db.RunnerHostProvisioningOperations
-            .Where(x => x.RunnerHostId == host.Id
-                && x.Status != RunnerHostProvisioningOperationStatuses.Succeeded)
-            .OrderByDescending(x => x.RequestedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (operation == null) return;
-        operation.Status = RunnerHostProvisioningOperationStatuses.Failed;
-        operation.FailureCode = code;
-        operation.Error = host.ProvisioningFailureMessage;
-        operation.FinishedAtUtc = DateTime.UtcNow;
-    }
-
-    private static void ApplyHostValidationSnapshot(RunnerHost host, string resultJson)
-    {
-        using var document = JsonDocument.Parse(resultJson);
-        var root = document.RootElement;
-        ApplyMetadataSnapshot(host, root);
-        ApplyHealthSnapshot(host, root);
-        ApplyNetworkSnapshot(host, root);
-        ApplyResourceSnapshot(host, root);
-        host.UpdatedAt = DateTime.UtcNow;
-    }
-
-    private static void ApplyMetadataSnapshot(RunnerHost host, JsonElement root)
-    {
-        if (root.TryGetProperty("metadata", out var metadata)
-            && metadata.ValueKind == JsonValueKind.Object)
-            host.MetadataJson = metadata.GetRawText();
-    }
-
-    private static void ApplyHealthSnapshot(RunnerHost host, JsonElement root)
-    {
-        if (!root.TryGetProperty("health", out var health)
-            || health.ValueKind != JsonValueKind.Object)
-            return;
-
-        host.HealthJson = health.GetRawText();
-        var healthy = IsHealthCheckHealthy(health, "docker")
-            && IsHealthCheckHealthy(health, "network")
-            && IsHealthCheckHealthy(health, "disk");
-        if (healthy)
-        {
-            MarkHostValidationSucceeded(host);
-            return;
-        }
-
-        MarkHostValidationFailed(host, "One or more host validation checks failed.");
-    }
-
-    private static bool IsHealthCheckHealthy(JsonElement health, string checkName)
-        => health.TryGetProperty(checkName, out var check)
-            && string.Equals(check.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
-
-    private static void MarkHostValidationSucceeded(RunnerHost host)
-    {
-        var isLocalDevelopmentHost = host.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker;
-        var wasApproved = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
-            && host.ApprovedAtUtc.HasValue;
-        host.ProvisioningStatus = isLocalDevelopmentHost || wasApproved
-            ? RunnerHostProvisioningStatuses.Ready
-            : RunnerHostProvisioningStatuses.AwaitingApproval;
-        host.ValidatedAtUtc = DateTime.UtcNow;
-        host.ProvisioningFailureCode = null;
-        host.ProvisioningFailureMessage = null;
-        if (!isLocalDevelopmentHost && !wasApproved)
-            host.HostedRunnerSchedulingEnabled = false;
-    }
-
-    private static void MarkHostValidationFailed(RunnerHost host, string message)
-    {
-        host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
-        host.ValidatedAtUtc = null;
-        host.ProvisioningFailureCode = "HostValidationFailed";
-        host.ProvisioningFailureMessage = message;
-        host.HostedRunnerSchedulingEnabled = false;
-    }
-
-    private static void ApplyNetworkSnapshot(RunnerHost host, JsonElement root)
-    {
-        if (root.TryGetProperty("metadata", out var metadataRoot)
-            && metadataRoot.TryGetProperty("network", out var network)
-            && network.TryGetProperty("privateIp", out var privateIp)
-            && privateIp.ValueKind == JsonValueKind.String
-            && !string.IsNullOrWhiteSpace(privateIp.GetString())
-            && !string.Equals(privateIp.GetString(), "unknown", StringComparison.OrdinalIgnoreCase))
-        {
-            host.PrivateIp = privateIp.GetString();
-        }
-    }
-
-    private static void ApplyResourceSnapshot(RunnerHost host, JsonElement root)
-    {
-        if (TryGetDecimal(root, "totalCpuCores", out var totalCpuCores) && totalCpuCores > 0)
-        {
-            host.TotalCpuCores = totalCpuCores;
-        }
-
-        if (TryGetInt32(root, "totalMemoryMb", out var totalMemoryMb) && totalMemoryMb > 0)
-        {
-            host.TotalMemoryMb = totalMemoryMb;
-        }
-
-        if (TryGetInt32(root, "totalDiskMb", out var totalDiskMb) && totalDiskMb > 0)
-        {
-            host.TotalDiskMb = totalDiskMb;
-        }
-    }
-
-    private static bool TryGetDecimal(JsonElement root, string propertyName, out decimal value)
-    {
-        value = default;
-        return root.TryGetProperty(propertyName, out var property)
-            && property.TryGetDecimal(out value);
-    }
-
-    private static bool TryGetInt32(JsonElement root, string propertyName, out int value)
-    {
-        value = default;
-        return root.TryGetProperty(propertyName, out var property)
-            && property.TryGetInt32(out value);
-    }
-
-    private static void AppendLogs(InfrastructureWorkflowExecution execution, string text, string stream)
-    {
-        foreach (var line in (text ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            AppendLog(execution, stream, line);
-        }
-    }
-
-    private static void AppendLog(InfrastructureWorkflowExecution execution, string stream, string message)
-        => execution.Logs.Add(new InfrastructureWorkflowExecutionLog
-        {
-            Id = Guid.NewGuid(),
-            ExecutionId = execution.Id,
-            Sequence = execution.Logs.Count,
-            Stream = stream,
-            Message = Limit(message, 10000)
-        });
-
-    private static bool LooksLikeJson(string value)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(value);
-            return document.RootElement.ValueKind == JsonValueKind.Object;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static string Limit(string? value, int max = 2000)
-        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Length <= max ? value : value[..max];
 
     private static InfrastructureWorkflowExecutionResponse Map(InfrastructureWorkflowExecution entity)
         => new()

@@ -1,0 +1,25 @@
+apiVersion: automaton.dev/v1
+kind: Action
+metadata:
+  name: Validate Runner Host
+  key: validate-runner-host
+  description: Read-only host health and resource validation.
+spec:
+  runtime: bash
+  entrypoint: main.sh
+  timeoutSeconds: 300
+  capabilities: [docker, host]
+  input:
+    type: object
+    required: [dockerNetwork]
+    properties:
+      dockerNetwork: { type: string }
+  output:
+    type: object
+    required: [totalCpuCores, totalMemoryMb, totalDiskMb, metadata, health]
+    properties:
+      totalCpuCores: { type: number }
+      totalMemoryMb: { type: integer }
+      totalDiskMb: { type: integer }
+      metadata: { type: object }
+      health: { type: object }

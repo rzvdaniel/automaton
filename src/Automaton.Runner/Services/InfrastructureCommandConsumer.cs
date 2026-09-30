@@ -58,10 +58,18 @@ public sealed class InfrastructureCommandConsumer
             return await ExecuteHostContainerAsync(command, cancellationToken);
 
         TrustedInfrastructureActions.EnsureAllowed(command.ActionKey);
+        ValidateHostValidationCommand(command);
         if (command.SecretGrantIds == null || string.IsNullOrWhiteSpace(command.InputJson)
             || command.CreatedAtUtc == default || command.CreatedAtUtc.Kind != DateTimeKind.Utc)
             throw new InvalidOperationException("Infrastructure command input, grant IDs, and UTC creation time are required.");
         return await executor.ExecuteAsync(command, cancellationToken);
+    }
+
+    private static void ValidateHostValidationCommand(InfrastructureCommandRequestedEvent command)
+    {
+        if (command.ActionKey == HostValidationCommand.ActionKey
+            && (command.CommandId != command.OperationId || command.SecretGrantIds?.Count != 0))
+            throw new InvalidDataException("Host validation requires its operation identity and no secret grants.");
     }
 
     private async Task<InfrastructureCommandExecutionResult> ExecuteHostContainerAsync(

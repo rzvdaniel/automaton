@@ -1,4 +1,8 @@
 using Automaton.Api.Config;
+using Automaton.Core.Models;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
+using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
@@ -20,7 +24,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     {
         await using var db = CreateDbContext();
         var host = await SeedValidationHostAsync(db);
-        var executor = new FakeInfrastructureRunnerCommandExecutor();
+        var executor = new RecordingPublisher();
         var service = CreateWorkflowExecutionService(db, executor, "test-network");
 
         var response = await service.StartHostValidationAsync(
@@ -28,18 +32,20 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             Guid.NewGuid(),
             CancellationToken.None);
 
-        AssertValidationResponse(response, host.InfrastructureRunnerId);
+        Assert.That(response.Status, Is.EqualTo(InfrastructureWorkflowExecutionStatuses.Queued));
+        Assert.That(host.ValidatedAtUtc, Is.Null);
+        var command = executor.LastCommand!;
+        Assert.That(command.InfrastructureRunnerId, Is.EqualTo(host.InfrastructureRunnerId));
+        Assert.That(command.CommandId, Is.EqualTo(response.Id));
+        Assert.That(command.InputJson, Does.Contain("test-network"));
+        var callback = Result(command);
+        var results = new InfrastructureHostValidationResultService(db, new RecordingAuditEventService());
+        Assert.That((await results.ApplyAsync(host.InfrastructureRunner!.ApiKeyId!.Value, response.Id,
+            callback, CancellationToken.None)).Outcome, Is.EqualTo("accepted"));
+        Assert.That((await results.ApplyAsync(host.InfrastructureRunner.ApiKeyId.Value, response.Id,
+            callback, CancellationToken.None)).Outcome, Is.EqualTo("already-applied"));
         await AssertValidationPersistenceAsync(db, host.Id);
-        AssertValidationScript(executor.LastScript);
-    }
 
-    private static void AssertValidationResponse(
-        InfrastructureWorkflowExecutionResponse response,
-        Guid? expectedRunnerId)
-    {
-        Assert.That(response.Status, Is.EqualTo(InfrastructureWorkflowExecutionStatuses.Succeeded));
-        Assert.That(response.TargetRunnerId, Is.EqualTo(expectedRunnerId));
-        Assert.That(response.ResultJson, Does.Contain("\"health\""));
     }
 
     private static async Task AssertValidationPersistenceAsync(ApplicationDbContext db, Guid hostId)
@@ -48,43 +54,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         Assert.That(validatedHost!.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.AwaitingApproval));
         Assert.That(validatedHost.ValidatedAtUtc, Is.Not.Null);
         Assert.That(validatedHost.IsSchedulingEligible, Is.False);
-        Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(2));
-    }
-
-    private static void AssertValidationScript(string script)
-    {
-        Assert.That(script, Does.Contain("test-network"));
-        Assert.That(script, Does.Contain("automaton-host-exec"));
-    }
-
-    [Test]
-    public async Task HostApproval_EnablesSchedulingAfterValidationButStorageTelemetryIsStillRequired()
-    {
-        await using var db = CreateDbContext();
-        var host = await SeedApprovalHostAsync(db, "8.8.8.8");
-        var service = CreateApprovalService(db);
-
-        var approved = await service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
-
-        Assert.That(approved.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.Ready));
-        Assert.That(approved.HostedRunnerSchedulingEnabled, Is.True);
-        Assert.That(approved.ApprovedAtUtc, Is.Not.Null);
-        Assert.That(approved.ApprovedByUserId, Is.Not.Null);
-        Assert.That(approved.IsSchedulingEligible, Is.False);
-    }
-
-    [Test]
-    public async Task HostApproval_RejectsPublicConnectivityWithoutPublicAddress()
-    {
-        await using var db = CreateDbContext();
-        var host = await SeedApprovalHostAsync(db, publicIp: null);
-        var service = CreateApprovalService(db);
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None));
-
-        Assert.That(exception!.Message, Does.Contain("public IPv4"));
-        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
+        Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(1));
     }
 
     [Test]
@@ -92,7 +62,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     {
         await using var db = CreateDbContext();
         var host = await SeedValidationHostAsync(db);
-        var executor = new FakeInfrastructureRunnerCommandExecutor();
+        var executor = new RecordingPublisher();
         var service = CreateWorkflowExecutionService(db, executor);
         var request = new StartHostValidationRequest { RunnerHostId = host.Id, IdempotencyKey = "same-request" };
 
@@ -104,7 +74,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         Assert.That(await db.InfrastructureWorkflowExecutions.CountAsync(), Is.EqualTo(1));
     }
 
-    private static async Task<RunnerHost> SeedValidationHostAsync(ApplicationDbContext db)
+    internal static async Task<RunnerHost> SeedValidationHostAsync(ApplicationDbContext db)
     {
         var runner = new Runner
         {
@@ -114,6 +84,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             CapabilitiesJson = RunnerCapabilities.Serialize(
                 RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
                 RunnerPurposes.Infrastructure),
+            ApiKeyId = Guid.NewGuid(),
             ConnectionId = "connection",
             LastHeartbeatAtUtc = DateTime.UtcNow
         };
@@ -130,88 +101,109 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         return host;
     }
 
-    private static async Task<RunnerHost> SeedApprovalHostAsync(ApplicationDbContext db, string? publicIp)
-    {
-        var apiKey = new ApiKey
-        {
-            Id = Guid.NewGuid(),
-            Name = "infra",
-            HashedKey = "hash",
-            KeyPrefix = "ak_runner_test",
-            CreatedAt = DateTime.UtcNow
-        };
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infra-test",
-            Purpose = RunnerPurposes.Infrastructure,
-            ApiKey = apiKey,
-            ApiKeyId = apiKey.Id,
-            ConnectionId = "connection",
-            LastHeartbeatAtUtc = DateTime.UtcNow
-        };
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = "host-test",
-            Provider = RunnerHostProviders.Hetzner,
-            PublicIp = publicIp,
-            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
-            ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
-            ValidatedAtUtc = DateTime.UtcNow,
-            HostedRunnerSchedulingEnabled = false,
-            InfrastructureRunner = runner,
-            InfrastructureRunnerId = runner.Id
-        };
-        db.AddRange(apiKey, runner, host);
-        await db.SaveChangesAsync();
-        return host;
-    }
-
-    private static InfrastructureWorkflowExecutionService CreateWorkflowExecutionService(
+    internal static InfrastructureWorkflowExecutionService CreateWorkflowExecutionService(
         ApplicationDbContext db,
-        IInfrastructureRunnerCommandExecutor executor,
+        RecordingPublisher executor,
         string dockerNetwork = "")
         => new(
             db,
             executor,
-            new RecordingAuditEventService(),
-            Options.Create(new HostedRunnerOptions { DockerNetwork = dockerNetwork }),
-            NullLogger<InfrastructureWorkflowExecutionService>.Instance);
+            new InlineTransaction(),
+            Options.Create(new HostedRunnerOptions { DockerNetwork = dockerNetwork }));
 
-    private static InfrastructureRunnerHostApprovalService CreateApprovalService(ApplicationDbContext db)
-        => new(
-            db,
-            new RecordingAuditEventService(),
-            NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
-            new NullHubContext<AutomatonHub>());
-
-    private static ApplicationDbContext CreateDbContext()
+    internal static ApplicationDbContext CreateDbContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase($"infrastructure-workflow-{Guid.NewGuid()}")
             .Options);
 
-    private sealed class FakeInfrastructureRunnerCommandExecutor : IInfrastructureRunnerCommandExecutor
+    internal sealed class RecordingPublisher : IEventPublisher
     {
         public int CallCount { get; private set; }
-        public string LastScript { get; private set; } = string.Empty;
-
-        public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
-            RunnerHost host,
-            string script,
-            CancellationToken cancellationToken)
+        public InfrastructureCommandRequestedEvent? LastCommand { get; private set; }
+        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
         {
             CallCount++;
-            LastScript = script;
-            return Task.FromResult(new HostedRunnerRemoteExecutionResult(
-                true,
-                0,
-                "{\"totalCpuCores\":2,\"totalMemoryMb\":4096,\"totalDiskMb\":40960,\"metadata\":{\"hostname\":\"host-test\"},\"health\":{\"docker\":\"Healthy\",\"network\":\"Healthy\",\"disk\":\"Healthy\",\"apiConnectivity\":\"Healthy\"}}\n",
-                "validation started\n"));
+            LastCommand = (InfrastructureCommandRequestedEvent)(object)message;
+            return Task.CompletedTask;
         }
     }
 
-    private sealed class RecordingAuditEventService : IAuditEventService
+    private sealed class InlineTransaction : ITransactionalEventExecutor
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+            => operation(cancellationToken);
+    }
+
+    internal static InfrastructureCommandResultRequest Result(InfrastructureCommandRequestedEvent command)
+        => new(command.OperationId, command.RunnerHostId, command.InfrastructureRunnerId,
+            command.ActionKey, [], new AppActionExecutionResult
+            {
+                ExecutionId = command.CommandId, Status = AppModuleExecutionStatuses.Succeeded,
+                ExitCode = 0, StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow
+            }, new AppModuleExecutionArtifactResponse(true, "{\"totalCpuCores\":2,\"totalMemoryMb\":4096,\"totalDiskMb\":40960,\"metadata\":{\"hostname\":\"host-test\"},\"health\":{\"docker\":\"Healthy\",\"network\":\"Healthy\",\"disk\":\"Healthy\"}}", null));
+
+    [Test]
+    public async Task HostValidation_RejectsWrongRunnerResultWithoutChangingHost()
+    {
+        await using var db = CreateDbContext();
+        var host = await SeedValidationHostAsync(db);
+        var publisher = new RecordingPublisher();
+        var service = CreateWorkflowExecutionService(db, publisher);
+        await service.StartHostValidationAsync(new StartHostValidationRequest { RunnerHostId = host.Id },
+            Guid.NewGuid(), CancellationToken.None);
+        var command = publisher.LastCommand!;
+        var results = new InfrastructureHostValidationResultService(db, new RecordingAuditEventService());
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => results.ApplyAsync(Guid.NewGuid(), command.CommandId,
+            Result(command), CancellationToken.None));
+        Assert.That(host.ValidatedAtUtc, Is.Null);
+        Assert.That((await db.InfrastructureWorkflowExecutions.SingleAsync()).CompletedAtUtc, Is.Null);
+    }
+
+    [Test]
+    public async Task HostValidation_FailedActionClosesOperationAndDisablesScheduling()
+    {
+        await using var db = CreateDbContext();
+        var host = await SeedValidationHostAsync(db);
+        host.HostedRunnerSchedulingEnabled = true;
+        var publisher = new RecordingPublisher();
+        await CreateWorkflowExecutionService(db, publisher).StartHostValidationAsync(
+            new StartHostValidationRequest { RunnerHostId = host.Id }, Guid.NewGuid(), CancellationToken.None);
+        var command = publisher.LastCommand!;
+        var request = Result(command);
+        request.Execution.Status = AppModuleExecutionStatuses.Failed;
+        request.Execution.FailureSummary = "Docker unavailable";
+        await new InfrastructureHostValidationResultService(db, new RecordingAuditEventService())
+            .ApplyAsync(host.InfrastructureRunner!.ApiKeyId!.Value, command.CommandId, request, CancellationToken.None);
+        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
+        Assert.That(host.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.ValidationFailed));
+        await AssertFailedExecutionAsync(db);
+    }
+
+    private static async Task AssertFailedExecutionAsync(ApplicationDbContext db)
+        => Assert.That((await db.InfrastructureWorkflowExecutions.SingleAsync()).Status,
+            Is.EqualTo(InfrastructureWorkflowExecutionStatuses.Failed));
+
+    [Test]
+    public async Task HostValidation_SupersededResultCannotUpdateHostSnapshot()
+    {
+        await using var db = CreateDbContext();
+        var host = await SeedValidationHostAsync(db);
+        var publisher = new RecordingPublisher();
+        var service = CreateWorkflowExecutionService(db, publisher);
+        await service.StartHostValidationAsync(new() { RunnerHostId = host.Id }, Guid.NewGuid(), CancellationToken.None);
+        var older = publisher.LastCommand!;
+        await service.StartHostValidationAsync(new() { RunnerHostId = host.Id }, Guid.NewGuid(), CancellationToken.None);
+        var newer = publisher.LastCommand!;
+        var results = new InfrastructureHostValidationResultService(db, new RecordingAuditEventService());
+        await results.ApplyAsync(host.InfrastructureRunner!.ApiKeyId!.Value, older.CommandId,
+            Result(older), CancellationToken.None);
+        Assert.That(host.ValidatedAtUtc, Is.Null);
+        await results.ApplyAsync(host.InfrastructureRunner.ApiKeyId.Value, newer.CommandId,
+            Result(newer), CancellationToken.None);
+        Assert.That(host.ValidatedAtUtc, Is.Not.Null);
+    }
+
+    internal sealed class RecordingAuditEventService : IAuditEventService
     {
         public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
@@ -220,33 +212,4 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             => Task.CompletedTask;
     }
 
-    private sealed class NullHubContext<THub> : IHubContext<THub> where THub : Hub
-    {
-        public IHubClients Clients { get; } = new NullHubClients();
-        public IGroupManager Groups { get; } = new NullGroupManager();
-    }
-
-    private sealed class NullHubClients : IHubClients
-    {
-        public IClientProxy All => new NullClientProxy();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
-        public IClientProxy Client(string connectionId) => new NullClientProxy();
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => new NullClientProxy();
-        public IClientProxy Group(string groupName) => new NullClientProxy();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => new NullClientProxy();
-        public IClientProxy User(string userId) => new NullClientProxy();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => new NullClientProxy();
-    }
-
-    private sealed class NullClientProxy : IClientProxy
-    {
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class NullGroupManager : IGroupManager
-    {
-        public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
 }

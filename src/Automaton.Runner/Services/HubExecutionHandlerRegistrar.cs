@@ -12,7 +12,6 @@ internal sealed class HubExecutionHandlerRegistrar
 {
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
-    private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
     private const string SynchronizeApplicationManagedArtifactsMethod = "SynchronizeApplicationManagedArtifacts";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
@@ -21,7 +20,6 @@ internal sealed class HubExecutionHandlerRegistrar
     private readonly TunnelForwarderService tunnelForwarder;
     private readonly IServiceProvider serviceProvider;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
-    private readonly InfrastructureCommandService infrastructureCommandService;
     private readonly ILogger logger;
 
     public HubExecutionHandlerRegistrar(
@@ -30,7 +28,6 @@ internal sealed class HubExecutionHandlerRegistrar
         TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
-        InfrastructureCommandService infrastructureCommandService,
         ILogger logger)
     {
         this.configService = configService;
@@ -38,7 +35,6 @@ internal sealed class HubExecutionHandlerRegistrar
         this.tunnelForwarder = tunnelForwarder;
         this.serviceProvider = serviceProvider;
         this.runnerWorkspaceService = runnerWorkspaceService;
-        this.infrastructureCommandService = infrastructureCommandService;
         this.logger = logger;
     }
 
@@ -48,9 +44,6 @@ internal sealed class HubExecutionHandlerRegistrar
             ExecuteWorkflowHandler(workflowId, beginActivity, endActivity));
         connection.On<CustomStepPayload, CustomStepExecutionResponse>(RunCustomStepMethod, customStep =>
             ExecuteCustomStepHandler(customStep, beginActivity, endActivity));
-        connection.On<InfrastructureCommandRequest, InfrastructureCommandResponse>(
-            RunInfrastructureCommandMethod,
-            request => infrastructureCommandService.ExecuteAsync(request, CancellationToken.None));
         connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
             SynchronizeApplicationManagedArtifactsMethod,
             request => SynchronizeApplicationManagedArtifacts(request));

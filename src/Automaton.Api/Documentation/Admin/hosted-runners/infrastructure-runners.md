@@ -24,6 +24,16 @@ Infrastructure capability profiles are issued by the enrollment flow; the instal
 
 [![Install an Infrastructure Runner on a new server](./assets/infrastructure-runner-installation.png)](./assets/infrastructure-runner-installation.png)
 
+## Validate host health
+
+**Validate** queues a durable, read-only command for the host's stable Infrastructure Runner identity.
+The validation dialog initially shows **queued**; use **Refresh** to read the persisted result and logs.
+The Runner executes the bundled validation action and sends its terminal result over authenticated HTTPS.
+A temporary API interruption retries result delivery without repeating completed validation work.
+If Runner interruption leaves execution uncertain, validation fails explicitly; correct the problem and start a new validation.
+Approval remains separate and requires successful validation. Existing storage admission checks still apply.
+Deploy matching API, Studio and Infrastructure Runner versions before using this command; the replaced SignalR host-script handler is no longer available.
+
 ## Repair an existing Infrastructure Runner
 
 Use **Repair** to reinstall or recover the Infrastructure Runner container without changing its identity or configuration. The current repair command reuses the container's installed immutable image; it does not select or deploy a newer image and does not provide update rollback.
@@ -78,14 +88,12 @@ After revocation, the runner cannot reconnect or perform host operations. Revoca
 
 The Runner includes `automaton-runner infrastructure-command-probe` for isolated
 development checks. It requires `DOTNET_ENVIRONMENT=Development` and is not started
-by the normal Runner service. Production Hosted Runner operations still use the
-existing SignalR path.
+by the normal Runner service. Production trusted Infrastructure Runner operations use the durable command queue.
 
 The probe consumes one RabbitMQ command and acknowledges it only after the API
 accepts the terminal Action result. It retrieves command-scoped secret grants and
 posts results through the Runner's existing API-key credential. It is not started
-by the normal Runner service, and production Hosted Runner operations still use
-SignalR. Do not run it against a production broker or use it to retry a live host
+by the normal Runner service, and it does not replace the normal durable consumer. Do not run it against a production broker or use it to retry a live host
 operation.
 
 ### The command fails to download
