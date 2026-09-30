@@ -18,7 +18,6 @@ namespace Automaton.Runner.Console.Services;
 public class HubService
 {
     internal const string CurrentRunnerApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current;
-    private const string RequestHostContainerExecutionMethod = "RequestHostContainerExecution";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -41,16 +40,6 @@ public class HubService
     private int reconnectRequested = 0;
     private readonly HubHeartbeatService heartbeatService;
 
-    public async Task<HostContainerExecutionResponse> RequestHostContainerExecutionAsync(
-        HostContainerExecutionRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (connection?.State != HubConnectionState.Connected)
-            throw new InvalidOperationException("Runner is not connected to the API.");
-        return await connection.InvokeAsync<HostContainerExecutionResponse>(
-            RequestHostContainerExecutionMethod, request, cancellationToken);
-    }
-
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
@@ -61,8 +50,7 @@ public class HubService
         RunnerDeploymentService runnerDeploymentService,
         InfrastructureCommandService infrastructureCommandService,
         AppActionExecutionService appActionExecutionService,
-        AppActionDeploymentService actionDeploymentService,
-        HostContainerExecutionService? hostContainerExecutionService = null)
+        AppActionDeploymentService actionDeploymentService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -82,7 +70,6 @@ public class HubService
             serviceProvider,
             runnerWorkspaceService,
             infrastructureCommandService,
-            hostContainerExecutionService,
             logger);
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);

@@ -9,8 +9,8 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     private readonly Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>> execute;
     private readonly Func<Task<RunnerInstallationProfile?>> loadProfile;
 
-    public BrokeredApplicationContainerRuntime(HubService hub, FileStorageService storage)
-        : this(hub.RequestHostContainerExecutionAsync, storage.LoadInstallationProfileAsync)
+    public BrokeredApplicationContainerRuntime(HostContainerExecutionApiClient api, FileStorageService storage)
+        : this(api.ExecuteAsync, storage.LoadInstallationProfileAsync)
     {
     }
 
@@ -29,7 +29,8 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         var context = request.Context ?? throw new InvalidOperationException("Brokered builds require deployment execution context.");
         var result = await execute(new()
         {
-            Scope = await ScopeAsync(context.AppId, context.DeploymentTargetId, context.ExecutionAttemptId, cancellationToken),
+            OperationId = context.ExecutionAttemptId,
+            Scope = await ScopeAsync(context.AppId, context.DeploymentTargetId, context.ExecutionAttemptId),
             Operation = HostContainerOperationKinds.RunBuild, RequestedImage = request.Image, Command = request.Command,
             TimeoutSeconds = request.TimeoutSeconds, Environment = environment
         }, cancellationToken);
@@ -42,9 +43,10 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
             throw new InvalidOperationException("Brokered application creation requires a candidate identity.");
         if (request.Storage is null)
             throw new InvalidOperationException("Brokered application creation requires the declared storage semantics.");
-        var scope = await ScopeAsync(request.AppId, request.DeploymentTargetId, Guid.Empty, cancellationToken);
+        var scope = await ScopeAsync(request.AppId, request.DeploymentTargetId, Guid.Empty);
         var result = await execute(new()
         {
+            OperationId = request.CandidateId,
             Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
             CandidateId = request.CandidateId, RequestedImage = request.Image, ContainerPort = request.ContainerPort,
             Command = request.Command, Storage = request.Storage, User = request.User
@@ -111,11 +113,11 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
 
     private async Task<HostContainerExecutionResponse> ExecuteExistingAsync(ApplicationContainerScope application, string operation, string id, CancellationToken cancellationToken)
     {
-        var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty, cancellationToken);
+        var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty);
         return await execute(new() { Scope = scope, Operation = operation, ContainerId = id }, cancellationToken);
     }
 
-    private async Task<HostContainerScope> ScopeAsync(Guid appId, Guid targetId, Guid attemptId, CancellationToken cancellationToken)
+    private async Task<HostContainerScope> ScopeAsync(Guid appId, Guid targetId, Guid attemptId)
     {
         var profile = await loadProfile()
             ?? throw new InvalidOperationException("Runner installation profile is required for brokered runtime operations.");

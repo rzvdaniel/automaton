@@ -572,6 +572,9 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<IHostedRunnerDeploymentCommandDispatcher>(provider =>
             provider.GetRequiredService<HostedRunnerDeploymentCommandService>());
         services.AddScoped<HostedRunnerDeploymentResultService>();
+        services.AddScoped<HostContainerExecutionOperationService>();
+        services.AddScoped<HostContainerRelayService>();
+        services.AddScoped<HostContainerRelayStateResolver>();
         services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<DeploymentOperationService>();
         services.AddHostedService<DeploymentOperationDispatcher>();
@@ -692,9 +695,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<AdminDocumentationService>();
         services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
         services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
-        services.AddScoped<HostContainerRelayService>();
-        services.AddScoped<HostContainerRelayStateResolver>();
-        services.AddScoped<IHostContainerTransport, SignalRHostContainerTransport>();
         services.AddScoped<HostedRunnerHostPlacementService>();
         services.AddScoped<HostedRunnerProvisioningPolicyService>();
         services.AddScoped<HostedRunnerProvisioningPreparationService>();

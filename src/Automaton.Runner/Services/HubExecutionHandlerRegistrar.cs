@@ -16,14 +16,12 @@ internal sealed class HubExecutionHandlerRegistrar
     private const string SynchronizeApplicationManagedArtifactsMethod = "SynchronizeApplicationManagedArtifacts";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
-    private const string ExecuteHostContainerMethod = "ExecuteHostContainer";
     private readonly ConfigurationService configService;
     private readonly FlowExecutionService flowExecutionService;
     private readonly TunnelForwarderService tunnelForwarder;
     private readonly IServiceProvider serviceProvider;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly InfrastructureCommandService infrastructureCommandService;
-    private readonly HostContainerExecutionService? hostContainerExecutionService;
     private readonly ILogger logger;
 
     public HubExecutionHandlerRegistrar(
@@ -33,7 +31,6 @@ internal sealed class HubExecutionHandlerRegistrar
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
         InfrastructureCommandService infrastructureCommandService,
-        HostContainerExecutionService? hostContainerExecutionService,
         ILogger logger)
     {
         this.configService = configService;
@@ -42,7 +39,6 @@ internal sealed class HubExecutionHandlerRegistrar
         this.serviceProvider = serviceProvider;
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.infrastructureCommandService = infrastructureCommandService;
-        this.hostContainerExecutionService = hostContainerExecutionService;
         this.logger = logger;
     }
 
@@ -55,15 +51,6 @@ internal sealed class HubExecutionHandlerRegistrar
         connection.On<InfrastructureCommandRequest, InfrastructureCommandResponse>(
             RunInfrastructureCommandMethod,
             request => infrastructureCommandService.ExecuteAsync(request, CancellationToken.None));
-        connection.On<HostContainerExecutionRequest, HostContainerExecutionResponse>(
-            ExecuteHostContainerMethod,
-            request => hostContainerExecutionService is null
-                ? Task.FromResult(new HostContainerExecutionResponse
-                {
-                    ErrorCode = "unsupported_operation",
-                    Error = "Host-container execution is not enabled in this Runner instance."
-                })
-                : hostContainerExecutionService.ExecuteAsync(request, CancellationToken.None));
         connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
             SynchronizeApplicationManagedArtifactsMethod,
             request => SynchronizeApplicationManagedArtifacts(request));

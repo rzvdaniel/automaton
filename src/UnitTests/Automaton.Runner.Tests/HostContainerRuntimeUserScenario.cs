@@ -33,10 +33,14 @@ internal static class HostContainerRuntimeUserScenario
             commands.Add(arguments);
             return Task.FromResult(new InfrastructureCommandResponse
             {
-                Success = true,
+                Success = !IsMissingCandidate(arguments),
+                Error = IsMissingCandidate(arguments) ? $"Error: No such object: {arguments[^1]}" : string.Empty,
                 Output = ResponseOutput(arguments, hostedRunnerId)
             });
         });
+
+    private static bool IsMissingCandidate(IReadOnlyList<string> arguments)
+        => arguments.Contains("container") && arguments.Contains("inspect");
 
     private static HostContainerExecutionRequest CreateRequest(Guid hostedRunnerId)
         => new()

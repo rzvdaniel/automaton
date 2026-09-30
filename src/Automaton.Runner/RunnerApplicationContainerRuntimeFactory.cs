@@ -16,8 +16,7 @@ internal static class RunnerApplicationContainerRuntimeFactory
             return new DockerContainerRuntime();
 
         return new BrokeredApplicationContainerRuntime(
-            (request, cancellationToken) => provider.GetRequiredService<HubService>()
-                .RequestHostContainerExecutionAsync(request, cancellationToken),
+            provider.GetRequiredService<HostContainerExecutionApiClient>().ExecuteAsync,
             () => provider.GetRequiredService<FileStorageService>().LoadInstallationProfileAsync());
     }
 }

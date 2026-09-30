@@ -1776,6 +1776,58 @@ namespace Automaton.Api.Migrations
                     b.ToTable("FlowUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.HostContainerExecutionOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("DeploymentAttemptId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("DeploymentTargetId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("HostedRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("InfrastructureRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostedRunnerId", "CreatedAtUtc");
+
+                    b.HasIndex("InfrastructureRunnerId", "CreatedAtUtc");
+
+                    b.ToTable("HostContainerExecutionOperations");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
                     b.Property<Guid>("Id")

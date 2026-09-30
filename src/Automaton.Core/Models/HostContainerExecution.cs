@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Automaton.Core.Models;
 
 public static class HostContainerOperationKinds
@@ -9,6 +11,11 @@ public static class HostContainerOperationKinds
     public const string InspectContainer = "inspect-container";
     public const string GetContainerLogs = "get-container-logs";
     public const string RemoveContainer = "remove-container";
+}
+
+public static class HostContainerExecutionCommandKinds
+{
+    public const string InfrastructureActionKey = "host-container-execution";
 }
 
 public static class HostContainerResourceKinds
@@ -32,6 +39,7 @@ public sealed record HostContainerResourceRef(
 
 public sealed record HostContainerExecutionRequest
 {
+    public Guid OperationId { get; init; }
     public HostContainerScope Scope { get; init; } = new(Guid.Empty, Guid.Empty, Guid.Empty, Guid.Empty);
     public string Operation { get; init; } = string.Empty;
     public string? RequestedImage { get; init; }
@@ -67,3 +75,15 @@ public sealed record HostContainerExecutionResponse
     public IReadOnlyDictionary<string, string> Labels { get; init; } = new Dictionary<string, string>();
     public string Logs { get; init; } = string.Empty;
 }
+
+public sealed record HostContainerExecutionOperationResponse(
+    Guid OperationId,
+    bool Completed,
+    HostContainerExecutionResponse? Result);
+
+public sealed record HostContainerCommandDispositionResponse(string Outcome);
+
+public sealed record HostContainerExecutionResultRequest(
+    [property: JsonRequired] Guid RunnerHostId,
+    [property: JsonRequired] Guid InfrastructureRunnerId,
+    [property: JsonRequired] HostContainerExecutionResponse Result);

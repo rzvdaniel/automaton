@@ -25,6 +25,8 @@ public sealed partial class HostContainerExecutionService
         try { hostAddress = GetPrivateRuntimeHostAddress(); }
         catch (InvalidOperationException ex) { return Failure("runtime_address", ex.Message); }
         var name = $"automaton-app-{scope.AppId:N}-{scope.DeploymentTargetId:N}-{request.CandidateId:N}";
+        var existing = await InspectExistingApplicationCandidateAsync(request, name, cancellationToken);
+        if (existing is not null) return existing;
         var resolved = await ResolveImageAsync(request, cancellationToken);
         if (!resolved.Success || string.IsNullOrWhiteSpace(resolved.ResolvedImage))
             return resolved;
@@ -53,6 +55,10 @@ public sealed partial class HostContainerExecutionService
             args.Add("--label");
             args.Add($"{label.Key}={label.Value}");
         }
+        args.Add("--label");
+        args.Add($"automaton.requested-image={request.RequestedImage}");
+        args.Add("--label");
+        args.Add($"automaton.resolved-image={resolved.ResolvedImage}");
         var environment = new Dictionary<string, string>(request.Command!.Environment, StringComparer.Ordinal);
         foreach (var pair in request.Environment)
             environment[pair.Key] = pair.Value;
@@ -91,6 +97,20 @@ public sealed partial class HostContainerExecutionService
             RequestedImage = request.RequestedImage!, ResolvedImage = resolved.ResolvedImage,
             Labels = RuntimeLabels(scope)
         };
+    }
+
+    private async Task<HostContainerExecutionResponse?> InspectExistingApplicationCandidateAsync(
+        HostContainerExecutionRequest request,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var existing = await InspectOwnedContainerAsync(name, request.Scope, cancellationToken, discoverEndpoint: false);
+        if (!existing.Success || !existing.Exists) return existing.Success ? null : existing;
+        if (!existing.Labels!.TryGetValue("automaton.requested-image", out var requestedImage)
+            || requestedImage != request.RequestedImage)
+            return Failure("container_operation_conflict", "The existing candidate container was created from a different image request.");
+        var resolvedImage = existing.Labels.TryGetValue("automaton.resolved-image", out var image) ? image : string.Empty;
+        return existing with { RequestedImage = request.RequestedImage!, ResolvedImage = resolvedImage };
     }
 
     private async Task<HostContainerExecutionResponse> ExecuteContainerOperationAsync(
