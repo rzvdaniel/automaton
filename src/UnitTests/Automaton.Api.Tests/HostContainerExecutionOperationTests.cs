@@ -49,12 +49,39 @@ public sealed class HostContainerExecutionOperationTests
         });
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task QueuedBuildIsRejectedAfterCancellationOrSupersession(bool superseded)
+    {
+        await using var fixture = await OperationFixture.CreateAsync();
+        await fixture.QueueBuildAsync();
+        Assert.That(await fixture.ReadDispositionAsync(), Is.EqualTo("execute"));
+
+        await fixture.ChangeBuildAttemptAsync(superseded ? Guid.NewGuid() : null);
+
+        Assert.That(await fixture.ReadDispositionAsync(), Is.EqualTo("obsolete"));
+        var result = await fixture.ReadResultAsync();
+        Assert.That(result?.Completed, Is.True);
+        Assert.That(result?.Result?.ErrorCode, Is.EqualTo("operation_obsolete"));
+    }
+
+    [Test]
+    public async Task QueuedWorkIsRejectedAfterTargetReassignment()
+    {
+        await using var fixture = await OperationFixture.CreateAsync();
+        await fixture.QueueAsync();
+        await fixture.ReassignTargetAsync();
+
+        Assert.That(await fixture.ReadDispositionAsync(), Is.EqualTo("obsolete"));
+        Assert.That((await fixture.ReadResultAsync())?.Result?.Success, Is.False);
+    }
+
     private sealed class OperationFixture : IAsyncDisposable
     {
         private readonly ApplicationDbContext db;
         private readonly HostContainerExecutionOperationService service;
         private readonly RecordingPublisher events;
-        private readonly HostContainerExecutionRequest request;
+        private HostContainerExecutionRequest request;
         private readonly Guid hostedKey;
         private readonly Guid infrastructureKey;
         private readonly Guid infrastructureId;
@@ -70,10 +97,10 @@ public sealed class HostContainerExecutionOperationTests
         public static async Task<OperationFixture> CreateAsync()
         {
             var db = CreateDatabase();
-            var (hostedKey, infraKey, infraId, hostedRunnerId) = await SeedRunnersAsync(db);
+            var (hostedKey, infraKey, infraId, scope) = await SeedRunnersAsync(db);
             var events = new RecordingPublisher();
             var service = new HostContainerExecutionOperationService(db, events);
-            return new(db, service, events, CreateRequest(hostedRunnerId), hostedKey, infraKey, infraId);
+            return new(db, service, events, CreateRequest(scope), hostedKey, infraKey, infraId);
         }
 
         public Task<HostContainerExecutionOperationResponse> QueueAsync()
@@ -81,6 +108,39 @@ public sealed class HostContainerExecutionOperationTests
 
         public Task<HostContainerExecutionOperationResponse> QueueOnDifferentInfrastructureRunnerAsync()
             => service.QueueAsync(request, request.Scope.RunnerHostId, Guid.NewGuid(), CancellationToken.None);
+
+        public async Task QueueBuildAsync()
+        {
+            var attemptId = Guid.NewGuid();
+            request = request with
+            {
+                Scope = request.Scope with { DeploymentAttemptId = attemptId },
+                Operation = HostContainerOperationKinds.RunBuild,
+                Command = new() { Executable = "build" }
+            };
+            await ChangeBuildAttemptAsync(attemptId);
+            await QueueAsync();
+        }
+
+        public async Task ChangeBuildAttemptAsync(Guid? attemptId)
+        {
+            var target = await db.AppDeploymentTargets.SingleAsync();
+            target.ActiveDeploymentExecutionAttemptId = attemptId;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task ReassignTargetAsync()
+        {
+            var target = await db.AppDeploymentTargets.SingleAsync();
+            target.ExecutionRunnerId = Guid.NewGuid();
+            await db.SaveChangesAsync();
+        }
+
+        public Task<string> ReadDispositionAsync()
+            => service.GetCommandDispositionAsync(infrastructureKey, request.OperationId, CancellationToken.None);
+
+        public Task<HostContainerExecutionOperationResponse?> ReadResultAsync()
+            => service.GetResultAsync(hostedKey, request.OperationId, CancellationToken.None);
 
         public async Task<OperationOutcome> ApplyAndReadAsync()
         {
@@ -90,7 +150,8 @@ public sealed class HostContainerExecutionOperationTests
             var replay = await service.ApplyResultAsync(infrastructureKey, operation.Id, result, CancellationToken.None);
             var retried = await service.QueueAsync(request, request.Scope.RunnerHostId, operation.InfrastructureRunnerId, CancellationToken.None);
             var visible = await service.GetResultAsync(hostedKey, operation.Id, CancellationToken.None);
-            var otherAccount = await service.GetResultAsync(Guid.NewGuid(), operation.Id, CancellationToken.None);
+            var otherRunner = await db.Runners.SingleAsync(runner => runner.Name == "other-hosted");
+            var otherAccount = await service.GetResultAsync(otherRunner.ApiKeyId!.Value, operation.Id, CancellationToken.None);
             return new(first, replay, retried, visible, otherAccount, events.Events.Count);
         }
 
@@ -98,24 +159,49 @@ public sealed class HostContainerExecutionOperationTests
             => new(new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
 
-        private static async Task<(Guid HostedKey, Guid InfrastructureKey, Guid InfrastructureId, Guid HostedRunnerId)> SeedRunnersAsync(ApplicationDbContext db)
+        private static async Task<(Guid HostedKey, Guid InfrastructureKey, Guid InfrastructureId, HostContainerScope Scope)> SeedRunnersAsync(ApplicationDbContext db)
         {
             var hostedKey = Guid.NewGuid();
             var infrastructureKey = Guid.NewGuid();
             var infrastructureId = Guid.NewGuid();
             var hostedRunnerId = Guid.NewGuid();
+            var runnerId = Guid.NewGuid();
+            var otherRunnerId = Guid.NewGuid();
+            var hostId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var target = AppDeploymentTarget.CreateLive(appId, runnerId);
             db.Runners.AddRange(
-                new Runner { Id = hostedRunnerId, Name = "hosted", Purpose = RunnerPurposes.Managed, ApiKeyId = hostedKey },
+                new Runner { Id = runnerId, Name = "hosted", Purpose = RunnerPurposes.Managed, ApiKeyId = hostedKey },
                 new Runner { Id = infrastructureId, Name = "infra", Purpose = RunnerPurposes.Infrastructure, ApiKeyId = infrastructureKey },
-                new Runner { Id = Guid.NewGuid(), Name = "other-hosted", Purpose = RunnerPurposes.Managed, ApiKeyId = Guid.NewGuid() });
+                new Runner { Id = otherRunnerId, Name = "other-hosted", Purpose = RunnerPurposes.Managed, ApiKeyId = Guid.NewGuid() });
+            db.RunnerHosts.Add(new RunnerHost
+            {
+                Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = infrastructureId
+            });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = hostedRunnerId, RunnerId = runnerId, RunnerHostId = hostId,
+                Name = "hosted", ContainerName = "hosted", UserId = Guid.NewGuid()
+            });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = Guid.NewGuid(), RunnerId = otherRunnerId, RunnerHostId = hostId,
+                Name = "other-hosted", ContainerName = "other-hosted", UserId = Guid.NewGuid()
+            });
+            db.WebApps.Add(new WebApp
+            {
+                Id = appId, Name = "app", Summary = "", Description = "", Definition = ""
+            });
+            db.AppDeploymentTargets.Add(target);
             await db.SaveChangesAsync();
-            return (hostedKey, infrastructureKey, infrastructureId, hostedRunnerId);
+            return (hostedKey, infrastructureKey, infrastructureId,
+                new(hostedRunnerId, hostId, appId, target.Id));
         }
 
-        private static HostContainerExecutionRequest CreateRequest(Guid hostedRunnerId) => new()
+        private static HostContainerExecutionRequest CreateRequest(HostContainerScope scope) => new()
         {
             OperationId = Guid.NewGuid(),
-            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Scope = scope,
             Operation = HostContainerOperationKinds.ResolveImage,
             RequestedImage = "example/image:1"
         };

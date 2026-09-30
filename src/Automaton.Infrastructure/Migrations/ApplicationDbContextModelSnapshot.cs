@@ -1791,6 +1791,9 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<Guid>("DeploymentAttemptId")
+                        .HasColumnType("char(36)");
+
                     b.Property<Guid>("DeploymentTargetId")
                         .HasColumnType("char(36)");
 

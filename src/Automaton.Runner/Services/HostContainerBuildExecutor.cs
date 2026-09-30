@@ -127,12 +127,25 @@ internal sealed class HostContainerBuildExecutor(
         var timeout = TimeSpan.FromSeconds(request.TimeoutSeconds);
         buildTimeout.CancelAfter(timeout);
         InfrastructureCommandResponse result;
-        result = await executor(arguments, timeout, buildTimeout.Token);
+        try
+        {
+            result = await executor(arguments, timeout, buildTimeout.Token);
+        }
+        catch (OperationCanceledException) when (buildTimeout.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            await StopTimedOutBuildAsync(container);
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        }
 
         if (result.Success)
             return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
         if (cancellationToken.IsCancellationRequested) return Failure("build_canceled", "The build was canceled.");
-        if (buildTimeout.IsCancellationRequested) return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        if (buildTimeout.IsCancellationRequested || result.ExitStatus == 124)
+        {
+            await StopTimedOutBuildAsync(container);
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        }
         return Failure("build_failed", result.Error);
     }
 
@@ -182,13 +195,43 @@ internal sealed class HostContainerBuildExecutor(
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(request.TimeoutSeconds));
-        var wait = await executor(["docker", "wait", container], TimeSpan.FromSeconds(request.TimeoutSeconds), timeout.Token);
+        InfrastructureCommandResponse wait;
+        try
+        {
+            wait = await executor(["docker", "wait", container], TimeSpan.FromSeconds(request.TimeoutSeconds), timeout.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            await StopTimedOutBuildAsync(container);
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        }
+        if (cancellationToken.IsCancellationRequested)
+            return Failure("build_canceled", "The build was canceled.");
+        if (timeout.IsCancellationRequested || wait.ExitStatus == 124)
+        {
+            await StopTimedOutBuildAsync(container);
+            return Failure("build_timeout", $"The build timed out after {request.TimeoutSeconds} seconds.");
+        }
         if (!wait.Success || !int.TryParse(wait.Output.Trim(), out var exitCode))
             return Failure("build_recovery", "Docker could not recover the existing build operation.");
         if (exitCode == 0)
             return new HostContainerExecutionResponse { Success = true, RequestedImage = request.RequestedImage!, ResolvedImage = image, ContainerName = container };
         var logs = await executor(["docker", "logs", container], TimeSpan.FromSeconds(30), cancellationToken);
         return Failure("build_failed", logs.Output + logs.Error);
+    }
+
+    private async Task StopTimedOutBuildAsync(string container)
+    {
+        try
+        {
+            await executor(["docker", "kill", container], TimeSpan.FromSeconds(30), CancellationToken.None);
+        }
+        catch
+        {
+            // Result delivery still retries cleanup; a callback outage must not delay this stop attempt.
+        }
+        // Retain the exited container so redelivery can recover its outcome before result persistence.
     }
 
     private static bool IsMissingContainer(InfrastructureCommandResponse result, string reference)

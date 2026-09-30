@@ -21,6 +21,7 @@ namespace Automaton.Infrastructure.Migrations
                     InfrastructureRunnerId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     AppId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     DeploymentTargetId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
+                    DeploymentAttemptId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     Status = table.Column<string>(type: "varchar(32)", maxLength: 32, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     RequestHash = table.Column<string>(type: "varchar(64)", maxLength: 64, nullable: false)

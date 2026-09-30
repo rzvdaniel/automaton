@@ -69,8 +69,14 @@ public sealed class HostContainerExecutionOperationService(
         var runner = await GetRunnerForApiKeyAsync(apiKeyId, RunnerPurposes.Managed, cancellationToken);
         if (runner is null)
             return null;
+        var hostedRunnerId = await db.HostedRunners.AsNoTracking()
+            .Where(hosted => hosted.RunnerId == runner.Id && hosted.DeletedAt == null)
+            .Select(hosted => (Guid?)hosted.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (hostedRunnerId is null)
+            return null;
         var operation = await db.HostContainerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(
-            item => item.Id == operationId && item.HostedRunnerId == runner.Id, cancellationToken);
+            item => item.Id == operationId && item.HostedRunnerId == hostedRunnerId.Value, cancellationToken);
         return operation is null ? null : ToResponse(operation);
     }
 
@@ -84,8 +90,31 @@ public sealed class HostContainerExecutionOperationService(
         var operation = await db.HostContainerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(
             item => item.Id == operationId && item.InfrastructureRunnerId == runner.Id, cancellationToken);
         if (operation is null) return "obsolete";
-        return operation.ResultJson is null ? "execute" : "already-applied";
+        if (operation.ResultJson is not null) return "already-applied";
+        if (await HasCurrentAssignmentAsync(operation, cancellationToken)) return "execute";
+
+        var outcome = await ApplyResultAsync(apiKeyId, operationId, new(
+            operation.RunnerHostId, operation.InfrastructureRunnerId,
+            new HostContainerExecutionResponse
+            {
+                ErrorCode = "operation_obsolete",
+                Error = "The host-container assignment or deployment attempt is no longer current."
+            }), cancellationToken);
+        return outcome == "conflict" ? "already-applied" : "obsolete";
     }
+
+    private Task<bool> HasCurrentAssignmentAsync(
+        HostContainerExecutionOperation operation,
+        CancellationToken cancellationToken)
+        => db.HostedRunners.AsNoTracking().AnyAsync(hosted =>
+            hosted.Id == operation.HostedRunnerId && hosted.DeletedAt == null
+            && hosted.RunnerId != null && hosted.RunnerHostId == operation.RunnerHostId
+            && db.RunnerHosts.Any(host => host.Id == operation.RunnerHostId
+                && host.InfrastructureRunnerId == operation.InfrastructureRunnerId)
+            && db.AppDeploymentTargets.Any(target => target.Id == operation.DeploymentTargetId
+                && target.WebAppId == operation.AppId && target.ExecutionRunnerId == hosted.RunnerId
+                && (operation.DeploymentAttemptId == Guid.Empty
+                    || target.ActiveDeploymentExecutionAttemptId == operation.DeploymentAttemptId)), cancellationToken);
 
     public async Task<string> ApplyResultAsync(
         Guid apiKeyId,
@@ -171,6 +200,7 @@ public sealed class HostContainerExecutionOperationService(
             InfrastructureRunnerId = infrastructureRunnerId,
             AppId = request.Scope.AppId,
             DeploymentTargetId = request.Scope.DeploymentTargetId,
+            DeploymentAttemptId = request.Scope.DeploymentAttemptId,
             RequestHash = requestHash
         };
 

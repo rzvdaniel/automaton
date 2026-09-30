@@ -13,6 +13,7 @@ public sealed class HostContainerExecutionOperation
     public Guid InfrastructureRunnerId { get; set; }
     public Guid AppId { get; set; }
     public Guid DeploymentTargetId { get; set; }
+    public Guid DeploymentAttemptId { get; set; }
 
     [Required, MaxLength(32)]
     public string Status { get; set; } = HostContainerExecutionOperationStatuses.Queued;
