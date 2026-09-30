@@ -26,9 +26,9 @@ public sealed class InfrastructureHostValidationResultService(
             .SingleOrDefaultAsync(item => item.Id == commandId, cancellationToken)
             ?? throw new UnauthorizedAccessException("The validation operation was not found.");
         var host = await AuthorizeAsync(apiKeyId, commandId, request, operation, cancellationToken);
-        ValidateResult(commandId, request);
         if (operation.CompletedAtUtc.HasValue)
             return new(InfrastructureCommandResultOutcomes.AlreadyApplied);
+        ValidateResult(commandId, request);
 
         ApplyExecution(operation, request);
         db.InfrastructureWorkflowExecutionLogs.AddRange(operation.Logs);
