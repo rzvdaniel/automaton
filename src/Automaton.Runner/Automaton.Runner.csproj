@@ -83,6 +83,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\system-apps\automaton-infrastructure\actions\validate-runner-host\main.sh"
+             Link="SystemApps\automaton-infrastructure\actions\validate-runner-host\main.sh"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Pack="false"
+             ExcludeFromSingleFile="true" />
     <Folder Include="Handlers\" />
   </ItemGroup>
 

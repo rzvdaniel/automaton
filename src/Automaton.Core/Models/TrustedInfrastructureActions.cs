@@ -12,7 +12,8 @@ public static class TrustedInfrastructureActions
         "suspend-hosted-runner",
         "resume-hosted-runner",
         "delete-hosted-runner",
-        "measure-hosted-runner-storage"
+        "measure-hosted-runner-storage",
+        HostValidationCommand.ActionKey
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static void EnsureAllowed(string actionKey)

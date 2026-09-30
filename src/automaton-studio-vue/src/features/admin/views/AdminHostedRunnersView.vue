@@ -470,6 +470,20 @@ async function validateHost(host: RunnerHost) {
   }
 }
 
+async function refreshHostValidation() {
+  if (!validationExecution.value) return
+  validatingHostId.value = validationExecution.value.targetRunnerHostId
+  try {
+    validationExecution.value = await adminHostedRunnersService.getInfrastructureWorkflowExecution(validationExecution.value.id)
+    validationLogs.value = await adminHostedRunnersService.getInfrastructureWorkflowLogs(validationExecution.value.id)
+    await loadHosts()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Refresh failed', detail: error instanceof Error ? error.message : 'Host validation could not be refreshed.', life: 4000 })
+  } finally {
+    validatingHostId.value = null
+  }
+}
+
 async function approveHost(host: RunnerHost) {
   approvingHostId.value = host.id
   try {
@@ -1229,6 +1243,7 @@ watch(() => route.path, refreshAll)
         </div>
       </div>
       <template #footer>
+        <Button label="Refresh" icon="pi pi-refresh" outlined :loading="!!validatingHostId" @click="refreshHostValidation" />
         <Button label="Close" text @click="validationDialogVisible = false" />
       </template>
     </Dialog>

@@ -77,6 +77,13 @@ class AdminHostedRunnersService {
     return response.data
   }
 
+  async getInfrastructureWorkflowExecution(executionId: string): Promise<InfrastructureWorkflowExecution> {
+    const response = await apiClient.get<InfrastructureWorkflowExecution>(
+      `/api/admin/infrastructure-workflows/executions/${executionId}`,
+    )
+    return response.data
+  }
+
   async getInfrastructureWorkflowLogs(executionId: string): Promise<InfrastructureWorkflowExecutionLog[]> {
     const response = await apiClient.get<InfrastructureWorkflowExecutionLog[]>(
       `/api/admin/infrastructure-workflows/executions/${executionId}/logs`,

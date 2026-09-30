@@ -693,8 +693,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
         services.AddScoped<AdminAiGuidanceService>();
         services.AddScoped<AdminDocumentationService>();
-        services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
-        services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
         services.AddScoped<HostedRunnerHostPlacementService>();
         services.AddScoped<HostedRunnerProvisioningPolicyService>();
         services.AddScoped<HostedRunnerProvisioningPreparationService>();
@@ -717,6 +715,7 @@ internal static class ApiOperationsRegistration
         services.AddScoped<IAccountStorageProjectAllocationService, AccountStorageProjectAllocationService>();
         services.AddScoped<HostedRunnerManagementService>();
         services.AddScoped<InfrastructureWorkflowExecutionService>();
+        services.AddScoped<InfrastructureHostValidationResultService>();
         services.AddScoped<LocalRunnerHostBootstrapService>();
         return services;
     }
