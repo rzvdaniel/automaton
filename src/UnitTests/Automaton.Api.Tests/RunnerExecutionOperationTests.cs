@@ -12,6 +12,24 @@ namespace Automaton.Api.Tests;
 
 public sealed class RunnerExecutionOperationTests
 {
+    private static IDataProtectionProvider Protection() => new EphemeralDataProtectionProvider();
+
+    [Test]
+    public async Task ActionManagementAndCancellationUseSeparateQueueFromExecution()
+    {
+        await using var db = Db(); var publisher = new Publisher();
+        var service = RunnerExecutionTestServices.Operations(db, publisher); var runner = Guid.NewGuid();
+        var execution = await service.QueueAsync(runner, Guid.NewGuid(), new(null, null,
+            AppActionCommand.Create("execute", new { })), CancellationToken.None);
+        Assert.That(publisher.Command!.Management, Is.False);
+        await service.QueueAsync(runner, Guid.NewGuid(), new(null, null,
+            AppActionCommand.Create("read-logs", new { })), CancellationToken.None);
+        Assert.That(publisher.Command.Management, Is.True);
+        await service.CancelAsync(execution, CancellationToken.None);
+        Assert.That(publisher.Command.Management, Is.True);
+        Assert.That(publisher.Command.OperationId, Is.EqualTo(execution));
+    }
+
     [Test]
     public async Task PayloadIsProtectedAndCommandContainsOnlyStableIdentities()
     {
@@ -30,7 +48,7 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db();
         var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
-        var protection = new EphemeralDataProtectionProvider();
+        var protection = Protection();
         var initiating = RunnerExecutionTestServices.Operations(db, protection: protection);
         var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);

@@ -1,10 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
-using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
-using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -14,7 +10,7 @@ namespace Automaton.Api.Services;
 /// </summary>
 public sealed class AppDeploymentTargetRuntimeCleanupService(
     ApplicationDbContext dbContext,
-    IHubContext<AutomatonHub> hubContext)
+    IRunnerActionCommands gateway)
 {
     public async Task CleanupRuntimeAsync(
         AppDeploymentTarget target,
@@ -27,8 +23,7 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var runner = target.ExecutionRunner;
-        if (runner is null || string.IsNullOrWhiteSpace(runner.ConnectionId) ||
-            !string.Equals(runner.Status, RunnerStatus.Online.ToString(), StringComparison.OrdinalIgnoreCase))
+        if (runner is null || !runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)
         {
             await RecordCleanupFailureAsync(
                 target,
@@ -38,11 +33,8 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
 
         try
         {
-            var result = await hubContext.Clients.Client(runner!.ConnectionId!)
-                .InvokeAsync<CleanupAppDeploymentTargetResult>(
-                    AutomatonHubMethods.CleanupAppDeploymentTarget,
-                    new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id),
-                    cancellationToken);
+            var result = await gateway.SendAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
+                "cleanup-target", new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id), cancellationToken);
             if (!result.Success || result.AppId != target.WebAppId || result.DeploymentTargetId != target.Id)
             {
                 await RecordCleanupFailureAsync(

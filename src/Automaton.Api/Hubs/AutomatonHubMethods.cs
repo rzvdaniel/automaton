@@ -16,17 +16,6 @@
         public const string GetAppMediaStats = "GetAppMediaStats";
         public const string GetAppMediaFileMetadata = "GetAppMediaFileMetadata";
         public const string DeployAppPackage = "DeployAppPackage";
-        public const string ExecuteAppActionModule = "ExecuteAppActionModule";
-        public const string CancelAppModuleExecution = "CancelAppModuleExecution";
-        public const string ReadAppModuleExecutionLogs = "ReadAppModuleExecutionLogs";
-        public const string ReadAppModuleExecutionResult = "ReadAppModuleExecutionResult";
-        public const string ListAppActionModules = "ListAppActionModules";
-        public const string ListAppActionVersions = "ListAppActionVersions";
-        public const string RestoreAppActionVersion = "RestoreAppActionVersion";
-        public const string DeleteAppActionVersion = "DeleteAppActionVersion";
-        public const string PrepareAppActionModule = "PrepareAppActionModule";
-        public const string SynchronizeAppActionModules = "SynchronizeAppActionModules";
-        public const string CleanupAppDeploymentTarget = "CleanupAppDeploymentTarget";
         public const string SynchronizeApplicationManagedArtifacts = "SynchronizeApplicationManagedArtifacts";
     }
 }

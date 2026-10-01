@@ -16,18 +16,19 @@ public sealed class RunnerExecutionOperationService(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("RunnerExecutionOperation.v1");
 
-    public async Task<Guid> QueueAsync(Guid runnerId, Guid actor, RunnerExecutionRequest request, CancellationToken token)
+    public async Task<Guid> QueueAsync(Guid runnerId, Guid actor, RunnerExecutionRequest request, CancellationToken token, Guid? operationId = null)
     {
         var operation = new RunnerExecutionOperation
         {
-            Id = Guid.NewGuid(), RunnerId = runnerId, RequestedByUserId = actor,
+            Id = operationId ?? Guid.NewGuid(), RunnerId = runnerId, RequestedByUserId = actor,
             ProtectedRequest = protector.Protect(JsonSerializer.Serialize(request, JsonOptions))
         };
         await transactions.ExecuteAsync(async ct =>
         {
             db.RunnerExecutionOperations.Add(operation);
             await db.SaveChangesAsync(ct);
-            await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId), ct);
+            await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId,
+                request.Action is not null && request.Action.Kind != "execute"), ct);
         }, token);
         return operation.Id;
     }
@@ -52,17 +53,25 @@ public sealed class RunnerExecutionOperationService(
         }
     }
 
-    public async Task CancelAsync(Guid operationId, CancellationToken token)
+    public async Task<bool> CancelAsync(Guid operationId, CancellationToken token)
     {
-        if (db.Database.IsRelational())
-            await db.RunnerExecutionOperations.Where(o => o.Id == operationId && o.CompletedAtUtc == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(o => o.CancellationRequested, true), token);
-        else
+        var changed = false;
+        await transactions.ExecuteAsync(async ct =>
         {
-            var operation = await db.RunnerExecutionOperations.SingleAsync(o => o.Id == operationId, token);
-            if (operation.CompletedAtUtc is null) operation.CancellationRequested = true;
-            await db.SaveChangesAsync(token);
-        }
+            var operation = await db.RunnerExecutionOperations.SingleAsync(o => o.Id == operationId, ct);
+            if (operation.CompletedAtUtc.HasValue) return;
+            if (db.Database.IsRelational())
+                changed = await db.RunnerExecutionOperations.Where(o => o.Id == operationId && o.CompletedAtUtc == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(o => o.CancellationRequested, true), ct) == 1;
+            else
+            {
+                operation.CancellationRequested = true;
+                await db.SaveChangesAsync(ct);
+                changed = true;
+            }
+            if (changed) await events.PublishAsync(new RunnerExecutionRequestedEvent(operationId, operation.RunnerId, Management: true), ct);
+        }, token);
+        return changed;
     }
 
     public async Task TerminateRunnerAsync(Guid runnerId, CancellationToken token)
@@ -86,6 +95,15 @@ public sealed class RunnerExecutionOperationService(
     {
         var operation = await AuthorizeAsync(keyId, operationId, authenticatedUserId, runnerId, token);
         if (operation.CompletedAtUtc.HasValue) return new("already-applied", null);
+        var actions = new AppActionExecutionResultPersistence(db);
+        if (await actions.IsExpiredAsync(operationId, token))
+        {
+            await ApplyAsync(keyId, operationId, RunnerExecutionResult.Interrupted("Action expired or was terminalized before dispatch."),
+                token, authenticatedUserId, runnerId);
+            return new("already-applied", null);
+        }
+        if (includeRequest && !operation.CancellationRequested) await actions.MarkStartedAsync(operationId, token);
+
         return new(operation.CancellationRequested ? "cancel" : "execute",
             includeRequest ? JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions) : null);
     }
@@ -97,19 +115,33 @@ public sealed class RunnerExecutionOperationService(
         if (operation.CompletedAtUtc.HasValue) return new("already-applied");
         if (result.Outcome is not ("Succeeded" or "Failed" or "Lost" or "Cancelled"))
             throw new ArgumentException("Execution results must be terminal.");
+        var action = new AppActionExecutionResultPersistence(db);
+        var projection = await action.ResolveAsync(operation, result, token);
         var json = protector.Protect(JsonSerializer.Serialize(result, JsonOptions));
-        if (db.Database.IsRelational())
+        var receipt = new RunnerExecutionReceipt("already-applied");
+        await transactions.ExecuteAsync(async ct =>
         {
-            var updated = await db.RunnerExecutionOperations.Where(o => o.Id == operationId && o.CompletedAtUtc == null)
+            if (await PersistResultAsync(operationId, json, ct))
+            {
+                await action.ApplyAsync(operationId, projection, ct);
+                receipt = new("accepted");
+            }
+        }, token);
+        return receipt;
+    }
+
+    private async Task<bool> PersistResultAsync(Guid id, string json, CancellationToken token)
+    {
+        if (db.Database.IsRelational())
+            return await db.RunnerExecutionOperations.Where(o => o.Id == id && o.CompletedAtUtc == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(o => o.ResultJson, json)
-                    .SetProperty(o => o.CompletedAtUtc, DateTime.UtcNow), token);
-            return new(updated == 1 ? "accepted" : "already-applied");
-        }
-        var tracked = await db.RunnerExecutionOperations.SingleAsync(o => o.Id == operationId, token);
+                    .SetProperty(o => o.CompletedAtUtc, DateTime.UtcNow), token) == 1;
+        var tracked = await db.RunnerExecutionOperations.SingleAsync(o => o.Id == id, token);
+        if (tracked.CompletedAtUtc.HasValue) return false;
         tracked.ResultJson = json;
         tracked.CompletedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(token);
-        return new("accepted");
+        return true;
     }
 
     private async Task<RunnerExecutionOperation> AuthorizeAsync(Guid keyId, Guid operationId,

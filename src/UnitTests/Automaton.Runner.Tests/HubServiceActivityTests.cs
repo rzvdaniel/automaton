@@ -125,5 +125,5 @@ public sealed class HubServiceActivityTests
             [interval ?? TimeSpan.FromSeconds(30), CancellationToken.None])!;
 
     private static HubService CreateService() => new(
-        null!, null!, null!, null!, null!, null!, null!, null!);
+        null!, null!, null!, null!, null!, null!, null!);
 }

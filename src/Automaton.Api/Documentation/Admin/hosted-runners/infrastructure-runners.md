@@ -133,3 +133,11 @@ Inspect the container and installer logs. Do not repeatedly run Repair without i
 - **Replace** creates new identity and credentials.
 - **Revoke** permanently blocks the current installation credential.
 - Studio provides the command and observes the result; it does not remotely replace the Infrastructure Runner.
+
+## Durable Action management
+
+Drain in-flight legacy Action operations and pause new Action submissions during the matching API/Runner rollout; there is no fallback to the retired transport. Release matching API and Runner versions before using the migrated Action management path. Runners require the configured private TLS broker listener, certificate trust and authenticated HTTPS access to the API. Action execution, module/version management, artifact reads and deployment-target cleanup use stable Runner identity; a fresh heartbeat is required for admission, without a management SignalR connection ID.
+
+Cancellation records intent. Check the persisted execution's terminal status before assuming that work stopped. Interrupted or uncertain execution reports `Lost` and is not automatically repeated. Logs/results retain their existing expiry; an expired artifact is unavailable. Trusted measurement-action readiness still completes before an administrator's storage verification is queued. Studio notifications and the remaining reconnect/drain requirements are retained until their dependent RM slices are migrated.
+
+The API provisions separate execution and management queues for each Runner, with consume-only access to those two queues. Execution has four delivery slots; management has its own channel and delivery slot so queued execution cannot block log reads, module operations or cleanup. Cancellation wakeups use the management queue. Pre-execution cancellation leaves a durable tombstone after result cleanup. The matching API/Runner rollout must include this queue configuration; older single-queue configuration is rejected rather than used as a fallback.

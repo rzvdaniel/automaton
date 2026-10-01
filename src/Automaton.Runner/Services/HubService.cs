@@ -47,8 +47,7 @@ public class HubService
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerDeploymentService runnerDeploymentService,
-        AppActionExecutionService appActionExecutionService,
-        AppActionDeploymentService actionDeploymentService)
+        AppActionExecutionService appActionExecutionService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -57,10 +56,7 @@ public class HubService
         fileTransferService = new HubFileTransferService(runnerWorkspaceService, logger);
         this.runnerDeploymentService = runnerDeploymentService;
         this.appActionExecutionService = appActionExecutionService;
-        appActionHandlerRegistrar = new HubAppActionHandlerRegistrar(
-            runnerDeploymentService,
-            appActionExecutionService,
-            actionDeploymentService);
+        appActionHandlerRegistrar = new HubAppActionHandlerRegistrar(runnerDeploymentService);
         executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
             tunnelForwarder,
             runnerWorkspaceService,
@@ -277,36 +273,7 @@ public class HubService
     private void RegisterActionHandlers()
     {
         var current = connection ?? throw new InvalidOperationException("Hub connection is unavailable.");
-        appActionHandlerRegistrar.Register(current, ExecuteWithRunnerActivityAsync, CleanupDeploymentTargetAsync);
-    }
-
-    private async Task<CleanupAppDeploymentTargetResult> CleanupDeploymentTargetAsync(
-        CleanupAppDeploymentTargetRequest request)
-    {
-        try
-        {
-            await runnerDeploymentService.CleanupTargetAsync(
-                request.AppId,
-                request.DeploymentTargetId);
-
-            return new CleanupAppDeploymentTargetResult(
-                request.AppId,
-                request.DeploymentTargetId,
-                Success: true);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(
-                ex,
-                "Failed to clean up app {AppId} target {DeploymentTargetId}",
-                request.AppId,
-                request.DeploymentTargetId);
-            return new CleanupAppDeploymentTargetResult(
-                request.AppId,
-                request.DeploymentTargetId,
-                Success: false,
-                Error: "Runner runtime cleanup failed.");
-        }
+        appActionHandlerRegistrar.Register(current, ExecuteWithRunnerActivityAsync);
     }
 
     public async Task DisconnectAsync()
