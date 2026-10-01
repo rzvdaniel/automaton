@@ -1,9 +1,7 @@
 using System.Text.Json;
 using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.SignalR;
 using CoreFlow = Automaton.Core.Models.Flow;
 
 namespace Automaton.Api.Services;
@@ -17,16 +15,16 @@ public sealed class ConnectedFlowArtifactService
     private const string FlowIndexFileName = "index.json";
     private readonly AppFileStorageService fileStorageService;
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
-    private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly IManagedApplicationArtifactCommands commands;
 
     public ConnectedFlowArtifactService(
         AppFileStorageService fileStorageService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
-        IHubContext<AutomatonHub> automatonHub)
+        IManagedApplicationArtifactCommands commands)
     {
         this.fileStorageService = fileStorageService;
         this.flowsServiceFactory = flowsServiceFactory;
-        this.automatonHub = automatonHub;
+        this.commands = commands;
     }
 
     public async Task SynchronizeAsync(
@@ -34,7 +32,8 @@ public sealed class ConnectedFlowArtifactService
         Guid deploymentTargetId,
         Guid ownerId,
         IEnumerable<Runner> runners,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? deploymentOperationId = null)
     {
         var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
         var flowIds = metadata.ConnectedFlowIds?
@@ -62,16 +61,10 @@ public sealed class ConnectedFlowArtifactService
 
         foreach (var runner in runners)
         {
-            if (string.IsNullOrWhiteSpace(runner.ConnectionId))
-                throw new InvalidOperationException($"Runner '{runner.Name}' is not connected.");
-
             RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
-
-            var result = await automatonHub.Clients.Client(runner.ConnectionId)
-                .InvokeAsync<SynchronizeApplicationManagedArtifactsResult>(
-                    AutomatonHubMethods.SynchronizeApplicationManagedArtifacts,
-                    new SynchronizeApplicationManagedArtifactsRequest(appId, deploymentTargetId, files),
-                    cancellationToken);
+            var result = await commands.SynchronizeAsync(runner.Id, ownerId,
+                new SynchronizeApplicationManagedArtifactsRequest(appId, deploymentTargetId, files),
+                deploymentOperationId, cancellationToken);
 
             ValidateSynchronizationResponse(appId, deploymentTargetId, result);
             if (!result.Success)

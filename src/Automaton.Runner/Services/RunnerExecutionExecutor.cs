@@ -14,10 +14,12 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
     public async Task<RunnerExecutionResult> ExecuteAsync(RunnerExecutionRequest request, CancellationToken token)
     {
         using var scope = services.CreateScope();
+        EnsureSinglePayload(request);
+        if (request.ManagedArtifacts is not null)
+            return new ManagedApplicationArtifactExecutor(scope.ServiceProvider.GetRequiredService<RunnerWorkspaceService>())
+                .Execute(request.ManagedArtifacts, token);
         if (request.Action is not null)
         {
-            if (request.FlowId.HasValue || request.Step is not null)
-                throw new InvalidDataException("Exactly one Runner execution payload is required.");
             return await new AppActionCommandExecutor(
                 scope.ServiceProvider.GetRequiredService<AppActionExecutionService>(),
                 scope.ServiceProvider.GetRequiredService<AppActionDeploymentService>(),
@@ -26,6 +28,13 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
         await workflowGate.WaitAsync(token);
         try { return await ExecuteWorkflowOrStepAsync(scope.ServiceProvider, request, token); }
         finally { workflowGate.Release(); }
+    }
+
+    private static void EnsureSinglePayload(RunnerExecutionRequest request)
+    {
+        var count = (request.FlowId.HasValue ? 1 : 0) + (request.Step is not null ? 1 : 0)
+            + (request.Action is not null ? 1 : 0) + (request.ManagedArtifacts is not null ? 1 : 0);
+        if (count != 1) throw new InvalidDataException("Exactly one Runner execution payload is required.");
     }
 
     private static async Task<RunnerExecutionResult> ExecuteWorkflowOrStepAsync(IServiceProvider provider,

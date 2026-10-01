@@ -53,7 +53,7 @@ public sealed class RunnerExecutionOperationTests
         var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);
         Assert.That((await callback.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("execute"));
-        var result = new RunnerExecutionResult { Outcome = "Succeeded", Output = "marker", Logs = ["log"], OutputVariables = new() { ["output"] = "value" } };
+        var result = CompletedWorkflowResult();
         Assert.That((await callback.ApplyAsync(runner.ApiKeyId.Value, id, result, CancellationToken.None)).Outcome, Is.EqualTo("accepted"));
         var before = (await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ResultJson;
         Assert.That((await callback.ApplyAsync(runner.ApiKeyId.Value, id, new(), CancellationToken.None)).Outcome, Is.EqualTo("already-applied"));
@@ -80,10 +80,11 @@ public sealed class RunnerExecutionOperationTests
         var service = RunnerExecutionTestServices.Operations(db);
         var id = await service.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
         await service.CancelAsync(id, CancellationToken.None);
-        Assert.That((await service.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("cancel"));
-        Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).CompletedAtUtc, Is.Null);
-        await service.ApplyAsync(runner.ApiKeyId.Value, id, new() { Outcome = "Cancelled" }, CancellationToken.None);
-        Assert.That((await service.AssignmentAsync(runner.ApiKeyId.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("already-applied"));
+        await AssertCancellationAssignmentAsync(service, runner, id);
+        await AssertNotCompletedAsync(db);
+        var key = runner.ApiKeyId!.Value;
+        await service.ApplyAsync(key, id, new() { Outcome = "Cancelled" }, CancellationToken.None);
+        Assert.That((await service.AssignmentAsync(key, id, CancellationToken.None)).Disposition, Is.EqualTo("already-applied"));
     }
 
     [Test]
@@ -140,6 +141,13 @@ public sealed class RunnerExecutionOperationTests
     }
 
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private static RunnerExecutionResult CompletedWorkflowResult() => new()
+    { Outcome = "Succeeded", Output = "marker", Logs = ["log"], OutputVariables = new() { ["output"] = "value" } };
+    private static async Task AssertCancellationAssignmentAsync(RunnerExecutionOperationService service, Runner runner, Guid id)
+        => Assert.That((await service.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition,
+            Is.EqualTo("cancel"));
+    private static async Task AssertNotCompletedAsync(ApplicationDbContext db)
+        => Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).CompletedAtUtc, Is.Null);
     private static Runner Runner() => new() { Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "test", LastHeartbeatAtUtc = DateTime.UtcNow, RunnerUsers = [] };
     private sealed class Publisher : IEventPublisher
     {

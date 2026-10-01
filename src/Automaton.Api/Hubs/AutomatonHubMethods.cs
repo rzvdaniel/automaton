@@ -16,6 +16,5 @@
         public const string GetAppMediaStats = "GetAppMediaStats";
         public const string GetAppMediaFileMetadata = "GetAppMediaFileMetadata";
         public const string DeployAppPackage = "DeployAppPackage";
-        public const string SynchronizeApplicationManagedArtifacts = "SynchronizeApplicationManagedArtifacts";
     }
 }

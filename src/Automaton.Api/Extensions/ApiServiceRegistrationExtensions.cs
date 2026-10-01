@@ -576,6 +576,7 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
         services.AddScoped<ConnectedFlowArtifactService>();
+        services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
         services.AddHostedService<DeploymentOperationDispatcher>();
         services.AddScoped<AppActionExecutionService>();

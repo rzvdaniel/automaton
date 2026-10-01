@@ -33,14 +33,11 @@ public sealed class RunnerProtocolCompatibilityTests
     }
 
     [Test]
-    public void ExecutionHandlerRegistrarContainsTheCanonicalManagedArtifactHandlerContract()
+    public void ManagedArtifactsUseTheDurableExecutorAndHaveNoHubHandler()
     {
-        var handler = typeof(HubExecutionHandlerRegistrar).GetMethod(
-            "SynchronizeApplicationManagedArtifacts",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.That(handler, Is.Not.Null);
-        Assert.That(handler!.GetParameters().Single().ParameterType, Is.EqualTo(typeof(SynchronizeApplicationManagedArtifactsRequest)));
-        Assert.That(handler.ReturnType, Is.EqualTo(typeof(SynchronizeApplicationManagedArtifactsResult)));
+        Assert.That(typeof(HubExecutionHandlerRegistrar).GetMethod("SynchronizeApplicationManagedArtifacts",
+            BindingFlags.Instance | BindingFlags.NonPublic), Is.Null);
+        Assert.That(typeof(RunnerExecutionRequest).GetProperty("ManagedArtifacts")!.PropertyType,
+            Is.EqualTo(typeof(SynchronizeApplicationManagedArtifactsRequest)));
     }
 }

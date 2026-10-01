@@ -236,7 +236,7 @@ public sealed class HostedRunnerDeploymentResultService(
         var file = new FormFile(stream, 0, stream.Length, "file", "deploy-package.zip");
         var application = await DeployPackageContractService.ReadAsync(file, operation.WebAppId, cancellationToken);
         await finalization.FinalizeAsync(operation.WebAppId, target.Id, operation.OwnerUserId,
-            runner, file, application, cancellationToken);
+            runner, file, application, cancellationToken, operation.Id);
         await targetState.MarkCompletedAsync(operation.WebAppId, target.Id, true,
             cancellationToken, application.Runtime.Command is not null,
             operation.Id, operation.ExecutionAttemptId);

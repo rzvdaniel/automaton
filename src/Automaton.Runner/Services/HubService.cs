@@ -59,7 +59,6 @@ public class HubService
         appActionHandlerRegistrar = new HubAppActionHandlerRegistrar(runnerDeploymentService);
         executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
             tunnelForwarder,
-            runnerWorkspaceService,
             logger);
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);
         connectionFailureReporter = new HubConnectionFailureReporter(configService, logger);

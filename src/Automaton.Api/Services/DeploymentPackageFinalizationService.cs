@@ -24,14 +24,16 @@ public sealed class DeploymentPackageFinalizationService(
         Runner runner,
         IFormFile file,
         ApplicationContract packageApplication,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? deploymentOperationId = null)
     {
         await connectedFlowArtifactService.SynchronizeAsync(
             appId,
             deploymentTargetId,
             ownerId,
             [runner],
-            cancellationToken);
+            cancellationToken,
+            deploymentOperationId);
         await DeployPackageContractService.PersistAsync(dataContext, appId, packageApplication, cancellationToken);
         await PersistSourceAsync(appId, ownerId, file, cancellationToken);
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>

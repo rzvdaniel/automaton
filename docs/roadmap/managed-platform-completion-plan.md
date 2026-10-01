@@ -1,6 +1,6 @@
 # Automaton hosting and platform completion roadmap
 
-Updated: 29 September 2026. Latest live evidence: production acceptance run on 29 September 2026.
+Updated: 1 October 2026. Latest live evidence: focused Slice 2 rollout and Action acceptance on 1 October 2026.
 
 ## Purpose and scope
 
@@ -10,7 +10,7 @@ Finish subscription-derived resource limits and accounting, simplify Runner mana
 
 This is the current execution roadmap. It supersedes the sequence and status in the [earlier architecture assessment](../architecture/managed-platform-completion-plan.md) and the earlier discussion/downloadable plans. M0–M7 retain their meanings; RM is the separate Runner management simplification milestone.
 
-Repository baseline: `main` at `295599d7`. This revision uses the repository plans, [M0/M1 inventory](../architecture/managed-platform-m0-acceptance-inventory.md), and recorded live checks. Reassess each milestone against then-current code before implementing it; a listed requirement does not mean its mechanism is absent.
+Historical roadmap baseline: `main` at `295599d7`; Slice 3 starts from canonical `04159baf`, after the Slice 2 merge and removal of the superseded inventory. This revision uses the repository plans and recorded live checks. Reassess each milestone against then-current code before implementing it; a listed requirement does not mean its mechanism is absent.
 
 ## Product boundaries
 
@@ -42,7 +42,7 @@ These are product decisions to implement and validate, not statements that every
 | --- | --- |
 | Historical Stages 1–3 and M0 | Reported complete; retain account identity, atomic admission and storage locality protections. |
 | M1 storage implementation | Merged; **live acceptance complete (2026-09-29)**. The disposable app flow below completed and the app was removed through Studio. |
-| Live routing and Runners | API commit `bb5c5a38` is live on green (image digest `sha256:e744b7c88193a5e18c5a7edb9a1949a38871cc8880b98571b0b63351030446e9`); `prod-verify.sh` passed. The blue rollback color remains healthy. Both Runners drained from blue and reconnected to green. Infrastructure Runner and Hosted Runner use `rzvdaniel/automaton-runner@sha256:77d29c25b61b0aae953233db5ab0e58b7ddc3badb3581377bbd6d0d4a45435b2`. |
+| Live routing and Runners | As of 2026-10-01, API revision `6c110604` is live on green; both installed Runners use digest `sha256:64a86f25b24092bbe13041ed04c0e951f336c7c9a2bc824894941d746f4fb39e`. Normal cutover/registration and `prod-verify.sh` passed. The retired API color is stopped; previous immutable images and pin/configuration backups remain for rollback. See the Slice 2 release evidence below. |
 | Fresh storage verification | Healthy `InfrastructureRunnerVerified` result: 0.00 GB / 2.00 GB, measured at 5:17 PM on 2026-09-29 after the app wrote its marker. This tiny marker sample verifies the flow, not large-write accounting. |
 | Runtime restrictions | The fixture container ran as UID/GID `1000:1000`, had a read-only root filesystem, `/tmp` tmpfs capped at 32 MiB, and a writable `/automaton/data` mount. These are observed fixture settings, not new tier defaults. |
 | Persistence and cleanup | The app process wrote and read `m1-marker.json`; after Hosted Runner reprovision it read the same marker. Studio then deleted the app. The Runner host had no matching app container; the marker and app-specific data directory were absent. The Hosted Runner user volume remained. |
@@ -53,7 +53,7 @@ These are product decisions to implement and validate, not statements that every
 | M2–M7 | Remaining completion/acceptance scope; audit existing mechanisms before adding code. |
 | Builder | Future functionality; outside this release's completion gates. |
 
-Runner image digest observed in production: `sha256:77d29c25b61b0aae953233db5ab0e58b7ddc3badb3581377bbd6d0d4a45435b2`.
+Historical Runner image digest for the completed M1 acceptance: `sha256:77d29c25b61b0aae953233db5ab0e58b7ddc3badb3581377bbd6d0d4a45435b2`. The subsequent RM releases are recorded separately below.
 
 The disposable `M1 Live Acceptance 20260928` app was deleted after its checks passed. Studio reported no apps; the Runner host had no matching container, and the marker/app-specific data directory were absent. Host scheduling was verified enabled. The isolated XFS test used a placeholder Infrastructure Runner and does not prove live control-plane reachability during disk exhaustion. A single Hosted Runner startup warning said managed application container reconciliation could not be retried from `deployment.json`; the app remained running and passed marker readback after reprovision. Track this warning if it recurs.
 
@@ -117,8 +117,8 @@ Use the existing RabbitMQ infrastructure for durable management commands and aut
 | Slice | Scope | Status |
 | --- | --- | --- |
 | 1 — Workflows and custom steps | Execution, cancellation intent, persisted results; remove replaced callers/handlers | Deployed; live execution checks deferred to final RM acceptance. |
-| 2 — App actions | Execute/cancel, logs/results, module/version management and cleanup | Implemented in this PR; review, CI and release pending. |
-| 3 — Managed artifacts | Application-artifact synchronization | Pending. |
+| 2 — App actions | Execute/cancel, logs/results, module/version management and cleanup | Deployed; normal Action, persisted result/logs and queue checks passed on 2026-10-01. Broader recovery remains in final acceptance. |
+| 3 — Managed artifacts | Application-artifact synchronization | Implemented in this PR; review, CI and release pending. |
 | 4 — File transfers | App/media uploads/downloads and generic deployment transfer | Pending. |
 | 5 — Connection cleanup | Obsolete management hub code, registries, reconnect/drain and API-slot registration gates | Pending; remove only after dependent callers move. |
 
@@ -154,7 +154,23 @@ These paths address stable Runner identity through the existing durable executio
 
 An action execution uses the same ID for its existing `AppModuleExecution` and durable Runner operation, queued transactionally. The authorized terminal HTTPS callback commits both results in one transaction; replay is already-applied. Expired dispatch cannot start late; interrupted/uncertain work is terminal rather than re-executed. Cancellation persists intent, publishes the existing identity-only command and reaches active processes through the existing HTTPS cancellation monitor; requesting cancellation is not proof that a process stopped. Module/version preparation and target cleanup also use journaled identities. Separate per-Runner execution and management queues keep queued execution from consuming management delivery capacity. Execution prefetch is four; management has an independent channel and one delivery slot. Cancellation wakeups use management. Consume-only permissions cover only the two queues for that Runner. The existing four-action process gate and serial workflow/script gate remain unchanged. File locks serialize duplicate operation processing. Private journal results are deleted after terminal API confirmation; minimal acceptance and pre-execution cancellation tombstones and lock inodes remain to prevent a stale in-flight assignment from executing again.
 
-Removed: detached `AppActionExecutionDispatcher`; action execute/cancel, read-log/result, list-module/version, restore/delete-version, prepare/synchronize-module and target-cleanup hub constants/registrations; connection-ID plumbing in those callers; obsolete transport test doubles. `DeployAppPackage`, managed-artifact/file handlers, independent Studio notifications, supported tunnels and reconnect/drain gates remain for Slices 3–5. No transport fallback is retained. No Slice 2 release or live acceptance is claimed. Focused regressions and build results belong to this PR; final combined RM acceptance still includes Slice 1 execution and forced host-validation interruption. M1 remains complete.
+Removed: detached `AppActionExecutionDispatcher`; action execute/cancel, read-log/result, list-module/version, restore/delete-version, prepare/synchronize-module and target-cleanup hub constants/registrations; connection-ID plumbing in those callers; obsolete transport test doubles. `DeployAppPackage`, file handlers, independent Studio notifications, supported tunnels and reconnect/drain gates remain for Slices 4–5. No transport fallback is retained. Final combined RM acceptance still includes Slice 1 execution and forced host-validation interruption. M1 remains complete.
+
+#### Slice 2 deployed — 2026-10-01
+
+PR #336 merged as `6c1106043a174425714b91989ee49e0eeff0d667`; checks #4920 (reviewed head) and #4921 (main) passed. Normal Runner pipeline #4922 published `rzvdaniel/automaton-runner@sha256:64a86f25b24092bbe13041ed04c0e951f336c7c9a2bc824894941d746f4fb39e`. Both installed Runners were inspected at that digest. API green runs the matching revision, image ID `sha256:4222452f54273b72db08b0bf068e486b07e31bbb2fd65047a26a76863d44cd68`. Normal reconnect/registration and `prod-verify.sh` passed. The previous pin, protected configuration backups and previous API/Runner images remain available for rollback; the retired API color was stopped after verification to avoid old subscribers consuming new management events.
+
+The retained disposable app `3903547c-0a74-4562-ab17-0aec2ea00eb2` was deployed through the CLI (operation `66664aef-b6e3-45e9-ab4c-bbe2b58b71ee`, terminal `Succeeded`). Its `rm-slice2-acceptance` Action completed as execution `18f205d4-f525-4157-8475-3e4a7cacedc8`, status `Succeeded`, exit code 0. Separate CLI reads returned the persisted result `{"slice":"RM2","status":"ok"}` and log `rm-slice2-action-log: completed`. Restricted broker connections were observed. Each Infrastructure/Hosted Runner execution and management queue had one consumer, zero ready messages and zero unacknowledged messages after delivery completed. The Infrastructure and deployment queues also drained. No deliberate interruption/cutover test is claimed for this run.
+
+Rollout observations: transient HTTP 429 responses delayed host execution and artifact reads, but retries completed without a manual consumer restart. The Infrastructure installer initially rolled back a healthy, registered Runner because its readiness expression did not recognize the successful-after-retries connection message. The retry used a temporary installer copy recognizing that existing success message and reading the complete log stream to avoid a `grep -q`/`pipefail` false failure. Container health and actual API registration were independently confirmed. The repository installer readiness defect remains a focused follow-up; no backend, quota or security settings were weakened.
+
+#### Slice 3 audit and implementation
+
+The actual caller is `DeploymentPackageFinalizationService` through `ConnectedFlowArtifactService`, used by both Hosted and generic deployment finalization. It serializes owner-scoped connected flows and their index. The replaced Runner handler was `HubExecutionHandlerRegistrar.SynchronizeApplicationManagedArtifacts`; there were no other callers. The flow format, target-specific workspace root, path boundary checks and staged atomic replacement are retained.
+
+Synchronization now uses an identity-only RabbitMQ command on the existing management queue. The pinned artifact bytes and typed terminal result travel through authenticated HTTPS and existing protected operation storage. The API verifies the owner/app association, target/Runner assignment, privileged-host approval, protocol support and fresh heartbeat. For persisted deployments, a deployment/Runner-derived synchronization identity makes repeated finalization reuse the original pinned request and terminal result. Competing inserts reconcile the committed operation; retries cannot silently substitute a newer artifact set under the same identity. Generic calls without a persisted deployment use a new operation identity. Runner journals prevent repeated replacement after a lost callback or restart; accepted but uncertain replacement reports `Lost`, rather than rerunning. There is no new storage subsystem or management transport fallback.
+
+Removed in this PR: the managed-artifact hub constant, API SignalR invocation/connection-ID requirement, Runner hub handler/workspace dependency and obsolete transport test double. Supported tunnels and their handler remain. Deploy matching API/Runner versions after review; Slice 3 live acceptance is not claimed. Cross-host package availability remains unestablished and separate scaling work.
 
 ### Infrastructure host-validation slice
 
@@ -181,8 +197,8 @@ This establishes normal live host validation and authorized completed-result rep
 | Workflow execution | `RunnerFlowExecutionService`, `ScheduleService` / durable execution consumer | Deployed; live execution checks deferred to final RM acceptance. `RunWorkflow` removed. |
 | Custom steps | `CustomStepRunnerExecutionService`, `AppsStepExecutionService` / durable execution consumer | Deployed; live execution checks deferred to final RM acceptance. `RunCustomStep` removed. |
 | Infrastructure host validation | `InfrastructureWorkflowExecutionService` / bundled `validate-runner-host` action | Migrated and released; replaced `RunInfrastructureCommand` handler and API script transport removed. Normal live validation and completed-result replay passed on 2026-09-30. |
-| App actions and action administration | `AppActionExecutionService`, `AppActionRunnerGateway`, `TrustedInfrastructureActionDeploymentService`, target cleanup / durable execution consumer | Migrated in Slice 2; review/release pending. Replaced action hub handlers and detached dispatcher removed. Generic `DeployAppPackage` remains for Slice 4. |
-| Managed application artifacts | `ConnectedFlowArtifactService` / `SynchronizeApplicationManagedArtifacts` | Move synchronization to the durable artifact/command path. |
+| App actions and action administration | `AppActionExecutionService`, `AppActionRunnerGateway`, `TrustedInfrastructureActionDeploymentService`, target cleanup / durable execution consumer | Slice 2 deployed; normal Action result/logs and queue checks passed. Generic `DeployAppPackage` remains for Slice 4. |
+| Managed application artifacts | `ConnectedFlowArtifactService`, `ManagedApplicationArtifactGateway` / durable management consumer and `ManagedApplicationArtifactExecutor` | Migrated in Slice 3; review/release pending. Replaced hub caller/handler removed. |
 | App, media and generic Runner deployment transfers | `AppFileUploadService`, `AppFileDownloadService`, `AppMediaStorageService`, and the generic Runner fallback in `DeploymentPackageRunnerService` / file chunks, metadata, and `DeployAppPackage` | Replace SignalR chunk transfer with authenticated HTTPS and persisted operation results. This is distinct from the Hosted Runner RabbitMQ/HTTPS deployment path already released. |
 | Runtime tunnels | `RuntimeTunnelRequestSender`, `RuntimeFileProxyService` / `TunnelRequest` and `TunnelResponse` | Keep supported BYO tunnel behavior if still required; do not use it as a management command transport. |
 | Connection and cutover lifecycle | API Runner registration/presence plus `HubControlHandlerRegistrar` / `Ping`, welcome and reconnect-when-idle coordination | Keep reconnect/drain until the replaceable management callers above have moved; remove API-slot registration gating only after that. |
