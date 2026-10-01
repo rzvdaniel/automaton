@@ -41,7 +41,9 @@ x-api-common: &api-common
     InfrastructureRunnerRabbitMq__Host: ${INFRASTRUCTURE_RABBITMQ_HOST:?INFRASTRUCTURE_RABBITMQ_HOST is required in .env}
     InfrastructureRunnerRabbitMq__Port: 5672
     HostedRunnerRabbitMq__Host: ${INFRASTRUCTURE_RABBITMQ_HOST:?INFRASTRUCTURE_RABBITMQ_HOST is required in .env}
-    HostedRunnerRabbitMq__Port: 5672
+    HostedRunnerRabbitMq__Port: 5671
+    HostedRunnerRabbitMq__TlsEnabled: "true"
+    HostedRunnerRabbitMq__TlsServerName: ${API_DOMAIN:?API_DOMAIN is required in .env}
     DataProtection__KeysPath: /app/data-protection-keys
   volumes:
     - prod-api-appdata:/app/AppData
@@ -145,6 +147,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "${INFRASTRUCTURE_RABBITMQ_HOST:?INFRASTRUCTURE_RABBITMQ_HOST is required in .env}:5671:5671"
     networks:
       - automaton-runtime
       - automaton-prod

@@ -9,6 +9,11 @@ source "$SCRIPT_DIR/../prod-blue-green-common.sh"
 template="$REPO_ROOT/docker/traefik/prod/api-edge.yml"
 grep -q 'api-live-edge:' "$template"
 grep -q 'url: "http://api-__API_COLOR__:8080"' "$template"
+grep -q '^tcp:' "$template"
+grep -q 'rule: "HostSNI(`__API_DOMAIN__`)"' "$template"
+grep -q 'address: "rabbitmq:5672"' "$template"
+grep -q 'runner-broker:' "$REPO_ROOT/docker/traefik/prod/traefik.yml"
+grep -q 'HostedRunnerRabbitMq__TlsEnabled: "true"' "$REPO_ROOT/docker-compose.prod.yml"
 if grep -q 'api-blue-edge' "$template"; then
     echo "The production API edge template must not hardcode the blue runtime service." >&2
     exit 1

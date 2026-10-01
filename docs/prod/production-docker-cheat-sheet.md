@@ -877,3 +877,11 @@ sudo apt install htop -y
 - API blue/green assumes database changes are backward-compatible for the duration of the cutover. Avoid schema changes where the old API crashes immediately after the migration is applied.
 - The blue/green scripts run `docker compose ... --remove-orphans`, so old pre-migration containers like `automaton-prod-website-1` / `-2` get cleaned up automatically on the next deploy.
 - `apps.automaton.monster` is not blue/green. It is the stable Traefik runtime edge; platform rollback and individual app rollback are separate operations.
+
+## External Runner broker TLS
+
+Production Compose exposes Traefik's `runner-broker` TLS entry point on port 5671, bound to the existing `INFRASTRUCTURE_RABBITMQ_HOST` address. Hosted Runner broker configuration uses that address, enables TLS and sets the expected certificate name to `API_DOMAIN`. Traefik terminates TLS using its existing Cloudflare ACME resolver and forwards AMQP only inside the Docker network to `rabbitmq:5672`. The existing Infrastructure Runner plaintext listener remains private and unchanged.
+
+Runners must reach the private broker address (for example through the existing private network/VPN). This does not publish a public BYO endpoint or configure DNS/firewalls. The certificate must match `API_DOMAIN` and chain to the Runner's OS trust; verify revocation access as well. No certificate-validation bypass is allowed. Traefik manages renewal; no copied private key or additional CA is required.
+
+For initial rollout, preserve the existing Compose/runtime files and deployment state, render configuration with the supported production setup scripts, then recreate Traefik so the new static entry point and port binding take effect. This briefly interrupts edge traffic. Verify routing and an actual Runner-to-broker TLS handshake with hostname/chain validation before releasing the new API and Runner. Normal redeploy rendering retains this TCP router across API color changes. If TLS verification fails, restore the previous Traefik configuration/port bindings and retain the old API/Runner images; do not downgrade the new execution path to plaintext.
