@@ -53,7 +53,7 @@ public sealed class HostedRunnerStorageVerificationControllerTests
         var result = await controller.VerifyStorage(hostedRunner.Id, CancellationToken.None);
 
         Assert.That(result, Is.TypeOf<AcceptedResult>());
-        Assert.That(deployment.ConnectionId, Is.EqualTo(infrastructureRunner.ConnectionId));
+        Assert.That(deployment.RunnerId, Is.EqualTo(infrastructureRunner.Id));
         Assert.That(deployment.DeploymentTargetId, Is.EqualTo(host.Id));
         Assert.That(deployment.ActionKey, Is.EqualTo(StorageTelemetryActions.MeasureHostedRunnerStorage));
         var verification = await db.HostedRunnerStorageVerifications.SingleAsync();
@@ -66,7 +66,7 @@ public sealed class HostedRunnerStorageVerificationControllerTests
     {
         await using var db = CreateDb();
         var infrastructureRunner = CreateOnlineInfrastructureRunner();
-        infrastructureRunner.ConnectionId = null;
+        infrastructureRunner.LastHeartbeatAtUtc = DateTime.UtcNow.AddHours(-1);
         var host = CreateReadyHost(infrastructureRunner);
         var hostedRunner = new HostedRunner
         {
@@ -81,7 +81,7 @@ public sealed class HostedRunnerStorageVerificationControllerTests
         var result = await CreateController(db, deployment).VerifyStorage(hostedRunner.Id, CancellationToken.None);
 
         Assert.That(result, Is.TypeOf<ConflictObjectResult>());
-        Assert.That(deployment.ConnectionId, Is.Null);
+        Assert.That(deployment.RunnerId, Is.Null);
         Assert.That(await db.HostedRunnerStorageVerifications.CountAsync(), Is.Zero);
     }
 
@@ -118,23 +118,23 @@ public sealed class HostedRunnerStorageVerificationControllerTests
 
     private sealed class RecordingTrustedActionDeploymentService : ITrustedInfrastructureActionDeploymentService
     {
-        public string? ConnectionId { get; private set; }
+        public Guid? RunnerId { get; private set; }
         public Guid? DeploymentTargetId { get; private set; }
         public string? ActionKey { get; private set; }
 
         public Task<AppActionModuleInfo> EnsureDeployedAsync(
-            string connectionId, string actionKey, CancellationToken cancellationToken)
+            Guid runnerId, string actionKey, CancellationToken cancellationToken)
         {
-            ConnectionId = connectionId;
+            RunnerId = runnerId;
             ActionKey = actionKey;
             return Task.FromResult(new AppActionModuleInfo(
                 actionKey, null, null, "python", "main.py", 120, "sha256:test", false, [], 0, null));
         }
 
         public Task<AppActionModuleInfo> EnsureDeployedOnTargetAsync(
-            string connectionId, Guid deploymentTargetId, string actionKey, CancellationToken cancellationToken)
+            Guid runnerId, Guid deploymentTargetId, string actionKey, CancellationToken cancellationToken)
         {
-            ConnectionId = connectionId;
+            RunnerId = runnerId;
             DeploymentTargetId = deploymentTargetId;
             ActionKey = actionKey;
             return Task.FromResult(new AppActionModuleInfo(

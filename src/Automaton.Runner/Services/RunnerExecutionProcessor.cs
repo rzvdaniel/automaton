@@ -13,7 +13,7 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
     private readonly ConcurrentDictionary<Guid, RunnerExecutionResult> completed = new();
     public async Task<RunnerExecutionResult> CancelAsync(Guid id, CancellationToken token)
     {
-        using var ownership = journal.Lock(id);
+        using var ownership = await journal.LockAsync(id, token);
         var saved = await journal.ReadAsync(id, token);
         if (saved is not null) return saved;
         if (completed.TryGetValue(id, out var completedResult))
@@ -32,7 +32,7 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
     public void Forget(Guid id) => journal.Forget(id);
     public async Task<RunnerExecutionResult> ProcessAsync(Guid id, RunnerExecutionRequest request, CancellationToken token)
     {
-        using var ownership = journal.Lock(id);
+        using var ownership = await journal.LockAsync(id, token);
         var saved = await journal.ReadAsync(id, token);
         if (saved is not null) return saved;
         if (!completed.TryGetValue(id, out var result))

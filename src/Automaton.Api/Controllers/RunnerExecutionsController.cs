@@ -37,6 +37,7 @@ public sealed class RunnerExecutionsController(
         try { return Ok(await operations.ApplyAsync(KeyId(), id, result, token, ActorId(), RunnerId())); }
         catch (UnauthorizedAccessException) { return Forbid(); }
         catch (ArgumentException exception) { return BadRequest(exception.Message); }
+        catch (System.Text.Json.JsonException) { return BadRequest("Malformed Action result."); }
     }
 
     [HttpGet("{id:guid}/status")]

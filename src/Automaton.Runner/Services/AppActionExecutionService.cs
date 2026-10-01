@@ -11,7 +11,8 @@ public sealed class AppActionExecutionService
     private readonly RunnerWorkspaceService workspace;
     private readonly AppActionExecutionCoordinator coordinator;
     private readonly ConcurrentDictionary<Guid, ActiveExecution> active = new();
-    private readonly SemaphoreSlim concurrencyGate = new(4, 4);
+    internal const ushort MaximumConcurrentExecutions = 4;
+    private readonly SemaphoreSlim concurrencyGate = new(MaximumConcurrentExecutions, MaximumConcurrentExecutions);
 
     public AppActionExecutionService(RunnerWorkspaceService workspace, AppActionExecutionCoordinator? coordinator = null)
     {

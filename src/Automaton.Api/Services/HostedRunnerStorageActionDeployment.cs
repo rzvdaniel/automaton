@@ -20,12 +20,11 @@ public sealed class HostedRunnerStorageActionDeployment(
         var infrastructureRunner = runnerHost?.InfrastructureRunner;
         if (runnerHost is null
             || infrastructureRunner?.Purpose != RunnerPurposes.Infrastructure
-            || !RunnerPresenceEvaluator.IsOnline(
-                infrastructureRunner.ConnectionId, infrastructureRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            || (!infrastructureRunner.LastHeartbeatAtUtc.HasValue || infrastructureRunner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold))
             return false;
 
         await trustedActionDeployment.EnsureDeployedOnTargetAsync(
-            infrastructureRunner.ConnectionId!,
+            infrastructureRunner.Id,
             runnerHost.Id,
             StorageTelemetryActions.MeasureHostedRunnerStorage,
             cancellationToken);

@@ -9,10 +9,13 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
     public async Task ConsumeAsync(HostedRunnerBrokerConfiguration broker, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
     {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token);
+        token = lifetime.Token;
         var factory = RunnerBrokerConnectionFactory.Create(broker, requireTls: true);
+        factory.ConsumerDispatchConcurrency = AppActionExecutionService.MaximumConcurrentExecutions + 1;
         await using var connection = await factory.CreateConnectionAsync(token);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: token);
-        await channel.BasicQosAsync(0, 1, false, token);
+        await channel.BasicQosAsync(0, AppActionExecutionService.MaximumConcurrentExecutions + 1, false, token);
         var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (_, delivery) =>
@@ -27,7 +30,8 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
         };
         await channel.BasicConsumeAsync(broker.QueueName, false, consumer, token);
         // Disposal happens after the delivery callback returns, never inside it.
-        await stopped.Task.WaitAsync(token);
+        try { await stopped.Task.WaitAsync(token); }
+        finally { await lifetime.CancelAsync(); }
     }
 
 }

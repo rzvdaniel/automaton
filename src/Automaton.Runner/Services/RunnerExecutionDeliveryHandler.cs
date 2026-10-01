@@ -91,7 +91,7 @@ internal sealed class RunnerExecutionDeliveryHandler(RunnerExecutionProcessor pr
         {
             await Task.Delay(TimeSpan.FromSeconds(5), token);
             var assignment = await api.StatusAsync(id, token);
-            if (assignment.Disposition == "cancel") { await execution.CancelAsync(); return; }
+            if (assignment.Disposition is "cancel" or "already-applied") { await execution.CancelAsync(); return; }
         }
     }
 }

@@ -167,6 +167,9 @@ public sealed class ScheduledActionExecutionHandler(
                 .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
     }
 
+    private static bool HasFreshHeartbeat(Runner runner)
+        => runner.LastHeartbeatAtUtc.HasValue && runner.LastHeartbeatAtUtc >= DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
+
     private async Task<AppModuleExecution> DispatchInfrastructureAsync(
         ActionSchedule schedule,
         Guid occurrenceId,
@@ -186,10 +189,10 @@ public sealed class ScheduledActionExecutionHandler(
             || !host.ValidatedAtUtc.HasValue
             || !host.ApprovedAtUtc.HasValue
             || !string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
-            || !RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            || !HasFreshHeartbeat(runner))
             throw new InvalidOperationException("Infrastructure Runner is not active, approved, ready, and online.");
         var module = await infrastructureActions.EnsureDeployedAsync(
-            runner.ConnectionId!, schedule.ActionKey, cancellationToken);
+            runner.Id, schedule.ActionKey, cancellationToken);
         var deploymentTargetId = await db.AppDeploymentTargets
             .Where(target =>
                 target.WebAppId == schedule.ApplicationId &&

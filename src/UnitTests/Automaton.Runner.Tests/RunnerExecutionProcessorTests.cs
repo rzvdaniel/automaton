@@ -62,6 +62,54 @@ public sealed class RunnerExecutionProcessorTests
         Assert.That((await journal.ReadAsync(id, CancellationToken.None))!.Outcome, Is.EqualTo("Cancelled"));
     }
 
+    [Test]
+    public async Task ConcurrentActionRedeliverySharesResultWithoutRepeatingWork()
+    {
+        var executor = new BlockingExecutor(); var id = Guid.NewGuid(); var processor = new RunnerExecutionProcessor(new(directory), executor);
+        var request = new RunnerExecutionRequest(null, null, AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest { ExecutionId = id, Input = System.Text.Json.JsonSerializer.SerializeToElement(new { }) }));
+        var first = processor.ProcessAsync(id, request, CancellationToken.None);
+        await executor.Started.Task;
+        var duplicate = processor.ProcessAsync(id, request, CancellationToken.None);
+        executor.Finish.SetResult();
+        var results = await Task.WhenAll(first, duplicate).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.That(executor.Calls, Is.EqualTo(1)); Assert.That(results.Select(r => r.Output), Is.All.EqualTo("once"));
+    }
+    [Test]
+    public async Task StaleAssignmentAfterConfirmedResultCleanupNeverExecutesAgain()
+    {
+        var executor = new Executor(); var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
+        var processor = new RunnerExecutionProcessor(journal, executor);
+        await processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        processor.Forget(id);
+        var stale = await processor.ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        Assert.That(stale.Outcome, Is.EqualTo("Lost")); Assert.That(executor.Calls, Is.EqualTo(1));
+    }
+    [Test]
+    public async Task ConfirmedCleanupDoesNotDeleteAConcurrentJournalWritersFiles()
+    {
+        var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
+        await new RunnerExecutionProcessor(journal, new Executor()).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
+        using (journal.Lock(id))
+        {
+            journal.Forget(id);
+            Assert.That(await journal.ReadAsync(id, CancellationToken.None), Is.Not.Null);
+        }
+        journal.Forget(id);
+        Assert.That(await journal.ReadAsync(id, CancellationToken.None), Is.Null);
+        Assert.That(journal.WasAccepted(id), Is.True);
+    }
+    private sealed class BlockingExecutor : IRunnerExecutionExecutor
+    {
+        public int Calls { get; private set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Finish { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task<RunnerExecutionResult> ExecuteAsync(RunnerExecutionRequest request, CancellationToken token)
+        {
+            Calls++; Started.TrySetResult(); await Finish.Task.WaitAsync(token);
+            return new() { Outcome = "Succeeded", Output = "once" };
+        }
+    }
+
     private sealed class Executor : IRunnerExecutionExecutor
     {
         public int Calls { get; private set; }

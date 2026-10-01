@@ -3,14 +3,12 @@ using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -470,16 +468,14 @@ public class AppDeploymentTargetManagementServiceTests
         {
             var authorization = CreateAuthorizationService(db, userId);
             var routeService = CreateRouteService(db, out routeRoot);
-            IHubContext<AutomatonHub> cleanupHub = successfulCleanup
-                ? new SuccessfulCleanupHubContext()
-                : new RejectingHubContext();
+            var cleanupCommands = new CleanupCommands(successfulCleanup);
             return new AppDeploymentTargetManagementService(
                 db,
                 authorization,
                 new AppRunnerAuthorizationPolicy(db, authorization),
                 routeService,
                 new AppDeploymentTargetStateService(db),
-                new AppDeploymentTargetRuntimeCleanupService(db, cleanupHub));
+                new AppDeploymentTargetRuntimeCleanupService(db, cleanupCommands));
         }
 
         private static ResourceAuthorizationService CreateAuthorizationService(
@@ -526,6 +522,7 @@ public class AppDeploymentTargetManagementServiceTests
                 CapabilitiesJson = RunnerCapabilities.Serialize(
                     RunnerCapabilities.DefaultsForPurpose(purpose), purpose),
                 ConnectionId = online ? $"connection-{Guid.NewGuid():N}" : null,
+                LastHeartbeatAtUtc = online ? DateTime.UtcNow : null,
                 Status = online ? RunnerStatus.Online.ToString() : RunnerStatus.Offline.ToString()
             };
             Db.Runners.Add(runner);
@@ -555,68 +552,16 @@ public class AppDeploymentTargetManagementServiceTests
         }
     }
 
-    private sealed class RejectingHubContext : IHubContext<AutomatonHub>
+    private sealed class CleanupCommands(bool successful) : IRunnerActionCommands
     {
-        public IHubClients Clients { get; } = new RejectingHubClients();
-        public IGroupManager Groups { get; } = null!;
-    }
-
-    private sealed class SuccessfulCleanupHubContext : IHubContext<AutomatonHub>
-    {
-        public IHubClients Clients { get; } = new SuccessfulCleanupHubClients();
-        public IGroupManager Groups { get; } = null!;
-    }
-
-    private sealed class SuccessfulCleanupHubClients : IHubClients
-    {
-        private readonly SuccessfulCleanupClientProxy clientProxy = new();
-
-        public IClientProxy All => throw new NotSupportedException();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => clientProxy;
-        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => clientProxy;
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => throw new NotSupportedException();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-        public IClientProxy User(string userId) => throw new NotSupportedException();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-    }
-
-    private sealed class SuccessfulCleanupClientProxy : ISingleClientProxy
-    {
-        public Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken)
+        public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         {
-            if (method == AutomatonHubMethods.CleanupAppDeploymentTarget &&
-                args.Length > 0 && args[0] is CleanupAppDeploymentTargetRequest request)
-            {
-                return Task.FromResult((T)(object)new CleanupAppDeploymentTargetResult(
-                    request.AppId,
-                    request.DeploymentTargetId,
-                    Success: true));
-            }
-
-            throw new NotSupportedException($"Unexpected invoke method: {method}");
+            if (!successful) throw new InvalidOperationException("Runner cleanup failed.");
+            var request = (CleanupAppDeploymentTargetRequest)payload;
+            object result = new CleanupAppDeploymentTargetResult(request.AppId, request.DeploymentTargetId, true);
+            return Task.FromResult((T)result);
         }
-
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
     }
-
-    private sealed class RejectingHubClients : IHubClients
-    {
-        public IClientProxy All => throw new NotSupportedException();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => throw new NotSupportedException();
-        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => throw new NotSupportedException();
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => throw new NotSupportedException();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-        public IClientProxy User(string userId) => throw new NotSupportedException();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-    }
-
     private sealed class StubWebHostEnvironment : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = "Automaton.Tests";

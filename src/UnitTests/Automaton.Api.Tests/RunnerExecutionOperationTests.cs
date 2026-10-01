@@ -12,6 +12,8 @@ namespace Automaton.Api.Tests;
 
 public sealed class RunnerExecutionOperationTests
 {
+    private static IDataProtectionProvider Protection() => new EphemeralDataProtectionProvider();
+
     [Test]
     public async Task PayloadIsProtectedAndCommandContainsOnlyStableIdentities()
     {
@@ -30,7 +32,7 @@ public sealed class RunnerExecutionOperationTests
     {
         await using var db = Db();
         var runner = Runner(); db.Runners.Add(runner); await db.SaveChangesAsync();
-        var protection = new EphemeralDataProtectionProvider();
+        var protection = Protection();
         var initiating = RunnerExecutionTestServices.Operations(db, protection: protection);
         var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);

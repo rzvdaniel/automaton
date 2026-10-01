@@ -22,7 +22,7 @@ public sealed class AppActionExecutionService
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppActionRunnerGateway runnerGateway;
-    private readonly IServiceScopeFactory scopeFactory;
+    private readonly RunnerExecutionOperationService operations;
 
     public AppActionExecutionService(
         ApplicationDbContext db,
@@ -31,7 +31,7 @@ public sealed class AppActionExecutionService
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         AppActionRunnerGateway runnerGateway,
-        IServiceScopeFactory scopeFactory)
+        RunnerExecutionOperationService operations)
     {
         this.db = db;
         this.appsService = appsService;
@@ -39,7 +39,7 @@ public sealed class AppActionExecutionService
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerGateway = runnerGateway;
-        this.scopeFactory = scopeFactory;
+        this.operations = operations;
     }
 
     public async Task<AppModuleExecution> ExecuteAsync(Guid appId, string actionKey, Guid userId, JsonElement input, CancellationToken cancellationToken)
@@ -77,7 +77,7 @@ public sealed class AppActionExecutionService
         var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
             userId,
-            requireOnline: true,
+            requireOnline: false,
             cancellationToken: cancellationToken);
         var target = await deploymentTargetResolver.ResolveAsync(
             appId,
@@ -85,8 +85,9 @@ public sealed class AppActionExecutionService
             userId,
             cancellationToken);
 
+        EnsureAvailable(runner);
         var deployed = await runnerGateway.ListModulesAsync(
-            runner.ConnectionId, appId, target.Id, actionKey, cancellationToken);
+            runner.Id, appId, target.Id, actionKey, cancellationToken);
         var deployedAction = deployed.Actions.SingleOrDefault(item => string.Equals(item.Key, actionKey, StringComparison.Ordinal))
             ?? throw new KeyNotFoundException("Action is not deployed on the assigned Runner.");
         return (runner, target, deployedAction);
@@ -104,7 +105,7 @@ public sealed class AppActionExecutionService
     {
         var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrenceId, cancellationToken);
         if (existing != null) return existing;
-        if (string.IsNullOrWhiteSpace(runner.ConnectionId))
+        if (!runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)
             throw new InvalidOperationException("The selected Runner is unavailable.");
         return await CreateAndDispatchAsync(
             appId, deploymentTargetId, actionKey, null, input, occurrenceId, AppModuleTriggerTypes.Scheduled, runner, deployedAction, cancellationToken);
@@ -135,25 +136,16 @@ public sealed class AppActionExecutionService
             CorrelationId = System.Diagnostics.Activity.Current?.TraceId.ToString()
         };
         db.AppModuleExecutions.Add(execution);
-        await db.SaveChangesAsync(cancellationToken);
-
-        var inputJson = input.ValueKind == JsonValueKind.Undefined ? "null" : input.GetRawText();
-        var executionId = execution.Id;
-        var connectionId = runner.ConnectionId;
-        _ = Task.Run(async () =>
+        var request = new ExecuteAppActionModuleRequest
         {
-            try
-            {
-                await using var scope = scopeFactory.CreateAsyncScope();
-                await scope.ServiceProvider.GetRequiredService<AppActionExecutionDispatcher>()
-                    .DispatchAsync(executionId, connectionId, inputJson);
-            }
-            catch
-            {
-                // The hosted reconciler marks the persisted record Lost if dispatch
-                // fails before a terminal result is saved.
-            }
-        }, CancellationToken.None);
+            ExecutionId = execution.Id, AppId = appId, DeploymentTargetId = deploymentTargetId,
+            ActionKey = actionKey, ExpectedDeploymentHash = deployedAction.ContentHash,
+            Input = input.ValueKind == JsonValueKind.Undefined ? JsonSerializer.SerializeToElement<object?>(null) : input.Clone(),
+            SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
+                && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
+        };
+        await operations.QueueAsync(runner.Id, userId ?? Guid.Empty,
+            new(null, null, AppActionCommand.Create("execute", request)), cancellationToken, execution.Id);
         return execution;
     }
 
@@ -167,8 +159,8 @@ public sealed class AppActionExecutionService
 
     public async Task<AppActionModulesResponse> ListModulesAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
     {
-        var (connectionId, deploymentTargetId) = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
-        return await runnerGateway.ListModulesAsync(connectionId, appId, deploymentTargetId, string.Empty, cancellationToken);
+        var (runnerId, deploymentTargetId) = await GetAuthorizedRunnerAsync(appId, userId, cancellationToken);
+        return await runnerGateway.ListModulesAsync(runnerId, appId, deploymentTargetId, string.Empty, cancellationToken);
     }
 
     public async Task<AppActionModuleInfo> GetModuleAsync(Guid appId, string actionKey, Guid userId, CancellationToken cancellationToken)
@@ -182,24 +174,24 @@ public sealed class AppActionExecutionService
     public async Task<AppActionVersionsResponse> ListVersionsAsync(Guid appId, string actionKey, Guid userId, CancellationToken cancellationToken)
     {
         AppActionManifestParser.ValidateKey(actionKey);
-        var (connectionId, deploymentTargetId) = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
-        return await runnerGateway.ListVersionsAsync(connectionId, appId, deploymentTargetId, actionKey, cancellationToken);
+        var (runnerId, deploymentTargetId) = await GetAuthorizedRunnerAsync(appId, userId, cancellationToken);
+        return await runnerGateway.ListVersionsAsync(runnerId, appId, deploymentTargetId, actionKey, cancellationToken);
     }
 
     public async Task<AppActionVersionOperationResponse> RestoreVersionAsync(Guid appId, string actionKey, string version, Guid userId, CancellationToken cancellationToken)
     {
         AppActionManifestParser.ValidateKey(actionKey);
         await EnsureCanUpdateAsync(appId, userId, cancellationToken);
-        var (connectionId, deploymentTargetId) = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
-        return await runnerGateway.RestoreVersionAsync(connectionId, appId, deploymentTargetId, actionKey, version, cancellationToken);
+        var (runnerId, deploymentTargetId) = await GetAuthorizedRunnerAsync(appId, userId, cancellationToken);
+        return await runnerGateway.RestoreVersionAsync(runnerId, appId, deploymentTargetId, actionKey, version, cancellationToken);
     }
 
     public async Task<AppActionVersionOperationResponse> DeleteVersionAsync(Guid appId, string actionKey, string version, Guid userId, CancellationToken cancellationToken)
     {
         AppActionManifestParser.ValidateKey(actionKey);
         await EnsureCanUpdateAsync(appId, userId, cancellationToken);
-        var (connectionId, deploymentTargetId) = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
-        return await runnerGateway.DeleteVersionAsync(connectionId, appId, deploymentTargetId, actionKey, version, cancellationToken);
+        var (runnerId, deploymentTargetId) = await GetAuthorizedRunnerAsync(appId, userId, cancellationToken);
+        return await runnerGateway.DeleteVersionAsync(runnerId, appId, deploymentTargetId, actionKey, version, cancellationToken);
     }
 
     public async Task<AppModuleExecution> GetAsync(Guid appId, Guid executionId, Guid userId, CancellationToken cancellationToken)
@@ -215,10 +207,8 @@ public sealed class AppActionExecutionService
         if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to cancel Actions in this App.");
         var execution = await GetAsync(appId, executionId, userId, cancellationToken);
-        if (!execution.RunnerId.HasValue) return false;
-        var connectionId = await db.Runners.Where(x => x.Id == execution.RunnerId).Select(x => x.ConnectionId).SingleOrDefaultAsync(cancellationToken);
-        return !string.IsNullOrWhiteSpace(connectionId)
-            && await runnerGateway.CancelExecutionAsync(connectionId, executionId, cancellationToken);
+        if (!execution.RunnerId.HasValue || execution.CompletedAtUtc.HasValue) return false;
+        return await runnerGateway.CancelExecutionAsync(execution.RunnerId.Value, executionId, cancellationToken);
     }
 
     public async Task<AppModuleExecutionArtifactResponse> ReadArtifactAsync(Guid appId, Guid executionId, Guid userId, bool result, CancellationToken cancellationToken)
@@ -227,10 +217,9 @@ public sealed class AppActionExecutionService
         if (!execution.RunnerId.HasValue) return new(false, null, null, "Runner is unavailable.");
         if (!execution.DeploymentTargetId.HasValue)
             return new(false, null, null, "Execution has no deployment target.");
-        var connectionId = await db.Runners.Where(x => x.Id == execution.RunnerId).Select(x => x.ConnectionId).SingleOrDefaultAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(connectionId)) return new(false, null, null, "Runner is unavailable.");
+        var runnerId = execution.RunnerId.Value;
         return await runnerGateway.ReadExecutionArtifactAsync(
-            connectionId,
+            runnerId,
             appId,
             execution.DeploymentTargetId.Value,
             execution.ModuleKey,
@@ -239,7 +228,7 @@ public sealed class AppActionExecutionService
             cancellationToken);
     }
 
-    private async Task<(string ConnectionId, Guid DeploymentTargetId)> GetAuthorizedRunnerConnectionAsync(
+    private async Task<(Guid RunnerId, Guid DeploymentTargetId)> GetAuthorizedRunnerAsync(
         Guid appId,
         Guid userId,
         CancellationToken cancellationToken)
@@ -247,14 +236,21 @@ public sealed class AppActionExecutionService
         var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
             userId,
-            requireOnline: true,
+            requireOnline: false,
             cancellationToken: cancellationToken);
         var target = await deploymentTargetResolver.ResolveAsync(
             appId,
             targetSlug: null,
             userId,
             cancellationToken);
-        return (runner.ConnectionId!, target.Id);
+        EnsureAvailable(runner);
+        return (runner.Id, target.Id);
+    }
+
+    private static void EnsureAvailable(Runner runner)
+    {
+        if (!runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)
+            throw new InvalidOperationException("The assigned Runner is unavailable.");
     }
 
     private async Task EnsureCanUpdateAsync(Guid appId, Guid userId, CancellationToken cancellationToken)

@@ -12,6 +12,14 @@ internal sealed class RunnerExecutionJournal(string directory)
         return new FileStream(Path.Combine(directory, $"{id:N}.lock"), FileMode.OpenOrCreate,
             FileAccess.ReadWrite, FileShare.None);
     }
+    public async Task<FileStream> LockAsync(Guid id, CancellationToken token)
+    {
+        while (true)
+        {
+            try { return Lock(id); }
+            catch (IOException) { await Task.Delay(TimeSpan.FromMilliseconds(50), token); }
+        }
+    }
     public async Task<RunnerExecutionResult?> ReadAsync(Guid id, CancellationToken token)
     {
         if (!File.Exists(ResultPath(id))) return null;
@@ -40,8 +48,19 @@ internal sealed class RunnerExecutionJournal(string directory)
     private string ResultPath(Guid id) => Path.Combine(directory, $"{id:N}.json");
     public void Forget(Guid id)
     {
-        // API terminal state is authoritative after its receipt. This avoids retaining private results indefinitely.
-        foreach (var suffix in new[] { ".json", ".accepted", ".lock", ".json.tmp" })
+        try
+        {
+            using var ownership = Lock(id);
+            RemovePrivateResults(id);
+        }
+        catch (IOException exception) { Serilog.Log.Warning(exception, "Execution journal cleanup deferred for {OperationId}.", id); }
+        catch (UnauthorizedAccessException exception) { Serilog.Log.Warning(exception, "Execution journal cleanup deferred for {OperationId}.", id); }
+    }
+    private void RemovePrivateResults(Guid id)
+    {
+        // Remove private results after API confirmation; retain acceptance tombstones and lock inodes.
+        // A concurrent delivery may already have fetched its assignment before the API became terminal.
+        foreach (var suffix in new[] { ".json", ".json.tmp" })
         {
             try { File.Delete(Path.Combine(directory, $"{id:N}{suffix}")); }
             catch (IOException exception) { Serilog.Log.Warning(exception, "Execution journal cleanup deferred for {OperationId}.", id); }
