@@ -72,8 +72,7 @@ internal sealed class RunnerRuntimeNetworkPolicy
                 timeoutToken);
             return (int)response.StatusCode is >= 200 and < 300;
         }
-        catch (Exception ex) when ((ex is SocketException or HttpRequestException or TaskCanceledException)
-            && !timeoutToken.IsCancellationRequested)
+        catch (Exception ex) when (IsReadinessProbeFailure(ex, callerToken))
         {
             return false;
         }
@@ -82,6 +81,10 @@ internal sealed class RunnerRuntimeNetworkPolicy
             return false;
         }
     }
+
+    internal static bool IsReadinessProbeFailure(Exception error, CancellationToken callerToken)
+        => !callerToken.IsCancellationRequested
+            && error is SocketException or HttpRequestException or TaskCanceledException;
 
     private static async Task<bool> DelayBeforeReadinessRetryAsync(
         CancellationToken timeoutToken,

@@ -83,6 +83,21 @@ http:
         servers:
           - url: "http://website-__WEBSITE_COLOR__:80"
 
+tcp:
+  routers:
+    runner-broker:
+      entryPoints:
+        - runner-broker
+      rule: "HostSNI(`__API_DOMAIN__`)"
+      service: runner-broker
+      tls:
+        certResolver: cloudflare
+  services:
+    runner-broker:
+      loadBalancer:
+        servers:
+          - address: "rabbitmq:5672"
+
 tls:
   stores:
     default:
