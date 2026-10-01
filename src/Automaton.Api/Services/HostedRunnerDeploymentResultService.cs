@@ -91,10 +91,20 @@ public sealed class HostedRunnerDeploymentResultService(
         if (!await PersistPendingResultAsync(operationId, request.ExecutionAttemptId, resultJson, cancellationToken))
             return "stale";
 
-        await FinalizeTargetAsync(operation, target, runnerId, request.Result, cancellationToken);
-        var error = request.Result.Success ? null : request.Result.Message;
-        return await PersistResultAsync(operationId, request.ExecutionAttemptId, response, error,
-            request.Result.Success, cancellationToken)
+        return await CompleteTargetAndResultAsync(operation, target, runnerId, request.Result, response, cancellationToken);
+    }
+
+    private async Task<string> CompleteTargetAndResultAsync(DeploymentOperation operation, AppDeploymentTarget target,
+        Guid runnerId, DeployAppPackageResult result, DeployPackageResponse response, CancellationToken cancellationToken)
+    {
+        try { await FinalizeTargetAsync(operation, target, runnerId, result, cancellationToken); }
+        catch (ManagedApplicationArtifactFailureException failure)
+        {
+            return await FailArtifactSynchronizationAsync(operation, target, failure.Message, cancellationToken);
+        }
+        var error = result.Success ? null : result.Message;
+        return await PersistResultAsync(operation.Id, operation.ExecutionAttemptId!.Value, response, error,
+            result.Success, cancellationToken)
             ? "accepted"
             : "stale";
     }
@@ -124,6 +134,26 @@ public sealed class HostedRunnerDeploymentResultService(
                 .SetProperty(item => item.ResultJson, JsonSerializer.Serialize(response, JsonOptions)),
                 cancellationToken);
         return completed == 1;
+    }
+
+    private async Task<string> FailArtifactSynchronizationAsync(DeploymentOperation operation,
+        AppDeploymentTarget target, string error, CancellationToken token)
+    {
+        await using var transaction = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, token) : null;
+        var response = new DeployPackageResponse
+        {
+            DeploymentTargetId = target.Id, Success = false, Message = error,
+            Logs = [$"Host deployment completed, but managed artifact synchronization failed: {error}"]
+        };
+        if (!await PersistResultAsync(operation.Id, operation.ExecutionAttemptId!.Value, response, error, false, token))
+            return "stale";
+        // Refresh the target inside the transaction before checking/releasing its current attempt.
+        await db.Entry(target).ReloadAsync(token);
+        await targetState.MarkCompletedAsync(operation.WebAppId, target.Id, false, token,
+            deploymentOperationId: operation.Id, executionAttemptId: operation.ExecutionAttemptId);
+        if (transaction is not null) await transaction.CommitAsync(token);
+        return "accepted";
     }
 
     private static string? GetTerminalOutcome(DeploymentOperation operation, Guid attemptId)

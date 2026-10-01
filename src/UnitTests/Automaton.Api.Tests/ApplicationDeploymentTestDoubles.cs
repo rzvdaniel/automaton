@@ -280,7 +280,7 @@ internal static class DeploymentFixtureServiceFactory
                 new ConnectedFlowArtifactService(storage, null!, new PackageManagedArtifactsCommands()),
                 routeService));
 
-    private static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
+    internal static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
     {
         var userContext = new UserContextService(new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
         var settings = new SettingsService(db, userContext, Options.Create(new AppFileRuleBaselineOptions()));

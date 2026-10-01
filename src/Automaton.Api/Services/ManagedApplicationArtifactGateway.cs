@@ -18,8 +18,9 @@ public sealed class ManagedApplicationArtifactGateway(ApplicationDbContext db, R
             ? OperationIdentity(deploymentOperationId.Value, runnerId) : Guid.NewGuid();
         await operations.QueueManagedArtifactsAsync(id, runnerId, ownerId, request, cancellationToken);
         var result = await operations.WaitAsync(id, cancellationToken);
-        if (result.Outcome != "Succeeded" || result.ManagedArtifactsResult is null)
-            throw new InvalidOperationException(result.Error ?? "Managed artifact synchronization did not complete.");
+        if (result.Outcome != "Succeeded" || result.ManagedArtifactsResult is null || !result.ManagedArtifactsResult.Success)
+            throw new ManagedApplicationArtifactFailureException(
+                result.Error ?? result.ManagedArtifactsResult?.Error ?? $"Managed artifact synchronization ended with {result.Outcome}.");
         return result.ManagedArtifactsResult;
     }
 
