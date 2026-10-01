@@ -40,6 +40,7 @@ public class HostedRunnerDeleteLifecycleTests
         Assert.That(result.RuntimePortCleared, Is.True);
         Assert.That(result.BrokerUserDeleted, Is.True);
         Assert.That(result.BrokerQueueDeleted, Is.True);
+        Assert.That(result.ExecutionBrokerRevoked, Is.True);
     }
 }
 
@@ -72,14 +73,22 @@ internal static class HostedRunnerDeleteLifecycleTestSupport
         return new HostedRunnerDeleteLifecycleTestResult(
             hostedRunner.Status == HostedRunnerStatuses.Deleted,
             hostedRunner.RuntimePort is null,
-            brokerHandler.Requests.Count == 4
-                && brokerHandler.Requests[2].Method == HttpMethod.Delete
-                && brokerHandler.Requests[2].Path.Contains($"hosted-runner-{runnerId:N}", StringComparison.Ordinal),
-            brokerHandler.Requests.Count == 4
+            brokerHandler.Requests.Count == 5
                 && brokerHandler.Requests[3].Method == HttpMethod.Delete
-                && brokerHandler.Requests[3].Path.Contains(
-                    HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), StringComparison.Ordinal));
+                && brokerHandler.Requests[3].Path.Contains($"hosted-runner-{runnerId:N}", StringComparison.Ordinal),
+            brokerHandler.Requests.Count == 5
+                && brokerHandler.Requests[4].Method == HttpMethod.Delete
+                && brokerHandler.Requests[4].Path.Contains(
+                    HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), StringComparison.Ordinal),
+            ExecutionBrokerRevoked(brokerHandler.Requests, runnerId));
     }
+
+    private static bool ExecutionBrokerRevoked(List<(HttpMethod Method, string Path)> requests, Guid runnerId)
+        => requests.Count == 5
+            && requests.Take(3).All(r => r.Method == HttpMethod.Delete)
+            && requests[0].Path.Contains($"execution-runner-{runnerId:N}", StringComparison.Ordinal)
+            && requests[1].Path.Contains(RunnerExecutionCommandPublisher.QueueName(runnerId), StringComparison.Ordinal)
+            && requests[2].Path.Contains(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId), StringComparison.Ordinal);
 
     private static HostedRunnerBrokerProvisioner CreateBrokerProvisioner(RecordingBrokerHandler handler)
         => new(
@@ -116,4 +125,5 @@ internal sealed record HostedRunnerDeleteLifecycleTestResult(
     bool RunnerDeleted,
     bool RuntimePortCleared,
     bool BrokerUserDeleted,
-    bool BrokerQueueDeleted);
+    bool BrokerQueueDeleted,
+    bool ExecutionBrokerRevoked);
