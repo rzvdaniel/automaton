@@ -15,7 +15,8 @@ public sealed class RunnerDeletionService(
     ApplicationDbContext dbContext,
     RunnerDeletionPolicy deletionPolicy,
     IAuditEventService auditEventService,
-    UserContextService userContextService)
+    UserContextService userContextService,
+    RunnerExecutionRevocationService executions)
 {
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -48,6 +49,7 @@ public sealed class RunnerDeletionService(
             target.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
+        await executions.RevokeAsync(id, cancellationToken);
         dbContext.Runners.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 

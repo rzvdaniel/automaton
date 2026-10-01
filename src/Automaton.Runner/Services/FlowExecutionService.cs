@@ -30,20 +30,20 @@ public class FlowExecutionService
         this.logger = Log.ForContext<FlowExecutionService>();
     }
 
-    public async Task<WorkflowExecution> ExecuteWorkflowAsync(Guid workflowId)
+    public async Task<WorkflowExecution> ExecuteWorkflowAsync(Guid workflowId, CancellationToken cancellationToken = default)
     {        
         try
         {
             logger.Debug("Starting execution of workflow {WorkflowId}", workflowId);
             
-            var flow = await LoadFlowAsync(workflowId);
+            var flow = await LoadFlowAsync(workflowId, cancellationToken);
 
             if (flow == null)
             {
                 throw new InvalidOperationException($"Workflow {workflowId} not found");
             }
 
-            var workflowExecution = await ExecuteAsync(flow);
+            var workflowExecution = await ExecuteAsync(flow, cancellationToken);
             
             logger.Debug("Completed execution of workflow {WorkflowId} with status {Status}",
                 workflowId, workflowExecution.Status);
@@ -77,17 +77,17 @@ public class FlowExecutionService
         return workflowExecution;
     }
 
-    private async Task<Flow?> LoadFlowAsync(Guid workflowId)
+    private async Task<Flow?> LoadFlowAsync(Guid workflowId, CancellationToken cancellationToken)
     {
         try
         {
             await SetupHttpClientAuthAsync();
 
-            var response = await httpClient.GetAsync($"{configService.BaseUrl}/{configService.FlowsUrl}/{workflowId}");
+            var response = await httpClient.GetAsync($"{configService.BaseUrl}/{configService.FlowsUrl}/{workflowId}", cancellationToken);
             
             if (response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
                 
                 var flow = JsonSerializer.Deserialize<Flow>(json, new JsonSerializerOptions
                 {

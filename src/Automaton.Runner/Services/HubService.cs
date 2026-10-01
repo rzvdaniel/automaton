@@ -43,7 +43,6 @@ public class HubService
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
-        FlowExecutionService flowExecutionService,
         TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
@@ -63,10 +62,7 @@ public class HubService
             appActionExecutionService,
             actionDeploymentService);
         executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
-            configService,
-            flowExecutionService,
             tunnelForwarder,
-            serviceProvider,
             runnerWorkspaceService,
             logger);
         controlHandlerRegistrar = new HubControlHandlerRegistrar(serviceProvider, logger);

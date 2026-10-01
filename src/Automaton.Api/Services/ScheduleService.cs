@@ -1,12 +1,10 @@
 ﻿using Automaton.Api.Data;
 using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
 using Hangfire;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -15,7 +13,7 @@ namespace Automaton.Api.Services;
 public class ScheduleService
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly RunnerExecutionDispatchService dispatch;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -23,11 +21,11 @@ public class ScheduleService
     (
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IHubContext<AutomatonHub> automatonHub
+        RunnerExecutionDispatchService dispatch
     )
     {
         this.dbContext = dbContext;
-        this.automatonHub = automatonHub;
+        this.dispatch = dispatch;
         this.userId = userContextService.GetUserId();
         logger = Serilog.Log.ForContext<ScheduleService>();
     }
@@ -157,7 +155,7 @@ public class ScheduleService
 
             try
             {
-                if (runner == null || !RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+                if (runner == null || (!runner.LastHeartbeatAtUtc.HasValue || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold))
                 {
                     logger.Warning("Runner {RunnerId} is not connected for scheduled flow {FlowId}", runnerId, flowId);
                     result = GetInvalidFlowResult(flowId: flowId, runnerId: runnerId);
@@ -165,8 +163,8 @@ public class ScheduleService
                     continue;
                 }
 
-                var client = automatonHub.Clients.Client(runner.ConnectionId);
-                var response = await client.InvokeAsync<WorkflowExecution>(AutomatonHubMethods.RunWorkflow, flowId, cancellationToken);
+                var response = await dispatch.ExecuteAsync(runnerId, userId,
+                    new(flowId, null), cancellationToken);
 
                 result = GetSuccessfulFlowResult(flowId: flowId, runnerId: runnerId, response);
             }
@@ -187,32 +185,12 @@ public class ScheduleService
 
     private Runner? GetRunner(Guid id, Guid userId)
     {
-        var runner = dbContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
-
-        // Because we update Runner's ConnectionId on the fly,
-        // when retrieving data we get the cached version of it
-        // with previous ConnectionId. There is no need to do the
-        // same thing with other entities if they aren't updated
-        // in the same way as the Runner entity.
-
-        // Here are some ideas to fix the issue:
-        // https://stackoverflow.com/a/51290890/778863
-        // http://codethug.com/2016/02/19/Entity-Framework-Cache-Busting/
-
-        // Solution 1. Reload the entity 
-        if (runner != null)
-        {
-            dbContext.Entry(runner).Reload();
-        }
-
-        // Solution 2. Detach the entity to remove it from context’s cache.
-        // dbContext.Entry(entity).State = EntityState.Detached;
-        // entity = dbContext.Runners.Find(id);
+        var runner = dbContext.Runners.AsNoTracking().SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
 
         return runner;
     }
 
-    private static RunnerFlowResult GetSuccessfulFlowResult(Guid flowId, Guid runnerId, WorkflowExecution flowExecution)
+    private static RunnerFlowResult GetSuccessfulFlowResult(Guid flowId, Guid runnerId, RunnerExecutionResult flowExecution)
     {
         return new RunnerFlowResult
         {
@@ -220,16 +198,11 @@ public class ScheduleService
             RunnerId = runnerId,
             Started = flowExecution.Started,
             Finished = flowExecution.Finished,
-            Status = flowExecution.Status,
+            Status = flowExecution.WorkflowStatus,
             
             // ✅ Include OutputVariables from flow execution
-            OutputVariables = flowExecution.OutputVariables
-                .ToDictionary(k => k.Key,v => v.Value.Value),
-            
-            // ✅ Include execution logs for debugging
+            OutputVariables = flowExecution.OutputVariables,
             Logs = flowExecution.Logs
-                .Select(log => $"[{log.Timestamp:HH:mm:ss}] [{log.Level}] {log.Message}")
-                .ToList()
         };
     }
 

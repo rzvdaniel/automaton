@@ -17,6 +17,7 @@ public abstract class ApplicationDbContextEntitySetBase1 : IdentityDbContext<App
     public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
     public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
     public virtual DbSet<AuditEvent> AuditEvents { get; set; }
+    public virtual DbSet<RunnerExecutionOperation> RunnerExecutionOperations { get; set; }
     public virtual DbSet<Runner> Runners { get; set; }
     public virtual DbSet<RunnerConnectionSession> RunnerConnectionSessions { get; set; }
     public virtual DbSet<RunnerUser> RunnerUsers { get; set; }

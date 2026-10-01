@@ -24,11 +24,11 @@ internal static class HostedRunnerProfileTestServiceFactory
                 db,
                 new RunnerDeletionPolicy(db, null!),
                 audit,
-                userContext),
+                userContext, RunnerExecutionTestServices.Revocation(db)),
             connectionSessionService: sessions,
             runnerQueryService: queries,
             restartCompletionService: new HostedRunnerRestartCompletionService(db, audit),
-            flowExecutionService: new RunnerFlowExecutionService(queries, null!),
+            flowExecutionService: new RunnerFlowExecutionService(null!),
             instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
             connectionLifecycleService: new RunnerConnectionLifecycleService(
                 db,

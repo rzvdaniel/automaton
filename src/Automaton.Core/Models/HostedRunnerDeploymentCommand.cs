@@ -19,7 +19,9 @@ public sealed record HostedRunnerBrokerConfiguration(
     string VirtualHost,
     string Username,
     string Password,
-    string QueueName);
+    string QueueName,
+    bool TlsEnabled = false,
+    string? TlsServerName = null);
 
 public sealed record HostedRunnerDeploymentResultRequest(
     Guid ExecutionAttemptId,

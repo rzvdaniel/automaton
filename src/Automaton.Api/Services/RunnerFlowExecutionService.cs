@@ -1,17 +1,14 @@
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Api.Services;
 
 /// <summary>
-/// Dispatches workflows to authorized connected Runners and maps their execution responses.
+/// Dispatches workflows to authorized Runners through durable operations and maps their execution responses.
 /// </summary>
 public sealed class RunnerFlowExecutionService(
-    RunnerQueryService runnerQueryService,
-    IHubContext<AutomatonHub> automatonHub)
+    RunnerExecutionDispatchService dispatch)
 {
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<RunnerFlowExecutionService>();
 
@@ -34,16 +31,12 @@ public sealed class RunnerFlowExecutionService(
         Guid? userId,
         CancellationToken cancellationToken)
     {
-        _ = userId;
         var results = new List<RunnerFlowResult>();
         foreach (var runnerId in runnerIds)
         {
-            var runner = runnerQueryService.Get(runnerId);
-            var client = automatonHub.Clients.Client(runner.ConnectionId);
             try
             {
-                var response = await client.InvokeAsync<WorkflowExecution>(
-                    AutomatonHubMethods.RunWorkflow, flowId, cancellationToken);
+                var response = await dispatch.ExecuteAsync(runnerId, userId, new(flowId, null), cancellationToken);
                 results.Add(GetSuccessfulFlowResult(flowId, runnerId, response));
             }
             catch (Exception ex)
@@ -58,19 +51,16 @@ public sealed class RunnerFlowExecutionService(
         return results;
     }
 
-    private static RunnerFlowResult GetSuccessfulFlowResult(Guid flowId, Guid runnerId, WorkflowExecution flowExecution)
+    private static RunnerFlowResult GetSuccessfulFlowResult(Guid flowId, Guid runnerId, RunnerExecutionResult flowExecution)
         => new()
         {
             FlowId = flowId,
             RunnerId = runnerId,
             Started = flowExecution.Started,
             Finished = flowExecution.Finished,
-            Status = flowExecution.Status,
-            OutputVariables = flowExecution.OutputVariables
-                .ToDictionary(variable => variable.Key, variable => variable.Value.Value),
+            Status = flowExecution.WorkflowStatus,
+            OutputVariables = flowExecution.OutputVariables,
             Logs = flowExecution.Logs
-                .Select(log => $"[{log.Timestamp:HH:mm:ss}] [{log.Level}] {log.Message}")
-                .ToList()
         };
 
     private static RunnerFlowResult GetInvalidFlowResult(Guid flowId, Guid runnerId)

@@ -22,6 +22,12 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<HostContainerExecutionApiClient>();
         services.AddSingleton<TunnelForwarderService>();
         services.AddHostedService<InfrastructureCommandHostedService>();
+        services.AddSingleton<IRunnerExecutionExecutor, RunnerExecutionExecutor>();
+        services.AddSingleton(provider => new RunnerExecutionJournal(provider.GetRequiredService<FileStorageService>().GetRunnerExecutionJournalDirectory()));
+        services.AddSingleton<RunnerExecutionProcessor>();
+        services.AddSingleton<RunnerExecutionDeliveryHandler>();
+        services.AddSingleton<RunnerExecutionQueueConsumer>();
+        services.AddHostedService<RunnerExecutionHostedService>();
         services.AddHostedService<HostedRunnerDeploymentCommandHostedService>();
         services.AddHttpClient<RunnerHostService>();
         services.AddHttpClient<RunnerSettingsService>();

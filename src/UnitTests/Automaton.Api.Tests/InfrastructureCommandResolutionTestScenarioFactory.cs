@@ -131,11 +131,10 @@ internal static class InfrastructureCommandResolutionTestScenarioFactory
         ITransactionalEventExecutor? transactionalEventExecutor)
     {
         var grants = new ExecutionSecretGrantService(db, protector);
-        var lifecycle = new InfrastructureActionProvisioningHandler(
+        var lifecycle = RunnerExecutionTestServices.Lifecycle(
             db,
             new NoOpAuditEventService(),
-            Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()), null!);
+            null!);
         var results = new InfrastructureCommandResultService(db, grants, lifecycle);
         return new InfrastructureCommandCallbackService(
             db,

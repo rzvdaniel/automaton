@@ -16,6 +16,8 @@ public sealed class HostedRunnerBrokerProvisionerTests
         var expectedQueue = $"automaton.hosted-runner.{runnerId:N}";
         Assert.That(result.QueueName, Is.EqualTo(expectedQueue));
         Assert.That(result.Host, Is.EqualTo("broker.example"));
+        Assert.That(result.TlsEnabled, Is.True);
+        Assert.That(result.TlsServerName, Is.EqualTo("broker-tls.example"));
         Assert.That(result.Username, Is.EqualTo($"hosted-runner-{runnerId:N}"));
         Assert.That(result.Password, Is.Not.Empty);
         Assert.That(requests, Has.Count.EqualTo(3));
@@ -32,11 +34,35 @@ public sealed class HostedRunnerBrokerProvisionerTests
 
         await provisioner.RevokeAsync(runnerId, CancellationToken.None);
 
-        Assert.That(handler.Requests, Has.Count.EqualTo(2));
-        Assert.That(handler.Requests[0].Method, Is.EqualTo(HttpMethod.Delete));
-        Assert.That(handler.Requests[0].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
-        Assert.That(handler.Requests[1].Method, Is.EqualTo(HttpMethod.Delete));
-        Assert.That(handler.Requests[1].Path, Does.Contain(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId)));
+        Assert.That(handler.Requests, Has.Count.EqualTo(4));
+        Assert.That(handler.Requests[0].Path, Does.Contain($"execution-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[1].Path, Does.Contain(RunnerExecutionCommandPublisher.QueueName(runnerId)));
+        Assert.That(handler.Requests[2].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[2].Path, Does.Contain($"hosted-runner-{runnerId:N}"));
+        Assert.That(handler.Requests[3].Method, Is.EqualTo(HttpMethod.Delete));
+        Assert.That(handler.Requests[3].Path, Does.Contain(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId)));
+    }
+
+    [Test]
+    public async Task ExecutionCredentialCanOnlyConsumeItsOwnQueue()
+    {
+        var runnerId = Guid.NewGuid();
+        var handler = new RecordingHandler();
+        var result = await CreateProvisioner(handler).ProvisionExecutionAsync(runnerId, CancellationToken.None);
+        Assert.That(result.QueueName, Is.EqualTo(RunnerExecutionCommandPublisher.QueueName(runnerId)));
+        Assert.That(result.Username, Is.EqualTo($"execution-runner-{runnerId:N}"));
+        Assert.That(result.TlsEnabled, Is.True);
+        Assert.That(result.TlsServerName, Is.EqualTo("broker-tls.example"));
+        AssertConsumeOnlyPermission(handler.Requests[2].Body, result.QueueName);
+    }
+
+    [Test]
+    public void ExecutionRejectsPlaintextBeforeIssuingCredentials()
+    {
+        var handler = new RecordingHandler();
+        var provisioner = CreateProvisioner(handler, tlsEnabled: false);
+        Assert.ThrowsAsync<InvalidOperationException>(() => provisioner.ProvisionExecutionAsync(Guid.NewGuid(), CancellationToken.None));
+        Assert.That(handler.Requests, Is.Empty);
     }
 
     private static void AssertConsumeOnlyPermission(string body, string expectedQueue)
@@ -57,7 +83,7 @@ public sealed class HostedRunnerBrokerProvisionerTests
         return (result, handler.Requests);
     }
 
-    private static HostedRunnerBrokerProvisioner CreateProvisioner(RecordingHandler handler)
+    private static HostedRunnerBrokerProvisioner CreateProvisioner(RecordingHandler handler, bool tlsEnabled = true)
         => new(
             new SingleClientFactory(new HttpClient(handler)),
             Options.Create(new RabbitMqOptions
@@ -69,7 +95,10 @@ public sealed class HostedRunnerBrokerProvisionerTests
                 VirtualHost = "/",
                 ManagementUrl = "http://rabbitmq:15672/"
             }),
-            Options.Create(new HostedRunnerRabbitMqOptions { Host = "broker.example", Port = 5672 }));
+            Options.Create(new HostedRunnerRabbitMqOptions
+            {
+                Host = "broker.example", Port = 5671, TlsEnabled = tlsEnabled, TlsServerName = "broker-tls.example"
+            }));
 
     private sealed class SingleClientFactory(HttpClient client) : IHttpClientFactory
     {

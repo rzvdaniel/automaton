@@ -158,18 +158,16 @@ internal static class InfrastructureCommandCallbackTestScenarios
     };
 
     private static InfrastructureActionProvisioningHandler CreateStorageProvisioningHandler(ApplicationDbContext db)
-        => new(db, new NoOpAuditEventService(), Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()), null!);
+        => RunnerExecutionTestServices.Lifecycle(db, new NoOpAuditEventService());
 
     private static InfrastructureCommandCallbackService CreateService(
         ApplicationDbContext db,
         InfrastructureActionProvisioningHandler? lifecycle)
     {
-        var handler = lifecycle ?? new InfrastructureActionProvisioningHandler(
+        var handler = lifecycle ?? RunnerExecutionTestServices.Lifecycle(
             db,
             new NoOpAuditEventService(),
-            Options.Create(new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()), null!);
+            null!);
         var resultService = new InfrastructureCommandResultService(db, null!, handler);
         return new InfrastructureCommandCallbackService(db, null!, handler, resultService);
     }
