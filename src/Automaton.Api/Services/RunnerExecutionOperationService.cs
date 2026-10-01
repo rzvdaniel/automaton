@@ -27,7 +27,8 @@ public sealed class RunnerExecutionOperationService(
         {
             db.RunnerExecutionOperations.Add(operation);
             await db.SaveChangesAsync(ct);
-            await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId), ct);
+            await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId,
+                request.Action is not null && request.Action.Kind != "execute"), ct);
         }, token);
         return operation.Id;
     }
@@ -68,7 +69,7 @@ public sealed class RunnerExecutionOperationService(
                 await db.SaveChangesAsync(ct);
                 changed = true;
             }
-            if (changed) await events.PublishAsync(new RunnerExecutionRequestedEvent(operationId, operation.RunnerId), ct);
+            if (changed) await events.PublishAsync(new RunnerExecutionRequestedEvent(operationId, operation.RunnerId, Management: true), ct);
         }, token);
         return changed;
     }

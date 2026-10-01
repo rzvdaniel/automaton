@@ -21,7 +21,8 @@ public sealed record HostedRunnerBrokerConfiguration(
     string Password,
     string QueueName,
     bool TlsEnabled = false,
-    string? TlsServerName = null);
+    string? TlsServerName = null,
+    string? ManagementQueueName = null);
 
 public sealed record HostedRunnerDeploymentResultRequest(
     Guid ExecutionAttemptId,

@@ -10,5 +10,5 @@ public sealed class RunnerExecutionRequestedCapSubscriber(RunnerExecutionCommand
 {
     [CapSubscribe(EventTopics.RunnerExecutionRequested, Group = "automaton.api")]
     public Task HandleAsync(RunnerExecutionRequestedEvent message, CancellationToken token)
-        => publisher.PublishAsync(new RunnerExecutionCommand(message.OperationId, message.RunnerId), token);
+        => publisher.PublishAsync(new RunnerExecutionCommand(message.OperationId, message.RunnerId), token, message.Management);
 }

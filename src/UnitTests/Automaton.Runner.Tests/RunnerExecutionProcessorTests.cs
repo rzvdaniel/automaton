@@ -85,6 +85,19 @@ public sealed class RunnerExecutionProcessorTests
         Assert.That(stale.Outcome, Is.EqualTo("Lost")); Assert.That(executor.Calls, Is.EqualTo(1));
     }
     [Test]
+    public async Task CancelThenConfirmedCleanupAndRestartRejectsStaleExecution()
+    {
+        var executor = new Executor(); var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);
+        var processor = new RunnerExecutionProcessor(journal, executor);
+        Assert.That((await processor.CancelAsync(id, CancellationToken.None)).Outcome, Is.EqualTo("Cancelled"));
+        processor.Forget(id);
+        Assert.That(await journal.ReadAsync(id, CancellationToken.None), Is.Null);
+        var restarted = new RunnerExecutionProcessor(new(directory), executor);
+        var stale = await restarted.ProcessAsync(id, new(null, null, AppActionCommand.Create("execute", new { })), CancellationToken.None);
+        Assert.That(stale.Outcome, Is.EqualTo("Cancelled"));
+        Assert.That(executor.Calls, Is.Zero);
+    }
+    [Test]
     public async Task ConfirmedCleanupDoesNotDeleteAConcurrentJournalWritersFiles()
     {
         var id = Guid.NewGuid(); var journal = new RunnerExecutionJournal(directory);

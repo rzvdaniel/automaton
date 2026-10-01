@@ -22,10 +22,10 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
             completed.TryRemove(id, out _);
             return completedResult;
         }
+        if (!journal.WasAccepted(id) && !journal.WasCancelled(id)) journal.CancelBeforeExecution(id);
         var result = journal.WasAccepted(id)
             ? RunnerExecutionResult.Interrupted("Cancellation followed interrupted execution; side effects are uncertain.")
-            : new RunnerExecutionResult { Outcome = "Cancelled", Error = "Cancelled before execution.",
-                Started = DateTime.UtcNow, Finished = DateTime.UtcNow };
+            : CancelledBeforeExecution();
         await journal.SaveAsync(id, result, CancellationToken.None);
         return result;
     }
@@ -37,7 +37,8 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
         if (saved is not null) return saved;
         if (!completed.TryGetValue(id, out var result))
         {
-            result = journal.WasAccepted(id)
+            if (journal.WasCancelled(id)) result = CancelledBeforeExecution();
+            else result = journal.WasAccepted(id)
                 ? RunnerExecutionResult.Interrupted("Runner stopped after accepting work; execution outcome is uncertain. Work was not repeated.")
                 : await ExecuteOnceAsync(id, request, token);
             completed[id] = result;
@@ -47,6 +48,11 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
         completed.TryRemove(id, out _);
         return result;
     }
+    private static RunnerExecutionResult CancelledBeforeExecution() => new()
+    {
+        Outcome = "Cancelled", Error = "Cancelled before execution.",
+        Started = DateTime.UtcNow, Finished = DateTime.UtcNow
+    };
     private async Task<RunnerExecutionResult> ExecuteOnceAsync(Guid id, RunnerExecutionRequest request, CancellationToken token)
     {
         journal.Accept(id);

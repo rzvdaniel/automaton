@@ -27,9 +27,13 @@ internal sealed class RunnerExecutionJournal(string directory)
             ?? throw new InvalidDataException("Saved Runner execution result is invalid.");
     }
     public bool WasAccepted(Guid id) => File.Exists(Path.Combine(directory, $"{id:N}.accepted"));
+    public bool WasCancelled(Guid id) => File.Exists(Path.Combine(directory, $"{id:N}.cancelled"));
+    public void CancelBeforeExecution(Guid id) => WriteMarker(id, ".cancelled");
     public void Accept(Guid id)
+        => WriteMarker(id, ".accepted");
+    private void WriteMarker(Guid id, string suffix)
     {
-        using var file = new FileStream(Path.Combine(directory, $"{id:N}.accepted"), FileMode.CreateNew,
+        using var file = new FileStream(Path.Combine(directory, $"{id:N}{suffix}"), FileMode.CreateNew,
             FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough);
         file.WriteByte(1);
         file.Flush(true);
@@ -58,7 +62,7 @@ internal sealed class RunnerExecutionJournal(string directory)
     }
     private void RemovePrivateResults(Guid id)
     {
-        // Remove private results after API confirmation; retain acceptance tombstones and lock inodes.
+        // Remove private results after API confirmation; retain acceptance/cancellation tombstones and lock inodes.
         // A concurrent delivery may already have fetched its assignment before the API became terminal.
         foreach (var suffix in new[] { ".json", ".json.tmp" })
         {

@@ -10,7 +10,7 @@ public sealed class RunnerExecutionCommandPublisher(IOptions<RabbitMqOptions> op
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task PublishAsync(RunnerExecutionCommand command, CancellationToken cancellationToken)
+    public async Task PublishAsync(RunnerExecutionCommand command, CancellationToken cancellationToken, bool management = false)
     {
         var settings = options.Value;
         var factory = new ConnectionFactory
@@ -38,9 +38,10 @@ public sealed class RunnerExecutionCommandPublisher(IOptions<RabbitMqOptions> op
             Type = nameof(RunnerExecutionCommand)
         };
         var payload = JsonSerializer.SerializeToUtf8Bytes(command, JsonOptions);
-        var queueName = QueueName(command.RunnerId);
+        var queueName = management ? ManagementQueueName(command.RunnerId) : QueueName(command.RunnerId);
         await channel.BasicPublishAsync("", queueName, mandatory: true, properties, payload, cancellationToken);
     }
 
     public static string QueueName(Guid runnerId) => $"automaton.runner-execution.{runnerId:N}";
+    public static string ManagementQueueName(Guid runnerId) => $"automaton.runner-management.{runnerId:N}";
 }

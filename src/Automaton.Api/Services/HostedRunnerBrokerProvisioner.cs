@@ -23,11 +23,12 @@ public sealed class HostedRunnerBrokerProvisioner(
         if (!runnerBrokerOptions.Value.TlsEnabled)
             throw new InvalidOperationException("Workflow and custom-step Runner broker connections require TLS.");
         return ProvisionQueueAsync($"execution-runner-{runnerId:N}",
-            RunnerExecutionCommandPublisher.QueueName(runnerId), cancellationToken);
+            RunnerExecutionCommandPublisher.QueueName(runnerId), cancellationToken,
+            RunnerExecutionCommandPublisher.ManagementQueueName(runnerId));
     }
 
     private async Task<HostedRunnerBrokerConfiguration> ProvisionQueueAsync(string username,
-        string queueName, CancellationToken cancellationToken)
+        string queueName, CancellationToken cancellationToken, string? managementQueueName = null)
     {
         var rabbit = rabbitOptions.Value;
         var external = runnerBrokerOptions.Value;
@@ -44,15 +45,22 @@ public sealed class HostedRunnerBrokerProvisioner(
         var encodedVhost = Uri.EscapeDataString(rabbit.VirtualHost);
         await PutAsync(client, $"api/queues/{encodedVhost}/{Uri.EscapeDataString(queueName)}",
             new { durable = true, auto_delete = false, arguments = new { } }, cancellationToken);
+        if (managementQueueName is not null)
+            await PutAsync(client, $"api/queues/{encodedVhost}/{Uri.EscapeDataString(managementQueueName)}",
+                new { durable = true, auto_delete = false, arguments = new { } }, cancellationToken);
         await PutAsync(client, $"api/users/{Uri.EscapeDataString(username)}",
             new { password = brokerPassword, tags = "" }, cancellationToken);
         await PutAsync(client, $"api/permissions/{encodedVhost}/{Uri.EscapeDataString(username)}",
-            new { configure = "", write = "", read = $"^{System.Text.RegularExpressions.Regex.Escape(queueName)}$" }, cancellationToken);
+            new { configure = "", write = "", read = ReadPermission(queueName, managementQueueName) }, cancellationToken);
 
         return new HostedRunnerBrokerConfiguration(
             external.Host, external.Port, rabbit.VirtualHost, username, brokerPassword, queueName,
-            external.TlsEnabled, external.TlsServerName);
+            external.TlsEnabled, external.TlsServerName, managementQueueName);
     }
+
+    private static string ReadPermission(string queue, string? managementQueue)
+        => managementQueue is null ? $"^{System.Text.RegularExpressions.Regex.Escape(queue)}$"
+            : $"^({System.Text.RegularExpressions.Regex.Escape(queue)}|{System.Text.RegularExpressions.Regex.Escape(managementQueue)})$";
 
     public async Task RevokeAsync(Guid runnerId, CancellationToken cancellationToken)
     {
@@ -68,6 +76,8 @@ public sealed class HostedRunnerBrokerProvisioner(
         await DeleteIfPresentAsync(client, $"api/users/execution-runner-{runnerId:N}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.QueueName(runnerId))}", cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}", cancellationToken);
         await DeleteIfPresentAsync(client, $"api/users/{Uri.EscapeDataString(username)}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId))}",
@@ -83,6 +93,9 @@ public sealed class HostedRunnerBrokerProvisioner(
         await DeleteIfPresentAsync(client, $"api/users/execution-runner-{runnerId:N}", cancellationToken);
         await DeleteIfPresentAsync(client,
             $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.QueueName(runnerId))}",
+            cancellationToken);
+        await DeleteIfPresentAsync(client,
+            $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}",
             cancellationToken);
     }
 
