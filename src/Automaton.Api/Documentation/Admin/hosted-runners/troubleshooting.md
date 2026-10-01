@@ -30,3 +30,11 @@ If an invocation does not finish, check broker connectivity, the Runner executio
 Runner removal, revocation and Hosted Runner deprovisioning remove execution broker access and close unfinished operations. Other management operations still depend on SignalR, so retain the current reconnect/drain procedure until those paths are migrated.
 
 Enrolled Runner execution endpoints require the bound Runner API key and `X-Runner-Id`. Existing unbound BYO registrations use their authenticated owner API key and the same identity header, subject to existing Runner access and privileged-profile authorization.
+
+### Runner broker TLS
+
+Before releasing matching API and Runner versions, configure a RabbitMQ TLS listener reachable from every Runner, including BYO hosts. Set `HostedRunnerRabbitMq:Host`, `Port` (the actual TLS listener port, commonly `5671`), and `TlsEnabled=true` in API configuration. Port `5671` alone does not enable TLS. `TlsEnabled` defaults to true; the existing port default remains `5672`, so explicitly select your TLS listener port. Workflow/custom-step credential provisioning and consumption reject disabled or missing TLS; no plaintext fallback is used.
+
+The certificate must chain to a CA trusted by the Runner operating system and match `Host`. When connecting through a different address, set `HostedRunnerRabbitMq:TlsServerName` to the expected certificate DNS name. Install a private issuing CA into the Runner host/container trust store when needed, and keep revocation information reachable. Do not disable certificate or hostname validation. Both workflow/custom-step and Hosted Runner deployment consumers honor the supplied TLS settings. TLS errors leave commands pending for recovery rather than retrying over plaintext.
+
+This configures the external Runner broker connection. The API's trusted RabbitMQ management endpoint and internal command-publishing connection retain their existing configuration. No listener, firewall, certificate, or production configuration is changed automatically by this release.

@@ -9,9 +9,7 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
     public async Task ConsumeAsync(HostedRunnerBrokerConfiguration broker, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
     {
-        var factory = new ConnectionFactory { HostName = broker.Host, Port = broker.Port,
-            UserName = broker.Username, Password = broker.Password, VirtualHost = broker.VirtualHost,
-            AutomaticRecoveryEnabled = true };
+        var factory = RunnerBrokerConnectionFactory.Create(broker, requireTls: true);
         await using var connection = await factory.CreateConnectionAsync(token);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: token);
         await channel.BasicQosAsync(0, 1, false, token);

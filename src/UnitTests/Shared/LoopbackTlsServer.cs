@@ -21,6 +21,7 @@ internal sealed class LoopbackTlsServer : IAsyncDisposable
     public bool ReceivedApplicationData { get; private set; }
     public Exception? ServerException { get; private set; }
     public Task Completion => serverTask;
+    public string CertificateThumbprint => certificate.Thumbprint;
 
     public LoopbackTlsServer()
     {

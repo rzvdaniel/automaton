@@ -19,7 +19,7 @@ internal sealed class HostedRunnerDeploymentCommandQueueConsumer(
         Guid runnerId,
         CancellationToken cancellationToken)
     {
-        var factory = CreateConnectionFactory(broker);
+        var factory = RunnerBrokerConnectionFactory.Create(broker);
         await using var connection = await factory.CreateConnectionAsync(cancellationToken);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
         await channel.BasicQosAsync(0, 1, global: false, cancellationToken);
@@ -100,17 +100,6 @@ internal sealed class HostedRunnerDeploymentCommandQueueConsumer(
         processor.DeleteJournal(command);
         processor.DeleteExecutionResult(command);
     }
-
-    private static ConnectionFactory CreateConnectionFactory(HostedRunnerBrokerConfiguration broker) => new()
-    {
-        HostName = broker.Host,
-        Port = broker.Port,
-        UserName = broker.Username,
-        Password = broker.Password,
-        VirtualHost = broker.VirtualHost,
-        AutomaticRecoveryEnabled = true,
-        TopologyRecoveryEnabled = true
-    };
 
     private static HostedRunnerDeploymentCommand Deserialize(ReadOnlyMemory<byte> body)
         => JsonSerializer.Deserialize<HostedRunnerDeploymentCommand>(body.Span, JsonOptions)

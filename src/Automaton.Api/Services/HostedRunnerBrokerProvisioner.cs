@@ -19,8 +19,12 @@ public sealed class HostedRunnerBrokerProvisioner(
             HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), cancellationToken);
 
     public Task<HostedRunnerBrokerConfiguration> ProvisionExecutionAsync(Guid runnerId, CancellationToken cancellationToken)
-        => ProvisionQueueAsync($"execution-runner-{runnerId:N}",
+    {
+        if (!runnerBrokerOptions.Value.TlsEnabled)
+            throw new InvalidOperationException("Workflow and custom-step Runner broker connections require TLS.");
+        return ProvisionQueueAsync($"execution-runner-{runnerId:N}",
             RunnerExecutionCommandPublisher.QueueName(runnerId), cancellationToken);
+    }
 
     private async Task<HostedRunnerBrokerConfiguration> ProvisionQueueAsync(string username,
         string queueName, CancellationToken cancellationToken)
@@ -46,7 +50,8 @@ public sealed class HostedRunnerBrokerProvisioner(
             new { configure = "", write = "", read = $"^{System.Text.RegularExpressions.Regex.Escape(queueName)}$" }, cancellationToken);
 
         return new HostedRunnerBrokerConfiguration(
-            external.Host, external.Port, rabbit.VirtualHost, username, brokerPassword, queueName);
+            external.Host, external.Port, rabbit.VirtualHost, username, brokerPassword, queueName,
+            external.TlsEnabled, external.TlsServerName);
     }
 
     public async Task RevokeAsync(Guid runnerId, CancellationToken cancellationToken)
