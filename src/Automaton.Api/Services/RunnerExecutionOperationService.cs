@@ -16,6 +16,34 @@ public sealed class RunnerExecutionOperationService(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("RunnerExecutionOperation.v1");
 
+    public async Task QueueManagedArtifactsAsync(Guid id, Guid runnerId, Guid ownerId,
+        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
+    {
+        if (await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) return;
+        try { await QueueAsync(runnerId, ownerId, new(null, null, ManagedArtifacts: request), token, id); }
+        catch (DbUpdateException)
+        {
+            // Competing API callbacks may create the same operation. Its committed, pinned request wins.
+            var added = db.ChangeTracker.Entries<RunnerExecutionOperation>()
+                .SingleOrDefault(entry => entry.Entity.Id == id && entry.State == EntityState.Added);
+            if (added is not null) added.State = EntityState.Detached;
+            if (!await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) throw;
+        }
+    }
+
+    private async Task<bool> HasManagedArtifactsOperationAsync(Guid id, Guid runnerId, Guid ownerId,
+        SynchronizeApplicationManagedArtifactsRequest request, CancellationToken token)
+    {
+        var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
+        if (operation is null) return false;
+        var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId
+            || pinned?.ManagedArtifacts?.AppId != request.AppId
+            || pinned.ManagedArtifacts.DeploymentTargetId != request.DeploymentTargetId)
+            throw new UnauthorizedAccessException("Managed artifact operation identity belongs to another assignment.");
+        return true;
+    }
+
     public async Task<Guid> QueueAsync(Guid runnerId, Guid actor, RunnerExecutionRequest request, CancellationToken token, Guid? operationId = null)
     {
         var operation = new RunnerExecutionOperation
@@ -28,7 +56,7 @@ public sealed class RunnerExecutionOperationService(
             db.RunnerExecutionOperations.Add(operation);
             await db.SaveChangesAsync(ct);
             await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId,
-                request.Action is not null && request.Action.Kind != "execute"), ct);
+                request.ManagedArtifacts is not null || request.Action is not null && request.Action.Kind != "execute"), ct);
         }, token);
         return operation.Id;
     }

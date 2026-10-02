@@ -1,5 +1,4 @@
 using Automaton.Core.Models;
-using Automaton.Runner.Console.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Serilog;
 using static System.Console;
@@ -8,50 +7,23 @@ namespace Automaton.Runner.Console.Services;
 
 internal sealed class HubExecutionHandlerRegistrar
 {
-    private const string SynchronizeApplicationManagedArtifactsMethod = "SynchronizeApplicationManagedArtifacts";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
     private readonly TunnelForwarderService tunnelForwarder;
-    private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly ILogger logger;
 
     public HubExecutionHandlerRegistrar(
         TunnelForwarderService tunnelForwarder,
-        RunnerWorkspaceService runnerWorkspaceService,
         ILogger logger)
     {
         this.tunnelForwarder = tunnelForwarder;
-        this.runnerWorkspaceService = runnerWorkspaceService;
         this.logger = logger;
     }
 
     public void Register(HubConnection connection, Action beginActivity, Action endActivity)
     {
-        connection.On<SynchronizeApplicationManagedArtifactsRequest, SynchronizeApplicationManagedArtifactsResult>(
-            SynchronizeApplicationManagedArtifactsMethod,
-            request => SynchronizeApplicationManagedArtifacts(request));
         connection.On<TunnelRequest>(TunnelRequestMethod, request =>
             ForwardTunnelRequestAsync(connection, request, beginActivity, endActivity));
-    }
-
-    private SynchronizeApplicationManagedArtifactsResult SynchronizeApplicationManagedArtifacts(
-        SynchronizeApplicationManagedArtifactsRequest request)
-    {
-        var artifactRoot = runnerWorkspaceService.GetAppFlowArtifactsRoot(request.AppId, request.DeploymentTargetId);
-        try
-        {
-            ManagedApplicationArtifactSynchronizer.Replace(
-                artifactRoot,
-                request.Files ?? [],
-                runnerWorkspaceService.NormalizeRelativePath);
-            return new SynchronizeApplicationManagedArtifactsResult(request.AppId, request.DeploymentTargetId, true);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to synchronize managed flow artifacts for AppId={AppId}", request.AppId);
-            return new SynchronizeApplicationManagedArtifactsResult(
-                request.AppId, request.DeploymentTargetId, false, ex.Message);
-        }
     }
 
     private async Task ForwardTunnelRequestAsync(

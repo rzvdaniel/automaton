@@ -3,7 +3,8 @@ using Automaton.Core.Enums;
 namespace Automaton.Core.Models;
 
 public sealed record RunnerExecutionCommand(Guid OperationId, Guid RunnerId);
-public sealed record RunnerExecutionRequest(Guid? FlowId, RunnerCustomStepPayload? Step, AppActionCommand? Action = null);
+public sealed record RunnerExecutionRequest(Guid? FlowId, RunnerCustomStepPayload? Step, AppActionCommand? Action = null,
+    SynchronizeApplicationManagedArtifactsRequest? ManagedArtifacts = null);
 public sealed record RunnerExecutionAssignment(string Disposition, RunnerExecutionRequest? Request);
 public sealed record RunnerExecutionReceipt(string Outcome);
 
@@ -26,6 +27,7 @@ public sealed class RunnerExecutionResult
     public DateTime Finished { get; set; }
     public string? Output { get; set; }
     public System.Text.Json.JsonElement? ActionResult { get; set; }
+    public SynchronizeApplicationManagedArtifactsResult? ManagedArtifactsResult { get; set; }
     public Dictionary<string, string?> OutputVariables { get; set; } = [];
     public List<string> Logs { get; set; } = [];
     public static RunnerExecutionResult Interrupted(string reason) => new()

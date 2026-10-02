@@ -277,10 +277,10 @@ internal static class DeploymentFixtureServiceFactory
             new DeploymentPackageFinalizationService(
                 state.Db,
                 storage,
-                new ConnectedFlowArtifactService(storage, null!, hub),
+                new ConnectedFlowArtifactService(storage, null!, new PackageManagedArtifactsCommands()),
                 routeService));
 
-    private static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
+    internal static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
     {
         var userContext = new UserContextService(new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
         var settings = new SettingsService(db, userContext, Options.Create(new AppFileRuleBaselineOptions()));
@@ -702,15 +702,6 @@ internal sealed class PackageClientProxy(
             if (runnerInvocationDelay is { } delay)
                 await Task.Delay(delay, CancellationToken.None);
             return (T)(object)runnerResult;
-        }
-
-        if (method == AutomatonHubMethods.SynchronizeApplicationManagedArtifacts)
-        {
-            var request = (SynchronizeApplicationManagedArtifactsRequest)args[0]!;
-            return (T)(object)new SynchronizeApplicationManagedArtifactsResult(
-                request.AppId,
-                request.DeploymentTargetId,
-                true);
         }
 
         throw new NotSupportedException($"Unexpected invoke method: {method}");

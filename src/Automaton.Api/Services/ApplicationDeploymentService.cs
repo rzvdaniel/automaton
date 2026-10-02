@@ -119,7 +119,8 @@ public sealed class ApplicationDeploymentService
                     runner,
                     file,
                     packageApplication,
-                    cancellationToken);
+                    cancellationToken,
+                    deploymentOperationId);
                 pendingRouteApplied = true;
 
                 await deploymentTargetStateService.MarkCompletedAsync(
