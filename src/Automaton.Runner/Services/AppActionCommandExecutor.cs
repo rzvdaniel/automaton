@@ -21,7 +21,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "read-logs" => execution.ReadLogs(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "read-result" => execution.ReadResult(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "prepare-module" => await deployment.PrepareModuleAsync(command.Read<PrepareAppActionModuleRequest>(), token),
-            "cleanup-target" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>()),
+            "cleanup-target" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
+            "cleanup-app" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,
@@ -37,7 +38,7 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
         => deployment.DeleteVersion(request.AppId, request.DeploymentTargetId, request.ActionKey, request.Version);
     private async Task<CleanupAppDeploymentTargetResult> CleanupAsync(CleanupAppDeploymentTargetRequest request)
     {
-        await runtime.CleanupTargetAsync(request.AppId, request.DeploymentTargetId);
+        await runtime.CleanupTargetAsync(request.AppId, request.DeploymentTargetId, request.DeleteApplicationStorage);
         return new(request.AppId, request.DeploymentTargetId, true);
     }
 }

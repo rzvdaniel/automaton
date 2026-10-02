@@ -4,7 +4,7 @@ using Automaton.Runner.Console.Models;
 namespace Automaton.Runner.Console.Services;
 
 /// <summary>Adapts the application container runtime to the typed host relay.</summary>
-public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime
+public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IScopedApplicationContainerRuntime, IApplicationContainerCleanupRuntime
 {
     private readonly Func<HostContainerExecutionRequest, CancellationToken, Task<HostContainerExecutionResponse>> execute;
     private readonly Func<Task<RunnerInstallationProfile?>> loadProfile;
@@ -110,6 +110,12 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
 
     public async Task StopAndRemoveAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)
         => EnsureSuccess(await ExecuteExistingAsync(scope, HostContainerOperationKinds.RemoveContainer, id, cancellationToken));
+
+    public async Task RemoveTargetContainersAsync(ApplicationContainerScope application, CancellationToken cancellationToken = default)
+    {
+        var scope = await ScopeAsync(application.AppId, application.DeploymentTargetId, Guid.Empty);
+        EnsureSuccess(await execute(new() { Scope = scope, Operation = HostContainerOperationKinds.RemoveTargetContainers }, cancellationToken));
+    }
 
     private async Task<HostContainerExecutionResponse> ExecuteExistingAsync(ApplicationContainerScope application, string operation, string id, CancellationToken cancellationToken)
     {

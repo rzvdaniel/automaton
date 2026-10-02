@@ -41,7 +41,8 @@ public sealed class AppActionDeploymentResult
 
 public sealed record CleanupAppDeploymentTargetRequest(
     Guid AppId,
-    Guid DeploymentTargetId);
+    Guid DeploymentTargetId,
+    bool DeleteApplicationStorage = false);
 
 public sealed record CleanupAppDeploymentTargetResult(
     Guid AppId,

@@ -413,6 +413,7 @@ public class AppDeploymentTargetManagementServiceTests
         public ApplicationDbContext Db { get; }
         public WebApp App { get; }
         public AppDeploymentTargetManagementService Service { get; }
+        public CleanupCommands Commands { get; private set; } = null!;
 
         private TestFixtureContext(
             ApplicationDbContext db,
@@ -431,8 +432,8 @@ public class AppDeploymentTargetManagementServiceTests
         public static async Task<TestFixtureContext> CreateAsync(bool successfulCleanup = false)
         {
             var state = await CreatePersistentStateAsync();
-            var service = CreateService(state.Db, state.UserId, successfulCleanup, out var routeRoot);
-            return new TestFixtureContext(state.Db, state.App, service, routeRoot, state.UserId);
+            var service = CreateService(state.Db, state.UserId, successfulCleanup, out var routeRoot, out var commands);
+            return new TestFixtureContext(state.Db, state.App, service, routeRoot, state.UserId) { Commands = commands };
         }
 
         private static async Task<PersistentState> CreatePersistentStateAsync()
@@ -464,11 +465,11 @@ public class AppDeploymentTargetManagementServiceTests
             ApplicationDbContext db,
             Guid userId,
             bool successfulCleanup,
-            out string routeRoot)
+            out string routeRoot, out CleanupCommands cleanupCommands)
         {
             var authorization = CreateAuthorizationService(db, userId);
             var routeService = CreateRouteService(db, out routeRoot);
-            var cleanupCommands = new CleanupCommands(successfulCleanup);
+            cleanupCommands = new CleanupCommands(successfulCleanup);
             return new AppDeploymentTargetManagementService(
                 db,
                 authorization,
@@ -552,12 +553,16 @@ public class AppDeploymentTargetManagementServiceTests
         }
     }
 
-    private sealed class CleanupCommands(bool successful) : IRunnerActionCommands
+    internal sealed class CleanupCommands(bool successful) : IRunnerActionCommands
     {
+        public List<CleanupAppDeploymentTargetRequest> Requests { get; } = [];
+        public bool FailStorageCleanup { get; set; }
         public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         {
             if (!successful) throw new InvalidOperationException("Runner cleanup failed.");
             var request = (CleanupAppDeploymentTargetRequest)payload;
+            Requests.Add(request);
+            if (request.DeleteApplicationStorage && FailStorageCleanup) throw new InvalidOperationException("storage cleanup failed");
             object result = new CleanupAppDeploymentTargetResult(request.AppId, request.DeploymentTargetId, true);
             return Task.FromResult((T)result);
         }

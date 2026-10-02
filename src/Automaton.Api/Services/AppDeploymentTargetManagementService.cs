@@ -310,11 +310,19 @@ public sealed partial class AppDeploymentTargetManagementService(
             foreach (var targetId in targetIds)
             {
                 var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
-                if (IsDeployed(target))
+                if (target.ExecutionRunnerId.HasValue)
                 {
                     await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
                 }
             }
+
+            var assignedTargets = await dbContext.AppDeploymentTargets
+                .Include(target => target.ExecutionRunner)
+                .Where(target => target.WebAppId == appId && target.ExecutionRunnerId != null)
+                .ToListAsync(cancellationToken);
+            foreach (var runnerTargets in assignedTargets.GroupBy(target => target.ExecutionRunnerId))
+                await runtimeCleanupService.CleanupRuntimeAsync(
+                    runnerTargets.First(), cancellationToken, deleteApplicationStorage: true);
 
             return claims;
         }

@@ -275,6 +275,36 @@ public sealed class HostContainerRuntimeTests
         Assert.That(calls, Has.Count.EqualTo(1));
     }
 
+    [TestCase("success")]
+    [TestCase("wrong-owner")]
+    [TestCase("remove-failure")]
+    [TestCase("list-failure")]
+    public async Task TargetCleanup_DiscoversOrphansAndChecksFullOwnership(string scenario)
+    {
+        var state = Inspection();
+        if (scenario == "wrong-owner") state["Config"]!["Labels"]!["com.automaton.hosted-runner-id"] = Guid.NewGuid().ToString();
+        var removed = false;
+        var service = Service(args =>
+        {
+            if (args[1] == "ps") return new() { Success = scenario != "list-failure", Output = removed ? "" : ContainerId };
+            if (args[1] == "rm")
+            {
+                removed = scenario != "remove-failure";
+                return new() { Success = removed };
+            }
+            return new() { Success = true, Output = state.ToJsonString() };
+        });
+        var request = new HostContainerExecutionRequest { Scope = scope, Operation = HostContainerOperationKinds.RemoveTargetContainers };
+        var result = await service.ExecuteAsync(request);
+        Assert.That(result.Success, Is.EqualTo(scenario == "success"));
+        if (scenario == "success") Assert.That((await service.ExecuteAsync(request)).Success, Is.True);
+        if (scenario is "wrong-owner" or "list-failure") Assert.That(calls.Any(args => args[1] == "rm"), Is.False);
+        Assert.That(calls[0], Does.Contain($"label=com.automaton.hosted-runner-id={scope.HostedRunnerId}"));
+        Assert.That(calls[0], Does.Contain($"label=com.automaton.runner-host-id={scope.RunnerHostId}"));
+        Assert.That(calls[0], Does.Contain($"label=com.automaton.app-id={scope.AppId}"));
+        Assert.That(calls[0], Does.Contain($"label=com.automaton.deployment-target-id={scope.DeploymentTargetId}"));
+    }
+
     [Test]
     public async Task LogsAreTail200AndBoundedEvenForOneHugeLine()
     {
