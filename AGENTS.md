@@ -22,6 +22,17 @@ Read the matching skill before changing the related area:
 
 The skills listed above are the repository contract. Other folders under `.agents/skills/` are developer-local. Do not add, expand, or commit local skills unless the task names that work.
 
+## Browser Automation
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+
+Core workflow:
+
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes
+
 ## Agent orchestration
 
 Symphony is the orchestration system for repository coding agents. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`.
