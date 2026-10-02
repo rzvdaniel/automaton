@@ -4,6 +4,15 @@ namespace Automaton.Runner.Console.Services;
 
 internal static class RunnerRuntimeMetadataPolicy
 {
+    public static void ValidateApplyRequest(ApplicationContract contract, bool acceptingLifecycleWork)
+    {
+        if (!acceptingLifecycleWork)
+            throw new InvalidOperationException("The managed runtime container manager is stopping and is not accepting new lifecycle work.");
+        ApplicationContractValidator.EnsureDeployable(contract);
+        if (contract.Health.Port is not null && contract.Health.Port != contract.Runtime.Port)
+            throw new InvalidOperationException("A health.port different from runtime.port is not supported by the isolated application-container network boundary.");
+    }
+
     public static bool HasExpectedIdentity(DockerContainerIdentity identity, Guid appId, Guid targetId)
         => identity.Labels.TryGetValue("com.automaton.managed", out var managed)
             && string.Equals(managed, "true", StringComparison.OrdinalIgnoreCase)

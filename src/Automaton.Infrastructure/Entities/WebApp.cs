@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Automaton.Api.Enums;
 using Automaton.Core.Models;
 
@@ -6,6 +7,9 @@ namespace Automaton.Api.Entities;
 public class WebApp
 {
     public Guid Id { get; set; }
+    /// <summary>Durable owner of whole-app deletion; admission stays closed until released or deleted.</summary>
+    [ConcurrencyCheck]
+    public Guid? DeletionClaimId { get; set; }
     public string Name { get; set; }
     public string Summary { get; set; }
     public string Description { get; set; }

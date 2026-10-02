@@ -80,6 +80,7 @@ public sealed class AccountStorageProjectMigrationTests
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options);
         db.Database.ExecuteSqlRaw("CREATE TABLE __EFMigrationsHistory (MigrationId TEXT NOT NULL PRIMARY KEY, ProductVersion TEXT NOT NULL)");
+        db.Database.ExecuteSqlRaw("CREATE TABLE WebApps (Id TEXT NOT NULL PRIMARY KEY)");
         db.Database.ExecuteSqlRaw("CREATE TABLE AspNetUsers (Id TEXT COLLATE ascii_general_ci NOT NULL PRIMARY KEY)");
         db.Database.ExecuteSqlRaw("CREATE TABLE HostedRunners (Id TEXT NOT NULL PRIMARY KEY, UserId TEXT NOT NULL, StorageProjectId INTEGER NULL)");
         db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IX_HostedRunners_StorageProjectId ON HostedRunners (StorageProjectId)");

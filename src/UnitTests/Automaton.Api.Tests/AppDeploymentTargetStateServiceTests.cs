@@ -201,6 +201,8 @@ public class AppDeploymentTargetStateServiceTests
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
+            CREATE TABLE WebApps (Id TEXT NOT NULL PRIMARY KEY, DeletionClaimId TEXT NULL);
+            INSERT INTO WebApps (Id) VALUES ($appId);
             CREATE TABLE AppDeploymentTargets (
                 Id TEXT NOT NULL PRIMARY KEY,
                 WebAppId TEXT NOT NULL,

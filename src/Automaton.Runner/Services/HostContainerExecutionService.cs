@@ -50,6 +50,9 @@ public sealed partial class HostContainerExecutionService
         var error = HostContainerRuntimeValidation.Validate(request);
         if (error is not null)
             return Failure("invalid_request", error);
+        if (request.Operation == HostContainerOperationKinds.RemoveTargetContainers)
+            return await new HostContainerRuntimeCleanup(executor, ExecuteContainerOperationAsync)
+                .ExecuteAsync(request, RuntimeLabels(request.Scope), cancellationToken);
         return request.Operation == HostContainerOperationKinds.CreateApplicationContainer
             ? await CreateApplicationContainerAsync(request, cancellationToken)
             : await ExecuteContainerOperationAsync(request, cancellationToken);
@@ -129,6 +132,7 @@ public sealed partial class HostContainerExecutionService
             or HostContainerOperationKinds.InspectContainer
             or HostContainerOperationKinds.GetContainerLogs
             or HostContainerOperationKinds.RemoveContainer
+            or HostContainerOperationKinds.RemoveTargetContainers
                 ? null
                 : Failure("operation", "The host-container operation is not supported.");
 

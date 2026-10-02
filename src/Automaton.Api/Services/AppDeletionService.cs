@@ -13,8 +13,12 @@ public sealed class AppDeletionService(
     public async Task DeleteResourcesAsync(Guid appId, WebApp app, Guid ownerId)
     {
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
+        Guid? appClaimId = null;
+        var appClaims = new AppDeletionClaimService(dataContext);
         try
         {
+            appClaimId = await appClaims.AcquireAsync(appId);
+            await dataContext.Entry(app).ReloadAsync();
             if (deploymentTargetManagementService is not null)
             {
                 deletionClaims = await deploymentTargetManagementService
@@ -34,6 +38,8 @@ public sealed class AppDeletionService(
                     appId, deletionClaims, CancellationToken.None);
             }
 
+            if (appClaimId.HasValue)
+                await appClaims.ReleaseAsync(appId, appClaimId.Value, CancellationToken.None);
             throw;
         }
     }

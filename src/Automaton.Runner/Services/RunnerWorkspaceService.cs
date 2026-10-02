@@ -280,6 +280,18 @@ public class RunnerWorkspaceService
         }
     }
 
+    public void DeleteApplicationStorage(Guid appId)
+    {
+        if (appId == Guid.Empty) throw new ArgumentException("App ID is required.", nameof(appId));
+        var roots = new[] {
+            ManagedPathBoundary.ResolveInside(AppsRoot, appId.ToString(), "app cleanup"),
+            ManagedPathBoundary.ResolveInside(GetFastApiScriptsRoot(), appId.ToString(), "legacy app cleanup"),
+            ManagedPathBoundary.ResolveInside(DataRoot, appId.ToString(), "app data cleanup"),
+            ManagedPathBoundary.ResolveInside(RunnerRoot, $"deployments/{appId}", "app staging cleanup") };
+        foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
     public void DeletePersistentApplicationData(Guid appId)
     {
         var dataRoot = GetAppDataDirectory(appId);

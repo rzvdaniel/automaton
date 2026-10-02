@@ -120,7 +120,7 @@ public interface IScopedApplicationContainerRuntime
     Task StopAndRemoveAsync(ApplicationContainerScope scope, string containerIdOrName, CancellationToken cancellationToken = default);
 }
 
-public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime
+public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStagedApplicationContainerRuntime, IApplicationContainerCleanupRuntime
 {
     private readonly string dockerExecutable;
     private readonly DockerCommandExecutor? commandExecutor;
@@ -328,6 +328,26 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
 
     public async Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         => (await ExecuteAsync(["logs", "--tail", "200", containerIdOrName], TimeSpan.FromSeconds(30), cancellationToken, allowFailure: true)).CombinedOutput;
+
+    public async Task RemoveTargetContainersAsync(ApplicationContainerScope scope, CancellationToken cancellationToken = default)
+    {
+        var listed = await ExecuteAsync(["ps", "--all", "--quiet", "--no-trunc",
+            "--filter", "label=com.automaton.managed=true",
+            "--filter", "label=com.automaton.runtime-kind=generic",
+            "--filter", $"label=com.automaton.app-id={scope.AppId}",
+            "--filter", $"label=com.automaton.deployment-target-id={scope.DeploymentTargetId}"],
+            TimeSpan.FromSeconds(30), cancellationToken);
+        foreach (var id in listed.StandardOutput.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!HostContainerRuntimeValidation.IsContainerId(id))
+                throw new InvalidOperationException("Docker returned an invalid container identity.");
+            var identity = await InspectAsync(id, cancellationToken);
+            if (!identity.Exists) continue;
+            if (!RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, scope.AppId, scope.DeploymentTargetId))
+                throw new UnauthorizedAccessException("Runtime cleanup ownership does not match.");
+            await StopAndRemoveAsync(id, cancellationToken);
+        }
+    }
 
     private async Task<CommandResult> ExecuteAsync(
         IReadOnlyList<string> arguments,

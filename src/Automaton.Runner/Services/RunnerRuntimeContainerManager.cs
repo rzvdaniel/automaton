@@ -222,7 +222,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         string? artifactRoot = null,
         Guid? candidateId = null)
     {
-        ValidateApplyRequest(contract);
+        RunnerRuntimeMetadataPolicy.ValidateApplyRequest(contract, acceptingLifecycleWork);
         var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var previous = await ReadExistingMetadataAsync(metadataPath, cancellationToken);
         if (contract.Runtime.Command is null)
@@ -231,15 +231,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var attempt = await PrepareRuntimeCandidateAsync(
             appId, deploymentTargetId, contract, previous, metadataPath, artifactRoot, candidateId, cancellationToken);
         return await StartAndPromoteCandidateAsync(attempt, previous, cancellationToken);
-    }
-
-    private void ValidateApplyRequest(ApplicationContract contract)
-    {
-        if (!acceptingLifecycleWork)
-            throw new InvalidOperationException("The managed runtime container manager is stopping and is not accepting new lifecycle work.");
-        ApplicationContractValidator.EnsureDeployable(contract);
-        if (contract.Health.Port is not null && contract.Health.Port != contract.Runtime.Port)
-            throw new InvalidOperationException("A health.port different from runtime.port is not supported by the isolated application-container network boundary.");
     }
 
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
@@ -486,11 +477,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var metadata = File.Exists(metadataPath)
             ? await metadataStore.ReadAsync(metadataPath, CancellationToken.None)
             : null;
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(current?.ContainerId)) ids.Add(current.ContainerId);
-        if (!string.IsNullOrWhiteSpace(metadata?.ContainerId)) ids.Add(metadata.ContainerId);
-        if (!string.IsNullOrWhiteSpace(metadata?.Candidate?.ContainerId)) ids.Add(metadata.Candidate.ContainerId);
-        if (!string.IsNullOrWhiteSpace(metadata?.Candidate?.ContainerName)) ids.Add(metadata.Candidate.ContainerName);
+        var ids = GetCleanupContainerReferences(current?.ContainerId, metadata);
+        if (containers is IApplicationContainerCleanupRuntime cleanup)
+            await cleanup.RemoveTargetContainersAsync(new(appId, deploymentTargetId));
         var warnings = new List<string>();
         foreach (var id in ids)
             await TryStopOwnedContainerAsync(id, appId, deploymentTargetId, warnings, "explicit runtime stop");
@@ -499,6 +488,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         if (warnings.Count > 0)
             throw new InvalidOperationException($"Managed runtime cleanup for {appId}/{deploymentTargetId} is incomplete; target state was preserved for retry. {string.Join(" ", warnings)}");
     }
+
+    private static HashSet<string> GetCleanupContainerReferences(
+        string? currentId, RunnerRuntimeDeploymentMetadata? metadata)
+        => new[] { currentId, metadata?.ContainerId, metadata?.Candidate?.ContainerId,
+            metadata?.Candidate?.ContainerName }.Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!).ToHashSet(StringComparer.Ordinal);
 
     private async Task<string?> PromoteAsync(
         Guid appId,

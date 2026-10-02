@@ -14,7 +14,8 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
 {
     public async Task CleanupRuntimeAsync(
         AppDeploymentTarget target,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool deleteApplicationStorage = false)
     {
         target.CleanupPending = true;
         target.LastCleanupAttemptAt = DateTimeOffset.UtcNow;
@@ -34,7 +35,7 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         try
         {
             var result = await gateway.SendAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
-                "cleanup-target", new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id), cancellationToken);
+                deleteApplicationStorage ? "cleanup-app" : "cleanup-target", new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id, deleteApplicationStorage), cancellationToken);
             if (!result.Success || result.AppId != target.WebAppId || result.DeploymentTargetId != target.Id)
             {
                 await RecordCleanupFailureAsync(

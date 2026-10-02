@@ -4,7 +4,6 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
-using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,24 +54,14 @@ public sealed class DeploymentOperationService(
 
         try
         {
-            await transactionalEventExecutor.ExecuteAsync(async transactionCancellationToken =>
-            {
-                dataContext.DeploymentOperations.Add(new DeploymentOperation
+            await new DeploymentOperationAdmission(dataContext, transactionalEventExecutor, eventPublisher)
+                .SaveAsync(new DeploymentOperation
                 {
-                    Id = operationId,
-                    WebAppId = appId,
-                    OwnerUserId = ownerId,
+                    Id = operationId, WebAppId = appId, OwnerUserId = ownerId,
                     TargetSlug = string.IsNullOrWhiteSpace(targetSlug) ? null : targetSlug.Trim(),
-                    Status = DeploymentOperationStatuses.Pending,
-                    PackagePath = packagePath,
-                    Clean = clean,
-                    CreatedAtUtc = DateTime.UtcNow
-                });
-                await dataContext.SaveChangesAsync(transactionCancellationToken);
-                await eventPublisher.PublishAsync(
-                    new DeploymentPackageRequestedEvent { OperationId = operationId },
-                    transactionCancellationToken);
-            }, cancellationToken);
+                    Status = DeploymentOperationStatuses.Pending, PackagePath = packagePath,
+                    Clean = clean, CreatedAtUtc = DateTime.UtcNow
+                }, cancellationToken);
 
             return new DeploymentOperationResponse
             {

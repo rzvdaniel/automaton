@@ -413,6 +413,8 @@ public class AppDeploymentTargetManagementServiceTests
         public ApplicationDbContext Db { get; }
         public WebApp App { get; }
         public AppDeploymentTargetManagementService Service { get; }
+        public DbContextOptions<ApplicationDbContext> ContextOptions { get; private set; } = null!;
+        public CleanupCommands Commands { get; private set; } = null!;
 
         private TestFixtureContext(
             ApplicationDbContext db,
@@ -431,16 +433,15 @@ public class AppDeploymentTargetManagementServiceTests
         public static async Task<TestFixtureContext> CreateAsync(bool successfulCleanup = false)
         {
             var state = await CreatePersistentStateAsync();
-            var service = CreateService(state.Db, state.UserId, successfulCleanup, out var routeRoot);
-            return new TestFixtureContext(state.Db, state.App, service, routeRoot, state.UserId);
+            var service = CreateService(state.Db, state.UserId, successfulCleanup, out var routeRoot, out var commands);
+            return new TestFixtureContext(state.Db, state.App, service, routeRoot, state.UserId) { Commands = commands, ContextOptions = state.Options };
         }
 
         private static async Task<PersistentState> CreatePersistentStateAsync()
         {
-            var db = new ApplicationDbContext(
-                new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseInMemoryDatabase($"target-management-{Guid.NewGuid():N}")
-                    .Options);
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase($"target-management-{Guid.NewGuid():N}").Options;
+            var db = new ApplicationDbContext(options);
             var userId = Guid.NewGuid();
             var appId = Guid.NewGuid();
             var app = new WebApp
@@ -457,18 +458,18 @@ public class AppDeploymentTargetManagementServiceTests
             db.WebApps.Add(app);
             db.WebAppUsers.Add(new WebAppUser { WebAppId = appId, UserId = userId });
             await db.SaveChangesAsync();
-            return new PersistentState(db, app, userId);
+            return new PersistentState(db, app, userId, options);
         }
 
-        private static AppDeploymentTargetManagementService CreateService(
+        internal static AppDeploymentTargetManagementService CreateService(
             ApplicationDbContext db,
             Guid userId,
             bool successfulCleanup,
-            out string routeRoot)
+            out string routeRoot, out CleanupCommands cleanupCommands)
         {
             var authorization = CreateAuthorizationService(db, userId);
             var routeService = CreateRouteService(db, out routeRoot);
-            var cleanupCommands = new CleanupCommands(successfulCleanup);
+            cleanupCommands = new CleanupCommands(successfulCleanup);
             return new AppDeploymentTargetManagementService(
                 db,
                 authorization,
@@ -506,7 +507,7 @@ public class AppDeploymentTargetManagementServiceTests
                 NullLogger<BackendRouteConfigService>.Instance);
         }
 
-        private sealed record PersistentState(ApplicationDbContext Db, WebApp App, Guid UserId);
+        private sealed record PersistentState(ApplicationDbContext Db, WebApp App, Guid UserId, DbContextOptions<ApplicationDbContext> Options);
 
         public Runner AddRunner(
             bool online,
@@ -552,14 +553,20 @@ public class AppDeploymentTargetManagementServiceTests
         }
     }
 
-    private sealed class CleanupCommands(bool successful) : IRunnerActionCommands
+    internal sealed class CleanupCommands(bool successful) : IRunnerActionCommands
     {
-        public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
+        public List<CleanupAppDeploymentTargetRequest> Requests { get; } = [];
+        public bool FailStorageCleanup { get; set; }
+        public Func<Task>? BeforeSend { get; set; }
+        public async Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         {
             if (!successful) throw new InvalidOperationException("Runner cleanup failed.");
             var request = (CleanupAppDeploymentTargetRequest)payload;
+            Requests.Add(request);
+            if (BeforeSend is not null) await BeforeSend();
+            if (request.DeleteApplicationStorage && FailStorageCleanup) throw new InvalidOperationException("storage cleanup failed");
             object result = new CleanupAppDeploymentTargetResult(request.AppId, request.DeploymentTargetId, true);
-            return Task.FromResult((T)result);
+            return (T)result;
         }
     }
     private sealed class StubWebHostEnvironment : IWebHostEnvironment

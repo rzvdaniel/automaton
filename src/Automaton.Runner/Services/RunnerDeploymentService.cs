@@ -102,9 +102,11 @@ public class RunnerDeploymentService
 
     public async Task CleanupTargetAsync(
         Guid appId,
-        Guid deploymentTargetId)
+        Guid deploymentTargetId,
+        bool deleteApplicationStorage = false)
     {
         await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
         runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
+        if (deleteApplicationStorage) runnerWorkspaceService.DeleteApplicationStorage(appId);
     }
 }

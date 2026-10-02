@@ -7,7 +7,7 @@ public static class HostContainerRuntimeValidation
     public static bool IsRuntimeOperation(string operation) => operation is
         HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.StartContainer
         or HostContainerOperationKinds.InspectContainer or HostContainerOperationKinds.GetContainerLogs
-        or HostContainerOperationKinds.RemoveContainer;
+        or HostContainerOperationKinds.RemoveContainer or HostContainerOperationKinds.RemoveTargetContainers;
 
     public static bool IsContainerReference(string? value) => value is not null
         && Regex.IsMatch(value, @"\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z", RegexOptions.CultureInvariant);
@@ -32,7 +32,8 @@ public static class HostContainerRuntimeValidation
 
     private static string? ValidateExistingContainerRequest(HostContainerExecutionRequest request)
     {
-        if (!IsContainerReference(request.ContainerId))
+        if (request.Operation == HostContainerOperationKinds.RemoveTargetContainers
+            ? request.ContainerId is not null : !IsContainerReference(request.ContainerId))
             return "A valid container ID or name is required.";
         if (request.RequestedImage is not null || request.Command is not null || request.Storage is not null
             || request.User is not null

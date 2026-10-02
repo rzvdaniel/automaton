@@ -11,6 +11,7 @@ public static class HostContainerOperationKinds
     public const string InspectContainer = "inspect-container";
     public const string GetContainerLogs = "get-container-logs";
     public const string RemoveContainer = "remove-container";
+    public const string RemoveTargetContainers = "remove-target-containers";
 }
 
 public static class HostContainerExecutionCommandKinds
