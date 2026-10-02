@@ -4039,6 +4039,10 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("DeletionClaimId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("longtext");

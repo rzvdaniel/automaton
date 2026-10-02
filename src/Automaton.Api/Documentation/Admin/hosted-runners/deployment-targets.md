@@ -63,9 +63,15 @@ current runtime. The shared account volume and other apps are preserved.
 
 Deleting an additional environment still preserves the app's shared persistent
 data. Whole-app deletion waits for all target cleanups before deleting that data.
+A persisted app deletion claim blocks creation of new environments and deployment
+admission throughout Runner cleanup, source cleanup, and app-record deletion.
+The claim has no automatic expiry: an API interruption leaves admission blocked.
 If cleanup fails, the app record is retained: resolve Runner availability or the
 reported cleanup problem, then retry **Delete App**. Already removed runtimes and
 data are not restored.
+
+Apply the app deletion-claim migration and update every API replica. Drain old API
+slots before exercising deletion; older API versions do not honor this claim.
 
 Release matching API, Hosted Runner, and Infrastructure Runner versions for this
 cleanup contract. Older Runners cannot perform the new container-discovery

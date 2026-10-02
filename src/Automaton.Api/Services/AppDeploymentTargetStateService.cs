@@ -90,6 +90,16 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
     }
 
     public async Task MarkStartedAsync(
+        Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken = default,
+        Guid? deploymentOperationId = null, Guid? executionAttemptId = null)
+    {
+        await using var transaction = await new AppDeletionClaimService(dataContext)
+            .OpenAdmissionAsync(appId, cancellationToken);
+        await MarkStartedCoreAsync(appId, deploymentTargetId, cancellationToken, deploymentOperationId, executionAttemptId);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task MarkStartedCoreAsync(
         Guid appId,
         Guid deploymentTargetId,
         CancellationToken cancellationToken = default,

@@ -1,3 +1,5 @@
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Services;
@@ -21,6 +23,7 @@ public sealed class AppDeletionCleanupTests
         {
             var targets = await fixture.Db.AppDeploymentTargets.AsNoTracking().Where(t => t.WebAppId == fixture.App.Id).ToListAsync();
             Assert.That(targets.All(t => t.Status != DeploymentTargetStatus.Deploying), Is.True);
+            Assert.That((await fixture.Db.WebApps.AsNoTracking().SingleAsync(a => a.Id == fixture.App.Id)).DeletionClaimId, Is.Null);
         }
     }
 
@@ -35,6 +38,25 @@ public sealed class AppDeletionCleanupTests
         Assert.ThrowsAsync<AppDeploymentTargetConflictException>(() => fixture.Service.ClaimAndCleanupAppRuntimesAsync(fixture.App.Id));
         Assert.That(fixture.Commands.Requests, Is.Empty);
         Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
+    }
+
+    [Test]
+    public async Task DeletionClaim_RejectsNewTargetAndDeploymentFromAnotherApiDuringCleanup()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        await ConfigureTargetsAsync(fixture);
+        await using var replica = new ApplicationDbContext(fixture.ContextOptions);
+        // Deliberately cache the app before deletion: admission must read durable state.
+        await replica.WebApps.SingleAsync(app => app.Id == fixture.App.Id);
+        var checks = 0;
+        fixture.Commands.BeforeSend = async () =>
+        {
+            await AppDeletionAdmissionAssertions.AssertRejectedAsync(fixture, replica);
+            checks++;
+        };
+        await DeleteAppAsync(fixture, false);
+        Assert.That(checks, Is.EqualTo(3));
+        Assert.That(await replica.WebApps.AnyAsync(app => app.Id == fixture.App.Id), Is.False);
     }
 
     private static async Task DeleteAppAsync(

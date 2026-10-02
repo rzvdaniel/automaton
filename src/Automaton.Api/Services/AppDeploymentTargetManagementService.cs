@@ -55,9 +55,8 @@ public sealed partial class AppDeploymentTargetManagementService(
                 app, request.RunnerId.Value, userId, cancellationToken);
         }
 
-        await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
-            : null;
+        await using var transaction = await new AppDeletionClaimService(dbContext)
+            .OpenAdmissionAsync(appId, cancellationToken);
         if (request.IsDefault)
         {
             await ClearDefaultAsync(appId, cancellationToken);
@@ -307,19 +306,17 @@ public sealed partial class AppDeploymentTargetManagementService(
                     cancellationToken);
             }
 
+            var assignedTargets = new List<AppDeploymentTarget>();
             foreach (var targetId in targetIds)
             {
                 var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
                 if (target.ExecutionRunnerId.HasValue)
                 {
                     await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
+                    assignedTargets.Add(target);
                 }
             }
 
-            var assignedTargets = await dbContext.AppDeploymentTargets
-                .Include(target => target.ExecutionRunner)
-                .Where(target => target.WebAppId == appId && target.ExecutionRunnerId != null)
-                .ToListAsync(cancellationToken);
             foreach (var runnerTargets in assignedTargets.GroupBy(target => target.ExecutionRunnerId))
                 await runtimeCleanupService.CleanupRuntimeAsync(
                     runnerTargets.First(), cancellationToken, deleteApplicationStorage: true);
