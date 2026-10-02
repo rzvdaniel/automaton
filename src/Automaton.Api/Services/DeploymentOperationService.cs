@@ -218,12 +218,14 @@ public sealed class DeploymentOperationService(
         }
     }
 
-    public async Task DispatchOwnedOperationsAsync(CancellationToken cancellationToken)
+    internal async Task<List<Guid>> GetDispatchableOwnedOperationIdsAsync(
+        int limit, IReadOnlyCollection<Guid> activeOperationIds, CancellationToken cancellationToken)
     {
         await CleanupUnreferencedPackagesAsync(cancellationToken);
         var now = DateTime.UtcNow;
-        var operationIds = await dataContext.DeploymentOperations
+        return await dataContext.DeploymentOperations
             .AsNoTracking()
+            .Where(operation => !activeOperationIds.Contains(operation.Id))
             .Where(operation =>
                 operation.Status == DeploymentOperationStatuses.Pending ||
                 (operation.Status == DeploymentOperationStatuses.Running &&
@@ -237,20 +239,11 @@ public sealed class DeploymentOperationService(
                  target.ExecutionRunner != null &&
                  (target.ExecutionRunner.Purpose == RunnerPurposes.Managed ||
                   target.ExecutionRunner.ApiInstanceId == executorInstanceId))))
+            .OrderBy(operation => operation.CreatedAtUtc)
+            .ThenBy(operation => operation.Id)
             .Select(operation => operation.Id)
+            .Take(limit)
             .ToListAsync(cancellationToken);
-
-        foreach (var operationId in operationIds)
-        {
-            try
-            {
-                await ExecuteAsync(operationId, cancellationToken);
-            }
-            catch (DeploymentOperationLeaseActiveException)
-            {
-                // Another API instance still owns a live attempt.
-            }
-        }
     }
 
     private async Task CleanupUnreferencedPackagesAsync(CancellationToken cancellationToken)

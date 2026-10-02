@@ -557,6 +557,10 @@ internal static class ApiAppExecutionRegistration
             .Validate(options => options.MaximumStoredBytes > 0, "Deployment package storage byte limit must be positive.")
             .Validate(options => options.MaximumStoredPackages > 0, "Deployment package file-count limit must be positive.")
             .ValidateOnStart();
+        services.AddOptions<DeploymentDispatchOptions>()
+            .BindConfiguration(DeploymentDispatchOptions.SectionName)
+            .Validate(options => options.MaximumConcurrentOperations > 0, "Deployment dispatch concurrency must be positive.")
+            .ValidateOnStart();
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
@@ -578,7 +582,8 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<ConnectedFlowArtifactService>();
         services.AddScoped<IManagedApplicationArtifactCommands, ManagedApplicationArtifactGateway>();
         services.AddScoped<DeploymentOperationService>();
-        services.AddHostedService<DeploymentOperationDispatcher>();
+        services.AddSingleton<DeploymentOperationDispatcher>();
+        services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();
         services.AddScoped<AppActionRunnerGateway>();
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
