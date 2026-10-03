@@ -18,6 +18,7 @@ Read the matching skill before changing the related area:
 | Production scripts, Compose, Traefik, certificates, health checks, blue-green, or rollback | [Production deployment](.agents/skills/production-deployment/SKILL.md) |
 | Docker disk space on a production host | [Production Docker maintenance](.agents/skills/production-docker-maintenance/SKILL.md) |
 | Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
+| Roadmaps, architecture guides, or other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
 | User-facing Studio UI, theme tokens, or visual verification | [Studio design](.agents/skills/studio-design/SKILL.md) |
 
 The skills listed above are the repository contract. Other folders under `.agents/skills/` are developer-local. Do not add, expand, or commit local skills unless the task names that work.
@@ -80,6 +81,8 @@ Use the existing checkout for Automaton work. Do not create or move work into an
 Local repository setup is the README quickstart. Do not invent Compose files, ports, or domains.
 
 Implemented code, tests, and Admin docs are current behavior. Files under `docs/architecture/` are inventories and plans. Do not implement a later stage unless the task names it.
+
+Architecture guides under `docs/architecture/` describe the implemented system; keep the relevant guide up to date in the same change whenever architecture, state ownership, message flow, runtime boundaries, or operational guarantees change.
 
 ## Platform invariants
 
