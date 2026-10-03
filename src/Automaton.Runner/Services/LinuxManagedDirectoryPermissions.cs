@@ -8,8 +8,10 @@ internal static class LinuxManagedDirectoryPermissions
 {
     private const int OpenReadOnly = 0;
     private const int OpenCloseOnExec = 0x80000;
-    private const int DirectoryFlag = 0x10000;
-    private const int OpenNoFollow = 0x20000;
+    private const int X64DirectoryFlag = 0x10000;
+    private const int X64OpenNoFollow = 0x20000;
+    private const int Arm64DirectoryFlag = 0x4000;
+    private const int Arm64OpenNoFollow = 0x8000;
     private const int NoEntryError = 2;
     private const int AlreadyExistsError = 17;
     private const uint DirectoryCreationMode = 0x1ED;
@@ -25,6 +27,7 @@ internal static class LinuxManagedDirectoryPermissions
     {
         if (!OperatingSystem.IsLinux())
             throw new PlatformNotSupportedException("Handle-anchored application storage preparation requires Linux.");
+        var openFlags = GetManagedDirectoryOpenFlags(RuntimeInformation.ProcessArchitecture);
         if (!Automaton.Core.Models.ManagedPathBoundary.IsSafeRelative(relativePath))
             throw new InvalidOperationException("Application data must remain inside its managed root.");
 
@@ -33,13 +36,13 @@ internal static class LinuxManagedDirectoryPermissions
             throw new InvalidOperationException("Application data must resolve below its managed root.");
 
         Directory.CreateDirectory(trustedRoot);
-        var root = OpenDirectory(trustedRoot);
+        var root = OpenDirectory(trustedRoot, openFlags);
         SafeFileHandle? current = null;
         try
         {
             foreach (var segment in segments)
             {
-                var next = OpenOrCreateDirectory(current ?? root, segment);
+                var next = OpenOrCreateDirectory(current ?? root, segment, openFlags);
                 current?.Dispose();
                 current = next;
             }
@@ -73,16 +76,15 @@ internal static class LinuxManagedDirectoryPermissions
             .Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Where(segment => segment != ".");
 
-    private static SafeFileHandle OpenDirectory(string path)
+    private static SafeFileHandle OpenDirectory(string path, int flags)
     {
-        var descriptor = Open(path, OpenReadOnly | DirectoryFlag | OpenNoFollow | OpenCloseOnExec);
+        var descriptor = Open(path, flags);
         return CreateHandle(descriptor, "Could not open the trusted application data root.");
     }
 
-    private static SafeFileHandle OpenOrCreateDirectory(SafeFileHandle parent, string name)
+    private static SafeFileHandle OpenOrCreateDirectory(SafeFileHandle parent, string name, int flags)
     {
         var parentDescriptor = GetDescriptor(parent);
-        var flags = OpenReadOnly | DirectoryFlag | OpenNoFollow | OpenCloseOnExec;
         var descriptor = OpenAt(parentDescriptor, name, flags);
         if (descriptor < 0 && Marshal.GetLastPInvokeError() == NoEntryError)
         {
@@ -94,6 +96,18 @@ internal static class LinuxManagedDirectoryPermissions
         }
 
         return CreateHandle(descriptor, "Application data path contains a symbolic link or non-directory component.");
+    }
+
+    internal static int GetManagedDirectoryOpenFlags(Architecture architecture)
+    {
+        var (directoryFlag, noFollowFlag) = architecture switch
+        {
+            Architecture.X64 => (X64DirectoryFlag, X64OpenNoFollow),
+            Architecture.Arm64 => (Arm64DirectoryFlag, Arm64OpenNoFollow),
+            _ => throw new PlatformNotSupportedException($"Linux managed storage permissions do not support {architecture}.")
+        };
+
+        return OpenReadOnly | directoryFlag | noFollowFlag | OpenCloseOnExec;
     }
 
     private static SafeFileHandle CreateHandle(int descriptor, string message)

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using Automaton.Core.Models;
@@ -403,6 +404,22 @@ public class RunnerWorkspaceServiceTests
             if (Directory.Exists(workspaceRoot))
                 Directory.Delete(workspaceRoot, recursive: true);
         }
+    }
+
+    [TestCase(Architecture.X64, 0xB0000)]
+    [TestCase(Architecture.Arm64, 0x8C000)]
+    public void LinuxManagedDirectoryOpenFlags_AreArchitectureSpecific(Architecture architecture, int expectedFlags)
+    {
+        Assert.That(LinuxManagedDirectoryPermissions.GetManagedDirectoryOpenFlags(architecture), Is.EqualTo(expectedFlags));
+    }
+
+    [TestCase(Architecture.X86)]
+    [TestCase(Architecture.Arm)]
+    public void LinuxManagedDirectoryOpenFlags_RejectUnsupportedArchitectures(Architecture architecture)
+    {
+        Assert.That(
+            () => LinuxManagedDirectoryPermissions.GetManagedDirectoryOpenFlags(architecture),
+            Throws.TypeOf<PlatformNotSupportedException>());
     }
 
     [Test]
