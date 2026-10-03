@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Text.Json;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
@@ -401,6 +402,53 @@ public class RunnerWorkspaceServiceTests
             Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", originalWorkspaceRoot);
             if (Directory.Exists(workspaceRoot))
                 Directory.Delete(workspaceRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    [SupportedOSPlatform("linux")]
+    public void LinuxPermissionPreparation_ChangesVerifiedDirectoryAfterAncestorIsReplacedWithSymlink()
+    {
+        if (!OperatingSystem.IsLinux())
+            Assert.Ignore("Handle-anchored permission preparation is Linux-specific.");
+
+        var testRoot = Path.Combine(Path.GetTempPath(), "runner-permission-boundary", Guid.NewGuid().ToString("N"));
+        var trustedRoot = Path.Combine(testRoot, "storage");
+        var appDirectory = Path.Combine(trustedRoot, "app");
+        var dataDirectory = Path.Combine(appDirectory, "data");
+        var movedAppDirectory = Path.Combine(trustedRoot, "app-original");
+        var outsideDirectory = Path.Combine(testRoot, "outside");
+        var outsideDataDirectory = Path.Combine(outsideDirectory, "data");
+        Directory.CreateDirectory(dataDirectory);
+        Directory.CreateDirectory(outsideDataDirectory);
+        File.SetUnixFileMode(dataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.SetUnixFileMode(outsideDataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var outsideMode = File.GetUnixFileMode(outsideDataDirectory);
+
+        try
+        {
+            using (var verifiedDirectory = LinuxManagedDirectoryPermissions.OpenManagedDirectory(trustedRoot, "app/data"))
+            {
+                Directory.Move(appDirectory, movedAppDirectory);
+                Directory.CreateSymbolicLink(appDirectory, outsideDirectory);
+
+                LinuxManagedDirectoryPermissions.SetWritableDirectoryPermissions(verifiedDirectory);
+            }
+
+            var writePermissions = UnixFileMode.UserWrite | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.GetUnixFileMode(Path.Combine(movedAppDirectory, "data")) & writePermissions, Is.EqualTo(writePermissions));
+                Assert.That(File.GetUnixFileMode(outsideDataDirectory), Is.EqualTo(outsideMode));
+                Assert.That(() => LinuxManagedDirectoryPermissions.PrepareWritableDirectory(trustedRoot, "app/data"), Throws.TypeOf<IOException>());
+            });
+
+            Assert.That(File.GetUnixFileMode(outsideDataDirectory), Is.EqualTo(outsideMode));
+        }
+        finally
+        {
+            if (Directory.Exists(testRoot))
+                Directory.Delete(testRoot, recursive: true);
         }
     }
 
