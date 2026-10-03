@@ -53,12 +53,9 @@ public sealed class RunnerExecutionOperationTests
         var id = await initiating.QueueAsync(runner.Id, Guid.NewGuid(), new(Guid.NewGuid(), null), CancellationToken.None);
         var callback = RunnerExecutionTestServices.Operations(db, protection: protection);
         Assert.That((await callback.AssignmentAsync(runner.ApiKeyId!.Value, id, CancellationToken.None)).Disposition, Is.EqualTo("execute"));
-        var result = CompletedWorkflowResult();
-        Assert.That((await callback.ApplyAsync(runner.ApiKeyId.Value, id, result, CancellationToken.None)).Outcome, Is.EqualTo("accepted"));
-        var before = (await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ResultJson;
-        Assert.That((await callback.ApplyAsync(runner.ApiKeyId.Value, id, new(), CancellationToken.None)).Outcome, Is.EqualTo("already-applied"));
-        Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ResultJson, Is.EqualTo(before));
-        Assert.That((await initiating.WaitAsync(id, CancellationToken.None)).OutputVariables["output"], Is.EqualTo("value"));
+        var before = await ApplyWorkflowResultAsync(db, callback, runner.ApiKeyId.Value, id);
+        await AssertCompletedReplayAsync(db, callback, runner.ApiKeyId.Value, id, before);
+        await AssertWorkflowOutputAsync(initiating, id);
     }
 
     [Test]
@@ -141,6 +138,19 @@ public sealed class RunnerExecutionOperationTests
     }
 
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private static async Task<string?> ApplyWorkflowResultAsync(ApplicationDbContext db, RunnerExecutionOperationService service, Guid keyId, Guid id)
+    {
+        Assert.That((await service.ApplyAsync(keyId, id, CompletedWorkflowResult(), CancellationToken.None)).Outcome, Is.EqualTo("accepted"));
+        return (await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ResultJson;
+    }
+    private static async Task AssertCompletedReplayAsync(ApplicationDbContext db, RunnerExecutionOperationService service,
+        Guid keyId, Guid id, string? before)
+    {
+        Assert.That((await service.ApplyAsync(keyId, id, new(), CancellationToken.None)).Outcome, Is.EqualTo("already-applied"));
+        Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ResultJson, Is.EqualTo(before));
+    }
+    private static async Task AssertWorkflowOutputAsync(RunnerExecutionOperationService service, Guid id)
+        => Assert.That((await service.WaitAsync(id, CancellationToken.None)).OutputVariables["output"], Is.EqualTo("value"));
     private static RunnerExecutionResult CompletedWorkflowResult() => new()
     { Outcome = "Succeeded", Output = "marker", Logs = ["log"], OutputVariables = new() { ["output"] = "value" } };
     private static async Task AssertCancellationAssignmentAsync(RunnerExecutionOperationService service, Runner runner, Guid id)

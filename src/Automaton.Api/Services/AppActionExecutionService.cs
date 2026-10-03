@@ -22,7 +22,6 @@ public sealed class AppActionExecutionService
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly AppActionRunnerGateway runnerGateway;
-    private readonly RunnerExecutionOperationService operations;
 
     public AppActionExecutionService(
         ApplicationDbContext db,
@@ -30,8 +29,7 @@ public sealed class AppActionExecutionService
         ResourceAuthorizationService authorizationService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
-        AppActionRunnerGateway runnerGateway,
-        RunnerExecutionOperationService operations)
+        AppActionRunnerGateway runnerGateway)
     {
         this.db = db;
         this.appsService = appsService;
@@ -39,7 +37,6 @@ public sealed class AppActionExecutionService
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerGateway = runnerGateway;
-        this.operations = operations;
     }
 
     public async Task<AppModuleExecution> ExecuteAsync(Guid appId, string actionKey, Guid userId, JsonElement input, CancellationToken cancellationToken)
@@ -144,8 +141,7 @@ public sealed class AppActionExecutionService
             SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
                 && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
         };
-        await operations.QueueAsync(runner.Id, userId ?? Guid.Empty,
-            new(null, null, AppActionCommand.Create("execute", request)), cancellationToken, execution.Id);
+        await runnerGateway.QueueExecutionAsync(runner.Id, userId ?? Guid.Empty, execution.Id, request, cancellationToken);
         return execution;
     }
 

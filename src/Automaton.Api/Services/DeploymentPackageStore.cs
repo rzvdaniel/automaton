@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Automaton.Api.Config;
+using Automaton.Core.Models;
 using System.Security.Cryptography;
 
 namespace Automaton.Api.Services;
@@ -26,6 +27,7 @@ public sealed class DeploymentPackageStore(
         await StorageGate.WaitAsync(cancellationToken);
         try
         {
+            await using var storageLock = await OpenStorageLockAsync(directory, cancellationToken);
             EnsureAvailableCapacity(directory, file.Length);
             await WriteStagedPackageAsync(file, stagingPath, cancellationToken);
             File.Move(stagingPath, packagePath);
@@ -51,6 +53,77 @@ public sealed class DeploymentPackageStore(
             FileShare.Read,
             bufferSize: 128 * 1024,
             useAsync: true);
+    }
+
+    public async Task<string> StoreRunnerTransferAsync(
+        Guid operationId,
+        bool input,
+        Stream source,
+        long length,
+        CancellationToken cancellationToken)
+    {
+        if (operationId == Guid.Empty || length < 0 || length > RunnerFileTransferBounds.MaximumBytes)
+            throw new InvalidDataException($"Runner transfers are limited to {RunnerFileTransferBounds.MaximumBytes} bytes.");
+
+        var directory = GetPackageDirectory();
+        Directory.CreateDirectory(directory);
+        var path = GetRunnerTransferPath(operationId, input);
+        var stagingPath = Path.Combine(directory, $"{operationId:N}.{Guid.NewGuid():N}.uploading");
+        await StorageGate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var storageLock = await OpenStorageLockAsync(directory, cancellationToken);
+            if (File.Exists(path))
+                return path;
+
+            EnsureAvailableCapacity(directory, length);
+            await using (var destination = new FileStream(stagingPath, FileMode.CreateNew, FileAccess.Write,
+                FileShare.None, 128 * 1024, useAsync: true))
+            {
+                await AppArchiveStorageBounds.CopyExactlyAsync(
+                    source, destination, length, RunnerFileTransferBounds.MaximumBytes, cancellationToken);
+                await destination.FlushAsync(cancellationToken);
+            }
+            File.Move(stagingPath, path);
+            return path;
+        }
+        catch
+        {
+            TryDelete(stagingPath);
+            throw;
+        }
+        finally
+        {
+            StorageGate.Release();
+        }
+    }
+
+    public FileStream OpenRunnerTransfer(Guid operationId, bool input)
+        => OpenRead(GetRunnerTransferPath(operationId, input));
+
+    public string GetRunnerTransferPath(Guid operationId, bool input)
+        => Path.Combine(GetPackageDirectory(), $"{operationId:N}.{(input ? "transfer-in" : "transfer-out")}");
+
+    public async Task TryDeleteRunnerTransferAsync(Guid operationId, bool input)
+    {
+        await StorageGate.WaitAsync();
+        try
+        {
+            var directory = GetPackageDirectory();
+            if (!Directory.Exists(directory))
+                return;
+
+            await using var storageLock = await OpenStorageLockAsync(directory, CancellationToken.None);
+            TryDelete(GetRunnerTransferPath(operationId, input));
+        }
+        catch
+        {
+            // A failed cleanup must not change the completed transfer result.
+        }
+        finally
+        {
+            StorageGate.Release();
+        }
     }
 
     public async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
@@ -85,6 +158,7 @@ public sealed class DeploymentPackageStore(
         await StorageGate.WaitAsync(cancellationToken);
         try
         {
+            await using var storageLock = await OpenStorageLockAsync(directory, cancellationToken);
             return DeleteExpiredUnreferencedPackages(directory, activePackagePaths, minimumFileAge, cancellationToken);
         }
         finally
@@ -96,6 +170,27 @@ public sealed class DeploymentPackageStore(
     private string GetPackageDirectory()
     {
         return Path.Combine(webHostEnvironment.ContentRootPath, "AppData", "deployment-operations");
+    }
+
+    private static async Task<FileStream> OpenStorageLockAsync(string directory, CancellationToken cancellationToken)
+    {
+        var appDataDirectory = Directory.GetParent(directory)?.FullName
+            ?? throw new InvalidOperationException("Deployment package storage must have a parent directory.");
+        Directory.CreateDirectory(appDataDirectory);
+        var lockPath = Path.Combine(appDataDirectory, ".deployment-operations.lock");
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
+                    FileShare.None, bufferSize: 1, useAsync: true);
+            }
+            catch (IOException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+            }
+        }
     }
 
     private void EnsureAvailableCapacity(string directory, long incomingBytes)
@@ -133,8 +228,11 @@ public sealed class DeploymentPackageStore(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var fullPath = Path.GetFullPath(path);
-            if (!Path.GetFileName(fullPath).EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
-                !Path.GetFileName(fullPath).EndsWith(".uploading", StringComparison.OrdinalIgnoreCase))
+            var name = Path.GetFileName(fullPath);
+            if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".uploading", StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".transfer-in", StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".transfer-out", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             if (activePaths.Contains(fullPath) || File.GetLastWriteTimeUtc(fullPath) > cutoff)

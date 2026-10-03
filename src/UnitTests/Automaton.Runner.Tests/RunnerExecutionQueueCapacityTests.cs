@@ -17,41 +17,14 @@ public sealed class RunnerExecutionQueueCapacityTests
     public async Task FourRunningActionsAndQueuedExecutionDoNotBlockLogs()
     {
         var directory = Path.Combine(Path.GetTempPath(), "automaton-capacity-" + Guid.NewGuid().ToString("N"));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var executor = new SaturatedExecutor(); var broker = new Broker(); var runner = Guid.NewGuid();
-        using var api = CreateApi();
-        var consumer = new RunnerExecutionQueueConsumer(new(new(new(directory), executor)));
-        var configuration = new HostedRunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
-            "execution", true, "unused", "management");
-        var consuming = consumer.ConsumeAsync(broker.Connection(), configuration, api, runner, cancellation.Token);
-        Task[] actions = []; Task queued = Task.CompletedTask;
-        try
-        {
-            actions = Enumerable.Range(0, 4).Select(_ => broker.DeliverAsync("execution", runner, false, cancellation.Token)).ToArray();
-            await executor.Started.Task.WaitAsync(cancellation.Token);
-            queued = broker.DeliverAsync("execution", runner, false, cancellation.Token);
-            await broker.DeliverAsync("management", runner, true, cancellation.Token).WaitAsync(cancellation.Token);
-            Assert.That(executor.LogReads, Is.EqualTo(1));
-            Assert.That(executor.ActionCalls, Is.EqualTo(4));
-            Assert.That(queued.IsCompleted, Is.False);
-            Assert.That(broker.Queues["execution"].Capacity, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(1));
-            Assert.That(broker.Queues["execution"].DispatchConcurrency, Is.EqualTo(4));
-            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(1));
-            executor.Finish.TrySetResult();
-            await Task.WhenAll(actions.Append(queued)).WaitAsync(cancellation.Token);
-            Assert.That(executor.ActionCalls, Is.EqualTo(5));
-        }
-        finally
-        {
-            executor.Finish.TrySetResult(); await cancellation.CancelAsync();
-            try { await Task.WhenAll(actions.Append(queued).Append(consuming)); }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
-                // The long-lived consumers stop when the test finishes.
-            }
-            if (Directory.Exists(directory)) Directory.Delete(directory, true);
-        }
+        await using var harness = new SaturatedQueueHarness(directory);
+        var actions = await harness.StartFourExecutionsAsync();
+        var queued = harness.DeliverExecutionAsync();
+        await harness.DeliverManagementAsync();
+        harness.AssertCapacityAndLogs(queued);
+        harness.ReleaseActions();
+        await harness.WaitForActionsAsync(actions, queued);
+        Assert.That(harness.ActionCalls, Is.EqualTo(5));
     }
 
     private static RunnerExecutionApiClient CreateApi()
@@ -88,6 +61,70 @@ public sealed class RunnerExecutionQueueCapacityTests
                 ? new RunnerExecutionAssignment("execute", new(null, null, AppActionCommand.Create(kind, new { })))
                 : new RunnerExecutionReceipt("accepted");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
+        }
+    }
+
+    private sealed class SaturatedQueueHarness : IAsyncDisposable
+    {
+        private readonly string directory;
+        private readonly CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(30));
+        private readonly SaturatedExecutor executor = new();
+        private readonly Broker broker = new();
+        private readonly Guid runner = Guid.NewGuid();
+        private readonly RunnerExecutionQueueConsumer consumer;
+        private readonly Task consuming;
+
+        public SaturatedQueueHarness(string directory)
+        {
+            this.directory = directory;
+            consumer = new(new(new(new(directory), executor)));
+            var api = CreateApi();
+            var configuration = new HostedRunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
+                "execution", true, "unused", "management");
+            consuming = consumer.ConsumeAsync(broker.Connection(), configuration, api, runner, cancellation.Token);
+        }
+
+        public int ActionCalls => executor.ActionCalls;
+
+        public async Task<Task[]> StartFourExecutionsAsync()
+        {
+            var actions = Enumerable.Range(0, 4)
+                .Select(_ => DeliverExecutionAsync())
+                .ToArray();
+            await executor.Started.Task.WaitAsync(cancellation.Token);
+            return actions;
+        }
+
+        public Task DeliverExecutionAsync()
+            => broker.DeliverAsync("execution", runner, false, cancellation.Token);
+
+        public Task DeliverManagementAsync()
+            => broker.DeliverAsync("management", runner, true, cancellation.Token);
+
+        public void AssertCapacityAndLogs(Task queued)
+        {
+            Assert.That(executor.LogReads, Is.EqualTo(1));
+            Assert.That(executor.ActionCalls, Is.EqualTo(4));
+            Assert.That(queued.IsCompleted, Is.False);
+            Assert.That(broker.Queues["execution"].Capacity, Is.EqualTo(4));
+            Assert.That(broker.Queues["management"].Capacity, Is.EqualTo(1));
+            Assert.That(broker.Queues["execution"].DispatchConcurrency, Is.EqualTo(4));
+            Assert.That(broker.Queues["management"].DispatchConcurrency, Is.EqualTo(1));
+        }
+
+        public void ReleaseActions() => executor.Finish.TrySetResult();
+
+        public Task WaitForActionsAsync(Task[] actions, Task queued)
+            => Task.WhenAll(actions.Append(queued)).WaitAsync(cancellation.Token);
+
+        public async ValueTask DisposeAsync()
+        {
+            ReleaseActions();
+            await cancellation.CancelAsync();
+            try { await consuming; }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            cancellation.Dispose();
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
         }
     }
 

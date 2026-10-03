@@ -106,23 +106,6 @@ __pycache__/
 .prod-runtime/
 
 .artifacts/
-.agents/*
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/generic-runtime/
-!.agents/skills/generic-runtime/**
-!.agents/skills/production-deployment/
-!.agents/skills/production-deployment/**
-!.agents/skills/production-docker-maintenance/
-!.agents/skills/production-docker-maintenance/**
-!.agents/skills/admin-docs/
-!.agents/skills/admin-docs/**
-!.agents/skills/studio-design/
-!.agents/skills/studio-design/**
-!.agents/skills/distributed-platform-architecture/
-!.agents/skills/distributed-platform-architecture/**
-!.agents/skills/maintainability/
-!.agents/skills/maintainability/**
 .vitepress/
 !src/automaton-vue/docs/.vitepress/
 src/automaton-vue/docs/.vitepress/cache/

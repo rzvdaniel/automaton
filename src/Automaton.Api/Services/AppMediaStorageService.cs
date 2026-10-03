@@ -1,335 +1,210 @@
 using Automaton.Api.Config;
-using Automaton.Api.Entities;
-using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
-using System.Threading.Channels;
 
 namespace Automaton.Api.Services;
 
-public class AppMediaStorageService
+public sealed class AppMediaStorageService
 {
-    private const int ChunkSize = 256 * 1024;
-    private const int UploadTimeoutMinutes = 10;
-    private const int DownloadChunkTimeoutSeconds = 30;
-
-    private readonly IHubContext<AutomatonHub> automatonHub;
-    private readonly FileUploadRegistry uploadRegistry;
-    private readonly FileDownloadRegistry downloadRegistry;
+    private static readonly TimeSpan TransferDeadline = TimeSpan.FromMinutes(10);
+    private readonly IRunnerFileTransferGateway transfers;
+    private readonly AppFileRunnerResolver runnerResolver;
     private readonly MediaStorageOptions options;
     private readonly ILogger<AppMediaStorageService> logger;
-    private readonly IAppDeploymentTargetResolver targetResolver;
 
     public AppMediaStorageService(
-        IHubContext<AutomatonHub> automatonHub,
-        FileUploadRegistry uploadRegistry,
-        FileDownloadRegistry downloadRegistry,
+        IRunnerFileTransferGateway transfers,
+        AppFileRunnerResolver runnerResolver,
         IOptions<MediaStorageOptions> options,
-        ILogger<AppMediaStorageService> logger,
-        IAppDeploymentTargetResolver targetResolver)
+        ILogger<AppMediaStorageService> logger)
     {
-        this.automatonHub = automatonHub;
-        this.uploadRegistry = uploadRegistry;
-        this.downloadRegistry = downloadRegistry;
+        this.transfers = transfers;
+        this.runnerResolver = runnerResolver;
         this.options = options.Value;
         this.logger = logger;
-        this.targetResolver = targetResolver;
     }
 
-    public async Task<(bool Success, int StatusCode, object Payload)> UploadAsync(Guid appId, Guid ownerId, IFormFile? file, CancellationToken ct)
+    public async Task<(bool Success, int StatusCode, object Payload)> UploadAsync(
+        Guid appId, Guid ownerId, IFormFile? file, CancellationToken token)
     {
-        if (!AppMediaStoragePolicy.TryValidateUpload(file, options.MaxUploadBytes, out var error, out _, out var contentType))
-        {
+        if (!AppMediaStoragePolicy.TryValidateUpload(file, options.MaxUploadBytes,
+                out var error, out _, out var contentType))
             return (false, StatusCodes.Status400BadRequest, new { error });
-        }
 
-        var runnerError = await GetRunnerErrorAsync(ownerId, appId, ct);
-        if (runnerError is not null)
-        {
-            return (false, StatusCodes.Status400BadRequest, new { error = runnerError });
-        }
-
-        var runner = await ResolveRunnerAsync(ownerId, appId, ct);
+        var runner = await ResolveRunnerAsync(ownerId, appId, token);
         if (runner is null)
-        {
-            return (false, StatusCodes.Status400BadRequest, new { error = "Runner is no longer available. Please try again." });
-        }
+            return (false, StatusCodes.Status400BadRequest, new { error = "No Runner is available." });
 
-        var stats = await automatonHub.Clients.Client(runner.ConnectionId!)
-            .InvokeAsync<AppMediaStatsResponse>(AutomatonHubMethods.GetAppMediaStats, appId.ToString(), ct);
-
-        if (!stats.Success)
-        {
-            return (false, StatusCodes.Status500InternalServerError, new { error = stats.Error ?? "Unable to inspect app media usage." });
-        }
-
-        if (stats.TotalBytes + file!.Length > options.DefaultQuotaBytes)
-        {
-            return (false, StatusCodes.Status400BadRequest, new { error = $"Media quota exceeded. Limit is {options.DefaultQuotaBytes} bytes." });
-        }
+        var stats = await ReadStatsAsync(appId, ownerId, runner.Id, token);
+        if (stats.Result?.Outcome != "Succeeded" || stats.Value is null)
+            return (false, StatusCodes.Status502BadGateway,
+                new { error = stats.Result?.Error ?? "Unable to inspect app media usage." });
+        if (stats.Value.TotalBytes.GetValueOrDefault() + file!.Length > options.DefaultQuotaBytes)
+            return (false, StatusCodes.Status400BadRequest,
+                new { error = $"Media quota exceeded. Limit is {options.DefaultQuotaBytes} bytes." });
 
         var relativePath = AppMediaStoragePolicy.BuildStorageRelativePath(file.FileName, DateTime.UtcNow);
-        return await UploadValidatedFileAsync(appId, file!, contentType, relativePath, runner, ct);
-    }
-
-    private async Task<(bool Success, int StatusCode, object Payload)> UploadValidatedFileAsync(
-        Guid appId,
-        IFormFile file,
-        string contentType,
-        string relativePath,
-        Runner runner,
-        CancellationToken cancellationToken)
-    {
-        var publicPath = AppMediaPathHelper.ToPublicPath(relativePath);
-        var (sessionId, completionTask) = uploadRegistry.Register(TimeSpan.FromMinutes(UploadTimeoutMinutes), cancellationToken);
-
+        var operationId = Guid.NewGuid();
+        var command = new RunnerFileTransferCommand(RunnerFileTransferKinds.UploadMedia,
+            appId, operationId.ToString("N"), Path.GetFileName(relativePath), contentType, relativePath);
         try
         {
-            using var stream = file.OpenReadStream();
-            await SendUploadChunksAsync(stream, sessionId, appId, contentType, relativePath, runner, cancellationToken);
-
-            await completionTask;
-
+            var (_, result) = await transfers.ExecuteAsync(operationId, runner.Id, ownerId,
+                command, file, token, TransferDeadline);
+            if (result.Outcome != "Succeeded" || result.FileTransferResult is not { Success: true })
+                return (false, StatusCodes.Status502BadGateway,
+                    new { error = result.Error ?? result.FileTransferResult?.Error ?? "Media upload failed." });
             return (true, StatusCodes.Status200OK, new
             {
                 success = true,
-                path = publicPath,
+                path = AppMediaPathHelper.ToPublicPath(relativePath),
                 fileName = Path.GetFileName(relativePath),
                 contentType,
                 size = file.Length
             });
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            logger.LogError(ex, "Failed to upload media for app {AppId}", appId);
-            return (false, StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            return (false, StatusCodes.Status504GatewayTimeout, new { error = "Media upload timed out." });
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to upload media for app {AppId}", appId);
+            return (false, StatusCodes.Status502BadGateway, new { error = "Media upload failed." });
         }
     }
 
-    private async Task SendUploadChunksAsync(
-        Stream stream,
-        string sessionId,
-        Guid appId,
-        string contentType,
-        string relativePath,
-        Runner runner,
-        CancellationToken cancellationToken)
+    public async Task<int> ProxyReadAsync(
+        Guid appId, Guid ownerId, string mediaPath, HttpResponse response, CancellationToken token)
     {
-        var buffer = new byte[ChunkSize];
-        var chunkIndex = 0;
-        int bytesRead;
-        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            var chunk = new FileUploadChunk
-            {
-                SessionId = sessionId,
-                ChunkIndex = chunkIndex++,
-                Data = bytesRead == ChunkSize ? buffer : buffer[..bytesRead],
-                IsLast = stream.Position >= stream.Length,
-                FileName = Path.GetFileName(relativePath),
-                ContentType = contentType,
-                AppId = appId,
-                RelativePath = relativePath,
-                StorageScope = FileTransferStorageScopes.Media
-            };
-
-            await automatonHub.Clients.Client(runner.ConnectionId!)
-                .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
-        }
-    }
-
-    public async Task<int> ProxyReadAsync(Guid appId, Guid ownerId, string mediaPath, HttpResponse response, CancellationToken ct)
-    {
-        string normalizedPath;
-        try
-        {
-            normalizedPath = AppMediaPathHelper.NormalizeRelativePath(mediaPath);
-        }
-        catch (ArgumentException)
-        {
-            return StatusCodes.Status400BadRequest;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return StatusCodes.Status403Forbidden;
-        }
-
+        if (!TryNormalizeMediaPath(mediaPath, out var normalizedPath, out var pathError))
+            return pathError;
         if (!AppMediaStoragePolicy.TryGetContentTypeForPath(normalizedPath, out _))
-        {
             return StatusCodes.Status400BadRequest;
-        }
 
-        var runner = await ResolveRunnerAsync(ownerId, appId, ct);
-        if (runner is null)
-        {
-            return StatusCodes.Status404NotFound;
-        }
-
-        var metadata = await automatonHub.Clients.Client(runner.ConnectionId!)
-            .InvokeAsync<AppMediaFileMetadataResponse>(
-                AutomatonHubMethods.GetAppMediaFileMetadata,
-                appId.ToString(),
-                normalizedPath,
-                ct);
-
-        if (!metadata.Success)
-        {
-            return metadata.StatusCode;
-        }
-
-        var sessionId = Guid.NewGuid().ToString("N");
-        var channel = downloadRegistry.Register(sessionId);
-        return await StreamMediaFileAsync(appId, normalizedPath, runner, metadata, sessionId, channel, response, ct);
+        var runner = await ResolveRunnerAsync(ownerId, appId, token);
+        if (runner is null) return StatusCodes.Status404NotFound;
+        return await ProxyRunnerMediaAsync(appId, ownerId, runner.Id, normalizedPath, response, token);
     }
 
-    private async Task<int> StreamMediaFileAsync(
-        Guid appId,
-        string normalizedPath,
-        Runner runner,
-        AppMediaFileMetadataResponse metadata,
-        string sessionId,
-        Channel<FileChunkReadyMessage> channel,
-        HttpResponse response,
-        CancellationToken cancellationToken)
+    private async Task<int> ProxyRunnerMediaAsync(
+        Guid appId, Guid ownerId, Guid runnerId, string relativePath, HttpResponse response, CancellationToken token)
     {
+        var metadataOperation = Guid.NewGuid();
+        var metadataCommand = new RunnerFileTransferCommand(RunnerFileTransferKinds.ReadMediaMetadata,
+            appId, metadataOperation.ToString("N"), RelativePath: relativePath);
+        var metadata = await ExecuteAsync(metadataOperation, runnerId, ownerId, metadataCommand, token);
+        var metadataStatus = GetTransferStatus(metadata);
+        if (metadataStatus != StatusCodes.Status200OK) return metadataStatus;
+
+        var downloadOperation = Guid.NewGuid();
+        var downloadCommand = new RunnerFileTransferCommand(RunnerFileTransferKinds.DownloadMedia,
+            appId, downloadOperation.ToString("N"), RelativePath: relativePath);
         try
         {
-            long offset = 0;
-            response.ContentType = metadata.ContentType;
-            response.Headers["X-Content-Type-Options"] = "nosniff";
-            response.Headers["Cache-Control"] = "public, max-age=3600";
-            response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(metadata.FileName);
+            var downloaded = await ExecuteAsync(downloadOperation, runnerId, ownerId, downloadCommand, token);
+            var downloadStatus = GetTransferStatus(downloaded);
+            if (downloadStatus != StatusCodes.Status200OK) return downloadStatus;
 
-            while (true)
-            {
-                var chunk = await RequestNextChunkAsync(
-                    appId,
-                    normalizedPath,
-                    runner,
-                    sessionId,
-                    offset,
-                    channel,
-                    cancellationToken);
-                if (chunk is null)
-                    return StatusCodes.Status504GatewayTimeout;
-
-                if (chunk.StatusCode != StatusCodes.Status200OK)
-                {
-                    logger.LogWarning(
-                        "Media download chunk failed after preflight for app {AppId}, path {Path}, status {StatusCode}",
-                        appId,
-                        normalizedPath,
-                        chunk.StatusCode);
-                    return response.HasStarted ? StatusCodes.Status200OK : chunk.StatusCode;
-                }
-
-                if (chunk.Data.Length > 0)
-                {
-                    await response.Body.WriteAsync(chunk.Data, cancellationToken);
-                    await response.Body.FlushAsync(cancellationToken);
-                    offset += chunk.Data.Length;
-                }
-
-                if (chunk.IsLast)
-                {
-                    return StatusCodes.Status200OK;
-                }
-            }
+            return await StreamMediaArtifactAsync(downloadOperation, metadata!, downloaded!, response, token);
         }
         finally
         {
-            downloadRegistry.Complete(sessionId);
+            await transfers.CleanupOutputAsync(downloadOperation);
         }
     }
 
-    private async Task<FileChunkReadyMessage?> RequestNextChunkAsync(
-        Guid appId,
-        string normalizedPath,
-        Runner runner,
-        string sessionId,
-        long offset,
-        Channel<FileChunkReadyMessage> channel,
-        CancellationToken cancellationToken)
+    private async Task<int> StreamMediaArtifactAsync(
+        Guid operationId, RunnerExecutionResult metadata, RunnerExecutionResult downloaded,
+        HttpResponse response, CancellationToken token)
     {
-        var request = new FetchFileChunkRequest
-        {
-            SessionId = sessionId,
-            Offset = offset,
-            ChunkSize = ChunkSize,
-            AppId = appId,
-            RelativePath = normalizedPath,
-            StorageScope = FileTransferStorageScopes.Media
-        };
-
-        await automatonHub.Clients.Client(runner.ConnectionId!)
-            .SendAsync(AutomatonHubMethods.FetchFileChunk, request, cancellationToken);
-
-        using var chunkCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        chunkCancellation.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
         try
         {
-            return await channel.Reader.ReadAsync(chunkCancellation.Token);
+            await using var content = transfers.OpenOutput(operationId);
+            response.ContentType = downloaded.FileTransferResult!.ContentType
+                ?? metadata.FileTransferResult!.ContentType ?? "application/octet-stream";
+            response.ContentLength = downloaded.FileTransferResult.Length;
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Cache-Control"] = "public, max-age=3600";
+            response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(
+                downloaded.FileTransferResult.FileName ?? metadata.FileTransferResult!.FileName ?? "media");
+            await content.CopyToAsync(response.Body, token);
+            await response.Body.FlushAsync(token);
+            return StatusCodes.Status200OK;
         }
-        catch (OperationCanceledException)
+        catch (FileNotFoundException)
         {
-            return null;
+            logger.LogWarning("Runner media result artifact was missing for operation {OperationId}.", operationId);
+            return StatusCodes.Status502BadGateway;
         }
     }
 
-    private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId, CancellationToken ct)
+    private static int GetTransferStatus(RunnerExecutionResult? result)
+    {
+        if (result?.Outcome == "Succeeded" && result.FileTransferResult is { Success: true })
+            return StatusCodes.Status200OK;
+        return result?.FileTransferResult?.StatusCode is int status && status is >= 400 and < 600
+            ? status
+            : StatusCodes.Status502BadGateway;
+    }
+
+    private static bool TryNormalizeMediaPath(string path, out string normalizedPath, out int errorStatus)
     {
         try
         {
-            var target = await targetResolver.ResolveAsync(appId, null, ownerId, ct);
-            var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
-                runner.LastHeartbeatAtUtc,
-                DateTime.UtcNow)
-                ? null
-                : $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
+            normalizedPath = AppMediaPathHelper.NormalizeRelativePath(path);
+            errorStatus = StatusCodes.Status200OK;
+            return true;
         }
-        catch (KeyNotFoundException)
+        catch (ArgumentException)
         {
-            return "The configured app or deployment target no longer exists.";
+            normalizedPath = string.Empty;
+            errorStatus = StatusCodes.Status400BadRequest;
+            return false;
         }
         catch (UnauthorizedAccessException)
         {
-            return "The runner configured for this app is not accessible by this app's owner.";
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ex.Message;
+            normalizedPath = string.Empty;
+            errorStatus = StatusCodes.Status403Forbidden;
+            return false;
         }
     }
 
-    private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId, CancellationToken ct)
+    private async Task<(RunnerExecutionResult? Result, RunnerFileTransferResult? Value)> ReadStatsAsync(
+        Guid appId, Guid ownerId, Guid runnerId, CancellationToken token)
+    {
+        var id = Guid.NewGuid();
+        var command = new RunnerFileTransferCommand(RunnerFileTransferKinds.ReadMediaStats, appId, id.ToString("N"));
+        var result = await ExecuteAsync(id, runnerId, ownerId, command, token);
+        return (result, result?.FileTransferResult);
+    }
+
+    private async Task<RunnerExecutionResult?> ExecuteAsync(
+        Guid id, Guid runnerId, Guid ownerId, RunnerFileTransferCommand command, CancellationToken token)
     {
         try
         {
-            var target = await targetResolver.ResolveAsync(appId, null, ownerId, ct);
-            var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
-                runner.LastHeartbeatAtUtc,
-                DateTime.UtcNow)
-                ? runner
-                : null;
+            var (_, result) = await transfers.ExecuteAsync(id, runnerId, ownerId, command, null, token, TransferDeadline);
+            return result;
         }
-        catch (Exception ex) when (
-            ex is KeyNotFoundException or
-                UnauthorizedAccessException or
-                InvalidOperationException)
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            return null;
+            return new RunnerExecutionResult { Error = "Runner file transfer timed out." };
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Runner file transfer failed for app {AppId}, operation {OperationId}.", command.AppId, id);
+            return new RunnerExecutionResult { Error = "Runner file transfer failed." };
         }
     }
 
-    private static string BuildInlineContentDispositionHeader(string fileName)
+    private async Task<Automaton.Api.Entities.Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId, CancellationToken token)
     {
-        return $"inline; filename=\"{fileName.Replace("\"", string.Empty, StringComparison.Ordinal)}\"";
+        var error = await runnerResolver.GetUnavailableErrorAsync(ownerId, appId, token);
+        return error is null ? await runnerResolver.ResolveOnlineRunnerAsync(ownerId, appId, token) : null;
     }
+
+    private static string BuildInlineContentDispositionHeader(string fileName)
+        => $"inline; filename=\"{fileName.Replace("\"", string.Empty, StringComparison.Ordinal)}\"";
 }

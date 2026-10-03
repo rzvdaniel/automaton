@@ -18,8 +18,11 @@ internal static class RunnerExecutionTestServices
             Options.Create(new StorageTelemetryOptions()), broker ?? Broker(), Operations(db));
     public static RunnerExecutionRevocationService Revocation(ApplicationDbContext db) => new(Operations(db), Broker());
     public static RunnerExecutionOperationService Operations(ApplicationDbContext db, IEventPublisher? events = null,
-        IDataProtectionProvider? protection = null)
-        => new(db, events ?? new Publisher(), new Transactions(), protection ?? new EphemeralDataProtectionProvider(), new RunnerExecutionIdentityService(db, new ResourceAuthorizationService(db, null!)));
+        IDataProtectionProvider? protection = null, string? artifactRoot = null)
+        => new(db, events ?? new Publisher(), new Transactions(), protection ?? new EphemeralDataProtectionProvider(),
+            new RunnerExecutionIdentityService(db, new ResourceAuthorizationService(db, null!)),
+            new DeploymentPackageStore(new TestWebHostEnvironment { ContentRootPath = artifactRoot ?? Path.Combine(Path.GetTempPath(), "automaton-runner-execution-tests") },
+                Options.Create(new DeploymentPackageStorageOptions())));
     public static HostedRunnerBrokerProvisioner Broker() => new(new Clients(),
         Options.Create(new RabbitMqOptions { ManagementUrl = "http://broker/", Username = "test", Password = "test", VirtualHost = "/" }),
         Options.Create(new HostedRunnerRabbitMqOptions { Host = "broker" }));

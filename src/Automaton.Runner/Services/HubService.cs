@@ -24,10 +24,7 @@ public class HubService
     private readonly ApiKeyAuthenticationService apiKeyAuthService;
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
-    private readonly HubFileTransferService fileTransferService;
-    private readonly RunnerDeploymentService runnerDeploymentService;
     private readonly AppActionExecutionService appActionExecutionService;
-    private readonly HubAppActionHandlerRegistrar appActionHandlerRegistrar;
     private readonly HubExecutionHandlerRegistrar executionHandlerRegistrar;
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
@@ -45,18 +42,13 @@ public class HubService
         ApiKeyAuthenticationService apiKeyAuthService,
         TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider,
-        RunnerWorkspaceService runnerWorkspaceService,
-        RunnerDeploymentService runnerDeploymentService,
         AppActionExecutionService appActionExecutionService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
         this.logger = Log.ForContext<HubService>();
         heartbeatService = new HubHeartbeatService(() => connection, logger);
-        fileTransferService = new HubFileTransferService(runnerWorkspaceService, logger);
-        this.runnerDeploymentService = runnerDeploymentService;
         this.appActionExecutionService = appActionExecutionService;
-        appActionHandlerRegistrar = new HubAppActionHandlerRegistrar(runnerDeploymentService);
         executionHandlerRegistrar = new HubExecutionHandlerRegistrar(
             tunnelForwarder,
             logger);
@@ -251,8 +243,6 @@ public class HubService
                 () => isReconnecting,
                 HubConnectionFailureReporter.GetFriendlyErrorMessage,
                 () => heartbeatService.SendAsync(cancellationToken));
-            RegisterActionHandlers();
-
             await connection.StartAsync(cancellationToken);
             await heartbeatService.StartAsync(cancellationToken);
             await heartbeatService.SendAsync(cancellationToken);
@@ -267,12 +257,6 @@ public class HubService
                 hubUrl, ex.GetType().Name, ex.Message);
             throw; // Re-throw to let the retry policy handle it
         }
-    }
-
-    private void RegisterActionHandlers()
-    {
-        var current = connection ?? throw new InvalidOperationException("Hub connection is unavailable.");
-        appActionHandlerRegistrar.Register(current, ExecuteWithRunnerActivityAsync);
     }
 
     public async Task DisconnectAsync()
@@ -327,19 +311,6 @@ public class HubService
         if (remaining == 0 && Volatile.Read(ref reconnectRequested) == 1)
         {
             WakeConnectionLoop();
-        }
-    }
-
-    internal async Task<T> ExecuteWithRunnerActivityAsync<T>(Func<Task<T>> operation)
-    {
-        BeginRunnerActivity();
-        try
-        {
-            return await operation();
-        }
-        finally
-        {
-            EndRunnerActivity();
         }
     }
 

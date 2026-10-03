@@ -11,7 +11,7 @@ namespace Automaton.Api.Services;
 
 public sealed class RunnerExecutionOperationService(
     ApplicationDbContext db, IEventPublisher events, ITransactionalEventExecutor transactions,
-    IDataProtectionProvider protection, RunnerExecutionIdentityService identity)
+    IDataProtectionProvider protection, RunnerExecutionIdentityService identity, DeploymentPackageStore artifacts)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("RunnerExecutionOperation.v1");
@@ -29,6 +29,32 @@ public sealed class RunnerExecutionOperationService(
             if (added is not null) added.State = EntityState.Detached;
             if (!await HasManagedArtifactsOperationAsync(id, runnerId, ownerId, request, token)) throw;
         }
+    }
+
+    public async Task QueueFileTransferAsync(Guid id, Guid runnerId, Guid ownerId,
+        RunnerFileTransferCommand request, CancellationToken token)
+    {
+        var payload = new RunnerExecutionRequest(null, null, FileTransfer: request);
+        if (await HasFileTransferOperationAsync(id, runnerId, ownerId, request, token)) return;
+        try { await QueueAsync(runnerId, ownerId, payload, token, id); }
+        catch (DbUpdateException)
+        {
+            var added = db.ChangeTracker.Entries<RunnerExecutionOperation>()
+                .SingleOrDefault(entry => entry.Entity.Id == id && entry.State == EntityState.Added);
+            if (added is not null) added.State = EntityState.Detached;
+            if (!await HasFileTransferOperationAsync(id, runnerId, ownerId, request, token)) throw;
+        }
+    }
+
+    private async Task<bool> HasFileTransferOperationAsync(Guid id, Guid runnerId, Guid ownerId,
+        RunnerFileTransferCommand request, CancellationToken token)
+    {
+        var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
+        if (operation is null) return false;
+        var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId || pinned?.FileTransfer != request)
+            throw new UnauthorizedAccessException("Runner file-transfer operation identity is already assigned to another request.");
+        return true;
     }
 
     private async Task<bool> HasManagedArtifactsOperationAsync(Guid id, Guid runnerId, Guid ownerId,
@@ -56,10 +82,15 @@ public sealed class RunnerExecutionOperationService(
             db.RunnerExecutionOperations.Add(operation);
             await db.SaveChangesAsync(ct);
             await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId,
-                request.ManagedArtifacts is not null || request.Action is not null && request.Action.Kind != "execute"), ct);
+                IsManagementRequest(request)), ct);
         }, token);
         return operation.Id;
     }
+
+    private static bool IsManagementRequest(RunnerExecutionRequest request)
+        => request.ManagedArtifacts is not null
+            || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
+            || request.Action is not null && request.Action.Kind != "execute";
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)
     {
@@ -145,6 +176,7 @@ public sealed class RunnerExecutionOperationService(
             throw new ArgumentException("Execution results must be terminal.");
         var action = new AppActionExecutionResultPersistence(db);
         var projection = await action.ResolveAsync(operation, result, token);
+        await EnsureFileTransferResultAsync(operation, result, token);
         var json = protector.Protect(JsonSerializer.Serialize(result, JsonOptions));
         var receipt = new RunnerExecutionReceipt("already-applied");
         await transactions.ExecuteAsync(async ct =>
@@ -156,6 +188,47 @@ public sealed class RunnerExecutionOperationService(
             }
         }, token);
         return receipt;
+    }
+
+    private async Task EnsureFileTransferResultAsync(
+        RunnerExecutionOperation operation, RunnerExecutionResult result, CancellationToken token)
+    {
+        var request = JsonSerializer.Deserialize<RunnerExecutionRequest>(
+            protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        var transfer = request?.FileTransfer;
+        if (transfer is null)
+        {
+            if (result.FileTransferResult is not null)
+                throw new ArgumentException("Non-transfer operations cannot return file-transfer results.");
+            return;
+        }
+
+        if (result.Outcome != "Succeeded") return;
+        if (result.FileTransferResult is not { Success: true })
+            throw new ArgumentException("Successful file-transfer operations require a successful typed result.");
+        if (transfer.Kind == RunnerFileTransferKinds.DeployPackage
+            && result.FileTransferResult.Deployment is null)
+            throw new ArgumentException("Deployment transfers require the deployment result.");
+        if (transfer.Kind is RunnerFileTransferKinds.DownloadAppFile or RunnerFileTransferKinds.DownloadMedia)
+            await EnsureDownloadArtifactAsync(operation, result.FileTransferResult, token);
+    }
+
+    private async Task EnsureDownloadArtifactAsync(
+        RunnerExecutionOperation operation, RunnerFileTransferResult transfer, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(transfer.FileName) || transfer.Length is null or < 0
+            || transfer.Sha256 is not { Length: 64 } checksum || checksum.Any(character => !Uri.IsHexDigit(character)))
+            throw new ArgumentException("Download transfers require file metadata and a SHA-256 checksum.");
+
+        var path = artifacts.GetRunnerTransferPath(operation.Id, input: false);
+        if (!File.Exists(path))
+            throw new ArgumentException("Download transfers must upload the result artifact before completing.");
+        var file = new FileInfo(path);
+        if (file.Length != transfer.Length)
+            throw new ArgumentException("Download artifact length does not match its result metadata.");
+        var actualChecksum = await artifacts.ComputeSha256Async(path, token);
+        if (!string.Equals(actualChecksum, checksum, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Download artifact checksum does not match its result metadata.");
     }
 
     private async Task<bool> PersistResultAsync(Guid id, string json, CancellationToken token)

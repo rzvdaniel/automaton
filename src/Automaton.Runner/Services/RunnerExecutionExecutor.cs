@@ -18,6 +18,8 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
         if (request.ManagedArtifacts is not null)
             return new ManagedApplicationArtifactExecutor(scope.ServiceProvider.GetRequiredService<RunnerWorkspaceService>())
                 .Execute(request.ManagedArtifacts, token);
+        if (request.FileTransfer is not null)
+            throw new InvalidOperationException("File transfers require an authenticated Runner execution client.");
         if (request.Action is not null)
         {
             return await new AppActionCommandExecutor(
@@ -33,7 +35,8 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
     private static void EnsureSinglePayload(RunnerExecutionRequest request)
     {
         var count = (request.FlowId.HasValue ? 1 : 0) + (request.Step is not null ? 1 : 0)
-            + (request.Action is not null ? 1 : 0) + (request.ManagedArtifacts is not null ? 1 : 0);
+            + (request.Action is not null ? 1 : 0) + (request.ManagedArtifacts is not null ? 1 : 0)
+            + (request.FileTransfer is not null ? 1 : 0);
         if (count != 1) throw new InvalidDataException("Exactly one Runner execution payload is required.");
     }
 

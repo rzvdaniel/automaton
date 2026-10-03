@@ -77,17 +77,17 @@ public sealed class ApplicationDeploymentService
 
         try
         {
-            var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+            var runner = await runnerAssignmentPolicy.GetAssignedRunnerForDurableManagementAsync(
                 appId,
                 ownerId,
-                requireOnline: true,
                 targetSlug: target.Slug,
                 cancellationToken: cancellationToken);
-            if (runner is null || string.IsNullOrWhiteSpace(runner.ConnectionId))
-                throw new InvalidOperationException("No connected runner is assigned to this app.");
+            if (runner is null)
+                throw new InvalidOperationException("No Runner is assigned to this app.");
 
             var result = await packageRunnerService.DeployAsync(
                 appId,
+                ownerId,
                 target.Id,
                 runner,
                 file,

@@ -17,6 +17,6 @@ internal static class AppAuthorizationActionExecutionTestFactory
             runnerAuthorization,
             targetResolver);
         var apps = AppAuthorizationTestServiceFactory.CreateAppsService(dbContext, userId);
-        return new AppActionExecutionService(dbContext, apps, authorization, assignment, targetResolver, null!, null!);
+        return new AppActionExecutionService(dbContext, apps, authorization, assignment, targetResolver, null!);
     }
 }
