@@ -101,27 +101,41 @@ public sealed class AppMediaStorageService
         var downloadOperation = Guid.NewGuid();
         var downloadCommand = new RunnerFileTransferCommand(RunnerFileTransferKinds.DownloadMedia,
             appId, downloadOperation.ToString("N"), RelativePath: relativePath);
-        var downloaded = await ExecuteAsync(downloadOperation, runnerId, ownerId, downloadCommand, token);
-        var downloadStatus = GetTransferStatus(downloaded);
-        if (downloadStatus != StatusCodes.Status200OK) return downloadStatus;
-
         try
         {
-            await using var content = transfers.OpenOutput(downloadOperation);
-            response.ContentType = downloaded!.FileTransferResult!.ContentType
-                ?? metadata!.FileTransferResult!.ContentType ?? "application/octet-stream";
+            var downloaded = await ExecuteAsync(downloadOperation, runnerId, ownerId, downloadCommand, token);
+            var downloadStatus = GetTransferStatus(downloaded);
+            if (downloadStatus != StatusCodes.Status200OK) return downloadStatus;
+
+            return await StreamMediaArtifactAsync(downloadOperation, metadata!, downloaded!, response, token);
+        }
+        finally
+        {
+            await transfers.CleanupOutputAsync(downloadOperation);
+        }
+    }
+
+    private async Task<int> StreamMediaArtifactAsync(
+        Guid operationId, RunnerExecutionResult metadata, RunnerExecutionResult downloaded,
+        HttpResponse response, CancellationToken token)
+    {
+        try
+        {
+            await using var content = transfers.OpenOutput(operationId);
+            response.ContentType = downloaded.FileTransferResult!.ContentType
+                ?? metadata.FileTransferResult!.ContentType ?? "application/octet-stream";
             response.ContentLength = downloaded.FileTransferResult.Length;
             response.Headers["X-Content-Type-Options"] = "nosniff";
             response.Headers["Cache-Control"] = "public, max-age=3600";
             response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(
-                downloaded.FileTransferResult.FileName ?? metadata.FileTransferResult.FileName ?? "media");
+                downloaded.FileTransferResult.FileName ?? metadata.FileTransferResult!.FileName ?? "media");
             await content.CopyToAsync(response.Body, token);
             await response.Body.FlushAsync(token);
             return StatusCodes.Status200OK;
         }
         catch (FileNotFoundException)
         {
-            logger.LogWarning("Runner media result artifact was missing for app {AppId}, operation {OperationId}.", appId, downloadOperation);
+            logger.LogWarning("Runner media result artifact was missing for operation {OperationId}.", operationId);
             return StatusCodes.Status502BadGateway;
         }
     }

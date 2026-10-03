@@ -104,8 +104,27 @@ public sealed class DeploymentPackageStore(
     public string GetRunnerTransferPath(Guid operationId, bool input)
         => Path.Combine(GetPackageDirectory(), $"{operationId:N}.{(input ? "transfer-in" : "transfer-out")}");
 
-    public void TryDeleteRunnerTransfer(Guid operationId, bool input)
-        => TryDelete(GetRunnerTransferPath(operationId, input));
+    public async Task TryDeleteRunnerTransferAsync(Guid operationId, bool input)
+    {
+        await StorageGate.WaitAsync();
+        try
+        {
+            var directory = GetPackageDirectory();
+            if (!Directory.Exists(directory))
+                return;
+
+            await using var storageLock = await OpenStorageLockAsync(directory, CancellationToken.None);
+            TryDelete(GetRunnerTransferPath(operationId, input));
+        }
+        catch
+        {
+            // A failed cleanup must not change the completed transfer result.
+        }
+        finally
+        {
+            StorageGate.Release();
+        }
+    }
 
     public async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
     {

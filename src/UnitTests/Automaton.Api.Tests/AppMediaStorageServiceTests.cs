@@ -33,6 +33,7 @@ public sealed class AppMediaStorageServiceTests
         Assert.That(context.Response.Headers["Cache-Control"].ToString(), Is.EqualTo("public, max-age=3600"));
         Assert.That(context.Response.Headers["Content-Disposition"].ToString(), Is.EqualTo("inline; filename=\"photo.png\""));
         Assert.That(transfers.OutputBytes, Is.EqualTo(new byte[] { 1, 2, 3 }));
+        Assert.That(transfers.CleanedOutputIds, Is.EqualTo(new[] { transfers.DownloadMediaOperationId }));
     }
 
     [Test]
@@ -89,6 +90,8 @@ public sealed class AppMediaStorageServiceTests
     {
         public bool MissingMetadata { get; init; }
         public byte[] OutputBytes { get; private set; } = [];
+        public Guid DownloadMediaOperationId { get; private set; }
+        public List<Guid> CleanedOutputIds { get; } = [];
 
         public Task<(Guid OperationId, RunnerExecutionResult Result)> ExecuteAsync(Guid operationId, Guid runnerId,
             Guid ownerId, RunnerFileTransferCommand command, IFormFile? input, CancellationToken token, TimeSpan? timeout = null)
@@ -102,6 +105,7 @@ public sealed class AppMediaStorageServiceTests
 
             if (command.Kind == RunnerFileTransferKinds.DownloadMedia)
             {
+                DownloadMediaOperationId = operationId;
                 OutputBytes = [1, 2, 3];
                 return Task.FromResult((operationId, new RunnerExecutionResult
                 {
@@ -120,5 +124,11 @@ public sealed class AppMediaStorageServiceTests
         }
 
         public Stream OpenOutput(Guid operationId) => new MemoryStream(OutputBytes, writable: false);
+
+        public Task CleanupOutputAsync(Guid operationId)
+        {
+            CleanedOutputIds.Add(operationId);
+            return Task.CompletedTask;
+        }
     }
 }

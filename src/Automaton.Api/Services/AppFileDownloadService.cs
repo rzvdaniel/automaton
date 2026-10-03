@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 
@@ -23,7 +21,7 @@ public sealed class AppFileDownloadService(
             return;
         }
 
-        var operationId = CreateOperationId(appId, runner.Id, sessionId);
+        var operationId = Guid.NewGuid();
         try
         {
             var command = new RunnerFileTransferCommand(
@@ -64,8 +62,9 @@ public sealed class AppFileDownloadService(
                 await response.WriteAsJsonAsync(new { error = "Runner download failed." }, cancellationToken);
             }
         }
+        finally
+        {
+            await transfers.CleanupOutputAsync(operationId);
+        }
     }
-
-    private static Guid CreateOperationId(Guid appId, Guid runnerId, string sessionId)
-        => new(SHA256.HashData(Encoding.UTF8.GetBytes($"file-download:{appId:N}:{runnerId:N}:{sessionId}"))[..16]);
 }

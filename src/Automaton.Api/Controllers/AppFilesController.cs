@@ -10,7 +10,7 @@ namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Transfers app files through persisted Runner execution operations and authenticated HTTPS artifacts.
-/// Binary artifacts use the existing shared API AppData volume and are removed by package-store retention.
+/// Binary artifacts use the existing shared API AppData volume and download outputs are removed after streaming.
 /// </summary>
 [ApiController]
 [Route("api")]

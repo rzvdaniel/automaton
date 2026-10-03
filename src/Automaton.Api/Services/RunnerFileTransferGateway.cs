@@ -11,6 +11,7 @@ public interface IRunnerFileTransferGateway
     Task<(Guid OperationId, RunnerExecutionResult Result)> ExecuteAsync(Guid operationId, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand command, IFormFile? input, CancellationToken token, TimeSpan? timeout = null);
     Stream OpenOutput(Guid operationId);
+    Task CleanupOutputAsync(Guid operationId);
 }
 
 public sealed class RunnerFileTransferGateway(
@@ -48,11 +49,26 @@ public sealed class RunnerFileTransferGateway(
         finally
         {
             if (reachedTerminalResult && inputPath is not null)
-                store.TryDeleteRunnerTransfer(operationId, input: true);
+                await store.TryDeleteRunnerTransferAsync(operationId, input: true);
         }
     }
 
     public Stream OpenOutput(Guid operationId) => store.OpenRunnerTransfer(operationId, input: false);
+
+    public async Task CleanupOutputAsync(Guid operationId)
+    {
+        try
+        {
+            var isTerminal = await db.RunnerExecutionOperations.AsNoTracking()
+                .AnyAsync(operation => operation.Id == operationId && operation.CompletedAtUtc != null);
+            if (isTerminal)
+                await store.TryDeleteRunnerTransferAsync(operationId, input: false);
+        }
+        catch
+        {
+            // Retention cleanup reclaims artifacts if the operation state cannot be checked here.
+        }
+    }
 
     private async Task EnsureOwnerStillOwnsRunnerAsync(
         Guid runnerId, Guid ownerId, Guid appId, Guid? deploymentTargetId, CancellationToken token)
