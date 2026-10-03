@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
@@ -361,6 +363,110 @@ public class RunnerWorkspaceServiceTests
             Assert.That(Directory.Exists(prepared.DataDirectory), Is.True);
             Assert.That(Directory.Exists(prepared.Mounts["uploads"]), Is.True);
         });
+    }
+
+    [Test]
+    public void PrepareApplicationStorage_RefreshesWritablePermissionsForContainerUsers()
+    {
+        if (OperatingSystem.IsWindows())
+            Assert.Ignore("Unix directory permissions are enforced on Linux Runner hosts.");
+
+        var appId = Guid.NewGuid();
+        var originalWorkspaceRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString("N"));
+        var storage = new ApplicationStorageSpec
+        {
+            DataDirectory = "app-data",
+            Mounts = [new ApplicationStorageMount { Name = "uploads", RelativePath = "media/uploads" }]
+        };
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        try
+        {
+            var dataDirectory = service.ResolveApplicationDataPath(appId, storage.DataDirectory);
+            var mountDirectory = service.ResolveApplicationDataPath(appId, storage.Mounts[0].RelativePath);
+            Directory.CreateDirectory(dataDirectory);
+            Directory.CreateDirectory(mountDirectory);
+            File.SetUnixFileMode(dataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.SetUnixFileMode(mountDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            service.PrepareApplicationStorage(appId, storage);
+
+            var requiredWritePermissions = UnixFileMode.UserWrite | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.GetUnixFileMode(dataDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
+                Assert.That(File.GetUnixFileMode(mountDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", originalWorkspaceRoot);
+            if (Directory.Exists(workspaceRoot))
+                Directory.Delete(workspaceRoot, recursive: true);
+        }
+    }
+
+    [TestCase(Architecture.X64, 0xB0000)]
+    [TestCase(Architecture.Arm64, 0x8C000)]
+    public void LinuxManagedDirectoryOpenFlags_AreArchitectureSpecific(Architecture architecture, int expectedFlags)
+    {
+        Assert.That(LinuxManagedDirectoryPermissions.GetManagedDirectoryOpenFlags(architecture), Is.EqualTo(expectedFlags));
+    }
+
+    [TestCase(Architecture.X86)]
+    [TestCase(Architecture.Arm)]
+    public void LinuxManagedDirectoryOpenFlags_RejectUnsupportedArchitectures(Architecture architecture)
+    {
+        Assert.That(
+            () => LinuxManagedDirectoryPermissions.GetManagedDirectoryOpenFlags(architecture),
+            Throws.TypeOf<PlatformNotSupportedException>());
+    }
+
+    [Test]
+    [SupportedOSPlatform("linux")]
+    public void LinuxPermissionPreparation_ChangesVerifiedDirectoryAfterAncestorIsReplacedWithSymlink()
+    {
+        if (!OperatingSystem.IsLinux())
+            Assert.Ignore("Handle-anchored permission preparation is Linux-specific.");
+
+        var testRoot = Path.Combine(Path.GetTempPath(), "runner-permission-boundary", Guid.NewGuid().ToString("N"));
+        var trustedRoot = Path.Combine(testRoot, "storage");
+        var appDirectory = Path.Combine(trustedRoot, "app");
+        var dataDirectory = Path.Combine(appDirectory, "data");
+        var movedAppDirectory = Path.Combine(trustedRoot, "app-original");
+        var outsideDirectory = Path.Combine(testRoot, "outside");
+        var outsideDataDirectory = Path.Combine(outsideDirectory, "data");
+        Directory.CreateDirectory(dataDirectory);
+        Directory.CreateDirectory(outsideDataDirectory);
+        File.SetUnixFileMode(dataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.SetUnixFileMode(outsideDataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var outsideMode = File.GetUnixFileMode(outsideDataDirectory);
+
+        try
+        {
+            using (var verifiedDirectory = LinuxManagedDirectoryPermissions.OpenManagedDirectory(trustedRoot, "app/data"))
+            {
+                Directory.Move(appDirectory, movedAppDirectory);
+                Directory.CreateSymbolicLink(appDirectory, outsideDirectory);
+
+                LinuxManagedDirectoryPermissions.SetWritableDirectoryPermissions(verifiedDirectory);
+            }
+
+            var writePermissions = UnixFileMode.UserWrite | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.GetUnixFileMode(Path.Combine(movedAppDirectory, "data")) & writePermissions, Is.EqualTo(writePermissions));
+                Assert.That(File.GetUnixFileMode(outsideDataDirectory), Is.EqualTo(outsideMode));
+                Assert.That(() => LinuxManagedDirectoryPermissions.PrepareWritableDirectory(trustedRoot, "app/data"), Throws.TypeOf<IOException>());
+            });
+
+            Assert.That(File.GetUnixFileMode(outsideDataDirectory), Is.EqualTo(outsideMode));
+        }
+        finally
+        {
+            if (Directory.Exists(testRoot))
+                Directory.Delete(testRoot, recursive: true);
+        }
     }
 
     [Test]

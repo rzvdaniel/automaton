@@ -249,16 +249,28 @@ public class RunnerWorkspaceService
         ApplicationContractValidator.EnsureValid(new ApplicationContract { Storage = storage });
 
         var dataDirectory = ResolveApplicationDataPath(appId, storage.DataDirectory);
-        Directory.CreateDirectory(dataDirectory);
+        PrepareWritableApplicationDirectory(dataDirectory);
         var mounts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var mount in storage.Mounts)
         {
             var mountPath = ResolveApplicationDataPath(appId, mount.RelativePath);
-            Directory.CreateDirectory(mountPath);
+            PrepareWritableApplicationDirectory(mountPath);
             mounts.Add(mount.Name, mountPath);
         }
 
         return new RunnerApplicationStorageRuntime(dataDirectory, mounts);
+    }
+
+    private void PrepareWritableApplicationDirectory(string path)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Directory.CreateDirectory(path);
+            return;
+        }
+
+        var relativePath = Path.GetRelativePath(DataRoot, path);
+        LinuxManagedDirectoryPermissions.PrepareWritableDirectory(DataRoot, relativePath);
     }
 
     /// <summary>

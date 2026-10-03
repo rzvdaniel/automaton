@@ -88,6 +88,9 @@ internal sealed class HostContainerRuntimeDockerAcceptance
         await Docker(
             "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed",
             "--entrypoint", "mkdir", image, "-p", $"/seed/{artifacts[0]}", $"/seed/{artifacts[1]}", $"/seed/{data}");
+        await Docker(
+            "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed",
+            "--entrypoint", "chmod", image, "777", $"/seed/{data}");
     }
 
     private async Task CreateContainersAsync(string image)
