@@ -94,6 +94,17 @@ public sealed class AppRunnerAssignmentPolicy(
         return runner;
     }
 
+    public async Task<Runner> GetAssignedRunnerForDurableManagementAsync(
+        Guid appId, Guid userId, string? targetSlug = null, CancellationToken cancellationToken = default)
+    {
+        var target = await targetResolver.ResolveAsync(appId, targetSlug, userId, cancellationToken);
+        var runner = target.ExecutionRunner!;
+        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
+        if (!RunnerPresenceEvaluator.HasRecentHeartbeat(runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            throw new InvalidOperationException("The assigned Runner is unavailable.");
+        return runner;
+    }
+
     private async Task<AppDeploymentTarget> GetOrCreateDefaultTargetAsync(
         WebApp app,
         CancellationToken cancellationToken)

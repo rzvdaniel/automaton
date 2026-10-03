@@ -3,7 +3,6 @@ using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Constants;
@@ -13,13 +12,11 @@ using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
-using static Automaton.Api.Hubs.AutomatonHub;
 
 namespace Automaton.Api.Tests;
 
@@ -251,25 +248,23 @@ internal static class DeploymentFixtureServiceFactory
     {
         var environment = new TestWebHostEnvironment { ContentRootPath = workspace.RootPath };
         var storage = CreateStorage(state.Db, environment);
-        var uploadRegistry = new FileUploadRegistry();
         var invocationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var hub = CreateHub(uploadRegistry, workspace.PackagePath, state.Target.Id, invocationStarted, settings);
+        var transferGateway = CreateTransferGateway(workspace.PackagePath, state.Target.Id, invocationStarted, settings);
         var resolver = new FixedTargetResolver(state.Target);
         var routeService = DeploymentFixtureRouteServiceFactory.Create(state.Db, workspace, environment, state.Target.Id, settings);
-        var service = CreateDeploymentService(state, storage, hub, uploadRegistry, resolver, routeService);
+        var service = CreateDeploymentService(state, storage, transferGateway, resolver, routeService);
 
-        return new DeploymentFixtureServices(service, hub.RunnerResult, invocationStarted);
+        return new DeploymentFixtureServices(service, transferGateway.RunnerResult, invocationStarted);
     }
 
     private static ApplicationDeploymentService CreateDeploymentService(
         DeploymentFixtureState state,
         AppFileStorageService storage,
-        PackageHubContext hub,
-        FileUploadRegistry uploadRegistry,
+        IRunnerFileTransferGateway transferGateway,
         FixedTargetResolver resolver,
         BackendRouteConfigService routeService)
         => new(
-            new DeploymentPackageRunnerService(state.Db, hub, uploadRegistry, state.ApiIdentity),
+            new DeploymentPackageRunnerService(transferGateway),
             null!,
             new AppRunnerAssignmentPolicy(state.Db, null!, null!, resolver),
             resolver,
@@ -287,8 +282,7 @@ internal static class DeploymentFixtureServiceFactory
         return new AppFileStorageService(environment, settings);
     }
 
-    private static PackageHubContext CreateHub(
-        FileUploadRegistry uploadRegistry,
+    private static PackageTransferGateway CreateTransferGateway(
         string packagePath,
         Guid targetId,
         TaskCompletionSource<bool> invocationStarted,
@@ -300,8 +294,7 @@ internal static class DeploymentFixtureServiceFactory
             Success = true,
             Message = "package deployed"
         };
-        return new PackageHubContext(
-            uploadRegistry,
+        return new PackageTransferGateway(
             packagePath,
             runnerResult,
             invocationStarted,
@@ -633,97 +626,33 @@ internal sealed class FixedTargetResolver(AppDeploymentTarget target) : IAppDepl
         Task.FromResult(target);
 }
 
-internal sealed class PackageHubContext : IHubContext<AutomatonHub>
+internal sealed class PackageTransferGateway(
+    string packagePath, DeployAppPackageResult runnerResult,
+    TaskCompletionSource<bool> invocationStarted, TimeSpan? invocationDelay) : IRunnerFileTransferGateway
 {
-    public PackageHubContext(
-        FileUploadRegistry uploadRegistry,
-        string packagePath,
-        DeployAppPackageResult runnerResult,
-        TaskCompletionSource<bool> runnerInvocationStarted,
-        TimeSpan? runnerInvocationDelay)
+    public async Task<(Guid OperationId, RunnerExecutionResult Result)> ExecuteAsync(
+        Guid operationId, Guid runnerId, Guid ownerId, RunnerFileTransferCommand command,
+        IFormFile? input, CancellationToken token, TimeSpan? timeout = null)
     {
-        RunnerResult = runnerResult;
-        Clients = new PackageHubClients(
-            uploadRegistry,
-            packagePath,
-            runnerResult,
-            runnerInvocationStarted,
-            runnerInvocationDelay);
-    }
-
-    public DeployAppPackageResult RunnerResult { get; }
-    public IHubClients Clients { get; }
-    public IGroupManager Groups { get; } = null!;
-}
-
-internal sealed class PackageHubClients : IHubClients
-{
-    private readonly PackageClientProxy clientProxy;
-
-    public PackageHubClients(
-        FileUploadRegistry uploadRegistry,
-        string packagePath,
-        DeployAppPackageResult runnerResult,
-        TaskCompletionSource<bool> runnerInvocationStarted,
-        TimeSpan? runnerInvocationDelay)
-    {
-        clientProxy = new PackageClientProxy(
-            uploadRegistry,
-            packagePath,
-            runnerResult,
-            runnerInvocationStarted,
-            runnerInvocationDelay);
-    }
-
-    public IClientProxy All => throw new NotSupportedException();
-    public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-    public ISingleClientProxy Client(string connectionId) => clientProxy;
-    IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => clientProxy;
-    public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-    public IClientProxy Group(string groupName) => throw new NotSupportedException();
-    public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-    public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
-    public IClientProxy User(string userId) => throw new NotSupportedException();
-    public IClientProxy Users(IReadOnlyList<string> userIds) => throw new NotSupportedException();
-}
-
-internal sealed class PackageClientProxy(
-    FileUploadRegistry uploadRegistry,
-    string packagePath,
-    DeployAppPackageResult runnerResult,
-    TaskCompletionSource<bool> runnerInvocationStarted,
-    TimeSpan? runnerInvocationDelay) : ISingleClientProxy
-{
-    public async Task<T> InvokeCoreAsync<T>(string method, object?[] args, CancellationToken cancellationToken)
-    {
-        if (method == AutomatonHubMethods.DeployAppPackage)
+        Assert.That(input, Is.Not.Null);
+        invocationStarted.TrySetResult(true);
+        if (invocationDelay is { } delay) await Task.Delay(delay, CancellationToken.None);
+        var deployment = new RunnerFileTransferResult
         {
-            runnerInvocationStarted.TrySetResult(true);
-            if (runnerInvocationDelay is { } delay)
-                await Task.Delay(delay, CancellationToken.None);
-            return (T)(object)runnerResult;
-        }
-
-        throw new NotSupportedException($"Unexpected invoke method: {method}");
-    }
-
-    public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
-    {
-        if (method == AutomatonHubMethods.ReceiveFileChunk && args.Length > 0 && args[0] is FileUploadChunk chunk && chunk.IsLast)
+            Success = runnerResult.Success,
+            Error = runnerResult.Message,
+            Deployment = runnerResult
+        };
+        return (operationId, new RunnerExecutionResult
         {
-            uploadRegistry.TryComplete(new FileUploadCompleteMessage
-            {
-                SessionId = chunk.SessionId,
-                LocalPath = packagePath
-            });
-            return Task.CompletedTask;
-        }
-
-        if (method == AutomatonHubMethods.ReceiveFileChunk)
-            return Task.CompletedTask;
-
-        throw new NotSupportedException($"Unexpected send method: {method}");
+            Outcome = runnerResult.Success ? "Succeeded" : "Failed",
+            Error = runnerResult.Success ? null : runnerResult.Message,
+            FileTransferResult = deployment
+        });
     }
+
+    public Stream OpenOutput(Guid operationId) => File.OpenRead(packagePath);
+    public DeployAppPackageResult RunnerResult { get; } = runnerResult;
 }
 
 internal sealed class ConflictRouteConfigService : BackendRouteConfigService

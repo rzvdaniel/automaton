@@ -27,7 +27,7 @@ namespace Automaton.Api.Tests;
 public sealed class ApplicationDeploymentServiceTests
 {
     [Test]
-    public async Task OwnershipLoss_DoesNotFinalizeDeploymentTarget()
+    public async Task RunnerConnectedToAnotherApiCanReceiveDurableDeploymentByStableIdentity()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
         var operationId = Guid.NewGuid();
@@ -36,14 +36,16 @@ public sealed class ApplicationDeploymentServiceTests
         await fixture.Db.SaveChangesAsync();
         var package = fixture.CreatePackage(hasRuntime: true);
 
-        Assert.ThrowsAsync<DeploymentOperationRunnerOwnershipChangedException>(async () =>
-            await fixture.Service.DeployPackageAsync(fixture.AppId, fixture.OwnerId, fixture.Target.Slug,
-                package, clean: true, CancellationToken.None, operationId, attemptId));
+        var response = await fixture.Service.DeployPackageAsync(fixture.AppId, fixture.OwnerId, fixture.Target.Slug,
+            package, clean: true, CancellationToken.None, operationId, attemptId);
 
         var target = await fixture.Db.AppDeploymentTargets.SingleAsync(item => item.Id == fixture.Target.Id);
-        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Deploying));
-        Assert.That(target.ActiveDeploymentOperationId, Is.EqualTo(operationId));
-        Assert.That(target.ActiveDeploymentExecutionAttemptId, Is.EqualTo(attemptId));
+        Assert.That(response.Success, Is.True);
+        Assert.That(fixture.RunnerInvocationStarted.Task.IsCompleted, Is.True);
+        Assert.That(target.Status, Is.EqualTo(DeploymentTargetStatus.Running));
+        Assert.That(target.GenericRuntimeDeployed, Is.True);
+        Assert.That(target.ActiveDeploymentOperationId, Is.Null);
+        Assert.That(target.ActiveDeploymentExecutionAttemptId, Is.Null);
     }
 
     [Test]

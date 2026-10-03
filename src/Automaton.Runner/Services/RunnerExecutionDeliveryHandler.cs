@@ -3,7 +3,8 @@ using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
 
-internal sealed class RunnerExecutionDeliveryHandler(RunnerExecutionProcessor processor)
+internal sealed class RunnerExecutionDeliveryHandler(
+    RunnerExecutionProcessor processor, RunnerFileTransferExecutor? fileTransfers = null)
 {
     internal async Task<bool> HandleAsync(ReadOnlyMemory<byte> body, string? messageId, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
@@ -72,7 +73,16 @@ internal sealed class RunnerExecutionDeliveryHandler(RunnerExecutionProcessor pr
         using var execution = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var monitor = CancellationTokenSource.CreateLinkedTokenSource(token);
         var watching = WatchCancellationAsync(command.OperationId, api, execution, monitor.Token);
-        try { return await processor.ProcessAsync(command.OperationId, assignment.Request, execution.Token); }
+        try
+        {
+            var request = assignment.Request;
+            if (request.FileTransfer is null)
+                return await processor.ProcessAsync(command.OperationId, request, execution.Token);
+            if (fileTransfers is null)
+                throw new InvalidOperationException("Runner file-transfer executor is unavailable.");
+            return await processor.ProcessAsync(command.OperationId, request, execution.Token,
+                (_, transferToken) => fileTransfers.ExecuteAsync(command.OperationId, request.FileTransfer, api, transferToken));
+        }
         finally
         {
             await monitor.CancelAsync();

@@ -15,6 +15,13 @@ public sealed class AppActionRunnerGateway(RunnerExecutionOperationService opera
             throw new InvalidOperationException(result.Error ?? "Runner Action management did not complete.");
         return result.ActionResult.Value.Deserialize<T>() ?? throw new InvalidDataException("Runner Action response is missing.");
     }
+
+    public Task<Guid> QueueExecutionAsync(
+        Guid runnerId, Guid requestedByUserId, Guid operationId,
+        ExecuteAppActionModuleRequest request, CancellationToken token)
+        => operations.QueueAsync(runnerId, requestedByUserId,
+            new(null, null, AppActionCommand.Create("execute", request)), token, operationId);
+
     public Task<AppActionModulesResponse> ListModulesAsync(Guid runnerId, Guid appId, Guid targetId, string key, CancellationToken token)
         => SendAsync<AppActionModulesResponse>(runnerId, "list-modules", new AppActionModuleRequest(appId, targetId, key), token);
     public Task<AppActionVersionsResponse> ListVersionsAsync(Guid runnerId, Guid appId, Guid targetId, string key, CancellationToken token)

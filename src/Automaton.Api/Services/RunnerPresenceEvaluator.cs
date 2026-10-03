@@ -8,10 +8,11 @@ public static class RunnerPresenceEvaluator
 
     public static bool IsOnline(string? connectionId, DateTime? lastHeartbeatAtUtc, DateTime utcNow)
     {
-        return !string.IsNullOrWhiteSpace(connectionId)
-            && lastHeartbeatAtUtc.HasValue
-            && utcNow - lastHeartbeatAtUtc.Value <= OfflineThreshold;
+        return !string.IsNullOrWhiteSpace(connectionId) && HasRecentHeartbeat(lastHeartbeatAtUtc, utcNow);
     }
+
+    public static bool HasRecentHeartbeat(DateTime? lastHeartbeatAtUtc, DateTime utcNow)
+        => lastHeartbeatAtUtc.HasValue && utcNow - lastHeartbeatAtUtc.Value <= OfflineThreshold;
 
     public static RunnerStatus DeriveStatus(DateTime? lastHeartbeatAtUtc, DateTime utcNow)
     {

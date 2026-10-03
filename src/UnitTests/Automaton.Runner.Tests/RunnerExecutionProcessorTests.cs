@@ -66,7 +66,7 @@ public sealed class RunnerExecutionProcessorTests
     public async Task ConcurrentActionRedeliverySharesResultWithoutRepeatingWork()
     {
         var executor = new BlockingExecutor(); var id = Guid.NewGuid(); var processor = new RunnerExecutionProcessor(new(directory), executor);
-        var request = new RunnerExecutionRequest(null, null, AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest { ExecutionId = id, Input = System.Text.Json.JsonSerializer.SerializeToElement(new { }) }));
+        var request = CreateActionRequest(id);
         var first = processor.ProcessAsync(id, request, CancellationToken.None);
         await executor.Started.Task;
         var duplicate = processor.ProcessAsync(id, request, CancellationToken.None);
@@ -122,6 +122,13 @@ public sealed class RunnerExecutionProcessorTests
             return new() { Outcome = "Succeeded", Output = "once" };
         }
     }
+
+    private static RunnerExecutionRequest CreateActionRequest(Guid id)
+        => new(null, null, AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest
+        {
+            ExecutionId = id,
+            Input = System.Text.Json.JsonSerializer.SerializeToElement(new { })
+        }));
 
     private sealed class Executor : IRunnerExecutionExecutor
     {

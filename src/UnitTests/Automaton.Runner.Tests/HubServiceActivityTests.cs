@@ -21,40 +21,6 @@ public sealed class HubServiceActivityTests
         ?? throw new MissingFieldException(nameof(HubService), "reconnectRequested");
 
     [Test]
-    public async Task PackageDeploymentActivityDefersReconnectUntilDeploymentCompletes()
-    {
-        var service = CreateService();
-        var deploymentStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseDeployment = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var deploymentTask = InvokeActivityAsync(service, async () =>
-        {
-            deploymentStarted.SetResult(true);
-            await releaseDeployment.Task;
-            return true;
-        });
-
-        await deploymentStarted.Task;
-        var connectionLoopWait = WaitForReconnectRequestAsync(service);
-        Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
-
-        HandleReconnectWhenIdleMethod.Invoke(service, ["API cutover"]);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(1));
-            Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(1));
-            Assert.That(connectionLoopWait.IsCompleted, Is.False);
-        });
-
-        releaseDeployment.SetResult(true);
-        Assert.That(await deploymentTask, Is.True);
-        Assert.That(await connectionLoopWait.WaitAsync(TimeSpan.FromSeconds(1)), Is.True);
-        Assert.That(ActiveOperationCountField.GetValue(service), Is.EqualTo(0));
-        Assert.That(ReconnectRequestedField.GetValue(service), Is.EqualTo(0));
-    }
-
-    [Test]
     public async Task ReconnectWhenIdle_WakesConnectionLoopImmediatelyWhenNoWorkIsActive()
     {
         var service = CreateService();
@@ -112,11 +78,6 @@ public sealed class HubServiceActivityTests
         });
     }
 
-    private static async Task<T> InvokeActivityAsync<T>(HubService service, Func<Task<T>> operation)
-    {
-        return await service.ExecuteWithRunnerActivityAsync(operation);
-    }
-
     private static Task<bool> WaitForReconnectRequestAsync(
         HubService service,
         TimeSpan? interval = null)
@@ -124,6 +85,5 @@ public sealed class HubServiceActivityTests
             service,
             [interval ?? TimeSpan.FromSeconds(30), CancellationToken.None])!;
 
-    private static HubService CreateService() => new(
-        null!, null!, null!, null!, null!, null!, null!);
+    private static HubService CreateService() => new(null!, null!, null!, null!, null!);
 }

@@ -10,8 +10,7 @@ public sealed class AppFileRunnerResolver(IAppDeploymentTargetResolver targetRes
         {
             var target = await targetResolver.ResolveAsync(appId, null, ownerId, cancellationToken);
             var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
+            return RunnerPresenceEvaluator.HasRecentHeartbeat(
                 runner.LastHeartbeatAtUtc,
                 DateTime.UtcNow)
                 ? null
@@ -37,8 +36,7 @@ public sealed class AppFileRunnerResolver(IAppDeploymentTargetResolver targetRes
         {
             var target = await targetResolver.ResolveAsync(appId, null, ownerId, cancellationToken);
             var runner = target.ExecutionRunner!;
-            return RunnerPresenceEvaluator.IsOnline(
-                runner.ConnectionId,
+            return RunnerPresenceEvaluator.HasRecentHeartbeat(
                 runner.LastHeartbeatAtUtc,
                 DateTime.UtcNow)
                 ? runner

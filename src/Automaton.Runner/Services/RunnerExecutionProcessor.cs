@@ -30,7 +30,9 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
         return result;
     }
     public void Forget(Guid id) => journal.Forget(id);
-    public async Task<RunnerExecutionResult> ProcessAsync(Guid id, RunnerExecutionRequest request, CancellationToken token)
+    public async Task<RunnerExecutionResult> ProcessAsync(
+        Guid id, RunnerExecutionRequest request, CancellationToken token,
+        Func<RunnerExecutionRequest, CancellationToken, Task<RunnerExecutionResult>>? executeOverride = null)
     {
         using var ownership = await journal.LockAsync(id, token);
         var saved = await journal.ReadAsync(id, token);
@@ -40,7 +42,7 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
             if (journal.WasCancelled(id)) result = CancelledBeforeExecution();
             else result = journal.WasAccepted(id)
                 ? RunnerExecutionResult.Interrupted("Runner stopped after accepting work; execution outcome is uncertain. Work was not repeated.")
-                : await ExecuteOnceAsync(id, request, token);
+                : await ExecuteOnceAsync(id, request, token, executeOverride);
             completed[id] = result;
         }
         // A persistence error must never become an execution failure or cause work to run again.
@@ -53,10 +55,13 @@ internal sealed class RunnerExecutionProcessor(RunnerExecutionJournal journal, I
         Outcome = "Cancelled", Error = "Cancelled before execution.",
         Started = DateTime.UtcNow, Finished = DateTime.UtcNow
     };
-    private async Task<RunnerExecutionResult> ExecuteOnceAsync(Guid id, RunnerExecutionRequest request, CancellationToken token)
+    private async Task<RunnerExecutionResult> ExecuteOnceAsync(Guid id, RunnerExecutionRequest request,
+        CancellationToken token, Func<RunnerExecutionRequest, CancellationToken, Task<RunnerExecutionResult>>? executeOverride)
     {
         journal.Accept(id);
-        try { return await executor.ExecuteAsync(request, token); }
+        try { return executeOverride is null
+            ? await executor.ExecuteAsync(request, token)
+            : await executeOverride(request, token); }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             return new() { Outcome = "Cancelled", Error = "Cancellation requested; side effects may have occurred.",

@@ -564,8 +564,6 @@ internal static class ApiAppExecutionRegistration
         services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
         services.AddScoped<RuntimeTunnelRequestSender>();
         services.AddScoped<RuntimeTunnelService>();
-        services.AddSingleton<FileUploadRegistry>();
-        services.AddSingleton<FileDownloadRegistry>();
         services.AddScoped<RuntimeFileProxyService>();
         services.AddScoped<ApplicationDeploymentService>();
         services.AddScoped<DeploymentPackageFinalizationService>();
@@ -716,6 +714,9 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerExecutionIdentityService>();
         services.AddScoped<RunnerExecutionRevocationService>();
         services.AddScoped<RunnerExecutionOperationService>();
+        services.AddScoped<RunnerExecutionArtifactService>();
+        services.AddScoped<RunnerFileTransferGateway>();
+        services.AddScoped<IRunnerFileTransferGateway>(provider => provider.GetRequiredService<RunnerFileTransferGateway>());
         services.AddScoped<RunnerExecutionDispatchService>();
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();

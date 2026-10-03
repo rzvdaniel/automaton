@@ -245,6 +245,16 @@ public sealed class DeploymentOperationService(
                     operation.Status == DeploymentOperationStatuses.Running)
                 .Select(operation => operation.PackagePath)
                 .ToListAsync(cancellationToken);
+            var activeTransferIds = await dataContext.RunnerExecutionOperations
+                .AsNoTracking()
+                .Where(operation => operation.CompletedAtUtc == null)
+                .Select(operation => operation.Id)
+                .ToListAsync(cancellationToken);
+            activePackagePaths.AddRange(activeTransferIds.SelectMany(id => new[]
+            {
+                packageStore.GetRunnerTransferPath(id, input: true),
+                packageStore.GetRunnerTransferPath(id, input: false)
+            }));
 
             var deletedCount = await packageStore.CleanupUnreferencedPackagesAsync(
                 activePackagePaths,

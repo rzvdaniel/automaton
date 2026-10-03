@@ -9,7 +9,8 @@ namespace Automaton.Api.Controllers;
 [Authorize(Policy = "AllowApiKey")]
 [Route("api/runner-executions")]
 public sealed class RunnerExecutionsController(
-    RunnerExecutionIdentityService identity, HostedRunnerBrokerProvisioner broker, RunnerExecutionOperationService operations) : ControllerBase
+    RunnerExecutionIdentityService identity, HostedRunnerBrokerProvisioner broker,
+    RunnerExecutionOperationService operations, RunnerExecutionArtifactService? artifacts = null) : ControllerBase
 {
     [HttpGet("configuration")]
     public async Task<ActionResult<HostedRunnerBrokerConfiguration>> Configuration(CancellationToken token)
@@ -47,6 +48,38 @@ public sealed class RunnerExecutionsController(
         if (RunnerId() == Guid.Empty) return Forbid();
         try { return Ok(await operations.AssignmentAsync(KeyId(), id, token, includeRequest: false, authenticatedUserId: ActorId(), runnerId: RunnerId())); }
         catch (UnauthorizedAccessException) { return Forbid(); }
+    }
+
+    [HttpGet("{id:guid}/input")]
+    public async Task<IActionResult> Input(Guid id, CancellationToken token)
+    {
+        try
+        {
+            var stream = await artifacts!.OpenInputAsync(KeyId(), RunnerId(), ActorId(), id, token);
+            Response.Headers.CacheControl = "no-store";
+            return File(stream, "application/octet-stream", enableRangeProcessing: false);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+        catch (InvalidOperationException exception) { return Conflict(exception.Message); }
+        catch (FileNotFoundException) { return NotFound(); }
+    }
+
+    [HttpPost("{id:guid}/artifact")]
+    [RequestSizeLimit(RunnerFileTransferBounds.MaximumBytes)]
+    public async Task<IActionResult> Artifact(Guid id, CancellationToken token)
+    {
+        try
+        {
+            await artifacts!.StoreOutputAsync(KeyId(), RunnerId(), ActorId(), id,
+                Request.Body, Request.ContentLength, token);
+            return Ok();
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+        catch (InvalidOperationException exception) { return Conflict(exception.Message); }
+        catch (InvalidDataException exception)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new { error = exception.Message });
+        }
     }
 
     private Guid RunnerId() => Guid.TryParse(Request.Headers["X-Runner-Id"], out var id) ? id : Guid.Empty;

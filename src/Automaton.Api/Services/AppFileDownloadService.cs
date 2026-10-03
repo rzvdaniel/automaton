@@ -1,26 +1,19 @@
-using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
+using System.Security.Cryptography;
+using System.Text;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Api.Services;
 
 public sealed class AppFileDownloadService(
-    IHubContext<AutomatonHub> automatonHub,
-    FileDownloadRegistry downloadRegistry,
+    IRunnerFileTransferGateway transfers,
     AppFileRunnerResolver runnerResolver,
     ILogger<Controllers.AppFilesController> logger)
 {
-    private const int ChunkSize = 256 * 1024;
-    private const int DownloadChunkTimeoutSeconds = 30;
+    private static readonly TimeSpan DownloadDeadline = TimeSpan.FromMinutes(10);
 
     internal async Task DownloadAsync(
-        Guid appId,
-        Guid ownerId,
-        string sessionId,
-        HttpResponse response,
-        CancellationToken cancellationToken)
+        Guid appId, Guid ownerId, string sessionId, HttpResponse response, CancellationToken cancellationToken)
     {
         var runner = await runnerResolver.ResolveOnlineRunnerAsync(ownerId, appId, cancellationToken);
         if (runner is null)
@@ -30,92 +23,49 @@ public sealed class AppFileDownloadService(
             return;
         }
 
-        var channel = downloadRegistry.Register(sessionId);
-        logger.LogDebug(
-            "[AppFilesController] Download started: SessionId={SessionId} AppId={AppId} Runner={Runner}",
-            sessionId,
-            appId,
-            runner.Name);
-
+        var operationId = CreateOperationId(appId, runner.Id, sessionId);
         try
         {
-            await StreamDownloadAsync(runner, sessionId, channel, response, cancellationToken);
-            logger.LogDebug("[AppFilesController] Download complete: SessionId={SessionId}", sessionId);
+            var command = new RunnerFileTransferCommand(
+                RunnerFileTransferKinds.DownloadAppFile, appId, sessionId);
+            var (_, result) = await transfers.ExecuteAsync(operationId, runner.Id, ownerId, command, null,
+                cancellationToken, DownloadDeadline);
+            if (result.Outcome != "Succeeded" || result.FileTransferResult is not { Success: true } artifact)
+            {
+                response.StatusCode = result.FileTransferResult?.StatusCode is >= 400 and < 600
+                    ? result.FileTransferResult.StatusCode.Value
+                    : StatusCodes.Status502BadGateway;
+                await response.WriteAsJsonAsync(new { error = result.Error ?? result.FileTransferResult?.Error ?? "Runner download failed." }, cancellationToken);
+                return;
+            }
+
+            await using var stream = transfers.OpenOutput(operationId);
+            response.StatusCode = StatusCodes.Status200OK;
+            response.ContentType = artifact.ContentType ?? "application/octet-stream";
+            response.ContentLength = artifact.Length;
+            response.Headers.ContentDisposition = $"attachment; filename=\"{Uri.EscapeDataString(artifact.FileName ?? "download")}\"";
+            await stream.CopyToAsync(response.Body, cancellationToken);
+            await response.Body.FlushAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            if (!response.HasStarted)
+            {
+                response.StatusCode = StatusCodes.Status504GatewayTimeout;
+                await response.WriteAsJsonAsync(new { error = "Runner download timed out." }, cancellationToken);
+            }
         }
         catch (Exception exception)
         {
-            logger.LogError(
-                exception,
-                "[AppFilesController] Download failed: SessionId={SessionId} AppId={AppId}",
-                sessionId,
-                appId);
-        }
-        finally
-        {
-            downloadRegistry.Complete(sessionId);
-        }
-    }
-
-    private async Task StreamDownloadAsync(
-        Runner runner,
-        string sessionId,
-        System.Threading.Channels.Channel<FileChunkReadyMessage> channel,
-        HttpResponse response,
-        CancellationToken cancellationToken)
-    {
-        long offset = 0;
-        var headerWritten = false;
-        while (true)
-        {
-            var chunk = await ReadNextChunkAsync(runner, sessionId, offset, channel, cancellationToken);
-            if (chunk is null)
+            logger.LogError(exception, "Runner download failed for app {AppId}, operation {OperationId}.", appId, operationId);
+            if (!response.HasStarted)
             {
-                logger.LogWarning("[AppFilesController] Download chunk timeout: SessionId={SessionId}", sessionId);
-                break;
+                response.StatusCode = StatusCodes.Status502BadGateway;
+                await response.WriteAsJsonAsync(new { error = "Runner download failed." }, cancellationToken);
             }
-
-            if (!headerWritten)
-            {
-                response.ContentType = chunk.ContentType;
-                response.Headers.ContentDisposition =
-                    $"attachment; filename=\"{Uri.EscapeDataString(chunk.FileName)}\"";
-                headerWritten = true;
-            }
-
-            await response.Body.WriteAsync(chunk.Data, cancellationToken);
-            await response.Body.FlushAsync(cancellationToken);
-            if (chunk.IsLast)
-                break;
-
-            offset += chunk.Data.Length;
         }
     }
 
-    private async Task<FileChunkReadyMessage?> ReadNextChunkAsync(
-        Runner runner,
-        string sessionId,
-        long offset,
-        System.Threading.Channels.Channel<FileChunkReadyMessage> channel,
-        CancellationToken cancellationToken)
-    {
-        var request = new FetchFileChunkRequest
-        {
-            SessionId = sessionId,
-            Offset = offset,
-            ChunkSize = ChunkSize
-        };
-        await automatonHub.Clients.Client(runner.ConnectionId!)
-            .SendAsync(AutomatonHubMethods.FetchFileChunk, request, cancellationToken);
-
-        using var chunkCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        chunkCancellation.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
-        try
-        {
-            return await channel.Reader.ReadAsync(chunkCancellation.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-    }
+    private static Guid CreateOperationId(Guid appId, Guid runnerId, string sessionId)
+        => new(SHA256.HashData(Encoding.UTF8.GetBytes($"file-download:{appId:N}:{runnerId:N}:{sessionId}"))[..16]);
 }

@@ -31,8 +31,6 @@ public class AutomatonHub : Hub
     private readonly AppsService appsService;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly TunnelRequestRegistry tunnelRegistry;
-    private readonly FileUploadRegistry fileUploadRegistry;
-    private readonly FileDownloadRegistry fileDownloadRegistry;
     private readonly ILogger<AutomatonHub> logger;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
 
@@ -41,8 +39,6 @@ public class AutomatonHub : Hub
         AppsService appsService,
         ApiInstanceIdentityService apiInstanceIdentityService,
         TunnelRequestRegistry tunnelRegistry,
-        FileUploadRegistry fileUploadRegistry,
-        FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger,
         IAppDeploymentTargetResolver deploymentTargetResolver)
     {
@@ -50,8 +46,6 @@ public class AutomatonHub : Hub
         this.appsService = appsService;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.tunnelRegistry = tunnelRegistry;
-        this.fileUploadRegistry = fileUploadRegistry;
-        this.fileDownloadRegistry = fileDownloadRegistry;
         this.logger = logger;
         this.deploymentTargetResolver = deploymentTargetResolver;
     }
@@ -107,35 +101,6 @@ public class AutomatonHub : Hub
     public Task TunnelResponse(TunnelResponse response)
     {
         tunnelRegistry.TryComplete(response);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Called by the runner when all upload chunks have been written to its local filesystem.
-    /// </summary>
-    public Task FileUploadComplete(FileUploadCompleteMessage message)
-    {
-        fileUploadRegistry.TryComplete(message);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Called by the runner when a chunk could not be written (disk error, permissions, etc.).
-    /// </summary>
-    public Task FileUploadFailed(FileUploadFailedMessage message)
-    {
-        fileUploadRegistry.TryFail(message);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Called by the runner to deliver a chunk of a requested download file.
-    /// </summary>
-    public Task FileChunkReady(FileChunkReadyMessage message)
-    {
-        fileDownloadRegistry.TryWrite(message);
-        if (message.IsLast)
-            fileDownloadRegistry.Complete(message.SessionId);
         return Task.CompletedTask;
     }
 

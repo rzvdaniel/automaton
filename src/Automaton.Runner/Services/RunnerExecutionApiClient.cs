@@ -14,6 +14,31 @@ internal sealed class RunnerExecutionApiClient : IDisposable
         => GetAsync<RunnerExecutionAssignment>($"api/runner-executions/{id:D}", token);
     public Task<RunnerExecutionAssignment> StatusAsync(Guid id, CancellationToken token)
         => GetAsync<RunnerExecutionAssignment>($"api/runner-executions/{id:D}/status", token);
+
+    public async Task DownloadInputArtifactAsync(Guid id, string destination, CancellationToken token)
+    {
+        using var response = await InfrastructureResultDelivery.SendAsync(
+            ct => client.GetAsync($"api/runner-executions/{id:D}/input", HttpCompletionOption.ResponseHeadersRead, ct), token);
+        response.EnsureSuccessStatusCode();
+        await using var source = await response.Content.ReadAsStreamAsync(token);
+        await using var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None,
+            128 * 1024, useAsync: true);
+        await source.CopyToAsync(output, token);
+        await output.FlushAsync(token);
+    }
+
+    public async Task UploadOutputArtifactAsync(Guid id, string path, CancellationToken token)
+    {
+        using var response = await InfrastructureResultDelivery.SendAsync(async ct =>
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"api/runner-executions/{id:D}/artifact");
+            var content = new StreamContent(File.OpenRead(path));
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            request.Content = content;
+            return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }, token);
+        response.EnsureSuccessStatusCode();
+    }
     private async Task<T> GetAsync<T>(string path, CancellationToken token)
     {
         using var response = await InfrastructureResultDelivery.SendAsync(ct => client.GetAsync(path, ct), token);
