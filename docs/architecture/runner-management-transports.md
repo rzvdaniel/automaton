@@ -2,7 +2,7 @@
 
 Updated: 3 October 2026.
 
-This guide describes the Runner management transport after the Slice 4 changes in review. Slice 4 release and live transfer acceptance are pending. Cross-host package/artifact availability has not been established.
+This guide describes the Runner management transport after Slice 4 was merged and released as `e71ca380` on 2026-10-03. Focused production checks passed for app-file upload/download, media upload, and generic deployment package transfer through a Hosted Runner. Published media HTTP reads, in-flight cross-slot transfers, and cross-host package/artifact availability remain unverified.
 
 ## Durable operation path
 
@@ -57,4 +57,12 @@ The Hosted Runner's existing package-deployment RabbitMQ/HTTPS path remains sepa
 
 The file chunk registries, chunk DTOs, API chunk callbacks, `HubFileTransferService`, and `DeployAppPackage` Runner hub handler are removed. Workflow/custom-step execution, App Actions, managed-artifact synchronization, trusted host-container operations, host validation and storage telemetry use their migrated durable/API paths.
 
-SignalR remains for independent Studio updates and supported BYO runtime tunnels. Runner registration/heartbeat, welcome/ping and reconnect-when-idle coordination also remain. Slice 5 will remove replaceable connection/drain coordination and API-slot registration gates after auditing the remaining dependencies; it must retain supported Studio and BYO behavior. The current guide does not claim that Slice 4 has been released or live-accepted.
+SignalR remains for independent Studio updates and supported BYO runtime tunnels. Runner registration/heartbeat, welcome/ping and reconnect-when-idle coordination also remain. Slice 5 will remove replaceable connection/drain coordination and API-slot registration gates after auditing the remaining dependencies; it must retain supported Studio and BYO behavior.
+
+## Focused production validation — 2026-10-03
+
+Runner pipeline #4951 passed from `e71ca380` and published `rzvdaniel/automaton-runner@sha256:4eda68e84a005730a15be3370a5b607211145fb6e817ac0baf8a6946195e272a`. The API was deployed to the blue color from the same revision, with the previous green API image retained. The protected Hosted Runner pin was backed up before updating; its reprovisioned container ran the published digest and registered with the new API color. The Infrastructure Runner remained on its previous digest and was not used to execute the file-transfer acceptance.
+
+Using the retained unpublished app, authenticated app-file upload and download both completed through the Hosted Runner. Upload bytes staged by the Runner and download response bytes matched their expected SHA-256 values. A media upload completed and the persisted app-media bytes matched the expected SHA-256; its test file was removed. A supported CLI pull/deploy then uploaded five package files, applied them on the Runner, and returned a terminal successful deployment result without warnings. The app health endpoint returned `200 ready`, and its app-originated persistence marker endpoint returned HTTP 200 after deployment; this run did not capture a pre-deploy marker hash for comparison.
+
+At verification, the active Hosted Runner execution, management and command queues each had one consumer and zero ready/unacknowledged messages. Production `prod-verify.sh` passed. Published media HTTP read was not exercised because the retained app is unpublished; the app was not made public for this check. The API blue/green pair shares one host, so cross-host artifact availability and a package fetch that begins before and completes after an in-flight slot switch remain unestablished. These results do not close Slice 5 or the combined RM recovery/cutover acceptance.
