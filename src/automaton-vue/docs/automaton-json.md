@@ -58,6 +58,7 @@ layout, build system, or application architecture.
 | `application.build.timeoutSeconds` | Maximum build duration. |
 | `application.runtime.command` | Executable and arguments for the long-running app process. |
 | `application.runtime.image` | OCI image that executes the runtime command; required for new container deployments when `runtime.command` is present. Historical stored contracts remain readable until redeployed with an image. |
+| `application.runtime.user` | Optional numeric UID or UID:GID for the runtime process. Keep the identity stable when the app must update files it created in persistent storage. |
 | `application.runtime.port` | Port requested by the app contract. |
 | `application.health.path` | Optional HTTP readiness path. |
 | `application.health.startupTimeoutSeconds` | Maximum startup duration. |
@@ -65,7 +66,10 @@ layout, build system, or application architecture.
 
 The Runner supplies the effective port in `AUTOMATON_PORT` and the durable data
 path in `AUTOMATON_APP_DATA_DIR`. A configured health path is ready only after a
-2xx HTTP response. Build and runtime artifacts can be replaced.
+2xx HTTP response. On managed Linux Runners, the data directory and declared
+storage mounts are prepared as writable directories for the app container. File
+ownership and permissions still follow the UID that creates each file. Build
+and runtime artifacts can be replaced.
 
 Commands use structured arguments by default. Set `useShell` only when needed.
 Keep managed paths inside the project workspace.

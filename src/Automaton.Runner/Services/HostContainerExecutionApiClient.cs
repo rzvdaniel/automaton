@@ -18,35 +18,26 @@ public sealed class HostContainerExecutionApiClient(
             : request;
         var deadline = DateTime.UtcNow.AddSeconds(Math.Clamp(operation.TimeoutSeconds, 30, 86_400) + 120);
         using var client = await CreateClientAsync();
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (DateTime.UtcNow >= deadline)
-                throw new TimeoutException($"Host-container operation {operation.OperationId} did not complete before its operation deadline.");
+        cancellationToken.ThrowIfCancellationRequested();
+        if (DateTime.UtcNow >= deadline)
+            throw new TimeoutException($"Host-container operation {operation.OperationId} did not complete before its operation deadline.");
 
-            try
-            {
-                var submission = await SubmitAsync(client, operation, cancellationToken);
-                if (submission.Completed)
-                    return RequireResult(submission);
+        var submission = await SubmitAsync(client, operation, deadline, cancellationToken);
+        if (submission.Completed)
+            return RequireResult(submission);
 
-                return RequireResult(await ReadUntilCompletedAsync(client, operation.OperationId, deadline, cancellationToken));
-            }
-            catch (HttpRequestException exception) when (IsTransient(exception.StatusCode))
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-            }
-        }
+        return RequireResult(await ReadUntilCompletedAsync(client, operation.OperationId, deadline, cancellationToken));
     }
 
     private static async Task<HostContainerExecutionOperationResponse> SubmitAsync(
         HttpClient client,
         HostContainerExecutionRequest request,
+        DateTime deadline,
         CancellationToken cancellationToken)
     {
-        using var response = await HttpClientJsonExtensions.PostAsJsonAsync(
-            client, "api/host-container-executions", request, cancellationToken);
-        EnsureRetryableStatus(response.StatusCode);
+        using var response = await SendWithRetryAsync(token =>
+            HttpClientJsonExtensions.PostAsJsonAsync(client, "api/host-container-executions", request, token),
+            deadline, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<HostContainerExecutionOperationResponse>(cancellationToken)
             ?? throw new InvalidDataException("The API returned no host-container operation submission.");
@@ -61,25 +52,83 @@ public sealed class HostContainerExecutionApiClient(
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                using var response = await client.GetAsync(
-                    $"api/host-container-executions/{operationId:D}/result", cancellationToken);
-                EnsureRetryableStatus(response.StatusCode);
-                response.EnsureSuccessStatusCode();
-                var operation = await response.Content.ReadFromJsonAsync<HostContainerExecutionOperationResponse>(cancellationToken)
-                    ?? throw new InvalidDataException("The API returned no host-container operation result.");
-                if (operation.Completed)
-                    return operation;
-            }
-            catch (HttpRequestException exception) when (IsTransient(exception.StatusCode))
-            {
-                // A later read observes the durable operation after API recovery or slot cutover.
-            }
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            using var response = await SendWithRetryAsync(token =>
+                client.GetAsync($"api/host-container-executions/{operationId:D}/result", token),
+                deadline, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var operation = await response.Content.ReadFromJsonAsync<HostContainerExecutionOperationResponse>(cancellationToken)
+                ?? throw new InvalidDataException("The API returned no host-container operation result.");
+            if (operation.Completed)
+                return operation;
+            await DelayBeforeDeadlineAsync(TimeSpan.FromMilliseconds(500), deadline, cancellationToken);
         }
 
         throw new TimeoutException($"Host-container operation {operationId} did not complete before its operation deadline.");
+    }
+
+    internal static async Task<HttpResponseMessage> SendWithRetryAsync(
+        Func<CancellationToken, Task<HttpResponseMessage>> send,
+        DateTime deadline,
+        CancellationToken cancellationToken,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        delay ??= Task.Delay;
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            HttpResponseMessage response;
+            try
+            {
+                response = await send(cancellationToken);
+            }
+            catch (HttpRequestException exception) when (IsTransient(exception.StatusCode))
+            {
+                Serilog.Log.Warning(exception, "Host-container API request failed; retrying the existing operation.");
+                await DelayBeforeDeadlineAsync(TimeSpan.FromSeconds(2), deadline, cancellationToken, delay);
+                continue;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                Serilog.Log.Warning("Host-container API request timed out; retrying the existing operation.");
+                await DelayBeforeDeadlineAsync(TimeSpan.FromSeconds(2), deadline, cancellationToken, delay);
+                continue;
+            }
+
+            if (!IsTransient(response.StatusCode))
+                return response;
+
+            var retryDelay = response.StatusCode == HttpStatusCode.TooManyRequests
+                ? InfrastructureResultDelivery.GetRetryDelay(response, DateTimeOffset.UtcNow)
+                : TimeSpan.FromSeconds(2);
+            var statusCode = response.StatusCode;
+            response.Dispose();
+            Serilog.Log.Warning(
+                "Host-container API returned HTTP {StatusCode}; retrying the existing operation in {RetryDelay}.",
+                (int)statusCode, retryDelay);
+            await DelayBeforeDeadlineAsync(retryDelay, deadline, cancellationToken, delay);
+        }
+
+        throw new TimeoutException("The host-container API operation did not complete before its deadline.");
+    }
+
+    private static async Task DelayBeforeDeadlineAsync(
+        TimeSpan delayDuration,
+        DateTime deadline,
+        CancellationToken cancellationToken,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        var remaining = deadline - DateTime.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+            throw new TimeoutException("The host-container API operation did not complete before its deadline.");
+
+        delay ??= Task.Delay;
+        if (delayDuration >= remaining)
+        {
+            await delay(remaining, cancellationToken);
+            throw new TimeoutException("The host-container API operation did not complete before its deadline.");
+        }
+
+        await delay(delayDuration, cancellationToken);
     }
 
     private async Task<HttpClient> CreateClientAsync()
@@ -102,12 +151,6 @@ public sealed class HostContainerExecutionApiClient(
         };
         client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
         return client;
-    }
-
-    private static void EnsureRetryableStatus(HttpStatusCode statusCode)
-    {
-        if (IsTransient(statusCode))
-            throw new HttpRequestException($"The host-container API returned transient HTTP {(int)statusCode}.", null, statusCode);
     }
 
     private static bool IsTransient(HttpStatusCode? statusCode)

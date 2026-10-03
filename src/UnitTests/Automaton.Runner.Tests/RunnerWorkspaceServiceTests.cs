@@ -364,6 +364,47 @@ public class RunnerWorkspaceServiceTests
     }
 
     [Test]
+    public void PrepareApplicationStorage_RefreshesWritablePermissionsForContainerUsers()
+    {
+        if (OperatingSystem.IsWindows())
+            Assert.Ignore("Unix directory permissions are enforced on Linux Runner hosts.");
+
+        var appId = Guid.NewGuid();
+        var originalWorkspaceRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString("N"));
+        var storage = new ApplicationStorageSpec
+        {
+            DataDirectory = "app-data",
+            Mounts = [new ApplicationStorageMount { Name = "uploads", RelativePath = "media/uploads" }]
+        };
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        try
+        {
+            var dataDirectory = service.ResolveApplicationDataPath(appId, storage.DataDirectory);
+            var mountDirectory = service.ResolveApplicationDataPath(appId, storage.Mounts[0].RelativePath);
+            Directory.CreateDirectory(dataDirectory);
+            Directory.CreateDirectory(mountDirectory);
+            File.SetUnixFileMode(dataDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.SetUnixFileMode(mountDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            service.PrepareApplicationStorage(appId, storage);
+
+            var requiredWritePermissions = UnixFileMode.UserWrite | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.GetUnixFileMode(dataDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
+                Assert.That(File.GetUnixFileMode(mountDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", originalWorkspaceRoot);
+            if (Directory.Exists(workspaceRoot))
+                Directory.Delete(workspaceRoot, recursive: true);
+        }
+    }
+
+    [Test]
     public void ResolveApplicationDataPath_RejectsTraversalAndAbsolutePaths()
     {
         var appId = Guid.NewGuid();

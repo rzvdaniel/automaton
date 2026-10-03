@@ -249,16 +249,30 @@ public class RunnerWorkspaceService
         ApplicationContractValidator.EnsureValid(new ApplicationContract { Storage = storage });
 
         var dataDirectory = ResolveApplicationDataPath(appId, storage.DataDirectory);
-        Directory.CreateDirectory(dataDirectory);
+        PrepareWritableApplicationDirectory(appId, dataDirectory);
         var mounts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var mount in storage.Mounts)
         {
             var mountPath = ResolveApplicationDataPath(appId, mount.RelativePath);
-            Directory.CreateDirectory(mountPath);
+            PrepareWritableApplicationDirectory(appId, mountPath);
             mounts.Add(mount.Name, mountPath);
         }
 
         return new RunnerApplicationStorageRuntime(dataDirectory, mounts);
+    }
+
+    private void PrepareWritableApplicationDirectory(Guid appId, string path)
+    {
+        Directory.CreateDirectory(path);
+        ManagedPathBoundary.EnsureNoReparsePointEscape(
+            GetAppDataDirectory(appId), path, "application persistent-data path");
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var writableDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+        File.SetUnixFileMode(path, writableDirectoryMode);
     }
 
     /// <summary>
