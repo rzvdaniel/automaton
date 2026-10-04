@@ -14,42 +14,37 @@ public sealed class RunnerTunnelReconnectService(
         bool reconcileAllRegisteredRunners,
         CancellationToken cancellationToken)
     {
-        var candidates = dbContext.Runners
-            .AsNoTracking();
-        if (!reconcileAllRegisteredRunners)
-            candidates = candidates.Where(runner => runner.ConnectionId != null && runner.ApiColor != targetApiColor);
-
-        var connectedRunners = await candidates
-            .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion })
+        // Recorded presence/color can lag an earlier queued cutover. Always append
+        // the latest target to every compatible Runner's serial management queue.
+        var registeredRunners = await dbContext.Runners.AsNoTracking()
+            .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion, IsConnected = runner.ConnectionId != null })
             .ToListAsync(cancellationToken);
 
-        var incompatibleRunners = connectedRunners
+        var incompatibleRunners = registeredRunners
             .Where(runner => !RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(
                 runner.ApiCompatibilityVersion))
             .ToArray();
-        if (incompatibleRunners.Length > 0 && !reconcileAllRegisteredRunners)
+        var connectedIncompatibleCount = incompatibleRunners.Count(runner => runner.IsConnected);
+        if (connectedIncompatibleCount > 0 && !reconcileAllRegisteredRunners)
         {
-            foreach (var runner in incompatibleRunners)
+            foreach (var runner in incompatibleRunners.Where(runner => runner.IsConnected))
             {
                 logger.LogWarning(
                     "Runner {RunnerId} cannot accept the API cutover tunnel reconnect command; upgrade its protocol first",
                     runner.Id);
             }
 
-            return new RunnerTunnelReconnectResult(connectedRunners.Count, 0, incompatibleRunners.Length);
+            return new RunnerTunnelReconnectResult(registeredRunners.Count, 0, connectedIncompatibleCount);
         }
 
-        if (reconcileAllRegisteredRunners)
+        foreach (var runner in incompatibleRunners)
         {
-            foreach (var runner in incompatibleRunners)
-            {
-                logger.LogInformation(
-                    "Skipping protocol-incompatible Runner {RunnerId} during tunnel rollback reconciliation",
-                    runner.Id);
-            }
+            logger.LogInformation(
+                "Skipping protocol-incompatible Runner {RunnerId} during tunnel reconciliation",
+                runner.Id);
         }
 
-        var supportedRunners = connectedRunners
+        var supportedRunners = registeredRunners
             .Where(runner => RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(
                 runner.ApiCompatibilityVersion))
             .ToArray();
@@ -63,13 +58,13 @@ public sealed class RunnerTunnelReconnectService(
                 targetApiColor,
                 cancellationToken);
             return new RunnerTunnelReconnectResult(
-                connectedRunners.Count, requested, reconcileAllRegisteredRunners ? 0 : incompatibleRunners.Length);
+                registeredRunners.Count, requested, 0);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogWarning(exception,
                 "Could not publish runtime tunnel reconnect commands for the previous API color");
-            return new RunnerTunnelReconnectResult(connectedRunners.Count, 0, connectedRunners.Count);
+            return new RunnerTunnelReconnectResult(registeredRunners.Count, 0, supportedRunners.Length);
         }
     }
 }

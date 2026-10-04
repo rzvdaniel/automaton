@@ -1,6 +1,6 @@
 # Automaton hosting and platform completion roadmap
 
-Updated: 4 October 2026. Latest live evidence: Slice 4 same-host production checks passed, including a published media read and an active media response across API color switch. Slice 5 is implemented on a review branch; no Slice 5 release or acceptance is claimed.
+Updated: 4 October 2026. Slice 5 and the reviewed PR #347 isolation follow-up are released. Detailed production evidence is tracked in PR #346. M1 remains complete; RM stays open for automatic recovery during rapid rollback/rollforward without manual reconciliation.
 
 ## Purpose and scope
 
@@ -415,4 +415,4 @@ For each milestone, record status, PR/source revision, deployed image digest, po
 
 Use focused PRs and repository-required checks for the affected code. Update Admin guides when actual operator behavior changes. Documentation-only roadmap changes need link/content/whitespace checks, not application builds or deployments.
 
-**Next action:** finish focused Slice 5 validation and review on `feat/rm-slice5-connection-cleanup`; after merge and normal release, run one combined RM recovery/cutover acceptance, repeating relevant workflow/custom-step, host-validation interruption and tunnel/cutover checks. Keep cross-host package availability documented as a separate limitation. Preserve the retained disposable app until remaining approved checks and supported cleanup are complete. Track Worker source provenance separately. Do not start Builder or expand commercial promises to work around pending acceptance.
+**Next action:** review the focused automatic cutover recovery follow-up on `fix/rm-automatic-cutover-recovery`. It publishes the latest target to all registered compatible Runners and preserves HTTP 429 Retry-After deadlines with bounded local backoff. Manual reconciliation stays supported. After review and green CI, release coordinated API/CI-produced Runner versions, then repeat rapid production rollback/rollforward without manual reconciliation, checking actual BYO tunnel recovery, durable operation completion, queue drain and health. Do not close RM from source/regression evidence; M1 remains complete. Keep cross-host/scaling limits and Worker source provenance separately documented.

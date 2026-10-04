@@ -12,15 +12,16 @@ namespace Automaton.Api.Tests;
 public sealed class RunnerTunnelReconnectServiceTests
 {
     [Test]
-    public async Task RequestForApiColor_QueuesReconnectOnlyForConnectedRunnersOutsideTargetColor()
+    public async Task RequestForApiColor_QueuesLatestTargetForAllRegisteredCompatibleRunners()
     {
         await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
         var result = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
 
-        Assert.That(result.CandidateRunnerCount, Is.EqualTo(1));
-        Assert.That(result.RequestedCount, Is.EqualTo(1));
+        Assert.That(result.CandidateRunnerCount, Is.EqualTo(5));
+        Assert.That(result.RequestedCount, Is.EqualTo(4));
         Assert.That(result.FailedCount, Is.Zero);
-        Assert.That(fixture.Publisher.RunnerIds, Is.EqualTo(new[] { fixture.PreviousRunnerId }));
+        Assert.That(fixture.Publisher.RunnerIds, Is.EquivalentTo(new[] { fixture.PreviousRunnerId,
+            fixture.CurrentRunnerId, fixture.CurrentReplicaRunnerId, fixture.DisconnectedRunnerId }));
         Assert.That(fixture.Publisher.TargetApiInstanceId, Is.EqualTo("green-instance"));
         Assert.That(fixture.Publisher.TargetApiColor, Is.EqualTo("green"));
     }
@@ -43,7 +44,7 @@ public sealed class RunnerTunnelReconnectServiceTests
         fixture.Publisher.FailAfterRunnerCount = 1;
 
         var forwardResult = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
-        Assert.That(forwardResult.FailedCount, Is.EqualTo(2));
+        Assert.That(forwardResult.FailedCount, Is.EqualTo(5));
         Assert.That(fixture.Publisher.Publications, Has.Count.EqualTo(1));
         Assert.That(fixture.Publisher.Publications[0].RunnerIds, Has.Count.EqualTo(1));
         await fixture.DisconnectRunnerAsync(fixture.Publisher.Publications[0].RunnerIds.Single());
@@ -60,6 +61,26 @@ public sealed class RunnerTunnelReconnectServiceTests
                 fixture.CurrentRunnerId, fixture.CurrentReplicaRunnerId, fixture.DisconnectedRunnerId }));
         Assert.That(fixture.Publisher.Publications[1].TargetApiColor, Is.EqualTo("blue"));
         Assert.That(fixture.Publisher.Publications[1].TargetApiInstanceId, Is.Null);
+    }
+
+    [Test]
+    public async Task RapidRollbackRollforward_AppendsLatestTargetDespiteUnchangedPresenceAndColor()
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
+        await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
+        await fixture.Service.RequestForApiColorAsync("blue", true, CancellationToken.None);
+        await fixture.DisconnectRunnerAsync(fixture.CurrentReplicaRunnerId);
+
+        var final = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
+
+        Assert.That(final.RequestedCount, Is.EqualTo(4));
+        Assert.That(final.FailedCount, Is.Zero);
+        foreach (var runnerId in new[] { fixture.PreviousRunnerId, fixture.CurrentRunnerId,
+            fixture.CurrentReplicaRunnerId, fixture.DisconnectedRunnerId })
+        {
+            Assert.That(fixture.Publisher.Publications.Where(item => item.RunnerIds.Contains(runnerId))
+                .Select(item => item.TargetApiColor), Is.EqualTo(new[] { "green", "blue", "green" }));
+        }
     }
 }
 

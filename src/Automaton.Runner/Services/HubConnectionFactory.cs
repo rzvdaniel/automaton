@@ -32,6 +32,7 @@ internal static class HubConnectionFactory
 
     private static void ConfigureHeaders(HttpConnectionOptions options, ConfigurationService configService, string apiKey)
     {
+        options.HttpMessageHandlerFactory = inner => new HubRateLimitHandler(inner);
         options.Headers.Add("X-API-Key", apiKey);
         options.Headers.Add(RunnerIdHeader, configService.RunnerId);
         options.Headers.Add(RunnerNameHeader, configService.ApplicationName);

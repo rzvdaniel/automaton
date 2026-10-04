@@ -35,8 +35,9 @@ public class ResilientPolicy : IConnectionPolicy
             .Or<TaskCanceledException>()
             .Or<TimeoutException>()
             .WaitAndRetryForeverAsync(
-                retryAttempt => TimeSpan.FromSeconds(retryAfterSeconds),
-                onRetry: (exception, retry, timespan) =>
+                (retryAttempt, exception, _) => ConnectionRetryDelay.Calculate(
+                    retryAttempt - 1, exception, retryAfterSeconds, Random.Shared.NextDouble(), DateTimeOffset.UtcNow),
+                onRetryAsync: (exception, retry, timespan, _) =>
                 {
                     // Log technical details to file logs only
                     logger.Warning(exception, "Connection retry attempt {RetryAttempt} after {Delay}s. Error: {ErrorType}",
@@ -44,10 +45,11 @@ public class ResilientPolicy : IConnectionPolicy
                     
                     // Show friendly message to user
                     WriteLine($"? Retry attempt {retry} in {timespan.TotalSeconds} seconds...");
+                    return Task.CompletedTask;
                 });
 
         var circuitBreakerPolicy = Policy
-            .Handle<HttpRequestException>()
+            .Handle<HttpRequestException>(exception => exception.StatusCode != System.Net.HttpStatusCode.TooManyRequests)
             .Or<SocketException>()
             .Or<TaskCanceledException>()
             .Or<TimeoutException>()
