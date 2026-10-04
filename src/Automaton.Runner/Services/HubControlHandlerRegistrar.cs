@@ -19,6 +19,8 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
         Func<Task> sendHeartbeat)
     {
         connection.On<string, string?>(ApiInstanceIdentityMethod, setConnectedApiIdentity);
+        connection.On<WelcomeRunnerMessage>("WelcomeRunner", message =>
+            setConnectedApiIdentity(message.ApiInstanceId, message.ApiColor));
         RegisterLifecycleEvents(
             connection,
             wakeConnectionLoop,
