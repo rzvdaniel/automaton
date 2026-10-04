@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Automaton.Api.Controllers;
 
 [ApiController]
+[TypeFilter(typeof(AppActionExceptionFilter))]
 [Authorize(Policy = "AllowApiKey")]
 [Route("api/apps/{appId:guid}")]
 public sealed class AppActionsController : ControllerBase

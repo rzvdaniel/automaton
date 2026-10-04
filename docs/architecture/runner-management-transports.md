@@ -2,9 +2,17 @@
 
 Updated: 4 October 2026.
 
-This guide describes the Runner management transport after Slice 5 was merged in PR #345 and released as `f017a068` on 2026-10-04. Both installed Infrastructure/Hosted Runners run the CI #4961 immutable image and protocol v5. Live durable execution, callback retry, broker/Runner recovery and older-API rollback confirmation passed for this same-host x64 cohort. Post-release published-media streaming/cleanup and actual BYO tunnel acceptance against both current and older APIs passed on the same production servers. A later two-account run verified Runner/artifact/tunnel boundaries but found Action access denials reported as 500 and delayed route enforcement after an authentication-setting change; RM remains open for correction and repetition. See the [release evidence and remaining gates](../roadmap/managed-platform-completion-plan.md#slice-5-release-and-combined-acceptance--2026-10-04). Cross-host package/artifact availability remains unverified.
+Slice 5 was released as `f017a068`; the reviewed isolation follow-up in PR #347 is released as `e888fef2`. Both installed Infrastructure/Hosted Runners retain the CI #4961 immutable image and protocol v5. Post-release media, actual BYO tunnel checks, two-account Action denials and saved authentication toggles passed. A rapid rollback/rollforward round trip required explicit Runner reconciliation; RM remains open until this recovery limitation is resolved or explicitly accepted. See the [release evidence and remaining gate](../roadmap/managed-platform-completion-plan.md#slice-5-release-and-combined-acceptance--2026-10-04). Cross-host package/artifact availability remains unverified.
 
 ## Durable operation path
+
+### Account isolation and runtime policy
+
+Action execution, result, and log reads authorize access to the App before loading execution data. The Action controller translates an inaccessible App or missing execution into HTTP 404 and an explicit permission denial into HTTP 403; unexpected exceptions retain the normal error handling. Runner assignment and artifact endpoints continue enforcing their bound Runner credentials separately.
+
+Every authorized App update reconciles the existing runtime route configuration from committed database state, including Hosted and BYO targets. Reconciliation runs immediately after persistence, before app file storage and auditing. If route application fails, retrying the same saved authentication setting attempts reconciliation again; no change detection or process-local pending flag is required. A failed write leaves the previous route file intact; database persistence and route application are not one transaction, so a failed request still requires retry or startup reconciliation. Both enabling and disabling authentication take effect without redeployment.
+
+The follow-up was reviewed, passed CI #4970 and released as `e888fef2`. Two-account Action reads/cancellation and authentication toggles passed on production Hosted and BYO routes without app redeployment; runtime container IDs stayed unchanged. RM remains open for the rapid cutover recovery decision recorded above; M1 remains complete.
 
 ```mermaid
 flowchart LR
