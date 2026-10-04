@@ -22,6 +22,57 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AppRunnerUpdateTests
 {
+    [TestCase(true, true)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(false, false)]
+    public async Task Update_AuthenticationChangeRefreshesDeployedRoutes(bool requiresAuthentication, bool hosted)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
+        await using var db = AppAuthorizationTestData.CreateDbContext();
+        AppAuthorizationTestData.SeedApp(db, appId, ownerId, "owner-app");
+        AppAuthorizationRunnerTestData.SeedManagedRunner(db, runnerId, ownerId);
+        var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
+        _ = service.Get(appId);
+        AppAuthorizationDeploymentTestData.SetDefaultDeploymentTarget(db, appId, runnerId, genericRuntimeDeployed: true);
+        await SeedAuthenticationRouteAsync(db, ownerId, runnerId, hosted, !requiresAuthentication);
+        var model = service.Get(appId);
+        model.RequiresAuthentication = requiresAuthentication;
+
+        await service.Update(appId, model);
+
+        var content = await File.ReadAllTextAsync(Path.Combine(tempRoot.Path, "AppData", "traefik-dynamic", "managed-runtime-routes.yml"));
+        Assert.That(content, Does.Contain($"private-{appId:N}-runtime"));
+        Assert.That(content.Contains("forwardAuth:", StringComparison.Ordinal), Is.EqualTo(requiresAuthentication));
+        Assert.That(content, Does.Contain(hosted ? "http://runner-test:8080" : "api-live-edge"));
+    }
+
+    private static async Task SeedAuthenticationRouteAsync(
+        ApplicationDbContext db, Guid ownerId, Guid runnerId, bool hosted, bool requiresAuthentication)
+    {
+        var entity = await db.WebApps.SingleAsync();
+        entity.RequiresAuthentication = requiresAuthentication;
+        entity.ApplicationContractJson = Automaton.Core.Models.ApplicationContractSerialization.Serialize(new()
+        {
+            Runtime = new()
+            {
+                Command = new() { Executable = "custom-server" }, Port = 5000
+            }
+        });
+        if (hosted)
+        {
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = Guid.NewGuid(), UserId = ownerId, RunnerId = runnerId,
+                Name = "hosted", Status = "Running", ContainerName = "runner-test",
+                RuntimeEndpoint = "http://runner-test:8080"
+            });
+        }
+        await db.SaveChangesAsync();
+    }
 
     [Test]
     public async Task Update_CannotBypassRunnerAssignmentPolicy()

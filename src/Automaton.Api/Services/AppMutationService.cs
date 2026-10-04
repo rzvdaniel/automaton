@@ -157,7 +157,8 @@ public sealed class AppMutationService(
                 previousIsProfileFeatured,
                 previousExecutionRunnerId));
 
-        if (previousExecutionRunnerId != GetDefaultRunnerId(entity))
+        if (previousExecutionRunnerId != GetDefaultRunnerId(entity)
+            || previousRequiresAuthentication != entity.RequiresAuthentication)
         {
             await backendRouteConfigService.RefreshAsync();
         }

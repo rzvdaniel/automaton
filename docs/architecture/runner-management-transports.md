@@ -6,6 +6,12 @@ This guide describes the Runner management transport after Slice 4 was released 
 
 ## Durable operation path
 
+### Account isolation and runtime policy
+
+Action execution, result, and log reads authorize access to the App before loading execution data. The Action controller translates an inaccessible App or missing execution into HTTP 404 and an explicit permission denial into HTTP 403; unexpected exceptions retain the normal error handling. Runner assignment and artifact endpoints continue enforcing their bound Runner credentials separately.
+
+Saving an App's `RequiresAuthentication` change refreshes the existing runtime route configuration for deployed targets, including Hosted and BYO targets. Both enabling and disabling authentication take effect without redeployment. This follow-up is not yet released; RM isolation acceptance must repeat these checks against production after review and release. The release acceptance report is tracked separately in PR #346; M1 remains complete.
+
 ```mermaid
 flowchart LR
     Client[CLI or Studio request] --> API[API caller and existing authorization]
