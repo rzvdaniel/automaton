@@ -18,10 +18,12 @@ public class StorageMeasurementTests
     public async Task TelemetryClient_PostsAuthenticatedReportToConfiguredApi()
     {
         var previousApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        var previousServerUrl = Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL");
         var previousAppData = Environment.GetEnvironmentVariable("APPDATA");
         var previousUserProfile = Environment.GetEnvironmentVariable("USERPROFILE");
         var isolatedAppData = Path.Combine(Path.GetTempPath(), $"automaton-runner-config-{Guid.NewGuid():N}");
         Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "test-runner-key");
+        Environment.SetEnvironmentVariable("AUTOMATON_SERVER_URL", "https://api.example.test/");
         Environment.SetEnvironmentVariable("APPDATA", isolatedAppData);
         Environment.SetEnvironmentVariable("USERPROFILE", "test-user");
         try
@@ -48,6 +50,7 @@ public class StorageMeasurementTests
         finally
         {
             Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", previousApiKey);
+            Environment.SetEnvironmentVariable("AUTOMATON_SERVER_URL", previousServerUrl);
             Environment.SetEnvironmentVariable("APPDATA", previousAppData);
             Environment.SetEnvironmentVariable("USERPROFILE", previousUserProfile);
             if (Directory.Exists(isolatedAppData))
