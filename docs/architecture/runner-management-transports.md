@@ -2,7 +2,7 @@
 
 Updated: 4 October 2026.
 
-This guide describes the Runner management transport after Slice 5 was merged in PR #345 and released as `f017a068` on 2026-10-04. Both installed Infrastructure/Hosted Runners run the CI #4961 immutable image and protocol v5. Live durable execution, callback retry, broker/Runner recovery and older-API rollback confirmation passed for this same-host x64 cohort. Published-media repetition, actual BYO tunnel acceptance and cross-account isolation remain open; see the [release evidence and remaining gates](../roadmap/managed-platform-completion-plan.md#slice-5-release-and-combined-acceptance--2026-10-04). Cross-host package/artifact availability remains unverified.
+This guide describes the Runner management transport after Slice 5 was merged in PR #345 and released as `f017a068` on 2026-10-04. Both installed Infrastructure/Hosted Runners run the CI #4961 immutable image and protocol v5. Live durable execution, callback retry, broker/Runner recovery and older-API rollback confirmation passed for this same-host x64 cohort. Post-release published-media streaming/cleanup and actual BYO tunnel acceptance against both current and older APIs passed on the same production servers. Cross-account isolation was skipped at the user's request and remains unverified; see the [release evidence and remaining gates](../roadmap/managed-platform-completion-plan.md#slice-5-release-and-combined-acceptance--2026-10-04). Cross-host package/artifact availability remains unverified.
 
 ## Durable operation path
 
