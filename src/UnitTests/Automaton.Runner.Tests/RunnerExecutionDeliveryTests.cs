@@ -56,8 +56,26 @@ public sealed class RunnerExecutionDeliveryTests
         Assert.That(executor.Calls, Is.Zero);
     }
 
-    private RunnerExecutionDeliveryHandler Handler(Executor executor)
-        => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor));
+    [Test]
+    public async Task RuntimeTunnelReconnectCommandRequestsReconnectWithoutCallingExecutionApi()
+    {
+        var http = new Api(); using var api = Client(http); var executor = new Executor();
+        var requester = new ReconnectRequester(); var handler = Handler(executor, requester);
+        var command = new RunnerExecutionCommand(Guid.NewGuid(), Guid.NewGuid(),
+            RunnerExecutionCommandKinds.ReconnectRuntimeTunnels, "new-api-instance", "green");
+
+        Assert.That(await handler.HandleAsync(
+            JsonSerializer.SerializeToUtf8Bytes(command, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            command.OperationId.ToString("N"), api, command.RunnerId, CancellationToken.None), Is.True);
+        Assert.That(requester.Requests, Is.EqualTo(1));
+        Assert.That(requester.TargetApiInstanceId, Is.EqualTo("new-api-instance"));
+        Assert.That(requester.TargetApiColor, Is.EqualTo("green"));
+        Assert.That(executor.Calls, Is.Zero);
+        Assert.That(http.Results, Is.Empty);
+    }
+
+    private RunnerExecutionDeliveryHandler Handler(Executor executor, ReconnectRequester? requester = null)
+        => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor), requester ?? new ReconnectRequester());
     private static RunnerExecutionApiClient Client(Api handler)
         => new(new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
     private static byte[] Body(Guid id, Guid runnerId)
@@ -67,6 +85,18 @@ public sealed class RunnerExecutionDeliveryTests
         public int Calls { get; private set; }
         public Task<RunnerExecutionResult> ExecuteAsync(RunnerExecutionRequest request, CancellationToken token)
         { Calls++; return Task.FromResult(new RunnerExecutionResult { Outcome = "Succeeded", Output = "marker" }); }
+    }
+    private sealed class ReconnectRequester : IRuntimeTunnelReconnectRequester
+    {
+        public int Requests { get; private set; }
+        public string? TargetApiInstanceId { get; private set; }
+        public string? TargetApiColor { get; private set; }
+        public void RequestRuntimeTunnelReconnect(string targetApiInstanceId, string? targetApiColor, string? reason)
+        {
+            Requests++;
+            TargetApiInstanceId = targetApiInstanceId;
+            TargetApiColor = targetApiColor;
+        }
     }
     private sealed class Api : HttpMessageHandler
     {

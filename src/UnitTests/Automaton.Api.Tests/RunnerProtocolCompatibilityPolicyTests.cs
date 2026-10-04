@@ -46,6 +46,15 @@ public sealed class RunnerProtocolCompatibilityPolicyTests
                 CreateRunner(RunnerApiCompatibilityVersions.ContainerApplicationExecution)));
     }
 
+    [TestCase(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands, true)]
+    [TestCase(RunnerApiCompatibilityVersions.HostContainerExecution, false)]
+    [TestCase(null, false)]
+    public void RuntimeTunnelReconnectCommandCompatibilityRequiresProtocolFive(string? version, bool expected)
+    {
+        Assert.That(RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(version),
+            Is.EqualTo(expected));
+    }
+
     private static Runner CreateRunner(string? version) => new()
     {
         Id = Guid.NewGuid(),

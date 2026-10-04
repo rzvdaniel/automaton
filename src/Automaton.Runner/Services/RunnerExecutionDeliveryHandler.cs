@@ -4,7 +4,9 @@ using Automaton.Core.Models;
 namespace Automaton.Runner.Console.Services;
 
 internal sealed class RunnerExecutionDeliveryHandler(
-    RunnerExecutionProcessor processor, RunnerFileTransferExecutor? fileTransfers = null)
+    RunnerExecutionProcessor processor,
+    IRuntimeTunnelReconnectRequester tunnelReconnect,
+    RunnerFileTransferExecutor? fileTransfers = null)
 {
     internal async Task<bool> HandleAsync(ReadOnlyMemory<byte> body, string? messageId, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
@@ -27,6 +29,23 @@ internal sealed class RunnerExecutionDeliveryHandler(
         {
             await RejectKnownAsync(command.OperationId, api, token);
             Serilog.Log.Warning("Rejected execution {OperationId} addressed to another Runner.", command.OperationId);
+            return false;
+        }
+        if (command.Kind == RunnerExecutionCommandKinds.ReconnectRuntimeTunnels)
+        {
+            if (string.IsNullOrWhiteSpace(command.TargetApiInstanceId))
+            {
+                Serilog.Log.Warning("Rejected runtime tunnel reconnect command without a target API instance.");
+                return false;
+            }
+
+            tunnelReconnect.RequestRuntimeTunnelReconnect(
+                command.TargetApiInstanceId, command.TargetApiColor, "API color changed");
+            return true;
+        }
+        if (command.Kind is not null)
+        {
+            Serilog.Log.Warning("Rejected unsupported Runner execution command kind {CommandKind}.", command.Kind);
             return false;
         }
         RunnerExecutionAssignment assignment;

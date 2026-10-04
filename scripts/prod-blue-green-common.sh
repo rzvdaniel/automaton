@@ -973,6 +973,28 @@ wait_before_stopping_previous_color() {
     fi
 }
 
+request_api_color_runner_tunnel_reconnect() {
+    local color="$1"
+    local compose_service
+    compose_service="$(compose_service_name api "$color")"
+
+    if ! service_exists "$compose_service"; then
+        echo "[ERROR] Active API color $compose_service is not running; cannot request Runner tunnel reconnect" >&2
+        return 1
+    fi
+
+    mapfile -t container_ids < <(service_container_ids "$compose_service")
+    if [[ "${#container_ids[@]}" -eq 0 ]]; then
+        echo "[ERROR] Active API color $compose_service has no running containers" >&2
+        return 1
+    fi
+
+    local container_id="${container_ids[0]}"
+    echo "[INFO] Asking $compose_service to queue runtime tunnel reconnect commands for Runners on the previous API color"
+    docker exec "$container_id" sh -lc \
+        "curl -fsS -X POST http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
+}
+
 assert_service_exists() {
     local service="$1"
     local color="$2"

@@ -77,7 +77,9 @@ public sealed class RunnerExecutionQueueCapacityTests
         public SaturatedQueueHarness(string directory)
         {
             this.directory = directory;
-            consumer = new(new(new(new(directory), executor)));
+            var processor = new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor);
+            var handler = new RunnerExecutionDeliveryHandler(processor, new NoopTunnelReconnectRequester());
+            consumer = new RunnerExecutionQueueConsumer(handler);
             var api = CreateApi();
             var configuration = new HostedRunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
                 "execution", true, "unused", "management");
@@ -100,6 +102,11 @@ public sealed class RunnerExecutionQueueCapacityTests
 
         public Task DeliverManagementAsync()
             => broker.DeliverAsync("management", runner, true, cancellation.Token);
+
+        private sealed class NoopTunnelReconnectRequester : IRuntimeTunnelReconnectRequester
+        {
+            public void RequestRuntimeTunnelReconnect(string targetApiInstanceId, string? targetApiColor, string? reason) { }
+        }
 
         public void AssertCapacityAndLogs(Task queued)
         {

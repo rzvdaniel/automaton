@@ -69,6 +69,12 @@ deploy_color api "$TARGET_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
 switch_live_color api "$TARGET_COLOR" "$DEPLOY_REVISION" "$CURRENT_REVISION"
 echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via Traefik dynamic configuration"
 
+if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_COLOR"; then
+    echo "[ERROR] Runtime tunnel reconnect requests failed; restoring API traffic to $CURRENT_COLOR" >&2
+    rollback_live_color api "$CURRENT_COLOR" "$CURRENT_REVISION" "$PREVIOUS_REVISION" || true
+    exit 1
+fi
+
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
     wait_before_stopping_previous_color api
     stop_color api "$CURRENT_COLOR"

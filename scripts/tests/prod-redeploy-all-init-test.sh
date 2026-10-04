@@ -49,6 +49,7 @@ ensure_infrastructure() {
 
 deploy_color() { record "deploy:$1:$2"; }
 switch_all_live_colors() { record "switch:$1:$2:$3"; }
+request_api_color_runner_tunnel_reconnect() { record "tunnel-reconnect:$1"; }
 wait_before_stopping_previous_color() { record "wait:$1"; }
 stop_color() { record "stop:$1:$2"; }
 status_table() { record 'status'; }
@@ -88,6 +89,10 @@ run_case() {
 
     grep -Fxq 'ensure:loaded' "$events"
     grep -Fxq 'switch:green:blue:green' "$events"
+    grep -Fxq 'tunnel-reconnect:green' "$events"
+    switch_line="$(grep -n '^switch:' "$events" | cut -d: -f1)"
+    reconnect_line="$(grep -n '^tunnel-reconnect:' "$events" | cut -d: -f1)"
+    [[ "$switch_line" -lt "$reconnect_line" ]]
 
     if [[ "$expected_stops" == "none" ]]; then
         if grep -q '^stop:' "$events"; then
@@ -96,6 +101,8 @@ run_case() {
         fi
     else
         [[ "$(grep -c '^stop:' "$events")" -eq 3 ]]
+        wait_line="$(grep -n '^wait:api$' "$events" | cut -d: -f1)"
+        [[ "$reconnect_line" -lt "$wait_line" ]]
     fi
 }
 

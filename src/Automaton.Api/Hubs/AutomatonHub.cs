@@ -84,6 +84,12 @@ public class AutomatonHub : Hub
             apiInstanceIdentityService.ApiInstanceId,
             apiInstanceIdentityService.ApiColor ?? "(unset)");
 
+        await Clients.Caller.SendAsync(
+            "ApiInstanceIdentity",
+            apiInstanceIdentityService.ApiInstanceId,
+            apiInstanceIdentityService.ApiColor,
+            Context.ConnectionAborted);
+
         await base.OnConnectedAsync();
     }
 

@@ -7,14 +7,18 @@ namespace Automaton.Runner.Console.Services;
 
 internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvider, ILogger logger)
 {
+    private const string ApiInstanceIdentityMethod = "ApiInstanceIdentity";
+
     public void Register(
         HubConnection connection,
+        Action<string?, string?> setConnectedApiIdentity,
         Action wakeConnectionLoop,
         Action<bool> setReconnecting,
         Func<bool> isReconnecting,
         Func<Exception?, string> getFriendlyErrorMessage,
         Func<Task> sendHeartbeat)
     {
+        connection.On<string, string?>(ApiInstanceIdentityMethod, setConnectedApiIdentity);
         RegisterLifecycleEvents(
             connection,
             wakeConnectionLoop,

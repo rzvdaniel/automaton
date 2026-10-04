@@ -20,16 +20,35 @@ internal sealed class HubExecutionHandlerRegistrar
         this.logger = logger;
     }
 
-    public void Register(HubConnection connection)
+    public void Register(
+        HubConnection connection,
+        Func<bool> tryBeginTunnelRequest,
+        Action completeTunnelRequest)
     {
         connection.On<TunnelRequest>(TunnelRequestMethod, request =>
-            ForwardTunnelRequestAsync(connection, request));
+            ForwardTunnelRequestAsync(connection, request, tryBeginTunnelRequest, completeTunnelRequest));
     }
 
     private async Task ForwardTunnelRequestAsync(
         HubConnection connection,
-        TunnelRequest request)
+        TunnelRequest request,
+        Func<bool> tryBeginTunnelRequest,
+        Action completeTunnelRequest)
     {
+        if (!tryBeginTunnelRequest())
+        {
+            try
+            {
+                await connection.SendAsync(TunnelResponseMethod, CreateReconnectResponse(request));
+            }
+            catch (Exception exception)
+            {
+                logger.Debug(exception,
+                    "Could not return a reconnect response for tunnel request {RequestId}", request.RequestId);
+            }
+            return;
+        }
+
         logger.Debug("Tunnel request received: {Method} {Path} RequestId={RequestId}",
             request.Method, request.Path, request.RequestId);
         try
@@ -50,5 +69,17 @@ internal sealed class HubExecutionHandlerRegistrar
             logger.Error(ex, "Tunnel forwarding failed: {Method} {Path} RequestId={RequestId}",
                 request.Method, request.Path, request.RequestId);
         }
+        finally
+        {
+            completeTunnelRequest();
+        }
     }
+
+    private static TunnelResponse CreateReconnectResponse(TunnelRequest request)
+        => new()
+        {
+            RequestId = request.RequestId,
+            StatusCode = 503,
+            Error = "Runner is reconnecting to the active API for runtime tunnel traffic."
+        };
 }

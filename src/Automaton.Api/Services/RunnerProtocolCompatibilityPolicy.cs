@@ -27,4 +27,8 @@ public static class RunnerProtocolCompatibilityPolicy
                 $"Runner '{runner.Name}' must be upgraded for container-based application execution before deployment.");
         }
     }
+
+    public static bool SupportsRuntimeTunnelReconnectCommands(string? apiCompatibilityVersion)
+        => int.TryParse(apiCompatibilityVersion, out var version)
+            && version >= int.Parse(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands);
 }

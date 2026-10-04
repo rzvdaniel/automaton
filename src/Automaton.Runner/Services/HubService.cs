@@ -15,9 +15,10 @@ using System.Reflection;
 
 namespace Automaton.Runner.Console.Services;
 
-public class HubService
+public class HubService : IRuntimeTunnelReconnectRequester
 {
     internal const string CurrentRunnerApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current;
+    private static readonly TimeSpan TunnelReconnectGracePeriod = TimeSpan.FromSeconds(20);
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -29,6 +30,10 @@ public class HubService
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
     private readonly SemaphoreSlim connectionLoopSignal = new(0, 1);
+    private readonly RunnerTunnelReconnectState tunnelReconnectState = new();
+    private int tunnelReconnectGraceStarted;
+    private string? connectedApiInstanceId;
+    private string? connectedApiColor;
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
@@ -144,6 +149,12 @@ public class HubService
         }
         if (IsConnected())
         {
+            if (tunnelReconnectState.ShouldReconnect)
+            {
+                await DisconnectForTunnelReconnectAsync();
+                return true;
+            }
+
             ResetAfterReconnect(state);
             await WaitForConnectionLoopSignalAsync(cancellationToken);
             return true;
@@ -220,6 +231,8 @@ public class HubService
                 await heartbeatService.StopAsync();
                 await connection.DisposeAsync();
                 connection = null;
+                Interlocked.Exchange(ref connectedApiInstanceId, null);
+                Interlocked.Exchange(ref connectedApiColor, null);
             }
 
             connection = HubConnectionFactory.Create(configService, apiKey, hubUrl);
@@ -231,9 +244,13 @@ public class HubService
             // Keep-alive interval to maintain connection during long operations
             connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
-            executionHandlerRegistrar.Register(connection);
+            executionHandlerRegistrar.Register(
+                connection,
+                tunnelReconnectState.TryBeginTunnelRequest,
+                CompleteTunnelRequest);
             controlHandlerRegistrar.Register(
                 connection,
+                SetConnectedApiIdentity,
                 WakeConnectionLoop,
                 value => isReconnecting = value,
                 () => isReconnecting,
@@ -280,6 +297,8 @@ public class HubService
             finally
             {
                 connection = null;
+                Interlocked.Exchange(ref connectedApiInstanceId, null);
+                Interlocked.Exchange(ref connectedApiColor, null);
                 WriteLine("📡 Disconnected from server");
             }
         }
@@ -288,6 +307,99 @@ public class HubService
     public bool IsConnected()
     {
         return connection?.State == HubConnectionState.Connected;
+    }
+
+    public void RequestRuntimeTunnelReconnect(
+        string targetApiInstanceId,
+        string? targetApiColor,
+        string? reason)
+    {
+        if (!IsConnected())
+        {
+            logger.Debug("Ignoring runtime tunnel reconnect request because the Runner has no active API connection");
+            return;
+        }
+
+        var alreadyOnTarget = string.IsNullOrWhiteSpace(targetApiColor)
+            ? string.Equals(Volatile.Read(ref connectedApiInstanceId), targetApiInstanceId, StringComparison.Ordinal)
+            : string.Equals(Volatile.Read(ref connectedApiColor), targetApiColor, StringComparison.Ordinal);
+        if (alreadyOnTarget)
+        {
+            logger.Debug("Ignoring duplicate runtime tunnel reconnect request for the API instance the Runner already uses");
+            return;
+        }
+
+        var canReconnectNow = tunnelReconnectState.RequestReconnect();
+        logger.Information(
+            "Runtime tunnel reconnect requested. ActiveTunnelRequests={ActiveTunnelRequests} Reason={Reason}",
+            tunnelReconnectState.ActiveTunnelRequestCount,
+            string.IsNullOrWhiteSpace(reason) ? "API color changed" : reason);
+
+        if (canReconnectNow)
+        {
+            WakeConnectionLoop();
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref tunnelReconnectGraceStarted, 1, 0) == 0)
+            _ = ExpireTunnelReconnectGracePeriodAsync(retryTokenSource?.Token ?? CancellationToken.None);
+    }
+
+    private void CompleteTunnelRequest()
+    {
+        if (tunnelReconnectState.CompleteTunnelRequest())
+            WakeConnectionLoop();
+    }
+
+    private async Task ExpireTunnelReconnectGracePeriodAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TunnelReconnectGracePeriod, cancellationToken);
+            if (tunnelReconnectState.ExpireGracePeriod())
+            {
+                logger.Warning("Runtime tunnel reconnect grace period elapsed; reconnecting the Runner");
+                WakeConnectionLoop();
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task DisconnectForTunnelReconnectAsync()
+    {
+        var currentConnection = connection;
+        if (currentConnection is null)
+            return;
+
+        try
+        {
+            await heartbeatService.StopAsync();
+            await currentConnection.StopAsync();
+        }
+        catch (Exception exception)
+        {
+            logger.Debug(exception, "Stopping the old API connection for runtime tunnel reconnect failed");
+        }
+
+        try
+        {
+            await currentConnection.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            logger.Debug(exception, "Disposing the old API connection for runtime tunnel reconnect failed");
+        }
+        finally
+        {
+            if (ReferenceEquals(connection, currentConnection))
+                connection = null;
+            Interlocked.Exchange(ref connectedApiInstanceId, null);
+            Interlocked.Exchange(ref connectedApiColor, null);
+            tunnelReconnectState.Reset();
+            Interlocked.Exchange(ref tunnelReconnectGraceStarted, 0);
+        }
     }
 
     private Task WaitForConnectionLoopSignalAsync(CancellationToken cancellationToken)
@@ -303,6 +415,16 @@ public class HubService
         {
             logger.Debug(ex, "A reconnect wake-up is already queued for the connection loop.");
         }
+    }
+
+    private void SetConnectedApiIdentity(string? apiInstanceId, string? apiColor)
+    {
+        if (string.IsNullOrWhiteSpace(apiInstanceId))
+            return;
+
+        Interlocked.Exchange(ref connectedApiInstanceId, apiInstanceId);
+        Interlocked.Exchange(ref connectedApiColor, apiColor);
+        logger.Debug("Runner connection is registered to API instance {ApiInstanceId}", apiInstanceId);
     }
 
     private sealed class RetryLoopState

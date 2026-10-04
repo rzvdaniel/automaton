@@ -11,7 +11,7 @@ namespace Automaton.Runner.Console.Tests;
 public sealed class RunnerProtocolCompatibilityTests
 {
     [Test]
-    public void RunnerAdvertisesTheManagedArtifactProtocolVersion()
+    public void RunnerAdvertisesTheCurrentProtocolVersion()
     {
         Assert.That(
             HubService.CurrentRunnerApiCompatibilityVersion,
@@ -19,12 +19,13 @@ public sealed class RunnerProtocolCompatibilityTests
     }
 
     [Test]
-    public void HostContainerExecutionIsProtocolFourAndInfrastructureOnly()
+    public void HostContainerExecutionIsProtocolFourAndTunnelReconnectCommandsAreProtocolFive()
     {
         Assert.Multiple(() =>
         {
             Assert.That(RunnerApiCompatibilityVersions.HostContainerExecution, Is.EqualTo("4"));
-            Assert.That(RunnerApiCompatibilityVersions.Current, Is.EqualTo("4"));
+            Assert.That(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands, Is.EqualTo("5"));
+            Assert.That(RunnerApiCompatibilityVersions.Current, Is.EqualTo("5"));
             Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
                 Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
             Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
