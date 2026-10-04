@@ -20,28 +20,8 @@ if grep -q 'api-blue-edge' "$template"; then
 fi
 
 common_script="$REPO_ROOT/scripts/prod-blue-green-common.sh"
-grep -q 'all_drained.*==.*true.*migration_complete.*==.*true' "$common_script" || {
-    echo "Runner drain must not succeed before migration completes." >&2
-    exit 1
-}
-
-fallback_sleep_seconds=""
-
-sleep() {
-    fallback_sleep_seconds="$1"
-}
-
-wait_for_api_color_runner_drain() {
-    return 2
-}
-
-if drain_api_color_runners blue green 60; then
-    echo "Expected unsupported drain status to fail the deployment." >&2
-    exit 1
-fi
-
-if [[ -n "$fallback_sleep_seconds" ]]; then
-    echo "Unsupported drain status must not sleep and continue deployment." >&2
+if rg -q 'reconnect-when-idle|drain-status|migration-status' "$common_script"; then
+    echo "Blue/green helpers must not depend on Runner reconnection or registration gates." >&2
     exit 1
 fi
 

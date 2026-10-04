@@ -5,7 +5,6 @@ using Automaton.Messaging.Events;
 using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
@@ -13,7 +12,6 @@ using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Api.Tests;
 
@@ -92,37 +90,7 @@ public sealed class InfrastructureRunnerHostApprovalTests
             db,
             new RecordingAuditEventService(),
             NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
-            new NullHubContext<AutomatonHub>(), RunnerExecutionTestServices.Revocation(db));
-
-    private sealed class NullHubContext<THub> : IHubContext<THub> where THub : Hub
-    {
-        public IHubClients Clients { get; } = new NullHubClients();
-        public IGroupManager Groups { get; } = new NullGroupManager();
-    }
-
-    private sealed class NullHubClients : IHubClients
-    {
-        public IClientProxy All => new NullClientProxy();
-        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
-        public IClientProxy Client(string connectionId) => new NullClientProxy();
-        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => new NullClientProxy();
-        public IClientProxy Group(string groupName) => new NullClientProxy();
-        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
-        public IClientProxy Groups(IReadOnlyList<string> groupNames) => new NullClientProxy();
-        public IClientProxy User(string userId) => new NullClientProxy();
-        public IClientProxy Users(IReadOnlyList<string> userIds) => new NullClientProxy();
-    }
-
-    private sealed class NullClientProxy : IClientProxy
-    {
-        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class NullGroupManager : IGroupManager
-    {
-        public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
+            RunnerExecutionTestServices.Revocation(db));
     private static ApplicationDbContext CreateDbContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase($"infrastructure-workflow-{Guid.NewGuid()}")

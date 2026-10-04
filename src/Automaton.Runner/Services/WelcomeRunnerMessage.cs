@@ -1,6 +1,7 @@
-namespace Automaton.Runner.Console.Models;
+namespace Automaton.Runner.Console.Services;
 
-public class WelcomeRunnerMessage
+// Identity handshake used by retained API revisions during tunnel rollback.
+internal sealed class WelcomeRunnerMessage
 {
     public string Message { get; set; } = string.Empty;
     public string ApiInstanceId { get; set; } = string.Empty;

@@ -22,53 +22,7 @@ STATE_FILE="$STATE_DIR/blue-green-state.env"
 CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
 LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 
-MIGRATION_EXPECTED_RUNNER_IDS=""
 PRODUCTION_REVISION="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-
-json_array_field() {
-    local field="$1"
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "[ERROR] python3 is required to parse internal deployment responses" >&2
-        return 1
-    fi
-
-    python3 -c 'import json, sys
-data = json.load(sys.stdin)
-value = data.get(sys.argv[1], [])
-if not isinstance(value, list):
-    raise SystemExit(f"JSON field {sys.argv[1]} is not an array")
-print(",".join(str(item) for item in value))' "$field"
-}
-
-json_int_field() {
-    local field="$1"
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "[ERROR] python3 is required to parse internal deployment responses" >&2
-        return 1
-    fi
-
-    python3 -c 'import json, sys
-data = json.load(sys.stdin)
-value = data.get(sys.argv[1])
-if not isinstance(value, int):
-    raise SystemExit(f"JSON field {sys.argv[1]} is not an integer")
-print(value)' "$field"
-}
-
-json_bool_field() {
-    local field="$1"
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "[ERROR] python3 is required to parse internal deployment responses" >&2
-        return 1
-    fi
-
-    python3 -c 'import json, sys
-data = json.load(sys.stdin)
-value = data.get(sys.argv[1])
-if not isinstance(value, bool):
-    raise SystemExit(f"JSON field {sys.argv[1]} is not a boolean")
-print("true" if value else "false")' "$field"
-}
 
 LIVE_API_COLOR_DEFAULT="blue"
 LIVE_STUDIO_COLOR_DEFAULT="blue"
@@ -102,9 +56,6 @@ load_prod_env() {
     : "${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}"
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
-    # Maximum time to drain runners attached to the previous API color. The
-    # normal path exits earlier when all old-color connections are gone.
-    RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-60}"
     CUTOVER_WARMUP_SECONDS="${CUTOVER_WARMUP_SECONDS:-10}"
     PREVIOUS_COLOR_OVERLAP_SECONDS="${PREVIOUS_COLOR_OVERLAP_SECONDS:-20}"
 }
@@ -1022,250 +973,28 @@ wait_before_stopping_previous_color() {
     fi
 }
 
-signal_api_color_runners_reconnect_when_idle() {
-    local color="$1"
-    local reason="${2:-API deploy cutover complete. Reconnect to the new live API instance when idle.}"
-    local allow_partial="${3:-false}"
+request_api_color_runner_tunnel_reconnect() {
+    local source_color="$1"
+    local target_color="$2"
+    local include_target_color_runners="${3:-false}"
     local compose_service
-    compose_service="$(compose_service_name api "$color")"
+    compose_service="$(compose_service_name api "$source_color")"
 
     if ! service_exists "$compose_service"; then
-        echo "[INFO] Skip runner reconnect signal for $compose_service because it is not running"
-        return 0
+        echo "[ERROR] Active API color $compose_service is not running; cannot request Runner tunnel reconnect" >&2
+        return 1
     fi
 
     mapfile -t container_ids < <(service_container_ids "$compose_service")
-    if [[ ${#container_ids[@]} -eq 0 ]]; then
-        echo "[INFO] No containers found for $compose_service"
-        return 0
-    fi
-
-    for container_id in "${container_ids[@]}"; do
-        echo "[INFO] Requesting reconnect-when-idle from API container $container_id via loopback"
-        local response
-        if ! response="$(docker exec "$container_id" sh -lc \
-            "curl -fsS -X POST -H 'Content-Type: application/json' --data '{\"reason\":\"${reason//\"/\\\"}\"}' http://127.0.0.1:8080/internal/runners/reconnect-when-idle")"; then
-            echo "[ERROR] Reconnect-when-idle signal was not accepted by API container $container_id." >&2
-            return 1
-        fi
-
-        echo "[INFO] Reconnect-when-idle response from API container $container_id: $response"
-        local reported_runner_ids
-        if ! reported_runner_ids="$(json_array_field candidateRunnerIds <<< "$response")"; then
-            echo "[ERROR] Reconnect response from API container $container_id was not valid JSON" >&2
-            return 1
-        fi
-        local expected_count=0
-        local current_old_count=0
-        if [[ -n "$MIGRATION_EXPECTED_RUNNER_IDS" ]]; then
-            expected_count="$(printf '%s\n' "$MIGRATION_EXPECTED_RUNNER_IDS" | tr ',' '\n' | wc -l | tr -d ' ')"
-        fi
-        if [[ -n "$reported_runner_ids" ]]; then
-            current_old_count="$(printf '%s\n' "$reported_runner_ids" | tr ',' '\n' | wc -l | tr -d ' ')"
-        else
-            echo "[INFO] API container $container_id returned no current Runner IDs; using the frozen snapshot for dispatch validation"
-        fi
-        local signaled_count
-        if ! signaled_count="$(json_int_field signaledRunnerCount <<< "$response")"; then
-            echo "[ERROR] Reconnect response from API container $container_id omitted signaledRunnerCount" >&2
-            return 1
-        fi
-        if [[ "$allow_partial" == "true" ]]; then
-            if [[ -n "$reported_runner_ids" ]]; then
-                if [[ -z "$signaled_count" || "$signaled_count" -ne "$current_old_count" ]]; then
-                    echo "[ERROR] Retry reconnect dispatch was invalid: current_old=$current_old_count signaled=${signaled_count:-unknown}." >&2
-                    return 1
-                fi
-            elif [[ -z "$signaled_count" || "$signaled_count" -lt 0 || "$signaled_count" -gt "$expected_count" ]]; then
-                echo "[ERROR] Retry reconnect dispatch was invalid: expected=$expected_count signaled=${signaled_count:-unknown}." >&2
-                return 1
-            fi
-        elif [[ -n "$reported_runner_ids" && "$signaled_count" -ne "$current_old_count" ]]; then
-            echo "[ERROR] Reconnect dispatch was incomplete: current_old=$current_old_count signaled=${signaled_count:-unknown}." >&2
-            return 1
-        elif [[ -z "$reported_runner_ids" && ( -z "$signaled_count" || "$signaled_count" -ne "$expected_count" ) ]]; then
-            echo "[ERROR] Reconnect dispatch was incomplete: expected=$expected_count signaled=${signaled_count:-unknown}." >&2
-            return 1
-        fi
-        if [[ -z "$reported_runner_ids" ]]; then
-            echo "[INFO] No current connected Runner IDs were reported by API container $container_id"
-        else
-            echo "[INFO] Runners currently attached to previous API: $reported_runner_ids"
-        fi
-    done
-}
-
-snapshot_api_color_runner_ids() {
-    local color="$1"
-    local fallback_color="${2:-}"
-    local compose_service
-    compose_service="$(compose_service_name api "$color")"
-
-    if ! service_exists "$compose_service"; then
-        echo "[ERROR] Cannot snapshot Runner IDs: $compose_service is not running" >&2
+    if [[ "${#container_ids[@]}" -eq 0 ]]; then
+        echo "[ERROR] Active API color $compose_service has no running containers" >&2
         return 1
     fi
 
-    local container_id
-    container_id="$(service_container_ids "$compose_service" | head -n 1)"
-    if [[ -z "$container_id" ]]; then
-        echo "[ERROR] Cannot snapshot Runner IDs: no container found for $compose_service" >&2
-        return 1
-    fi
-
-    local response
-    response="$(docker exec "$container_id" sh -lc \
-        "curl -fsS http://127.0.0.1:8080/internal/runners/drain-status" \
-        2>/dev/null || true)"
-    if [[ -z "$response" ]]; then
-        echo "[ERROR] API container $container_id did not return migration candidates" >&2
-        return 1
-    fi
-
-    if ! MIGRATION_EXPECTED_RUNNER_IDS="$(json_array_field connectedRunnerIds <<< "$response")"; then
-        echo "[ERROR] Drain status from API container $container_id was not valid JSON" >&2
-        return 1
-    fi
-    if [[ -z "$MIGRATION_EXPECTED_RUNNER_IDS" ]]; then
-        local connected_count
-        if ! connected_count="$(json_int_field connectedRunnerCount <<< "$response")"; then
-            echo "[ERROR] Drain status from API container $container_id omitted connectedRunnerCount" >&2
-            return 1
-        fi
-        if (( connected_count > 0 )) && [[ -n "$fallback_color" ]]; then
-            local fallback_container_id
-            fallback_container_id="$(service_container_ids "$(compose_service_name api "$fallback_color")" | head -n 1)"
-            local fallback_response
-            fallback_response="$(docker exec "$fallback_container_id" sh -lc \
-                "curl -fsS http://127.0.0.1:8080/internal/runners/migration-candidates" \
-                2>/dev/null || true)"
-            if ! MIGRATION_EXPECTED_RUNNER_IDS="$(json_array_field expectedRunnerIds <<< "$fallback_response")"; then
-                echo "[ERROR] Target API did not return a valid migration candidate snapshot" >&2
-                return 1
-            fi
-            local fallback_count=0
-            if [[ -n "$MIGRATION_EXPECTED_RUNNER_IDS" ]]; then
-                fallback_count="$(printf '%s\n' "$MIGRATION_EXPECTED_RUNNER_IDS" | tr ',' '\n' | wc -l | tr -d ' ')"
-            fi
-            if [[ "$fallback_count" -ne "$connected_count" ]]; then
-                echo "[ERROR] Legacy Runner migration snapshot mismatch: old_api_count=$connected_count target_candidate_count=$fallback_count" >&2
-                return 1
-            fi
-            echo "[INFO] Legacy API omitted connected Runner IDs; using pre-cutover target-side compatibility snapshot"
-        fi
-    fi
-    if [[ -n "$MIGRATION_EXPECTED_RUNNER_IDS" ]]; then
-        echo "[INFO] Frozen pre-cutover Runner migration candidates: $MIGRATION_EXPECTED_RUNNER_IDS"
-    else
-        echo "[INFO] No pre-cutover Runner migration candidates"
-    fi
-}
-
-wait_for_api_color_runner_drain() {
-    local color="$1"
-    local target_color="$2"
-    local timeout_seconds="${3:-60}"
-    local compose_service
-    compose_service="$(compose_service_name api "$color")"
-    local started_at
-    started_at="$(date +%s)"
-    local last_resignal_at=0
-
-    mapfile -t container_ids < <(service_container_ids "$compose_service")
-    if [[ ${#container_ids[@]} -eq 0 ]]; then
-        echo "[INFO] No previous API containers remain to drain"
-        return 0
-    fi
-
-    while true; do
-        local all_drained=true
-        local migration_complete=true
-        for container_id in "${container_ids[@]}"; do
-            local response
-            response="$(docker exec "$container_id" sh -lc \
-                "curl -fsS http://127.0.0.1:8080/internal/runners/drain-status" \
-                2>/dev/null || true)"
-
-            if [[ -z "$response" ]]; then
-                echo "[WARN] Previous API color does not expose runner drain status"
-                return 2
-            fi
-
-            if [[ "$response" != *'"drained":true'* ]]; then
-                all_drained=false
-                echo "[INFO] Previous API color still has connected runners: $response"
-            fi
-
-            if [[ -n "$MIGRATION_EXPECTED_RUNNER_IDS" ]]; then
-                local migration_response
-                migration_response="$(docker exec "$(service_container_ids "$(compose_service_name api "$target_color")" | head -n 1)" sh -lc \
-                    "curl -fsS 'http://127.0.0.1:8080/internal/runners/migration-status?runnerIds=$MIGRATION_EXPECTED_RUNNER_IDS'" \
-                    2>/dev/null || true)"
-                local migration_complete_value
-                if ! migration_complete_value="$(json_bool_field allConnected <<< "$migration_response")"; then
-                    migration_complete_value=false
-                fi
-                if [[ "$migration_complete_value" != "true" ]]; then
-                    all_drained=false
-                    migration_complete=false
-                    echo "[INFO] New API color has not confirmed all candidate Runners: ${migration_response:-unavailable}"
-                fi
-            fi
-        done
-
-        local now
-        now="$(date +%s)"
-        if [[ "$migration_complete" != "true" &&
-              "$MIGRATION_EXPECTED_RUNNER_IDS" != "" &&
-              $((now - last_resignal_at)) -ge 10 ]]; then
-            echo "[INFO] Retrying reconnect for Runners still attached to the previous API color"
-            if ! signal_api_color_runners_reconnect_when_idle "$color" \
-                "Retry API deploy cutover reconnect for unresolved Runners." true; then
-                return 1
-            fi
-            last_resignal_at="$now"
-        fi
-
-        if [[ "$all_drained" == "true" && "$migration_complete" == "true" ]]; then
-            echo "[INFO] Previous API color runner drain completed"
-            return 0
-        fi
-
-        if (( $(date +%s) - started_at >= timeout_seconds )); then
-            echo "[WARN] Runner drain timed out after ${timeout_seconds}s; stopping previous API color" >&2
-            return 1
-        fi
-
-        sleep 2
-    done
-}
-
-drain_api_color_runners() {
-    local color="$1"
-    local target_color="$2"
-    local timeout_seconds="${3:-60}"
-    local drain_status
-
-    if wait_for_api_color_runner_drain "$color" "$target_color" "$timeout_seconds"; then
-        return 0
-    else
-        drain_status=$?
-    fi
-
-    case "$drain_status" in
-        1)
-            echo "[ERROR] Previous API color did not drain its connected Runners within ${timeout_seconds}s; preserving it for diagnosis." >&2
-            return 1
-            ;;
-        2)
-            echo "[ERROR] Previous API color does not expose a verifiable Runner drain status; preserving it for diagnosis." >&2
-            return 1
-            ;;
-        *)
-            echo "[ERROR] Unexpected runner drain status: $drain_status; preserving the previous API color for diagnosis." >&2
-            return 1
-            ;;
-    esac
+    local container_id="${container_ids[0]}"
+    echo "[INFO] Asking $compose_service to queue runtime tunnel reconnect commands targeting API color $target_color"
+    docker exec "$container_id" sh -lc \
+        "curl -fsS -X POST -H 'Content-Type: application/json' -d '{\"targetApiColor\":\"$target_color\",\"reconcileAllRegisteredRunners\":$include_target_color_runners}' http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
 }
 
 assert_service_exists() {

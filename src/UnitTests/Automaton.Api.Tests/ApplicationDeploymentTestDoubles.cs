@@ -463,6 +463,13 @@ internal static class DeploymentOperationTestScenarios
             null!,
             NullLogger<DeploymentOperationService>.Instance);
 
+    public static Task<List<Guid>> GetDispatchableOperationIdsAsync(
+        ApplicationDeploymentServiceTests.DeploymentFixture fixture)
+        => CreateService(fixture).GetDispatchableOwnedOperationIdsAsync(
+            10,
+            Array.Empty<Guid>(),
+            CancellationToken.None);
+
     public static async Task<OperationExecutionSnapshot> ReclaimExpiredOperationAsync(
         ApplicationDeploymentServiceTests.DeploymentFixture fixture)
     {

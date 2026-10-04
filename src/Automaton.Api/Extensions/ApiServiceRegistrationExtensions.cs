@@ -606,6 +606,9 @@ internal static class ApiRunnerRegistration
     internal static IServiceCollection AddApiRunnerServices(this IServiceCollection services, WebApplicationBuilder applicationBuilder)
     {
         services.AddScoped<RunnerService>();
+        services.AddScoped<RunnerTunnelReconnectService>();
+        services.AddScoped<IRuntimeTunnelReconnectCommandPublisher>(provider =>
+            provider.GetRequiredService<RunnerExecutionCommandPublisher>());
         services.AddScoped<RunnerStorageTelemetryService>();
         services.AddScoped<RunnerStorageTelemetrySubmissionService>();
         services.Configure<StorageTelemetryOptions>(applicationBuilder.Configuration.GetSection("StorageTelemetry"));
@@ -720,7 +723,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerExecutionDispatchService>();
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
-        services.AddScoped<RunnerInstanceMigrationService>();
         services.AddScoped<RunnerConnectionLifecycleService>();
         services.AddScoped<HostedRunnerPlanCapabilityValidator>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();

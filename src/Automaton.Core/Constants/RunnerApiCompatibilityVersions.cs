@@ -10,5 +10,6 @@ public static class RunnerApiCompatibilityVersions
     public const string ManagedApplicationArtifacts = "2";
     public const string ContainerApplicationExecution = "3";
     public const string HostContainerExecution = "4";
-    public const string Current = HostContainerExecution;
+    public const string RuntimeTunnelReconnectCommands = "5";
+    public const string Current = RuntimeTunnelReconnectCommands;
 }

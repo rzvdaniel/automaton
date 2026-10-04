@@ -69,11 +69,34 @@ public sealed class AppActionDurableOperationTests
         Assert.That(assignment.Request!.Action!.Kind, Is.EqualTo("execute"));
         Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).Status, Is.EqualTo("Running"));
     }
+
+    [Test]
+    public async Task SignalRDisconnectDoesNotTerminalizeDurableActionBeforeItsResultArrives()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.QueueAsync();
+        await fixture.Service.AssignmentAsync(fixture.Key, fixture.Id, CancellationToken.None);
+        var runner = await fixture.Db.Runners.SingleAsync();
+        runner.ConnectionId = "cutover-connection";
+        await fixture.Db.SaveChangesAsync();
+
+        await ManagedRunnerConnectionTestServiceFactory.MarkDisconnectedAsync(
+            fixture.Db, fixture.RunnerId, "cutover-connection");
+
+        var disconnectedExecution = await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync();
+        Assert.That(disconnectedExecution.Status, Is.EqualTo(AppModuleExecutionStatuses.Running));
+        Assert.That(disconnectedExecution.CompletedAtUtc, Is.Null);
+
+        await fixture.Service.ApplyAsync(fixture.Key, fixture.Id, fixture.Result(), CancellationToken.None);
+        Assert.That((await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync()).Status,
+            Is.EqualTo(AppModuleExecutionStatuses.Succeeded));
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         public ApplicationDbContext Db { get; } = new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
         public Guid Id { get; } = Guid.NewGuid(); public Guid Key { get; } = Guid.NewGuid();
-        private Guid RunnerId { get; } = Guid.NewGuid();
+        public Guid RunnerId { get; } = Guid.NewGuid();
         public RunnerExecutionOperationService Service { get; private set; } = null!;
         public static async Task<Fixture> CreateAsync()
         {

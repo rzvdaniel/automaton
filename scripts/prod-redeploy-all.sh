@@ -136,7 +136,6 @@ if [[ -z "$CURRENT_WEBSITE_REVISION" ]]; then
 fi
 
 ensure_infrastructure
-DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
 
 if [[ -n "$CURRENT_API_REVISION" ]]; then
     preserve_current_service_image api "$CURRENT_API_COLOR"
@@ -157,12 +156,6 @@ deploy_color studio "$TARGET_STUDIO_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISIO
 echo "[INFO] Redeploying website to $TARGET_WEBSITE_COLOR (current live color: $CURRENT_WEBSITE_COLOR)"
 deploy_color website "$TARGET_WEBSITE_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION" "$WEBSITE_RECOVERY_ARTIFACT_REFERENCE"
 
-if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
-    if ! snapshot_api_color_runner_ids "$CURRENT_API_COLOR" "$TARGET_API_COLOR"; then
-        exit 1
-    fi
-fi
-
 STUDIO_SWITCH_REVISION="$DEPLOY_REVISION"
 WEBSITE_SWITCH_REVISION="$DEPLOY_REVISION"
 if [[ -n "$STUDIO_RECOVERY_ARTIFACT_REFERENCE" ]]; then
@@ -182,26 +175,21 @@ switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSI
 
 echo "[INFO] Traefik is now routing api, studio, and website to the freshly deployed colors"
 
-if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
-    if ! signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"; then
-        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
-            "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
-            "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
-            "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" \
-            "$CURRENT_API_REVISION_STATE" "$CURRENT_STUDIO_REVISION_STATE" "$CURRENT_WEBSITE_REVISION_STATE" || true
+if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_API_COLOR" "$TARGET_API_COLOR" false; then
+    echo "[ERROR] Runtime tunnel reconnect requests failed; restoring previous public colors" >&2
+    if ! rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
+        "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
+        "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
+        "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" \
+        "$CURRENT_API_REVISION_STATE" "$CURRENT_STUDIO_REVISION_STATE" "$CURRENT_WEBSITE_REVISION_STATE"; then
+        echo "[ERROR] Public route rollback failed; Runner tunnel reconciliation was not attempted" >&2
         exit 1
     fi
-fi
-
-if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
-    if ! drain_api_color_runners "$CURRENT_API_COLOR" "$TARGET_API_COLOR" "$DRAIN_WAIT_SECONDS"; then
-        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
-            "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
-            "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
-            "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" \
-            "$CURRENT_API_REVISION_STATE" "$CURRENT_STUDIO_REVISION_STATE" "$CURRENT_WEBSITE_REVISION_STATE" || true
+    if ! request_api_color_runner_tunnel_reconnect "$TARGET_API_COLOR" "$CURRENT_API_COLOR" true; then
+        echo "[ERROR] Public routes were restored, but Runner tunnel rollback reconciliation failed; keep both API colors running and retry reconciliation" >&2
         exit 1
     fi
+    exit 1
 fi
 
 if [[ "$KEEP_PREVIOUS" != "true" ]]; then

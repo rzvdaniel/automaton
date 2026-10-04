@@ -27,11 +27,11 @@ public sealed class DeploymentOperationService(
     IServiceScopeFactory scopeFactory,
     ILogger<DeploymentOperationService> logger)
 {
+    private readonly string executorInstanceId = apiInstanceIdentityService.ApiInstanceId;
     private static readonly TimeSpan ExecutionLeaseDuration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ExecutionLeaseRenewalInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan UnreferencedPackageRetention = TimeSpan.FromHours(24);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly string executorInstanceId = apiInstanceIdentityService.ApiInstanceId;
 
     public async Task<DeploymentOperationResponse> AcceptAsync(
         Guid appId,
@@ -95,10 +95,10 @@ public sealed class DeploymentOperationService(
 
     public async Task ExecuteAsync(Guid operationId, CancellationToken cancellationToken)
     {
-        if (!await IsRunnerOwnedByThisInstanceAsync(operationId, cancellationToken))
+        if (!await IsTargetDispatchableAsync(operationId, cancellationToken))
         {
             logger.LogInformation(
-                "Deferring deployment operation {OperationId}: assigned Runner connection is owned by another API instance",
+                "Deferring deployment operation {OperationId}: deployment target is no longer dispatchable",
                 operationId);
             return;
         }
@@ -224,10 +224,7 @@ public sealed class DeploymentOperationService(
                 (operation.TargetSlug == null
                     ? target.IsDefault
                     : target.Slug == operation.TargetSlug) &&
-                (target.ExecutionRunner == null && operation.TargetSlug == null ||
-                 target.ExecutionRunner != null &&
-                 (target.ExecutionRunner.Purpose == RunnerPurposes.Managed ||
-                  target.ExecutionRunner.ApiInstanceId == executorInstanceId))))
+                (target.ExecutionRunnerId != null || operation.TargetSlug == null)))
             .OrderBy(operation => operation.CreatedAtUtc)
             .ThenBy(operation => operation.Id)
             .Select(operation => operation.Id)
@@ -273,7 +270,7 @@ public sealed class DeploymentOperationService(
         }
     }
 
-    private async Task<bool> IsRunnerOwnedByThisInstanceAsync(Guid operationId, CancellationToken cancellationToken)
+    private async Task<bool> IsTargetDispatchableAsync(Guid operationId, CancellationToken cancellationToken)
     {
         var operation = await dataContext.DeploymentOperations
             .AsNoTracking()
@@ -281,21 +278,14 @@ public sealed class DeploymentOperationService(
         if (operation is null)
             return false;
 
-        var runner = await dataContext.AppDeploymentTargets
-            .Where(target =>
+        return await dataContext.AppDeploymentTargets
+            .AnyAsync(target =>
             target.WebAppId == operation.WebAppId &&
             (operation.TargetSlug == null
                 ? target.IsDefault
-                : target.Slug == operation.TargetSlug))
-            .Select(target => target.ExecutionRunner)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (runner is null)
-        {
-            return operation.TargetSlug is null && await dataContext.AppDeploymentTargets.AnyAsync(target =>
-                target.WebAppId == operation.WebAppId && target.IsDefault && target.ExecutionRunnerId == null,
-                cancellationToken);
-        }
-        return runner.Purpose == RunnerPurposes.Managed || runner.ApiInstanceId == executorInstanceId;
+                : target.Slug == operation.TargetSlug) &&
+            (target.ExecutionRunnerId != null || operation.TargetSlug == null),
+            cancellationToken);
     }
 
     private async Task WaitForHostedRunnerResultAsync(

@@ -20,19 +20,35 @@ internal sealed class HubExecutionHandlerRegistrar
         this.logger = logger;
     }
 
-    public void Register(HubConnection connection, Action beginActivity, Action endActivity)
+    public void Register(
+        HubConnection connection,
+        Func<bool> tryBeginTunnelRequest,
+        Action completeTunnelRequest)
     {
         connection.On<TunnelRequest>(TunnelRequestMethod, request =>
-            ForwardTunnelRequestAsync(connection, request, beginActivity, endActivity));
+            ForwardTunnelRequestAsync(connection, request, tryBeginTunnelRequest, completeTunnelRequest));
     }
 
     private async Task ForwardTunnelRequestAsync(
         HubConnection connection,
         TunnelRequest request,
-        Action beginActivity,
-        Action endActivity)
+        Func<bool> tryBeginTunnelRequest,
+        Action completeTunnelRequest)
     {
-        beginActivity();
+        if (!tryBeginTunnelRequest())
+        {
+            try
+            {
+                await connection.SendAsync(TunnelResponseMethod, CreateReconnectResponse(request));
+            }
+            catch (Exception exception)
+            {
+                logger.Debug(exception,
+                    "Could not return a reconnect response for tunnel request {RequestId}", request.RequestId);
+            }
+            return;
+        }
+
         logger.Debug("Tunnel request received: {Method} {Path} RequestId={RequestId}",
             request.Method, request.Path, request.RequestId);
         try
@@ -55,7 +71,15 @@ internal sealed class HubExecutionHandlerRegistrar
         }
         finally
         {
-            endActivity();
+            completeTunnelRequest();
         }
     }
+
+    private static TunnelResponse CreateReconnectResponse(TunnelRequest request)
+        => new()
+        {
+            RequestId = request.RequestId,
+            StatusCode = 503,
+            Error = "Runner is reconnecting to the active API for runtime tunnel traffic."
+        };
 }

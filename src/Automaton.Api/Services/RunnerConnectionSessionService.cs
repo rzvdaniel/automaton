@@ -84,27 +84,32 @@ public sealed class RunnerConnectionSessionService(
             return;
 
         var disconnectedAtUtc = DateTime.UtcNow;
-        var disconnected = await dbContext.Runners
-            .Where(x => x.Id == runnerId && x.ConnectionId == connectionId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.ConnectionId, (string?)null)
-                .SetProperty(x => x.LastDisconnectedAtUtc, disconnectedAtUtc)
-                .SetProperty(x => x.Status, RunnerConnectivityStatuses.Offline),
-                cancellationToken);
+        int disconnected;
+        if (dbContext.Database.IsRelational())
+        {
+            disconnected = await dbContext.Runners
+                .Where(x => x.Id == runnerId && x.ConnectionId == connectionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.ConnectionId, (string?)null)
+                    .SetProperty(x => x.LastDisconnectedAtUtc, disconnectedAtUtc)
+                    .SetProperty(x => x.Status, RunnerConnectivityStatuses.Offline),
+                    cancellationToken);
+        }
+        else
+        {
+            var trackedRunner = await dbContext.Runners
+                .SingleOrDefaultAsync(x => x.Id == runnerId && x.ConnectionId == connectionId, cancellationToken);
+            if (trackedRunner is null)
+                return;
+
+            trackedRunner.ConnectionId = null;
+            trackedRunner.LastDisconnectedAtUtc = disconnectedAtUtc;
+            trackedRunner.Status = RunnerConnectivityStatuses.Offline;
+            disconnected = 1;
+        }
+
         if (disconnected != 1)
             return;
-
-        var lostExecutions = await dbContext.AppModuleExecutions
-            .Where(execution => execution.RunnerId == runner.Id
-                && (execution.Status == AppModuleExecutionStatuses.Dispatching || execution.Status == AppModuleExecutionStatuses.Running))
-            .ToListAsync(cancellationToken);
-        foreach (var execution in lostExecutions)
-        {
-            execution.Status = AppModuleExecutionStatuses.Lost;
-            execution.ErrorCode = AppModuleExecutionErrorCodes.RunnerUnavailable;
-            execution.FailureSummary = "Runner disconnected before execution completion was confirmed.";
-            execution.CompletedAtUtc = disconnectedAtUtc;
-        }
 
         await CloseMatchingOpenSessionAsync(
             runner.Id,

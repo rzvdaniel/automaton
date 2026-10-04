@@ -3,75 +3,34 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_DIR="$SCRIPT_DIR"
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/../prod-blue-green-common.sh"
+api_script="$SCRIPT_DIR/../prod-redeploy-api.sh"
+all_script="$SCRIPT_DIR/../prod-redeploy-all.sh"
+common_script="$SCRIPT_DIR/../prod-blue-green-common.sh"
 
-api_script="$TEST_DIR/../prod-redeploy-api.sh"
-all_script="$TEST_DIR/../prod-redeploy-all.sh"
-api_snapshot_line="$(grep -n 'snapshot_api_color_runner_ids' "$api_script" | head -n 1 | cut -d: -f1)"
+if grep -Eq 'snapshot_api_color_runner_ids|signal_api_color_runners_reconnect_when_idle|drain_api_color_runners|internal/runners/(drain-status|migration-status|reconnect-when-idle)' \
+    "$api_script" "$all_script" "$common_script"; then
+    echo "API cutover must not wait for Runner registration or signal reconnect." >&2
+    exit 1
+fi
+
 api_switch_line="$(grep -n 'switch_live_color api' "$api_script" | head -n 1 | cut -d: -f1)"
-all_snapshot_line="$(grep -n 'snapshot_api_color_runner_ids' "$all_script" | head -n 1 | cut -d: -f1)"
-all_switch_line="$(grep -n 'switch_all_live_colors' "$all_script" | head -n 1 | cut -d: -f1)"
-(( api_snapshot_line < api_switch_line ))
-(( all_snapshot_line < all_switch_line ))
-! grep -q 'RECONNECT_CANDIDATE_RUNNER_IDS' "$TEST_DIR/../prod-blue-green-common.sh"
-grep -q 'migration-status?runnerIds=$MIGRATION_EXPECTED_RUNNER_IDS' "$TEST_DIR/../prod-blue-green-common.sh"
-grep -q 'Legacy Runner migration snapshot mismatch' "$TEST_DIR/../prod-blue-green-common.sh"
-grep -q 'fallback_count' "$TEST_DIR/../prod-blue-green-common.sh"
-grep -q 'signaled_count" -lt 0' "$TEST_DIR/../prod-blue-green-common.sh"
+api_reconnect_line="$(grep -n 'request_api_color_runner_tunnel_reconnect' "$api_script" | head -n 1 | cut -d: -f1)"
+api_wait_line="$(grep -n 'wait_before_stopping_previous_color api' "$api_script" | head -n 1 | cut -d: -f1)"
+api_stop_line="$(grep -n 'stop_color api' "$api_script" | head -n 1 | cut -d: -f1)"
+api_rollback_line="$(grep -n 'rollback_live_color api' "$api_script" | head -n 1 | cut -d: -f1)"
+api_compensation_line="$(grep -n 'request_api_color_runner_tunnel_reconnect \"\$TARGET_COLOR\" \"\$CURRENT_COLOR\" true' "$api_script" | head -n 1 | cut -d: -f1)"
+all_switch_line="$(grep -n '^switch_all_live_colors ' "$all_script" | head -n 1 | cut -d: -f1)"
+all_reconnect_line="$(grep -n 'request_api_color_runner_tunnel_reconnect' "$all_script" | head -n 1 | cut -d: -f1)"
+all_wait_line="$(grep -n 'wait_before_stopping_previous_color api' "$all_script" | head -n 1 | cut -d: -f1)"
+all_stop_line="$(grep -n 'stop_color api' "$all_script" | head -n 1 | cut -d: -f1)"
+all_rollback_line="$(grep -n 'rollback_all_live_colors' "$all_script" | head -n 1 | cut -d: -f1)"
+all_compensation_line="$(grep -n 'request_api_color_runner_tunnel_reconnect \"\$TARGET_API_COLOR\" \"\$CURRENT_API_COLOR\" true' "$all_script" | head -n 1 | cut -d: -f1)"
 
-live_color="green"
-green_running=true
-blue_running=true
-signal_result=0
-drain_result=0
-stop_called=false
+[[ -n "$api_switch_line" && -n "$api_reconnect_line" && -n "$api_wait_line" && -n "$api_stop_line" ]]
+[[ "$api_switch_line" -lt "$api_reconnect_line" && "$api_reconnect_line" -lt "$api_wait_line" && "$api_wait_line" -lt "$api_stop_line" ]]
+[[ -n "$all_switch_line" && -n "$all_reconnect_line" && -n "$all_wait_line" && -n "$all_stop_line" ]]
+[[ "$all_switch_line" -lt "$all_reconnect_line" && "$all_reconnect_line" -lt "$all_wait_line" && "$all_wait_line" -lt "$all_stop_line" ]]
+[[ -n "$api_rollback_line" && -n "$api_compensation_line" && "$api_rollback_line" -lt "$api_compensation_line" ]]
+[[ -n "$all_rollback_line" && -n "$all_compensation_line" && "$all_rollback_line" -lt "$all_compensation_line" ]]
 
-signal_api_color_runners_reconnect_when_idle() { return "$signal_result"; }
-drain_api_color_runners() { return "$drain_result"; }
-rollback_live_color() { live_color="green"; }
-stop_color() { stop_called=true; }
-
-run_api_migration() {
-    local keep_previous="$1"
-    local current_color="green"
-    local target_color="blue"
-
-    if [[ "$current_color" != "$target_color" ]]; then
-        signal_api_color_runners_reconnect_when_idle "$current_color" || {
-            rollback_live_color api "$current_color"
-            return 1
-        }
-        drain_api_color_runners "$current_color" "$target_color" 60 || {
-            rollback_live_color api "$current_color"
-            return 1
-        }
-        live_color="$target_color"
-    fi
-
-    if [[ "$keep_previous" != "true" && "$current_color" != "$target_color" ]]; then
-        stop_color api "$current_color"
-    fi
-}
-
-drain_result=1
-if run_api_migration true; then
-    echo "Expected keep-previous migration failure to fail." >&2
-    exit 1
-fi
-[[ "$live_color" == "green" ]]
-[[ "$green_running" == "true" && "$blue_running" == "true" ]]
-[[ "$stop_called" == "false" ]]
-
-live_color="green"
-drain_result=0
-if ! run_api_migration true; then
-    echo "Expected keep-previous migration success." >&2
-    exit 1
-fi
-[[ "$live_color" == "blue" ]]
-[[ "$green_running" == "true" && "$blue_running" == "true" ]]
-[[ "$stop_called" == "false" ]]
-
-echo "keep-previous migration verification passed"
+echo "API slot cutover no longer gates on Runner reconnect; prior-color overlap remains before stop"

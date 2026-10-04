@@ -9,9 +9,7 @@ trap 'rm -rf -- "$TEST_ROOT"' EXIT
 
 cp "$REPO_ROOT/scripts/prod-redeploy-all.sh" "$TEST_ROOT/prod-redeploy-all.sh"
 
-ensure_line="$(grep -n '^ensure_infrastructure$' "$REPO_ROOT/scripts/prod-redeploy-all.sh" | cut -d: -f1)"
-drain_wait_line="$(grep -n '^DRAIN_WAIT_SECONDS=' "$REPO_ROOT/scripts/prod-redeploy-all.sh" | cut -d: -f1)"
-[[ -n "$ensure_line" && -n "$drain_wait_line" && "$ensure_line" -lt "$drain_wait_line" ]]
+! rg -q 'RunnerDrain|reconnect-when-idle|drain-status|migration-status|DRAIN_WAIT_SECONDS' "$REPO_ROOT/scripts/prod-redeploy-all.sh"
 
 cat > "$TEST_ROOT/prod-blue-green-common.sh" <<'EOF'
 set -euo pipefail
@@ -46,14 +44,16 @@ preserve_current_service_image() { record "preserve:$1:$2"; }
 
 ensure_infrastructure() {
     load_prod_env
-    record "ensure:$RUNNER_RECONNECT_GRACE_SECONDS"
+    record 'ensure:loaded'
 }
 
 deploy_color() { record "deploy:$1:$2"; }
-snapshot_api_color_runner_ids() { record "snapshot:$1:$2"; }
 switch_all_live_colors() { record "switch:$1:$2:$3"; }
-signal_api_color_runners_reconnect_when_idle() { record "signal:$1"; }
-drain_api_color_runners() { record "drain:$3"; }
+rollback_all_live_colors() { record "rollback:$1:$2:$3"; }
+request_api_color_runner_tunnel_reconnect() {
+    record "tunnel-reconnect:$1:$2:$3"
+    [[ "${TEST_FAIL_FORWARD:-false}" != "true" || "$3" == "true" ]]
+}
 wait_before_stopping_previous_color() { record "wait:$1"; }
 stop_color() { record "stop:$1:$2"; }
 status_table() { record 'status'; }
@@ -61,8 +61,6 @@ EOF
 
 write_env() {
     local path="$1"
-    local reconnect_grace="$2"
-
     cat > "$path" <<'EOF'
 API_DOMAIN=api.example.invalid
 STUDIO_DOMAIN=studio.example.invalid
@@ -71,38 +69,34 @@ APPS_DOMAIN=apps.example.invalid
 ACME_EMAIL=ops@example.invalid
 RUNTIME_PROXY_AUTH_KEY=test-only-placeholder
 EOF
-
-    if [[ "$reconnect_grace" != "unset" ]]; then
-        printf 'RUNNER_RECONNECT_GRACE_SECONDS=%s\n' "$reconnect_grace" >> "$path"
-    fi
 }
 
 run_case() {
     local name="$1"
-    local configured_grace="$2"
-    local expected_grace="$3"
-    local keep_previous="$4"
-    local expected_stops="$5"
+    local keep_previous="$2"
+    local expected_stops="$3"
     local env_file="$TEST_ROOT/$name.env"
     local events="$TEST_ROOT/$name.events"
     local -a args=()
 
-    write_env "$env_file" "$configured_grace"
+    write_env "$env_file"
     : > "$events"
 
     if [[ "$keep_previous" == "true" ]]; then
         args+=(--keep-previous)
     fi
 
-    env -u RUNNER_RECONNECT_GRACE_SECONDS \
-        TEST_COMMON_SCRIPT="$REPO_ROOT/scripts/prod-blue-green-common.sh" \
+    env TEST_COMMON_SCRIPT="$REPO_ROOT/scripts/prod-blue-green-common.sh" \
         TEST_ENV_FILE="$env_file" \
         TEST_EVENTS="$events" \
         bash "$TEST_ROOT/prod-redeploy-all.sh" "${args[@]}"
 
-    grep -Fxq "ensure:$expected_grace" "$events"
-    grep -Fxq "drain:$expected_grace" "$events"
+    grep -Fxq 'ensure:loaded' "$events"
     grep -Fxq 'switch:green:blue:green' "$events"
+    grep -Fxq 'tunnel-reconnect:green:green:false' "$events"
+    switch_line="$(grep -n '^switch:' "$events" | cut -d: -f1)"
+    reconnect_line="$(grep -n '^tunnel-reconnect:' "$events" | cut -d: -f1)"
+    [[ "$switch_line" -lt "$reconnect_line" ]]
 
     if [[ "$expected_stops" == "none" ]]; then
         if grep -q '^stop:' "$events"; then
@@ -111,20 +105,32 @@ run_case() {
         fi
     else
         [[ "$(grep -c '^stop:' "$events")" -eq 3 ]]
+        wait_line="$(grep -n '^wait:api$' "$events" | cut -d: -f1)"
+        [[ "$reconnect_line" -lt "$wait_line" ]]
     fi
 }
 
-# The production example config specifies the reconnect grace value; loading
-# it must happen before strict-mode code reads the value.
-documented_grace="$(grep '^RUNNER_RECONNECT_GRACE_SECONDS=' "$REPO_ROOT/.env.prod.example" | cut -d= -f2)"
-[[ -n "$documented_grace" ]]
-run_case documented-config "$documented_grace" "$documented_grace" true none
+run_case keep-previous true none
+run_case stop-previous false all
 
-# If the optional setting is absent, common production defaults resolve to 60.
-run_case common-default unset 60 true none
-
-# An explicit environment value is preserved, and no flag still stops the old
-# colors after a successful cutover.
-run_case explicit-config 37 37 false all
+rollback_env="$TEST_ROOT/partial-publication.env"
+rollback_events="$TEST_ROOT/partial-publication.events"
+write_env "$rollback_env"
+: > "$rollback_events"
+if env TEST_COMMON_SCRIPT="$REPO_ROOT/scripts/prod-blue-green-common.sh" \
+    TEST_ENV_FILE="$rollback_env" \
+    TEST_EVENTS="$rollback_events" \
+    TEST_FAIL_FORWARD=true \
+    bash "$TEST_ROOT/prod-redeploy-all.sh"; then
+    echo "Expected the full-stack redeploy to report a failed forward reconnect publication." >&2
+    exit 1
+fi
+rollback_line="$(grep -n '^rollback:' "$rollback_events" | cut -d: -f1)"
+compensation_line="$(grep -n '^tunnel-reconnect:green:blue:true$' "$rollback_events" | cut -d: -f1)"
+[[ -n "$rollback_line" && -n "$compensation_line" && "$rollback_line" -lt "$compensation_line" ]]
+if grep -q '^stop:' "$rollback_events"; then
+    echo "Rollback compensation must keep both API colors available." >&2
+    exit 1
+fi
 
 echo "production full-stack initialization and keep-previous checks passed"

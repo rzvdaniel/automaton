@@ -84,12 +84,11 @@ public class AutomatonHub : Hub
             apiInstanceIdentityService.ApiInstanceId,
             apiInstanceIdentityService.ApiColor ?? "(unset)");
 
-        await Clients.Caller.SendAsync("WelcomeRunner", new WelcomeRunnerMessage
-        {
-            Message = $"Welcome {runner.Name}",
-            ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
-            ApiColor = apiInstanceIdentityService.ApiColor
-        });
+        await Clients.Caller.SendAsync(
+            "ApiInstanceIdentity",
+            apiInstanceIdentityService.ApiInstanceId,
+            apiInstanceIdentityService.ApiColor,
+            Context.ConnectionAborted);
 
         await base.OnConnectedAsync();
     }
@@ -123,11 +122,6 @@ public class AutomatonHub : Hub
         }
 
         await base.OnDisconnectedAsync(exception);
-    }
-
-    public bool Ping(string runnerName)
-    {
-        return !string.IsNullOrEmpty(runnerName);
     }
 
     public async Task JoinAppRuntimeLogs(Guid appId, Guid deploymentTargetId)
@@ -170,18 +164,6 @@ public class AutomatonHub : Hub
         Guid appId,
         Guid deploymentTargetId)
         => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
-
-    public Task ReconnectWhenIdleAcknowledged(string? reason)
-    {
-        var runner = GetRunner();
-        logger.LogInformation(
-            "Runner acknowledged reconnect-when-idle request: RunnerId={RunnerId} RunnerName={RunnerName} ConnectionId={ConnectionId} Reason={Reason}",
-            runner.Id,
-            runner.Name,
-            Context.ConnectionId,
-            reason);
-        return Task.CompletedTask;
-    }
 
     public async Task Heartbeat()
     {

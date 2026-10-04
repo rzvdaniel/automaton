@@ -2,7 +2,17 @@ using Automaton.Core.Enums;
 
 namespace Automaton.Core.Models;
 
-public sealed record RunnerExecutionCommand(Guid OperationId, Guid RunnerId);
+public sealed record RunnerExecutionCommand(
+    Guid OperationId,
+    Guid RunnerId,
+    string? Kind = null,
+    string? TargetApiInstanceId = null,
+    string? TargetApiColor = null);
+
+public static class RunnerExecutionCommandKinds
+{
+    public const string ReconnectRuntimeTunnels = "reconnect-runtime-tunnels";
+}
 public sealed record RunnerExecutionRequest(Guid? FlowId, RunnerCustomStepPayload? Step, AppActionCommand? Action = null,
     SynchronizeApplicationManagedArtifactsRequest? ManagedArtifacts = null, RunnerFileTransferCommand? FileTransfer = null);
 public sealed record RunnerExecutionAssignment(string Disposition, RunnerExecutionRequest? Request);

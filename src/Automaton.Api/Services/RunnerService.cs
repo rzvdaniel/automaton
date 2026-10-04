@@ -24,7 +24,6 @@ public class RunnerService
     private readonly RunnerQueryService runnerQueryService;
     private readonly HostedRunnerRestartCompletionService restartCompletionService;
     private readonly RunnerFlowExecutionService flowExecutionService;
-    private readonly RunnerInstanceMigrationService instanceMigrationService;
     private readonly RunnerConnectionLifecycleService connectionLifecycleService;
     private readonly Serilog.ILogger logger;
 
@@ -40,7 +39,6 @@ public class RunnerService
         RunnerQueryService runnerQueryService,
         HostedRunnerRestartCompletionService restartCompletionService,
         RunnerFlowExecutionService flowExecutionService,
-        RunnerInstanceMigrationService instanceMigrationService,
         RunnerConnectionLifecycleService connectionLifecycleService)
     {
         this.dbContext = dbContext;
@@ -52,7 +50,6 @@ public class RunnerService
         this.runnerQueryService = runnerQueryService;
         this.restartCompletionService = restartCompletionService;
         this.flowExecutionService = flowExecutionService;
-        this.instanceMigrationService = instanceMigrationService;
         this.connectionLifecycleService = connectionLifecycleService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
@@ -92,21 +89,6 @@ public class RunnerService
 
     public Task<int> CloseStaleConnectionSessionsAsync(CancellationToken cancellationToken)
         => connectionSessionService.CloseStaleConnectionSessionsAsync(cancellationToken);
-    public Task<ReconnectWhenIdleResult> RequestConnectedRunnersReconnectWhenIdleAsync(
-        string reason,
-        CancellationToken cancellationToken)
-        => instanceMigrationService.RequestReconnectWhenIdleAsync(reason, cancellationToken);
-
-    public Task<RunnerDrainStatus> GetReconnectDrainStatusAsync(CancellationToken cancellationToken)
-        => instanceMigrationService.GetDrainStatusAsync(cancellationToken);
-
-    public Task<RunnerMigrationStatus> GetRunnerMigrationStatusAsync(
-        IReadOnlyCollection<Guid> runnerIds,
-        CancellationToken cancellationToken)
-        => instanceMigrationService.GetMigrationStatusAsync(runnerIds, cancellationToken);
-
-    public Task<RunnerMigrationStatus> GetRunnerMigrationCandidatesAsync(CancellationToken cancellationToken)
-        => instanceMigrationService.GetMigrationCandidatesAsync(cancellationToken);
     public async Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
     {
         // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
@@ -244,24 +226,4 @@ public class RunnerService
 
     public Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)
         => runnerQueryService.GetByNameAsync(name, cancellationToken);
-}
-
-public record RunnerDrainStatus
-{
-    public IReadOnlyList<Guid> ConnectedRunnerIds { get; init; } = [];
-    public int ConnectedRunnerCount { get; init; }
-    public bool Drained { get; init; }
-}
-
-public record RunnerMigrationStatus
-{
-    public IReadOnlyList<Guid> ExpectedRunnerIds { get; init; } = [];
-    public IReadOnlyList<Guid> ConnectedRunnerIds { get; init; } = [];
-    public bool AllConnected { get; init; }
-}
-
-public record ReconnectWhenIdleResult
-{
-    public IReadOnlyList<Guid> CandidateRunnerIds { get; init; } = [];
-    public int SignaledRunnerCount { get; init; }
 }
