@@ -69,9 +69,16 @@ deploy_color api "$TARGET_COLOR" "$DEPLOY_REVISION" "$EXPLICIT_REVISION"
 switch_live_color api "$TARGET_COLOR" "$DEPLOY_REVISION" "$CURRENT_REVISION"
 echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via Traefik dynamic configuration"
 
-if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_COLOR"; then
+if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_COLOR" "$TARGET_COLOR" false; then
     echo "[ERROR] Runtime tunnel reconnect requests failed; restoring API traffic to $CURRENT_COLOR" >&2
-    rollback_live_color api "$CURRENT_COLOR" "$CURRENT_REVISION" "$PREVIOUS_REVISION" || true
+    if ! rollback_live_color api "$CURRENT_COLOR" "$CURRENT_REVISION" "$PREVIOUS_REVISION"; then
+        echo "[ERROR] API route rollback failed; Runner tunnel reconciliation was not attempted" >&2
+        exit 1
+    fi
+    if ! request_api_color_runner_tunnel_reconnect "$TARGET_COLOR" "$CURRENT_COLOR" true; then
+        echo "[ERROR] API route was restored, but Runner tunnel rollback reconciliation failed; keep both API colors running and retry reconciliation" >&2
+        exit 1
+    fi
     exit 1
 fi
 

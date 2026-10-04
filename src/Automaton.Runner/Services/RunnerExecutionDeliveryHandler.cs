@@ -33,7 +33,8 @@ internal sealed class RunnerExecutionDeliveryHandler(
         }
         if (command.Kind == RunnerExecutionCommandKinds.ReconnectRuntimeTunnels)
         {
-            if (string.IsNullOrWhiteSpace(command.TargetApiInstanceId))
+            if (string.IsNullOrWhiteSpace(command.TargetApiInstanceId)
+                && string.IsNullOrWhiteSpace(command.TargetApiColor))
             {
                 Serilog.Log.Warning("Rejected runtime tunnel reconnect command without a target API instance.");
                 return false;

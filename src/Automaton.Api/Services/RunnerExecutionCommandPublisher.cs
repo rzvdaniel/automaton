@@ -45,7 +45,7 @@ public sealed class RunnerExecutionCommandPublisher(IOptions<RabbitMqOptions> op
 
     public async Task<int> PublishRuntimeTunnelReconnectsAsync(
         IReadOnlyCollection<Guid> runnerIds,
-        string targetApiInstanceId,
+        string? targetApiInstanceId,
         string? targetApiColor,
         CancellationToken cancellationToken)
     {

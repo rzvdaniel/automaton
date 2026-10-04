@@ -175,13 +175,20 @@ switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSI
 
 echo "[INFO] Traefik is now routing api, studio, and website to the freshly deployed colors"
 
-if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_API_COLOR"; then
+if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]] && ! request_api_color_runner_tunnel_reconnect "$TARGET_API_COLOR" "$TARGET_API_COLOR" false; then
     echo "[ERROR] Runtime tunnel reconnect requests failed; restoring previous public colors" >&2
-    rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
+    if ! rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" \
         "$CURRENT_API_REVISION" "$CURRENT_API_PREVIOUS_REVISION" \
         "$CURRENT_STUDIO_REVISION" "$CURRENT_STUDIO_PREVIOUS_REVISION" \
         "$CURRENT_WEBSITE_REVISION" "$CURRENT_WEBSITE_PREVIOUS_REVISION" \
-        "$CURRENT_API_REVISION_STATE" "$CURRENT_STUDIO_REVISION_STATE" "$CURRENT_WEBSITE_REVISION_STATE" || true
+        "$CURRENT_API_REVISION_STATE" "$CURRENT_STUDIO_REVISION_STATE" "$CURRENT_WEBSITE_REVISION_STATE"; then
+        echo "[ERROR] Public route rollback failed; Runner tunnel reconciliation was not attempted" >&2
+        exit 1
+    fi
+    if ! request_api_color_runner_tunnel_reconnect "$TARGET_API_COLOR" "$CURRENT_API_COLOR" true; then
+        echo "[ERROR] Public routes were restored, but Runner tunnel rollback reconciliation failed; keep both API colors running and retry reconciliation" >&2
+        exit 1
+    fi
     exit 1
 fi
 

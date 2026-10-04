@@ -310,7 +310,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
     }
 
     public void RequestRuntimeTunnelReconnect(
-        string targetApiInstanceId,
+        string? targetApiInstanceId,
         string? targetApiColor,
         string? reason)
     {

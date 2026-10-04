@@ -9,15 +9,16 @@ public sealed class RunnerTunnelReconnectService(
     IRuntimeTunnelReconnectCommandPublisher commandPublisher,
     ILogger<RunnerTunnelReconnectService> logger)
 {
-    public async Task<RunnerTunnelReconnectResult> RequestForPreviousInstancesAsync(
+    public async Task<RunnerTunnelReconnectResult> RequestForApiColorAsync(
+        string targetApiColor,
+        bool includeRunnersAlreadyOnTargetColor,
         CancellationToken cancellationToken)
     {
         var candidates = dbContext.Runners
             .AsNoTracking()
             .Where(runner => runner.ConnectionId != null);
-        candidates = apiInstanceIdentityService.ApiColor is { Length: > 0 } currentApiColor
-            ? candidates.Where(runner => runner.ApiColor != currentApiColor)
-            : candidates.Where(runner => runner.ApiInstanceId != apiInstanceIdentityService.ApiInstanceId);
+        if (!includeRunnersAlreadyOnTargetColor)
+            candidates = candidates.Where(runner => runner.ApiColor != targetApiColor);
 
         var connectedRunners = await candidates
             .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion })
@@ -27,7 +28,7 @@ public sealed class RunnerTunnelReconnectService(
             .Where(runner => !RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(
                 runner.ApiCompatibilityVersion))
             .ToArray();
-        if (incompatibleRunners.Length > 0)
+        if (incompatibleRunners.Length > 0 && !includeRunnersAlreadyOnTargetColor)
         {
             foreach (var runner in incompatibleRunners)
             {
@@ -39,14 +40,21 @@ public sealed class RunnerTunnelReconnectService(
             return new RunnerTunnelReconnectResult(connectedRunners.Count, 0, incompatibleRunners.Length);
         }
 
+        var supportedRunners = connectedRunners
+            .Where(runner => RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(
+                runner.ApiCompatibilityVersion))
+            .ToArray();
         try
         {
             var requested = await commandPublisher.PublishRuntimeTunnelReconnectsAsync(
-                connectedRunners.Select(runner => runner.Id).ToArray(),
-                apiInstanceIdentityService.ApiInstanceId,
-                apiInstanceIdentityService.ApiColor,
+                supportedRunners.Select(runner => runner.Id).ToArray(),
+                targetApiColor == apiInstanceIdentityService.ApiColor
+                    ? apiInstanceIdentityService.ApiInstanceId
+                    : null,
+                targetApiColor,
                 cancellationToken);
-            return new RunnerTunnelReconnectResult(connectedRunners.Count, requested, 0);
+            return new RunnerTunnelReconnectResult(
+                connectedRunners.Count, requested, includeRunnersAlreadyOnTargetColor ? 0 : incompatibleRunners.Length);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

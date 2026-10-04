@@ -12,10 +12,10 @@ namespace Automaton.Api.Tests;
 public sealed class RunnerTunnelReconnectServiceTests
 {
     [Test]
-    public async Task RequestForCurrentInstance_QueuesReconnectOnlyForConnectedPreviousInstanceRunners()
+    public async Task RequestForApiColor_QueuesReconnectOnlyForConnectedRunnersOutsideTargetColor()
     {
         await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
-        var result = await fixture.Service.RequestForPreviousInstancesAsync(CancellationToken.None);
+        var result = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
 
         Assert.That(result.ConnectedRunnerCount, Is.EqualTo(1));
         Assert.That(result.RequestedCount, Is.EqualTo(1));
@@ -26,14 +26,39 @@ public sealed class RunnerTunnelReconnectServiceTests
     }
 
     [Test]
-    public async Task RequestForPreviousInstances_RejectsCutoverWhenConnectedRunnerCannotAcceptCommand()
+    public async Task RequestForApiColor_RejectsCutoverWhenConnectedRunnerCannotAcceptCommand()
     {
         await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync(previousRunnerProtocol: "4");
-        var result = await fixture.Service.RequestForPreviousInstancesAsync(CancellationToken.None);
+        var result = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
 
         Assert.That(result.RequestedCount, Is.Zero);
         Assert.That(result.FailedCount, Is.EqualTo(1));
         Assert.That(fixture.Publisher.RunnerIds, Is.Empty);
+    }
+
+    [Test]
+    public async Task PartialCutoverPublication_RollbackQueuesCompensationForAllConnectedCompatibleRunners()
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync(additionalPreviousRunner: true);
+        fixture.Publisher.FailAfterRunnerCount = 1;
+
+        var forwardResult = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
+        Assert.That(forwardResult.FailedCount, Is.EqualTo(2));
+        Assert.That(fixture.Publisher.Publications, Has.Count.EqualTo(1));
+        Assert.That(fixture.Publisher.Publications[0].RunnerIds, Has.Count.EqualTo(1));
+
+        fixture.Publisher.FailAfterRunnerCount = null;
+        var rollbackResult = await fixture.Service.RequestForApiColorAsync(
+            "blue", includeRunnersAlreadyOnTargetColor: true, CancellationToken.None);
+
+        Assert.That(rollbackResult.FailedCount, Is.Zero);
+        Assert.That(rollbackResult.RequestedCount, Is.EqualTo(4));
+        Assert.That(fixture.Publisher.Publications, Has.Count.EqualTo(2));
+        Assert.That(fixture.Publisher.Publications[1].RunnerIds,
+            Is.EquivalentTo(new[] { fixture.PreviousRunnerId, fixture.AdditionalPreviousRunnerId,
+                fixture.CurrentRunnerId, fixture.CurrentReplicaRunnerId }));
+        Assert.That(fixture.Publisher.Publications[1].TargetApiColor, Is.EqualTo("blue"));
+        Assert.That(fixture.Publisher.Publications[1].TargetApiInstanceId, Is.Null);
     }
 }
 
@@ -49,6 +74,9 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         RunnerTunnelReconnectService service,
         RecordingReconnectPublisher publisher,
         Guid previousRunnerId,
+        Guid additionalPreviousRunnerId,
+        Guid currentRunnerId,
+        Guid currentReplicaRunnerId,
         string? previousInstanceId,
         string? previousApiColor)
     {
@@ -58,14 +86,21 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         Service = service;
         Publisher = publisher;
         PreviousRunnerId = previousRunnerId;
+        AdditionalPreviousRunnerId = additionalPreviousRunnerId;
+        CurrentRunnerId = currentRunnerId;
+        CurrentReplicaRunnerId = currentReplicaRunnerId;
     }
 
     public RunnerTunnelReconnectService Service { get; }
     public RecordingReconnectPublisher Publisher { get; }
     public Guid PreviousRunnerId { get; }
+    public Guid AdditionalPreviousRunnerId { get; }
+    public Guid CurrentRunnerId { get; }
+    public Guid CurrentReplicaRunnerId { get; }
 
     public static async Task<RunnerTunnelReconnectFixture> CreateAsync(
-        string previousRunnerProtocol = RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands)
+        string previousRunnerProtocol = RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands,
+        bool additionalPreviousRunner = false)
     {
         var oldInstanceId = Environment.GetEnvironmentVariable("AUTOMATON_API_INSTANCE_ID");
         var oldApiColor = Environment.GetEnvironmentVariable("AUTOMATON_API_COLOR");
@@ -73,11 +108,16 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", "green");
         var db = CreateDb();
         var previousRunnerId = Guid.NewGuid();
+        var additionalPreviousRunnerId = Guid.NewGuid();
+        var currentRunnerId = Guid.NewGuid();
+        var currentReplicaRunnerId = Guid.NewGuid();
         db.Runners.AddRange(
             ConnectedRunner(previousRunnerId, "previous", "blue-instance", "blue", previousRunnerProtocol),
-            ConnectedRunner(Guid.NewGuid(), "current", InstanceId, "green", RunnerApiCompatibilityVersions.Current),
-            ConnectedRunner(Guid.NewGuid(), "current-replica", "green-instance-2", "green", RunnerApiCompatibilityVersions.Current),
+            ConnectedRunner(currentRunnerId, "current", InstanceId, "green", RunnerApiCompatibilityVersions.Current),
+            ConnectedRunner(currentReplicaRunnerId, "current-replica", "green-instance-2", "green", RunnerApiCompatibilityVersions.Current),
             new Runner { Id = Guid.NewGuid(), Name = "disconnected", ConnectionId = null!, ApiInstanceId = "blue-instance" });
+        if (additionalPreviousRunner)
+            db.Runners.Add(ConnectedRunner(additionalPreviousRunnerId, "previous-2", "blue-instance-2", "blue", previousRunnerProtocol));
         await db.SaveChangesAsync();
 
         var publisher = new RecordingReconnectPublisher();
@@ -86,7 +126,8 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
             new ApiInstanceIdentityService(),
             publisher,
             NullLogger<RunnerTunnelReconnectService>.Instance);
-        return new RunnerTunnelReconnectFixture(db, service, publisher, previousRunnerId, oldInstanceId, oldApiColor);
+        return new RunnerTunnelReconnectFixture(db, service, publisher, previousRunnerId,
+            additionalPreviousRunnerId, currentRunnerId, currentReplicaRunnerId, oldInstanceId, oldApiColor);
     }
 
     public ValueTask DisposeAsync()
@@ -115,19 +156,31 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
 
 internal sealed class RecordingReconnectPublisher : IRuntimeTunnelReconnectCommandPublisher
 {
-    public List<Guid> RunnerIds { get; } = [];
-    public string? TargetApiInstanceId { get; private set; }
-    public string? TargetApiColor { get; private set; }
+    public List<ReconnectPublication> Publications { get; } = [];
+    public int? FailAfterRunnerCount { get; set; }
+
+    public List<Guid> RunnerIds => Publications.SelectMany(publication => publication.RunnerIds).ToList();
+    public string? TargetApiInstanceId => Publications.LastOrDefault()?.TargetApiInstanceId;
+    public string? TargetApiColor => Publications.LastOrDefault()?.TargetApiColor;
 
     public Task<int> PublishRuntimeTunnelReconnectsAsync(
         IReadOnlyCollection<Guid> runnerIds,
-        string targetApiInstanceId,
+        string? targetApiInstanceId,
         string? targetApiColor,
         CancellationToken cancellationToken)
     {
-        RunnerIds.AddRange(runnerIds);
-        TargetApiInstanceId = targetApiInstanceId;
-        TargetApiColor = targetApiColor;
+        var publishedRunnerIds = FailAfterRunnerCount is { } failAfter
+            ? runnerIds.Take(failAfter).ToArray()
+            : runnerIds.ToArray();
+        Publications.Add(new ReconnectPublication(publishedRunnerIds, targetApiInstanceId, targetApiColor));
+        if (FailAfterRunnerCount is not null)
+            throw new InvalidOperationException("Simulated partial command publication.");
+
         return Task.FromResult(runnerIds.Count);
     }
 }
+
+internal sealed record ReconnectPublication(
+    IReadOnlyCollection<Guid> RunnerIds,
+    string? TargetApiInstanceId,
+    string? TargetApiColor);

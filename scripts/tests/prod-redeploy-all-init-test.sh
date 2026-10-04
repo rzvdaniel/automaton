@@ -49,7 +49,11 @@ ensure_infrastructure() {
 
 deploy_color() { record "deploy:$1:$2"; }
 switch_all_live_colors() { record "switch:$1:$2:$3"; }
-request_api_color_runner_tunnel_reconnect() { record "tunnel-reconnect:$1"; }
+rollback_all_live_colors() { record "rollback:$1:$2:$3"; }
+request_api_color_runner_tunnel_reconnect() {
+    record "tunnel-reconnect:$1:$2:$3"
+    [[ "${TEST_FAIL_FORWARD:-false}" != "true" || "$3" == "true" ]]
+}
 wait_before_stopping_previous_color() { record "wait:$1"; }
 stop_color() { record "stop:$1:$2"; }
 status_table() { record 'status'; }
@@ -89,7 +93,7 @@ run_case() {
 
     grep -Fxq 'ensure:loaded' "$events"
     grep -Fxq 'switch:green:blue:green' "$events"
-    grep -Fxq 'tunnel-reconnect:green' "$events"
+    grep -Fxq 'tunnel-reconnect:green:green:false' "$events"
     switch_line="$(grep -n '^switch:' "$events" | cut -d: -f1)"
     reconnect_line="$(grep -n '^tunnel-reconnect:' "$events" | cut -d: -f1)"
     [[ "$switch_line" -lt "$reconnect_line" ]]
@@ -108,5 +112,25 @@ run_case() {
 
 run_case keep-previous true none
 run_case stop-previous false all
+
+rollback_env="$TEST_ROOT/partial-publication.env"
+rollback_events="$TEST_ROOT/partial-publication.events"
+write_env "$rollback_env"
+: > "$rollback_events"
+if env TEST_COMMON_SCRIPT="$REPO_ROOT/scripts/prod-blue-green-common.sh" \
+    TEST_ENV_FILE="$rollback_env" \
+    TEST_EVENTS="$rollback_events" \
+    TEST_FAIL_FORWARD=true \
+    bash "$TEST_ROOT/prod-redeploy-all.sh"; then
+    echo "Expected the full-stack redeploy to report a failed forward reconnect publication." >&2
+    exit 1
+fi
+rollback_line="$(grep -n '^rollback:' "$rollback_events" | cut -d: -f1)"
+compensation_line="$(grep -n '^tunnel-reconnect:green:blue:true$' "$rollback_events" | cut -d: -f1)"
+[[ -n "$rollback_line" && -n "$compensation_line" && "$rollback_line" -lt "$compensation_line" ]]
+if grep -q '^stop:' "$rollback_events"; then
+    echo "Rollback compensation must keep both API colors available." >&2
+    exit 1
+fi
 
 echo "production full-stack initialization and keep-previous checks passed"

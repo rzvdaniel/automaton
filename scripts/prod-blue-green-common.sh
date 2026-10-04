@@ -974,9 +974,11 @@ wait_before_stopping_previous_color() {
 }
 
 request_api_color_runner_tunnel_reconnect() {
-    local color="$1"
+    local source_color="$1"
+    local target_color="$2"
+    local include_target_color_runners="${3:-false}"
     local compose_service
-    compose_service="$(compose_service_name api "$color")"
+    compose_service="$(compose_service_name api "$source_color")"
 
     if ! service_exists "$compose_service"; then
         echo "[ERROR] Active API color $compose_service is not running; cannot request Runner tunnel reconnect" >&2
@@ -990,9 +992,9 @@ request_api_color_runner_tunnel_reconnect() {
     fi
 
     local container_id="${container_ids[0]}"
-    echo "[INFO] Asking $compose_service to queue runtime tunnel reconnect commands for Runners on the previous API color"
+    echo "[INFO] Asking $compose_service to queue runtime tunnel reconnect commands targeting API color $target_color"
     docker exec "$container_id" sh -lc \
-        "curl -fsS -X POST http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
+        "curl -fsS -X POST -H 'Content-Type: application/json' -d '{\"targetApiColor\":\"$target_color\",\"includeRunnersAlreadyOnTargetColor\":$include_target_color_runners}' http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
 }
 
 assert_service_exists() {
