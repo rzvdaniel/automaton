@@ -1,5 +1,3 @@
-using Automaton.Core.Models;
-using Automaton.Runner.Console.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -9,20 +7,14 @@ namespace Automaton.Runner.Console.Services;
 
 internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvider, ILogger logger)
 {
-    private const string PingMethod = "Ping";
-    private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
-    private const string ReconnectWhenIdleAcknowledgedMethod = "ReconnectWhenIdleAcknowledged";
-
     public void Register(
         HubConnection connection,
-        Action<string?> handleReconnectWhenIdle,
         Action wakeConnectionLoop,
         Action<bool> setReconnecting,
         Func<bool> isReconnecting,
         Func<Exception?, string> getFriendlyErrorMessage,
         Func<Task> sendHeartbeat)
     {
-        RegisterServerCommands(connection, handleReconnectWhenIdle);
         RegisterLifecycleEvents(
             connection,
             wakeConnectionLoop,
@@ -30,35 +22,6 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
             isReconnecting,
             getFriendlyErrorMessage,
             sendHeartbeat);
-    }
-
-    private void RegisterServerCommands(HubConnection connection, Action<string?> handleReconnectWhenIdle)
-    {
-        connection.On(PingMethod, () =>
-        {
-            logger.Debug("Received ping from server");
-            return "Pong";
-        });
-        connection.On<WelcomeRunnerMessage>("WelcomeRunner", message =>
-        {
-            var apiColor = string.IsNullOrWhiteSpace(message.ApiColor) ? "(unset)" : message.ApiColor;
-            logger.Debug("Runner accepted by API instance {ApiInstanceId} color {ApiColor}",
-                message.ApiInstanceId, apiColor);
-            WriteLine($"✅ Accepted by API instance {message.ApiInstanceId} (color: {apiColor})");
-        });
-        connection.On<string>(ReconnectWhenIdleMethod, async reason =>
-        {
-            try
-            {
-                await connection.InvokeAsync(ReconnectWhenIdleAcknowledgedMethod, reason);
-            }
-            catch (Exception ex)
-            {
-                logger.Warning(ex, "Failed to acknowledge reconnect-when-idle request");
-            }
-
-            handleReconnectWhenIdle(reason);
-        });
     }
 
     private void RegisterLifecycleEvents(
@@ -89,6 +52,7 @@ internal sealed class HubControlHandlerRegistrar(IServiceProvider serviceProvide
         connection.Reconnecting += error =>
         {
             setReconnecting(true);
+            wakeConnectionLoop();
             if (error is not null) logger.Warning(error, "Connection reconnecting due to error");
             else logger.Debug("Connection reconnecting");
             WriteLine($"🔄 Reconnecting to server: {getFriendlyErrorMessage(error)}");

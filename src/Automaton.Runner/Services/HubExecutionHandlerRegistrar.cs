@@ -20,19 +20,16 @@ internal sealed class HubExecutionHandlerRegistrar
         this.logger = logger;
     }
 
-    public void Register(HubConnection connection, Action beginActivity, Action endActivity)
+    public void Register(HubConnection connection)
     {
         connection.On<TunnelRequest>(TunnelRequestMethod, request =>
-            ForwardTunnelRequestAsync(connection, request, beginActivity, endActivity));
+            ForwardTunnelRequestAsync(connection, request));
     }
 
     private async Task ForwardTunnelRequestAsync(
         HubConnection connection,
-        TunnelRequest request,
-        Action beginActivity,
-        Action endActivity)
+        TunnelRequest request)
     {
-        beginActivity();
         logger.Debug("Tunnel request received: {Method} {Path} RequestId={RequestId}",
             request.Method, request.Path, request.RequestId);
         try
@@ -52,10 +49,6 @@ internal sealed class HubExecutionHandlerRegistrar
         {
             logger.Error(ex, "Tunnel forwarding failed: {Method} {Path} RequestId={RequestId}",
                 request.Method, request.Path, request.RequestId);
-        }
-        finally
-        {
-            endActivity();
         }
     }
 }

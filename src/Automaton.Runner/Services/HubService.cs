@@ -28,13 +28,11 @@ public class HubService
     private readonly HubExecutionHandlerRegistrar executionHandlerRegistrar;
     private readonly HubControlHandlerRegistrar controlHandlerRegistrar;
     private readonly HubConnectionFailureReporter connectionFailureReporter;
-    private readonly SemaphoreSlim reconnectLoopSignal = new(0, 1);
+    private readonly SemaphoreSlim connectionLoopSignal = new(0, 1);
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
     private Task? retryTask;
-    private int activeOperationCount = 0;
-    private int reconnectRequested = 0;
     private readonly HubHeartbeatService heartbeatService;
 
     public HubService(
@@ -147,8 +145,7 @@ public class HubService
         if (IsConnected())
         {
             ResetAfterReconnect(state);
-            if (await WaitForReconnectRequestAsync(TimeSpan.FromSeconds(10), cancellationToken))
-                await DisconnectConnectionForReconnectAsync();
+            await WaitForConnectionLoopSignalAsync(cancellationToken);
             return true;
         }
 
@@ -234,10 +231,9 @@ public class HubService
             // Keep-alive interval to maintain connection during long operations
             connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
-            executionHandlerRegistrar.Register(connection, BeginRunnerActivity, EndRunnerActivity);
+            executionHandlerRegistrar.Register(connection);
             controlHandlerRegistrar.Register(
                 connection,
-                HandleReconnectWhenIdle,
                 WakeConnectionLoop,
                 value => isReconnecting = value,
                 () => isReconnecting,
@@ -294,121 +290,18 @@ public class HubService
         return connection?.State == HubConnectionState.Connected;
     }
 
-    private void BeginRunnerActivity()
-    {
-        Interlocked.Increment(ref activeOperationCount);
-    }
-
-    private void EndRunnerActivity()
-    {
-        var remaining = Interlocked.Decrement(ref activeOperationCount);
-        if (remaining < 0)
-        {
-            Interlocked.Exchange(ref activeOperationCount, 0);
-            remaining = 0;
-        }
-
-        if (remaining == 0 && Volatile.Read(ref reconnectRequested) == 1)
-        {
-            WakeConnectionLoop();
-        }
-    }
-
-    private void HandleReconnectWhenIdle(string? reason)
-    {
-        Interlocked.Exchange(ref reconnectRequested, 1);
-        var activeOperations = Math.Max(0, Volatile.Read(ref activeOperationCount));
-        var message = string.IsNullOrWhiteSpace(reason)
-            ? "Server requested reconnect to the new API instance."
-            : reason.Trim();
-
-        logger.Warning(
-            "Received reconnect-when-idle request from server. ActiveOperations={ActiveOperations} Reason={Reason}",
-            activeOperations,
-            message);
-
-        if (activeOperations == 0)
-        {
-            WakeConnectionLoop();
-            return;
-        }
-
-        WriteLine($"⏳ Reconnect requested by server. Waiting for {activeOperations} active task(s) to finish.");
-    }
-
-    private async Task<bool> WaitForReconnectRequestAsync(
-        TimeSpan interval,
-        CancellationToken cancellationToken)
-    {
-        _ = await reconnectLoopSignal.WaitAsync(interval, cancellationToken);
-        if (Volatile.Read(ref reconnectRequested) != 1)
-            return false;
-
-        if (Volatile.Read(ref activeOperationCount) != 0)
-        {
-            return false;
-        }
-
-        Interlocked.Exchange(ref reconnectRequested, 0);
-        return true;
-    }
-
     private Task WaitForConnectionLoopSignalAsync(CancellationToken cancellationToken)
-        => reconnectLoopSignal.WaitAsync(cancellationToken);
+        => connectionLoopSignal.WaitAsync(cancellationToken);
 
     private void WakeConnectionLoop()
     {
         try
         {
-            reconnectLoopSignal.Release();
+            connectionLoopSignal.Release();
         }
         catch (SemaphoreFullException ex)
         {
             logger.Debug(ex, "A reconnect wake-up is already queued for the connection loop.");
-        }
-    }
-
-    private async Task DisconnectConnectionForReconnectAsync()
-    {
-        var currentConnection = connection;
-        if (currentConnection == null)
-        {
-            return;
-        }
-
-        try
-        {
-            try
-            {
-                await heartbeatService.StopAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.Debug(ex, "Stopping the heartbeat before reconnect failed");
-            }
-
-            try
-            {
-                await currentConnection.StopAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.Debug(ex, "Stopping current SignalR connection during reconnect failed");
-            }
-
-            try
-            {
-                await currentConnection.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.Debug(ex, "Disposing current SignalR connection during reconnect failed");
-            }
-        }
-        finally
-        {
-            if (ReferenceEquals(connection, currentConnection))
-                connection = null;
         }
     }
 

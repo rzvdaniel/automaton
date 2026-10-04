@@ -1,8 +1,8 @@
 # Runner management transports
 
-Updated: 3 October 2026.
+Updated: 4 October 2026.
 
-This guide describes the Runner management transport after Slice 4 was merged and released as `e71ca380` on 2026-10-03. Focused production checks passed for app-file upload/download, media upload, and generic deployment package transfer through a Hosted Runner. Published media HTTP reads, in-flight cross-slot transfers, and cross-host package/artifact availability remain unverified.
+This guide describes the Runner management transport after Slice 4 was released as `e71ca380` and the Slice 5 connection-cleanup change was prepared on `feat/rm-slice5-connection-cleanup` (not yet reviewed or released). The 2026-10-04 same-host baseline verified published-media byte integrity and cleanup, an active media read across API color switch, workflow/custom-step results, and automatic host-validation recovery. Cross-host package/artifact availability remains unverified.
 
 ## Durable operation path
 
@@ -57,7 +57,9 @@ The Hosted Runner's existing package-deployment RabbitMQ/HTTPS path remains sepa
 
 The file chunk registries, chunk DTOs, API chunk callbacks, `HubFileTransferService`, and `DeployAppPackage` Runner hub handler are removed. Workflow/custom-step execution, App Actions, managed-artifact synchronization, trusted host-container operations, host validation and storage telemetry use their migrated durable/API paths.
 
-SignalR remains for independent Studio updates and supported BYO runtime tunnels. Runner registration/heartbeat, welcome/ping and reconnect-when-idle coordination also remain. Slice 5 will remove replaceable connection/drain coordination and API-slot registration gates after auditing the remaining dependencies; it must retain supported Studio and BYO behavior.
+SignalR remains for independent Studio updates, Runner registration/heartbeat/presence, and supported BYO runtime tunnels. Welcome, ping, reconnect-when-idle, Runner drain/migration endpoints, and API deployment registration gates are removed by the pending Slice 5 change. Runners reconnect through their normal Hub retry loop when the old API color is stopped; deployment commands, results and file transfers continue through RabbitMQ and authenticated HTTPS without a SignalR callback.
+
+Runtime tunnels remain instance-local: the API validates that the Runner's recorded API instance matches the serving API and relays through that instance's SignalR connection. During a color switch, a Runner can remain connected to the old API until that container stops and reconnects. Tunnel requests served by the new color can therefore be unavailable during this interval; `--keep-previous` can prolong it. This change does not add a cross-slot tunnel relay or promise zero tunnel interruption. Studio notifications and supported BYO tunnel behavior remain supported.
 
 ## Focused production validation — 2026-10-03
 
@@ -65,4 +67,10 @@ Runner pipeline #4951 passed from `e71ca380` and published `rzvdaniel/automaton-
 
 Using the retained unpublished app, authenticated app-file upload and download both completed through the Hosted Runner. Upload bytes staged by the Runner and download response bytes matched their expected SHA-256 values. A media upload completed and the persisted app-media bytes matched the expected SHA-256; its test file was removed. A supported CLI pull/deploy then uploaded five package files, applied them on the Runner, and returned a terminal successful deployment result without warnings. The app health endpoint returned `200 ready`, and its app-originated persistence marker endpoint returned HTTP 200 after deployment; this run did not capture a pre-deploy marker hash for comparison.
 
-At verification, the active Hosted Runner execution, management and command queues each had one consumer and zero ready/unacknowledged messages. Production `prod-verify.sh` passed. Published media HTTP read was not exercised because the retained app is unpublished; the app was not made public for this check. The API blue/green pair shares one host, so cross-host artifact availability and a package fetch that begins before and completes after an in-flight slot switch remain unestablished. These results do not close Slice 5 or the combined RM recovery/cutover acceptance.
+At verification, the active Hosted Runner execution, management and command queues each had one consumer and zero ready/unacknowledged messages. Production `prod-verify.sh` passed. These checks do not close Slice 5 or the combined RM recovery/cutover acceptance.
+
+## Same-host RM baseline — 2026-10-04
+
+Using the explicitly authorized retained test app, a temporary public-unlisted media route returned 2 MiB and 16 MiB files with exact expected SHA-256 values. The larger read was still streaming when the normal API cutover switched blue to green; it completed with the full byte count and matching digest. Transfer output cleanup left no artifacts after response completion, and the temporary route/files were removed. An in-flight package fetch across a slot switch and different-host API slots remain unverified; the two production API slots share the same host and package volume.
+
+Through the authenticated Studio session, a temporary custom step and workflow both completed on the Infrastructure Runner with persisted successful results/logs; they were deleted afterward. Separately, the Infrastructure Runner was paused during host validation and automatically resumed. The persisted operation reached `Succeeded`, with one result log and healthy Docker/network/disk/API checks. No manual restart was used. During the pause the execution queue showed one consumer, one ready delivery, and one unacknowledged delivery; after recovery, infrastructure and execution queues each had one consumer and zero ready/unacknowledged messages. API/Studio/Website health checks passed. These are pre-Slice-5 baselines; repeat the relevant interruption and recovery checks against the released Slice 5 revision during final combined acceptance.

@@ -171,13 +171,7 @@ RABBITMQ_USER=automaton
 RABBITMQ_PASSWORD=strong-rabbitmq-password
 ```
 
-Optional:
-
-```env
-RUNNER_RECONNECT_GRACE_SECONDS=60
-```
-
-Use `RUNNER_RECONNECT_GRACE_SECONDS` as the maximum API runner-drain timeout after cutover. The old API color asks connected runners to reconnect when idle, and the deploy script stops waiting as soon as the old color reports no connected runners. This means runners have acknowledged idleness by disconnecting from the old API; the API does not directly count runner operations. The timeout is a control-plane protection for in-flight SignalR work; it is not required for hosted app availability because Traefik routes hosted app traffic directly to runner runtime endpoints.
+API and Runner management commands, results, and transfers use durable RabbitMQ operations and authenticated HTTPS. API blue/green deployment no longer waits for Runner registration or a SignalR drain acknowledgement. The old API color is stopped after cutover unless `--keep-previous` is used. Runners reconnect through their normal retry loop after the old color stops. Supported BYO runtime tunnels remain tied to the API instance holding the Runner's SignalR connection and can be unavailable until that reconnect completes; `--keep-previous` can prolong the interval. Hosted app traffic continues through Traefik directly to Runner runtime endpoints.
 
 Use `APPS_DOMAIN` for public published apps. Public app URLs use the nested wildcard hostname
 `https://{slug}.apps.automaton.monster`; the DNS provider must therefore contain a
@@ -291,23 +285,11 @@ The deploy scripts build the inactive color, wait for health checks to pass, ver
 
 For `prod-redeploy-all.sh`, the three public selectors are now switched together and Traefik reloads its dynamic configuration once. This reduces Cloudflare origin churn during full-stack deploys.
 
-`website` and `studio` are static frontend containers behind Traefik. API blue/green state is still tracked separately so runner control-plane draining remains explicit.
+`website` and `studio` are static frontend containers behind Traefik. API blue/green state is tracked separately; switching API colors does not wait for Runner registration.
 
 `apps.automaton.monster` is different. It is the stable runtime edge, backed by the API for platform runtime assets and by Traefik dynamic routes for managed applications. It does not have `apps-blue` or `apps-green` containers.
 
-For API deploys, there is an extra runner-drain step:
-
-- after the production edge switches `api.automaton.monster` to the new API color
-- the previous API color tells its connected runners to reconnect when idle
-- the deploy script polls the old color's internal drain status until all runners have reconnected, up to `RUNNER_RECONNECT_GRACE_SECONDS`
-- then it stops the previous API color unless `--keep-previous` was used
-
-This protects control-plane work such as workflow dispatch, file synchronization, log streaming, command execution, and runner lifecycle updates. Frontend files and backend requests for hosted apps continue through Traefik and do not depend on the old API SignalR connection.
-
-Backward-compatibility note:
-
-- if the previous API color is still running an older version that does not support the internal reconnect/drain endpoints yet, the deploy scripts log a warning and fall back to the maximum grace period
-- in that case, hosted runners may remain attached to the old API color until that color is stopped or the runner container is restarted
+Runner management work does not depend on the old API SignalR connection. Presence and heartbeat continue over SignalR. Supported BYO runtime tunnels still require the serving API instance to own the Runner connection, so tunnel requests can fail between traffic cutover and Runner reconnection. When `--keep-previous` leaves the old API alive, a Runner may stay connected there until that color is stopped or the Runner reconnects for another reason.
 
 ## Full Stack
 
@@ -346,9 +328,10 @@ Use `--keep-previous` for normal production deploys while the deployment is stil
 
 Important for runners:
 
-- if you use `--keep-previous`, old API-color runners can continue finishing work on that old API color
-- they will not be forced off immediately, so rollback stays fast
-- when you do not use `--keep-previous`, the script waits for observable drain or `RUNNER_RECONNECT_GRACE_SECONDS`, then stops the previous API color, which forces any remaining runners on that color to reconnect through `api.automaton.monster`
+- if you use `--keep-previous`, Runners can remain connected to the old API color, preserving a fast route rollback
+- management commands continue through RabbitMQ and authenticated HTTPS across the API color change
+- supported BYO runtime tunnels can remain unavailable from the active API until the Runner reconnects to it
+- without `--keep-previous`, the old API color is stopped after the configured overlap, prompting its connected Runners to reconnect through `api.automaton.monster`
 
 Run without `--keep-previous` only when you are comfortable removing the old color after the switch. That keeps the server cleaner and uses fewer resources, but rollback then requires rebuilding or redeploying the previous version.
 
@@ -530,7 +513,7 @@ cd /opt/automaton
 ./scripts/prod-redeploy-api.sh
 ```
 
-This uses the same runner reconnect flow as `prod-redeploy-all.sh`: after cutover, the previous API color signals connected runners to reconnect when idle, polls for observable drain up to `RUNNER_RECONNECT_GRACE_SECONDS`, then stops the old API color unless `--keep-previous` is used.
+This uses the same API cutover behavior as `prod-redeploy-all.sh`: after health-checked cutover and the configured overlap, the old API color is stopped unless `--keep-previous` is used. No Runner drain acknowledgement is required. BYO runtime tunnels may be unavailable until their Runner reconnects to the active API color.
 
 Studio:
 

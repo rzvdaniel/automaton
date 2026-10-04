@@ -3,12 +3,10 @@ using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
-using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Api.Services;
 
@@ -16,7 +14,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
     ApplicationDbContext db,
     IAuditEventService auditEventService,
     ILogger<InfrastructureRunnerHostApprovalService> logger,
-    IHubContext<AutomatonHub> automatonHub,
     RunnerExecutionRevocationService executions)
 {
     public async Task<RunnerHost> ApproveAsync(Guid hostId, Guid approvedByUserId, CancellationToken cancellationToken)
@@ -105,20 +102,17 @@ public sealed class InfrastructureRunnerHostApprovalService(
             throw new InvalidOperationException("The Runner host has no linked Infrastructure Runner.");
 
         var runner = host.InfrastructureRunner;
-        var connectionId = runner.ConnectionId;
         await ExecuteAtomicallyAsync(async () =>
         {
             await RevokeWithinTransactionAsync(host, runner, cancellationToken);
         }, cancellationToken);
 
         await executions.RevokeAsync(runner.Id, cancellationToken);
-        await SignalRunnerRevocationAsync(connectionId, runner.Id, cancellationToken);
 
         logger.LogInformation(
-            "Infrastructure Runner {RunnerId} revoked for host {RunnerHostId}; previous connection present: {HadConnection}",
+            "Infrastructure Runner {RunnerId} revoked for host {RunnerHostId}",
             runner.Id,
-            host.Id,
-            !string.IsNullOrWhiteSpace(connectionId));
+            host.Id);
         await WriteRevocationAuditAsync(host, runner, adminUserId, cancellationToken);
 
         return host;
@@ -149,25 +143,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
         host.Status = RunnerHostStatuses.Disabled;
         host.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task SignalRunnerRevocationAsync(
-        string? connectionId,
-        Guid runnerId,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(connectionId))
-            return;
-
-        try
-        {
-            await automatonHub.Clients.Client(connectionId)
-                .SendAsync("ReconnectWhenIdle", "Infrastructure Runner credential revoked.", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Could not signal revoked Infrastructure Runner {RunnerId} to disconnect", runnerId);
-        }
     }
 
     private Task WriteRevocationAuditAsync(

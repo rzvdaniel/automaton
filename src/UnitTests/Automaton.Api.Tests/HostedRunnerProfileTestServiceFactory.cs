@@ -29,7 +29,6 @@ internal static class HostedRunnerProfileTestServiceFactory
             runnerQueryService: queries,
             restartCompletionService: new HostedRunnerRestartCompletionService(db, audit),
             flowExecutionService: new RunnerFlowExecutionService(null!),
-            instanceMigrationService: new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
             connectionLifecycleService: new RunnerConnectionLifecycleService(
                 db,
                 null!,

@@ -37,7 +37,6 @@ internal static class ManagedRunnerConnectionTestServiceFactory
             queryService,
             restartService,
             new RunnerFlowExecutionService(null!),
-            new RunnerInstanceMigrationService(db, new ApiInstanceIdentityService(), null!),
             new RunnerConnectionLifecycleService(
                 db, authorization, new ApiInstanceIdentityService(), sessionService,
                 registrationService, appAssignment, restartService));
