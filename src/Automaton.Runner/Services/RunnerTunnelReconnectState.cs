@@ -6,12 +6,14 @@ internal sealed class RunnerTunnelReconnectState
     private int activeTunnelRequests;
     private bool reconnectRequested;
     private bool gracePeriodElapsed;
+    private string? requestedTargetApiColor;
+    private string? connectedApiColor;
 
     public bool TryBeginTunnelRequest()
     {
         lock (syncRoot)
         {
-            if (reconnectRequested)
+            if (reconnectRequested || IsWaitingForTargetApiColor())
                 return false;
 
             activeTunnelRequests++;
@@ -28,10 +30,42 @@ internal sealed class RunnerTunnelReconnectState
         }
     }
 
-    public bool RequestReconnect()
+    public bool RequestReconnect(string? targetApiColor = null)
     {
         lock (syncRoot)
         {
+            if (!string.IsNullOrWhiteSpace(targetApiColor))
+                requestedTargetApiColor = targetApiColor;
+
+            if (IsConnectedToRequestedTarget())
+            {
+                requestedTargetApiColor = null;
+                reconnectRequested = false;
+                gracePeriodElapsed = false;
+                return false;
+            }
+
+            reconnectRequested = true;
+            return activeTunnelRequests == 0;
+        }
+    }
+
+    public bool SetConnectedApiColor(string? apiColor)
+    {
+        lock (syncRoot)
+        {
+            connectedApiColor = apiColor;
+            if (requestedTargetApiColor is null)
+                return false;
+
+            if (IsConnectedToRequestedTarget())
+            {
+                requestedTargetApiColor = null;
+                reconnectRequested = false;
+                gracePeriodElapsed = false;
+                return false;
+            }
+
             reconnectRequested = true;
             return activeTunnelRequests == 0;
         }
@@ -75,4 +109,12 @@ internal sealed class RunnerTunnelReconnectState
             gracePeriodElapsed = false;
         }
     }
+
+    private bool IsWaitingForTargetApiColor()
+        => requestedTargetApiColor is not null
+            && !string.Equals(connectedApiColor, requestedTargetApiColor, StringComparison.Ordinal);
+
+    private bool IsConnectedToRequestedTarget()
+        => requestedTargetApiColor is not null
+            && string.Equals(connectedApiColor, requestedTargetApiColor, StringComparison.Ordinal);
 }

@@ -994,7 +994,7 @@ request_api_color_runner_tunnel_reconnect() {
     local container_id="${container_ids[0]}"
     echo "[INFO] Asking $compose_service to queue runtime tunnel reconnect commands targeting API color $target_color"
     docker exec "$container_id" sh -lc \
-        "curl -fsS -X POST -H 'Content-Type: application/json' -d '{\"targetApiColor\":\"$target_color\",\"includeRunnersAlreadyOnTargetColor\":$include_target_color_runners}' http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
+        "curl -fsS -X POST -H 'Content-Type: application/json' -d '{\"targetApiColor\":\"$target_color\",\"reconcileAllRegisteredRunners\":$include_target_color_runners}' http://127.0.0.1:8080/internal/runners/reconnect-runtime-tunnels"
 }
 
 assert_service_exists() {

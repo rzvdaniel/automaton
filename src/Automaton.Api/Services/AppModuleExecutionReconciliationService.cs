@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-/// <summary>Marks unfinished MVP dispatches lost after an API restart or ungraceful disconnect.</summary>
+/// <summary>Marks unfinished durable executions lost after their dispatch or execution deadline expires.</summary>
 public sealed class AppModuleExecutionReconciliationService : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(1);

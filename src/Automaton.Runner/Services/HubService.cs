@@ -233,6 +233,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
                 connection = null;
                 Interlocked.Exchange(ref connectedApiInstanceId, null);
                 Interlocked.Exchange(ref connectedApiColor, null);
+                tunnelReconnectState.SetConnectedApiColor(null);
             }
 
             connection = HubConnectionFactory.Create(configService, apiKey, hubUrl);
@@ -314,28 +315,32 @@ public class HubService : IRuntimeTunnelReconnectRequester
         string? targetApiColor,
         string? reason)
     {
-        if (!IsConnected())
-        {
-            logger.Debug("Ignoring runtime tunnel reconnect request because the Runner has no active API connection");
-            return;
-        }
-
+        var isConnected = IsConnected();
         var alreadyOnTarget = string.IsNullOrWhiteSpace(targetApiColor)
             ? string.Equals(Volatile.Read(ref connectedApiInstanceId), targetApiInstanceId, StringComparison.Ordinal)
             : string.Equals(Volatile.Read(ref connectedApiColor), targetApiColor, StringComparison.Ordinal);
-        if (alreadyOnTarget)
+        if (isConnected && alreadyOnTarget)
         {
+            tunnelReconnectState.RequestReconnect(targetApiColor);
             logger.Debug("Ignoring duplicate runtime tunnel reconnect request for the API instance the Runner already uses");
             return;
         }
 
-        var canReconnectNow = tunnelReconnectState.RequestReconnect();
+        if (!isConnected)
+        {
+            Interlocked.Exchange(ref connectedApiInstanceId, null);
+            Interlocked.Exchange(ref connectedApiColor, null);
+            tunnelReconnectState.SetConnectedApiColor(null);
+        }
+
+        var canReconnectNow = tunnelReconnectState.RequestReconnect(targetApiColor);
         logger.Information(
-            "Runtime tunnel reconnect requested. ActiveTunnelRequests={ActiveTunnelRequests} Reason={Reason}",
+            "Runtime tunnel reconnect requested. ActiveTunnelRequests={ActiveTunnelRequests} TargetApiColor={TargetApiColor} Reason={Reason}",
             tunnelReconnectState.ActiveTunnelRequestCount,
+            targetApiColor,
             string.IsNullOrWhiteSpace(reason) ? "API color changed" : reason);
 
-        if (canReconnectNow)
+        if (canReconnectNow || !isConnected)
         {
             WakeConnectionLoop();
             return;
@@ -397,6 +402,7 @@ public class HubService : IRuntimeTunnelReconnectRequester
                 connection = null;
             Interlocked.Exchange(ref connectedApiInstanceId, null);
             Interlocked.Exchange(ref connectedApiColor, null);
+            tunnelReconnectState.SetConnectedApiColor(null);
             tunnelReconnectState.Reset();
             Interlocked.Exchange(ref tunnelReconnectGraceStarted, 0);
         }
@@ -424,6 +430,8 @@ public class HubService : IRuntimeTunnelReconnectRequester
 
         Interlocked.Exchange(ref connectedApiInstanceId, apiInstanceId);
         Interlocked.Exchange(ref connectedApiColor, apiColor);
+        if (tunnelReconnectState.SetConnectedApiColor(apiColor))
+            WakeConnectionLoop();
         logger.Debug("Runner connection is registered to API instance {ApiInstanceId}", apiInstanceId);
     }
 

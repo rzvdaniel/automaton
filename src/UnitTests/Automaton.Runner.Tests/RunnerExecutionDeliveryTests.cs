@@ -91,7 +91,7 @@ public sealed class RunnerExecutionDeliveryTests
         public int Requests { get; private set; }
         public string? TargetApiInstanceId { get; private set; }
         public string? TargetApiColor { get; private set; }
-        public void RequestRuntimeTunnelReconnect(string targetApiInstanceId, string? targetApiColor, string? reason)
+        public void RequestRuntimeTunnelReconnect(string? targetApiInstanceId, string? targetApiColor, string? reason)
         {
             Requests++;
             TargetApiInstanceId = targetApiInstanceId;

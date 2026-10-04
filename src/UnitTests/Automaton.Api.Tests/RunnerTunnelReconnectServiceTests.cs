@@ -17,7 +17,7 @@ public sealed class RunnerTunnelReconnectServiceTests
         await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
         var result = await fixture.Service.RequestForApiColorAsync("green", false, CancellationToken.None);
 
-        Assert.That(result.ConnectedRunnerCount, Is.EqualTo(1));
+        Assert.That(result.CandidateRunnerCount, Is.EqualTo(1));
         Assert.That(result.RequestedCount, Is.EqualTo(1));
         Assert.That(result.FailedCount, Is.Zero);
         Assert.That(fixture.Publisher.RunnerIds, Is.EqualTo(new[] { fixture.PreviousRunnerId }));
@@ -46,17 +46,18 @@ public sealed class RunnerTunnelReconnectServiceTests
         Assert.That(forwardResult.FailedCount, Is.EqualTo(2));
         Assert.That(fixture.Publisher.Publications, Has.Count.EqualTo(1));
         Assert.That(fixture.Publisher.Publications[0].RunnerIds, Has.Count.EqualTo(1));
+        await fixture.DisconnectRunnerAsync(fixture.Publisher.Publications[0].RunnerIds.Single());
 
         fixture.Publisher.FailAfterRunnerCount = null;
         var rollbackResult = await fixture.Service.RequestForApiColorAsync(
-            "blue", includeRunnersAlreadyOnTargetColor: true, CancellationToken.None);
+            "blue", reconcileAllRegisteredRunners: true, CancellationToken.None);
 
         Assert.That(rollbackResult.FailedCount, Is.Zero);
-        Assert.That(rollbackResult.RequestedCount, Is.EqualTo(4));
+        Assert.That(rollbackResult.RequestedCount, Is.EqualTo(5));
         Assert.That(fixture.Publisher.Publications, Has.Count.EqualTo(2));
         Assert.That(fixture.Publisher.Publications[1].RunnerIds,
             Is.EquivalentTo(new[] { fixture.PreviousRunnerId, fixture.AdditionalPreviousRunnerId,
-                fixture.CurrentRunnerId, fixture.CurrentReplicaRunnerId }));
+                fixture.CurrentRunnerId, fixture.CurrentReplicaRunnerId, fixture.DisconnectedRunnerId }));
         Assert.That(fixture.Publisher.Publications[1].TargetApiColor, Is.EqualTo("blue"));
         Assert.That(fixture.Publisher.Publications[1].TargetApiInstanceId, Is.Null);
     }
@@ -77,6 +78,7 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         Guid additionalPreviousRunnerId,
         Guid currentRunnerId,
         Guid currentReplicaRunnerId,
+        Guid disconnectedRunnerId,
         string? previousInstanceId,
         string? previousApiColor)
     {
@@ -89,6 +91,7 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         AdditionalPreviousRunnerId = additionalPreviousRunnerId;
         CurrentRunnerId = currentRunnerId;
         CurrentReplicaRunnerId = currentReplicaRunnerId;
+        DisconnectedRunnerId = disconnectedRunnerId;
     }
 
     public RunnerTunnelReconnectService Service { get; }
@@ -97,6 +100,14 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
     public Guid AdditionalPreviousRunnerId { get; }
     public Guid CurrentRunnerId { get; }
     public Guid CurrentReplicaRunnerId { get; }
+    public Guid DisconnectedRunnerId { get; }
+
+    public async Task DisconnectRunnerAsync(Guid runnerId)
+    {
+        var runner = await db.Runners.SingleAsync(candidate => candidate.Id == runnerId);
+        runner.ConnectionId = null!;
+        await db.SaveChangesAsync();
+    }
 
     public static async Task<RunnerTunnelReconnectFixture> CreateAsync(
         string previousRunnerProtocol = RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands,
@@ -111,10 +122,20 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         var additionalPreviousRunnerId = Guid.NewGuid();
         var currentRunnerId = Guid.NewGuid();
         var currentReplicaRunnerId = Guid.NewGuid();
+        var disconnectedRunnerId = Guid.NewGuid();
         db.Runners.AddRange(
             ConnectedRunner(previousRunnerId, "previous", "blue-instance", "blue", previousRunnerProtocol),
             ConnectedRunner(currentRunnerId, "current", InstanceId, "green", RunnerApiCompatibilityVersions.Current),
             ConnectedRunner(currentReplicaRunnerId, "current-replica", "green-instance-2", "green", RunnerApiCompatibilityVersions.Current),
+            new Runner
+            {
+                Id = disconnectedRunnerId,
+                Name = "disconnected-compatible",
+                ConnectionId = null!,
+                ApiInstanceId = "blue-instance-3",
+                ApiColor = "blue",
+                ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current
+            },
             new Runner { Id = Guid.NewGuid(), Name = "disconnected", ConnectionId = null!, ApiInstanceId = "blue-instance" });
         if (additionalPreviousRunner)
             db.Runners.Add(ConnectedRunner(additionalPreviousRunnerId, "previous-2", "blue-instance-2", "blue", previousRunnerProtocol));
@@ -127,7 +148,8 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
             publisher,
             NullLogger<RunnerTunnelReconnectService>.Instance);
         return new RunnerTunnelReconnectFixture(db, service, publisher, previousRunnerId,
-            additionalPreviousRunnerId, currentRunnerId, currentReplicaRunnerId, oldInstanceId, oldApiColor);
+            additionalPreviousRunnerId, currentRunnerId, currentReplicaRunnerId, disconnectedRunnerId,
+            oldInstanceId, oldApiColor);
     }
 
     public ValueTask DisposeAsync()

@@ -105,7 +105,7 @@ public sealed class RunnerExecutionQueueCapacityTests
 
         private sealed class NoopTunnelReconnectRequester : IRuntimeTunnelReconnectRequester
         {
-            public void RequestRuntimeTunnelReconnect(string targetApiInstanceId, string? targetApiColor, string? reason) { }
+            public void RequestRuntimeTunnelReconnect(string? targetApiInstanceId, string? targetApiColor, string? reason) { }
         }
 
         public void AssertCapacityAndLogs(Task queued)

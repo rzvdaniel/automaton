@@ -22,7 +22,7 @@ public sealed class RunnerTunnelReconnectController(RunnerTunnelReconnectService
             return BadRequest("Target API color must be blue or green.");
 
         var result = await reconnectService.RequestForApiColorAsync(
-            request.TargetApiColor, request.IncludeRunnersAlreadyOnTargetColor, cancellationToken);
+            request.TargetApiColor, request.ReconcileAllRegisteredRunners, cancellationToken);
         if (result.FailedCount > 0)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, result);
 
@@ -33,4 +33,4 @@ public sealed class RunnerTunnelReconnectController(RunnerTunnelReconnectService
         => address is not null && IPAddress.IsLoopback(address);
 }
 
-public sealed record RunnerTunnelReconnectRequest(string TargetApiColor, bool IncludeRunnersAlreadyOnTargetColor = false);
+public sealed record RunnerTunnelReconnectRequest(string TargetApiColor, bool ReconcileAllRegisteredRunners = false);

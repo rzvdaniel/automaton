@@ -7,6 +7,15 @@ namespace Automaton.Api.Tests;
 
 internal static class ManagedRunnerConnectionTestServiceFactory
 {
+    public static Task MarkDisconnectedAsync(ApplicationDbContext db, Guid runnerId, string connectionId)
+    {
+        var service = new RunnerConnectionSessionService(
+            db,
+            new ApplicationEventService(db),
+            new UserContextService(new HttpContextAccessor()));
+        return service.MarkDisconnectedAsync(runnerId, connectionId, CancellationToken.None);
+    }
+
     public static ManagedRunnerAppAssignmentService CreateWithFailingRoutes(
         ApplicationDbContext db,
         ResourceAuthorizationService authorization,

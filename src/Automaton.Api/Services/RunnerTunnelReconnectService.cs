@@ -11,14 +11,13 @@ public sealed class RunnerTunnelReconnectService(
 {
     public async Task<RunnerTunnelReconnectResult> RequestForApiColorAsync(
         string targetApiColor,
-        bool includeRunnersAlreadyOnTargetColor,
+        bool reconcileAllRegisteredRunners,
         CancellationToken cancellationToken)
     {
         var candidates = dbContext.Runners
-            .AsNoTracking()
-            .Where(runner => runner.ConnectionId != null);
-        if (!includeRunnersAlreadyOnTargetColor)
-            candidates = candidates.Where(runner => runner.ApiColor != targetApiColor);
+            .AsNoTracking();
+        if (!reconcileAllRegisteredRunners)
+            candidates = candidates.Where(runner => runner.ConnectionId != null && runner.ApiColor != targetApiColor);
 
         var connectedRunners = await candidates
             .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion })
@@ -28,7 +27,7 @@ public sealed class RunnerTunnelReconnectService(
             .Where(runner => !RunnerProtocolCompatibilityPolicy.SupportsRuntimeTunnelReconnectCommands(
                 runner.ApiCompatibilityVersion))
             .ToArray();
-        if (incompatibleRunners.Length > 0 && !includeRunnersAlreadyOnTargetColor)
+        if (incompatibleRunners.Length > 0 && !reconcileAllRegisteredRunners)
         {
             foreach (var runner in incompatibleRunners)
             {
@@ -38,6 +37,16 @@ public sealed class RunnerTunnelReconnectService(
             }
 
             return new RunnerTunnelReconnectResult(connectedRunners.Count, 0, incompatibleRunners.Length);
+        }
+
+        if (reconcileAllRegisteredRunners)
+        {
+            foreach (var runner in incompatibleRunners)
+            {
+                logger.LogInformation(
+                    "Skipping protocol-incompatible Runner {RunnerId} during tunnel rollback reconciliation",
+                    runner.Id);
+            }
         }
 
         var supportedRunners = connectedRunners
@@ -54,7 +63,7 @@ public sealed class RunnerTunnelReconnectService(
                 targetApiColor,
                 cancellationToken);
             return new RunnerTunnelReconnectResult(
-                connectedRunners.Count, requested, includeRunnersAlreadyOnTargetColor ? 0 : incompatibleRunners.Length);
+                connectedRunners.Count, requested, reconcileAllRegisteredRunners ? 0 : incompatibleRunners.Length);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -65,4 +74,4 @@ public sealed class RunnerTunnelReconnectService(
     }
 }
 
-public sealed record RunnerTunnelReconnectResult(int ConnectedRunnerCount, int RequestedCount, int FailedCount);
+public sealed record RunnerTunnelReconnectResult(int CandidateRunnerCount, int RequestedCount, int FailedCount);
