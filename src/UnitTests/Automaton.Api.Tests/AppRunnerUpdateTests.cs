@@ -33,12 +33,8 @@ public class AppRunnerUpdateTests
         var runnerId = Guid.NewGuid();
         using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
         await using var db = AppAuthorizationTestData.CreateDbContext();
-        AppAuthorizationTestData.SeedApp(db, appId, ownerId, "owner-app");
-        AppAuthorizationRunnerTestData.SeedManagedRunner(db, runnerId, ownerId);
         var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
-        _ = service.Get(appId);
-        AppAuthorizationDeploymentTestData.SetDefaultDeploymentTarget(db, appId, runnerId, genericRuntimeDeployed: true);
-        await SeedAuthenticationRouteAsync(db, ownerId, runnerId, hosted, !requiresAuthentication);
+        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, hosted, !requiresAuthentication);
         var model = service.Get(appId);
         model.RequiresAuthentication = requiresAuthentication;
 
@@ -48,6 +44,17 @@ public class AppRunnerUpdateTests
         Assert.That(content, Does.Contain($"private-{appId:N}-runtime"));
         Assert.That(content.Contains("forwardAuth:", StringComparison.Ordinal), Is.EqualTo(requiresAuthentication));
         Assert.That(content, Does.Contain(hosted ? "http://runner-test:8080" : "api-live-edge"));
+    }
+
+    private static async Task SeedDeployedAuthenticationAppAsync(
+        ApplicationDbContext db, AppsService service, Guid ownerId, Guid appId, Guid runnerId,
+        bool hosted, bool requiresAuthentication)
+    {
+        AppAuthorizationTestData.SeedApp(db, appId, ownerId, "owner-app");
+        AppAuthorizationRunnerTestData.SeedManagedRunner(db, runnerId, ownerId);
+        _ = service.Get(appId);
+        AppAuthorizationDeploymentTestData.SetDefaultDeploymentTarget(db, appId, runnerId, genericRuntimeDeployed: true);
+        await SeedAuthenticationRouteAsync(db, ownerId, runnerId, hosted, requiresAuthentication);
     }
 
     private static async Task SeedAuthenticationRouteAsync(
@@ -72,6 +79,43 @@ public class AppRunnerUpdateTests
             });
         }
         await db.SaveChangesAsync();
+    }
+
+    [TestCase(true, true)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(false, false)]
+    public async Task Update_FailedAuthenticationRouteWrite_SameValueRetryRepairsRoute(bool requiresAuthentication, bool hosted)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
+        await using var db = AppAuthorizationTestData.CreateDbContext();
+        var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
+        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, hosted, requiresAuthentication);
+        var model = service.Get(appId);
+        model.RequiresAuthentication = !requiresAuthentication;
+        await service.Update(appId, model);
+        var routePath = Path.Combine(tempRoot.Path, "AppData", "traefik-dynamic", "managed-runtime-routes.yml");
+        var oldRoute = await File.ReadAllTextAsync(routePath);
+
+        // A directory at the atomic writer's temporary path fails before replacement.
+        Directory.CreateDirectory(routePath + ".tmp");
+        model.RequiresAuthentication = requiresAuthentication;
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.Update(appId, model));
+        db.ChangeTracker.Clear();
+        Assert.That((await db.WebApps.SingleAsync()).RequiresAuthentication, Is.EqualTo(requiresAuthentication));
+        Assert.That(await File.ReadAllTextAsync(routePath), Is.EqualTo(oldRoute));
+        Directory.Delete(routePath + ".tmp");
+
+        // Recreate the service and model to represent a later request, not a local flag.
+        var retryService = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
+        await retryService.Update(appId, retryService.Get(appId));
+
+        var repairedRoute = await File.ReadAllTextAsync(routePath);
+        Assert.That(repairedRoute.Contains("forwardAuth:", StringComparison.Ordinal), Is.EqualTo(requiresAuthentication));
+        Assert.That(repairedRoute, Is.Not.EqualTo(oldRoute));
     }
 
     [Test]

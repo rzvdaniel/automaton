@@ -2,7 +2,7 @@
 
 Updated: 4 October 2026.
 
-This guide describes the Runner management transport after Slice 4 was released as `e71ca380` and the Slice 5 connection-cleanup change was prepared on `feat/rm-slice5-connection-cleanup` (not yet reviewed or released). The 2026-10-04 same-host baseline verified published-media byte integrity and cleanup, an active media read across API color switch, workflow/custom-step results, and automatic host-validation recovery. Cross-host package/artifact availability remains unverified.
+This guide describes the Runner management transport after Slice 5 was released as `f017a068`, with older API revision `e71ca380` retained for rollback. The production acceptance report in PR #346 records successful post-release media integrity/streaming and live BYO tunnel checks. A rapid rollback/rollforward round trip required explicit Runner reconciliation; that recovery limitation remains visible when assessing RM closure. Cross-host package/artifact availability remains unverified.
 
 ## Durable operation path
 
@@ -10,7 +10,9 @@ This guide describes the Runner management transport after Slice 4 was released 
 
 Action execution, result, and log reads authorize access to the App before loading execution data. The Action controller translates an inaccessible App or missing execution into HTTP 404 and an explicit permission denial into HTTP 403; unexpected exceptions retain the normal error handling. Runner assignment and artifact endpoints continue enforcing their bound Runner credentials separately.
 
-Saving an App's `RequiresAuthentication` change refreshes the existing runtime route configuration for deployed targets, including Hosted and BYO targets. Both enabling and disabling authentication take effect without redeployment. This follow-up is not yet released; RM isolation acceptance must repeat these checks against production after review and release. The release acceptance report is tracked separately in PR #346; M1 remains complete.
+Every authorized App update reconciles the existing runtime route configuration from committed database state, including Hosted and BYO targets. Reconciliation runs immediately after persistence, before app file storage and auditing. If route application fails, retrying the same saved authentication setting attempts reconciliation again; no change detection or process-local pending flag is required. A failed write leaves the previous route file intact; database persistence and route application are not one transaction, so a failed request still requires retry or startup reconciliation. Both enabling and disabling authentication take effect without redeployment.
+
+This follow-up is not yet released; RM isolation acceptance must repeat these checks against production after review and release. The release acceptance report is tracked separately in PR #346; M1 remains complete.
 
 ```mermaid
 flowchart LR

@@ -136,6 +136,10 @@ public sealed class AppMutationService(
 
         await dataContext.SaveChangesAsync();
 
+        // Reconcile on every save so a retry repairs a failed route write even
+        // when the requested policy already matches the committed database state.
+        await backendRouteConfigService.RefreshAsync();
+
         // Save app content to file system
         await fileStorageService.SaveAppAsync(ownerId, id, app.Definition);
 
@@ -156,12 +160,6 @@ public sealed class AppMutationService(
                 previousTags,
                 previousIsProfileFeatured,
                 previousExecutionRunnerId));
-
-        if (previousExecutionRunnerId != GetDefaultRunnerId(entity)
-            || previousRequiresAuthentication != entity.RequiresAuthentication)
-        {
-            await backendRouteConfigService.RefreshAsync();
-        }
     }
 
     private static void ApplyUpdatedAppFields(Entities.WebApp entity, AppModel app)
