@@ -51,6 +51,8 @@ Capacity includes total and reserved CPU, memory, and disk. Schedulable capacity
 Available capacity = Total - Reserved - Existing runner allocations
 ```
 
+CPU and memory admission reserve the larger of each occupying Hosted Runner's current and pending limits, separately for each resource. A pending upgrade reserves its increase immediately; a pending downgrade does not release capacity until Runner registration confirms the new specification. The Runner being resized is counted once, using at least its existing reservation and the requested limits. Host CPU and memory reserves remain unavailable for tenant placement.
+
 Disk admission counts each Hosted Runner's specification XFS disk limit, separately bounded writable root layer, and configured maximum Docker log storage. The root layer and Docker logs are platform overhead outside the account XFS project quota.
 
 ## Onboarding sequence

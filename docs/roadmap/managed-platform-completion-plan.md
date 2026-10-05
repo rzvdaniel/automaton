@@ -380,6 +380,8 @@ The earlier result-delivery recovery finding is closed for these focused live sc
 
 ## M2 — Compute, running-app admission and capacity
 
+**Implementation progress:** host placement now reserves CPU and memory using the per-resource maximum of each occupying Runner's current and pending specification. Resize admission counts the selected Runner once, retaining its existing reservation until registration confirms a downgrade. Focused regressions cover upgrades, downgrades, exact capacity boundaries, host reserves and capacity release after snapshot confirmation. This is a source correction, not a production release or M2 completion claim. Concurrent MySQL placement/resize, live cgroup enforcement and the remaining acceptance gates below are still pending.
+
 - Read back aggregate CPU, memory and PID limits after create/restart/reprovision. Verify Hosted Runner, app and build membership in the same intended cgroup.
 - Exercise simultaneous workload saturation, OOM and PID exhaustion; preserve Infrastructure Runner access and reserve host/control-process headroom.
 - Bound build/action concurrency and apply backpressure. Local development reduces platform build demand but does not eliminate server-side workload limits.
