@@ -22,7 +22,10 @@ public sealed class AdminHostedRunnerSpecificationsController(
             .AsNoTracking()
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
-        return Ok(await Task.WhenAll(specifications.Select(x => ToDtoAsync(x, cancellationToken))));
+        var responses = new List<HostedRunnerSpecificationDto>(specifications.Count);
+        foreach (var specification in specifications)
+            responses.Add(await ToDtoAsync(specification, cancellationToken));
+        return Ok(responses);
     }
 
     [HttpGet("{id:guid}")]
@@ -138,8 +141,8 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         var specification = await db.HostedRunnerSpecifications.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (specification == null) return NotFound();
-        if (await db.HostedRunners.AnyAsync(x => x.HostedRunnerSpecificationId == id && x.DeletedAt == null, cancellationToken))
-            return Conflict(new { message = "A specification used by hosted runners cannot be deleted." });
+        if (await db.HostedRunners.AnyAsync(x => x.HostedRunnerSpecificationId == id, cancellationToken))
+            return Conflict(new { message = "A specification referenced by retained hosted runner records cannot be deleted. Deactivate it instead." });
 
         db.HostedRunnerSpecifications.Remove(specification);
         await db.SaveChangesAsync(cancellationToken);

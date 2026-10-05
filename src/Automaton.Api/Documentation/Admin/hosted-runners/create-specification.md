@@ -41,3 +41,5 @@ Active: Yes
 ## After saving
 
 The specification exists, but no user receives it yet. Assign it to an enabled Hosted Runner capability on a Subscription Plan. An inactive specification cannot be selected for new valid plan mappings or provisioning; existing containers retain their snapshot.
+
+A specification referenced by a Hosted Runner record cannot be deleted, including after the Runner is deleted and its record is retained. The API returns a conflict; deactivate the specification instead to preserve that history.
