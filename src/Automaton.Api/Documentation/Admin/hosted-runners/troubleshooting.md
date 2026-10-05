@@ -45,6 +45,6 @@ Cutover publishes the latest API color to every eligible registered protocol-v5 
 
 Manual reconciliation remains available if publication or connectivity fails. From the production checkout, use the existing `request_api_color_runner_tunnel_reconnect <source-color> <live-target-color> true` helper in `scripts/prod-blue-green-common.sh`. The source must be a running API revision supporting that endpoint; an older rollback image need not provide it. Restore the intended live selector before requesting reconciliation, keep both API colors running if publication fails, and retry after correcting broker/API connectivity. This is tunnel recovery, not a management drain.
 
-The automatic recovery follow-up still requires reviewed release and live acceptance; the production evidence report currently keeps RM open.
+The reviewed automatic recovery follow-up is released. Rapid rollback/rollforward with queued earlier targets passed without manual reconciliation for the installed production cohort; see the repository roadmap for its release evidence and separate limitations.
 
 Revoked Infrastructure Runner records are retained for history but excluded from cutover and compensation commands once their bound API key is inactive. Eligible disconnected Runners still receive the latest target; do not delete their queues to work around a reconnect delay.
