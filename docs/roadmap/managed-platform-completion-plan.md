@@ -380,6 +380,8 @@ The earlier result-delivery recovery finding is closed for these focused live sc
 
 ## M2 — Compute, running-app admission and capacity
 
+The focused cgroup correction compares CPU quota, memory maximum, zero swap and PID maximum readback with the requested specification in both trusted provision/reprovision actions. Missing, malformed, duplicate or mismatched properties fail before container replacement. Relational admission and cgroup enforcement are separate gates: this correction is not released or live accepted yet, and already-applied slice properties are not automatically restored on failure. Host drift/retry, app/build membership and saturation acceptance remain open.
+
 **Implementation progress:** PR #351 reserves CPU and memory using the per-resource maximum of each occupying Runner's current and pending specification. Resize admission counts the selected Runner once, retaining its existing reservation until registration confirms a downgrade. The API correction is released and its focused sequential production acceptance passed. Concurrent MySQL placement/resize, aggregate enforcement under saturation and the remaining acceptance gates below are still pending; **M2 remains open**.
 
 - Read back aggregate CPU, memory and PID limits after create/restart/reprovision. Verify Hosted Runner, app and build membership in the same intended cgroup.

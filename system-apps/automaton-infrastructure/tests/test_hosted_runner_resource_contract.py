@@ -186,6 +186,7 @@ Project ID       Used       Soft       Hard    Warn/Grace
         writable_layer_readback_matches: bool = True,
         reset_storage_after_container: bool = False,
         result_out: list[dict[str, object]] | None = None,
+        resource_group_readback: str | None = None,
     ):
         module = load_action(action_key)
         calls = calls_out if calls_out is not None else []
@@ -292,7 +293,11 @@ Project ID       Used       Soft       Hard    Warn/Grace
                     project_id = int(request["xfsProjectId"]) if assigned_project and xfs_assignment_succeeds else 0
                 stdout = f"fsxattr.projid = {project_id}\n"
             elif arguments[:2] == ("systemctl", "show"):
-                stdout = "1\n1\n256\n"
+                stdout = resource_group_readback if resource_group_readback is not None else (
+                    f"CPUQuotaPerSecUSec={float(request['cpuLimit']) * 1_000_000:.0f}us\n"
+                    f"MemoryMax={int(request['memoryMb']) * 1024 * 1024}\n"
+                    f"MemorySwapMax=0\nTasksMax={request['pidsLimit']}\n"
+                )
             else:
                 if arguments[:2] == ("docker", "run") and reset_storage_after_container:
                     assigned_project = False
@@ -835,6 +840,40 @@ Project ID       Used       Soft       Hard    Warn/Grace
             module.main()
         self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
         self.assertFalse(any(call[:2] == ("docker", "run") for call in calls))
+
+    def test_resource_group_mismatch_fails_before_container_replacement(self):
+        valid = "CPUQuotaPerSecUSec=500ms\nMemoryMax=402653184\nMemorySwapMax=0\nTasksMax=256\n"
+        invalid_outputs = (
+            valid.replace("500ms", "250ms"),
+            valid.replace("402653184", "1"),
+            valid.replace("MemorySwapMax=0", "MemorySwapMax=infinity"),
+            valid.replace("TasksMax=256", "TasksMax=128"),
+            valid.replace("500ms", "infinity"),
+            valid.replace("500ms", "invalid"),
+            valid.replace("TasksMax=256\n", ""),
+            valid + "MemoryMax=402653184\n",
+            "",
+        )
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            for readback in invalid_outputs:
+                with self.subTest(action_key=action_key, readback=readback):
+                    calls = []
+                    with self.assertRaisesRegex(RuntimeError, "resource group"):
+                        self.run_provision_action(action_key, calls_out=calls, resource_group_readback=readback)
+                    self.assertFalse(any(call[:2] in (("docker", "rm"), ("docker", "run")) for call in calls))
+
+    def test_resource_group_accepts_named_properties_and_duration_units(self):
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            module = load_action(action_key)
+            for cpu, duration in ((0.25, "250ms"), (0.125, "125000us"), (1.5, "1s 500ms"), (2, "2s")):
+                with self.subTest(action_key=action_key, cpu=cpu):
+                    readback = f"TasksMax=128\nMemorySwapMax=0\nMemoryMax=805306368\nCPUQuotaPerSecUSec={duration}\n"
+                    def fake_host(*arguments):
+                        return subprocess.CompletedProcess(arguments, 0,
+                            "2|systemd\n" if arguments[:2] == ("docker", "info") else readback, "")
+                    with patch.object(module, "host", side_effect=fake_host):
+                        self.assertEqual(module.ensure_resource_group(RUNNER_ID, cpu, 768, 128),
+                            f"automaton-hosted-runner-{RUNNER_ID_COMPACT}.slice")
 
     def test_unsupported_cgroup_host_fails_closed_before_container_replacement(self):
         existing = {
