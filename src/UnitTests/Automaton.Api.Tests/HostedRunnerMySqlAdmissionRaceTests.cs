@@ -41,6 +41,8 @@ public sealed class HostedRunnerMySqlAdmissionRaceTests
             () => PrepareAsync(connectionString, userId));
 
         Assert.That(preparations.Select(result => result.HostedRunner.Id).Distinct().ToArray(), Has.Length.EqualTo(1));
+        Assert.That(preparations.All(result => result.ShouldPublishProvisionRequest), Is.True,
+            "Both requests must reach eligible-host preparation, rather than merely sharing a failed admission record.");
         Assert.That(await db.HostedRunners.CountAsync(runner => runner.UserId == userId && runner.DeletedAt == null), Is.EqualTo(1));
     }
 
