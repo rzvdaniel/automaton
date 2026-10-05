@@ -76,17 +76,23 @@ public sealed class ActionScheduleProcessor(
         string? occurrenceStatus = null;
         string? executionScope = null;
         var eventPublished = false;
+        var ownerId = await db.ActionSchedules.AsNoTracking()
+            .Where(x => x.Id == scheduleId).Select(x => x.OwnerUserId).SingleAsync(cancellationToken);
         await transactions.ExecuteAsync(
-            ct => ProcessScheduleWithinTransactionAsync(
-                scheduleId, nowUtc, ct,
-                result =>
-                {
-                    occurrenceId = result.OccurrenceId;
-                    systemIdentity = result.SystemIdentity;
-                    executionScope = result.ExecutionScope;
-                    occurrenceStatus = result.OccurrenceStatus;
-                    eventPublished = result.EventPublished;
-                }), cancellationToken);
+            async ct =>
+            {
+                await LockAccountAdmissionAsync(ownerId, ct);
+                await ProcessScheduleWithinTransactionAsync(
+                    scheduleId, nowUtc, ct,
+                    result =>
+                    {
+                        occurrenceId = result.OccurrenceId;
+                        systemIdentity = result.SystemIdentity;
+                        executionScope = result.ExecutionScope;
+                        occurrenceStatus = result.OccurrenceStatus;
+                        eventPublished = result.EventPublished;
+                    });
+            }, cancellationToken);
         if (occurrenceId.HasValue)
         {
             logger.LogInformation(
@@ -233,29 +239,35 @@ public sealed class ActionScheduleProcessor(
             .OrderBy(x => x.ScheduledForUtc).Select(x => new { x.Id, x.ScheduleId }).Take(50).ToListAsync(cancellationToken);
         foreach (var item in queued)
         {
-            if (await HasActiveExecutionAsync(item.ScheduleId, cancellationToken)) continue;
-            var schedule = await db.ActionSchedules.AsNoTracking().SingleAsync(x => x.Id == item.ScheduleId, cancellationToken);
-            var capability = await GetCurrentCapabilityAsync(schedule, cancellationToken);
-            if (capability == null) continue;
-            if (!IsSystem(schedule)
-                && await CountActiveExecutionsAsync(schedule.OwnerUserId!.Value, cancellationToken) >= capability.MaximumConcurrentExecutions)
-                continue;
-            await transactions.ExecuteAsync(async ct =>
-            {
-                var changed = await db.ActionScheduleOccurrences
-                    .Where(x => x.Id == item.Id && x.Status == ActionScheduleOccurrenceStatuses.Queued)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Published)
-                        .SetProperty(x => x.TriggeredAtUtc, nowUtc)
-                        .SetProperty(x => x.UpdatedAtUtc, nowUtc), ct);
-                if (changed == 0) return;
-                var occurrence = await db.ActionScheduleOccurrences.AsNoTracking().SingleAsync(x => x.Id == item.Id, ct);
-                var scope = await db.ActionSchedules.Where(x => x.Id == item.ScheduleId)
-                    .Select(x => x.ExecutionScope).SingleAsync(ct);
-                if (scope != ActionExecutionScopes.Worker)
-                    await events.PublishAsync(ToEvent(occurrence), ct);
-            }, cancellationToken);
+            var ownerId = await db.ActionSchedules.AsNoTracking()
+                .Where(x => x.Id == item.ScheduleId).Select(x => x.OwnerUserId).SingleAsync(cancellationToken);
+            await transactions.ExecuteAsync(
+                ct => DispatchQueuedWithinTransactionAsync(item.Id, item.ScheduleId, ownerId, nowUtc, ct),
+                cancellationToken);
         }
+    }
+
+    private async Task DispatchQueuedWithinTransactionAsync(
+        Guid occurrenceId, Guid scheduleId, Guid? ownerId, DateTime nowUtc, CancellationToken ct)
+    {
+        await LockAccountAdmissionAsync(ownerId, ct);
+        if (await HasActiveExecutionAsync(scheduleId, ct)) return;
+        var schedule = await db.ActionSchedules.AsNoTracking().SingleAsync(x => x.Id == scheduleId, ct);
+        var capability = await GetCurrentCapabilityAsync(schedule, ct);
+        if (capability == null) return;
+        if (!IsSystem(schedule)
+            && await CountActiveExecutionsAsync(schedule.OwnerUserId!.Value, ct) >= capability.MaximumConcurrentExecutions)
+            return;
+        var changed = await db.ActionScheduleOccurrences
+            .Where(x => x.Id == occurrenceId && x.Status == ActionScheduleOccurrenceStatuses.Queued)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Published)
+                .SetProperty(x => x.TriggeredAtUtc, nowUtc)
+                .SetProperty(x => x.UpdatedAtUtc, nowUtc), ct);
+        if (changed == 0) return;
+        var occurrence = await db.ActionScheduleOccurrences.AsNoTracking().SingleAsync(x => x.Id == occurrenceId, ct);
+        if (schedule.ExecutionScope != ActionExecutionScopes.Worker)
+            await events.PublishAsync(ToEvent(occurrence), ct);
     }
 
     private async Task<ScheduledActionsCapability?> GetCurrentCapabilityAsync(ActionSchedule schedule, CancellationToken ct)
@@ -279,21 +291,25 @@ public sealed class ActionScheduleProcessor(
         return capability.Enabled ? capability : null;
     }
 
+    private Task LockAccountAdmissionAsync(Guid? ownerId, CancellationToken ct)
+    {
+        if (!ownerId.HasValue || db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) != true)
+            return Task.CompletedTask;
+        if (db.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("Scheduled account admission requires a database transaction.");
+        // This is the first database read inside the transaction: subsequent consistent reads
+        // must see the previous owner's committed reservations after waiting for this lock.
+        return db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT Id FROM AspNetUsers WHERE Id = {ownerId.Value} FOR UPDATE", ct);
+    }
+
     private Task<bool> HasActiveExecutionAsync(Guid scheduleId, CancellationToken ct)
-        => db.ActionScheduleOccurrences
-            .Where(x => x.ScheduleId == scheduleId && x.ExecutionId != null)
-            .Join(db.AppModuleExecutions, x => x.ExecutionId, x => x.Id, (occurrence, execution) => execution)
-            .AnyAsync(x => x.Status == AppModuleExecutionStatuses.Created
-                || x.Status == AppModuleExecutionStatuses.Dispatching
-                || x.Status == AppModuleExecutionStatuses.Running, ct);
+        => ActionScheduleCapacityReservations.Active(db)
+            .AnyAsync(x => x.ScheduleId == scheduleId, ct);
 
     private Task<int> CountActiveExecutionsAsync(Guid ownerUserId, CancellationToken ct)
-        => db.ActionScheduleOccurrences
-            .Where(x => x.Schedule.OwnerUserId == ownerUserId && x.ExecutionId != null)
-            .Join(db.AppModuleExecutions, x => x.ExecutionId, x => x.Id, (occurrence, execution) => execution)
-            .CountAsync(x => x.Status == AppModuleExecutionStatuses.Created
-                || x.Status == AppModuleExecutionStatuses.Dispatching
-                || x.Status == AppModuleExecutionStatuses.Running, ct);
+        => ActionScheduleCapacityReservations.Active(db)
+            .CountAsync(x => x.Schedule.OwnerUserId == ownerUserId, ct);
 
     private Task<int> CountMonthlyOccurrencesAsync(Guid ownerUserId, DateTime nowUtc, CancellationToken ct)
     {
