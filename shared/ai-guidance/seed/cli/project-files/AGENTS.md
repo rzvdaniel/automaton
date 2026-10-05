@@ -25,4 +25,4 @@ After implementing the app, run `automaton validate` and fix every error. Run
 If deployment fails, inspect the reported operation and correct the source or
 contract before retrying. Do not claim a successful deploy from a local build.
 
-Never run `automaton publish` without the user's explicit approval.
+Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.

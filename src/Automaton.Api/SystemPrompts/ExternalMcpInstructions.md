@@ -14,7 +14,7 @@ or `automaton link <app-id>` for an existing one.
 The `application` object in `automaton.json` is the source of truth. Automaton
 does not prescribe the app's language, framework, source layout, or architecture.
 Use `automaton validate`, then `automaton deploy`, and wait for the deployment
-to reach `Succeeded`. Never publish without explicit user approval.
+to reach `Succeeded`. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
 Use `list_user_apps`, `get_file_tree`, `list_files`, and `read_file` only for
 remote discovery. Do not use MCP as a substitute for the CLI delivery flow.

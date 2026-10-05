@@ -80,4 +80,4 @@ The optional positional argument to `automaton deploy` selects a remote
 deployment target. Its `--env <name>` option instead selects a local project
 profile for credentials and app linkage.
 
-Use `automaton publish` only after deployment and approval.
+Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
