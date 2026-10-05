@@ -134,7 +134,7 @@ public sealed class ActionScheduleProcessorTests
         Assert.That(await db.ActionScheduleOccurrences.CountAsync(), Is.EqualTo(1));
     }
 
-    private static ActionScheduleProcessor Processor(ApplicationDbContext db)
+    internal static ActionScheduleProcessor Processor(ApplicationDbContext db)
         => Processor(db, []);
 
     private static ActionScheduleProcessor Processor(
@@ -145,7 +145,7 @@ public sealed class ActionScheduleProcessorTests
             new WorkerScheduledActionDispatcher(db, new StubTrustedValidator(), handlers),
             NullLogger<ActionScheduleProcessor>.Instance);
 
-    private static ActionSchedule Schedule(string type) => new()
+    internal static ActionSchedule Schedule(string type) => new()
     {
         Id = Guid.NewGuid(),
         OwnerType = ActionScheduleOwnerTypes.System,

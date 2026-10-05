@@ -106,6 +106,8 @@ Reuse the existing XFS provision/reprovision actions and user-volume topology.
 
 ### M2 — Complete compute, admission and capacity (old Stage 8)
 
+Scheduled Action admission reserves both unlinked Published/Dispatching occurrences and linked Created/Dispatching/Running executions, counting each occurrence once. Queued/skipped/failed occurrences without active execution do not occupy slots; terminal executions release capacity. New occurrences and queued retries serialize user-account admission with an `AspNetUsers` row lock as the first read in the MySQL publication transaction. Queue capacity checks and the occurrence transition/CAP publication share that transaction. System schedules retain their separate concurrency policy. This is scheduled-action admission, not a subscription-wide manual Action/build quota or running-app reservation.
+
 - Verify Hosted Runner, runtime and build containers belong to the intended cgroup after create/restart/reprovision and recovery.
 - Read back effective CPU, memory and PID settings rather than relying only on successful command execution.
 - Exercise CPU saturation, memory pressure/OOM and PID exhaustion across simultaneous workloads; preserve operator access through the Infrastructure Runner.
