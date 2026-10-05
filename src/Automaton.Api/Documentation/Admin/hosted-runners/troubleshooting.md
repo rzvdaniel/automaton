@@ -22,6 +22,10 @@ order: 100
 
 This feature is still in active development. Development environments may require manual host preparation, and incomplete legacy hosted-runner configuration is not silently repaired or given a fallback specification.
 
+Trusted provisioning and reprovisioning Actions are bundled in the Infrastructure Runner image. Releasing the API alone does not update those Actions. Deploy the matching CI-published Infrastructure Runner artifact through the canonical installer before testing new enforcement behavior; verify its immutable digest and bundled Action revision. On a failed readback, inspect the existing container and actual slice properties before retrying, because some properties may already have changed.
+
+The host summary currently understates compute reservations for pending upgrades and failed operations retaining a container. Inspect current and pending Runner snapshots and retain the larger CPU and memory values separately when assessing capacity. The admission policy applies those reservations even when the displayed totals omit them. An expected reprovisioning capacity denial can currently return HTTP 500; inspect the persisted deployment error and correct capacity before retrying.
+
 ## Workflow and custom-step execution
 
 Workflow and custom-step execution uses durable RabbitMQ commands and authenticated HTTPS results. API and Runner versions must be released together after applying the execution-operation migration; there is no SignalR execution fallback. All supported Runner profiles need access to the configured external broker endpoint (`HostedRunnerRabbitMq:Host` and `Port`), and the API needs its trusted `RabbitMq:ManagementUrl` credentials to issue consume-only Runner credentials. API slots must share the existing Data Protection key ring to read protected execution requests/results.
