@@ -41,7 +41,7 @@ These are product decisions to implement and validate, not statements that every
 | Milestone / evidence | Status |
 | --- | --- |
 | Historical Stages 1–3 and M0 | Reported complete; retain account identity, atomic admission and storage locality protections. |
-| M1 storage implementation | Merged; **live acceptance complete (2026-09-29)**. The disposable app flow below completed and the app was removed through Studio. |
+| M1 storage acceptance | **Complete (2026-09-29).** Deployment, app-written persistent data, fresh storage verification, survival across Hosted Runner reprovisioning and supported cleanup passed. No further M1 acceptance gate remains for the tested scope; broader exhaustion recovery belongs to M6. |
 | Live routing and Runners | API `3d890c29` is live on blue; `e888fef2` remains running on green for rollback. Both retained Runners use CI #4978 digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`, protocol v5. Automatic recovery, empty queues and final production health checks passed on 2026-10-05. |
 | Fresh storage verification | Healthy `InfrastructureRunnerVerified` result: 0.00 GB / 2.00 GB, measured at 5:17 PM on 2026-09-29 after the app wrote its marker. This tiny marker sample verifies the flow, not large-write accounting. |
 | Runtime restrictions | The fixture container ran as UID/GID `1000:1000`, had a read-only root filesystem, `/tmp` tmpfs capped at 32 MiB, and a writable `/automaton/data` mount. These are observed fixture settings, not new tier defaults. |
@@ -60,7 +60,7 @@ The disposable `M1 Live Acceptance 20260928` app was deleted after its checks pa
 ## Execution order
 
 1. The historical SignalR upload failure led to RM; its replacement RabbitMQ/HTTPS path completed production CLI deployments. The Worker image's unknown source revision remains a separate release-tracking gap.
-2. M1 live acceptance is complete. RM Slices 1–3 are implemented and released. PR #342's focused x64 production acceptance passed, including app-process marker read/write and marker survival after Hosted Runner reprovision; ARM64 runtime behavior remains unverified. The acceptance app is retained for any further approved RM checks and has not been deleted.
+2. M1 live acceptance and RM Slices 1–5 are complete within their documented scope. PR #342's focused x64 production acceptance passed, including app-process marker read/write and marker survival after Hosted Runner reprovision; ARM64 runtime behavior remains unverified. The acceptance app is retained for any further approved RM checks and has not been deleted.
 3. RM combined acceptance is complete for the installed x64 cohort, including the reviewed isolation fixes and automatic rapid cutover recovery. Preserve the evidence and retained app. Cross-host package availability remains a separate scaling limitation, not a reason to add storage in these slices.
 4. Complete M2 and M3. Collect M5/M6 lifecycle and recovery evidence alongside this work.
 5. Complete M4 and the remaining M5/M6 gaps for supported hosting modes.
@@ -475,4 +475,4 @@ For each milestone, record status, PR/source revision, deployed image digest, po
 
 Use focused PRs and repository-required checks for the affected code. Update Admin guides when actual operator behavior changes. Documentation-only roadmap changes need link/content/whitespace checks, not application builds or deployments.
 
-**Next action:** review the final release/acceptance evidence in PR #346. RM and M1 are complete for their documented scope. Preserve the retained app, rollback artifacts and the separate Worker/cross-host/ARM64/capacity limitations; choose later milestone work explicitly. PR #349 records standing publication authorization in generated app guidance and public CLI documentation.
+**Next action:** audit M2 compute, running-app admission and capacity against its existing implementation and exit criteria, then identify the missing validation or focused changes. M1 and RM are complete within their documented scope; M2 remains unfinished until its own evidence supports completion. Preserve the retained app, rollback artifacts and separate Worker/cross-host/ARM64/capacity limitations. PRs #346 and #349 are merged, including the release evidence and standing publication authorization guidance.
