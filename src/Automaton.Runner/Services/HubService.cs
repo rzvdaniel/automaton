@@ -195,11 +195,11 @@ public class HubService : IRuntimeTunnelReconnectRequester
     private async Task<bool> WaitAfterConnectionFailureAsync(Exception exception, CancellationToken cancellationToken)
     {
         connectionFailureReporter.Report(exception, isReconnecting, () => isReconnecting = true);
-        const int delaySeconds = 30;
-        logger.Debug("Waiting {DelaySeconds} seconds before next connection attempt", delaySeconds);
+        var delay = ConnectionRetryDelay.Calculate(0, exception, 30, 0, DateTimeOffset.UtcNow);
+        logger.Debug("Waiting {RetryDelay} before next connection attempt", delay);
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+            await Task.Delay(delay, cancellationToken);
             return true;
         }
         catch (OperationCanceledException)

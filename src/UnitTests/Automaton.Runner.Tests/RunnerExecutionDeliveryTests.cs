@@ -74,6 +74,32 @@ public sealed class RunnerExecutionDeliveryTests
         Assert.That(http.Results, Is.Empty);
     }
 
+    [Test]
+    public async Task QueuedCutoverCommandsConvergeAfterRapidRollbackRollforward()
+    {
+        var http = new Api(); using var api = Client(http); var executor = new Executor();
+        var requester = new ReconnectRequester(); var handler = Handler(executor, requester);
+        var runnerId = Guid.NewGuid();
+        requester.State.SetConnectedApiColor("green");
+        foreach (var color in new[] { "green", "blue", "green" })
+        {
+            var command = new RunnerExecutionCommand(Guid.NewGuid(), runnerId,
+                RunnerExecutionCommandKinds.ReconnectRuntimeTunnels, TargetApiColor: color);
+            Assert.That(await handler.HandleAsync(JsonSerializer.SerializeToUtf8Bytes(command),
+                command.OperationId.ToString(), api, runnerId, CancellationToken.None), Is.True);
+            requester.State.SetConnectedApiColor(null);
+            requester.State.Reset();
+        }
+
+        // The older connection finishes after the final queued command was applied.
+        Assert.That(requester.State.SetConnectedApiColor("blue"), Is.True);
+        Assert.That(requester.State.TryBeginTunnelRequest(), Is.False);
+        Assert.That(requester.State.SetConnectedApiColor("green"), Is.False);
+        Assert.That(requester.State.TryBeginTunnelRequest(), Is.True);
+        Assert.That(http.Posts, Is.Empty);
+        Assert.That(executor.Calls, Is.Zero);
+    }
+
     private RunnerExecutionDeliveryHandler Handler(Executor executor, ReconnectRequester? requester = null)
         => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor), requester ?? new ReconnectRequester());
     private static RunnerExecutionApiClient Client(Api handler)
@@ -88,11 +114,13 @@ public sealed class RunnerExecutionDeliveryTests
     }
     private sealed class ReconnectRequester : IRuntimeTunnelReconnectRequester
     {
+        public RunnerTunnelReconnectState State { get; } = new();
         public int Requests { get; private set; }
         public string? TargetApiInstanceId { get; private set; }
         public string? TargetApiColor { get; private set; }
         public void RequestRuntimeTunnelReconnect(string? targetApiInstanceId, string? targetApiColor, string? reason)
         {
+            State.RequestReconnect(targetApiColor);
             Requests++;
             TargetApiInstanceId = targetApiInstanceId;
             TargetApiColor = targetApiColor;

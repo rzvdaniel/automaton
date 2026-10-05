@@ -8,7 +8,6 @@ namespace Automaton.Runner.Console.Connection;
 /// </summary>
 public sealed class JitteredReconnectPolicy : IRetryPolicy
 {
-    private static readonly TimeSpan MaximumDelay = TimeSpan.FromSeconds(30);
     private readonly Func<double> nextJitter;
 
     public JitteredReconnectPolicy()
@@ -23,12 +22,7 @@ public sealed class JitteredReconnectPolicy : IRetryPolicy
 
     public TimeSpan? NextRetryDelay(RetryContext retryContext)
     {
-        var exponentialSeconds = Math.Min(
-            Math.Pow(2, retryContext.PreviousRetryCount),
-            MaximumDelay.TotalSeconds);
-        var jitterSeconds = Math.Clamp(nextJitter(), 0, 1) * 5;
-
-        return TimeSpan.FromSeconds(
-            Math.Min(exponentialSeconds + jitterSeconds, MaximumDelay.TotalSeconds));
+        return ConnectionRetryDelay.Calculate((int)Math.Min(retryContext.PreviousRetryCount, 6),
+            retryContext.RetryReason, 1, nextJitter(), DateTimeOffset.UtcNow);
     }
 }
