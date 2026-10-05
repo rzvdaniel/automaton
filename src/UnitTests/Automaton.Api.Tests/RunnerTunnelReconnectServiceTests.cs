@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
@@ -12,6 +13,28 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerTunnelReconnectServiceTests
 {
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task CutoverAndCompensation_SkipDeletedHostedRegistrationWithActiveKeyAndRemovedQueues(bool reconcile, bool linkedByRunnerId)
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
+        var deletedId = await fixture.AddHostedRunnerAsync(deleted: true);
+        var disconnectedId = await fixture.AddHostedRunnerAsync(deleted: false, linkedByRunnerId);
+        var legacyId = await fixture.AddBoundLegacyRunnerAsync();
+        fixture.Publisher.RemovedQueueRunnerIds.Add(deletedId);
+
+        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
+
+        Assert.That(result.FailedCount, Is.Zero);
+        Assert.That(result.RequestedCount, Is.EqualTo(6));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(deletedId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(disconnectedId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(legacyId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(fixture.DisconnectedRunnerId));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task CutoverAndCompensation_SkipRetainedRevokedRunnerWithRemovedQueues(bool reconcile)
@@ -154,6 +177,38 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
             ApiKeyId = key.Id, ApiKey = key
         };
         db.Runners.Add(runner);
+        await db.SaveChangesAsync();
+        return runner.Id;
+    }
+
+    public async Task<Guid> AddBoundLegacyRunnerAsync()
+    {
+        var id = await AddInfrastructureRunnerAsync(isActive: true);
+        var runner = await db.Runners.SingleAsync(candidate => candidate.Id == id);
+        runner.Purpose = RunnerPurposes.Managed;
+        await db.SaveChangesAsync();
+        return id;
+    }
+
+    public async Task<Guid> AddHostedRunnerAsync(bool deleted, bool linkedByRunnerId = false)
+    {
+        var key = new ApiKey { Id = Guid.NewGuid(), IsActive = true, Source = ApiKeySource.RunnerProvisioning };
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), Name = "retained-hosted-registration", ConnectionId = null!,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
+            ApiKeyId = key.Id, ApiKey = key
+        };
+        db.Runners.Add(runner);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(),
+            // Successful deletion clears both links; reprovisioning can temporarily clear RunnerId.
+            RunnerId = !deleted && linkedByRunnerId ? runner.Id : null,
+            ApiKeyId = deleted || linkedByRunnerId ? null : key.Id,
+            Status = deleted ? HostedRunnerStatuses.Deleted : HostedRunnerStatuses.Reprovisioning,
+            DeletedAt = deleted ? DateTime.UtcNow : null
+        });
         await db.SaveChangesAsync();
         return runner.Id;
     }

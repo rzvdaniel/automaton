@@ -24,6 +24,13 @@ public sealed class RunnerTunnelReconnectService(
             .Where(runner => runner.ApiKeyId.HasValue
                 ? runner.ApiKey != null && runner.ApiKey.IsActive
                 : runner.Purpose != RunnerPurposes.Infrastructure)
+            // Successful Hosted Runner deletion clears its credential/Runner links
+            // and removes queues, while retaining the generic registration and key.
+            // Source identifies managed credentials without excluding legacy BYO keys.
+            .Where(runner => runner.ApiKey == null
+                || runner.ApiKey.Source != ApiKeySource.RunnerProvisioning
+                || dbContext.HostedRunners.Any(hosted => hosted.DeletedAt == null
+                    && (hosted.ApiKeyId == runner.ApiKeyId || hosted.RunnerId == runner.Id)))
             .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion, IsConnected = runner.ConnectionId != null })
             .ToListAsync(cancellationToken);
 
