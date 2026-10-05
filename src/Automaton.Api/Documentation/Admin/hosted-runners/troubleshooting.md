@@ -17,6 +17,7 @@ order: 100
 | Inactive specification | Activate it or select another active specification. |
 | Global provisioning paused | Enable **Allow hosted runner provisioning** in the Specifications tab. |
 | Container provisioned but Runner not connected | Check deployment result, container logs, registration, and API connectivity. |
+| Systemd resource group limits could not be verified or did not match | Check the requested CPU, memory, swap and PID limits against the host's systemd slice properties. Provisioning/reprovisioning stops before replacing the container when readback is missing, malformed or mismatched. Slice properties may already have changed; this failure does not restore their previous values. Correct the host configuration and retry reprovisioning. |
 | Runner reports an API certificate validation error | Verify the API certificate matches its configured hostname and is trusted by the Runner host or container. Install the issuing CA in that environment for development certificates; do not disable certificate validation. |
 
 This feature is still in active development. Development environments may require manual host preparation, and incomplete legacy hosted-runner configuration is not silently repaired or given a fallback specification.

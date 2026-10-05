@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import uuid
+from decimal import Decimal
 
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
@@ -364,17 +365,35 @@ def verify_xfs_project_quota(mountpoints: list[str], project_id: int, disk_limit
     return filesystem_uuid
 
 
+def verify_resource_group(output: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> None:
+    properties = {}
+    for line in output.splitlines():
+        key, separator, value = line.partition("=")
+        if not separator or key in properties:
+            raise RuntimeError("The Hosted Runner systemd resource group readback is malformed")
+        properties[key] = value
+    duration = properties.get("CPUQuotaPerSecUSec", "")
+    if not re.fullmatch(r"(?:\d+(?:\.\d+)?(?:us|ms|s)\s*)+", duration):
+        raise RuntimeError("The Hosted Runner systemd resource group CPU quota could not be verified")
+    units = {"us": Decimal(1), "ms": Decimal(1000), "s": Decimal(1_000_000)}
+    quota_us = sum(Decimal(value) * units[unit] for value, unit in re.findall(r"(\d+(?:\.\d+)?)(us|ms|s)", duration))
+    expected = {"MemoryMax": str(memory_mb * 1024 * 1024), "MemorySwapMax": "0", "TasksMax": str(pids_limit)}
+    if quota_us != Decimal(str(cpu_limit)) * 1_000_000 or any(properties.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("The Hosted Runner systemd resource group limits did not match the requested specification")
+
+
 def ensure_resource_group(runner_id: str, cpu_limit: float, memory_mb: int, pids_limit: int) -> str:
     info = host("docker", "info", "--format", "{{.CgroupVersion}}|{{.CgroupDriver}}")
     version, _, driver = info.stdout.strip().partition("|")
     if version != "2" or driver != "systemd":
         raise RuntimeError("Aggregate Hosted Runner CPU, memory, and PID limits require cgroup v2 with Docker systemd cgroups")
     slice_name = f"automaton-hosted-runner-{runner_id.replace('-', '')}.slice"
-    cpu_percent = format(cpu_limit * 100, ".6g") + "%"
+    cpu_percent = format(cpu_limit * 100, ".12g") + "%"
     host("systemctl", "set-property", slice_name, f"CPUQuota={cpu_percent}", f"MemoryMax={memory_mb}M", "MemorySwapMax=0", f"TasksMax={pids_limit}")
-    shown = host("systemctl", "show", slice_name, "--property=CPUQuotaPerSecUSec,MemoryMax,TasksMax", "--value")
+    shown = host("systemctl", "show", slice_name, "--property=CPUQuotaPerSecUSec,MemoryMax,MemorySwapMax,TasksMax", "--all")
     if shown.returncode != 0:
         raise RuntimeError("The Hosted Runner systemd resource group could not be verified")
+    verify_resource_group(shown.stdout, cpu_limit, memory_mb, pids_limit)
     return slice_name
 
 
