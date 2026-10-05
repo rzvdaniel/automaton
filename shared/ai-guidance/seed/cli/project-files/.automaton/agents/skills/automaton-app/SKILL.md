@@ -22,7 +22,7 @@ the existing files before choosing commands, paths, or dependencies.
 11. Wait for the asynchronous operation to reach a terminal result.
 12. If it reaches `Succeeded`, verify the deployed URL.
 13. If it fails, inspect the exact failure and fix it.
-14. Never publish unless the user explicitly requests it.
+14. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
 Prefer a Standard or Hosted Runner for ordinary applications. Do not use a
 Privileged Host Runner as an automatic fallback. Privileged Host approval is

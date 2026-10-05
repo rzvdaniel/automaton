@@ -44,7 +44,7 @@ by the application-owned process. A runtime-less deployment is only suitable
 for an Actions-only or other finite-work app with no HTTP endpoint.
 
 Run `automaton validate`, then `automaton deploy`. Wait for `Succeeded` and
-verify the deployed URL. Use `automaton publish` only after explicit approval.
+verify the deployed URL. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
 The [automaton.json reference](/automaton-json) documents the complete generic
 contract.
