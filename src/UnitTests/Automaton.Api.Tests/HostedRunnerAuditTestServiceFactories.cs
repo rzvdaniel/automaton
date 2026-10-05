@@ -16,6 +16,13 @@ internal static class HostedRunnerProvisioningTestServiceFactory
         ApplicationDbContext db,
         Guid actorUserId,
         HostedRunnerOptions options)
+        => CreateWithPublisher(db, actorUserId, options, new NoOpEventPublisher());
+
+    public static HostedRunnerProvisioningService CreateWithPublisher(
+        ApplicationDbContext db,
+        Guid actorUserId,
+        HostedRunnerOptions options,
+        IEventPublisher eventPublisher)
     {
         var httpContextAccessor = HostedRunnerAuditTestHttpContext.Create(actorUserId, "admin@automaton.test");
         var userContextService = new UserContextService(httpContextAccessor);
@@ -31,7 +38,7 @@ internal static class HostedRunnerProvisioningTestServiceFactory
 
         return new HostedRunnerProvisioningService(
             db,
-            new NoOpEventPublisher(),
+            eventPublisher,
             hostedRunnerOptions,
             CreatePolicyService(db),
             new AccountStorageProjectAllocationService(db),
@@ -72,10 +79,11 @@ internal static class HostedRunnerManagementTestServiceFactory
         var userContextService = new UserContextService(httpContextAccessor);
         IAuditEventService auditEventService = new AuditEventService(db, userContextService, httpContextAccessor);
         var options = new HostedRunnerTestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions { Enabled = true });
-        var provisioningService = HostedRunnerProvisioningTestServiceFactory.Create(
+        var provisioningService = HostedRunnerProvisioningTestServiceFactory.CreateWithPublisher(
             db,
             actorUserId,
-            options.Value);
+            options.Value,
+            eventPublisher ?? new NoOpEventPublisher());
 
         return new HostedRunnerManagementService(
             db,

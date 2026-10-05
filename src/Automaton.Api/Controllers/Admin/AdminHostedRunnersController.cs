@@ -90,7 +90,14 @@ public class AdminHostedRunnersController : ControllerBase
     [HttpPost("runners/{id:guid}/reprovision")]
     public async Task<ActionResult<HostedRunnerResponse>> ReprovisionHostedRunner(Guid id, CancellationToken cancellationToken)
     {
-        await managementService.ReprovisionAsAdminAsync(id, cancellationToken);
+        try
+        {
+            await managementService.ReprovisionAsAdminAsync(id, cancellationToken);
+        }
+        catch (HostedRunnerProvisioningConflictException exception)
+        {
+            return Conflict(new { message = exception.Message });
+        }
         return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
     }
 

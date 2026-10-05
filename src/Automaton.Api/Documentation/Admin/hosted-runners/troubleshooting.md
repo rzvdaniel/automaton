@@ -24,7 +24,7 @@ This feature is still in active development. Development environments may requir
 
 Trusted provisioning and reprovisioning Actions are bundled in the Infrastructure Runner image. Releasing the API alone does not update those Actions. Deploy the matching CI-published Infrastructure Runner artifact through the canonical installer before testing new enforcement behavior; verify its immutable digest and bundled Action revision. On a failed readback, inspect the existing container and actual slice properties before retrying, because some properties may already have changed.
 
-The host summary currently understates compute reservations for pending upgrades and failed operations retaining a container. Inspect current and pending Runner snapshots and retain the larger CPU and memory values separately when assessing capacity. The admission policy applies those reservations even when the displayed totals omit them. An expected reprovisioning capacity denial can currently return HTTP 500; inspect the persisted deployment error and correct capacity before retrying.
+Host CPU and memory totals use the same reservation policy as admission: pending upgrades reserve increases immediately, unconfirmed downgrades retain the larger limits, and failed operations with an existing container still occupy capacity. An expected reprovisioning placement/capacity denial returns HTTP 409 with the persisted failure message. It does not dispatch work or apply a new pending reservation/storage allowance; existing reservations and identity remain intact. Correct capacity and retry. These corrections require the matching API release; see the roadmap for release and live acceptance status.
 
 ## Workflow and custom-step execution
 

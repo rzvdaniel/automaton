@@ -11,8 +11,9 @@ internal static class RunnerHostAdminResponseMapper
     public static RunnerHostResponse ToResponse(RunnerHost host)
     {
         var assigned = host.HostedRunners
-            .Where(x => x.DeletedAt == null && x.Status is HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Running)
+            .Where(HostedRunnerComputeReservationPolicy.OccupiesCapacity)
             .ToList();
+        var computeReservations = assigned.Select(HostedRunnerComputeReservationPolicy.Calculate).ToArray();
 
         return new RunnerHostResponse
         {
@@ -40,10 +41,10 @@ internal static class RunnerHostAdminResponseMapper
             IsSchedulingEligible = host.IsSchedulingEligible,
             TotalCpuCores = host.TotalCpuCores,
             ReservedCpuCores = host.ReservedCpuCores,
-            UsedCpuCores = assigned.Sum(x => x.SpecificationSnapshot.Resources.CpuLimit),
+            UsedCpuCores = computeReservations.Sum(x => x.CpuCores),
             TotalMemoryMb = host.TotalMemoryMb,
             ReservedMemoryMb = host.ReservedMemoryMb,
-            UsedMemoryMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.MemoryLimitMb),
+            UsedMemoryMb = computeReservations.Sum(x => x.MemoryMb),
             TotalDiskMb = host.TotalDiskMb,
             ReservedDiskMb = host.ReservedDiskMb,
             UsedDiskMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.DiskLimitMb),
