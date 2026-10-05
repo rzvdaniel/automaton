@@ -1,17 +1,60 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using System.Text.RegularExpressions;
 
 namespace Automaton.Api.Tests;
 
 [TestFixture]
 public sealed class RunnerTunnelReconnectServiceTests
 {
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task CutoverAndCompensation_IncludeEnrolledByoWithProvisioningKey(bool reconcile, bool connected)
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
+        var byoId = await fixture.AddEnrolledByoRunnerAsync(connected);
+        var deletedId = await fixture.AddHostedRunnerAsync(deleted: true);
+        fixture.Publisher.RemovedQueueRunnerIds.Add(deletedId);
+
+        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
+
+        Assert.That(result.FailedCount, Is.Zero);
+        Assert.That(result.RequestedCount, Is.EqualTo(5));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(byoId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(deletedId));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task CutoverAndCompensation_SkipDeletedHostedRegistrationWithActiveKeyAndRemovedQueues(bool reconcile, bool linkedByRunnerId)
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
+        var deletedId = await fixture.AddHostedRunnerAsync(deleted: true);
+        var disconnectedId = await fixture.AddHostedRunnerAsync(deleted: false, linkedByRunnerId);
+        var legacyId = await fixture.AddBoundLegacyRunnerAsync();
+        fixture.Publisher.RemovedQueueRunnerIds.Add(deletedId);
+
+        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
+
+        Assert.That(result.FailedCount, Is.Zero);
+        Assert.That(result.RequestedCount, Is.EqualTo(6));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(deletedId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(disconnectedId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(legacyId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(fixture.DisconnectedRunnerId));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task CutoverAndCompensation_SkipRetainedRevokedRunnerWithRemovedQueues(bool reconcile)
@@ -156,6 +199,71 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         db.Runners.Add(runner);
         await db.SaveChangesAsync();
         return runner.Id;
+    }
+
+    public async Task<Guid> AddBoundLegacyRunnerAsync()
+    {
+        var id = await AddInfrastructureRunnerAsync(isActive: true);
+        var runner = await db.Runners.SingleAsync(candidate => candidate.Id == id);
+        runner.Purpose = RunnerPurposes.Managed;
+        await db.SaveChangesAsync();
+        return id;
+    }
+
+    public async Task<Guid> AddHostedRunnerAsync(bool deleted, bool linkedByRunnerId = false)
+    {
+        var key = new ApiKey { Id = Guid.NewGuid(), IsActive = true, Source = ApiKeySource.RunnerProvisioning };
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), Name = "retained-hosted-registration", ConnectionId = null!,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
+            ApiKeyId = key.Id, ApiKey = key
+        };
+        db.Runners.Add(runner);
+        var hosted = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(),
+            // Successful deletion clears both links; reprovisioning can temporarily clear RunnerId.
+            RunnerId = !deleted && linkedByRunnerId ? runner.Id : null,
+            ApiKeyId = deleted || linkedByRunnerId ? null : key.Id,
+            Status = deleted ? HostedRunnerStatuses.Deleted : HostedRunnerStatuses.Reprovisioning,
+            DeletedAt = deleted ? DateTime.UtcNow : null
+        };
+        db.HostedRunners.Add(hosted);
+        db.RunnerEnrollments.Add(new RunnerEnrollment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hosted.Id, RunnerId = runner.Id,
+            InstallationId = Guid.NewGuid().ToString("N"),
+            Status = RunnerEnrollmentStatuses.Completed, UsedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        return runner.Id;
+    }
+
+    public async Task<Guid> AddEnrolledByoRunnerAsync(bool connected)
+    {
+        var runner = await EnrollByoRunnerAsync();
+        Assert.That(runner.ApiKey!.Source, Is.EqualTo(ApiKeySource.RunnerProvisioning));
+        runner.ConnectionId = connected ? "byo-connection" : null!;
+        runner.ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current;
+        await db.SaveChangesAsync();
+        return runner.Id;
+    }
+
+    private async Task<Runner> EnrollByoRunnerAsync()
+    {
+        var installationService = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
+        var installation = await installationService.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "enrolled-byo", ApplicationProfile = RunnerApplicationProfiles.Standard
+        }, CancellationToken.None);
+        var token = Regex.Match(installation.InstallationCommand,
+            "AUTOMATON_ENROLLMENT_TOKEN='([^']+)'", RegexOptions.None, TimeSpan.FromSeconds(1)).Groups[1].Value;
+        var response = await installationService.ExchangeAsync(new RunnerEnrollmentExchangeRequest
+        {
+            EnrollmentToken = token, RunnerName = installation.RunnerName
+        }, CancellationToken.None) ?? throw new InvalidOperationException("BYO enrollment failed.");
+        return await db.Runners.Include(x => x.ApiKey).SingleAsync(x => x.Id == response.RunnerId);
     }
 
     public async Task DisconnectRunnerAsync(Guid runnerId)

@@ -24,6 +24,13 @@ public sealed class RunnerTunnelReconnectService(
             .Where(runner => runner.ApiKeyId.HasValue
                 ? runner.ApiKey != null && runner.ApiKey.IsActive
                 : runner.Purpose != RunnerPurposes.Infrastructure)
+            // Completed Hosted enrollment retains RunnerId after deletion clears
+            // the Hosted Runner links and removes queues. BYO enrollment uses a
+            // separate durable identity record, even with the same key source.
+            .Where(runner => !dbContext.RunnerEnrollments.Any(enrollment =>
+                    enrollment.HostedRunnerId.HasValue && enrollment.RunnerId == runner.Id)
+                || dbContext.HostedRunners.Any(hosted => hosted.DeletedAt == null
+                    && (hosted.ApiKeyId == runner.ApiKeyId || hosted.RunnerId == runner.Id)))
             .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion, IsConnected = runner.ConnectionId != null })
             .ToListAsync(cancellationToken);
 
