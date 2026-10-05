@@ -45,6 +45,8 @@ For on-host Docker builds, also apply [.agents/skills/production-docker-maintena
 
 Use it during preflight before starting a Docker build, whenever free disk is below its maintenance thresholds, and after a successful deployment to bound accumulated build cache. Do not bypass its volume, rollback-image, or destructive-prune safeguards. A production Docker build must not begin with less than 10 GB of free disk space.
 
+When space is unexpectedly low, that skill also covers host storage attribution and authorized cleanup of obsolete tagged images, archived journals, MySQL binary-log history and historical backups. Inspect these separately from live application data; deployment authorization alone does not authorize removing recovery history.
+
 ## Rollback image retention
 
 Before replacing a production revision, retain the currently deployed API, Studio,
