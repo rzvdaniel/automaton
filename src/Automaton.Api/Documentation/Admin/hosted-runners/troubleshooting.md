@@ -27,7 +27,7 @@ Workflow and custom-step execution uses durable RabbitMQ commands and authentica
 
 If an invocation does not finish, check broker connectivity, the Runner execution-consumer logs and API access. A Runner interrupted after accepting work reports an uncertain terminal outcome on redelivery and does not automatically repeat the script. Inspect side effects before deliberately running it again. Request cancellation stops queued work and is cooperative for running workflows; the synchronous custom-step engine cannot forcibly stop an already-running script. Cancellation does not undo side effects.
 
-Runner removal, revocation and Hosted Runner deprovisioning remove execution broker access and close unfinished operations. Other management operations still depend on SignalR, so retain the current reconnect/drain procedure until those paths are migrated.
+Runner removal, revocation and Hosted Runner deprovisioning remove execution broker access and close unfinished operations. SignalR remains for presence/heartbeat and BYO runtime tunnels; it is not the durable management execution path.
 
 Enrolled Runner execution endpoints require the bound Runner API key and `X-Runner-Id`. Existing unbound BYO registrations use their authenticated owner API key and the same identity header, subject to existing Runner access and privileged-profile authorization.
 
@@ -38,3 +38,13 @@ Before releasing matching API and Runner versions, configure a RabbitMQ TLS list
 The certificate must chain to a CA trusted by the Runner operating system and match `Host`. When connecting through a different address, set `HostedRunnerRabbitMq:TlsServerName` to the expected certificate DNS name. Install a private issuing CA into the Runner host/container trust store when needed, and keep revocation information reachable. Do not disable certificate or hostname validation. Both workflow/custom-step and Hosted Runner deployment consumers honor the supplied TLS settings. TLS errors leave commands pending for recovery rather than retrying over plaintext.
 
 This configures the external Runner broker connection. The API's trusted RabbitMQ management endpoint and internal command-publishing connection retain their existing configuration. No listener, firewall, certificate, or production configuration is changed automatically by this release.
+
+## API cutover tunnel recovery
+
+Cutover publishes the latest API color to every eligible registered protocol-v5 Runner, including those disconnected or still recorded on the target color while earlier commands are queued. Upgrade all connected eligible Runners before cutover. Tunnel admission can return 503 during the handoff; existing requests have a bounded 20-second grace. Hub HTTP 429 retries honor `Retry-After`; a server deadline longer than the normal 30-second backoff cap takes precedence. Wait for recovery rather than repeatedly restarting the Runner.
+
+Manual reconciliation remains available if publication or connectivity fails. From the production checkout, use the existing `request_api_color_runner_tunnel_reconnect <source-color> <live-target-color> true` helper in `scripts/prod-blue-green-common.sh`. The source must be a running API revision supporting that endpoint; an older rollback image need not provide it. Restore the intended live selector before requesting reconciliation, keep both API colors running if publication fails, and retry after correcting broker/API connectivity. This is tunnel recovery, not a management drain.
+
+The automatic recovery follow-up still requires reviewed release and live acceptance; the production evidence report currently keeps RM open.
+
+Revoked Infrastructure Runner records are retained for history but excluded from cutover and compensation commands once their bound API key is inactive. Eligible disconnected Runners still receive the latest target; do not delete their queues to work around a reconnect delay.
