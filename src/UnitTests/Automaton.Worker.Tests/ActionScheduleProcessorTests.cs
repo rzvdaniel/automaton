@@ -137,7 +137,7 @@ public sealed class ActionScheduleProcessorTests
     internal static ActionScheduleProcessor Processor(ApplicationDbContext db)
         => Processor(db, []);
 
-    private static ActionScheduleProcessor Processor(
+    internal static ActionScheduleProcessor Processor(
         ApplicationDbContext db,
         IEnumerable<IWorkerScheduledActionHandler> handlers,
         ITransactionalEventExecutor? transactions = null)
