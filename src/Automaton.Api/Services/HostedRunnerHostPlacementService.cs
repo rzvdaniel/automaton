@@ -217,17 +217,30 @@ public sealed class HostedRunnerHostPlacementService(
         HostedRunnerResources requested,
         Guid? excludedHostedRunnerId)
     {
-        var assigned = host.HostedRunners.Where(runner =>
-            runner.Id != excludedHostedRunnerId
-            && (OccupyingStatuses.Contains(runner.Status)
+        var occupying = host.HostedRunners.Where(runner =>
+            (OccupyingStatuses.Contains(runner.Status)
                 || runner.Status == HostedRunnerStatuses.Failed && runner.ContainerId != null)
             && runner.DeletedAt == null);
-        return host.ReservedCpuCores + assigned.Sum(runner => runner.SpecificationSnapshot.Resources.CpuLimit) + requested.CpuLimit <= host.TotalCpuCores
-            && host.ReservedMemoryMb + assigned.Sum(runner => runner.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb
+        var assigned = occupying.Where(runner => runner.Id != excludedHostedRunnerId);
+        var resizing = occupying.FirstOrDefault(runner => runner.Id == excludedHostedRunnerId);
+        var resizingCompute = resizing is null ? default : CalculateComputeReservation(resizing);
+        var assignedCompute = assigned.Select(CalculateComputeReservation).ToArray();
+        return host.ReservedCpuCores + assignedCompute.Sum(reservation => reservation.CpuCores)
+                + Math.Max(requested.CpuLimit, resizingCompute.CpuCores) <= host.TotalCpuCores
+            && host.ReservedMemoryMb + assignedCompute.Sum(reservation => reservation.MemoryMb)
+                + Math.Max(requested.MemoryLimitMb, resizingCompute.MemoryMb) <= host.TotalMemoryMb
             && host.ReservedDiskMb
                 + assigned.Sum(runner => CalculateDiskReservationMb(
                     (runner.PendingSpecificationSnapshot ?? runner.SpecificationSnapshot).Resources))
                 + CalculateDiskReservationMb(requested) <= EffectiveDiskCapacityMb(host);
+    }
+
+    private static (decimal CpuCores, int MemoryMb) CalculateComputeReservation(HostedRunner runner)
+    {
+        var current = runner.SpecificationSnapshot.Resources;
+        var pending = runner.PendingSpecificationSnapshot?.Resources ?? current;
+        return (Math.Max(current.CpuLimit, pending.CpuLimit),
+            Math.Max(current.MemoryLimitMb, pending.MemoryLimitMb));
     }
 
     internal static int EffectiveDiskCapacityMb(RunnerHost host)
