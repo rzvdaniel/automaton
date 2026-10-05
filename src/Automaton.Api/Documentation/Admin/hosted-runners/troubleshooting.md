@@ -41,8 +41,10 @@ This configures the external Runner broker connection. The API's trusted RabbitM
 
 ## API cutover tunnel recovery
 
-Cutover publishes the latest API color to every registered protocol-v5 Runner, including those disconnected or still recorded on the target color while earlier commands are queued. Upgrade all connected Runners before cutover. Tunnel admission can return 503 during the handoff; existing requests have a bounded 20-second grace. Hub HTTP 429 retries honor `Retry-After`; a server deadline longer than the normal 30-second backoff cap takes precedence. Wait for recovery rather than repeatedly restarting the Runner.
+Cutover publishes the latest API color to every eligible registered protocol-v5 Runner, including those disconnected or still recorded on the target color while earlier commands are queued. Upgrade all connected eligible Runners before cutover. Tunnel admission can return 503 during the handoff; existing requests have a bounded 20-second grace. Hub HTTP 429 retries honor `Retry-After`; a server deadline longer than the normal 30-second backoff cap takes precedence. Wait for recovery rather than repeatedly restarting the Runner.
 
 Manual reconciliation remains available if publication or connectivity fails. From the production checkout, use the existing `request_api_color_runner_tunnel_reconnect <source-color> <live-target-color> true` helper in `scripts/prod-blue-green-common.sh`. The source must be a running API revision supporting that endpoint; an older rollback image need not provide it. Restore the intended live selector before requesting reconciliation, keep both API colors running if publication fails, and retry after correcting broker/API connectivity. This is tunnel recovery, not a management drain.
 
 The automatic recovery follow-up still requires reviewed release and live acceptance; the production evidence report currently keeps RM open.
+
+Revoked Infrastructure Runner records are retained for history but excluded from cutover and compensation commands once their bound API key is inactive. Eligible disconnected Runners still receive the latest target; do not delete their queues to work around a reconnect delay.

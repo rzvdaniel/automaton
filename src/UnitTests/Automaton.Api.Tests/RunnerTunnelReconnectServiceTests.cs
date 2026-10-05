@@ -2,6 +2,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Services;
 using Automaton.Core.Constants;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
@@ -11,6 +12,25 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerTunnelReconnectServiceTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CutoverAndCompensation_SkipRetainedRevokedRunnerWithRemovedQueues(bool reconcile)
+    {
+        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
+        var revokedId = await fixture.AddInfrastructureRunnerAsync(isActive: false);
+        var eligibleId = await fixture.AddInfrastructureRunnerAsync(isActive: true);
+        fixture.Publisher.RemovedQueueRunnerIds.Add(revokedId);
+
+        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
+
+        Assert.That(result.FailedCount, Is.Zero);
+        Assert.That(result.CandidateRunnerCount, Is.EqualTo(6));
+        Assert.That(result.RequestedCount, Is.EqualTo(5));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(revokedId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(eligibleId));
+        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(fixture.DisconnectedRunnerId));
+    }
+
     [Test]
     public async Task RequestForApiColor_QueuesLatestTargetForAllRegisteredCompatibleRunners()
     {
@@ -123,6 +143,21 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
     public Guid CurrentReplicaRunnerId { get; }
     public Guid DisconnectedRunnerId { get; }
 
+    public async Task<Guid> AddInfrastructureRunnerAsync(bool isActive)
+    {
+        var key = new ApiKey { Id = Guid.NewGuid(), IsActive = isActive };
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), Name = isActive ? "eligible-offline" : "retained-revoked",
+            Purpose = RunnerPurposes.Infrastructure, ConnectionId = null!,
+            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
+            ApiKeyId = key.Id, ApiKey = key
+        };
+        db.Runners.Add(runner);
+        await db.SaveChangesAsync();
+        return runner.Id;
+    }
+
     public async Task DisconnectRunnerAsync(Guid runnerId)
     {
         var runner = await db.Runners.SingleAsync(candidate => candidate.Id == runnerId);
@@ -201,6 +236,7 @@ internal sealed class RecordingReconnectPublisher : IRuntimeTunnelReconnectComma
 {
     public List<ReconnectPublication> Publications { get; } = [];
     public int? FailAfterRunnerCount { get; set; }
+    public HashSet<Guid> RemovedQueueRunnerIds { get; } = [];
 
     public List<Guid> RunnerIds => Publications.SelectMany(publication => publication.RunnerIds).ToList();
     public string? TargetApiInstanceId => Publications.LastOrDefault()?.TargetApiInstanceId;
@@ -212,6 +248,8 @@ internal sealed class RecordingReconnectPublisher : IRuntimeTunnelReconnectComma
         string? targetApiColor,
         CancellationToken cancellationToken)
     {
+        if (runnerIds.Any(RemovedQueueRunnerIds.Contains))
+            throw new InvalidOperationException("Mandatory publication to a removed Runner queue.");
         var publishedRunnerIds = FailAfterRunnerCount is { } failAfter
             ? runnerIds.Take(failAfter).ToArray()
             : runnerIds.ToArray();

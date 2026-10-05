@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -17,6 +18,12 @@ public sealed class RunnerTunnelReconnectService(
         // Recorded presence/color can lag an earlier queued cutover. Always append
         // the latest target to every compatible Runner's serial management queue.
         var registeredRunners = await dbContext.Runners.AsNoTracking()
+            // Revocation retains Infrastructure Runner rows but disables their
+            // credentials and removes their queues. Legacy BYO registrations
+            // can still authenticate with an owner key without a bound key.
+            .Where(runner => runner.ApiKeyId.HasValue
+                ? runner.ApiKey != null && runner.ApiKey.IsActive
+                : runner.Purpose != RunnerPurposes.Infrastructure)
             .Select(runner => new { runner.Id, runner.ApiCompatibilityVersion, IsConnected = runner.ConnectionId != null })
             .ToListAsync(cancellationToken);
 
