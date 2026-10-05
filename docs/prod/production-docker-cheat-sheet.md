@@ -727,6 +727,10 @@ See [`docs/runners/runner-download-publishing.md`](/C:/Work/automaton/docs/runne
 
 ## Logs
 
+For disk preflight and cleanup, follow [production Docker maintenance](../../.agents/skills/production-docker-maintenance/SKILL.md), including storage attribution and the authorization boundaries for recovery history.
+
+**Storage maintenance record — 2026-10-05:** authorized cleanup removed obsolete unused image revisions, closed MySQL binary-log history and historical backup files. Live tables/volumes and immediate blue-green rollback images were preserved. MySQL binary-log expiry was persisted at seven days (`604800` seconds); this is the current host setting, not a universal retention requirement. The historical local backup directories were emptied, so their previous restore points and the purged incremental history are unavailable. Free space reached 21.3 GB and production health verification passed. The API release was stopped during its build before cutover; release and M2 live response/reporting acceptance remain pending.
+
 Phase 1 production logging on the single Hetzner VPS is intentionally split:
 
 - audit events go to MySQL in `AuditEvents`
