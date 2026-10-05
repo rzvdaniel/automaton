@@ -99,7 +99,6 @@ public class HostedRunnerProvisioningService
             db.HostedRunners.Add(hostedRunner);
 
         var requestedSnapshot = CreateRequestedSnapshot(specification, policy, now);
-        hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
         var storageProjectWasMissing = hostedRunner.StorageProjectId is null;
         await AssignAccountStorageProjectAsync(
             hostedRunner, storageAllocation.StorageProjectId, createdHostedRunner, cancellationToken);

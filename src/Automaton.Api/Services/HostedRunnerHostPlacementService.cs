@@ -19,13 +19,6 @@ public sealed class HostedRunnerHostPlacementService(
 {
     private readonly HostedRunnerOptions settings = options.Value;
     private readonly StorageTelemetryOptions telemetrySettings = storageTelemetryOptions?.Value ?? new StorageTelemetryOptions();
-    private static readonly string[] OccupyingStatuses =
-    [
-        HostedRunnerStatuses.Pending,
-        HostedRunnerStatuses.Provisioning,
-        HostedRunnerStatuses.Reprovisioning,
-        HostedRunnerStatuses.Running
-    ];
 
     public async Task<(RunnerHost? Host, string? FailureReason)> SelectHostAsync(
         Guid accountId,
@@ -217,14 +210,11 @@ public sealed class HostedRunnerHostPlacementService(
         HostedRunnerResources requested,
         Guid? excludedHostedRunnerId)
     {
-        var occupying = host.HostedRunners.Where(runner =>
-            (OccupyingStatuses.Contains(runner.Status)
-                || runner.Status == HostedRunnerStatuses.Failed && runner.ContainerId != null)
-            && runner.DeletedAt == null);
+        var occupying = host.HostedRunners.Where(HostedRunnerComputeReservationPolicy.OccupiesCapacity);
         var assigned = occupying.Where(runner => runner.Id != excludedHostedRunnerId);
         var resizing = occupying.FirstOrDefault(runner => runner.Id == excludedHostedRunnerId);
-        var resizingCompute = resizing is null ? default : CalculateComputeReservation(resizing);
-        var assignedCompute = assigned.Select(CalculateComputeReservation).ToArray();
+        var resizingCompute = resizing is null ? default : HostedRunnerComputeReservationPolicy.Calculate(resizing);
+        var assignedCompute = assigned.Select(HostedRunnerComputeReservationPolicy.Calculate).ToArray();
         return host.ReservedCpuCores + assignedCompute.Sum(reservation => reservation.CpuCores)
                 + Math.Max(requested.CpuLimit, resizingCompute.CpuCores) <= host.TotalCpuCores
             && host.ReservedMemoryMb + assignedCompute.Sum(reservation => reservation.MemoryMb)
@@ -233,14 +223,6 @@ public sealed class HostedRunnerHostPlacementService(
                 + assigned.Sum(runner => CalculateDiskReservationMb(
                     (runner.PendingSpecificationSnapshot ?? runner.SpecificationSnapshot).Resources))
                 + CalculateDiskReservationMb(requested) <= EffectiveDiskCapacityMb(host);
-    }
-
-    private static (decimal CpuCores, int MemoryMb) CalculateComputeReservation(HostedRunner runner)
-    {
-        var current = runner.SpecificationSnapshot.Resources;
-        var pending = runner.PendingSpecificationSnapshot?.Resources ?? current;
-        return (Math.Max(current.CpuLimit, pending.CpuLimit),
-            Math.Max(current.MemoryLimitMb, pending.MemoryLimitMb));
     }
 
     internal static int EffectiveDiskCapacityMb(RunnerHost host)

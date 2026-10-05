@@ -226,7 +226,8 @@ public class HostedRunnerManagementService
                     }
                 },
                 cancellationToken);
-            throw new InvalidOperationException("Hosted runner reprovisioning could not start.");
+            throw new HostedRunnerProvisioningConflictException(
+                preparation.HostedRunner.LastError ?? "Hosted runner reprovisioning could not start.");
         }
 
         return reprovisioned;

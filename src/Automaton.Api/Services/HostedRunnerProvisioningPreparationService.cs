@@ -60,6 +60,7 @@ public sealed class HostedRunnerProvisioningPreparationService(
             }
 
             hostedRunner.RunnerHostId = host.Id;
+            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
             hostedRunner.RuntimePort = await hostPlacementService.AllocateRuntimePortAsync(
                 host,
                 hostedRunner,
