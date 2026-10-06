@@ -289,7 +289,8 @@ public sealed partial class AppDeploymentTargetManagementService(
         Guid appId,
         CancellationToken cancellationToken = default,
         bool recoverInterrupted = false,
-        Func<CancellationToken, Task>? assertDeletionOwner = null)
+        Func<CancellationToken, Task>? assertDeletionOwner = null,
+        Guid? deletionClaimId = null)
     {
         var targetIds = await dbContext.AppDeploymentTargets
             .AsNoTracking()
@@ -333,7 +334,7 @@ public sealed partial class AppDeploymentTargetManagementService(
         catch
         {
             dbContext.ChangeTracker.Clear();
-            await ReleaseAppDeletionClaimsAsync(appId, claims, CancellationToken.None);
+            await ReleaseAppDeletionClaimsAsync(appId, claims, CancellationToken.None, deletionClaimId);
             throw;
         }
     }
@@ -341,12 +342,13 @@ public sealed partial class AppDeploymentTargetManagementService(
     public async Task ReleaseAppDeletionClaimsAsync(
         Guid appId,
         IReadOnlyDictionary<Guid, DeploymentTargetStatus> claims,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? deletionClaimId = null)
     {
         foreach (var claim in claims)
         {
             await targetStateService.ReleaseMutationAsync(
-                appId, claim.Key, claim.Value, cancellationToken);
+                appId, claim.Key, claim.Value, cancellationToken, deletionClaimId);
         }
     }
 

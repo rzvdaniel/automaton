@@ -1,3 +1,4 @@
+using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -88,5 +89,12 @@ public sealed class AppDeletionRecoveryTests
         await claims.AssertOwnedAsync(executor, current, CancellationToken.None);
         await executor.DisposeAsync();
         await Assert.ThatAsync(() => executor.AssertOwnedAsync(), Throws.TypeOf<AppDeploymentTargetConflictException>());
+    }
+
+    [Test]
+    public async Task Recovery_SupersededExecutorCannotReleaseReplacementTargets()
+    {
+        await using var fixture = await AppDeletionRecoveryFixture.CreateAsync();
+        await new AppDeletionSupersededExecutorScenario(fixture).RunAsync();
     }
 }

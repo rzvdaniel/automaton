@@ -66,25 +66,36 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         Guid appId,
         Guid deploymentTargetId,
         DeploymentTargetStatus status,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? deletionClaimId = null)
     {
         if (dataContext.Database.IsRelational())
         {
-            await dataContext.AppDeploymentTargets
+            var now = DateTimeOffset.UtcNow;
+            var targets = dataContext.AppDeploymentTargets
                 .Where(target =>
                     target.Id == deploymentTargetId &&
                     target.WebAppId == appId &&
-                    target.Status == DeploymentTargetStatus.Deploying)
+                    target.Status == DeploymentTargetStatus.Deploying);
+            if (deletionClaimId.HasValue)
+            {
+                targets = targets.Where(target => dataContext.WebApps.Any(app =>
+                    app.Id == appId && app.DeletionClaimId == deletionClaimId));
+            }
+            await targets
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(target => target.Status, status)
                     .SetProperty(target => target.ActiveDeploymentOperationId, (Guid?)null)
                     .SetProperty(target => target.ActiveDeploymentExecutionAttemptId, (Guid?)null)
-                    .SetProperty(target => target.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
+                    .SetProperty(target => target.UpdatedAt, now), cancellationToken);
             return;
         }
 
         var target = await GetTargetAsync(appId, deploymentTargetId, cancellationToken);
-        if (target.Status == DeploymentTargetStatus.Deploying)
+        var ownsDeletionClaim = !deletionClaimId.HasValue || await dataContext.WebApps
+            .AsNoTracking()
+            .AnyAsync(app => app.Id == appId && app.DeletionClaimId == deletionClaimId, cancellationToken);
+        if (ownsDeletionClaim && target.Status == DeploymentTargetStatus.Deploying)
         {
             target.Status = status;
             target.ActiveDeploymentOperationId = null;

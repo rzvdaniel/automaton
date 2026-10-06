@@ -29,7 +29,8 @@ public sealed class AppDeletionService(
             {
                 deletionClaims = await deploymentTargetManagementService
                     .ClaimAndCleanupAppRuntimesAsync(appId, recoverInterrupted: resuming,
-                        assertDeletionOwner: ct => appClaims.AssertOwnedAsync(executor, appClaimId.Value, ct));
+                        assertDeletionOwner: ct => appClaims.AssertOwnedAsync(executor, appClaimId.Value, ct),
+                        deletionClaimId: appClaimId.Value);
             }
 
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
@@ -44,7 +45,7 @@ public sealed class AppDeletionService(
             {
                 dataContext.ChangeTracker.Clear();
                 await deploymentTargetManagementService.ReleaseAppDeletionClaimsAsync(
-                    appId, deletionClaims, CancellationToken.None);
+                    appId, deletionClaims, CancellationToken.None, appClaimId);
             }
 
             // Recovery remains a pending deletion intent on failure; admission must
