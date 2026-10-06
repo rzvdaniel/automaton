@@ -240,3 +240,9 @@ For each implementation PR:
 - Record unavailable checks and evidence location. A milestone becomes complete only after its exit criteria are demonstrated.
 
 This assessment changes documentation only. It does not certify production readiness, enable paid plans, migrate storage, or start deployment.
+
+### Interrupted whole-app deletion recovery
+
+Whole-app deletion combines a durable admission fence (`WebApp.DeletionClaimId`) with an exclusive MySQL session lock per app. The executor uses a separate non-pooled connection, so death/session loss releases the execution lock without clearing the durable intent. Destructive steps check session and claim ownership; the existing claim concurrency token also fences the final database deletion. The in-memory provider uses a test-only semaphore; production recovery requires the MySQL platform store.
+
+Ordinary deletion refuses an existing claim. Explicit administrator recovery through the existing deletion API still requires app-deletion authorization. Under the executor lock, it replaces an interrupted claim, resumes target cleanup only when no active deployment operation/attempt is recorded, and preserves the durable admission fence on recovery failure. An older claim owner cannot clear the replacement. Cleanup commands remain idempotent and address stable app/target identities. On first rollout, older deletion executors must be stopped before their legacy claims are explicitly recovered, since they lack the execution lock. This correction is prepared for review; production cleanup of the retained interrupted fixture remains pending.

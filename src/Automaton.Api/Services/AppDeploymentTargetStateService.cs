@@ -10,7 +10,8 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
         Guid appId,
         Guid deploymentTargetId,
         string conflictMessage,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool recoverInterruptedDeletion = false)
     {
         var originalStatus = await dataContext.AppDeploymentTargets
             .AsNoTracking()
@@ -21,6 +22,10 @@ public sealed class AppDeploymentTargetStateService(ApplicationDbContext dataCon
                 $"Deployment target '{deploymentTargetId}' does not belong to app '{appId}'.");
         if (originalStatus == DeploymentTargetStatus.Deploying)
         {
+            if (recoverInterruptedDeletion && await dataContext.AppDeploymentTargets.AsNoTracking()
+                .AnyAsync(t => t.Id == deploymentTargetId && t.WebAppId == appId
+                    && t.ActiveDeploymentOperationId == null && t.ActiveDeploymentExecutionAttemptId == null, cancellationToken))
+                return DeploymentTargetStatus.Failed;
             throw new AppDeploymentTargetConflictException(conflictMessage);
         }
 

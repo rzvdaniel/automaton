@@ -42,6 +42,36 @@ public sealed class AppDeletionClaimService(ApplicationDbContext db)
         }
     }
 
+    public async Task<Guid> RecoverAsync(AppDeletionExecutionLock owner, CancellationToken token = default)
+    {
+        await owner.AssertOwnedAsync(token);
+        var previous = await db.WebApps.AsNoTracking().Where(a => a.Id == owner.AppId)
+            .Select(a => a.DeletionClaimId).SingleAsync(token);
+        if (previous is null) return await AcquireAsync(owner.AppId, token);
+        var id = Guid.NewGuid();
+        if (db.Database.IsRelational())
+        {
+            var changed = await db.WebApps.Where(a => a.Id == owner.AppId && a.DeletionClaimId == previous)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.DeletionClaimId, id), token);
+            if (changed != 1) throw new AppDeploymentTargetConflictException(Conflict);
+        }
+        else
+        {
+            var app = await db.WebApps.SingleAsync(a => a.Id == owner.AppId, token);
+            if (app.DeletionClaimId != previous) throw new AppDeploymentTargetConflictException(Conflict);
+            app.DeletionClaimId = id;
+            await db.SaveChangesAsync(token);
+        }
+        return id;
+    }
+
+    public async Task AssertOwnedAsync(AppDeletionExecutionLock owner, Guid claim, CancellationToken token)
+    {
+        await owner.AssertOwnedAsync(token);
+        if (!await db.WebApps.AsNoTracking().AnyAsync(a => a.Id == owner.AppId && a.DeletionClaimId == claim, token))
+            throw new AppDeploymentTargetConflictException(Conflict);
+    }
+
     public async Task<IDbContextTransaction?> OpenAdmissionAsync(Guid appId, CancellationToken token)
     {
         var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
