@@ -124,3 +124,13 @@ Changing a deployed target's Runner requires confirmation because the selected t
 ## Operational rule
 
 Do not use the Hosted Runner Container actions to manage an Infrastructure Runner. Repair or replace an Infrastructure Runner from **Admin → Runners → Runner Hosts**, then use Hosted Runner reprovisioning for the managed tenant container.
+
+## Recover an interrupted whole-app deletion
+
+A whole-app deletion fences new targets and deployments until cleanup finishes. An active deletion or a retained interrupted claim returns HTTP 409; normal deletion does not silently replace another owner's claim.
+
+For an interrupted deletion, an administrator who also has the existing app-deletion permission may explicitly retry `DELETE /api/Apps/{appId}?recoverInterrupted=true`. There is no separate Studio recovery control. This is a destructive retry of the original deletion, including assigned runtime and app-storage cleanup.
+
+Before requesting recovery, confirm that the original deletion executor has stopped. During the first upgrade to this recovery version, stop all older API deletion executors before recovering their retained claims: older versions do not hold the new executor lock. Do not run an older API alongside recovery requests. Confirm that no deployment is active and that every assigned Runner needed for cleanup is online. Project membership and app ownership restrictions still apply; administrator status does not override them.
+
+The MySQL session lock rejects concurrent deletion executors and releases when their session ends. Recovery replaces the interrupted app claim with a new owner token, then resumes idempotent target/app cleanup. Targets with an active deployment operation or execution attempt remain conflicts. If recovery fails, the deletion intent continues blocking new admission; correct the reported cleanup problem and repeat the same supported recovery request. Do not clear claims or deployment state through database writes. Successful deletion returns 204; confirm the app is absent afterward.

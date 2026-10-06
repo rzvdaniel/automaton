@@ -10,22 +10,32 @@ public sealed class AppDeletionService(
     AppFileStorageService fileStorageService,
     AppDeploymentTargetManagementService? deploymentTargetManagementService = null)
 {
-    public async Task DeleteResourcesAsync(Guid appId, WebApp app, Guid ownerId)
+    public async Task DeleteResourcesAsync(Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false)
     {
+        await using var executor = await AppDeletionExecutionLock.AcquireAsync(dataContext, appId);
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
         Guid? appClaimId = null;
+        var resuming = false;
         var appClaims = new AppDeletionClaimService(dataContext);
         try
         {
-            appClaimId = await appClaims.AcquireAsync(appId);
+            await dataContext.Entry(app).ReloadAsync();
+            resuming = recoverInterrupted && app.DeletionClaimId.HasValue;
+            appClaimId = resuming
+                ? await appClaims.RecoverAsync(executor)
+                : await appClaims.AcquireAsync(appId);
             await dataContext.Entry(app).ReloadAsync();
             if (deploymentTargetManagementService is not null)
             {
                 deletionClaims = await deploymentTargetManagementService
-                    .ClaimAndCleanupAppRuntimesAsync(appId);
+                    .ClaimAndCleanupAppRuntimesAsync(appId, recoverInterrupted: resuming,
+                        assertDeletionOwner: ct => appClaims.AssertOwnedAsync(executor, appClaimId.Value, ct),
+                        deletionClaimId: appClaimId.Value);
             }
 
+            await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             await fileStorageService.DeleteAppAsync(ownerId, appId);
+            await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }
@@ -35,10 +45,12 @@ public sealed class AppDeletionService(
             {
                 dataContext.ChangeTracker.Clear();
                 await deploymentTargetManagementService.ReleaseAppDeletionClaimsAsync(
-                    appId, deletionClaims, CancellationToken.None);
+                    appId, deletionClaims, CancellationToken.None, appClaimId);
             }
 
-            if (appClaimId.HasValue)
+            // Recovery remains a pending deletion intent on failure; admission must
+            // not reopen while older idempotent cleanup commands can still finish.
+            if (appClaimId.HasValue && !resuming)
                 await appClaims.ReleaseAsync(appId, appClaimId.Value, CancellationToken.None);
             throw;
         }

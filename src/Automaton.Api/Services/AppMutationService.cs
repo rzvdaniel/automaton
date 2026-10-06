@@ -194,7 +194,7 @@ public sealed class AppMutationService(
         entity.Tags = AppTagNormalizer.Serialize(app.Tags);
     }
 
-    public async Task Remove(Guid id)
+    public async Task Remove(Guid id, bool recoverInterrupted = false)
     {
         // Check if user can delete this app (must be personal owner AND not part of any project)
         if (!await authorizationService.CanDeleteAppAsync(id))
@@ -223,7 +223,7 @@ public sealed class AppMutationService(
         var appName = app.Name;
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
-        await appDeletionService.DeleteResourcesAsync(id, app, ownerId);
+        await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted);
 
         await mutationAuditService.RecordDeletedAsync(app, ownerId);
 

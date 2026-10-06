@@ -228,9 +228,11 @@ public class AppsController : BaseController
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
+    [ServiceFilter(typeof(AppDeploymentTargetExceptionFilter))]
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] bool recoverInterrupted = false)
     {
-        await appsService.Remove(id);
+        if (recoverInterrupted && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
+        await appsService.Remove(id, recoverInterrupted);
 
         return NoContent();
     }

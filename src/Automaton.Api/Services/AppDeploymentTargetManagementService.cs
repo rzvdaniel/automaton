@@ -287,7 +287,10 @@ public sealed partial class AppDeploymentTargetManagementService(
 
     public async Task<IReadOnlyDictionary<Guid, DeploymentTargetStatus>> ClaimAndCleanupAppRuntimesAsync(
         Guid appId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool recoverInterrupted = false,
+        Func<CancellationToken, Task>? assertDeletionOwner = null,
+        Guid? deletionClaimId = null)
     {
         var targetIds = await dbContext.AppDeploymentTargets
             .AsNoTracking()
@@ -299,16 +302,18 @@ public sealed partial class AppDeploymentTargetManagementService(
         {
             foreach (var targetId in targetIds)
             {
+                if (assertDeletionOwner is not null) await assertDeletionOwner(cancellationToken);
                 claims[targetId] = await targetStateService.ClaimMutationAsync(
                     appId,
                     targetId,
                     "The app cannot be deleted while one of its targets is deploying.",
-                    cancellationToken);
+                    cancellationToken, recoverInterrupted);
             }
 
             var assignedTargets = new List<AppDeploymentTarget>();
             foreach (var targetId in targetIds)
             {
+                if (assertDeletionOwner is not null) await assertDeletionOwner(cancellationToken);
                 var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
                 if (target.ExecutionRunnerId.HasValue)
                 {
@@ -318,15 +323,18 @@ public sealed partial class AppDeploymentTargetManagementService(
             }
 
             foreach (var runnerTargets in assignedTargets.GroupBy(target => target.ExecutionRunnerId))
+            {
+                if (assertDeletionOwner is not null) await assertDeletionOwner(cancellationToken);
                 await runtimeCleanupService.CleanupRuntimeAsync(
                     runnerTargets.First(), cancellationToken, deleteApplicationStorage: true);
+            }
 
             return claims;
         }
         catch
         {
             dbContext.ChangeTracker.Clear();
-            await ReleaseAppDeletionClaimsAsync(appId, claims, CancellationToken.None);
+            await ReleaseAppDeletionClaimsAsync(appId, claims, CancellationToken.None, deletionClaimId);
             throw;
         }
     }
@@ -334,12 +342,13 @@ public sealed partial class AppDeploymentTargetManagementService(
     public async Task ReleaseAppDeletionClaimsAsync(
         Guid appId,
         IReadOnlyDictionary<Guid, DeploymentTargetStatus> claims,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? deletionClaimId = null)
     {
         foreach (var claim in claims)
         {
             await targetStateService.ReleaseMutationAsync(
-                appId, claim.Key, claim.Value, cancellationToken);
+                appId, claim.Key, claim.Value, cancellationToken, deletionClaimId);
         }
     }
 
