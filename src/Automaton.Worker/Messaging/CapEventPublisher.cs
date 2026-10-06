@@ -14,6 +14,7 @@ public sealed class CapEventPublisher(ICapPublisher capPublisher) : IEventPublis
 
         return message switch
         {
+            ScheduledActionExecutionRequestedEvent => capPublisher.PublishAsync(EventTopics.ScheduledActionExecutionRequested, message, cancellationToken: cancellationToken),
             UserRegisteredEvent => capPublisher.PublishAsync(EventTopics.UserRegistered, message, cancellationToken: cancellationToken),
             ManagedRunnerProvisionRequestedEvent => capPublisher.PublishAsync(EventTopics.ManagedRunnerProvisionRequested, message, cancellationToken: cancellationToken),
             InfrastructureCommandRequestedEvent => capPublisher.PublishAsync(EventTopics.InfrastructureCommandRequested, message, cancellationToken: cancellationToken),
