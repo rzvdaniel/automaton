@@ -124,7 +124,7 @@ public sealed class ActionScheduleService
         var userId = schedule.OwnerUserId ?? Guid.Empty;
         var capability = await GetCapabilityAsync(userId, administrator: system, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-        await ValidateEffectiveAsync(schedule, userId, administrator: system, capability, DateTime.UtcNow, ct);
+        await ValidateEffectiveAsync(schedule, userId, administrator: system, capability, DateTime.UtcNow, ct, requireFutureRun: false);
     }
 
     private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, bool administrator, ScheduledActionsCapability capability, CancellationToken ct)
@@ -158,7 +158,7 @@ public sealed class ActionScheduleService
     internal static void ApplyTimingFields(ActionSchedule schedule, SaveActionScheduleRequest request)
         => ActionSchedulePolicy.ApplyTimingFields(schedule, request);
 
-    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, bool administrator, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct)
+    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, bool administrator, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
     {
         var system = schedule.OwnerType == ActionScheduleOwnerTypes.System;
         if (system != InfrastructureAppTrust.IsTrustedApp(schedule.ApplicationId))
@@ -182,7 +182,8 @@ public sealed class ActionScheduleService
         ActionSchedulePolicy.ValidateSchedule(
             schedule,
             Math.Max(capability.MinimumIntervalSeconds, manifest.Spec.MinimumIntervalSeconds),
-            nowUtc);
+            nowUtc,
+            requireFutureRun);
     }
 
     internal static void ValidateSchedule(ActionSchedule schedule, int minimumIntervalSeconds, DateTime nowUtc)
