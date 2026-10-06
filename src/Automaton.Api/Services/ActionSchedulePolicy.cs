@@ -16,12 +16,14 @@ internal static class ActionSchedulePolicy
         schedule.CronExpression = request.ScheduleType == ActionScheduleTypes.Cron ? request.CronExpression?.Trim() : null;
     }
 
-    internal static void ValidateSchedule(ActionSchedule schedule, int minimumIntervalSeconds, DateTime nowUtc)
+    internal static void ValidateSchedule(ActionSchedule schedule, int minimumIntervalSeconds, DateTime nowUtc, bool requireFutureRun = true)
     {
         _ = GetTimeZone(schedule.TimeZone);
         if (schedule.ScheduleType == ActionScheduleTypes.OneTime)
         {
-            if (!schedule.RunAtUtc.HasValue || schedule.RunAtUtc <= nowUtc)
+            if (!schedule.RunAtUtc.HasValue)
+                throw new InvalidOperationException("One-time run time is required.");
+            if (requireFutureRun && schedule.RunAtUtc <= nowUtc)
                 throw new InvalidOperationException("One-time run must be in the future.");
         }
         else if (schedule.ScheduleType == ActionScheduleTypes.Interval)

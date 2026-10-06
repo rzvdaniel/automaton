@@ -77,6 +77,69 @@ public sealed class ActionScheduleEnableValidationTests
         Assert.That(async () => await fixture.EnableAsync(), Throws.InvalidOperationException);
     }
 
+    [TestCase(1)]
+    [TestCase(60)]
+    [TestCase(86400)]
+    public async Task Dispatch_AcceptsDueOrDelayedOneTimeSchedule(int delaySeconds)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
+        fixture.Schedule.IntervalSeconds = null;
+        fixture.Schedule.RunAtUtc = DateTime.UtcNow.AddSeconds(-delaySeconds);
+        // One-time schedules are disabled by the Worker after publishing their occurrence.
+        fixture.Schedule.Enabled = false;
+        await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None);
+        Assert.That(fixture.Resolver.Calls, Is.EqualTo(1));
+        await Assert.ThatAsync(async () => await fixture.EnableAsync(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public async Task Dispatch_RejectsOneTimeScheduleWithoutRunTime()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
+        fixture.Schedule.RunAtUtc = null;
+        await Assert.ThatAsync(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
+            Throws.InvalidOperationException.With.Message.EqualTo("One-time run time is required."));
+    }
+
+    [Test]
+    public async Task Dispatch_StillRejectsRemovedPermission()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
+        fixture.Schedule.RunAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        fixture.Resolver.Error = new UnauthorizedAccessException("permission removed");
+        await Assert.ThatAsync(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
+            Throws.TypeOf<UnauthorizedAccessException>());
+    }
+
+    [Test]
+    public async Task Dispatch_StillRejectsRemovedPlanCapability()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
+        fixture.Schedule.RunAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        fixture.Plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
+        {
+            ScheduledActions = new ScheduledActionsCapability { Enabled = false }
+        });
+        await fixture.Db.SaveChangesAsync();
+        await Assert.ThatAsync(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
+            Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public async Task Dispatch_StillRejectsActionNoLongerSchedulable()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.ScheduleType = ActionScheduleTypes.OneTime;
+        fixture.Schedule.RunAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        fixture.Resolver.Manifest.Spec.Schedulable = false;
+        await Assert.ThatAsync(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
+            Throws.InvalidOperationException.With.Message.EqualTo("The Action manifest does not allow scheduling."));
+    }
+
     [Test]
     public async Task Enable_RevalidatesAndPersistsFutureOccurrence()
     {
