@@ -24,6 +24,26 @@ The hosted AI authoring/agent runtime, visual workflow designer and management-a
 
 This scope intentionally accepts a smaller product and some breaking changes. The migration inventory must expose those changes account by account before cutover.
 
+### SaaS and on-premises operating model
+
+Automaton SaaS is a first-class delivery configuration of this same open-source platform. Offer managed hosting and BYO hosting through the same hosted Studio, API, CLI and Runner protocol. A fully self-hosted installation uses the same versioned artifacts with local configuration and billing/provider purchase features disabled. Do not create separate hosted and on-premises product forks.
+
+The operator reports the current deployment as API/Studio on one server and customer app containers on a second server. Preserve that separation of control-plane and application workloads. Consolidate the control-plane services on the first server initially, subject to measured capacity. Replace shared customer placement on the second server with provider-managed account VMs, allocated as customers provision managed hosting. Existing customer data on the second server follows the offline migration before that server is retired or reassigned; do not assume it is empty or can be repurposed during development.
+
+The second server is not automatically a VM host in this plan. Running our own hypervisor fleet would add VM packing, physical-host recovery and another infrastructure lifecycle; defer it. Customer-owned VMs, including suitable VMs hosted on a company's own virtualization infrastructure, enroll through the same Runner contract without Automaton managing that hypervisor.
+
+Define operational responsibility explicitly:
+
+- **Managed SaaS:** Automaton operates the control plane and the provisioned account VM, including supported Runner/runtime updates, OS maintenance, DNS/certificates for platform domains, agreed backups and recovery procedures. App code and external app dependencies remain the customer's responsibility unless separately managed. OS maintenance starts with an operator runbook; automatic OS administration remains deferred.
+- **SaaS with a customer VM:** Automaton operates the control plane and supplies the supported Runner/runtime software. The customer owns the VM, OS maintenance, network/DNS access and external dependencies. Enrollment authorizes the documented app operations, not unrestricted machine administration or deletion. State who operates configured backups and verifies restores before enabling stateful hosting.
+- **Fully self-hosted:** the installation owner operates the control plane, VMs, registry/artifact storage, network, updates and backups. Automaton supplies the same release packages and tested installation/upgrade/recovery documentation. Operation does not depend on an Automaton cloud account or commercial billing service.
+
+For each mode, the customer workflow is connect/provision a machine, publish an app, attach a domain, then inspect health/logs and manage releases. Runner roles, broker queues and deployment colors are not user-facing concepts. Public app traffic stays on the deployment VM; control-plane maintenance pauses management operations without stopping existing public apps. Private-app authentication retains the availability exception in section 6.
+
+Commercial entitlements govern platform access, permitted machine provisioning and application policy; they must not create a different execution path. Managed pricing must account for idle VM rental, addresses, backups, retained images/artifacts, traffic and control-plane/support costs. No free or inactive account implicitly receives a billable VM. Record provisioning limits, cancellation/grace/retention policy, backup scope and who authorizes destructive deletion before the managed service launches. Paying for BYO SaaS does not imply Automaton can resize or delete the customer's hardware.
+
+Treat SaaS capacity and isolation as release acceptance: authenticate every machine/operation/log request, bound per-account outstanding work and build concurrency, verify fair progress for another account while one is busy, reconcile provider costs/resources, and expose failed provisioning and overdue backups to operators. Open-source availability and the managed service share one codebase; the hosted offering provides installation, operations and support rather than a separate proprietary execution architecture.
+
 ## 2. What source review supports
 
 Reviewed revision: `57941d9971f58409356a74cbcf2529292c2f8a61`. The original review also inspected uncommitted runtime-admission/shared-static work; that work was subsequently discarded at the user's request when this roadmap was moved into the repository. It is not part of the implementation baseline. This is a source review, not a production inventory or runtime acceptance result.
@@ -225,6 +245,16 @@ Review dependencies before deleting entire files or projects; these names identi
 
 Each stage produces working evidence and a smaller final codebase. Implementation stays in the existing checkout/branch. Check the working tree before implementation and preserve unrelated changes unless the user explicitly authorizes discarding them. No production rollout occurs before all cutover gates pass.
 
+### Implementation readiness and planning depth
+
+This roadmap is sufficient to start Stage 0 and prepare the first implementation slices. It is not an exact schema, wire-protocol specification or production cutover runbook. Resolve those contracts immediately before the dependent work. Do not delay the first working VM for a complete design of every later feature, and do not begin destructive cleanup or production conversion from architectural prose alone.
+
+Use the ordered slices below as the initial implementation backlog. Before coding a slice, record its concrete files/features, prerequisites, request/data contracts, failure behavior, acceptance tests and removal scope. Keep decisions and completion evidence with the relevant stage in this roadmap; link a focused schema/protocol/runbook document only when the detail would obscure the roadmap. Do not create a second competing execution plan or a generic orchestration framework for tracking this work.
+
+Keep commits small and independently reviewable. A development branch may temporarily contain old code while replacements are completed, but no mixed backend release, production feature switch or executable compatibility path is an accepted outcome. Remove obsolete code as each replacement becomes testable; Stage 4 is the final deletion audit. Interim artifacts are for disposable acceptance only until the complete release passes its cutover gates.
+
+For C# slices, capture affected-project analyzer diagnostics before editing, run the affected non-incremental Debug build afterward, and run the all-project non-incremental Debug build plus affected tests before handoff, as required by `AGENTS.md`. Record pre-existing unrelated failures without suppressing them. Studio changes require its type/build and visual checks; touched production shell scripts require syntax checks. A passed test or build does not imply live VM or migration acceptance.
+
 ### Stage 0 — Freeze scope and inventory
 
 Inventory accounts, apps, environments, private/public routes, tunnel reliance, databases/volumes, source, secrets, active operations and Actions/workflow-only content. Categorize every item as migrate, export/archive or explicitly retire. Record all unsupported apps and dependency blockers; no silent exclusion.
@@ -233,11 +263,31 @@ Choose one provider, cost/entitlement policy, supported machine image/storage la
 
 **Gate:** every retained feature and data category has an owner and destination; the machine/control-plane contracts are precise enough to implement; no unresolved assumption can silently expose data or destroy a workload.
 
+Implement Stage 0 as these ordered deliverables:
+
+1. **0.1 — Baseline and dependency inventory.** Record the implementation revision and inspect the retained API, Worker registrations, Runner execution/transport paths, CLI, Studio, schema and release scripts. Produce a keep/replace/delete list with concrete files and their consumers. Inventory current workloads and data through supported read-only inspection when access is available; record unavailable inventory explicitly rather than inventing counts. Identify apps requiring tunnels, private authentication, multiple services or nonportable data.
+2. **0.2 — Freeze the first-slice contracts.** Specify machine ownership/enrollment/revocation, image-release manifest, desired/observed deployment state, operation transitions, generation fencing, cancellation/unknown outcomes and persistent-volume identity. Define the minimal API payloads and database constraints, plus the Runner journal format/version. Locate each responsibility in an existing feature or a narrowly scoped new feature. Keep provider-specific details out of app contracts. These are the concrete reviewable inputs to Stage 1, not another broad architecture proposal.
+3. **0.3 — Record installation and operating decisions.** Fix the supported VM/storage profile, first test registry, artifact/key-ring location, Traefik route/certificate policy and isolated test environment. Record the initial provider and managed/BYO responsibility, entitlement and cost policies when settled. Unresolved commercial/provider choices block managed provisioning, not .NET modernization or a manually enrolled disposable VM. Keep all production migrations and resource purchases separate from source implementation.
+4. **0.4 — Establish acceptance fixtures and traceability.** Select a small stateless web image, a persistent-data web image and a static image, with two independent account identities. Specify observable results for restart, lost acknowledgement, conflicting requests, stale credentials and control-plane outage. Map each mandatory requirement in section 10 to its implementation slice and acceptance gate. Fixtures must use synthetic data and explicit disposable-resource configuration.
+
+Stage 0 produces actual inventory/contract decisions before it is marked complete. Its production-dependent findings may remain open during isolated development, but every such finding must be resolved before the relevant migration or launch gate. No existing production acceptance is implied by writing this backlog.
+
 ### Stage 1 — Modern foundation and one deployable VM
 
 Validate the .NET 10 dependency matrix. Build the small self-hosted control-plane bundle and one manually enrolled Runner. Deploy a prebuilt image with a domain, health check, limits and a persistent mount. Implement HTTPS work polling, journal recovery and local ingress. Prove app/container confinement and machine headroom. Use the old implementation only as a reference; the prototype is a slice of the new implementation, not a second production backend.
 
 **Gate:** install from release artifacts on clean infrastructure; publish through CLI and Studio; survive control-plane/Runner restarts and lost result acknowledgements; reject a second account's access. Public serving survives a control-plane outage. Two API replicas cannot execute conflicting mutations.
+
+Implement Stage 1 in these reviewable slices, with each slice depending on the previous one unless its prerequisites are independently satisfied:
+
+1. **1.1 — Supported runtime and control-plane package.** Validate and apply the .NET 10/EF provider/CAP/MySQL dependency matrix. Produce the reference API/Studio, database, broker and Traefik bundle with explicit durable storage, secret configuration and health checks. Keep unrelated runtime rewrites out of the dependency change. Acceptance is a clean build and disposable installation with identity and database access; no hidden Automaton SaaS dependency.
+2. **1.2 — Machine identity and durable desired state.** Implement the agreed machine/release/operation records, fresh-schema setup, account authorization and manually issued enrollment. The credential is bound to one machine/owner and can be revoked. Implement idempotent request acceptance, conditional claims and version checks using real MySQL tests with concurrent callers. Do not create provider VMs yet or add an old-schema adapter.
+3. **1.3 — HTTPS Runner and recovery journal.** Install the one Runner as a systemd service, authenticate its polling/results/heartbeat calls and persist accepted work/results locally. Implement generation checks, duplicate-result handling and interrupted-operation reconciliation. Test lost acknowledgements, process death and a result arriving at another API replica. Connectivity loss must not mark a still-serving deployment failed or authorize destructive replacement.
+4. **1.4 — Safe image deployment and local ingress.** Pull a digest-pinned fixture image, create only owned/container-labeled resources with limits and allowed mounts, serialize deployment changes, verify readiness and apply Traefik routes atomically. Persist the accepted release/route state and reconnect after a VM reboot. Verify public access, foreign-account management denial, stale-route removal and no direct-origin authentication bypass where protection is configured. No host-process app fallback or Docker-socket exposure.
+5. **1.5 — Thin CLI and Studio workflow.** Expose connect-machine, deploy-image, operation status, stop/start and bounded health/log reads through the same API. Studio displays machine connectivity separately from app health, and the CLI waits for a terminal deployment result. Keep provider purchases, source builds, Actions and infrastructure-admin screens out of this slice. Generate typed clients/models from the agreed API contract.
+6. **1.6 — End-to-end acceptance and evidence.** Run the clean-install/publish/restart/recovery sequence with two accounts and two API replicas on disposable infrastructure. Verify a persistent marker across app update and VM reboot, rejection of stale/revoked credentials, and continued public serving while the control plane is unavailable. Record exact release artifacts, results and unresolved limitations. This gate proves the foundation; it is not the production migration or the complete managed offering.
+
+After 1.6, detail Stage 2 using the demonstrated contracts. Expand each later stage before starting it, preserving its existing scope and gates. The exact offline importer and cutover runbook belong after the new deployment path is proven, while the workload inventory remains an early input.
 
 ### Stage 2 — Useful publishing and data recovery
 
@@ -250,6 +300,8 @@ Add the Dockerfile/source path through isolated BuildKit and the selected regist
 Implement the first provider's create/reconcile/delete flow and the SSH bootstrap using the same enrollment contract. Add basic capacity/health views and explicit ownership/deletion consequences. Keep resize and general OS management out. Package independent self-hosting, backup and upgrade instructions; demonstrate an internal installation using internal domains and registries.
 
 **Gate:** duplicated/time-out provisioning requests create at most the intended billable resource after reconciliation; interrupted setup resumes; customer disconnection leaves the server intact; provider failure does not trigger destructive cleanup. The complete product works without an Automaton SaaS dependency.
+
+Before declaring the SaaS offering ready, exercise both managed and BYO onboarding through the same Studio/API, account entitlements, cancellation/retention outcomes, operator recovery and cross-account workload fairness. Publish the responsibility and backup scope for both offers. Independently validate the same release installed on a company's private network without Automaton-hosted identity, billing, registry or control-plane services. Do not retire or repurpose the current application server until Stage 6 has reconciled its workloads and recovery copies.
 
 ### Stage 4 — Delete legacy code and implement offline conversion
 
