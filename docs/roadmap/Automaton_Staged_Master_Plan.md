@@ -236,6 +236,10 @@ P3 reuses S06/S07 billing/pilot briefs after updating Hosted Runner references t
 
 R1 reuses S08 workerd/V8 lab comparisons; R2 reuses S09 microVM comparisons. Node runtime extension stays a narrow capability proposal, not a plugin framework built before a second engine exists. A successful experiment needs a separate integration brief with security, image/kernel lifecycle, network/storage, operations, admission, cancellation and rollout requirements. Stronger isolation required by an accepted threat model cannot be waived for economy.
 
+## Detailed slice briefs
+
+All N0–N4 subsection briefs are available in the [Node execution index](node-execution/README.md), with a shared [execution contract](node-execution/EXECUTION-CONTRACT.md). Start with [N0-A](node-execution/N0-A-responsibility-audit.md). Later briefs are authored now; their dependency gates and code-level specification steps must be satisfied from actual preceding findings before implementation.
+
 ## Workflow for Luna-sized implementation
 
 Give Luna this plan's global boundaries, ONE named slice and the handoff below. Each slice is a maximum scope; split further when it spans several independently reviewable changes. Audits do not authorize implementation, and implementation does not authorize production migration. Follow session authorization and repository deployment rules; do not introduce an extra confirmation for already authorized reversible work.
@@ -250,7 +254,7 @@ Give Luna this plan's global boundaries, ONE named slice and the handoff below. 
 
 ### Copyable first task
 
-> Execute N0-A ONLY from the revised Node-first plan in the existing rzvdaniel/automaton checkout. Read AGENTS.md, matching skills, the canonical managed-platform roadmap and RM/runtime contracts. Verify branch/HEAD/worktree and current merged/deployed status. Inventory every Infrastructure Runner and Hosted Runner responsibility, durable identity, privilege, storage relationship and supported BYO behavior. Produce the responsibility map, factual unknowns and next smallest N0-B task. Do not implement, deploy, merge or mutate production.
+> Execute N0-A ONLY from the revised Node-first plan in the existing rzvdaniel/automaton checkout. Read AGENTS.md, matching skills, this master plan, the detailed N0-A brief and RM/runtime contracts. Verify branch/HEAD/worktree and current merged/deployed status. Inventory every Infrastructure Runner and Hosted Runner responsibility, durable identity, privilege, storage relationship and supported BYO behavior. Produce the responsibility map, factual unknowns and next smallest N0-B task. Do not implement, deploy, merge or mutate production.
 
 ### One-slice handoff contract
 
