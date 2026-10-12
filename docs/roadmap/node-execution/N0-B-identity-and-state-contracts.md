@@ -1,5 +1,5 @@
 # N0-B — identity and state contracts
-Status: authored; dependency-gated. No implementation or live acceptance is claimed.
+Status: specification-ready; [proposed contracts](results/N0-B-contracts.md), recorded 2026-10-12 against `64922354380276c5e0068515858769dbed61817f`. Independent security/tenancy/fencing review is pending. No implementation or live acceptance is claimed.
 Mode: design. Prerequisites: N0-A.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
