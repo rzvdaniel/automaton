@@ -2,7 +2,7 @@
 
 The [master plan](../Automaton_Staged_Master_Plan.md) owns scope and sequencing. These 21 briefs elaborate every N0–N4 subsection; they do not introduce another roadmap.
 
-**Current task: N0-B amendment review only.** [N0-A source audit](results/N0-A-responsibility-audit.md) was reviewed at `64922354`. [N0-B contracts](results/N0-B-contracts.md) now specify deduplication before workload allocation and explicit recovery across Node incarnations; review is pending. mTLS is a proposed security decision (S-B1), not an approved implementation requirement. N0-C has not been started and must not proceed yet. Runtime consumers remain gated on review and the complete N0 exit; deployment/live state remains unverified.
+**Current task: N0-C design specified; review pending.** [N0-A source audit](results/N0-A-responsibility-audit.md) was reviewed at `64922354`. [Amended N0-B contracts](results/N0-B-contracts.md) supply pre-allocation deduplication and cross-incarnation recovery. The user subsequently authorized [N0-C migration design](results/N0-C-migration-design.md), covering storage/cgroup adoption, host-wide fencing, outstanding-effect settlement and cutover/rollback proofs. This authorization does not constitute independent contract review. mTLS remains proposed S-B1, not approved. N0-D has not been executed; runtime consumers and live migration remain gated on review and the complete N0 exit.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Each brief includes ordered work, required deliverables, failure scenarios, observations and a copyable task. Refine code-level contracts in the result record before implementing their consumers; do not wait for another author to provide a later brief.
 
@@ -12,7 +12,7 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 | --- | --- | --- | --- |
 | N0-A | [responsibility audit](N0-A-responsibility-audit.md) | none | source audit complete; [evidence](results/N0-A-responsibility-audit.md) |
 | N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | specification-ready amendment; [proposal](results/N0-B-contracts.md), review pending |
-| N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | not started; held pending N0-B amendment review |
+| N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | design specified; [proposal](results/N0-C-migration-design.md), review/live evidence pending |
 | N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | dependency-gated |
 | N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | dependency-gated |
 | N1-B | [durable typed commands](N1-B-durable-typed-commands.md) | N1-A | dependency-gated |
@@ -44,7 +44,7 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 
 Store actual audit/specification/test/rollout evidence under results/ with the filename declared by the brief, and add its link here when created. [N0-A responsibility audit](results/N0-A-responsibility-audit.md) records the 2026-10-12 source baseline, dispositions, recovery traces and unavailable live observations. Keep current readiness separate from code-merged, tested, deployed and live-accepted states. Do not create placeholder results that imply work was done.
 
-[N0-B identity/state contracts](results/N0-B-contracts.md) record proposed Node mapping, locally checked fences, RM reuse, authorization/journal schemas and BYO/legacy support scope. The user's N0-A source review permits this specification work; it does not approve these eventual security contracts. PR #369 carries N0 documentation; N0-C/N0-D are not completed by this record.
+[N0-B identity/state contracts](results/N0-B-contracts.md) record proposed Node mapping, locally checked fences, RM reuse, authorization/journal schemas and BYO/legacy support scope. The user's N0-A source review permits this specification work; it does not approve these eventual security contracts. PR #369 carries N0 documentation. [N0-C migration design](results/N0-C-migration-design.md) is now specified under subsequent user authorization; N0-D remains unexecuted.
 
 Later slices may perform preparation against code while live inventory is unavailable, but cannot pass the dependent cutover or release gate without evidence. Independent review for high-risk contracts is part of readiness; a model writing a brief is not that review.
 

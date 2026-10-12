@@ -2,6 +2,8 @@
 
 Recorded 2026-10-12 against `64922354380276c5e0068515858769dbed61817f`, branch `codex/n0-a-responsibility-audit`, clean initial worktree. Amended against `d2985a657628bdab78495409e7e236c9bf0c1ac5` to clarify pre-allocation request deduplication and cross-incarnation recovery. This is a proposed N0-B specification awaiting review; N0-C has not been started and is held pending this amendment review; it is not implemented, tested, independently security-reviewed, deployed or live-accepted.
 
+Subsequent scope update: the user explicitly authorized N0-C using this amendment; see [N0-C migration design](N0-C-migration-design.md). References below to holding N0-C record this amendment's original handoff, now superseded for design work only. Independent review and S-B1 approval remain pending.
+
 The user reviewed [N0-A](N0-A-responsibility-audit.md) at `64922354` and reported no blocking source-audit findings, permitting N0-B. That review does not approve the contracts below. [PR #369](https://github.com/rzvdaniel/automaton/pull/369) is the shared N0 documentation PR; N0-C/N0-D remain separate task scopes. The [master plan](../../Automaton_Staged_Master_Plan.md) and [execution contract](../EXECUTION-CONTRACT.md) govern this proposal.
 
 ## Current mechanisms and selected reuse

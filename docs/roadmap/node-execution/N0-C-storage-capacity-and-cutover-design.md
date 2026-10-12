@@ -1,5 +1,5 @@
 # N0-C — storage capacity and cutover design
-Status: authored; dependency-gated. No implementation or live acceptance is claimed.
+Status: design specified in [N0-C migration design](results/N0-C-migration-design.md) under explicit user authorization using amended N0-B. Independent review and implementation/live evidence remain pending. No implementation or live acceptance is claimed.
 Mode: design. Prerequisites: N0-B.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
