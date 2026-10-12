@@ -55,6 +55,7 @@ internal static class ApiApplicationPipelineExtensions
     {
         app.UseForwardedHeaders();
         app.UseRouting();
+        app.UseMiddleware<NodeListenerRouteIsolationMiddleware>();
         ApiRequestLoggingMiddleware.Configure(app, logSuccessfulRequests);
         app.UseRateLimiter();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -70,6 +71,7 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
         app.MapControllers();
+        app.MapNodeEnrollmentEndpoints();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapFallbackToPage("/_Host");

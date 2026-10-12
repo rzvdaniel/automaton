@@ -97,6 +97,7 @@ internal static class ApiFeatureServiceRegistration
         services.AddApiAppCatalogServices();
         services.AddApiAppExecutionServices(applicationBuilder);
         services.AddApiRunnerServices(applicationBuilder);
+        services.AddNodeEnrollmentServices(applicationBuilder.Configuration);
         services.AddApiEmailService(applicationBuilder, configurationService);
         services.AddApiAccountServices();
         services.AddApiOperationsServices();
@@ -127,6 +128,7 @@ internal static class ApiCoreOptionRegistration
         services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
         services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
         services.Configure<RunnerEnrollmentOptions>(applicationBuilder.Configuration.GetSection(RunnerEnrollmentOptions.SectionName));
+        services.Configure<NodeListenerOptions>(applicationBuilder.Configuration.GetSection(NodeListenerOptions.SectionName));
         services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
         services.Configure<InfrastructureRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(InfrastructureRunnerRabbitMqOptions.SectionName));
         services.Configure<HostedRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(HostedRunnerRabbitMqOptions.SectionName));

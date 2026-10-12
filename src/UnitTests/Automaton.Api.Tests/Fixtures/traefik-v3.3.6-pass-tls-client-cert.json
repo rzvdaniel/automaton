@@ -1,0 +1,15 @@
+{
+  "image": "traefik@sha256:83f3c843133530e4aa45e6ddc415488583a8a01c88adc5022d415c6e97ceeaae",
+  "version": "3.3.6",
+  "capturedAtUtc": "2026-10-12T19:25:37Z",
+  "capture": {
+    "middleware": "PassTLSClientCert.pem=true",
+    "clientAuth": "RequireAnyClientCert",
+    "identity": "synthetic-node-fixture",
+    "certificateDerLength": 451,
+    "privateKeyCommitted": false
+  },
+  "headerName": "X-Forwarded-Tls-Client-Cert",
+  "headerValue": "MIIBvzCCASCgAwIBAgIJAJzk+EQ2XQsgMAoGCCqGSM49BAMCMCExHzAdBgNVBAMTFnN5bnRoZXRpYy1ub2RlLWZpeHR1cmUwHhcNMjYxMDEyMTkyNTQ0WhcNMjYxMDEzMTkyNjQ0WjAhMR8wHQYDVQQDExZzeW50aGV0aWMtbm9kZS1maXh0dXJlMIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBWCy/kkYCc0tpo2WyN7eA7AGoFRhyWSnTs1O6Bq79nEplRW5iyYOqLm0KN3RjuDs4zCk1A8RJPW/o5EhPd0Rp54wB8Pe8xykUDKui+tR4jQR2ZlubVyqz66XI02YalYTY0lAsf/T21B+qqTUlIezIVN1zLEChwj5kJMUWPnn2EO+G4VQwCgYIKoZIzj0EAwIDgYwAMIGIAkIBLg+AIMDUYjzEes8HV05mCXDZTb4AINJ6utw3WJIBykdC15DxuVJ2ksCD86okP9Iu7HkxqayNFsLD2veEhfgn+vQCQgCcPjiFXh+AmtMcu/+UtwphSsdfbHOpVPKhlSuvNBtJtlcyjm/CyeG26rlXc2ZNd7Vntz8Jf3wmffVpKoAdSxeIEg==",
+  "sha256DerFingerprint": "3B8498DC05FACDE97C92E598548B7B59CFFA699E6115EFB5334612F5C3742B36"
+}

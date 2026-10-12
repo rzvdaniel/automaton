@@ -10,27 +10,17 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Automaton.Api.Data
 {
-    public class ApplicationDbContext : ApplicationDbContextEntitySetBase2, IDataContext
+    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
+        Justification = "This EF Core context intentionally maps the shared database model and exposes its entity sets. Splitting declarations across base classes would hide coupling without separating responsibilities.")]
+    public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>, ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>, IDataContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
         private IDbContextTransaction _transaction;
-
-
-        // GitHub integration
-
-        // Project/Organization entities
-
-        // Organization entities
-
-        // AI Chat History entities
-
-        // User Settings
-
-        // Subscription plans
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -42,6 +32,7 @@ namespace Automaton.Api.Data
             base.OnModelCreating(modelBuilder);
             CoreModelConfiguration.Apply(modelBuilder);
             RunnerModelConfiguration.Apply(modelBuilder);
+            NodeEnrollmentModelConfiguration.Apply(modelBuilder);
             RunnerStorageModelConfiguration.Apply(modelBuilder);
             SchedulingModelConfiguration.Apply(modelBuilder);
             ApplicationModelConfiguration.Apply(modelBuilder);
