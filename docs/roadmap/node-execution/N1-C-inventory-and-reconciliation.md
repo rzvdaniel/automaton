@@ -1,5 +1,5 @@
 # N1-C — inventory and reconciliation
-Status: authored; dependency-gated. No implementation or live acceptance is claimed.
+Status: authored; limited preparation and blocked consumer scopes are defined in [N0-D readiness](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). Full slice entry/exit remains gated. No implementation or live acceptance is claimed.
 Mode: implementation. Prerequisites: N1-B.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.

@@ -1,8 +1,8 @@
 # N0-B — Node identity, authority and durable operation contracts
 
-Recorded 2026-10-12 against `64922354380276c5e0068515858769dbed61817f`, branch `codex/n0-a-responsibility-audit`, clean initial worktree. Amended against `d2985a657628bdab78495409e7e236c9bf0c1ac5` to clarify pre-allocation request deduplication and cross-incarnation recovery. This is a proposed N0-B specification awaiting review; N0-C has not been started and is held pending this amendment review; it is not implemented, tested, independently security-reviewed, deployed or live-accepted.
+Recorded 2026-10-12 against `64922354380276c5e0068515858769dbed61817f`, branch `codex/n0-a-responsibility-audit`, clean initial worktree. Amended against `d2985a657628bdab78495409e7e236c9bf0c1ac5` to clarify pre-allocation request deduplication and cross-incarnation recovery. This is a proposed N0-B specification awaiting review; it is not implemented, tested, independently security-reviewed, deployed or live-accepted.
 
-Subsequent scope update: the user explicitly authorized N0-C using this amendment; see [N0-C migration design](N0-C-migration-design.md). References below to holding N0-C record this amendment's original handoff, now superseded for design work only. Independent review and S-B1 approval remain pending.
+Subsequent scope update: the user authorized N0-C and N0-D design. [N0-D consolidation](N0-D-architecture-and-acceptance.md) supplies mandatory realm/recovery-epoch fields, restore and route-writer contracts, final dependency/support decisions and current readiness. Independent review and S-B1 selection remain pending. Its field additions apply before any schema-v1 consumer is implemented; the examples below include the required realm/epoch binding.
 
 The user reviewed [N0-A](N0-A-responsibility-audit.md) at `64922354` and reported no blocking source-audit findings, permitting N0-B. That review does not approve the contracts below. [PR #369](https://github.com/rzvdaniel/automaton/pull/369) is the shared N0 documentation PR; N0-C/N0-D remain separate task scopes. The [master plan](../../Automaton_Staged_Master_Plan.md) and [execution contract](../EXECUTION-CONTRACT.md) govern this proposal.
 
@@ -112,7 +112,7 @@ These are new DTO specifications extending RM, not current API routes/models. Us
 Broker notification (identity only, no paths, scripts, limits or secrets):
 
 ```json
-{"schemaVersion":1,"operationId":"10000000-0000-0000-0000-000000000001","runnerId":"20000000-0000-0000-0000-000000000001","nodeId":"30000000-0000-0000-0000-000000000001","incarnation":"4"}
+{"schemaVersion":1,"controlPlaneRealmId":"40000000-0000-0000-0000-000000000001","recoveryEpoch":"2","operationId":"10000000-0000-0000-0000-000000000001","runnerId":"20000000-0000-0000-0000-000000000001","nodeId":"30000000-0000-0000-0000-000000000001","incarnation":"4"}
 ```
 
 `runnerId` is the Node TransportRunnerId, retaining current queue naming/routing. Extend the existing dispatch event/command with versioned Node identity; broker notifications only wake HTTPS assignment. Queue order is not ownership authority. Notification incarnation mismatch is discarded/reported without effect, never adopted into local state. Management uses its separate bounded consumer for cancellation, reads, reconciliation and tunnel reconnect; concurrency comes from validated configuration and account admission, not a second per-Node entitlement limit.
@@ -121,6 +121,7 @@ Required canonical request fields:
 
 | Field / .NET type | Rules |
 | --- | --- |
+| `controlPlaneRealmId : Guid`, `recoveryEpoch : long` | Required trusted realm and positive epoch, pinned locally and included in digest. [N0-D restore protocol](N0-D-architecture-and-acceptance.md#restore-fencing-an-epoch-outside-the-restored-database) governs advancement; ordinary commands cannot adopt a new realm/epoch. |
 | `schemaVersion : int`, `operationId : Guid`, `operationKind : enum` | Version exactly 1, nonempty ID, one finite allowlisted operation. Immutable on admission. |
 | `nodeId`, `transportRunnerId : Guid`, `incarnation : long` | All required; exact active Node/key/session binding with the reviewed client-proof mechanism; certificate proof is conditional on S-B1 selection. |
 | `scope : enum` | `host` or `account`; never inferred from a missing account ID. Host-scoped kinds use host configuration revision instead of account placement fields. |
@@ -147,6 +148,8 @@ Concrete host request example (all IDs are synthetic; nullable fields are explic
 ```json
 {
   "schemaVersion": 1,
+  "controlPlaneRealmId": "40000000-0000-0000-0000-000000000001",
+  "recoveryEpoch": "2",
   "operationId": "10000000-0000-0000-0000-000000000001",
   "operationKind": "InspectNode",
   "nodeId": "30000000-0000-0000-0000-000000000001",
@@ -306,7 +309,7 @@ Existing relevant tests inspected/referenced: Runner `RunnerExecutionProcessorTe
 
 ## Readiness, dependent decisions and handoff
 
-N0-B specification drafted with identity mapping, typed schemas, replay/fencing/journal semantics and explicit support choices. The mandatory scenarios have specified observations; none is claimed proven in a running Node. Independent review of identity, mTLS/proxy trust, local fencing, tenancy and compatibility decisions is pending; source-audit review cannot substitute. This amendment remains N0-B only; do not proceed to N0-C until its request-deduplication/recovery changes are reviewed. N1 consumers/release must not proceed before review and the complete N0 gate.
+N0-B specification drafted with identity mapping, typed schemas, replay/fencing/journal semantics and explicit support choices. The mandatory scenarios have specified observations; none is claimed proven in a running Node. Independent review of identity, mTLS/proxy trust, local fencing, tenancy and compatibility decisions is pending; source-audit review cannot substitute. This amendment was N0-B only; subsequent user authorization permitted N0-C/N0-D design, now consolidated in the linked N0-D record. N1 consumers/release must not proceed before review and the complete N0 gate.
 
 | Remaining evidence/decision owner | Consumers/gate affected |
 | --- | --- |
@@ -315,7 +318,7 @@ N0-B specification drafted with identity mapping, typed schemas, replay/fencing/
 | Independent security/operational review of S-B1 (proposed mTLS), then N1-A/N1-D implementation of the selected mechanism and Linux state persistence | Authentication consumers blocked pending mechanism selection; if mTLS is selected, issuance/rotation/proxy trust require end-to-end tests. No claim that certificates are already approved or bearer-only credentials meet the replay contract. |
 | N2/N3 workload sandbox, resource field mapping, package/readback rules and OCI Action/workflow compatibility | Concrete per-kind effect consumers remain disabled until their versioned payload/policy validation is complete. An envelope alone does not authorize a partially specified executor. |
 
-The immediate next step is **review this N0-B amendment only**. N0-C has not been started; after review, its separately authorized scope will be to specify same-host storage/account-resource adoption and single-owner cutover/rollback around this identity contract. No runtime code, DB migration, certificates, credentials, deployments or retained state changed here. Current architecture/Admin docs remain implemented behavior and need no behavior edit. Reverting this documentation is harmless; later rollback must advance fence generations and may require coordinated restore, not old binary restart.
+Current handoff is [N0-D readiness](N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). N0-B review remains pending; N0-C/N0-D specifications do not imply approval. No runtime code, DB migration, certificates, credentials, deployments or retained state changed here. Current architecture/Admin docs remain implemented behavior and need no behavior edit. Later restore must follow N0-D's independently retained recovery-epoch protocol, not restart old binaries or rewind fence authority.
 
 Amendment verification is documentation-only; the required tests above are new specifications, not executed tests. Baseline source seams remain RunnerExecutionOperationService.QueueAsync and RunnerExecutionProcessor.ProcessAsync (no Node incarnation recovery implementation claimed).
 

@@ -2,7 +2,7 @@
 
 The [master plan](../Automaton_Staged_Master_Plan.md) owns scope and sequencing. These 21 briefs elaborate every N0–N4 subsection; they do not introduce another roadmap.
 
-**Current task: N0-C design specified; review pending.** [N0-A source audit](results/N0-A-responsibility-audit.md) was reviewed at `64922354`. [Amended N0-B contracts](results/N0-B-contracts.md) supply pre-allocation deduplication and cross-incarnation recovery. The user subsequently authorized [N0-C migration design](results/N0-C-migration-design.md), covering storage/cgroup adoption, host-wide fencing, outstanding-effect settlement and cutover/rollback proofs. This authorization does not constitute independent contract review. mTLS remains proposed S-B1, not approved. N0-D has not been executed; runtime consumers and live migration remain gated on review and the complete N0 exit.
+**Current task: N0-D consolidation specified; review pending.** [N0-D architecture and acceptance](results/N0-D-architecture-and-acceptance.md) consolidates [N0-B contracts](results/N0-B-contracts.md) and [N0-C migration design](results/N0-C-migration-design.md), including restore fencing through an independently retained recovery epoch, guarantee-to-test traceability and N1 readiness. N0-A source review remains the only recorded review; mTLS selection, independent security/tenancy/fencing/accounting review and live evidence remain pending. N0 exit is unsatisfied. Limited N1 preparation is ready upon separate request; enrolled/privileged consumers remain blocked as detailed in the result. No N1 task has been executed.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Each brief includes ordered work, required deliverables, failure scenarios, observations and a copyable task. Refine code-level contracts in the result record before implementing their consumers; do not wait for another author to provide a later brief.
 
@@ -13,11 +13,11 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 | N0-A | [responsibility audit](N0-A-responsibility-audit.md) | none | source audit complete; [evidence](results/N0-A-responsibility-audit.md) |
 | N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | specification-ready amendment; [proposal](results/N0-B-contracts.md), review pending |
 | N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | design specified; [proposal](results/N0-C-migration-design.md), review/live evidence pending |
-| N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | dependency-gated |
-| N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | dependency-gated |
-| N1-B | [durable typed commands](N1-B-durable-typed-commands.md) | N1-A | dependency-gated |
-| N1-C | [inventory and reconciliation](N1-C-inventory-and-reconciliation.md) | N1-B | dependency-gated |
-| N1-D | [installation update and doctor](N1-D-installation-update-and-doctor.md) | N1-C | dependency-gated |
+| N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | [consolidation specified](results/N0-D-architecture-and-acceptance.md); review/exit pending |
+| N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | limited preparation ready; enrollment/activation blocked by review/auth selection |
+| N1-B | [durable typed commands](N1-B-durable-typed-commands.md) | N1-A | pure contract preparation ready; consumers blocked by N1-A/review |
+| N1-C | [inventory and reconciliation](N1-C-inventory-and-reconciliation.md) | N1-B | model/fixture preparation ready; reconciliation consumers blocked by N1-A/B/review |
+| N1-D | [installation update and doctor](N1-D-installation-update-and-doctor.md) | N1-C | specification preparation ready; installation consumers blocked by N1-A–C/review |
 | N2-A | [account resources and admission](N2-A-account-resources-and-admission.md) | N1-D, N0-C | dependency-gated |
 | N2-B | [persistent storage adoption](N2-B-persistent-storage-adoption.md) | N2-A, N0-C | dependency-gated |
 | N2-C | [web deployment and routing](N2-C-web-deployment-and-routing.md) | N2-A, N2-B, N1-C | dependency-gated |
@@ -44,7 +44,7 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 
 Store actual audit/specification/test/rollout evidence under results/ with the filename declared by the brief, and add its link here when created. [N0-A responsibility audit](results/N0-A-responsibility-audit.md) records the 2026-10-12 source baseline, dispositions, recovery traces and unavailable live observations. Keep current readiness separate from code-merged, tested, deployed and live-accepted states. Do not create placeholder results that imply work was done.
 
-[N0-B identity/state contracts](results/N0-B-contracts.md) record proposed Node mapping, locally checked fences, RM reuse, authorization/journal schemas and BYO/legacy support scope. The user's N0-A source review permits this specification work; it does not approve these eventual security contracts. PR #369 carries N0 documentation. [N0-C migration design](results/N0-C-migration-design.md) is now specified under subsequent user authorization; N0-D remains unexecuted.
+[N0-B identity/state contracts](results/N0-B-contracts.md) record proposed Node mapping, locally checked fences, RM reuse, authorization/journal schemas and BYO/legacy support scope. The user's N0-A source review permits this specification work; it does not approve these eventual security contracts. PR #369 carries N0 documentation. [N0-C migration design](results/N0-C-migration-design.md) is now specified under subsequent user authorization; [N0-D consolidation](results/N0-D-architecture-and-acceptance.md) now records proposed final contracts and readiness; its reviewed-contract exit remains unsatisfied.
 
 Later slices may perform preparation against code while live inventory is unavailable, but cannot pass the dependent cutover or release gate without evidence. Independent review for high-risk contracts is part of readiness; a model writing a brief is not that review.
 

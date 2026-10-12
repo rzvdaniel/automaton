@@ -1,5 +1,5 @@
 # N0-D — roadmap and acceptance contract
-Status: authored; dependency-gated. No implementation or live acceptance is claimed.
+Status: [consolidation specified](results/N0-D-architecture-and-acceptance.md); independent review and N0 exit pending. No implementation or live acceptance is claimed.
 Mode: design. Prerequisites: N0-C.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
@@ -10,7 +10,7 @@ Classify M2–M7 requirements as preserved, absorbed, deferred or unsupported; i
 
 **Exit:** contracts reviewed, storage preservation specified, ownership fencing implementable, coherent support scope and no contradiction in canonical roadmap. Unknown live status remains unknown.
 
-**First prompt:** Execute N0-A only in the existing checkout. Inspect and report current responsibilities, privileges, data identities and evidence. No replacement implementation, deployment or production mutations. Return the next smallest N0 slice.
+The N0-D result records current N1 preparation/consumer gates; no N1 implementation is authorized by this brief.
 
 ## Before starting
 
