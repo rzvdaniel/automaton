@@ -1,15 +1,12 @@
 using Automaton.Api.Authentication;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Data;
 
-public abstract class ApplicationDbContextEntitySetBase1 : IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>, ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>
+public partial class ApplicationDbContext
 {
-    protected ApplicationDbContextEntitySetBase1(DbContextOptions options) : base(options) { }
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
     public virtual DbSet<Flow> Flows { get; set; }
     public virtual DbSet<FlowUser> FlowUsers { get; set; }
@@ -52,11 +49,6 @@ public abstract class ApplicationDbContextEntitySetBase1 : IdentityDbContext<App
     public virtual DbSet<AiModel> AiModels { get; set; }
     public virtual DbSet<AiGuidanceDocument> AiGuidanceDocuments { get; set; }
     public virtual DbSet<WebApp> WebApps { get; set; }
-}
-
-public abstract class ApplicationDbContextEntitySetBase2 : ApplicationDbContextEntitySetBase1
-{
-    protected ApplicationDbContextEntitySetBase2(DbContextOptions options) : base(options) { }
     public virtual DbSet<AppDeploymentTarget> AppDeploymentTargets { get; set; }
     public virtual DbSet<DeploymentOperation> DeploymentOperations { get; set; }
     public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
