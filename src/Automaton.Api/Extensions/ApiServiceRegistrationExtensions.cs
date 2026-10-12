@@ -97,7 +97,7 @@ internal static class ApiFeatureServiceRegistration
         services.AddApiAppCatalogServices();
         services.AddApiAppExecutionServices(applicationBuilder);
         services.AddApiRunnerServices(applicationBuilder);
-        services.AddNodeEnrollmentServices();
+        services.AddNodeEnrollmentServices(applicationBuilder.Configuration);
         services.AddApiEmailService(applicationBuilder, configurationService);
         services.AddApiAccountServices();
         services.AddApiOperationsServices();

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Security;
@@ -24,6 +25,8 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
     private readonly ApplicationDbContext db;
     private readonly NodeEnrollmentService service;
     private readonly NodeEnrollmentKeyMaterial keyMaterial;
+    private readonly NodeProxyAuthenticationTestMaterial proxyMaterial;
+    private readonly System.Security.Cryptography.X509Certificates.X509Certificate2 proxyLeaf;
     private readonly DateTimeOffset now;
 
     private NodeEnrollmentTestHarness(
@@ -31,12 +34,16 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
         ApplicationDbContext db,
         NodeEnrollmentService service,
         NodeEnrollmentKeyMaterial keyMaterial,
+        NodeProxyAuthenticationTestMaterial proxyMaterial,
+        System.Security.Cryptography.X509Certificates.X509Certificate2 proxyLeaf,
         DateTimeOffset now)
     {
         this.connection = connection;
         this.db = db;
         this.service = service;
         this.keyMaterial = keyMaterial;
+        this.proxyMaterial = proxyMaterial;
+        this.proxyLeaf = proxyLeaf;
         this.now = now;
     }
 
@@ -44,6 +51,8 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
     {
         var now = DateTimeOffset.UtcNow;
         var material = NodeEnrollmentKeyMaterial.Create("CN=synthetic-node", now);
+        var proxyMaterial = NodeProxyAuthenticationTestMaterial.Create(now);
+        var proxyLeaf = proxyMaterial.CreateTraefikLeaf(now);
         var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
@@ -54,8 +63,9 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
         var service = new NodeEnrollmentService(
             db,
             new EphemeralDataProtectionProvider(NullLoggerFactory.Instance),
-            new FrozenTimeProvider(now));
-        return new NodeEnrollmentTestHarness(connection, db, service, material, now);
+            new FrozenTimeProvider(now),
+            proxyMaterial.CreateValidator(proxyLeaf));
+        return new NodeEnrollmentTestHarness(connection, db, service, material, proxyMaterial, proxyLeaf, now);
     }
 
     public async Task<BootstrapObservation> BootstrapAsync()
@@ -64,10 +74,10 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
         var stored = await db.NodeEnrollmentAuthorizations.AsNoTracking().SingleAsync(value => value.Id == EnrollmentId);
         var retry = await service.BootstrapAsync(EnrollmentId, ValidRequest(), CancellationToken.None);
         var identity = await service.AuthenticateManagementRequestAsync(
+            ManagementContext(),
             result.Credentials?.NodeApiKey,
-            CertificateHeader(),
             CancellationToken.None);
-        var wrongKey = await service.AuthenticateManagementRequestAsync("node_wrong-key", CertificateHeader(), CancellationToken.None);
+        var wrongKey = await service.AuthenticateManagementRequestAsync(ManagementContext(), "node_wrong-key", CancellationToken.None);
         return new BootstrapObservation(
             result.Accepted,
             result.Credentials is not null,
@@ -128,6 +138,8 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         keyMaterial.Dispose();
+        proxyLeaf.Dispose();
+        proxyMaterial.Dispose();
         await db.DisposeAsync();
         await connection.DisposeAsync();
     }
@@ -184,10 +196,13 @@ internal sealed class NodeEnrollmentTestHarness : IAsyncDisposable
         Convert.ToBase64String(keyMaterial.CsrDer),
         Convert.ToBase64String(keyMaterial.CertificateDer));
 
-    private HeaderDictionary CertificateHeader() => new()
+    private DefaultHttpContext ManagementContext()
     {
-        ["X-Forwarded-Tls-Client-Cert"] = Convert.ToBase64String(keyMaterial.CertificateDer)
-    };
+        var context = new DefaultHttpContext();
+        context.Request.Headers["X-Forwarded-Tls-Client-Cert"] = Convert.ToBase64String(keyMaterial.CertificateDer);
+        context.Connection.ClientCertificate = proxyLeaf;
+        return context;
+    }
 
     private static byte[] DecodeBase64Url(string value)
     {

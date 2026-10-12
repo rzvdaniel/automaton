@@ -83,8 +83,23 @@ public sealed class NodeAuthenticationBoundaryTests
         Assert.That(NodeCertificateHeaderDecoder.TryDecode(headers, out _), Is.False);
     }
 
+    [Test]
+    public void Enrollment_rejects_a_valid_p384_csr_and_certificate()
+    {
+        var now = DateTime.UtcNow;
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+        var request = new CertificateRequest("CN=synthetic-p384-node", key, HashAlgorithmName.SHA256);
+        using var certificate = request.CreateSelfSigned(now.AddMinutes(-1), now.AddDays(1));
+        var csr = request.CreateSigningRequest();
+        var pin = Convert.ToHexString(SHA256.HashData(key.ExportSubjectPublicKeyInfo()));
+
+        Assert.That(
+            NodeEnrollmentCryptography.ValidateEnrollmentProof(csr, certificate.RawData, pin, now, out _),
+            Is.False);
+    }
+
     [TestCase("GET", "/api/node/v1/identity", 7101)]
-    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap", 7101)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", 7101)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/challenge", 7101)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/complete", 7102)]
     [TestCase("GET", "/api/node/v1/identity", 5000)]
@@ -130,7 +145,7 @@ public sealed class NodeAuthenticationBoundaryTests
         }, options);
         var context = new DefaultHttpContext();
         context.Request.Method = "POST";
-        context.Request.Path = "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap";
+        context.Request.Path = "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete";
         context.Connection.LocalPort = 5000;
 
         await middleware.InvokeAsync(context);
@@ -139,10 +154,46 @@ public sealed class NodeAuthenticationBoundaryTests
         Assert.That(invoked, Is.False);
     }
 
+    [TestCase("GET", "/api/users", 7102)]
+    [TestCase("GET", "/api/workflow/hub", 7102)]
+    [TestCase("GET", "/healthz", 7102)]
+    [TestCase("GET", "/not-a-mapped-route", 7102)]
+    [TestCase("GET", "/api/users", 7103)]
+    [TestCase("GET", "/api/workflow/hub", 7103)]
+    [TestCase("GET", "/healthz", 7103)]
+    [TestCase("GET", "/not-a-mapped-route", 7103)]
+    [TestCase("GET", "/api/node/v1/identity", 7103)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", 7102)]
+    public async Task Isolated_listener_rejects_every_route_outside_its_complete_allow_list(
+        string method,
+        string path,
+        int localPort)
+    {
+        var options = Options.Create(new NodeListenerOptions { ManagementPort = 7102, BootstrapPort = 7103 });
+        var invoked = false;
+        var middleware = new NodeListenerRouteIsolationMiddleware(_ =>
+        {
+            invoked = true;
+            return Task.CompletedTask;
+        }, options);
+        var context = new DefaultHttpContext();
+        context.Request.Method = method;
+        context.Request.Path = path;
+        context.Connection.LocalPort = localPort;
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.Response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+            Assert.That(invoked, Is.False);
+        });
+    }
+
     [TestCase("GET", "/api/node/v1/identity", true)]
     [TestCase("POST", "/api/node/v1/identity", false)]
     [TestCase("GET", "/api/node/v1/assignments", false)]
-    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap", false)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", false)]
     public void Management_listener_allows_only_the_implemented_read_only_identity_route(string method, string path, bool expected)
     {
         Assert.That(
@@ -150,11 +201,12 @@ public sealed class NodeAuthenticationBoundaryTests
             Is.EqualTo(expected));
     }
 
-    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap", true)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", true)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap", false)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/challenge", true)]
     [TestCase("GET", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/challenge", false)]
-    [TestCase("POST", "/api/node-enrollments/not-a-guid/bootstrap", false)]
-    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/bootstrap/extra", false)]
+    [TestCase("POST", "/api/node-enrollments/not-a-guid/complete", false)]
+    [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete/extra", false)]
     public void Bootstrap_listener_allows_only_exact_post_contracts(string method, string path, bool expected)
     {
         Assert.That(

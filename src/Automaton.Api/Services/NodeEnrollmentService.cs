@@ -10,11 +10,15 @@ public sealed class NodeEnrollmentService
     private readonly NodeEnrollmentRecoveryHandler recovery;
     private readonly NodeManagementAuthenticationHandler authentication;
 
-    public NodeEnrollmentService(ApplicationDbContext db, IDataProtectionProvider protectionProvider, TimeProvider timeProvider)
+    public NodeEnrollmentService(
+        ApplicationDbContext db,
+        IDataProtectionProvider protectionProvider,
+        TimeProvider timeProvider,
+        NodeProxyCertificateValidator proxyCertificateValidator)
     {
         bootstrap = new NodeEnrollmentBootstrapHandler(db, protectionProvider, timeProvider);
         recovery = new NodeEnrollmentRecoveryHandler(db, protectionProvider, timeProvider);
-        authentication = new NodeManagementAuthenticationHandler(db, timeProvider);
+        authentication = new NodeManagementAuthenticationHandler(db, timeProvider, proxyCertificateValidator);
     }
 
     public Task<NodeEnrollmentOperationResult> BootstrapAsync(Guid enrollmentId, NodeBootstrapRequest request, CancellationToken cancellationToken) =>
@@ -26,8 +30,11 @@ public sealed class NodeEnrollmentService
     public Task<NodeEnrollmentOperationResult> CompleteRecoveryAsync(Guid enrollmentId, NodeRecoveryCompletionRequest request, CancellationToken cancellationToken) =>
         recovery.CompleteAsync(enrollmentId, request, cancellationToken);
 
-    public Task<NodeIdentityResult> AuthenticateManagementRequestAsync(string? apiKey, Microsoft.AspNetCore.Http.IHeaderDictionary headers, CancellationToken cancellationToken) =>
-        authentication.AuthenticateAsync(apiKey, headers, cancellationToken);
+    public Task<NodeIdentityResult> AuthenticateManagementRequestAsync(
+        Microsoft.AspNetCore.Http.HttpContext context,
+        string? apiKey,
+        CancellationToken cancellationToken) =>
+        authentication.AuthenticateAsync(context, apiKey, cancellationToken);
 }
 
 public sealed record NodeBootstrapRequest(string EnrollmentToken, string CsrDerBase64, string CertificateDerBase64);

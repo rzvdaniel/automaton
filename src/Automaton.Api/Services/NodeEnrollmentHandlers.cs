@@ -171,7 +171,7 @@ internal sealed class NodeEnrollmentRecoveryHandler(
             return NodeEnrollmentOperationResult.Invalid;
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
         var proof = await LoadProofAsync(enrollmentId, request, now, cancellationToken);
         if (proof is null || !Verify(proof, request, signature))
             return NodeEnrollmentOperationResult.Rejected;
@@ -231,17 +231,27 @@ internal sealed class NodeEnrollmentRecoveryHandler(
 
 internal sealed record NodeRecoveryProof(NodeEnrollmentRecoveryChallenge Challenge, NodeEnrollmentAuthorization Record);
 
-internal sealed class NodeManagementAuthenticationHandler(ApplicationDbContext db, TimeProvider timeProvider)
+internal sealed class NodeManagementAuthenticationHandler(
+    ApplicationDbContext db,
+    TimeProvider timeProvider,
+    NodeProxyCertificateValidator proxyCertificateValidator)
 {
-    public async Task<NodeIdentityResult> AuthenticateAsync(string? apiKey, Microsoft.AspNetCore.Http.IHeaderDictionary headers, CancellationToken cancellationToken)
+    public async Task<NodeIdentityResult> AuthenticateAsync(
+        Microsoft.AspNetCore.Http.HttpContext context,
+        string? apiKey,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(apiKey) || apiKey.Length > 256 ||
-            !NodeCertificateHeaderDecoder.TryDecode(headers, out var forwardedCertificate))
+        if (string.IsNullOrEmpty(apiKey) || apiKey.Length > 256)
+            return NodeIdentityResult.Rejected;
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var proxyCertificate = await context.Connection.GetClientCertificateAsync(cancellationToken);
+        if (!proxyCertificateValidator.IsTrustedPeer(proxyCertificate, now) ||
+            !NodeCertificateHeaderDecoder.TryDecode(context.Request.Headers, out var forwardedCertificate))
             return NodeIdentityResult.Rejected;
 
         using (forwardedCertificate!.Certificate)
         {
-            var now = timeProvider.GetUtcNow().UtcDateTime;
             if (forwardedCertificate.Certificate.NotBefore.ToUniversalTime() > now ||
                 forwardedCertificate.Certificate.NotAfter.ToUniversalTime() <= now)
                 return NodeIdentityResult.Rejected;

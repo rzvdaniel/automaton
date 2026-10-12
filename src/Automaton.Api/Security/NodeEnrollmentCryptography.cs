@@ -45,7 +45,9 @@ internal static class NodeEnrollmentCryptography
         try
         {
             publicKey.ImportSubjectPublicKeyInfo(csrPublicKey, out var csrConsumed);
+            var publicKeyCurveOid = publicKey.ExportParameters(false).Curve.Oid.Value;
             if (csrConsumed != csrPublicKey.Length ||
+                !string.Equals(publicKeyCurveOid, ECCurve.NamedCurves.nistP256.Oid.Value, StringComparison.Ordinal) ||
                 !publicKey.VerifyData(requestInfo.Span, csrSignature, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence) ||
                 !certificatePublicKey.AsSpan().SequenceEqual(csrPublicKey) ||
                 !MatchesSha256Hex(Convert.ToHexString(SHA256.HashData(csrPublicKey)), pinnedPublicKeySha256) ||

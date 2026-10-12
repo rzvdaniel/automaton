@@ -1,3 +1,5 @@
+using Automaton.Api.Config;
+using Automaton.Api.Security;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -6,10 +8,12 @@ namespace Automaton.Api.Extensions;
 
 internal static class NodeEnrollmentServiceRegistration
 {
-    public static IServiceCollection AddNodeEnrollmentServices(this IServiceCollection services)
+    public static IServiceCollection AddNodeEnrollmentServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDataProtection();
         services.TryAddSingleton(TimeProvider.System);
+        services.Configure<NodeProxyAuthenticationOptions>(configuration.GetSection(NodeProxyAuthenticationOptions.SectionName));
+        services.AddScoped<NodeProxyCertificateValidator>();
         services.AddScoped<NodeEnrollmentService>();
         return services;
     }
@@ -19,7 +23,7 @@ internal static class NodeEnrollmentEndpointRegistration
 {
     public static WebApplication MapNodeEnrollmentEndpoints(this WebApplication app)
     {
-        app.MapPost("/api/node-enrollments/{enrollmentId:guid}/bootstrap",
+        app.MapPost("/api/node-enrollments/{enrollmentId:guid}/complete",
             async (Guid enrollmentId, NodeBootstrapRequest request, NodeEnrollmentService enrollment, CancellationToken cancellationToken) =>
                 ToHttpResult(await enrollment.BootstrapAsync(enrollmentId, request, cancellationToken)));
 
@@ -45,7 +49,7 @@ internal static class NodeEnrollmentEndpointRegistration
                 if (keys.Count != 1)
                     return Results.Unauthorized();
                 var result = await enrollment.AuthenticateManagementRequestAsync(
-                    keys[0], context.Request.Headers, cancellationToken);
+                    context, keys[0], cancellationToken);
                 return result.Accepted ? Results.Ok(result) : Results.Unauthorized();
             });
         return app;
