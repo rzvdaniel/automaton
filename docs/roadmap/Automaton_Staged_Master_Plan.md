@@ -13,7 +13,7 @@ Consolidation is an architectural simplification, not by itself a security impro
 
 ## Evidence and status
 
-N0-A source audit completed on 2026-10-12 at `1cc52af1266a482c3adff77d1928fa94c19d4bb0` and received user source-audit review at `64922354`; see the [responsibility map and limitations](node-execution/results/N0-A-responsibility-audit.md). [N0-B identity/state contracts](node-execution/results/N0-B-contracts.md) are specification-ready against `64922354`, including Node mapping, local fencing, RM reuse and explicit BYO/legacy support scope; independent security/tenancy/fencing review is pending. N0-B was amended against `d2985a65` to specify pre-allocation request deduplication and cross-incarnation recovery; independent review remains pending. The user subsequently authorized [N0-C migration design](node-execution/results/N0-C-migration-design.md), now specified for storage/cgroup adoption, host-wide fencing, effect settlement and cutover/rollback proof. This design authorization does not approve the contracts. mTLS remains a proposed security decision requiring review. [N0-D architecture and acceptance](node-execution/results/N0-D-architecture-and-acceptance.md) now consolidates the proposals, specifies an external recovery epoch for database restore, maps guarantees to implementation/tests and distinguishes limited N1 preparation from blocked consumers. N0 exit remains unsatisfied pending independent review and authentication selection. Current deployment/live status was not refreshed. N0 as a whole and all Node runtime stages remain pending.
+N0-A source audit completed on 2026-10-12 at `1cc52af1266a482c3adff77d1928fa94c19d4bb0` and received user source-audit review at `64922354`; see the [responsibility map and limitations](node-execution/results/N0-A-responsibility-audit.md). [N0-B identity/state contracts](node-execution/results/N0-B-contracts.md) are specification-ready against `64922354`, including Node mapping, local fencing, RM reuse and explicit BYO/legacy support scope; independent security/tenancy/fencing review is pending. N0-B was amended against `d2985a65` to specify pre-allocation request deduplication and cross-incarnation recovery; independent review remains pending. The user subsequently authorized [N0-C migration design](node-execution/results/N0-C-migration-design.md), now specified for storage/cgroup adoption, host-wide fencing, effect settlement and cutover/rollback proof. This design authorization does not approve the contracts. mTLS remains a proposed security decision requiring review. [N0-D architecture and acceptance](node-execution/results/N0-D-architecture-and-acceptance.md) now consolidates the proposals, specifies an external recovery epoch for database restore, maps guarantees to implementation/tests and distinguishes limited N1 preparation from blocked consumers. N0 exit remains unsatisfied pending independent review and authentication selection. Current deployment/live status was not refreshed. N0 as a whole and full Node runtime stage exits remain pending. [Limited N1-A preparation](node-execution/results/N1-A-node-enrollment.md) now implements a non-enrolled/nonprivileged skeleton and pure tests; separate PR review is next, with no enrollment/authentication/activation or host effects enabled.
 
 The previous packet recorded main at 57941d9971f5 on 2026-10-06: M1 accepted for its documented scope; RM accepted for the installed x64 cohort; M2 incomplete; PRs #366/#368 merged; #368 live acceptance and #367 status unresolved. These are historical observations from that packet, not a fresh repository audit. N0 must establish current code, deployment and acceptance truth. Do not repeat merged work or claim Node migration is already implemented.
 
@@ -111,7 +111,7 @@ Classify M2–M7 requirements as preserved, absorbed, deferred or unsupported; i
 
 **Exit:** contracts reviewed, storage preservation specified, ownership fencing implementable, coherent support scope and no contradiction in canonical roadmap. Unknown live status remains unknown.
 
-**Current handoff:** N0-A–D documentation is specified. Consult [N0-D readiness](node-execution/results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope); limited N1-A preparation is the next smallest separately authorized task. Enrolled/privileged consumers remain blocked on authentication selection and independent review.
+**Current handoff:** N0-A–D documentation is specified. Consult [N0-D readiness](node-execution/results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope); limited N1-A preparation is implemented and awaits its separate PR review. Enrolled/privileged consumers remain blocked on authentication selection and independent review.
 
 ## N1 — Minimal Node management plane
 
@@ -254,9 +254,9 @@ Give Luna this plan's global boundaries, ONE named slice and the handoff below. 
 6. Release only within explicit task authorization; record code, test, deployed and live-accepted states separately.
 7. Choose the next slice from actual evidence.
 
-### Next task scope
+### Current handoff scope
 
-The next smallest task is N1-A preparation only as specified in [N0-D](node-execution/results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). It requires a separate request and does not authorize enrollment, privileged host access, authentication selection or production operations. Full N1 entry remains gated on reviewed N0 contracts; missing live evidence blocks dependent migration/release, not unrelated preparation.
+Review the [limited N1-A preparation](node-execution/results/N1-A-node-enrollment.md) PR and stop. No later task is started. Full N1 entry remains gated on reviewed N0 contracts and authentication selection; missing live evidence blocks dependent migration/release, not unrelated preparation.
 
 ### One-slice handoff contract
 
