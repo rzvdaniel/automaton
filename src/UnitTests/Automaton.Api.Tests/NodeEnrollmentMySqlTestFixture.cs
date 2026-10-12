@@ -49,7 +49,8 @@ internal sealed class NodeEnrollmentMySqlTestFixture : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(source.Database))
             Assert.Ignore("The isolated MySQL test connection must name an existing database for authorization and server selection.");
 
-        var databaseName = "automaton_node_enrollment_" + Guid.NewGuid().ToString("N");
+        // Pomelo appends the database name to a MySQL advisory lock limited to 64 characters.
+        var databaseName = "automaton_n1a" + Guid.NewGuid().ToString("N");
         var fixtureBuilder = new MySqlConnectionStringBuilder(source.ConnectionString)
         {
             Database = databaseName,
