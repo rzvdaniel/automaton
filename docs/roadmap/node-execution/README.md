@@ -2,7 +2,7 @@
 
 The [master plan](../Automaton_Staged_Master_Plan.md) owns scope and sequencing. These 21 briefs elaborate every N0–N4 subsection; they do not introduce another roadmap.
 
-**Current task: limited N1-A preparation implemented; review pending.** [Preparation evidence](results/N1-A-node-enrollment.md) records the non-enrolled Node skeleton, pure capability validation, lifecycle/dependency tests and narrow future shared-RM boundary. Existing Runner code/behavior is unchanged. [N0-D consolidation](results/N0-D-architecture-and-acceptance.md) remains the contract; the user's subsequent design feedback found no further blocking design issues after clarifying atomic admission, but mTLS selection, independent security review and live evidence remain pending. Full N0 exit and N1-A enrollment/activation remain blocked. No authentication, broker consumption, Docker/host effects or N1-B work is enabled. Stop at the separate preparation PR for review.
+**Current task: N0 authentication selection and security-contract review.** [N0 security review](results/N0-authentication-and-security-review.md) selects mTLS plus the Node-bound API key as a design proposal and records the certificate issuance, proxy, rotation, revocation and restore tests still required. This author review is not independent approval. PR #370 merged the limited non-enrolled N1-A preparation at `ea694219`; see [preparation evidence](results/N1-A-node-enrollment.md). Full N0 exit and N1-A enrollment/activation remain blocked pending independent security/operations review and live evidence. No authentication, broker consumption, Docker/host effects or later N1 work is enabled.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Each brief includes ordered work, required deliverables, failure scenarios, observations and a copyable task. Refine code-level contracts in the result record before implementing their consumers; do not wait for another author to provide a later brief.
 
@@ -14,7 +14,7 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 | N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | specification-ready amendment; [proposal](results/N0-B-contracts.md), review pending |
 | N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | design specified; [proposal](results/N0-C-migration-design.md), review/live evidence pending |
 | N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | [consolidation specified](results/N0-D-architecture-and-acceptance.md); review/exit pending |
-| N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | [limited preparation implemented/tested](results/N1-A-node-enrollment.md); PR review pending; enrollment/activation blocked |
+| N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | [limited preparation merged](results/N1-A-node-enrollment.md); enrollment/activation blocked pending independent S-B1 approval and evidence |
 | N1-B | [durable typed commands](N1-B-durable-typed-commands.md) | N1-A | pure contract preparation ready; consumers blocked by N1-A/review |
 | N1-C | [inventory and reconciliation](N1-C-inventory-and-reconciliation.md) | N1-B | model/fixture preparation ready; reconciliation consumers blocked by N1-A/B/review |
 | N1-D | [installation update and doctor](N1-D-installation-update-and-doctor.md) | N1-C | specification preparation ready; installation consumers blocked by N1-A–C/review |

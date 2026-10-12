@@ -1,6 +1,6 @@
 # N1-A — limited preparation evidence
 
-Baseline: `0df99d86411f89a4c54111632be7dfd2333d1253`, existing checkout, clean initial tree, branch `codex/n1-a-preparation`. Scope is the separately authorized preparation subset of [N0-D](N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope), not full N1-A. mTLS selection and independent security review remain pending. No enrollment/authentication/activation, transport consumption, Docker/host inspection or durable identity/fence implementation is authorized here.
+Baseline: `0df99d86411f89a4c54111632be7dfd2333d1253`, existing checkout, clean initial tree, branch `codex/n1-a-preparation`. Scope is the separately authorized preparation subset of [N0-D](N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope), not full N1-A. At PR #370 review time, mTLS selection and independent security review remained pending; the later [N0 authentication review](N0-authentication-and-security-review.md) selects the mTLS plus Node API-key proposal, with independent approval still pending. No enrollment/authentication/activation, transport consumption, Docker/host inspection or durable identity/fence implementation was authorized here.
 
 ## Specification before implementation
 

@@ -1,5 +1,5 @@
 # N1-A — node host and enrollment
-Status: [limited preparation implemented/tested](results/N1-A-node-enrollment.md); separate PR review pending. Full enrollment/activation remains blocked by authentication selection and independent review per [N0-D](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). No operational Node or live acceptance is claimed.
+Status: [limited preparation implemented/tested and merged in PR #370](results/N1-A-node-enrollment.md). Full enrollment/activation remains blocked pending independent approval of selected S-B1 authentication and affected N0 contracts per [N0-D](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). No operational Node or live acceptance is claimed.
 Mode: implementation. Prerequisites: N0-D.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
