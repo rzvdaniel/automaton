@@ -2,7 +2,7 @@
 
 The [master plan](../Automaton_Staged_Master_Plan.md) owns scope and sequencing. These 21 briefs elaborate every N0–N4 subsection; they do not introduce another roadmap.
 
-**Next design task: [N0-C](N0-C-storage-capacity-and-cutover-design.md), storage/capacity/cutover specification only.** [N0-A source audit](results/N0-A-responsibility-audit.md) was reviewed at `64922354`. [N0-B contracts](results/N0-B-contracts.md) are specification-ready, with independent security/tenancy/fencing review pending. N0-C may design against that proposal; runtime consumers remain gated on review and the complete N0 exit. Current deployed state is unverified. All Node runtime implementation, deployment and live-acceptance states remain pending.
+**Current task: N0-B amendment review only.** [N0-A source audit](results/N0-A-responsibility-audit.md) was reviewed at `64922354`. [N0-B contracts](results/N0-B-contracts.md) now specify deduplication before workload allocation and explicit recovery across Node incarnations; review is pending. mTLS is a proposed security decision (S-B1), not an approved implementation requirement. N0-C has not been started and must not proceed yet. Runtime consumers remain gated on review and the complete N0 exit; deployment/live state remains unverified.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Each brief includes ordered work, required deliverables, failure scenarios, observations and a copyable task. Refine code-level contracts in the result record before implementing their consumers; do not wait for another author to provide a later brief.
 
@@ -11,8 +11,8 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 | Slice | Brief | Prerequisites | Current readiness |
 | --- | --- | --- | --- |
 | N0-A | [responsibility audit](N0-A-responsibility-audit.md) | none | source audit complete; [evidence](results/N0-A-responsibility-audit.md) |
-| N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | specification-ready; [proposal](results/N0-B-contracts.md), independent review pending |
-| N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | ready for design against N0-B proposal; runtime gates unchanged |
+| N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | specification-ready amendment; [proposal](results/N0-B-contracts.md), review pending |
+| N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | not started; held pending N0-B amendment review |
 | N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | dependency-gated |
 | N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | dependency-gated |
 | N1-B | [durable typed commands](N1-B-durable-typed-commands.md) | N1-A | dependency-gated |
