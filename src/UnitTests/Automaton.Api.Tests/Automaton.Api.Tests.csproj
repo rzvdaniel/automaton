@@ -28,7 +28,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Automaton.Api\Automaton.Api.csproj" />
+    <ProjectReference Include="..\..\Automaton.Node\Automaton.Node.csproj" />
     <Compile Include="..\Shared\LoopbackTlsServer.cs" Link="LoopbackTlsServer.cs" />
     <Compile Include="..\Shared\RecordingCapPublisher.cs" Link="RecordingCapPublisher.cs" />
+    <None Include="Fixtures\traefik-v3.3.6-pass-tls-client-cert.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

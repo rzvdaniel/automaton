@@ -2574,6 +2574,112 @@ namespace Automaton.Api.Migrations
                     b.ToTable("MarketplaceCategories");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentAuthorization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<byte[]>("CertificateDer")
+                        .HasColumnType("longblob");
+
+                    b.Property<string>("CertificateSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("CommittedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("ControlPlaneRealmId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("CredentialBundleExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EnrollmentTokenSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("NodeApiKeySha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("OwnerScope")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("PinnedPublicKeySha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<byte[]>("ProtectedCredentialBundle")
+                        .HasColumnType("longblob");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentTokenSha256")
+                        .IsUnique();
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique();
+
+                    b.HasIndex("NodeId")
+                        .IsUnique();
+
+                    b.HasIndex("Id", "Status");
+
+                    b.ToTable("NodeEnrollmentAuthorizations");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentRecoveryChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("ConsumedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("EnrollmentAuthorizationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)");
+
+                    b.Property<string>("PublicKeySha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentAuthorizationId", "ExpiresAtUtc");
+
+                    b.ToTable("NodeEnrollmentRecoveryChallenges");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4754,6 +4860,17 @@ namespace Automaton.Api.Migrations
                     b.Navigation("Execution");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentRecoveryChallenge", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.NodeEnrollmentAuthorization", "EnrollmentAuthorization")
+                        .WithMany("RecoveryChallenges")
+                        .HasForeignKey("EnrollmentAuthorizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EnrollmentAuthorization");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", "Owner")
@@ -5329,6 +5446,11 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecution", b =>
                 {
                     b.Navigation("Logs");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentAuthorization", b =>
+                {
+                    b.Navigation("RecoveryChallenges");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>

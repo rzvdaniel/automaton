@@ -25,6 +25,8 @@ public abstract class ApplicationDbContextEntitySetBase1 : IdentityDbContext<App
     public virtual DbSet<RunnerHostProvisioningOperation> RunnerHostProvisioningOperations { get; set; }
     public virtual DbSet<InfrastructureRunnerUpdateOperation> InfrastructureRunnerUpdateOperations { get; set; }
     public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
+    public virtual DbSet<NodeEnrollmentAuthorization> NodeEnrollmentAuthorizations { get; set; }
+    public virtual DbSet<NodeEnrollmentRecoveryChallenge> NodeEnrollmentRecoveryChallenges { get; set; }
     public virtual DbSet<SelfHostedRunnerEnrollment> SelfHostedRunnerEnrollments { get; set; }
     public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
     public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
