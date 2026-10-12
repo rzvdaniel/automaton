@@ -13,6 +13,8 @@ Consolidation is an architectural simplification, not by itself a security impro
 
 ## Evidence and status
 
+N0-A source audit completed on 2026-10-12 at `1cc52af1266a482c3adff77d1928fa94c19d4bb0`; see the [responsibility map and limitations](node-execution/results/N0-A-responsibility-audit.md). Existing RM, storage and brokered container mechanisms are reuse candidates; Node fencing, account resource ownership and tenant/legacy execution scope still require specification. Current deployment/live status was not refreshed. N0-B is next; N0 as a whole and all Node runtime stages remain pending.
+
 The previous packet recorded main at 57941d9971f5 on 2026-10-06: M1 accepted for its documented scope; RM accepted for the installed x64 cohort; M2 incomplete; PRs #366/#368 merged; #368 live acceptance and #367 status unresolved. These are historical observations from that packet, not a fresh repository audit. N0 must establish current code, deployment and acceptance truth. Do not repeat merged work or claim Node migration is already implemented.
 
 The historical `docs/roadmap/managed-platform-completion-plan.md` was removed from current main at `9e18987a9bfcebd87909167d4eb4e5a6cb82cf6c` (2026-10-11). Use Git history for its acceptance evidence. This document is the proposed Node-first roadmap; N0 must reconcile current source and release evidence before recording implementation status. No milestone is complete merely because a brief exists.

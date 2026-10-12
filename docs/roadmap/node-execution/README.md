@@ -2,16 +2,16 @@
 
 The [master plan](../Automaton_Staged_Master_Plan.md) owns scope and sequencing. These 21 briefs elaborate every N0–N4 subsection; they do not introduce another roadmap.
 
-**Next ready task: [N0-A](N0-A-responsibility-audit.md), source audit only.** Everything else is authored now and gated on its prerequisite findings. All runtime implementation, deployment and live-acceptance states remain pending.
+**Next ready task: [N0-B](N0-B-identity-and-state-contracts.md), identity and state specification only.** [N0-A source audit](results/N0-A-responsibility-audit.md) is complete at `1cc52af1266a482c3adff77d1928fa94c19d4bb0`; current deployed state remains unverified. Later slices remain gated on their prerequisite findings. All runtime implementation, deployment and live-acceptance states remain pending.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Each brief includes ordered work, required deliverables, failure scenarios, observations and a copyable task. Refine code-level contracts in the result record before implementing their consumers; do not wait for another author to provide a later brief.
 
 ## Slice index
 
-| Slice | Brief | Prerequisites | Initial readiness |
+| Slice | Brief | Prerequisites | Current readiness |
 | --- | --- | --- | --- |
-| N0-A | [responsibility audit](N0-A-responsibility-audit.md) | none | audit-ready |
-| N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | dependency-gated |
+| N0-A | [responsibility audit](N0-A-responsibility-audit.md) | none | source audit complete; [evidence](results/N0-A-responsibility-audit.md) |
+| N0-B | [identity and state contracts](N0-B-identity-and-state-contracts.md) | N0-A | ready for specification; independent review pending |
 | N0-C | [storage capacity and cutover design](N0-C-storage-capacity-and-cutover-design.md) | N0-B | dependency-gated |
 | N0-D | [roadmap and acceptance contract](N0-D-roadmap-and-acceptance-contract.md) | N0-C | dependency-gated |
 | N1-A | [node host and enrollment](N1-A-node-host-and-enrollment.md) | N0-D | dependency-gated |
@@ -42,7 +42,7 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) with each assigned brief. Ea
 
 ## Results and review
 
-Store actual audit/specification/test/rollout evidence under results/ with the filename declared by the brief, and add its link here when created. No results files exist at authoring time. Keep current readiness separate from code-merged, tested, deployed and live-accepted states. Do not create placeholder results that imply work was done.
+Store actual audit/specification/test/rollout evidence under results/ with the filename declared by the brief, and add its link here when created. [N0-A responsibility audit](results/N0-A-responsibility-audit.md) records the 2026-10-12 source baseline, dispositions, recovery traces and unavailable live observations. Keep current readiness separate from code-merged, tested, deployed and live-accepted states. Do not create placeholder results that imply work was done.
 
 Later slices may perform preparation against code while live inventory is unavailable, but cannot pass the dependent cutover or release gate without evidence. Independent review for high-risk contracts is part of readiness; a model writing a brief is not that review.
 
