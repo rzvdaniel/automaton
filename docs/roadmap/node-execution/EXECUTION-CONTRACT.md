@@ -4,7 +4,7 @@ Read this file with ONE assigned slice, the [master plan](../Automaton_Staged_Ma
 
 ## Readiness and authority
 
-N0-A is ready for a source audit. All other slices are authored now but dependency-gated. Their prerequisites refer to evidence-backed outputs, not merely merged brief files. Audit/design slices may proceed without production access: record missing live facts. Missing live inventory blocks only the dependent migration/release decision, not unrelated lab development.
+Consult the [index and result records](README.md) for current readiness. [N0-D consolidation](results/N0-D-architecture-and-acceptance.md) defines the mandatory realm/recovery-epoch extension, offline restore protocol and limited N1 preparation versus blocked consumers; earlier N0 examples must be read with that required field set. Prerequisites refer to evidence-backed outputs, not merely merged brief files. A specification-ready proposal permits dependent design work; independent review remains required before implementing its privileged/tenancy/fencing consumers. Audit/design slices may proceed without production access: record missing live facts. Missing live inventory blocks only the dependent migration/release decision, not unrelated lab development.
 
 Before coding, write a specification in the slice's results file containing:
 1. Exact current HEAD, relevant paths/symbols, reused mechanisms and gap.

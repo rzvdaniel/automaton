@@ -1,5 +1,5 @@
 # N0-A — responsibility audit
-Status: audit-ready. No implementation or live acceptance is claimed.
+Status: source audit complete; [result and limitations](results/N0-A-responsibility-audit.md), recorded 2026-10-12 at `1cc52af1266a482c3adff77d1928fa94c19d4bb0`. No implementation or live acceptance is claimed.
 Mode: audit. Prerequisites: none.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
