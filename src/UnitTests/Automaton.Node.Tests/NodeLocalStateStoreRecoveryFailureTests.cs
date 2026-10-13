@@ -25,7 +25,7 @@ public sealed class NodeLocalStateStoreRecoveryFailureTests
                 var checkpoint = store.ReadCheckpoint()!;
                 intent = NodeLocalStateStoreIntegrationTests.CreateIntent(store, identity, checkpoint,
                     Guid.NewGuid(), Guid.NewGuid());
-                _ = store.MarkResponseUnknown(intent.ActivationRequestId);
+                intent = store.MarkResponseUnknown(intent.ActivationRequestId);
                 var receipt = new NodeActivationReceipt(1, identity.NodeId, identity.InstallationId,
                     identity.ControlPlaneRealmId, intent.ActivationRequestId, 1, 3,
                     checkpoint.RecoveryCheckpointSha256, "Recovering",
@@ -104,3 +104,4 @@ public sealed class NodeLocalStateStoreRecoveryFailureTests
         }
     }
 }
+
