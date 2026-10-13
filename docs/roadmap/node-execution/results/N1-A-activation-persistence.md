@@ -21,10 +21,10 @@ Verification on the implementation branch:
 - `dotnet build src/Automaton.Api/Automaton.Api.csproj -c Debug --no-incremental --no-restore -m:1 -v minimal` — passed, 0 errors (884 warnings, including existing dependency/analyzer warnings).
 - `dotnet build src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-incremental -v quiet` — passed, 0 errors (966 warnings).
 - `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivationContractTests" -v minimal` — passed, 6 passed, 0 failed, 0 skipped.
-- `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivation" -v minimal` — passed, 6 passed, 0 failed, 10 skipped. The 10 MySQL cases, including migration, same-request races, positive-incarnation race, revocation race and rollback/retry, skipped because no database connection is configured.
+- On commit `37d5169d`, `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivation" -v minimal` — passed, 16 passed, 0 failed, 0 skipped. The filter includes all 10 MySQL integration cases, including migration, same-request races, positive-incarnation race, revocation race and rollback/retry.
 - The MySQL concurrency tests compare immutable receipt byte arrays by sequence content, not reference identity.
 - `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` — passed, 0 errors (1,253 warnings; NuGet audit retrieval was unavailable and SSH.NET advisories were reported).
-- `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` is unset, and the user confirmed no disposable MySQL instance is available. The MySQL migration/race tests remain unexecuted. Docker was excluded from the implementation scope.
+- The MySQL cases ran against the local `mysql:8.0.36` image (`sha256:f5f171121fa3e572eb30770e3c9a6ca240e822fdaea4e2f44882de402c8ce9d4`) in a disposable container published only on `127.0.0.1`. `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` was set only for the test process. The container and its test data were removed after the run.
 - `git diff --check` — passed.
 
 ## Remaining gates
