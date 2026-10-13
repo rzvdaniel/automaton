@@ -264,7 +264,8 @@ public sealed class NodeHostFenceReceiptValidator(INodeHostFenceTrustStore trust
         DateTimeOffset now)
     {
         var payload = envelope.Payload;
-        if (!HasValidBindings(payload, request, currentIncarnation, priorActivationRequestId, currentRecoveryEpoch, lastHostFenceGeneration) ||
+        if (envelope.SignatureAlgorithm != "ECDSA_P256_SHA256_P1363" ||
+            !HasValidBindings(payload, request, currentIncarnation, priorActivationRequestId, currentRecoveryEpoch, lastHostFenceGeneration) ||
             !HasValidWindow(payload, now) || !TryDecodeSignature(envelope.Signature, out var signature))
             return false;
 
@@ -311,7 +312,7 @@ public sealed class NodeHostFenceReceiptValidator(INodeHostFenceTrustStore trust
     {
         if (!TryTimestamp(payload.FencedAtUtc, out var fencedAt) || !TryTimestamp(payload.IssuedAtUtc, out var issuedAt) ||
             !TryTimestamp(payload.ExpiresAtUtc, out var expiresAt)) return false;
-        return issuedAt <= now.AddMinutes(1) && fencedAt <= issuedAt && expiresAt > now && expiresAt > issuedAt &&
+        return issuedAt <= now && fencedAt <= issuedAt && expiresAt > now && expiresAt > issuedAt &&
                expiresAt - issuedAt <= TimeSpan.FromMinutes(10);
     }
 

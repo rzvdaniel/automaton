@@ -17,6 +17,7 @@ public sealed class NodeEnrollmentMySqlMigrationTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(appliedMigrations, Does.Contain(NodeEnrollmentMySqlTestFixture.EnrollmentMigrationId));
             Assert.That(appliedMigrations, Does.Contain(NodeEnrollmentMySqlTestFixture.ActivationMigrationId));
             Assert.That(db.NodeEnrollmentAuthorizations.Count(), Is.Zero);
             Assert.That(db.NodeEnrollmentRecoveryChallenges.Count(), Is.Zero);

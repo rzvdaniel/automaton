@@ -67,18 +67,25 @@ public sealed class NodeActivationContractTests
             4, Guid.NewGuid(), request.ActivationRequestId, 4, 9,
             now.AddSeconds(-3).ToString("O"), now.AddSeconds(-2).ToString("O"), now.AddMinutes(3).ToString("O"),
             new string('a', 64), new string('b', 64), request.RecoveryCheckpointSha256);
-        request = request with { HostFenceReceipt = Sign(payload, signer) };
+        var receipt = Sign(payload, signer);
+        request = request with { HostFenceReceipt = receipt };
         var validator = new NodeHostFenceReceiptValidator(new TestTrustStore(signer));
+        var futurePayload = payload with { IssuedAtUtc = now.AddSeconds(1).ToString("O") };
+        var futureReceipt = Sign(futurePayload, signer);
 
         Assert.Multiple(() =>
         {
-            Assert.That(validator.TryValidate(request.HostFenceReceipt!, request, 4, payload.PriorActivationRequestId,
+            Assert.That(validator.TryValidate(receipt, request, 4, payload.PriorActivationRequestId,
                 request.RecoveryEpoch, 8, now), Is.True);
-            Assert.That(validator.TryValidate(request.HostFenceReceipt!, request, 5, payload.PriorActivationRequestId,
+            Assert.That(validator.TryValidate(receipt with { SignatureAlgorithm = "ECDSA_P384_SHA384" }, request, 4,
+                payload.PriorActivationRequestId, request.RecoveryEpoch, 8, now), Is.False);
+            Assert.That(validator.TryValidate(futureReceipt, request, 4, payload.PriorActivationRequestId,
                 request.RecoveryEpoch, 8, now), Is.False);
-            Assert.That(validator.TryValidate(request.HostFenceReceipt!, request with { RecoveryCheckpointSha256 = new string('c', 64) },
+            Assert.That(validator.TryValidate(receipt, request, 5, payload.PriorActivationRequestId,
+                request.RecoveryEpoch, 8, now), Is.False);
+            Assert.That(validator.TryValidate(receipt, request with { RecoveryCheckpointSha256 = new string('c', 64) },
                 4, payload.PriorActivationRequestId, request.RecoveryEpoch, 8, now), Is.False);
-            Assert.That(validator.TryValidate(request.HostFenceReceipt!, request, 4, payload.PriorActivationRequestId,
+            Assert.That(validator.TryValidate(receipt, request, 4, payload.PriorActivationRequestId,
                 request.RecoveryEpoch + 1, 8, now), Is.False);
         });
     }

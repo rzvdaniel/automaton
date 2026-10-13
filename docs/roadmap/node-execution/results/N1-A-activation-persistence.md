@@ -14,12 +14,16 @@ The route is management-listener-only under the existing listener allow-list. Th
 
 This PR adds contract tests for the initial zero sentinel, strict canonical request decoding, HFA signature/binding validation and fail-closed defaults. MySQL integration tests use the actual migration and independent contexts for initial-incarnation competing CAS and HFA receipt/epoch CAS behavior. They require `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` to point to a disposable MySQL database.
 
+Review amendments add an enrollment-status predicate to the incarnation update, exact HFA algorithm and not-yet-valid time checks, real enrollment-then-activation migration application, an independent-context revocation race, identical-request races for initial and HFA restart, positive-incarnation races and transaction rollback/retry proof that leaves an HFA receipt unconsumed until commit.
+
 Verification on the implementation branch:
 
 - `dotnet build src/Automaton.Api/Automaton.Api.csproj -c Debug --no-incremental --no-restore -m:1 -v minimal` — passed, 0 errors (884 warnings, including existing dependency/analyzer warnings).
-- `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` — passed, 0 errors (1,256 warnings; NuGet audit retrieval was unavailable and SSH.NET advisories were reported).
-- Focused `dotnet test` for the activation contract/listener tests and MySQL integration tests — aborted because VSTest could not connect to its testhost after 90 seconds. A non-MySQL-only retry hit the same 90-second testhost failure. The focused test cases therefore have no passing test-run evidence from this environment.
-- `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` is unset, so the MySQL migration/race tests could not be run against a disposable server. Docker was outside this task's scope.
+- `dotnet build src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-incremental --no-restore -v quiet` — passed, 0 errors (963 warnings).
+- `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivationContractTests" -v minimal` — passed, 6 passed, 0 failed, 0 skipped.
+- `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivation" -v minimal` — passed, 6 passed, 0 failed, 10 skipped. The 10 MySQL cases, including migration, same-request races, positive-incarnation race, revocation race and rollback/retry, skipped because no database connection is configured.
+- `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` — passed, 0 errors (1,254 warnings; NuGet audit retrieval was unavailable and SSH.NET advisories were reported).
+- `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` is unset, and the user confirmed no disposable MySQL instance is available. The MySQL migration/race tests remain unexecuted. Docker was excluded from the implementation scope.
 - `git diff --check` — passed.
 
 ## Remaining gates

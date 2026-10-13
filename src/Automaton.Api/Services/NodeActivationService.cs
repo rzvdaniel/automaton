@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Automaton.Api.Data;
@@ -170,22 +171,42 @@ internal sealed class NodeActivationTransactionHandler(
         status is NodeManagementStatuses.Quiescing or NodeManagementStatuses.Fenced or NodeManagementStatuses.Recovering;
 
     private Task<int> ApplyCompareAndSwapAsync(NodeIdentityResult identity, NodeEnrollmentAuthorization enrollment,
-        NodeActivationRequest request, NodeActivationTransition transition, CancellationToken cancellationToken) =>
-        db.NodeManagement.Where(value => value.NodeId == identity.NodeId && value.InstallationId == request.InstallationId &&
-                value.EnrollmentAuthorizationId == enrollment.Id && value.ControlPlaneRealmId == request.ControlPlaneRealmId &&
-                value.CredentialRevision == request.CredentialRevision && value.RecoveryEpoch == request.RecoveryEpoch &&
-                (transition.IsInitial
-                    ? value.Status == NodeManagementStatuses.Enrolled && value.CurrentIncarnation == null
-                    : value.CurrentIncarnation == request.ExpectedIncarnation &&
-                      (value.Status == NodeManagementStatuses.Quiescing || value.Status == NodeManagementStatuses.Fenced ||
-                       value.Status == NodeManagementStatuses.Recovering) &&
-                      value.HostFenceGeneration < transition.HostFenceGeneration))
+        NodeActivationRequest request, NodeActivationTransition transition, CancellationToken cancellationToken)
+    {
+        var enrollmentPredicate = IsCommittedEnrollment(enrollment, identity, request);
+        var statePredicate = transition.IsInitial
+            ? IsInitialActivationState()
+            : IsRestartActivationState(request, transition);
+        return db.NodeManagement.Where(value => value.NodeId == identity.NodeId &&
+                value.InstallationId == request.InstallationId && value.EnrollmentAuthorizationId == enrollment.Id &&
+                value.ControlPlaneRealmId == request.ControlPlaneRealmId &&
+                value.CredentialRevision == request.CredentialRevision && value.RecoveryEpoch == request.RecoveryEpoch)
+            .Where(value => db.NodeEnrollmentAuthorizations.Any(enrollmentPredicate))
+            .Where(statePredicate)
             .ExecuteUpdateAsync(updates => updates
                 .SetProperty(value => value.CurrentIncarnation, transition.AssignedIncarnation)
                 .SetProperty(value => value.Status, NodeManagementStatuses.Recovering)
                 .SetProperty(value => value.CurrentActivationRequestId, request.ActivationRequestId)
                 .SetProperty(value => value.RecoveryCheckpointSha256, request.RecoveryCheckpointSha256)
                 .SetProperty(value => value.HostFenceGeneration, transition.HostFenceGeneration), cancellationToken);
+    }
+
+    private static Expression<Func<NodeEnrollmentAuthorization, bool>> IsCommittedEnrollment(
+        NodeEnrollmentAuthorization enrollment, NodeIdentityResult identity, NodeActivationRequest request) =>
+        value => value.Id == enrollment.Id && value.NodeId == identity.NodeId &&
+                 value.InstallationId == request.InstallationId && value.ControlPlaneRealmId == request.ControlPlaneRealmId &&
+                 value.Status == NodeEnrollmentStatuses.Committed && value.CertificateSha256 != null &&
+                 value.NodeApiKeySha256 != null;
+
+    private static Expression<Func<NodeManagement, bool>> IsInitialActivationState() =>
+        value => value.Status == NodeManagementStatuses.Enrolled && value.CurrentIncarnation == null;
+
+    private static Expression<Func<NodeManagement, bool>> IsRestartActivationState(
+        NodeActivationRequest request, NodeActivationTransition transition) =>
+        value => value.CurrentIncarnation == request.ExpectedIncarnation &&
+                 (value.Status == NodeManagementStatuses.Quiescing || value.Status == NodeManagementStatuses.Fenced ||
+                  value.Status == NodeManagementStatuses.Recovering) &&
+                 value.HostFenceGeneration < transition.HostFenceGeneration;
 
     private static async Task SaveAttemptAsync(ApplicationDbContext db, NodeIdentityResult identity, NodeActivationRequest request,
         string digest, NodeActivationTransition transition, DateTime now, CancellationToken cancellationToken)
