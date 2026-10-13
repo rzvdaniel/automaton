@@ -191,6 +191,7 @@ public sealed class NodeAuthenticationBoundaryTests
     }
 
     [TestCase("GET", "/api/node/v1/identity", true)]
+    [TestCase("POST", "/api/node/v1/activation", true)]
     [TestCase("POST", "/api/node/v1/identity", false)]
     [TestCase("GET", "/api/node/v1/assignments", false)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", false)]

@@ -2574,6 +2574,70 @@ namespace Automaton.Api.Migrations
                     b.ToTable("MarketplaceCategories");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.NodeActivationAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("ActivationRequestId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<long>("AssignedIncarnation")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ControlPlaneRealmId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("CredentialRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ExpectedIncarnation")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("HostFenceReceiptId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<byte[]>("ImmutableReceiptJson")
+                        .IsRequired()
+                        .HasColumnType("longblob");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<long>("RecoveryEpoch")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostFenceReceiptId")
+                        .IsUnique();
+
+                    b.HasIndex("NodeId", "ActivationRequestId")
+                        .IsUnique();
+
+                    b.ToTable("NodeActivationAttempts", t =>
+                        {
+                            t.HasCheckConstraint("CK_NodeActivationAttempts_PositiveState", "RecoveryEpoch > 0 AND CredentialRevision > 0 AND AssignedIncarnation > 0 AND (ExpectedIncarnation IS NULL OR ExpectedIncarnation > 0)");
+                        });
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentAuthorization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2678,6 +2742,88 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("EnrollmentAuthorizationId", "ExpiresAtUtc");
 
                     b.ToTable("NodeEnrollmentRecoveryChallenges");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeHostFenceReceiptUse", b =>
+                {
+                    b.Property<Guid>("ReceiptId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("ActivationRequestId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("ConsumedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("HostFenceGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ReceiptId");
+
+                    b.HasIndex("NodeId", "ActivationRequestId")
+                        .IsUnique();
+
+                    b.HasIndex("NodeId", "HostFenceGeneration")
+                        .IsUnique();
+
+                    b.ToTable("NodeHostFenceReceiptUses");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeManagement", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("ControlPlaneRealmId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<long>("CredentialRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("CurrentActivationRequestId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<long?>("CurrentIncarnation")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("EnrollmentAuthorizationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<long>("HostFenceGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("RecoveryCheckpointSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<long>("RecoveryEpoch")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("varchar(24)");
+
+                    b.HasKey("NodeId");
+
+                    b.HasIndex("EnrollmentAuthorizationId")
+                        .IsUnique();
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique();
+
+                    b.ToTable("NodeManagement", t =>
+                        {
+                            t.HasCheckConstraint("CK_NodeManagement_PositiveFenceState", "CredentialRevision > 0 AND RecoveryEpoch > 0 AND (CurrentIncarnation IS NULL OR CurrentIncarnation > 0) AND HostFenceGeneration >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
@@ -4860,6 +5006,17 @@ namespace Automaton.Api.Migrations
                     b.Navigation("Execution");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.NodeActivationAttempt", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.NodeManagement", "NodeManagement")
+                        .WithMany("ActivationAttempts")
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NodeManagement");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentRecoveryChallenge", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.NodeEnrollmentAuthorization", "EnrollmentAuthorization")
@@ -4869,6 +5026,15 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("EnrollmentAuthorization");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeManagement", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.NodeEnrollmentAuthorization", null)
+                        .WithOne()
+                        .HasForeignKey("Automaton.Api.Entities.NodeManagement", "EnrollmentAuthorizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
@@ -5451,6 +5617,11 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.NodeEnrollmentAuthorization", b =>
                 {
                     b.Navigation("RecoveryChallenges");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.NodeManagement", b =>
+                {
+                    b.Navigation("ActivationAttempts");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>

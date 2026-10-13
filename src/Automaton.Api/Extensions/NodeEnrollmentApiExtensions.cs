@@ -15,6 +15,10 @@ internal static class NodeEnrollmentServiceRegistration
         services.Configure<NodeProxyAuthenticationOptions>(configuration.GetSection(NodeProxyAuthenticationOptions.SectionName));
         services.AddScoped<NodeProxyCertificateValidator>();
         services.AddScoped<NodeEnrollmentService>();
+        services.AddSingleton<INodeRecoveryEpochAuthority, UnavailableNodeRecoveryEpochAuthority>();
+        services.AddSingleton<INodeHostFenceTrustStore, ConfiguredNodeHostFenceTrustStore>();
+        services.AddSingleton<INodeHostFenceReceiptValidator, NodeHostFenceReceiptValidator>();
+        services.AddScoped<NodeActivationService>();
         return services;
     }
 }
@@ -52,6 +56,8 @@ internal static class NodeEnrollmentEndpointRegistration
                     context, keys[0], cancellationToken);
                 return result.Accepted ? Results.Ok(result) : Results.Unauthorized();
             });
+
+        app.MapNodeActivationEndpoint();
         return app;
     }
 

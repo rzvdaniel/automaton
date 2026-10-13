@@ -15,6 +15,7 @@ namespace Automaton.Api.Tests;
 internal sealed class NodeEnrollmentMySqlTestFixture : IAsyncDisposable
 {
     public const string EnrollmentMigrationId = "20261012183817_AddNodeEnrollmentAuthentication";
+    public const string ActivationMigrationId = "20261013095351_AddNodeActivationPersistence";
     public const string EnrollmentToken = "synthetic-mysql-enrollment-token-for-tests";
     private readonly string administratorConnectionString;
     private readonly string databaseName;
@@ -82,11 +83,27 @@ internal sealed class NodeEnrollmentMySqlTestFixture : IAsyncDisposable
 
     public ApplicationDbContext CreateContext() => new(Options);
 
+    public ApplicationDbContext CreateContext(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>(Options)
+            .AddInterceptors(interceptors)
+            .Options;
+        return new ApplicationDbContext(options);
+    }
+
     public NodeEnrollmentService CreateService(ApplicationDbContext db) => new(
         db,
         protectionProvider,
         new FrozenTimeProvider(Now),
         new NodeProxyCertificateValidator(new StaticOptionsMonitor<NodeProxyAuthenticationOptions>(new NodeProxyAuthenticationOptions())));
+
+    public NodeActivationService CreateActivationService(ApplicationDbContext db,
+        INodeHostFenceReceiptValidator? hostFenceValidator = null,
+        INodeRecoveryEpochAuthority? epochAuthority = null) => new(
+        db,
+        new FrozenTimeProvider(Now),
+        epochAuthority ?? new TestNodeEpochAuthority(),
+        hostFenceValidator ?? new NodeHostFenceReceiptValidator(new TestConfiguredHostFenceTrustStore()));
 
     public NodeEnrollmentAuthorization CreatePendingAuthorization() => new()
     {
@@ -185,7 +202,10 @@ internal static class NodeEnrollmentMySqlMigrationInstaller
         {
             var migrations = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>().Migrations.Keys.ToArray();
             var enrollmentMigrationIndex = Array.IndexOf(migrations, NodeEnrollmentMySqlTestFixture.EnrollmentMigrationId);
+            var activationMigrationIndex = Array.IndexOf(migrations, NodeEnrollmentMySqlTestFixture.ActivationMigrationId);
             Assert.That(enrollmentMigrationIndex, Is.GreaterThanOrEqualTo(0), "The enrollment migration must be present in the API migration assembly.");
+            Assert.That(activationMigrationIndex, Is.GreaterThanOrEqualTo(0), "The activation migration must be present in the API migration assembly.");
+            Assert.That(enrollmentMigrationIndex, Is.LessThan(activationMigrationIndex), "Enrollment tables must precede the activation foreign key.");
 
             await db.Database.ExecuteSqlRawAsync("""
                 CREATE TABLE `__EFMigrationsHistory` (
@@ -195,6 +215,8 @@ internal static class NodeEnrollmentMySqlMigrationInstaller
                 ) CHARACTER SET=utf8mb4;
                 """);
             const string productVersion = "9.0.10";
+            // Existing application history is intentionally skipped, but both Node migrations execute
+            // against their real schema so the activation foreign key has a principal table.
             for (var index = 0; index < enrollmentMigrationIndex; index++)
             {
                 await db.Database.ExecuteSqlInterpolatedAsync(
@@ -202,7 +224,19 @@ internal static class NodeEnrollmentMySqlMigrationInstaller
             }
 
             await db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>()
-                .MigrateAsync(NodeEnrollmentMySqlTestFixture.EnrollmentMigrationId);
+                .MigrateAsync(NodeEnrollmentMySqlTestFixture.ActivationMigrationId);
         }
     }
+}
+
+internal sealed class TestNodeEpochAuthority : INodeRecoveryEpochAuthority
+{
+    public Task<bool> IsCurrentEpochAsync(Guid realmId, long recoveryEpoch, CancellationToken cancellationToken) =>
+        Task.FromResult(realmId != Guid.Empty && recoveryEpoch > 0);
+}
+
+internal sealed class TestConfiguredHostFenceTrustStore : INodeHostFenceTrustStore
+{
+    public bool HasTrustedKeys => true;
+    public System.Security.Cryptography.ECDsa? FindTrustedKey(string signerKeyId, string issuerId) => null;
 }
