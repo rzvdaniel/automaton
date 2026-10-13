@@ -186,7 +186,7 @@ Review questions:
 - Are DTOs, options, provider details, and persistence concerns at the intended boundaries?
 - Are the checks unchanged and their results reproducible?
 
-Exit criteria: guidance names actual commands, gives concrete examples and exceptions, and works within the existing Symphony/repository workflow. A representative future change can follow it without relying on conversation history.
+Exit criteria: guidance names actual commands, gives concrete examples and exceptions, and works directly with AGENTS.md and the repository skills without requiring a separate local orchestrator. A representative future change can follow it without relying on conversation history.
 
 ### Stage 4 — Pilot refactor and convention validation
 

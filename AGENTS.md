@@ -36,7 +36,7 @@ Core workflow:
 
 ## Agent orchestration
 
-Symphony is the orchestration system for repository coding agents. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`.
+Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`.
 
 ## Git workflow
 
