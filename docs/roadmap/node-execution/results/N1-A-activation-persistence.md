@@ -19,10 +19,11 @@ Review amendments add an enrollment-status predicate to the incarnation update, 
 Verification on the implementation branch:
 
 - `dotnet build src/Automaton.Api/Automaton.Api.csproj -c Debug --no-incremental --no-restore -m:1 -v minimal` — passed, 0 errors (884 warnings, including existing dependency/analyzer warnings).
-- `dotnet build src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-incremental --no-restore -v quiet` — passed, 0 errors (963 warnings).
+- `dotnet build src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-incremental -v quiet` — passed, 0 errors (966 warnings).
 - `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivationContractTests" -v minimal` — passed, 6 passed, 0 failed, 0 skipped.
 - `dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~NodeActivation" -v minimal` — passed, 6 passed, 0 failed, 10 skipped. The 10 MySQL cases, including migration, same-request races, positive-incarnation race, revocation race and rollback/retry, skipped because no database connection is configured.
-- `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` — passed, 0 errors (1,254 warnings; NuGet audit retrieval was unavailable and SSH.NET advisories were reported).
+- The MySQL concurrency tests compare immutable receipt byte arrays by sequence content, not reference identity.
+- `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` — passed, 0 errors (1,253 warnings; NuGet audit retrieval was unavailable and SSH.NET advisories were reported).
 - `AUTOMATON_TEST_MYSQL_CONNECTION_STRING` is unset, and the user confirmed no disposable MySQL instance is available. The MySQL migration/race tests remain unexecuted. Docker was excluded from the implementation scope.
 - `git diff --check` — passed.
 

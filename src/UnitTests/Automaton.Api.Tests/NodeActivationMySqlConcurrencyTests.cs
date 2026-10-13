@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Automaton.Api.Entities;
@@ -27,7 +28,8 @@ public sealed class NodeActivationSameRequestMySqlTests
         Assert.Multiple(() =>
         {
             Assert.That(results.All(value => value.Disposition == NodeActivationDisposition.Accepted), Is.True);
-            Assert.That(results[0].ImmutableReceiptJson, Is.EqualTo(results[1].ImmutableReceiptJson));
+            Assert.That(NodeActivationMySqlRaceScenarios.ReceiptBytesEqual(
+                results[0].ImmutableReceiptJson, results[1].ImmutableReceiptJson), Is.True);
             Assert.That(state.CurrentIncarnation, Is.EqualTo(1));
             Assert.That(attempts, Is.EqualTo(1));
         });
@@ -151,6 +153,9 @@ internal static class NodeActivationMySqlRaceScenarios
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    public static bool ReceiptBytesEqual(byte[]? first, byte[]? second) =>
+        first is not null && second is not null && first.SequenceEqual(second);
+
     public static async Task<bool> SameRestartRaceIsValidAsync()
     {
         await using var fixture = await NodeEnrollmentMySqlTestFixture.CreateAsync();
@@ -177,7 +182,7 @@ internal static class NodeActivationMySqlRaceScenarios
             () => HostFenceTestSupport.ActivateInOwnContextAsync(fixture, prepared.Request, prepared.Validator),
             () => HostFenceTestSupport.ActivateInOwnContextAsync(fixture, prepared.Request, prepared.Validator));
         return new SameRequestRaceObservation(results.All(value => value.Disposition == NodeActivationDisposition.Accepted),
-            results[0].ImmutableReceiptJson == results[1].ImmutableReceiptJson,
+            ReceiptBytesEqual(results[0].ImmutableReceiptJson, results[1].ImmutableReceiptJson),
             await HostFenceTestSupport.CountFenceUsesAsync(fixture), await HostFenceTestSupport.CountAttemptsAsync(fixture));
     }
 
@@ -200,7 +205,7 @@ internal static class NodeActivationMySqlRaceScenarios
         var committed = await HostFenceTestSupport.LoadManagementAsync(fixture);
         return new RollbackRaceObservation(rollback.Disposition, rollbackState.Incarnation, rollbackState.FenceGeneration,
             rollbackState.Attempts, rollbackState.ReceiptUses, retry.Disposition,
-            retry.ImmutableReceiptJson == replay.ImmutableReceiptJson, committed.CurrentIncarnation ?? 0,
+            ReceiptBytesEqual(retry.ImmutableReceiptJson, replay.ImmutableReceiptJson), committed.CurrentIncarnation ?? 0,
             await HostFenceTestSupport.CountFenceUsesAsync(fixture));
     }
 
