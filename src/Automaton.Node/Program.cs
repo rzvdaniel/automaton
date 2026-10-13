@@ -5,9 +5,21 @@ namespace Automaton.Node;
 
 public static class Program
 {
-    public static async Task Main()
+    public const string HostStateDirectoryEnvironmentVariable = "AUTOMATON_NODE_HOST_STATE_DIRECTORY";
+
+    public static async Task<int> Main()
     {
-        using var host = NodePreparationHost.CreateBuilder().Build();
-        await host.RunAsync();
+        var hostStateDirectory = Environment.GetEnvironmentVariable(HostStateDirectoryEnvironmentVariable);
+        try
+        {
+            using var host = NodePreparationHost.CreateBuilder(hostStateDirectory).Build();
+            await host.RunAsync();
+            return 0;
+        }
+        catch (NodeInstallationLockException exception)
+        {
+            await Console.Error.WriteLineAsync($"Node startup blocked: {exception.Failure}.");
+            return 2;
+        }
     }
 }

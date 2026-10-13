@@ -18,9 +18,25 @@ public sealed class NodePreparationDependencyTests
             .Select(type => metadata.GetString(type.Namespace) + "." + metadata.GetString(type.Name)).ToArray();
         string[] forbiddenPrefixes = ["Automaton.Runner.", "Automaton.Steps.", "Automaton.Core.Scripting.",
             "Automaton.Api.", "Automaton.Infrastructure.", "Automaton.Worker.", "RabbitMQ.", "Docker.",
-            "System.Net.", "System.IO.", "System.Diagnostics.Process", "System.Environment"];
+            "System.Net.", "System.Diagnostics.Process"];
         Assert.That(types, Does.Not.Contain("System.Reflection.Assembly"));
         foreach (var prefix in forbiddenPrefixes)
             Assert.That(types.Any(t => t.StartsWith(prefix, StringComparison.Ordinal)), Is.False, prefix);
+
+        string[] allowedLocalStartupReferences =
+        [
+            "System.Environment", "System.IO.Path", "System.IO.PathTooLongException", "System.IO.IOException",
+            "System.IO.TextWriter", "System.Console",
+            "System.Runtime.InteropServices.Architecture", "System.Runtime.InteropServices.Marshal",
+            "System.Runtime.InteropServices.RuntimeInformation", "System.Runtime.InteropServices.SafeHandle",
+            "System.Runtime.InteropServices.UnmanagedType",
+            "System.Buffers.Binary.BinaryPrimitives", "Microsoft.Win32.SafeHandles.SafeFileHandle"
+        ];
+        foreach (var type in types.Where(t => t.StartsWith("System.IO.", StringComparison.Ordinal)
+            || t.StartsWith("System.Runtime.InteropServices.", StringComparison.Ordinal)
+            || t.StartsWith("System.Buffers.Binary.", StringComparison.Ordinal)
+            || t.StartsWith("Microsoft.Win32.SafeHandles.", StringComparison.Ordinal)
+            || t == "System.Environment"))
+            Assert.That(allowedLocalStartupReferences, Does.Contain(type), type);
     }
 }
