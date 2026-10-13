@@ -88,23 +88,43 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
 
     private static SafeFileHandle OpenValidatedDirectory(string path)
     {
-        if (!string.Equals(path, ResolvePath(path), StringComparison.Ordinal))
-            throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
-        var handle = OpenDirectory(path);
+        SafeFileHandle? current = OpenRootDirectory();
         try
         {
-            var metadata = ReadMetadata(handle);
-            if ((metadata.Mode & FileTypeMask) != DirectoryType || metadata.UserId != RootUserId
-                || (metadata.Mode & ForbiddenDirectoryModes) != 0)
-                throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
-            EnsureSupportedFileSystem(handle);
-            return handle;
+            ValidateDirectory(current);
+            foreach (var component in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var child = OpenDirectoryAt(current, component);
+                try
+                {
+                    ValidateDirectory(child);
+                }
+                catch
+                {
+                    child.Dispose();
+                    throw;
+                }
+                current.Dispose();
+                current = child;
+            }
+
+            EnsureSupportedFileSystem(current);
+            var finalDirectory = current;
+            current = null;
+            return finalDirectory;
         }
-        catch
+        finally
         {
-            handle.Dispose();
-            throw;
+            current?.Dispose();
         }
+    }
+
+    private static void ValidateDirectory(SafeFileHandle handle)
+    {
+        var metadata = ReadMetadata(handle);
+        if ((metadata.Mode & FileTypeMask) != DirectoryType || metadata.UserId != RootUserId
+            || (metadata.Mode & ForbiddenDirectoryModes) != 0)
+            throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
     }
 
     private static SafeFileHandle OpenValidatedLockFile(SafeFileHandle directory)
@@ -154,25 +174,17 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
 
     private static NodeInstallationLockException Failure(NodeInstallationLockFailure failure) => new(failure);
 
-    private static string ResolvePath(string path)
+    private static SafeFileHandle OpenRootDirectory()
     {
-        var resolved = RealPath(path, IntPtr.Zero);
-        if (resolved == IntPtr.Zero)
+        var descriptor = Open("/", ReadOnly | Directory | CloseOnExec | NoFollow, 0);
+        if (descriptor < 0)
             throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
-        try
-        {
-            return Marshal.PtrToStringUTF8(resolved)
-                ?? throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
-        }
-        finally
-        {
-            Free(resolved);
-        }
+        return new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
     }
 
-    private static SafeFileHandle OpenDirectory(string path)
+    private static SafeFileHandle OpenDirectoryAt(SafeFileHandle parent, string component)
     {
-        var descriptor = Open(path, ReadOnly | Directory | CloseOnExec | NoFollow, 0);
+        var descriptor = OpenAt(parent, component, ReadOnly | Directory | CloseOnExec | NoFollow, 0);
         if (descriptor < 0)
             throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
         return new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
@@ -203,12 +215,6 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
 
     [DllImport("libc", EntryPoint = "geteuid", SetLastError = true)]
     private static extern uint GetEffectiveUserId();
-
-    [DllImport("libc", EntryPoint = "realpath", SetLastError = true)]
-    private static extern IntPtr RealPath([MarshalAs(UnmanagedType.LPUTF8Str)] string path, IntPtr resolvedPath);
-
-    [DllImport("libc", EntryPoint = "free")]
-    private static extern void Free(IntPtr pointer);
 
     [DllImport("libc", EntryPoint = "open", SetLastError = true)]
     private static extern int Open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags, uint mode);

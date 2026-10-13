@@ -31,17 +31,39 @@ public sealed class NodeInstallationLockPathValidationTests
     }
 
     [Test]
+    public async Task NodeHostLock_RejectsSecureDirectoryUnderWritableAncestor()
+    {
+        NodeInstallationLockTestEnvironment.RequireSupportedIntegrationEnvironment();
+        var root = NodeInstallationLockTestEnvironment.CreatePrivateTemporaryDirectory();
+        var unsafeParent = Path.Combine(root, "unsafe-parent");
+        var secureFinalDirectory = Path.Combine(unsafeParent, "secure-final");
+        Directory.CreateDirectory(secureFinalDirectory);
+        NodeInstallationLockTestEnvironment.SetUnixMode(unsafeParent, UserOnlyMode | UnixFileMode.GroupWrite);
+        NodeInstallationLockTestEnvironment.SetUnixMode(secureFinalDirectory, UserOnlyMode);
+
+        try
+        {
+            await AssertStartupFailureAsync(secureFinalDirectory, NodeInstallationLockFailure.UnsafeDirectory);
+        }
+        finally
+        {
+            NodeInstallationLockTestEnvironment.SetUnixMode(unsafeParent, UserOnlyMode);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task NodeHostLock_RejectsMissingRelativeAndUnsafeLockFiles()
     {
         NodeInstallationLockTestEnvironment.RequireSupportedIntegrationEnvironment();
         await AssertStartupFailureAsync("relative-node-state", NodeInstallationLockFailure.ConfigurationInvalid);
-        await AssertStartupFailureAsync(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
-            NodeInstallationLockFailure.UnsafeDirectory);
-
         var root = NodeInstallationLockTestEnvironment.CreatePrivateTemporaryDirectory();
-        var lockPath = Path.Combine(root, "node-manager.lock");
         try
         {
+            await AssertStartupFailureAsync(Path.Combine(root, Guid.NewGuid().ToString("N")),
+                NodeInstallationLockFailure.UnsafeDirectory);
+
+            var lockPath = Path.Combine(root, "node-manager.lock");
             var target = Path.Combine(root, "target");
             await File.WriteAllTextAsync(target, string.Empty);
             File.CreateSymbolicLink(lockPath, target);
@@ -90,7 +112,10 @@ internal static class NodeInstallationLockTestEnvironment
 
     public static string CreatePrivateTemporaryDirectory()
     {
-        var directory = Directory.CreateTempSubdirectory("automaton-node-lock-").FullName;
+        var configuredTestRoot = Environment.GetEnvironmentVariable("AUTOMATON_NODE_TEST_ROOT");
+        var testRoot = string.IsNullOrWhiteSpace(configuredTestRoot) ? "/run" : configuredTestRoot;
+        var directory = Path.Combine(testRoot, $"automaton-node-lock-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
         SetUnixMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return directory;
     }
