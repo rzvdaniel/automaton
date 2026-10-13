@@ -78,13 +78,12 @@ public sealed class NodeLocalStateStoreIntegrationTests
                 var afterFirstCrash = secondStore.ReadSnapshot();
                 AssertIntent(afterFirstCrash.Checkpoint!, "ResponseUnknown", 1);
                 var second = CreateIntent(secondStore, identity, afterFirstCrash.Checkpoint!, Guid.NewGuid(), Guid.NewGuid());
-                Assert.That(secondStore.MarkResponseUnknown(second.ActivationRequestId).State, Is.EqualTo("ResponseUnknown"));
+                Assert.That(second.State, Is.EqualTo("Prepared"));
             }
 
             using var thirdLock = Acquire(statePath);
             var thirdStore = new NodeLocalStateStore(thirdLock);
             var afterSecondCrash = thirdStore.ReadSnapshot();
-            AssertIntent(afterSecondCrash.Checkpoint!, "ResponseUnknown", 2);
             var third = CreateIntent(thirdStore, identity, afterSecondCrash.Checkpoint!, Guid.NewGuid(), Guid.NewGuid());
             var finalCheckpoint = thirdStore.ReadCheckpoint()!;
 
@@ -92,7 +91,7 @@ public sealed class NodeLocalStateStoreIntegrationTests
             {
                 Assert.That(finalCheckpoint.ActivationIntents, Has.Count.EqualTo(3));
                 Assert.That(finalCheckpoint.ActivationIntents.Select(value => value.State),
-                    Is.EqualTo(new[] { "ResponseUnknown", "ResponseUnknown", "Prepared" }));
+                    Is.EqualTo(new[] { "ResponseUnknown", "AbandonedUnsent", "Prepared" }));
                 Assert.That(finalCheckpoint.ActivationIntents.Select(value => value.ActivationRequestId),
                     Is.EqualTo(new[] { finalCheckpoint.ActivationIntents[0].ActivationRequestId,
                         finalCheckpoint.ActivationIntents[1].ActivationRequestId, third.ActivationRequestId }));
@@ -107,14 +106,14 @@ public sealed class NodeLocalStateStoreIntegrationTests
         }
     }
 
-    private static NodeInstallationLock Acquire(string statePath)
+    internal static NodeInstallationLock Acquire(string statePath)
     {
         var installationLock = new NodeInstallationLock(statePath);
         installationLock.Acquire(CancellationToken.None);
         return installationLock;
     }
 
-    private static NodeIdentityManifest InstallIdentityAndGenesis(NodeLocalStateStore store)
+    internal static NodeIdentityManifest InstallIdentityAndGenesis(NodeLocalStateStore store)
     {
         var now = DateTimeOffset.UtcNow;
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -139,7 +138,7 @@ public sealed class NodeLocalStateStoreIntegrationTests
         return identity;
     }
 
-    private static NodeActivationIntent CreateIntent(NodeLocalStateStore store, NodeIdentityManifest identity,
+    internal static NodeActivationIntent CreateIntent(NodeLocalStateStore store, NodeIdentityManifest identity,
         NodeActivationCheckpoint checkpoint, Guid processStartId, Guid requestId)
     {
         var request = new NodeActivationRequestDocument(1, identity.ControlPlaneRealmId, 3, identity.NodeId,

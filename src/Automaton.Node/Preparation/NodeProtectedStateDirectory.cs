@@ -6,7 +6,9 @@ using Microsoft.Win32.SafeHandles;
 namespace Automaton.Node.Preparation;
 
 /// <summary>File operations relative to the directory handle held by the installation lock.</summary>
-internal sealed class NodeProtectedStateDirectory(SafeFileHandle directory)
+internal sealed class NodeProtectedStateDirectory(
+    SafeFileHandle directory,
+    Action<string, NodeProtectedStateWriteStage>? beforeWriteOperation = null)
 {
     private const int CloseOnExec = 0x80000;
     private const int NoFollow = 0x20000;
@@ -75,13 +77,16 @@ internal sealed class NodeProtectedStateDirectory(SafeFileHandle directory)
                 throw new NodeProtectedStateException();
             using var stream = new FileStream(handle, FileAccess.Write, 4096, isAsync: false);
             stream.Write(content);
+            beforeWriteOperation?.Invoke(name, NodeProtectedStateWriteStage.FileFsync);
             stream.Flush(flushToDisk: true);
             if (!IsProtectedRegularFile(ReadMetadata(stream.SafeFileHandle)))
                 throw new NodeProtectedStateException();
         }
 
+        beforeWriteOperation?.Invoke(name, NodeProtectedStateWriteStage.Rename);
         if (RenameAt(directory, temporaryName, directory, name) != 0)
             throw new NodeProtectedStateException();
+        beforeWriteOperation?.Invoke(name, NodeProtectedStateWriteStage.DirectoryFsync);
         if (Fsync(directory) != 0)
             throw new NodeProtectedStateException();
     }
@@ -124,6 +129,13 @@ internal sealed class NodeProtectedStateDirectory(SafeFileHandle directory)
 
     [DllImport("libc", EntryPoint = "fsync", SetLastError = true)]
     private static extern int Fsync(SafeFileHandle file);
+}
+
+internal enum NodeProtectedStateWriteStage
+{
+    FileFsync,
+    Rename,
+    DirectoryFsync
 }
 
 internal sealed class NodeProtectedStateException : IOException

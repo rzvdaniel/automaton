@@ -5,7 +5,9 @@ using Microsoft.Win32.SafeHandles;
 namespace Automaton.Node.Preparation;
 
 /// <summary>Linux x64, root-owned host lock. Never removes or replaces the lock inode.</summary>
-internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeInstallationLock, IDisposable
+internal sealed class NodeInstallationLock(
+    string? hostStateDirectory,
+    Action<string, NodeProtectedStateWriteStage>? beforeStateWriteOperation = null) : INodeInstallationLock, IDisposable
 {
     private const int ReadWrite = 2;
     private const int Create = 0x40;
@@ -45,7 +47,7 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
         {
             lock (sync)
                 return lockHandle is not null && stateDirectoryHandle is not null
-                    ? new NodeProtectedStateDirectory(stateDirectoryHandle)
+                    ? new NodeProtectedStateDirectory(stateDirectoryHandle, beforeStateWriteOperation)
                     : null;
         }
     }
