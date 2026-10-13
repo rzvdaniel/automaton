@@ -26,7 +26,8 @@ public sealed class NodePreparationDependencyTests
         string[] allowedHttpReferences =
         [
             "System.Net.Http.ByteArrayContent", "System.Net.Http.HttpClient", "System.Net.Http.HttpCompletionOption",
-            "System.Net.Http.HttpContent", "System.Net.Http.HttpMessageHandler", "System.Net.Http.HttpRequestException", "System.Net.Http.HttpMethod",
+            "System.Net.Http.HttpContent", "System.Net.Http.HttpMessageHandler", "System.Net.Http.HttpMessageInvoker", "System.Net.Http.HttpRequestException", "System.Net.Http.HttpMethod",
+            "System.Net.Http.SocketsHttpHandler",
             "System.Net.Http.HttpRequestMessage", "System.Net.Http.HttpResponseMessage",
             "System.Net.HttpStatusCode", "System.Net.Http.Headers.MediaTypeHeaderValue",
             "System.Net.Http.Headers.HttpContentHeaders", "System.Net.Http.Headers.HttpHeaders",

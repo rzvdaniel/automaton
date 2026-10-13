@@ -7,14 +7,31 @@ using Automaton.Node.Preparation;
 
 namespace Automaton.Node.Activation;
 
-internal sealed class NodeActivationClient(HttpClient httpClient, Uri managementOrigin, INodeActivationIntentLedger intentLedger)
+internal sealed class NodeActivationClient : IDisposable
 {
     private const int MaximumResponseBytes = 64 * 1024;
     private const int MaximumTransportAttempts = 4;
     private static readonly Regex LowerSha256 = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private readonly HttpClient httpClient;
+    private readonly Uri managementOrigin;
+    private readonly INodeActivationIntentLedger intentLedger;
 
-    public NodeActivationClient(HttpClient httpClient, string? origin, INodeActivationIntentLedger intentLedger)
-        : this(httpClient, ParseOrigin(origin), intentLedger) { }
+    public NodeActivationClient(string? origin, INodeActivationIntentLedger intentLedger)
+        : this(new HttpClient(CreateTransportHandler(), disposeHandler: true), ParseOrigin(origin), intentLedger) { }
+
+    internal NodeActivationClient(HttpMessageHandler handler, Uri managementOrigin, INodeActivationIntentLedger intentLedger)
+        : this(new HttpClient(handler, disposeHandler: true), managementOrigin, intentLedger) { }
+
+    private NodeActivationClient(HttpClient httpClient, Uri managementOrigin, INodeActivationIntentLedger intentLedger)
+    {
+        this.httpClient = httpClient;
+        this.managementOrigin = managementOrigin;
+        this.intentLedger = intentLedger;
+    }
+
+    internal static SocketsHttpHandler CreateTransportHandler() => new() { AllowAutoRedirect = false };
+
+    public void Dispose() => httpClient.Dispose();
 
     public async Task<NodeActivationReadbackSnapshot> ReadCurrentAsync(
         NodeIdentityManifest identity,

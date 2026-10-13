@@ -38,8 +38,7 @@ public sealed class NodeActivationClientTests
     public async Task ActivationPersistsUnknownBeforeTransportAndRetriesIdenticalBytes()
     {
         var setup = CreateClientSetup();
-        using var client = new HttpClient(setup.Handler);
-        var activationClient = new NodeActivationClient(client, new Uri("https://node.example"), setup.IntentLedger);
+        using var activationClient = new NodeActivationClient(setup.Handler, new Uri("https://node.example"), setup.IntentLedger);
 
         var result = await activationClient.SendActivationAsync(setup.NodeIdentity, setup.AuthorityEvidence, setup.Intent,
             [setup.Intent], setup.PreflightReadback,
@@ -61,8 +60,7 @@ public sealed class NodeActivationClientTests
     {
         var setup = CreateClientSetup(intentState: "ResponseUnknown", ledgerAlreadyUnknown: true);
         var readbackBytes = CreateWinningReadback(setup);
-        using var client = new HttpClient(new FixedHandler(readbackBytes));
-        var activationClient = new NodeActivationClient(client, new Uri("https://node.example"), setup.IntentLedger);
+        using var activationClient = new NodeActivationClient(new FixedHandler(readbackBytes), new Uri("https://node.example"), setup.IntentLedger);
 
         var snapshot = await activationClient.ReadCurrentAsync(setup.NodeIdentity, setup.AuthorityEvidence,
             [setup.Intent], "synthetic-api-key", CancellationToken.None);

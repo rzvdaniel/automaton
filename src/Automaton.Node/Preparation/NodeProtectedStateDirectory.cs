@@ -11,7 +11,7 @@ internal sealed class NodeProtectedStateDirectory(SafeFileHandle directory)
     private const int CloseOnExec = 0x80000;
     private const int NoFollow = 0x20000;
     private const int Create = 0x40;
-    private const int Exclusive = 2;
+    private const int Exclusive = 0x80;
     private const int WriteOnly = 1;
     private const uint RootUserId = 0;
     private const uint RegularFileType = 0x8000;

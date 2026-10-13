@@ -15,7 +15,7 @@ public sealed class NodeActivationReadbackService(
     private static readonly JsonSerializerOptions ReceiptOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        NumberHandling = JsonNumberHandling.WriteAsString
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     public async Task<NodeActivationReadbackResult> ReadCurrentAsync(
