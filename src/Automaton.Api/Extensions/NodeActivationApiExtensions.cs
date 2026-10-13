@@ -1,13 +1,53 @@
 using Automaton.Api.Services;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Extensions;
 
 internal static class NodeActivationApiExtensions
 {
+    private static readonly JsonSerializerOptions ReadbackJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never
+    };
+
     public static WebApplication MapNodeActivationEndpoint(this WebApplication app)
     {
         app.MapPost("/api/node/v1/activation", HandleActivationAsync);
+        app.MapGet("/api/node/v1/activation/current", HandleCurrentActivationAsync);
         return app;
+    }
+
+    private static async Task<IResult> HandleCurrentActivationAsync(HttpContext context,
+        NodeEnrollmentService enrollment, NodeActivationReadbackService readback,
+        CancellationToken cancellationToken)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        if (!TryReadApiKey(context.Request.Headers, out var apiKey))
+            return Results.Unauthorized();
+        var identity = await enrollment.AuthenticateManagementRequestAsync(context, apiKey, cancellationToken);
+        if (!identity.Accepted)
+            return Results.Unauthorized();
+
+        var result = await readback.ReadCurrentAsync(identity, cancellationToken);
+        return result.Disposition switch
+        {
+            NodeActivationReadbackDisposition.Success => ToReadbackResult(result.Readback),
+            NodeActivationReadbackDisposition.Unauthorized => Results.Unauthorized(),
+            NodeActivationReadbackDisposition.Conflict => Results.Conflict(),
+            _ => Results.StatusCode(StatusCodes.Status503ServiceUnavailable)
+        };
+    }
+
+    private static IResult ToReadbackResult(NodeActivationCurrentReadback? readback)
+    {
+        if (readback is null)
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(readback, ReadbackJsonOptions);
+        return bytes.Length is > 0 and <= 64 * 1024
+            ? Results.Bytes(bytes, "application/json")
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static async Task<IResult> HandleActivationAsync(HttpContext context, NodeEnrollmentService enrollment,

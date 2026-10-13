@@ -6,7 +6,8 @@ namespace Automaton.Node.Preparation;
 internal sealed class NodePreparationService(
     NodePreparationState state,
     INodeInstallationLock installationLock,
-    ILogger<NodePreparationService> logger) : IHostedService
+    ILogger<NodePreparationService> logger,
+    NodeLocalStateStore? localStateStore = null) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -17,6 +18,14 @@ internal sealed class NodePreparationService(
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                _ = localStateStore?.ReadSnapshot();
+            }
+            catch (NodeProtectedStateException exception)
+            {
+                logger.LogWarning(exception, "Protected Node identity or activation checkpoint is invalid; startup remains RecoveryRequired.");
+            }
             if (!state.TryRequireRecovery())
                 throw new InvalidOperationException("Node startup state is not eligible for local recovery.");
             logger.LogInformation("Node installation lock held; local authority unavailable; RecoveryRequired; admission disabled.");

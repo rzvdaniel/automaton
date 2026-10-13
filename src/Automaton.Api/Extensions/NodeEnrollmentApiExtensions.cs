@@ -19,6 +19,7 @@ internal static class NodeEnrollmentServiceRegistration
         services.AddSingleton<INodeHostFenceTrustStore, ConfiguredNodeHostFenceTrustStore>();
         services.AddSingleton<INodeHostFenceReceiptValidator, NodeHostFenceReceiptValidator>();
         services.AddScoped<NodeActivationService>();
+        services.AddScoped<NodeActivationReadbackService>();
         return services;
     }
 }

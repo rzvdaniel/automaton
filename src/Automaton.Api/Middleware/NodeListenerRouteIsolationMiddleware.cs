@@ -39,6 +39,7 @@ internal static class NodeListenerRoutePolicy
     {
         if (listeners.ManagementPort is int managementPort && localPort == managementPort)
             return (HttpMethods.IsGet(method) && string.Equals(path.Value, "/api/node/v1/identity", StringComparison.Ordinal)) ||
+                   (HttpMethods.IsGet(method) && string.Equals(path.Value, "/api/node/v1/activation/current", StringComparison.Ordinal)) ||
                    (HttpMethods.IsPost(method) && string.Equals(path.Value, "/api/node/v1/activation", StringComparison.Ordinal));
 
         if (listeners.BootstrapPort is int bootstrapPort && localPort == bootstrapPort)
