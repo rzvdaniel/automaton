@@ -1,5 +1,5 @@
 # N1-A — node host and enrollment
-Status: [limited preparation implemented/tested and merged in PR #370](results/N1-A-node-enrollment.md). Full enrollment/activation remains blocked pending independent approval of selected S-B1 authentication and affected N0 contracts per [N0-D](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). No operational Node or live acceptance is claimed.
+Status: [limited preparation implemented/tested and merged in PR #370](results/N1-A-node-enrollment.md). The [activation/recovery implementation specification](results/N1-A-activation-recovery-spec.md) is prepared for review. Full enrollment/activation remains blocked pending independent approval of selected S-B1 authentication and affected N0 contracts per [N0-D](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope), plus the prerequisites recorded in the specification. No operational Node or live acceptance is claimed.
 Mode: implementation. Prerequisites: N0-D.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
@@ -7,6 +7,8 @@ Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Aut
 ## Intended outcome and scope
 
 Reuse/extract verified Runner lifecycle code, credential storage and RM client machinery. Choose existing project evolution or a small dedicated project based on N0, not a full rewrite. Add service startup/shutdown and read-only capability inventory: OS/architecture, engine/storage configuration, cgroup support, filesystem identities and eligible workload kinds. Health does not imply admission eligibility.
+
+Before any enrollment/activation implementation, review the [N1-A activation/recovery specification](results/N1-A-activation-recovery-spec.md). Its activation CAS, lock ownership, realm/epoch checks and RecoveryOnly startup contract refine this brief; they do not authorize implementation or privileged effects by themselves.
 
 Tests: rejected/repeated enrollment, rotation/revocation, stale incarnation, invalid capability report, shutdown and secret redaction. Exit: disposable node registers, authenticates, reports capabilities and unregisters predictably.
 
