@@ -24,6 +24,9 @@ public partial class ApplicationDbContext
     public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
     public virtual DbSet<NodeEnrollmentAuthorization> NodeEnrollmentAuthorizations { get; set; }
     public virtual DbSet<NodeEnrollmentRecoveryChallenge> NodeEnrollmentRecoveryChallenges { get; set; }
+    public virtual DbSet<NodeManagement> NodeManagement { get; set; }
+    public virtual DbSet<NodeActivationAttempt> NodeActivationAttempts { get; set; }
+    public virtual DbSet<NodeHostFenceReceiptUse> NodeHostFenceReceiptUses { get; set; }
     public virtual DbSet<SelfHostedRunnerEnrollment> SelfHostedRunnerEnrollments { get; set; }
     public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
     public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }

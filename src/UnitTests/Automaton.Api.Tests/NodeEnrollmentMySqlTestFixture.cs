@@ -14,7 +14,7 @@ namespace Automaton.Api.Tests;
 
 internal sealed class NodeEnrollmentMySqlTestFixture : IAsyncDisposable
 {
-    public const string EnrollmentMigrationId = "20261012183817_AddNodeEnrollmentAuthentication";
+    public const string ActivationMigrationId = "20261013095351_AddNodeActivationPersistence";
     public const string EnrollmentToken = "synthetic-mysql-enrollment-token-for-tests";
     private readonly string administratorConnectionString;
     private readonly string databaseName;
@@ -87,6 +87,13 @@ internal sealed class NodeEnrollmentMySqlTestFixture : IAsyncDisposable
         protectionProvider,
         new FrozenTimeProvider(Now),
         new NodeProxyCertificateValidator(new StaticOptionsMonitor<NodeProxyAuthenticationOptions>(new NodeProxyAuthenticationOptions())));
+
+    public NodeActivationService CreateActivationService(ApplicationDbContext db,
+        INodeHostFenceReceiptValidator? hostFenceValidator = null) => new(
+        db,
+        new FrozenTimeProvider(Now),
+        new TestNodeEpochAuthority(),
+        hostFenceValidator ?? new NodeHostFenceReceiptValidator(new TestConfiguredHostFenceTrustStore()));
 
     public NodeEnrollmentAuthorization CreatePendingAuthorization() => new()
     {
@@ -184,8 +191,8 @@ internal static class NodeEnrollmentMySqlMigrationInstaller
         await using (db)
         {
             var migrations = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>().Migrations.Keys.ToArray();
-            var enrollmentMigrationIndex = Array.IndexOf(migrations, NodeEnrollmentMySqlTestFixture.EnrollmentMigrationId);
-            Assert.That(enrollmentMigrationIndex, Is.GreaterThanOrEqualTo(0), "The enrollment migration must be present in the API migration assembly.");
+            var activationMigrationIndex = Array.IndexOf(migrations, NodeEnrollmentMySqlTestFixture.ActivationMigrationId);
+            Assert.That(activationMigrationIndex, Is.GreaterThanOrEqualTo(0), "The activation migration must be present in the API migration assembly.");
 
             await db.Database.ExecuteSqlRawAsync("""
                 CREATE TABLE `__EFMigrationsHistory` (
@@ -195,14 +202,26 @@ internal static class NodeEnrollmentMySqlMigrationInstaller
                 ) CHARACTER SET=utf8mb4;
                 """);
             const string productVersion = "9.0.10";
-            for (var index = 0; index < enrollmentMigrationIndex; index++)
+            for (var index = 0; index < activationMigrationIndex; index++)
             {
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VALUES ({migrations[index]}, {productVersion})");
             }
 
             await db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>()
-                .MigrateAsync(NodeEnrollmentMySqlTestFixture.EnrollmentMigrationId);
+                .MigrateAsync(NodeEnrollmentMySqlTestFixture.ActivationMigrationId);
         }
     }
+}
+
+internal sealed class TestNodeEpochAuthority : INodeRecoveryEpochAuthority
+{
+    public Task<bool> IsCurrentEpochAsync(Guid realmId, long recoveryEpoch, CancellationToken cancellationToken) =>
+        Task.FromResult(realmId != Guid.Empty && recoveryEpoch > 0);
+}
+
+internal sealed class TestConfiguredHostFenceTrustStore : INodeHostFenceTrustStore
+{
+    public bool HasTrustedKeys => true;
+    public System.Security.Cryptography.ECDsa? FindTrustedKey(string signerKeyId, string issuerId) => null;
 }
