@@ -581,6 +581,12 @@ internal sealed record NodeActivationCheckpoint(
     {
         if (!NodeIdentityManifest.TryPositive(CheckpointSequence, out var sequence) || sequence == long.MaxValue)
             throw new NodeProtectedStateException();
+        var recoveryView = RecoveryView with
+        {
+            RecoveryEpoch = lastKnownRecoveryEpoch,
+            CurrentIncarnation = currentIncarnation
+        };
+        var recoveryViewBytes = recoveryView.SerializeAndValidate();
         var value = this with
         {
             CheckpointSequence = (sequence + 1).ToString(CultureInfo.InvariantCulture),
@@ -591,7 +597,9 @@ internal sealed record NodeActivationCheckpoint(
             CurrentIncarnation = currentIncarnation,
             LastActivationRequestId = lastActivationRequestId,
             LastActivationReceiptJsonBase64 = lastActivationReceiptJsonBase64,
-            LastActivationReceiptSha256 = lastActivationReceiptSha256
+            LastActivationReceiptSha256 = lastActivationReceiptSha256,
+            RecoveryViewJsonBase64 = Convert.ToBase64String(recoveryViewBytes),
+            RecoveryCheckpointSha256 = recoveryView.ComputeDigest()
         };
         value = value with { CheckpointPayloadSha256 = value.ComputePayloadDigest() };
         value.Validate();
@@ -616,7 +624,9 @@ internal sealed record NodeActivationCheckpoint(
             throw new NodeProtectedStateException();
         var recoveryView = RecoveryView;
         if (recoveryView.ControlPlaneRealmId != ControlPlaneRealmId || recoveryView.NodeId != NodeId ||
-            recoveryView.InstallationId != InstallationId || recoveryView.ComputeDigest() != RecoveryCheckpointSha256)
+            recoveryView.InstallationId != InstallationId || recoveryView.RecoveryEpoch != LastKnownRecoveryEpoch ||
+            recoveryView.CurrentIncarnation != CurrentIncarnation ||
+            recoveryView.ComputeDigest() != RecoveryCheckpointSha256)
             throw new NodeProtectedStateException();
     }
 
