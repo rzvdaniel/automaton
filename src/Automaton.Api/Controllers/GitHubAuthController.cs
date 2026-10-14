@@ -137,6 +137,11 @@ public class GitHubAuthController : ControllerBase
             return (user, null);
         }
 
+        if (_configurationService.NoUserSignUp)
+        {
+            return (null, ConfigurationService.RegistrationPausedMessage);
+        }
+
         var publicUsername = await _usersService.GenerateUniquePublicUsernameFromCandidateAsync(githubUsername);
         user = new ApplicationUser
         {

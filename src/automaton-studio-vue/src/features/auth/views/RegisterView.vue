@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -15,6 +15,18 @@ import type { RegisterFormErrors } from '../types/auth.types'
 
 const { register, isLoading, error, clearError } = useAuth()
 const router = useRouter()
+
+const registrationEnabled = ref(false)
+const registrationStatusMessage = ref('Checking registration availability...')
+onMounted(async () => {
+  try {
+    const status = await authService.registrationStatus()
+    registrationEnabled.value = status.enabled
+    registrationStatusMessage.value = status.message || ''
+  } catch {
+    registrationStatusMessage.value = 'Unable to check registration availability. Please try again later.'
+  }
+})
 
 // Form state
 const name = ref('')
@@ -161,6 +173,7 @@ function validateForm(): boolean {
 
 // Handle form submission
 async function handleSubmit() {
+  if (!registrationEnabled.value) return
   submitted.value = true
   clearError()
   turnstileError.value = null
@@ -228,12 +241,18 @@ function handleTurnstileError() {
       </template>
 
       <template #content>
+        <Message v-if="!registrationEnabled" severity="info" :closable="false" class="mb-4">
+          {{ registrationStatusMessage }}
+        </Message>
+        <div v-if="!registrationEnabled" class="text-center">
+          <router-link to="/login" class="text-primary no-underline hover:underline">Sign in</router-link>
+        </div>
         <!-- Error message -->
         <Message v-if="error" severity="error" :closable="false" class="mb-4">
           {{ error }}
         </Message>
 
-        <form class="flex flex-column gap-4" @submit.prevent="handleSubmit">
+        <form v-if="registrationEnabled" class="flex flex-column gap-4" @submit.prevent="handleSubmit">
           <div class="flex flex-column gap-2">
             <label for="name" class="font-medium">Full Name</label>
             <InputText

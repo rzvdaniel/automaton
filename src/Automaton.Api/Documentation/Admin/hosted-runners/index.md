@@ -9,3 +9,5 @@ End-to-end onboarding and operational procedures for runner hosts, runner contai
 
 - [Environments and Runner relationships](./deployment-targets.md)
 - [Infrastructure Runner installation, maintenance, and the development command probe](./infrastructure-runners.md)
+
+- [Pause public registration](./public-registration.md)

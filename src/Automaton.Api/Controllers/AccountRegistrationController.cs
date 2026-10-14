@@ -48,6 +48,14 @@ public sealed class AccountRegistrationController : BaseController
         this.logger = logger;
     }
 
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult RegistrationStatus() => Ok(new
+    {
+        enabled = !configurationService.NoUserSignUp,
+        message = configurationService.NoUserSignUp ? ConfigurationService.RegistrationPausedMessage : null
+    });
+
     [HttpPost]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicyNames.AuthRegistration)]
@@ -55,7 +63,7 @@ public sealed class AccountRegistrationController : BaseController
     public async Task<IActionResult> RegisterUser(RegisterUserCommand registerUserCommand)
     {
         if (configurationService.NoUserSignUp)
-            return NotFound();
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfigurationService.RegistrationPausedMessage });
 
         if (!await ValidateTurnstileAsync(registerUserCommand.TurnstileToken, CancellationToken.None))
             return BadRequest(new { message = "Verification failed. Please try again." });

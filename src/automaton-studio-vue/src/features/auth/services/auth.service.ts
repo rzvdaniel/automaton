@@ -40,6 +40,13 @@ class AuthService {
    * Register a new user
    * POST /api/Account/RegisterUser
    */
+  async registrationStatus(): Promise<{ enabled: boolean; message: string | null }> {
+    const { data } = await apiClient.get<{ enabled: boolean; message: string | null }>(
+      '/api/Account/RegistrationStatus',
+    )
+    return data
+  }
+
   async register(request: RegisterRequest): Promise<string> {
     const { data } = await apiClient.post<string>('/api/Account/RegisterUser', request)
     return data
