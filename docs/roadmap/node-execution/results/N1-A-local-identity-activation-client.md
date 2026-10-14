@@ -1,6 +1,6 @@
 # N1-A — durable local identity and activation client implementation
 
-Status: implementation submitted for review in source commit `c236e920b9f1c615b6cf2258a6472ed7dce3a7fc`; operational activation remains disabled. This implements the bounded scope approved by the reviewed specification `73b4b6e5`.
+Status: the bounded implementation approved by the reviewed specification `73b4b6e5` merged in PR #379 at `f524c2bd`. Positive-incarnation checkpoint synchronization follow-up is under review at commit `325c97b1`; operational activation remains disabled.
 
 ## Implemented boundary
 
@@ -30,6 +30,23 @@ No mTLS implementation choice was made here; the proposed selection remains pend
 | `git diff --check` | Passed. |
 
 The Linux acceptance was run against source commit `c236e920b9f1c615b6cf2258a6472ed7dce3a7fc`. The focused selection included actual abrupt process termination for installation-lock recovery and passed with no skips. The write-stage fault injection is test-only and does not change production I/O behavior.
+
+## Positive-incarnation checkpoint follow-up
+
+The merged implementation advanced the checkpoint's top-level incarnation after persisting an activation receipt but left the embedded recovery view at its genesis incarnation. After a restart, that mismatch prevented preparation of the next activation request. Commit `325c97b1a932392a657b36664bd78c83ada28e2c` updates the embedded recovery view's epoch/incarnation with the checkpoint tuple, recomputes both nested and outer digests, and rejects tuple divergence during envelope validation. Its regression persists an incarnation-1 receipt, reopens the protected store, validates both tuples and the recovery-view digest, then prepares a subsequent request with `expectedIncarnation=1`.
+
+Independent review of exact commit `325c97b1a932392a657b36664bd78c83ada28e2c` found no blocker. Independent QA used that exact source revision and reported:
+
+| Check | Result |
+| --- | --- |
+| `dotnet build src/Automaton.Node/Automaton.Node.csproj -c Debug --no-incremental -v minimal` | Passed, 0 warnings/errors. |
+| `dotnet build src/UnitTests/Automaton.Node.Tests/Automaton.Node.Tests.csproj -c Debug --no-incremental -v minimal` | Passed, 0 warnings/errors. |
+| Linux `dotnet test src/UnitTests/Automaton.Node.Tests/Automaton.Node.Tests.csproj -c Debug --no-build --no-restore -v minimal` | Passed, 99/99, 0 failed/skipped; includes positive-incarnation receipt reconciliation and local filesystem cases. |
+| Linux `dotnet test src/UnitTests/Automaton.Architecture.Tests/Automaton.Architecture.Tests.csproj -c Debug --no-build --no-restore -v minimal` | Passed, 10/10, 0 failed/skipped. |
+| `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` | Passed, 0 errors, 1,254 existing warnings including SSH.NET NU1903 advisories. |
+| `git diff --check` | Passed. |
+
+The disposable Linux test container used `mcr.microsoft.com/dotnet/sdk:9.0`, read-only source and package mounts, no network, privileged mode, Docker socket or production mounts, bounded 2 CPU/2 GiB/256 PIDs, and private `/run` and `/tmp` tmpfs. It was launched with automatic removal and verified absent afterward. No MySQL, broker, workload, enrollment authority or production path was exercised. This follow-up test does not simulate power loss or forced termination during every individual filesystem syscall. The implementation remains uncomposed by the Node host and does not enable activation or host effects.
 
 ## Remaining gates
 
