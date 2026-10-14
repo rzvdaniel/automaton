@@ -1,6 +1,8 @@
 # N1-B — durable typed commands
-Status: pure DTO/codec/hash/timestamp and fixture-boundary slice implemented, independently reviewed and acceptance-tested in [N1-B evidence](results/N1-B-command-evidence.md). N1-A's local identity/activation-client implementation merged in PR #379 at `f524c2bd`; positive-incarnation checkpoint follow-up `325c97b1` awaits PR review. No command consumer is implemented. N0-D's independent B1 approval and external-authority/deployed-path gates remain distinct. Dispatch, persistence, journal, broker and security-sensitive consumers remain blocked pending actual B1 approval; no live acceptance or full N1-B exit is claimed.
-Mode: implementation. Prerequisites: N1-A.
+Status: pure DTO/codec/hash/timestamp and fixture-boundary slice implemented, independently reviewed and acceptance-tested in [N1-B evidence](results/N1-B-command-evidence.md). N1-A's local identity/activation-client implementation merged in PR #379; positive-incarnation checkpoint follow-up merged in PR #386. No command consumer is implemented. N0-D's independent B1 approval and external-authority/deployed-path gates remain distinct. Dispatch, persistence, journal, broker and security-sensitive consumers remain blocked pending actual B1 approval; no live acceptance or full N1-B exit is claimed.
+Mode: stateful contract review; prerequisites for consumer implementation: N1-A authority integration and approved B1 security/tenancy/fencing contract.
+
+**Stateful consumer readiness:** the code-level persistence/API proposal in [N1-B evidence](results/N1-B-command-evidence.md) pins the `RunnerExecutionOperation` Node columns and nullability, MySQL indexes, claim/command transaction boundary, result-versus-expiry CAS/readback, and HTTP status/body/retry matrix. Its independent review amendment is pending. Actual B1 security/tenancy/fencing approval and N1-A operational authority gates remain distinct blockers; a documentation review cannot supply them.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
 
@@ -52,7 +54,7 @@ The deliverables and mandatory scenarios are satisfied for the declared scope, p
 
 ## Next task
 
-N1-C. Proceed only when its prerequisites are satisfied. If this slice needs smaller PRs, retain this gate and list ordered subtasks in its results file.
+Complete independent review of the stateful persistence/API proposal. Do not implement dispatch, persistence, journal or broker consumers until the contract is accepted and the applicable B1 security/tenancy/fencing approval plus N1-A authority prerequisites are actually available. N1-C host inventory/reconciliation remains blocked on those N1-B/N1-A consumer gates; its pure DTO preparation is already complete.
 
 ## Copyable task
 

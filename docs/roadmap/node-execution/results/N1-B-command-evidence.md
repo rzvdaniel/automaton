@@ -102,6 +102,87 @@ Commands are valid only for their pinned realm, freshly verified positive Recove
 
 The isolated fixture can use synthetic Node/HFA/register signers only through the same parser, verifier and binding interfaces used by production. Test-only services live in test assemblies and are absent from production DI. They can establish validator behavior, not issuer custody, authority freshness in deployment or physical host fencing. Production composition remains fail-closed and startup remains `RecoveryRequired` until separately reviewed authority adapters and operational evidence exist.
 
+## Stateful persistence and HTTP outcome contract — proposal for review
+
+This section resolves the code-level schema, transition and response gaps before any N1-B consumer work. It is a proposal for independent review, not approval to implement or enable the consumer. Implementation still requires actual B1 security/tenancy/fencing approval, fresh N1-A authority integration and the external custody/deployed-path gates. No runtime, database or broker behavior is changed by this document.
+
+### `RunnerExecutionOperation` extension and migration
+
+Retain `RunnerExecutionOperation` as the durable operation owner and use `NodeManagement.TransportRunnerId` as the existing transport `RunnerId` for a Node-bound row. Keep the existing Runner fields and paths behaviorally unchanged. One additive migration adds the following nullable columns; null is reserved for legacy Runner rows and is never a default authorization value:
+
+| Column | MySQL type | Meaning |
+| --- | --- | --- |
+| `NodeRecordRole` | `varchar(24) CHARACTER SET ascii COLLATE ascii_bin NULL` | `RequestIntent` or `Command`. |
+| `NodeRequestScopeKind` | `varchar(16) CHARACTER SET ascii COLLATE ascii_bin NULL` | `host` for this first command. |
+| `NodeRequestScopeId` | `char(36) CHARACTER SET ascii COLLATE ascii_bin NULL` | Lowercase-D NodeId. |
+| `NodeRequestKind` | `varchar(64) CHARACTER SET ascii COLLATE ascii_bin NULL` | `inspect-node-status-v1`. |
+| `NodeClientRequestId` | `char(36) CHARACTER SET ascii COLLATE ascii_bin NULL` | Client-supplied stable retry key. |
+| `NodeIntentSchemaVersion` | `int NULL` | Pinned normalizer version for replay. |
+| `NodeClientIntentJson` | `longblob NULL` | Exact normalized, protected client-intent bytes. |
+| `NodeClientIntentSha256` | `char(64) CHARACTER SET ascii COLLATE ascii_bin NULL` | Digest of those bytes. |
+| `NodeRootRequestOperationId` | `char(36) CHARACTER SET ascii COLLATE ascii_bin NULL` | Request root for a command child; null on the root itself. |
+| `NodeStepKey` | `varchar(128) CHARACTER SET ascii COLLATE ascii_bin NULL` | Versioned finite semantic step key; null on the request root. |
+| `NodeId`, `NodeInstallationId`, `NodeControlPlaneRealmId` | `char(36) CHARACTER SET ascii COLLATE ascii_bin NULL` | Immutable Node binding tuple. |
+| `NodeRecoveryEpoch`, `NodeIncarnation`, `NodeCredentialRevision` | `bigint NULL` | Positive authorization tuple captured at command admission. |
+| `NodeDeadlineUtc` | `datetime(6) NULL` | Immutable command deadline compared using MySQL UTC. |
+| `NodeState` | `varchar(24) CHARACTER SET ascii COLLATE ascii_bin NULL` | Closed committed Node row state: root `Admitted`/`Rejected`/`IntakePending`; command `Queued`/`ResultStored`/`Expired`. Transient `Claimed` exists only inside the normal admission transaction. |
+| `NodeCommandJson`, `NodeResultJson`, `NodeResultReceiptJson` | `longblob NULL` | Exact canonical command, result and receipt bytes. Result/receipt fields are null until their atomic result commit. |
+| `NodeCommandSha256`, `NodeResultSha256`, `NodeResultReceiptSha256` | `char(64) CHARACTER SET ascii COLLATE ascii_bin NULL` | Lowercase SHA-256 of corresponding exact bytes. |
+
+New Node roots and command children set all fields required by their `NodeRecordRole`; legacy rows keep every new field null. Stable request-key and normalized-intent columns are populated on `RequestIntent` roots only; child `Command` rows leave those four unique-key columns null and carry the root ID plus unique semantic `StepKey`. The existing primary key `Id` is the operation/command ID, while a `RequestIntent` root's provisional `Id` is not a workload allocation. Its `RunnerId` is the uniquely bound `NodeManagement.TransportRunnerId`, and `RequestedByUserId` remains the real authenticated human initiator for this administrator status command; never use `Guid.Empty` or a fabricated actor. The command child is created only after the stable-key claim succeeds in the same database transaction, with a self-referential root foreign key that uses `RESTRICT` on delete. `Claimed` is an in-transaction state only: normal admission commits the root as `Admitted` with child command and CAP outbox atomically, while only the explicitly supported resumable upload contract may separately commit `IntakePending`. A rejected no-effect request may commit as `Rejected`; no ordinary request may commit a root-only `Claimed` record. Require role-specific shape constraints in MySQL `CHECK` constraints and in the API validator; unknown roles, partial tuples and mixed Root/Command columns reject. Exact request, command, result and receipt bytes use binary columns so MySQL text collation or JSON reformatting cannot change byte identity. UTC comparisons use database time, never an API-server clock.
+
+Add these indexes in the same migration:
+
+| Index | Columns | Purpose |
+| --- | --- | --- |
+| `UX_RunnerExecutionOperations_NodeRequestKey` unique | `(NodeRequestScopeKind, NodeRequestScopeId, NodeRequestKind, NodeClientRequestId)` | One stable intent claim. MySQL permits multiple legacy rows because at least one indexed value is null; complete Node roots require all four values. |
+| `UX_RunnerExecutionOperations_NodeRootStep` unique | `(NodeRootRequestOperationId, NodeStepKey)` | One child command per root and semantic step; both are required on `Command` rows and null on roots/legacy rows. |
+| `IX_RunnerExecutionOperations_NodeReconcile` | `(NodeId, NodeIncarnation, NodeState, NodeDeadlineUtc)` | Bounded lookup for current Node work and deadline settlement. |
+
+`NodeCommandIntentClaimRace` must execute the real migration on disposable MySQL 8.0.36. It seeds and reads a pre-migration Runner row, verifies all Node columns remain null and Runner behavior remains unchanged, proves multiple legacy null-key rows coexist, and verifies duplicate complete stable keys and duplicate root/step pairs fail at their unique indexes. Migration rollback is tested only on the disposable database. No production migration is authorized by this specification.
+
+### Administrator admission endpoint
+
+The first status command is admitted through `POST /api/nodes/{nodeId}/management-commands/inspect-status` on the ordinary authenticated API listener, protected by the existing administrator host-management authorization. It is not a Node-management listener route and is never accepted on bootstrap. The closed request has ordered properties `schemaVersion`, `clientRequestId`, `view`; `schemaVersion` is numeric `1`, `clientRequestId` is required lowercase-D GUID and `view` is exactly `status`. The caller cannot submit realm, installation, incarnation, credential, policy, command ID, deadline, queue, result, or host-effect fields. The server resolves and authorizes the Node binding and creates the immutable command/outbox from current state.
+
+The first committed response is `202` with canonical `NodeCommandAdmissionV1` fields `schemaVersion`, `requestOperationId`, `commandId`, `status`, `requestIntentSha256`; `status` is the immutable `Admitted`. A same-key/same-intent retry returns `200` with byte-identical admission receipt bytes. Reuse with different normalized intent is `409 idempotency_conflict`. Missing key or malformed body is `400 invalid_contract`; unauthenticated/unauthorized caller is `401`/`403`; unknown or inaccessible Node is masked `404 not_found`; transient failure before commit is `503 temporarily_unavailable`. Caller retries after timeout reuse the exact client key/body. Before commit, no root/command/outbox survives; after commit, retry returns the same admission receipt without another command, outbox, reservation or workload.
+
+`NodeCommandAdmissionListenerAndIdempotency` asserts that this exact endpoint is served only on the ordinary API listener, has no mapping on management/bootstrap listeners, authorizes the actual account/host owner, and rejects all caller-supplied binding or executor fields. Its independent-context MySQL race submits the same key/body and changed-body key; exactly one root, command and outbox commit, replay IDs/bytes match, and changed intent is conflict. Faults before commit leave zero durable rows; lost response after commit returns the same admission receipt.
+
+### Conditional result/expiry commit and loser readback
+
+The result and expiry transitions compete on the same command row, with MySQL UTC as the sole deadline clock:
+
+- Result commit is one conditional update from `Queued` to `ResultStored`. Predicates include `Id`, `NodeState='Queued'`, bound `NodeId`, `NodeInstallationId`, realm, recovery epoch, incarnation, credential revision, `NodeDeadlineUtc > UTC_TIMESTAMP(6)`, and null result/receipt columns. The transaction first locks and validates the current NodeManagement binding; revocation and result reporting use the same NodeManagement-before-operation lock order. Exactly one affected command row wins. Exact result bytes/hash, immutable receipt bytes/hash and completion timestamp are written together.
+- Expiry is one conditional update from `Queued` to `Expired` where `NodeDeadlineUtc <= UTC_TIMESTAMP(6)` and result/receipt fields are null. It writes no result and cannot overwrite `ResultStored`. Exactly one affected row wins. Both statements evaluate the deadline in the database and rely on the row's conditional state transition, so result-versus-expiry has one terminal winner.
+- An update affecting zero rows is never treated as success. Read the row again in a fresh context/transaction, reauthorize the caller against current NodeManagement, and branch only on durable state: byte-identical `ResultStored` returns its saved receipt; different result bytes return conflict; `Expired` returns terminal expiry; missing/foreign rows remain masked as not found; a still-queued row is retryable only after the winning transaction is confirmed rolled back or the caller's transaction has ended. No lost response creates a second receipt, timestamp or ID.
+
+`NodeCommandResultExpiryCasRace` uses two independent MySQL contexts and synchronizes concurrent result and expiry attempts on both sides of the database deadline. It asserts exactly one state transition, one immutable receipt only for the result winner, no overwritten result, and a loser response derived from a fresh-row read. It also injects rollback before commit and confirms a retry can win once; lost HTTP response followed by byte-identical PUT/readback returns the original receipt bytes. Boundary cases at database time exactly equal to the deadline resolve to `Expired` because result requires `>` and expiry requires `<=`.
+
+### HTTP status, body and retry contract
+
+All API error bodies are canonical `NodeCommandErrorV1` JSON with the exact ordered fields `schemaVersion`, `code`, `commandId`, `retryAfterSeconds`; nulls are emitted. `code` is a closed enum, `commandId` is null when disclosure is unsafe, and `retryAfterSeconds` is null except for retryable responses. Error bodies contain no query, identity, secret or database details. `Retry-After` and `retryAfterSeconds` agree and are bounded to 1–60 seconds.
+
+| Route/outcome | HTTP and body | Node action |
+| --- | --- | --- |
+| `GET /commands/{id}` — current authorized queued command, read from the primary/strongly consistent owner | `200` with exact canonical command bytes. | Validate and durably journal before handler invocation. |
+| Fetch — command expired or already terminal | `410 command_expired` or `409 command_terminal`; expiry is durably CAS-settled before returning 410. | Persist terminal rejection without handler and ack only after durable journal record. |
+| `GET /commands/{id}/result-receipt` — receipt committed | `200` with exact saved receipt bytes. | Validate and fsync receipt, then mark reported and ack. |
+| Receipt read — result still pending | `202`, `code=result_pending`, retry after 1 second. | Keep immutable local result pending; retry receipt read/identical PUT; do not ack. |
+| First valid result PUT | `201` with exact newly stored receipt bytes. | Validate and fsync receipt, then ack. |
+| Byte-identical result PUT replay | `200` with byte-identical original receipt. | Validate and fsync receipt, then ack. |
+| Unknown or foreign command/receipt | `404`, `code=not_found`, no identity disclosure. | Persist a bounded rejected-wakeup journal record without running a handler; ack only after that record is durable. |
+| Stale incarnation/epoch tuple, conflicting bytes or already-terminal incompatible state | `409`, closed codes `binding_conflict`, `result_conflict`, or `command_terminal`. | Preserve any result; journal/quarantine the mismatch; never run or regenerate a result. Ack only after durable quarantine; require fresh authorization before resuming. |
+| Expired command with no result | `410`, `code=command_expired`. | Persist terminal rejection without handler and ack only after durable journal record. |
+| Malformed/noncanonical command or result | `422`, `code=invalid_contract`. | Quarantine exact bounded input, do not invoke handler; ack only after durable rejection record. |
+| Missing/invalid authentication or revoked binding | `401`/`403`, `code=authentication_required`/`authorization_denied`. | Keep command/result quarantined and unacked; stop that consumer session pending current credentials/authority. |
+| Database/external-authority/service transient failure | `503`, `code=temporarily_unavailable`, retry after 1–60 seconds. | Keep the wake-up unacked and retry with the identical request/result bytes. |
+| Rate limit | `429`, `code=rate_limited`, retry after 1–60 seconds. | Keep the wake-up unacked and retry unchanged after the interval. |
+
+The API masks unknown and foreign IDs identically. It reauthorizes before returning any existing body/receipt, including an idempotent replay. A command, its CAP outbox event and stable root commit atomically, so a fetch never needs to poll for a separately committed claim; command fetch uses the primary/strongly consistent owner. Node retries `202` only for receipt readback while a queued command is still unsettled, plus `429`, `503`, transport timeout/connection loss and `5xx`, using bounded exponential backoff capped at 60 seconds and identical bytes. It does not retry a changed request after `409`, a malformed payload after `422`, or an expired command after `410`. `401`/`403` never authorize fallback; they stop the consumer and preserve the journal for a fresh authenticated recovery session. The broker wake-up is acknowledged only after a durable result receipt or the explicit pre-handler `Rejected`/`Quarantined` journal state above; no uncommitted local rejection can drop a delivery.
+
+Required deterministic/API tests are `NodeCommandHttpOutcomeMatrix` (each row above, exact status and canonical bytes, retry headers, error-code closure, masked foreign identity, and handler invocation count zero on every rejection), `NodeCommandReceiptLostResponse` (201 then lost response, identical PUT and receipt GET produce original receipt bytes), and `NodeWakeupAckRequiresDurableOutcome` (fault before journal fsync keeps delivery unacked; after durable terminal rejection it may ack; after transient API error it cannot ack). The MySQL tests must additionally assert the role/nullability/index shape, actual result-versus-expiry SQL affected-row behavior, revocation/result race, exact duplicate replay and stale/foreign loser readback. These are mandatory before the stateful N1-B consumer is accepted.
+
 ## Acceptance scopes
 
 ### Immediate pure-contract preparation
