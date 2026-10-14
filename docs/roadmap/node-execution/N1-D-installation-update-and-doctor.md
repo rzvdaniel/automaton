@@ -1,5 +1,5 @@
 # N1-D — installation update and doctor
-Status: authored; limited preparation and blocked consumer scopes are defined in [N0-D readiness](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). Full slice entry/exit remains gated. No implementation or live acceptance is claimed.
+Status: the bounded pure doctor formatter is implemented, independently reviewed and QA-tested; the package-provenance proposal is ready for owner/security review in [N1-D evidence](results/N1-D-installation-evidence.md). Installer, package verification/publication, service/update/rollback, revocation, restore-startup, host-facing doctor and live acceptance remain blocked; N1-D as a whole is not complete.
 Mode: implementation. Prerequisites: N1-C.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
