@@ -34,3 +34,9 @@ Signup is not an execution safeguard. Review each account in Administration > Us
 Hosted provisioning checks the platform provisioning switch, effective plan capability, active specification, account runner count, host capacity and storage locality. Existing execution depends on runner/app/project access and API-key permissions. Administrators have broader management rights.
 
 Before wider access, independently validate live image provenance, tenant authorization on execution and secret grants, privileged Infrastructure Runner separation, CPU/memory/PID limits, capability dropping/no-new-privileges, filesystem and Docker-socket isolation, writable-layer/durable-storage limits, outbound network restrictions, cancellation/timeouts and retry behavior. Source inspection and unit tests do not establish live enforcement. Do not revoke permissions, change subscriptions or stop workloads as part of this review.
+
+## GitHub login build configuration
+
+Studio uses `VITE_GITHUB_AUTH_API_BASE_URL` when explicitly configured, otherwise it uses `VITE_API_BASE_URL`. Leave the GitHub override empty when both flows use the same API. These are build-time values: rebuilding Studio is required after changing them. The Docker image leaves the GitHub override empty so production Compose's configured API domain is used instead of a development localhost address.
+
+When GitHub returns the exact registration-pause message for a missing account, Studio displays that message and offers **Back to Sign In**, without an immediate GitHub retry prompt. Other OAuth errors retain generic wording. Existing GitHub users continue through the normal sign-in flow.
