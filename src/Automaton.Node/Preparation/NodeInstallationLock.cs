@@ -5,7 +5,9 @@ using Microsoft.Win32.SafeHandles;
 namespace Automaton.Node.Preparation;
 
 /// <summary>Linux x64, root-owned host lock. Never removes or replaces the lock inode.</summary>
-internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeInstallationLock, IDisposable
+internal sealed class NodeInstallationLock(
+    string? hostStateDirectory,
+    Action<string, NodeProtectedStateWriteStage>? beforeStateWriteOperation = null) : INodeInstallationLock, IDisposable
 {
     private const int ReadWrite = 2;
     private const int Create = 0x40;
@@ -20,6 +22,7 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
     private const uint RegularFileType = 0x8000;
     private const uint ForbiddenDirectoryModes = 0x12; // group/other write
     private const uint RequiredLockFileMode = 0x180; // 0600
+    private const uint RequiredStateDirectoryMode = 0x1C0; // 0700
     private const uint RootUserId = 0;
     // Linux x64 struct stat offsets; other ABIs are rejected before these buffers are read.
     private const int LinkCountOffset = 16;
@@ -36,6 +39,18 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
 
     private readonly object sync = new();
     private SafeFileHandle? lockHandle;
+    private SafeFileHandle? stateDirectoryHandle;
+
+    internal NodeProtectedStateDirectory? StateDirectory
+    {
+        get
+        {
+            lock (sync)
+                return lockHandle is not null && stateDirectoryHandle is not null
+                    ? new NodeProtectedStateDirectory(stateDirectoryHandle, beforeStateWriteOperation)
+                    : null;
+        }
+    }
 
     public void Acquire(CancellationToken cancellationToken)
     {
@@ -49,18 +64,22 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
                 throw Failure(NodeInstallationLockFailure.OperatingSystemFailure);
 
             SafeFileHandle? candidateHandle = null;
+            SafeFileHandle? directoryHandle = null;
             try
             {
-                using var directoryHandle = OpenValidatedDirectory(fullPath);
+                directoryHandle = OpenValidatedDirectory(fullPath);
                 candidateHandle = OpenValidatedLockFile(directoryHandle);
                 cancellationToken.ThrowIfCancellationRequested();
                 AcquireKernelLock(candidateHandle);
                 lockHandle = candidateHandle;
                 candidateHandle = null;
+                stateDirectoryHandle = directoryHandle;
+                directoryHandle = null;
             }
             finally
             {
                 candidateHandle?.Dispose();
+                directoryHandle?.Dispose();
             }
         }
     }
@@ -108,6 +127,7 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
                 current = child;
             }
 
+            ValidateProtectedStateDirectory(current);
             EnsureSupportedFileSystem(current);
             var finalDirectory = current;
             current = null;
@@ -124,6 +144,14 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
         var metadata = ReadMetadata(handle);
         if ((metadata.Mode & FileTypeMask) != DirectoryType || metadata.UserId != RootUserId
             || (metadata.Mode & ForbiddenDirectoryModes) != 0)
+            throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
+    }
+
+    private static void ValidateProtectedStateDirectory(SafeFileHandle handle)
+    {
+        var metadata = ReadMetadata(handle);
+        if ((metadata.Mode & FileTypeMask) != DirectoryType || metadata.UserId != RootUserId ||
+            (metadata.Mode & 0xFFF) != RequiredStateDirectoryMode)
             throw Failure(NodeInstallationLockFailure.UnsafeDirectory);
     }
 
@@ -162,12 +190,16 @@ internal sealed class NodeInstallationLock(string? hostStateDirectory) : INodeIn
     public void Release()
     {
         SafeFileHandle? handle;
+        SafeFileHandle? directory;
         lock (sync)
         {
             handle = lockHandle;
             lockHandle = null;
+            directory = stateDirectoryHandle;
+            stateDirectoryHandle = null;
         }
         handle?.Dispose();
+        directory?.Dispose();
     }
 
     public void Dispose() => Release();

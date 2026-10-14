@@ -21,6 +21,8 @@ public static class NodePreparationHost
         builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.None);
         builder.Services.AddSingleton<NodePreparationState>();
         builder.Services.AddSingleton(installationLock);
+        if (installationLock is NodeInstallationLock localLock)
+            builder.Services.AddSingleton(new NodeLocalStateStore(localLock));
         builder.Services.AddHostedService<NodePreparationService>();
         return builder;
     }

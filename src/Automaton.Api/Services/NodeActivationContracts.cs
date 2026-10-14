@@ -172,7 +172,16 @@ internal static class NodeActivationRequestParser
 public interface INodeRecoveryEpochAuthority
 {
     Task<bool> IsCurrentEpochAsync(Guid realmId, long recoveryEpoch, CancellationToken cancellationToken);
+
+    Task<NodeRecoveryAuthoritySnapshot?> ReadCurrentAsync(Guid realmId, CancellationToken cancellationToken) =>
+        Task.FromResult<NodeRecoveryAuthoritySnapshot?>(null);
 }
+
+public sealed record NodeRecoveryAuthoritySnapshot(
+    Guid ControlPlaneRealmId,
+    long RecoveryEpoch,
+    string AuthorityRevision,
+    string AttestationSha256);
 
 /// <summary>Production default: activation remains disabled until an independently reviewed register adapter is configured.</summary>
 internal sealed class UnavailableNodeRecoveryEpochAuthority : INodeRecoveryEpochAuthority

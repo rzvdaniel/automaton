@@ -233,6 +233,11 @@ internal sealed class TestNodeEpochAuthority : INodeRecoveryEpochAuthority
 {
     public Task<bool> IsCurrentEpochAsync(Guid realmId, long recoveryEpoch, CancellationToken cancellationToken) =>
         Task.FromResult(realmId != Guid.Empty && recoveryEpoch > 0);
+
+    public Task<NodeRecoveryAuthoritySnapshot?> ReadCurrentAsync(Guid realmId, CancellationToken cancellationToken) =>
+        Task.FromResult<NodeRecoveryAuthoritySnapshot?>(realmId == Guid.Empty
+            ? null
+            : new NodeRecoveryAuthoritySnapshot(realmId, 3, "mysql-test-revision-1", new string('a', 64)));
 }
 
 internal sealed class TestConfiguredHostFenceTrustStore : INodeHostFenceTrustStore

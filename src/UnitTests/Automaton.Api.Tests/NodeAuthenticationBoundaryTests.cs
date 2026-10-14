@@ -99,11 +99,13 @@ public sealed class NodeAuthenticationBoundaryTests
     }
 
     [TestCase("GET", "/api/node/v1/identity", 7101)]
+    [TestCase("GET", "/api/node/v1/activation/current", 7101)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", 7101)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/challenge", 7101)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/recovery/complete", 7102)]
     [TestCase("GET", "/api/node/v1/identity", 5000)]
     [TestCase("GET", "/api/node/v1/identity", 7103)]
+    [TestCase("GET", "/api/node/v1/activation/current", 7103)]
     public async Task Cross_listener_request_is_rejected_even_with_spoofed_identity_headers(
         string method,
         string path,
@@ -163,6 +165,7 @@ public sealed class NodeAuthenticationBoundaryTests
     [TestCase("GET", "/healthz", 7103)]
     [TestCase("GET", "/not-a-mapped-route", 7103)]
     [TestCase("GET", "/api/node/v1/identity", 7103)]
+    [TestCase("GET", "/api/node/v1/activation/current", 7103)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", 7102)]
     public async Task Isolated_listener_rejects_every_route_outside_its_complete_allow_list(
         string method,
@@ -191,11 +194,12 @@ public sealed class NodeAuthenticationBoundaryTests
     }
 
     [TestCase("GET", "/api/node/v1/identity", true)]
+    [TestCase("GET", "/api/node/v1/activation/current", true)]
     [TestCase("POST", "/api/node/v1/activation", true)]
     [TestCase("POST", "/api/node/v1/identity", false)]
     [TestCase("GET", "/api/node/v1/assignments", false)]
     [TestCase("POST", "/api/node-enrollments/18d38dcc-6a44-4c6f-a35a-9b784436fac1/complete", false)]
-    public void Management_listener_allows_only_the_implemented_read_only_identity_route(string method, string path, bool expected)
+    public void Management_listener_allows_only_exact_management_routes(string method, string path, bool expected)
     {
         Assert.That(
             NodeListenerRoutePolicy.Allows(method, path, 7102, new NodeListenerOptions { ManagementPort = 7102, BootstrapPort = 7103 }),
