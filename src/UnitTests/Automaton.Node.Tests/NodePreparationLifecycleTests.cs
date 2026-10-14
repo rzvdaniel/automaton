@@ -1,4 +1,7 @@
 using Automaton.Node.Preparation;
+using Automaton.Node.Commands;
+using Automaton.Node.Diagnostics;
+using Automaton.Node.Inventory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -82,6 +85,18 @@ public sealed class NodePreparationLifecycleTests
     {
         var builder = NodePreparationHost.CreateBuilderForTests(new FakeInstallationLock());
         Assert.That(((IConfigurationBuilder)builder.Configuration).Sources, Is.Empty);
+        var commandRegistrations = builder.Services.Where(descriptor =>
+            descriptor.ServiceType.Namespace == typeof(NodeCommandContractCodec).Namespace ||
+            descriptor.ImplementationType?.Namespace == typeof(NodeCommandContractCodec).Namespace).ToArray();
+        Assert.That(commandRegistrations, Is.Empty);
+        var inventoryRegistrations = builder.Services.Where(descriptor =>
+            descriptor.ServiceType.Namespace == typeof(NodeInventorySnapshotV1).Namespace ||
+            descriptor.ImplementationType?.Namespace == typeof(NodeInventorySnapshotV1).Namespace).ToArray();
+        Assert.That(inventoryRegistrations, Is.Empty);
+        var doctorRegistrations = builder.Services.Where(descriptor =>
+            descriptor.ServiceType.Namespace == typeof(NodeDoctorFormatter).Namespace ||
+            descriptor.ImplementationType?.Namespace == typeof(NodeDoctorFormatter).Namespace).ToArray();
+        Assert.That(doctorRegistrations, Is.Empty);
         using var host = builder.Build();
         var services = host.Services.GetServices<IHostedService>().Select(s => s.GetType().FullName).ToArray();
         Assert.That(services, Is.EqualTo(new[] { "Automaton.Node.Preparation.NodePreparationService" }));

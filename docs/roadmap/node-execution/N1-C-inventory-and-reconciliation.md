@@ -1,5 +1,5 @@
 # N1-C — inventory and reconciliation
-Status: authored; limited preparation and blocked consumer scopes are defined in [N0-D readiness](results/N0-D-architecture-and-acceptance.md#n1-readiness-and-exact-first-implementation-scope). Full slice entry/exit remains gated. No implementation or live acceptance is claimed.
+Status: the bounded read-only inventory/ownership DTO and validator preparation is implemented, independently reviewed and QA-tested in [N1-C evidence](results/N1-C-reconciliation-evidence.md). Inventory access, classification, ownership persistence, reconciliation, adoption, cleanup and live acceptance remain gated; N1-C as a whole is not complete.
 Mode: implementation. Prerequisites: N1-B.
 
 Read [EXECUTION-CONTRACT.md](EXECUTION-CONTRACT.md) and the [master plan](../Automaton_Staged_Master_Plan.md). Prerequisites must have actual outputs/evidence; a task title or a successful unrelated build is insufficient.
