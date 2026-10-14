@@ -48,6 +48,8 @@ public enum NodeResourceOwnerScopeV1
 
 public sealed record NodeInventorySnapshotV1
 {
+    private const int MaximumObservationCopyCount = NodeInventoryContractValidator.MaximumObservations + 1;
+
     private IReadOnlyList<NodeResourceObservationV1> _observations = Array.Empty<NodeResourceObservationV1>();
 
     public required int SchemaVersion { get; init; }
@@ -67,11 +69,26 @@ public sealed record NodeInventorySnapshotV1
     public required IReadOnlyList<NodeResourceObservationV1> Observations
     {
         get => _observations;
-        init => _observations = Array.AsReadOnly(value?.ToArray()
-            ?? throw new ArgumentNullException(nameof(value)));
+        init => _observations = CopyObservations(value);
     }
 
     public required string SnapshotSha256 { get; init; }
+
+    private static IReadOnlyList<NodeResourceObservationV1> CopyObservations(
+        IReadOnlyList<NodeResourceObservationV1>? observations)
+    {
+        ArgumentNullException.ThrowIfNull(observations);
+        var initialCapacity = Math.Clamp(observations.Count, 0, MaximumObservationCopyCount);
+        var copy = new List<NodeResourceObservationV1>(initialCapacity);
+        foreach (var observation in observations)
+        {
+            copy.Add(observation);
+            if (copy.Count == MaximumObservationCopyCount)
+                break;
+        }
+
+        return Array.AsReadOnly(copy.ToArray());
+    }
 }
 
 public sealed record NodeResourceObservationV1

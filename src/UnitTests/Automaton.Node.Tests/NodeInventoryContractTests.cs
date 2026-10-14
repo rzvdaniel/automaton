@@ -1,3 +1,4 @@
+using System.Collections;
 using Automaton.Node.Inventory;
 using NUnit.Framework;
 
@@ -39,6 +40,12 @@ public sealed class NodeInventoryContractTests
             .Select(index => CreateObservation(index.ToString("x64", System.Globalization.CultureInfo.InvariantCulture)))
             .ToArray();
         AssertInvalid(CreateSnapshot() with { Observations = tooMany });
+        var oversizedSource = new OversizedObservationList(CreateObservation());
+        var boundedSnapshot = CreateSnapshot() with { Observations = oversizedSource };
+        Assert.That(boundedSnapshot.Observations, Has.Count.EqualTo(NodeInventoryContractValidator.MaximumObservations + 1));
+        Assert.That(oversizedSource.EnumeratedCount,
+            Is.EqualTo(NodeInventoryContractValidator.MaximumObservations + 1));
+        AssertInvalid(boundedSnapshot);
         AssertInvalid(CreateSnapshot() with
         {
             Observations = [CreateObservation() with { LabelCount = NodeInventoryContractValidator.MaximumLabelsPerResource + 1 }]
@@ -224,4 +231,25 @@ public sealed class NodeInventoryContractTests
 
     private static void AssertInvalid(NodeResourceOwnerBindingV1 binding)
         => Assert.That(() => NodeInventoryContractValidator.ValidateOwnerBinding(binding), Throws.TypeOf<InvalidDataException>());
+
+    private sealed class OversizedObservationList(NodeResourceObservationV1 observation)
+        : IReadOnlyList<NodeResourceObservationV1>
+    {
+        public int Count => int.MaxValue;
+
+        public int EnumeratedCount { get; private set; }
+
+        public NodeResourceObservationV1 this[int index] => throw new NotSupportedException();
+
+        public IEnumerator<NodeResourceObservationV1> GetEnumerator()
+        {
+            for (var index = 0; index < NodeInventoryContractValidator.MaximumObservations + 100; index++)
+            {
+                EnumeratedCount++;
+                yield return observation;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

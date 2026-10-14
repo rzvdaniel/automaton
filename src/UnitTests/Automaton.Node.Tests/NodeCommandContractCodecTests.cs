@@ -223,6 +223,18 @@ public sealed class NodeCommandContractCodecTests
         });
         Assert.That(() => NodeCommandContractCodec.ValidateResultBinding(command, tooEarly, binding,
             IssuedAt.AddSeconds(2)), Throws.TypeOf<InvalidDataException>());
+        var afterDeadline = NodeCommandContractCodec.SealResult(result with
+        {
+            ObservedAtUtc = UtcText(Deadline.AddTicks(1))
+        });
+        Assert.That(() => NodeCommandContractCodec.ValidateResultBinding(command, afterDeadline, binding,
+            Deadline.AddSeconds(-1)), Throws.TypeOf<InvalidDataException>());
+        var afterServerWindow = NodeCommandContractCodec.SealResult(result with
+        {
+            ObservedAtUtc = UtcText(IssuedAt.AddSeconds(31))
+        });
+        Assert.That(() => NodeCommandContractCodec.ValidateResultBinding(command, afterServerWindow, binding,
+            IssuedAt), Throws.TypeOf<InvalidDataException>());
         Assert.That(() => NodeCommandContractCodec.ParseCommand(Encoding.UTF8.GetBytes(
             Encoding.UTF8.GetString(NodeCommandContractCodec.SerializeCommand(command))
                 .Replace("2026-10-14T12:00:00.0000000Z", "2026-10-14T12:00:00+00:00", StringComparison.Ordinal))),
