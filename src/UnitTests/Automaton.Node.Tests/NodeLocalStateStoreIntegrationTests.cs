@@ -145,8 +145,9 @@ public sealed class NodeLocalStateStoreIntegrationTests
             ? 0
             : long.Parse(checkpoint.CurrentIncarnation);
         var recoveryEpoch = long.Parse(checkpoint.LastKnownRecoveryEpoch);
-        var request = new NodeActivationRequestDocument(1, identity.ControlPlaneRealmId, 3, identity.NodeId,
-            identity.InstallationId, requestId, expectedIncarnation, recoveryEpoch, new string('b', 64),
+        var request = new NodeActivationRequestDocument(1, identity.ControlPlaneRealmId, recoveryEpoch,
+            identity.NodeId, identity.InstallationId, requestId, expectedIncarnation,
+            long.Parse(identity.CredentialRevision), new string('b', 64),
             checkpoint.RecoveryCheckpointSha256, [1], null);
         return store.PrepareIntent(processStartId, requestId, expectedIncarnation, recoveryEpoch,
             JsonSerializer.SerializeToUtf8Bytes(request, RequestOptions));
