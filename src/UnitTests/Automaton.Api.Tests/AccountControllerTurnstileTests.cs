@@ -15,6 +15,25 @@ namespace Automaton.Api.Tests;
 public class AccountControllerTurnstileTests
 {
     [Test]
+    public async Task RegisterUser_WhenPaused_BlocksBeforeVerificationOrPersistence()
+    {
+        var controller = CreateRegistrationController(null!, false);
+        var result = await controller.RegisterUser(new RegisterUserCommand("User", "user@example.com", "Password1!"));
+        Assert.That(result, Is.InstanceOf<ObjectResult>());
+        Assert.That(((ObjectResult)result).StatusCode, Is.EqualTo(403));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void RegistrationStatus_ReflectsConfiguration(bool enabled)
+    {
+        var controller = CreateRegistrationController(null!, enabled);
+        var result = (OkObjectResult)controller.RegistrationStatus();
+        var json = System.Text.Json.JsonSerializer.Serialize(result.Value);
+        Assert.That(json, Does.Contain(enabled ? "\"enabled\":true" : ConfigurationService.RegistrationPausedMessage));
+    }
+
+    [Test]
     public async Task RegisterUser_WhenTurnstileValidationFails_ReturnsBadRequest()
     {
         var controller = CreateRegistrationController(new StubTurnstileService(false));
@@ -46,10 +65,10 @@ public class AccountControllerTurnstileTests
         Assert.That(mediator.LastRequest, Is.InstanceOf<ForgotUserPasswordCommand>());
     }
 
-    private static AccountRegistrationController CreateRegistrationController(ICloudflareTurnstileService turnstileService)
+    private static AccountRegistrationController CreateRegistrationController(ICloudflareTurnstileService turnstileService, bool enabled = true)
     {
         var controller = new AccountRegistrationController(
-            CreateConfiguration(),
+            CreateConfiguration(enabled),
             null!,
             null!,
             null!,
@@ -78,12 +97,12 @@ public class AccountControllerTurnstileTests
         };
     }
 
-    private static ConfigurationService CreateConfiguration()
+    private static ConfigurationService CreateConfiguration(bool enabled = true)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AppConfig:UserSignUp"] = "true",
+                ["AppConfig:UserSignUp"] = enabled.ToString(),
                 ["AppConfig:WebsiteUrl"] = "https://localhost:5173"
             })
             .Build();

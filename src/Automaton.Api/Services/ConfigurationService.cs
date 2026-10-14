@@ -18,6 +18,8 @@ public class ConfigurationService
     public string DatabaseType => AppConfig.DatabaseType;
     public int RefreshTokenLifetime => AppConfig.RefreshTokenLifetime;
     public string WebsiteUrl => AppConfig.WebsiteUrl;
+    public const string RegistrationPausedMessage = "Public registration is temporarily paused while we prepare Automaton for wider access.";
+
     public bool NoUserSignUp => !AppConfig.UserSignUp;
 
     public bool RequireDigit => userPasswordConfig.RequireDigit;
