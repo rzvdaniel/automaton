@@ -22,13 +22,13 @@ public sealed class NodeLocalStateStoreRecoveryFailureTests
             {
                 var store = new NodeLocalStateStore(installationLock);
                 identity = NodeLocalStateStoreIntegrationTests.InstallIdentityAndGenesis(store);
-                var checkpoint = store.ReadCheckpoint()!;
-                intent = NodeLocalStateStoreIntegrationTests.CreateIntent(store, identity, checkpoint,
+                var genesisCheckpoint = store.ReadCheckpoint()!;
+                intent = NodeLocalStateStoreIntegrationTests.CreateIntent(store, identity, genesisCheckpoint,
                     Guid.NewGuid(), Guid.NewGuid());
                 intent = store.MarkResponseUnknown(intent.ActivationRequestId);
                 var receipt = new NodeActivationReceipt(1, identity.NodeId, identity.InstallationId,
                     identity.ControlPlaneRealmId, intent.ActivationRequestId, 1, 3,
-                    checkpoint.RecoveryCheckpointSha256, "Recovering",
+                    genesisCheckpoint.RecoveryCheckpointSha256, "Recovering",
                     new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc));
                 exactReceipt = JsonSerializer.SerializeToUtf8Bytes(receipt,
                     NodeLocalStateStore.CanonicalJsonOptions);
@@ -47,12 +47,22 @@ public sealed class NodeLocalStateStoreRecoveryFailureTests
             using var reopenedLock = NodeLocalStateStoreIntegrationTests.Acquire(statePath);
             var reopenedStore = new NodeLocalStateStore(reopenedLock);
             var recovered = reopenedStore.GetIntent(intent.ActivationRequestId);
+            var checkpoint = reopenedStore.ReadCheckpoint()!;
+            var recoveryView = checkpoint.RecoveryView;
             Assert.Multiple(() =>
             {
                 Assert.That(recovered.State, Is.EqualTo("ReceiptPersisted"));
                 Assert.That(Convert.FromBase64String(recovered.ReceiptJsonBase64!), Is.EqualTo(exactReceipt));
-                Assert.That(reopenedStore.ReadCheckpoint()!.LastActivationRequestId, Is.EqualTo(intent.ActivationRequestId));
+                Assert.That(checkpoint.LastActivationRequestId, Is.EqualTo(intent.ActivationRequestId));
+                Assert.That(checkpoint.CurrentIncarnation, Is.EqualTo("1"));
+                Assert.That(recoveryView.CurrentIncarnation, Is.EqualTo("1"));
+                Assert.That(recoveryView.RecoveryEpoch, Is.EqualTo("3"));
+                Assert.That(checkpoint.RecoveryCheckpointSha256, Is.EqualTo(recoveryView.ComputeDigest()));
             });
+
+            var nextIntent = NodeLocalStateStoreIntegrationTests.CreateIntent(reopenedStore, identity, checkpoint,
+                Guid.NewGuid(), Guid.NewGuid());
+            Assert.That(nextIntent.ExpectedIncarnation, Is.EqualTo("1"));
         }
         finally
         {

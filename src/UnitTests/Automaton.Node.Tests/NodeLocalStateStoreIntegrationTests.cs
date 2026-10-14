@@ -141,9 +141,15 @@ public sealed class NodeLocalStateStoreIntegrationTests
     internal static NodeActivationIntent CreateIntent(NodeLocalStateStore store, NodeIdentityManifest identity,
         NodeActivationCheckpoint checkpoint, Guid processStartId, Guid requestId)
     {
-        var request = new NodeActivationRequestDocument(1, identity.ControlPlaneRealmId, 3, identity.NodeId,
-            identity.InstallationId, requestId, 0, 1, new string('b', 64), checkpoint.RecoveryCheckpointSha256, [1], null);
-        return store.PrepareIntent(processStartId, requestId, 0, 3,
+        var expectedIncarnation = checkpoint.CurrentIncarnation is null
+            ? 0
+            : long.Parse(checkpoint.CurrentIncarnation);
+        var recoveryEpoch = long.Parse(checkpoint.LastKnownRecoveryEpoch);
+        var request = new NodeActivationRequestDocument(1, identity.ControlPlaneRealmId, recoveryEpoch,
+            identity.NodeId, identity.InstallationId, requestId, expectedIncarnation,
+            long.Parse(identity.CredentialRevision), new string('b', 64),
+            checkpoint.RecoveryCheckpointSha256, [1], null);
+        return store.PrepareIntent(processStartId, requestId, expectedIncarnation, recoveryEpoch,
             JsonSerializer.SerializeToUtf8Bytes(request, RequestOptions));
     }
 
