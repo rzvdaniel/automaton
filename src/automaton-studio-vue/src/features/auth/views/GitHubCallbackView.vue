@@ -13,6 +13,8 @@ const router = useRouter()
 
 const errorMessage = ref('')
 const failureTitle = ref('GitHub sign-in failed')
+const registrationPaused = ref(false)
+const registrationPausedMessage = 'Public registration is temporarily paused while we prepare Automaton for wider access.'
 
 function readTokenFromHash(): string | null {
   const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
@@ -36,7 +38,11 @@ function readRedirectTarget(): string {
 onMounted(async () => {
   const callbackError = typeof route.query.error === 'string' ? route.query.error : ''
   if (callbackError) {
-    if (callbackError.toLowerCase().includes('cancel')) {
+    if (callbackError === registrationPausedMessage) {
+      registrationPaused.value = true
+      failureTitle.value = 'Public registration paused'
+      errorMessage.value = registrationPausedMessage
+    } else if (callbackError.toLowerCase().includes('cancel')) {
       failureTitle.value = 'GitHub sign-in was cancelled'
       errorMessage.value = 'You can try again whenever you are ready.'
     } else {
@@ -92,11 +98,12 @@ async function goToLogin() {
             <Message severity="error" :closable="false" class="w-full github-failure-message">
               {{ errorMessage }}
             </Message>
-            <p class="m-0 text-color-secondary github-failure-help">
+            <p v-if="!registrationPaused" class="m-0 text-color-secondary github-failure-help">
               If this keeps happening, return to email sign-in or try GitHub again.
             </p>
             <div class="github-failure-actions flex flex-column gap-2 w-full">
               <Button
+                v-if="!registrationPaused"
                 type="button"
                 label="Try GitHub Again"
                 icon="pi pi-github"
