@@ -1,6 +1,6 @@
 # N1-A — durable local identity and activation client implementation
 
-Status: the bounded implementation approved by the reviewed specification `73b4b6e5` merged in PR #379 at `f524c2bd`. Positive-incarnation checkpoint synchronization follow-up is under review at commit `325c97b1`; operational activation remains disabled.
+Status: the bounded implementation approved by the reviewed specification `73b4b6e5` merged in PR #379 at `f524c2bd`. Positive-incarnation checkpoint synchronization follow-up (source commit `325c97b1`) merged in PR #386 at `e3aeaaa2`; operational activation remains disabled.
 
 ## Implemented boundary
 
