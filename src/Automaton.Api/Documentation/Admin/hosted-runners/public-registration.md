@@ -7,7 +7,7 @@ order: 21
 
 Signup and Hosted Runner provisioning have separate switches. Pausing signup does not disable existing accounts, revoke keys, change plans, delete data or stop workloads.
 
-Deploy only the reviewed release hotfix based on the currently deployed revision; building current main could include unrelated Node changes and migrations. After the hotfix release, cherry-pick the same registration commit into main so later deployments retain the gate.
+The pre-Node rollback retains the public-registration gate and GitHub login fixes. Deploy the reviewed rollback revision through the normal production workflow; preparing or merging the rollback does not change the running API configuration or database.
 
 After deployment and approval, set the existing API `AppConfig:UserSignUp` to `false`. For the production Compose installation, edit only this property in the mounted `/opt/automaton/config/appsettings.Production.json`:
 

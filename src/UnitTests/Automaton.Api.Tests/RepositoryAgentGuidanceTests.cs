@@ -40,9 +40,7 @@ public sealed class RepositoryAgentGuidanceTests
             Assert.That(guidance, Does.Not.Contain(forbiddenText), forbiddenText);
         }
 
-        Assert.That(guidance, Does.Not.Contain("Symphony"));
-        Assert.That(guidance, Does.Not.Contain("Automaton.AgentOrchestrator"));
-        Assert.That(guidance, Does.Contain("No separate local orchestrator is required."));
+        Assert.That(guidance, Does.Contain("Symphony"));
         Assert.That(guidance, Does.Contain("Do not add manager/developer/reviewer role prompts"));
     }
 
