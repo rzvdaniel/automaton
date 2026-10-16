@@ -205,6 +205,7 @@ Repository-owned skills cover generic runtime behavior, production deployment, a
 
 ## Documentation
 
+- [Self-hosted roadmap](docs/roadmap/README.md) — proposed direction and milestones for simplifying the existing Runner architecture
 - `AGENTS.md` — repository-level agent/developer contract
 - `.agents/skills/` — task-specific AI agent skills
 - `docs/dev/messaging-rabbitmq.md` — internal CAP + RabbitMQ event publishing/consumption architecture
