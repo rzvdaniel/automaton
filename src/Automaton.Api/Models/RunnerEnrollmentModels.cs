@@ -36,6 +36,7 @@ public sealed record RunnerEnrollmentExchangeResponse
     public string RunnerName { get; init; } = string.Empty;
     public string ApiKey { get; init; } = string.Empty;
     public string Purpose { get; init; } = RunnerPurposes.Infrastructure;
+    public string? ApplicationProfile { get; init; }
     public IReadOnlyList<string> Capabilities { get; init; } = Array.Empty<string>();
     public string InstallationId { get; init; } = string.Empty;
 }

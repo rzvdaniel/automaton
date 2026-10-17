@@ -22,6 +22,8 @@ public sealed class AppActionExecutionService
 
     public async Task<AppActionExecutionResult> ExecuteAsync(ExecuteAppActionModuleRequest request, CancellationToken cancellationToken = default)
     {
+        AppActionExecutionPreparer.EnsureProfileAllowsExecution();
+
         if (active.TryGetValue(request.ExecutionId, out var existingExecution))
             return await existingExecution.Completion.Task.WaitAsync(cancellationToken);
 

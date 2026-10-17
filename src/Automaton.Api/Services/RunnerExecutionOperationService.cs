@@ -46,6 +46,50 @@ public sealed class RunnerExecutionOperationService(
         }
     }
 
+    public async Task QueueHostContainerAsync(Guid id, Guid runnerId, Guid ownerId,
+        HostContainerExecutionRequest request, CancellationToken token)
+    {
+        var payload = new RunnerExecutionRequest(null, null, HostContainer: request);
+        if (await HasHostContainerOperationAsync(id, runnerId, ownerId, request, token)) return;
+        try { await QueueAsync(runnerId, ownerId, payload, token, id); }
+        catch (DbUpdateException)
+        {
+            var added = db.ChangeTracker.Entries<RunnerExecutionOperation>()
+                .SingleOrDefault(entry => entry.Entity.Id == id && entry.State == EntityState.Added);
+            if (added is not null) added.State = EntityState.Detached;
+            if (!await HasHostContainerOperationAsync(id, runnerId, ownerId, request, token)) throw;
+        }
+    }
+
+    public async Task<HostContainerExecutionOperationResponse?> ReadHostContainerOperationAsync(
+        Guid keyId, Guid operationId, Guid authenticatedUserId, Guid runnerId, CancellationToken token)
+    {
+        var operation = await AuthorizeAsync(keyId, operationId, authenticatedUserId, runnerId, token);
+        var request = JsonSerializer.Deserialize<RunnerExecutionRequest>(
+            protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        if (request?.HostContainer is null)
+            throw new UnauthorizedAccessException("The Runner operation is not a typed container operation.");
+        if (operation.ResultJson is null)
+            return new(operation.Id, false, null);
+        var result = JsonSerializer.Deserialize<RunnerExecutionResult>(protector.Unprotect(operation.ResultJson), JsonOptions)
+            ?? throw new InvalidDataException("The saved typed container result is invalid.");
+        var hostContainerResult = result.HostContainerResult ?? result.Outcome switch
+        {
+            "Lost" => new HostContainerExecutionResponse
+            {
+                ErrorCode = "operation_lost",
+                Error = result.Error ?? "The Runner stopped before the typed container operation completed."
+            },
+            "Cancelled" => new HostContainerExecutionResponse
+            {
+                ErrorCode = "operation_cancelled",
+                Error = result.Error ?? "The typed container operation was cancelled."
+            },
+            _ => throw new InvalidDataException("The saved Runner operation has no typed container result.")
+        };
+        return new(operation.Id, true, hostContainerResult);
+    }
+
     private async Task<bool> HasFileTransferOperationAsync(Guid id, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand request, CancellationToken token)
     {
@@ -70,6 +114,22 @@ public sealed class RunnerExecutionOperationService(
         return true;
     }
 
+    private async Task<bool> HasHostContainerOperationAsync(Guid id, Guid runnerId, Guid ownerId,
+        HostContainerExecutionRequest request, CancellationToken token)
+    {
+        var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
+        if (operation is null) return false;
+        var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId
+            || pinned?.HostContainer is null
+            || !string.Equals(
+                JsonSerializer.Serialize(pinned.HostContainer, JsonOptions),
+                JsonSerializer.Serialize(request, JsonOptions),
+                StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Typed container operation identity is already assigned to another request.");
+        return true;
+    }
+
     public async Task<Guid> QueueAsync(Guid runnerId, Guid actor, RunnerExecutionRequest request, CancellationToken token, Guid? operationId = null)
     {
         var operation = new RunnerExecutionOperation
@@ -90,6 +150,7 @@ public sealed class RunnerExecutionOperationService(
     private static bool IsManagementRequest(RunnerExecutionRequest request)
         => request.ManagedArtifacts is not null
             || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
+            || request.HostContainer is not null
             || request.Action is not null && request.Action.Kind != "execute";
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)
@@ -174,6 +235,7 @@ public sealed class RunnerExecutionOperationService(
         if (operation.CompletedAtUtc.HasValue) return new("already-applied");
         if (result.Outcome is not ("Succeeded" or "Failed" or "Lost" or "Cancelled"))
             throw new ArgumentException("Execution results must be terminal.");
+        EnsureHostContainerResult(operation, result);
         var action = new AppActionExecutionResultPersistence(db);
         var projection = await action.ResolveAsync(operation, result, token);
         await EnsureFileTransferResultAsync(operation, result, token);
@@ -188,6 +250,26 @@ public sealed class RunnerExecutionOperationService(
             }
         }, token);
         return receipt;
+    }
+
+    private void EnsureHostContainerResult(
+        RunnerExecutionOperation operation, RunnerExecutionResult result)
+    {
+        var request = JsonSerializer.Deserialize<RunnerExecutionRequest>(
+            protector.Unprotect(operation.ProtectedRequest), JsonOptions);
+        if (request?.HostContainer is null)
+        {
+            if (result.HostContainerResult is not null)
+                throw new ArgumentException("Non-container operations cannot return typed container results.");
+            return;
+        }
+
+        if (result.Outcome is "Lost" or "Cancelled" && result.HostContainerResult is null)
+            return;
+
+        if (result.HostContainerResult is null
+            || result.Outcome != (result.HostContainerResult.Success ? "Succeeded" : "Failed"))
+            throw new ArgumentException("Typed container operations require a matching terminal result.");
     }
 
     private async Task EnsureFileTransferResultAsync(

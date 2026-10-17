@@ -135,7 +135,7 @@ public sealed class HostContainerExecutionApiClient(
     {
         var apiKey = await storage.LoadApiKeyAsync();
         if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("A Hosted Runner API key is required for host-container operations.");
+            throw new InvalidOperationException("A Runner API key is required for host-container operations.");
         var serverUrl = Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL")
             ?? await storage.LoadServerUrlAsync()
             ?? configuration["AppConfig:BaseUrl"];

@@ -45,6 +45,12 @@ const profileOptions = [
       'Runs Automaton apps with normal container isolation. Recommended for ordinary application workloads.',
   },
   {
+    label: 'Machine Management',
+    value: RunnerApplicationProfiles.MachineManagement,
+    description:
+      'Runs one trusted management Runner on this machine. Automaton exposes typed app-container operations; Action and workflow execution remain disabled until isolated execution is available.',
+  },
+  {
     label: 'Privileged Host',
     value: RunnerApplicationProfiles.PrivilegedHost,
     description:
@@ -53,6 +59,10 @@ const profileOptions = [
 ]
 
 const isPrivileged = computed(() => profile.value === RunnerApplicationProfiles.PrivilegedHost)
+const requiresHostAccess = computed(() =>
+  profile.value === RunnerApplicationProfiles.PrivilegedHost ||
+  profile.value === RunnerApplicationProfiles.MachineManagement
+)
 const isValidName = computed(() => isValidSelfHostedRunnerName(runnerName.value))
 const canCreate = computed(
   () =>
@@ -65,7 +75,9 @@ const canCreate = computed(
 const warning = computed(
   () =>
     installation.value?.hostAccessWarning ??
-    'Apps deployed to this Runner may read and modify host files, inspect host processes, control Docker containers, affect services and system state, and access secrets stored on this machine.'
+    (isPrivileged.value
+      ? 'Apps deployed to this Runner may read and modify host files, inspect host processes, control Docker containers, affect services and system state, and access secrets stored on this machine.'
+      : 'Automaton exposes typed app-container operations and disables Actions and workflows, but the Runner itself is trusted infrastructure: a compromise could control host Docker. Ordinary app and build code must remain isolated in containers.')
 )
 
 watch(profile, () => {
@@ -94,7 +106,11 @@ async function createInstallation() {
   errorMessage.value = null
   try {
     installation.value = await runnersService.createSelfHostedInstallation(
-      createSelfHostedInstallationRequest(runnerName.value, profile.value)
+      createSelfHostedInstallationRequest(
+        runnerName.value,
+        profile.value,
+        acknowledgedHostAccess.value
+      )
     )
     installationStatus.value = installation.value.status
     scheduleStatusRefresh()
@@ -209,8 +225,8 @@ function close() {
           {{ profileOptions.find((option) => option.value === profile)?.description }}
         </p>
       </div>
-      <Message v-if="isPrivileged" severity="warn" :closable="false" class="mt-4">
-        <strong>Privileged Host access</strong><br />{{ warning }}
+      <Message v-if="requiresHostAccess" severity="warn" :closable="false" class="mt-4">
+        <strong>{{ isPrivileged ? 'Privileged Host access' : 'Machine management access' }}</strong><br />{{ warning }}
         <div class="flex align-items-start gap-2 mt-3">
           <Checkbox
             v-model="acknowledgedHostAccess"
@@ -218,8 +234,11 @@ function close() {
             binary
           />
           <label for="host-access-acknowledgement"
-            >I understand that apps on this Runner will have administrator-level access to this
-            machine.</label
+            >{{
+              isPrivileged
+                ? 'I understand that apps on this Runner will have administrator-level access to this machine.'
+                : 'I understand that this trusted Runner can manage Docker containers on this machine, and user app code must remain isolated in containers.'
+            }}</label
           >
         </div>
       </Message>
@@ -238,7 +257,7 @@ function close() {
         :closable="false"
         class="mb-4"
       >
-        <strong>Privileged Host access</strong><br />{{ installation.hostAccessWarning ?? warning }}
+        <strong>{{ installation.applicationProfile === RunnerApplicationProfiles.MachineManagement ? 'Machine management access' : 'Privileged Host access' }}</strong><br />{{ installation.hostAccessWarning ?? warning }}
       </Message>
       <div class="installation-summary">
         <span><strong>Runner:</strong> {{ installation.runnerName }}</span>
@@ -247,7 +266,9 @@ function close() {
           {{
             installation.applicationProfile === RunnerApplicationProfiles.PrivilegedHost
               ? 'Privileged Host'
-              : 'Standard'
+              : installation.applicationProfile === RunnerApplicationProfiles.MachineManagement
+                ? 'Machine Management'
+                : 'Standard'
           }}</span
         >
         <span

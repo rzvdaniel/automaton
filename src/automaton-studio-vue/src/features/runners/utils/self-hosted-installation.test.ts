@@ -31,6 +31,23 @@ describe('self-hosted Runner installation form', () => {
     ).toBe(true)
   })
 
+  it('requires acknowledgement before creating a Machine Management installation', () => {
+    expect(
+      canCreateSelfHostedInstallation(
+        'machine-runner',
+        RunnerApplicationProfiles.MachineManagement,
+        false
+      )
+    ).toBe(false)
+    expect(
+      canCreateSelfHostedInstallation(
+        'machine-runner',
+        RunnerApplicationProfiles.MachineManagement,
+        true
+      )
+    ).toBe(true)
+  })
+
   it('enforces the API-aligned Runner name limits', () => {
     expect(isValidSelfHostedRunnerName('   ')).toBe(false)
     expect(isValidSelfHostedRunnerName('a'.repeat(120))).toBe(true)
@@ -43,6 +60,7 @@ describe('self-hosted Runner installation form', () => {
     ).toEqual({
       runnerName: 'my-runner',
       applicationProfile: 'Standard',
+      acknowledgeHostAccess: false,
     })
   })
 

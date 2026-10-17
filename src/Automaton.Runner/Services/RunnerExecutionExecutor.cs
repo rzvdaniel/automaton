@@ -18,6 +18,21 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
         if (request.ManagedArtifacts is not null)
             return new ManagedApplicationArtifactExecutor(scope.ServiceProvider.GetRequiredService<RunnerWorkspaceService>())
                 .Execute(request.ManagedArtifacts, token);
+        if (request.HostContainer is not null)
+        {
+            var started = DateTime.UtcNow;
+            var result = await scope.ServiceProvider.GetRequiredService<HostContainerExecutionService>()
+                .ExecuteAsync(request.HostContainer, token);
+            var finished = DateTime.UtcNow;
+            return new RunnerExecutionResult
+            {
+                Outcome = result.Success ? "Succeeded" : "Failed",
+                Started = started,
+                Finished = finished,
+                Error = result.Error,
+                HostContainerResult = result
+            };
+        }
         if (request.FileTransfer is not null)
             throw new InvalidOperationException("File transfers require an authenticated Runner execution client.");
         if (request.Action is not null)
@@ -36,7 +51,7 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
     {
         var count = (request.FlowId.HasValue ? 1 : 0) + (request.Step is not null ? 1 : 0)
             + (request.Action is not null ? 1 : 0) + (request.ManagedArtifacts is not null ? 1 : 0)
-            + (request.FileTransfer is not null ? 1 : 0);
+            + (request.FileTransfer is not null ? 1 : 0) + (request.HostContainer is not null ? 1 : 0);
         if (count != 1) throw new InvalidDataException("Exactly one Runner execution payload is required.");
     }
 

@@ -40,6 +40,8 @@ const getLiveDestinationLabel = (app: AppListItem) => {
   if (environment.isHostedRunner) return 'Automaton Hosted'
   return environment.applicationProfile === 'PrivilegedHost'
     ? 'Self-hosted · Privileged Host'
+    : environment.applicationProfile === 'MachineManagement'
+      ? 'Self-hosted · Machine Management'
     : 'Self-hosted · Standard'
 }
 

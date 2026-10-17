@@ -81,6 +81,7 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
             RunnerName = registration.Runner.Name,
             ApiKey = registration.RawApiKey,
             Purpose = registration.Runner.Purpose,
+            ApplicationProfile = registration.Runner.ApplicationProfile,
             Capabilities = registration.Capabilities,
             InstallationId = registration.Runner.InstallationId!
         };
@@ -117,7 +118,9 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
         RunnerEnrollmentExchangeRequest request,
         CancellationToken cancellationToken)
     {
-        var capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
+        var capabilities = enrollment.ApplicationProfile == RunnerApplicationProfiles.MachineManagement
+            ? [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.ManagedContainerExecution]
+            : RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
         var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
             enrollment.UserId,
             $"Self-hosted Runner - {enrollment.RunnerName}",

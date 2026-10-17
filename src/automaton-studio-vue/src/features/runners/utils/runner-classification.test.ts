@@ -41,6 +41,12 @@ describe('runner classification', () => {
     ).toBe('self-hosted-privileged')
   })
 
+  it('marks a non-hosted Machine Management runner distinctly', () => {
+    expect(
+      classifyRunner(runner({ applicationProfile: RunnerApplicationProfiles.MachineManagement }))
+    ).toBe('self-hosted-machine-management')
+  })
+
   it('hides infrastructure runners from the normal Runners page', () => {
     const infrastructureRunner = runner({ purpose: 'Infrastructure' })
 

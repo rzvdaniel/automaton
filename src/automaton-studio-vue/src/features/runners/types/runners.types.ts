@@ -67,6 +67,7 @@ export interface Runner {
 export const RunnerApplicationProfiles = {
   Standard: 'Standard',
   PrivilegedHost: 'PrivilegedHost',
+  MachineManagement: 'MachineManagement',
 } as const
 
 export type RunnerApplicationProfile =
@@ -87,6 +88,7 @@ export type SelfHostedRunnerInstallationStatus =
 export interface CreateSelfHostedRunnerInstallationRequest {
   runnerName: string
   applicationProfile: RunnerApplicationProfile
+  acknowledgeHostAccess: boolean
 }
 
 export interface SelfHostedRunnerInstallation {

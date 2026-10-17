@@ -100,8 +100,49 @@ public sealed class RunnerExecutionDeliveryTests
         Assert.That(executor.Calls, Is.Zero);
     }
 
-    private RunnerExecutionDeliveryHandler Handler(Executor executor, ReconnectRequester? requester = null)
-        => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor), requester ?? new ReconnectRequester());
+    [Test]
+    public async Task BuildContainerCleanupRunsOnlyAfterResultSubmission()
+    {
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", "HostContainerExecution");
+            var events = new List<string>();
+            var http = new Api { Events = events };
+            var runnerId = Guid.NewGuid();
+            var operationId = Guid.NewGuid();
+            http.Request = new HostContainerExecutionRequest
+            {
+                OperationId = operationId,
+                Operation = HostContainerOperationKinds.RunBuild,
+                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            };
+            var docker = new InfrastructureCommandService((_, _, _) =>
+            {
+                events.Add("cleanup");
+                return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+            });
+            var cleanup = new HostContainerBuildCleanupService(docker);
+            using var api = Client(http);
+            var handler = Handler(new Executor(), buildCleanup: cleanup);
+
+            Assert.That(await handler.HandleAsync(Body(operationId, runnerId), operationId.ToString(), api,
+                runnerId, CancellationToken.None), Is.True);
+            Assert.That(events, Is.EqualTo(new[] { "submit", "cleanup" }));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    private RunnerExecutionDeliveryHandler Handler(Executor executor, ReconnectRequester? requester = null,
+        HostContainerBuildCleanupService? buildCleanup = null)
+        => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor),
+            requester ?? new ReconnectRequester(), buildCleanup: buildCleanup);
     private static RunnerExecutionApiClient Client(Api handler)
         => new(new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
     private static byte[] Body(Guid id, Guid runnerId)
@@ -133,6 +174,8 @@ public sealed class RunnerExecutionDeliveryTests
         public int FailResults { get; init; }
         public bool Cancel { get; init; }
         public bool Forbidden { get; init; }
+        public HostContainerExecutionRequest? Request { get; set; }
+        public List<string>? Events { get; init; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (Forbidden) return new(HttpStatusCode.Forbidden);
@@ -142,7 +185,7 @@ public sealed class RunnerExecutionDeliveryTests
                 var disposition = Results.ContainsKey(id) ? "already-applied" : "execute";
                 if (Cancel && !Results.ContainsKey(id)) disposition = "cancel";
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(new RunnerExecutionAssignment(
-                    disposition, new(Guid.NewGuid(), null))) };
+                    disposition, new(Guid.NewGuid(), null, HostContainer: Request))) };
             }
             var body = await request.Content!.ReadAsStringAsync(cancellationToken); Posts.Add(body);
             if (Posts.Count <= FailResults)
@@ -150,6 +193,7 @@ public sealed class RunnerExecutionDeliveryTests
                 var transient = new HttpResponseMessage(Posts.Count == 1 ? HttpStatusCode.TooManyRequests : HttpStatusCode.ServiceUnavailable);
                 transient.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.Zero); return transient;
             }
+            Events?.Add("submit");
             Results[id] = JsonSerializer.Deserialize<RunnerExecutionResult>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new RunnerExecutionReceipt("accepted")) };
         }

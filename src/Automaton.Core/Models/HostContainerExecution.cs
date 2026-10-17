@@ -31,7 +31,8 @@ public sealed record HostContainerScope(
     Guid RunnerHostId,
     Guid AppId,
     Guid DeploymentTargetId,
-    Guid DeploymentAttemptId = default);
+    Guid DeploymentAttemptId = default,
+    Guid MachineRunnerId = default);
 
 public sealed record HostContainerResourceRef(
     string SourceKind,

@@ -67,6 +67,44 @@ public sealed class HostContainerRelayServiceTests
         Assert.That(fixture.Events.Events, Is.Empty);
     }
 
+    [Test]
+    public async Task Submit_MachineRunnerQueuesTypedOperationForAssignedUserWorkspace()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+
+        var result = await fixture.Service.SubmitAsync(
+            fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+        var operation = await fixture.Db.RunnerExecutionOperations.SingleAsync();
+        var executionEvent = fixture.Events.RunnerEvents.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Completed, Is.False);
+            Assert.That(result.OperationId, Is.EqualTo(fixture.OperationId));
+            Assert.That(operation.RunnerId, Is.EqualTo(fixture.MachineRunnerId));
+            Assert.That(operation.RequestedByUserId, Is.EqualTo(ownerId));
+            Assert.That(operation.ProtectedRequest, Is.Not.Empty);
+            Assert.That(executionEvent.OperationId, Is.EqualTo(fixture.OperationId));
+            Assert.That(executionEvent.RunnerId, Is.EqualTo(fixture.MachineRunnerId));
+            Assert.That(executionEvent.Management, Is.True);
+        });
+    }
+
+    [Test]
+    public async Task Submit_MachineRunnerRejectsWorkspaceWithoutRunnerAssignment()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.AssignMachineRunnerToPersonalWorkspace(assignRunnerToUser: false);
+
+        var result = await fixture.Service.SubmitAsync(
+            fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+
+        Assert.That(result.Result?.ErrorCode, Is.EqualTo("workspace_assignment_missing"));
+        Assert.That(fixture.Events.RunnerEvents, Is.Empty);
+        Assert.That(await fixture.Db.RunnerExecutionOperations.CountAsync(), Is.Zero);
+    }
+
     private sealed class RelayFixture : IDisposable
     {
         public ApplicationDbContext Db { get; }
@@ -74,7 +112,9 @@ public sealed class HostContainerRelayServiceTests
         public RecordingPublisher Events { get; } = new();
         public Guid ApiKeyId { get; } = Guid.NewGuid();
         public Guid OtherAccountApiKeyId { get; } = Guid.NewGuid();
+        public Guid MachineApiKeyId { get; } = Guid.NewGuid();
         public Guid OperationId { get; } = Guid.NewGuid();
+        public Guid MachineRunnerId { get; } = Guid.NewGuid();
         public HostedRunner HostedRunner { get; private set; } = null!;
         public RunnerHost Host { get; private set; } = null!;
         public Runner Infrastructure { get; private set; } = null!;
@@ -137,9 +177,10 @@ public sealed class HostContainerRelayServiceTests
 
         private HostContainerRelayService CreateService()
         {
-            var operations = new HostContainerExecutionOperationService(Db, Events);
+            var runnerOperations = RunnerExecutionTestServices.Operations(Db, Events);
+            var operations = new HostContainerExecutionOperationService(Db, Events, runnerOperations);
             return new HostContainerRelayService(
-                new HostContainerRelayStateResolver(Db), operations, Options.Create(new StorageTelemetryOptions()));
+                new HostContainerRelayStateResolver(Db), operations, runnerOperations, Options.Create(new StorageTelemetryOptions()));
         }
 
         public static RelayFixture Create() => new();
@@ -151,6 +192,27 @@ public sealed class HostContainerRelayServiceTests
             RequestedImage = "python:3.13-slim",
             Scope = new(Guid.Empty, Guid.Empty, App.Id, Target.Id)
         };
+
+        public Guid AssignMachineRunnerToPersonalWorkspace(bool assignRunnerToUser = true)
+        {
+            var ownerId = Guid.NewGuid();
+            var machineRunner = new Runner
+            {
+                Id = MachineRunnerId,
+                Name = "machine-management",
+                ApiKeyId = MachineApiKeyId,
+                Purpose = RunnerPurposes.Managed,
+                ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+                CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\"]"
+            };
+            Target.ExecutionRunnerId = machineRunner.Id;
+            Db.Runners.Add(machineRunner);
+            Db.WebAppUsers.Add(new WebAppUser { WebAppId = App.Id, UserId = ownerId });
+            if (assignRunnerToUser)
+                Db.RunnerUsers.Add(new RunnerUser { RunnerId = machineRunner.Id, UserId = ownerId });
+            Db.SaveChanges();
+            return ownerId;
+        }
 
         public async Task<HostContainerExecutionRequest> ReadForwardedRequestAsync()
         {
@@ -165,10 +227,12 @@ public sealed class HostContainerRelayServiceTests
     private sealed class RecordingPublisher : IEventPublisher
     {
         public List<InfrastructureCommandRequestedEvent> Events { get; } = [];
+        public List<RunnerExecutionRequestedEvent> RunnerEvents { get; } = [];
 
         public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
         {
             if (message is InfrastructureCommandRequestedEvent command) Events.Add(command);
+            if (message is RunnerExecutionRequestedEvent runnerOperation) RunnerEvents.Add(runnerOperation);
             return Task.CompletedTask;
         }
     }

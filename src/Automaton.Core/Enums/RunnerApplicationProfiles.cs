@@ -8,6 +8,7 @@ public static class RunnerApplicationProfiles
 {
     public const string Standard = "Standard";
     public const string PrivilegedHost = "PrivilegedHost";
+    public const string MachineManagement = "MachineManagement";
 
     public static bool TryNormalize(string? profile, out string normalized)
     {
@@ -26,6 +27,12 @@ public static class RunnerApplicationProfiles
         if (string.Equals(profile, PrivilegedHost, StringComparison.OrdinalIgnoreCase))
         {
             normalized = PrivilegedHost;
+            return true;
+        }
+
+        if (string.Equals(profile, MachineManagement, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = MachineManagement;
             return true;
         }
 

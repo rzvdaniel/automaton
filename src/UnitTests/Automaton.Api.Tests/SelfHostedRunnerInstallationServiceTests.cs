@@ -96,6 +96,42 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     }
 
     [Test]
+    public async Task MachineManagementInstallation_RequiresAcknowledgementAndGrantsOnlyTypedContainerAccess()
+    {
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
+        var request = new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "machine-management",
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement
+        };
+
+        Assert.That(async () => await service.CreateAsync(request, CancellationToken.None),
+            Throws.TypeOf<UnauthorizedAccessException>());
+
+        var response = await service.CreateAsync(request with { AcknowledgeHostAccess = true }, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RequiresHostAccessAcknowledgement, Is.True);
+            Assert.That(response.HostAccessWarning, Does.Contain("Docker socket"));
+            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution"));
+            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace'"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                $"machine_workspace_volume='automaton-machine-runner-{response.InstallationId}-workspace'"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                $"--label automaton.installation-id='{response.InstallationId}'"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker volume create --label automaton.managed=true --label automaton.resource=machine-workspace-volume"));
+            Assert.That(response.InstallationCommand, Does.Contain("volume:/automaton/storage"));
+            Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("--privileged"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("/:/host"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
+        });
+    }
+
+    [Test]
     public async Task MultiplePrivilegedInstallations_UseDistinctIdentityAndNoHostPorts()
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
@@ -213,6 +249,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     {
         Assert.That(result.Purpose, Is.EqualTo(RunnerPurposes.Managed));
         Assert.That(result.Profile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(result.ResponseProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
         Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.ApplicationHosting));
         Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.WorkflowExecution));
         Assert.That(result.Capabilities, Does.Not.Contain(RunnerCapabilities.DockerManagement));
@@ -360,7 +397,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
                 await db.HostedRunners.CountAsync(),
                 await db.RunnerHosts.CountAsync(),
                 userLinked,
-                response?.ApiKey);
+                response?.ApiKey,
+                response?.ApplicationProfile);
             var replayWasRejected = await ReplayAsync() is null;
             return result with { ReplayWasRejected = replayWasRejected };
         }
@@ -390,6 +428,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         int RunnerHosts,
         bool UserLinked,
         string? ApiKey,
+        string? ResponseProfile,
         bool ReplayWasRejected = false);
 
 }

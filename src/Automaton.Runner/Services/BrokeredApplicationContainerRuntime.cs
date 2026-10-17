@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using Automaton.Core.Enums;
 using Automaton.Runner.Console.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -127,6 +128,14 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
     {
         var profile = await loadProfile()
             ?? throw new InvalidOperationException("Runner installation profile is required for brokered runtime operations.");
+        if (RunnerApplicationProfiles.Normalize(profile.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
+        {
+            var configuredRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
+            if (!Guid.TryParse(configuredRunnerId, out var machineRunnerId) || machineRunnerId == Guid.Empty)
+                throw new InvalidOperationException("Machine Runner identity is required for brokered runtime operations.");
+            return new(Guid.Empty, Guid.Empty, appId, targetId, attemptId, machineRunnerId);
+        }
+
         if (profile.RunnerHostId is not Guid hostId || hostId == Guid.Empty)
             throw new InvalidOperationException("Runner Host identity is required for brokered runtime operations.");
         var hosted = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");

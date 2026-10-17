@@ -15,10 +15,9 @@ internal sealed class HostContainerBuildExecutor(
         if (validation is not null) return validation;
 
         var scope = request.Scope!;
-        var volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
-        var labels = await executor(["docker", "volume", "inspect", "--format", "{{json .Labels}}", volume], TimeSpan.FromSeconds(900), cancellationToken);
-        if (!labels.Success || !HostContainerExecutionService.HasExpectedVolumeLabels(labels.Output, scope.HostedRunnerId))
-            return Failure("trusted_storage", "The Hosted Runner user volume is missing or has invalid ownership labels.");
+        var volume = HostContainerResourcePolicy.VolumeName(scope);
+        if (!await HostContainerResourcePolicy.EnsureVolumeAsync(scope, executor, cancellationToken))
+            return Failure("trusted_storage", "The app workspace volume is missing or has invalid ownership labels.");
 
         var attempt = scope.DeploymentAttemptId;
         if (attempt == Guid.Empty)
@@ -76,17 +75,22 @@ internal sealed class HostContainerBuildExecutor(
         string image)
     {
         var args = new List<string> { "docker", "run", "--name", container, "--network", "bridge",
-            "--cgroup-parent", HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId),
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
-            "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
-            "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}",
             "--label", $"automaton.app-id={scope.AppId:N}",
             "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",
             "--label", $"automaton.deployment-attempt-id={scope.DeploymentAttemptId:N}",
             "--label", $"automaton.operation-id={request.OperationId:N}",
             "--label", $"automaton.resolved-image={image}",
             "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
+        if (scope.MachineRunnerId != Guid.Empty)
+            args.AddRange(["--label", $"automaton.machine-runner-id={scope.MachineRunnerId:N}"]);
+        else
+        {
+            args.AddRange(["--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
+                "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}"]);
+        }
+        HostContainerResourcePolicy.AddCgroupParent(args, scope);
         HostContainerWritablePathPolicy.AddTo(
             args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
         var command = request.Command!;
@@ -168,12 +172,17 @@ internal sealed class HostContainerBuildExecutor(
             var expected = new Dictionary<string, string>
             {
                 ["automaton.operation-id"] = request.OperationId.ToString("N"),
-                ["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString("N"),
-                ["automaton.runner-host-id"] = request.Scope.RunnerHostId.ToString("N"),
                 ["automaton.app-id"] = request.Scope.AppId.ToString("N"),
                 ["automaton.deployment-target-id"] = request.Scope.DeploymentTargetId.ToString("N"),
                 ["automaton.deployment-attempt-id"] = request.Scope.DeploymentAttemptId.ToString("N")
             };
+            if (request.Scope.MachineRunnerId != Guid.Empty)
+                expected["automaton.machine-runner-id"] = request.Scope.MachineRunnerId.ToString("N");
+            else
+            {
+                expected["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString("N");
+                expected["automaton.runner-host-id"] = request.Scope.RunnerHostId.ToString("N");
+            }
             if (expected.Any(pair => !labels.TryGetProperty(pair.Key, out var value) || value.GetString() != pair.Value))
                 return (false, null, Failure("build_ownership", "The existing build container belongs to another operation."));
             var image = labels.GetProperty("automaton.resolved-image").GetString();

@@ -76,6 +76,13 @@ public sealed class AppActionExecutionService
             userId,
             requireOnline: false,
             cancellationToken: cancellationToken);
+        if (!RunnerCapabilities.Includes(
+                runner.CapabilitiesJson,
+                RunnerCapabilities.WorkflowExecution,
+                runner.Purpose))
+        {
+            throw new InvalidOperationException("The assigned Runner does not support isolated Action execution.");
+        }
         var target = await deploymentTargetResolver.ResolveAsync(
             appId,
             targetSlug: null,
@@ -120,6 +127,12 @@ public sealed class AppActionExecutionService
         AppActionModuleInfo deployedAction,
         CancellationToken cancellationToken)
     {
+        if (!RunnerCapabilities.Includes(
+                runner.CapabilitiesJson,
+                RunnerCapabilities.WorkflowExecution,
+                runner.Purpose))
+            throw new InvalidOperationException("The assigned Runner does not support isolated Action execution.");
+
         var now = DateTime.UtcNow;
         var execution = new AppModuleExecution
         {

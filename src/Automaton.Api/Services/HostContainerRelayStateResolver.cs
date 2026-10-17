@@ -17,11 +17,17 @@ public sealed class HostContainerRelayStateResolver(
         CancellationToken cancellationToken)
     {
         var caller = await db.Runners.SingleOrDefaultAsync(runner => runner.ApiKeyId == apiKeyId, cancellationToken);
-        if (caller is null || caller.Purpose != RunnerPurposes.Managed || !IsStandardProfile(caller.ApplicationProfile))
+        if (caller is null || caller.Purpose != RunnerPurposes.Managed)
         {
             return HostContainerRelayResolution.Rejected(
-                Failure("caller_not_managed_runner", "The API key is not assigned to a standard Managed Hosted Runner."));
+                Failure("caller_not_managed_runner", "The API key is not assigned to a Managed Runner."));
         }
+
+        if (IsMachineManagementProfile(caller.ApplicationProfile))
+            return await ResolveMachineManagementAsync(caller, request, cancellationToken);
+        if (!IsStandardProfile(caller.ApplicationProfile))
+            return HostContainerRelayResolution.Rejected(
+                Failure("caller_not_managed_runner", "The API key is not assigned to a supported Managed Runner profile."));
 
         var runnerLookup = await ResolveHostedRunnerAsync(caller, request, cancellationToken);
         if (runnerLookup.Failure is not null)
@@ -52,7 +58,74 @@ public sealed class HostContainerRelayStateResolver(
             binding.HostedRunner,
             binding.HostId,
             targetLookup.Value!,
-            infrastructureLookup.Value!));
+            infrastructureLookup.Value!,
+            null,
+            Guid.Empty));
+    }
+
+    private async Task<HostContainerRelayResolution> ResolveMachineManagementAsync(
+        Runner caller,
+        HostContainerExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!RunnerCapabilities.Includes(caller.CapabilitiesJson,
+                RunnerCapabilities.ManagedContainerExecution, caller.Purpose))
+            return HostContainerRelayResolution.Rejected(
+                Failure("machine_container_capability_missing", "The Machine Management Runner lacks typed container capability."));
+
+        if ((request.Scope.MachineRunnerId != Guid.Empty && request.Scope.MachineRunnerId != caller.Id)
+            || request.Scope.HostedRunnerId != Guid.Empty || request.Scope.RunnerHostId != Guid.Empty)
+            return HostContainerRelayResolution.Rejected(
+                Failure("machine_runner_binding_mismatch", "The requested machine scope does not match this Runner."));
+
+        var requestFailure = HostContainerRelayRequestValidator.ValidateOperation(request);
+        if (requestFailure is not null)
+            return HostContainerRelayResolution.Rejected(requestFailure);
+
+        var target = await db.AppDeploymentTargets.SingleOrDefaultAsync(
+            item => item.Id == request.Scope.DeploymentTargetId && item.WebAppId == request.Scope.AppId,
+            cancellationToken);
+        if (target is null || target.ExecutionRunnerId != caller.Id)
+            return HostContainerRelayResolution.Rejected(
+                Failure("app_assignment_mismatch", "The target is not assigned to this machine Runner."));
+        if (request.Operation == HostContainerOperationKinds.RunBuild
+            && target.ActiveDeploymentExecutionAttemptId != request.Scope.DeploymentAttemptId)
+            return HostContainerRelayResolution.Rejected(
+                Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt."));
+
+        var actorId = await ResolveMachineWorkspaceActorAsync(caller, target, cancellationToken);
+        if (!actorId.HasValue)
+            return HostContainerRelayResolution.Rejected(
+                Failure("workspace_assignment_missing", "The app workspace is not assigned to this machine Runner."));
+
+        return HostContainerRelayResolution.Resolved(new HostContainerRelayState(
+            null, Guid.Empty, target, null, caller, actorId.Value));
+    }
+
+    private async Task<Guid?> ResolveMachineWorkspaceActorAsync(
+        Runner caller,
+        AppDeploymentTarget target,
+        CancellationToken cancellationToken)
+    {
+        var app = await db.WebApps.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == target.WebAppId, cancellationToken);
+        if (app is null) return null;
+
+        if (app.ProjectId is Guid projectId)
+        {
+            var project = await db.Projects.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == projectId, cancellationToken);
+            if (project is null || !await db.ProjectRunners.AnyAsync(
+                    item => item.ProjectId == projectId && item.RunnerId == caller.Id, cancellationToken))
+                return null;
+            return project.OwnerId;
+        }
+
+        return await db.WebAppUsers
+            .Where(user => user.WebAppId == app.Id
+                && db.RunnerUsers.Any(link => link.RunnerId == caller.Id && link.UserId == user.UserId))
+            .Select(user => (Guid?)user.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<HostContainerRelayLookup<HostedRunnerBinding>> ResolveHostedRunnerAsync(
@@ -122,6 +195,10 @@ public sealed class HostContainerRelayStateResolver(
         RunnerApplicationProfiles.TryNormalize(applicationProfile, out var profile)
         && string.Equals(profile, RunnerApplicationProfiles.Standard, StringComparison.Ordinal);
 
+    private static bool IsMachineManagementProfile(string? applicationProfile) =>
+        RunnerApplicationProfiles.TryNormalize(applicationProfile, out var profile)
+        && string.Equals(profile, RunnerApplicationProfiles.MachineManagement, StringComparison.Ordinal);
+
     private static HostContainerExecutionResponse? ValidateRequestedBinding(
         HostContainerScope scope,
         HostedRunner hostedRunner,
@@ -131,6 +208,9 @@ public sealed class HostContainerRelayStateResolver(
         {
             return Failure("hosted_runner_binding_mismatch", "The requested Hosted Runner does not match persisted state.");
         }
+
+        if (scope.MachineRunnerId != Guid.Empty)
+            return Failure("hosted_runner_binding_mismatch", "A Hosted Runner request cannot contain a machine Runner identity.");
 
         return scope.RunnerHostId != Guid.Empty && scope.RunnerHostId != hostId
             ? Failure("runner_host_binding_mismatch", "The requested Runner Host does not match persisted state.")
@@ -144,7 +224,7 @@ public sealed class HostContainerRelayStateResolver(
     {
         if (target.ExecutionRunnerId != caller.Id)
         {
-            return Failure("app_assignment_mismatch", "The target is not assigned to the authenticated Hosted Runner.");
+            return Failure("app_assignment_mismatch", "The target is not assigned to the authenticated Runner.");
         }
 
         return request.Operation == HostContainerOperationKinds.RunBuild
@@ -187,10 +267,12 @@ public sealed class HostContainerRelayStateResolver(
 internal sealed record HostedRunnerBinding(HostedRunner HostedRunner, Guid HostId);
 
 internal sealed record HostContainerRelayState(
-    HostedRunner Hosted,
+    HostedRunner? Hosted,
     Guid HostId,
     AppDeploymentTarget Target,
-    Runner Infrastructure);
+    Runner? Infrastructure,
+    Runner? MachineRunner,
+    Guid OperationActorUserId);
 
 internal sealed record HostContainerRelayResolution(
     HostContainerRelayState? State,

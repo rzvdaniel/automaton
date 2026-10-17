@@ -99,7 +99,7 @@ public sealed class HostContainerExecutionOperationTests
             var db = CreateDatabase();
             var (hostedKey, infraKey, infraId, scope) = await SeedRunnersAsync(db);
             var events = new RecordingPublisher();
-            var service = new HostContainerExecutionOperationService(db, events);
+            var service = new HostContainerExecutionOperationService(db, events, RunnerExecutionTestServices.Operations(db, events));
             return new(db, service, events, CreateRequest(scope), hostedKey, infraKey, infraId);
         }
 
