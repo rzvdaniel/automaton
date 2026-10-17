@@ -8,5 +8,6 @@ public static class SelfHostedRuntimeTunnelPolicy
         => !RunnerProfileRules.IsInfrastructure(purpose)
             && RunnerApplicationProfiles.TryNormalize(applicationProfile, out var normalizedProfile)
             && (normalizedProfile == RunnerApplicationProfiles.Standard
-                || normalizedProfile == RunnerApplicationProfiles.PrivilegedHost);
+                || normalizedProfile == RunnerApplicationProfiles.PrivilegedHost
+                || normalizedProfile == RunnerApplicationProfiles.MachineManagement);
 }

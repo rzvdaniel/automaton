@@ -147,6 +147,7 @@ public sealed class SelfHostedRunnerInstallationService(
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
         var isPrivilegedHost = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost;
         var isMachineManagement = enrollment.ApplicationProfile == RunnerApplicationProfiles.MachineManagement;
+        var requiresRuntimeNetwork = isPrivilegedHost || isMachineManagement;
         var machineWorkspaceVolume = $"automaton-machine-runner-{enrollment.InstallationId}-workspace";
         var network = $"automaton-self-hosted-{enrollment.InstallationId}-runtime";
         var args = isPrivilegedHost
@@ -165,8 +166,8 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_RUNNER_PURPOSE={Quote(RunnerPurposes.Managed)}",
             $"-e AUTOMATON_RUNNER_APPLICATION_PROFILE={Quote(enrollment.ApplicationProfile)}",
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
-            (isPrivilegedHost ? "--network \"$runtime_network\"" : string.Empty),
-            (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
+            (requiresRuntimeNetwork ? "--network \"$runtime_network\"" : string.Empty),
+            (requiresRuntimeNetwork ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
             (isMachineManagement ? "-e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution" : string.Empty),
             (isMachineManagement ? $"-e AUTOMATON_RUNNER_INSTALLATION_ID={Quote(enrollment.InstallationId)} -e AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace' -v \"$machine_workspace_volume:/automaton/storage\"" : string.Empty),
             "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
@@ -200,10 +201,10 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
             BuildMachineWorkspaceSetupCommands(isMachineManagement, machineWorkspaceVolume, enrollment.InstallationId),
-            BuildNetworkSetupCommands(isPrivilegedHost, network, root, workspace),
+            BuildNetworkSetupCommands(requiresRuntimeNetwork, isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
-            BuildNetworkCleanupCommand(isPrivilegedHost),
+            BuildNetworkCleanupCommand(requiresRuntimeNetwork),
             "  exit 1",
             "fi",
             "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",
@@ -243,14 +244,17 @@ public sealed class SelfHostedRunnerInstallationService(
                 "fi")
             : string.Empty;
 
-    private static string BuildNetworkSetupCommands(bool isPrivilegedHost, string network, string root, string workspace)
+    private static string BuildNetworkSetupCommands(
+        bool requiresRuntimeNetwork,
+        bool createPrivilegedWorkspace,
+        string network,
+        string root,
+        string workspace)
     {
-        if (!isPrivilegedHost)
-        {
-            return string.Join('\n', new string[11]);
-        }
+        if (!requiresRuntimeNetwork) return string.Empty;
 
-        return string.Join('\n',
+        var commands = new List<string>
+        {
             $"runtime_network={Quote(network)}",
             "if ! docker network create \"$runtime_network\" >/dev/null; then",
             "  echo 'The private Runner runtime network could not be created.' >&2",
@@ -260,12 +264,14 @@ public sealed class SelfHostedRunnerInstallationService(
             "  echo 'The private Runner runtime network gateway could not be resolved.' >&2",
             "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true",
             "  exit 1",
-            "fi",
-            $"mkdir -p {Quote(root)} {Quote(workspace)}");
+            "fi"
+        };
+        if (createPrivilegedWorkspace) commands.Add($"mkdir -p {Quote(root)} {Quote(workspace)}");
+        return string.Join('\n', commands);
     }
 
-    private static string BuildNetworkCleanupCommand(bool isPrivilegedHost)
-        => isPrivilegedHost
+    private static string BuildNetworkCleanupCommand(bool requiresRuntimeNetwork)
+        => requiresRuntimeNetwork
             ? "  docker network rm \"$runtime_network\" >/dev/null 2>&1 || true"
             : string.Empty;
 

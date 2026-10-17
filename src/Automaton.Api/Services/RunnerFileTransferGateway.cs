@@ -75,11 +75,11 @@ public sealed class RunnerFileTransferGateway(
     private async Task EnsureOwnerCanDeployThroughRunnerAsync(
         Guid runnerId, Guid ownerId, Guid appId, Guid? deploymentTargetId, CancellationToken token)
     {
-        var target = await db.AppDeploymentTargets.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.WebAppId == appId
+        var targetAssigned = await db.AppDeploymentTargets.AsNoTracking()
+            .AnyAsync(item => item.WebAppId == appId
                 && item.ExecutionRunnerId == runnerId
                 && (!deploymentTargetId.HasValue || item.Id == deploymentTargetId.Value), token);
-        if (target is null || !await authorization.CanUpdateAppAsync(appId, ownerId, token))
+        if (!targetAssigned || !await authorization.CanUpdateAppAsync(appId, ownerId, token))
             throw new UnauthorizedAccessException("The Runner is not assigned to an application this user can deploy.");
 
         var runnerProfile = await db.Runners.AsNoTracking()

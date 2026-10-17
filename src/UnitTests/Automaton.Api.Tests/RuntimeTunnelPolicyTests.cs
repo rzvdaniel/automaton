@@ -53,6 +53,7 @@ public class RuntimeTunnelPolicyTests
 
     [TestCase("Managed", "Standard", true)]
     [TestCase("Managed", "PrivilegedHost", true)]
+    [TestCase("Managed", "MachineManagement", true)]
     [TestCase("Infrastructure", null, false)]
     [TestCase("Managed", "Unknown", false)]
     public void AllowsRuntimeTunnel_OnlyAllowsApplicationProfiles(string purpose, string? profile, bool expected)
@@ -212,9 +213,9 @@ public class RuntimeTunnelPolicyTests
         dbContext.Runners.Add(new Runner
         {
             Id = runnerId,
-            Name = "Self-hosted standard",
+            Name = "Machine Management",
             Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
             ConnectionId = "connection",
             ApiInstanceId = identity.ApiInstanceId,
             LastHeartbeatAtUtc = DateTime.UtcNow
