@@ -60,6 +60,34 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         return new(true, $"Deleted Action version '{version}'.");
     }
 
+    public async Task PublishAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey,
+        string stagingDirectory,
+        string contentHash,
+        CancellationToken cancellationToken)
+    {
+        var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
+        await AppActionDeploymentOutputGuard.WriteMetadataAsync(
+            stagingDirectory,
+            DeploymentMetadataFileName,
+            JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow }),
+            cancellationToken);
+        AppActionDeploymentOutputGuard.EnsureNoLinks(stagingDirectory);
+
+        if (Directory.Exists(current))
+        {
+            var version = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{HashSuffix(ReadCurrentHash(current))}";
+            var versionDirectory = Path.Combine(workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey), version);
+            Directory.CreateDirectory(Path.GetDirectoryName(versionDirectory)!);
+            Directory.Move(current, versionDirectory);
+        }
+
+        Directory.Move(stagingDirectory, current);
+        PruneVersions(appId, deploymentTargetId, actionKey);
+    }
+
     public void PruneVersions(Guid appId, Guid deploymentTargetId, string actionKey)
     {
         var root = workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey);

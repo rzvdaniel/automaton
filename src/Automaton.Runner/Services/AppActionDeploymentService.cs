@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Serilog;
@@ -7,7 +6,6 @@ namespace Automaton.Runner.Console.Services;
 
 public sealed class AppActionDeploymentService
 {
-    private const string DeploymentMetadataFileName = ".automaton-action-deployment.json";
     private readonly RunnerWorkspaceService workspace;
     private readonly AppActionExecutionCoordinator coordinator;
     private readonly ILogger logger = Log.ForContext<AppActionDeploymentService>();
@@ -184,7 +182,9 @@ public sealed class AppActionDeploymentService
         Directory.CreateDirectory(actionRoot);
         try
         {
+            AppActionDeploymentOutputGuard.EnsureNoLinks(action.DirectoryPath);
             AppActionSourceFiles.CopyToRuntime(action.DirectoryPath, stagingDirectory);
+            AppActionDeploymentOutputGuard.EnsureNoLinks(stagingDirectory);
             var entrypoint = Path.GetFullPath(Path.Combine(stagingDirectory, action.Manifest.Spec.Entrypoint));
             AppActionSourceFiles.EnsureInside(stagingDirectory, entrypoint);
             if (!File.Exists(entrypoint))
@@ -203,22 +203,8 @@ public sealed class AppActionDeploymentService
                     await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
             }
 
-            await File.WriteAllTextAsync(
-                Path.Combine(stagingDirectory, DeploymentMetadataFileName),
-                JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow }),
-                cancellationToken);
-
-            if (Directory.Exists(currentDirectory))
-            {
-                var versionDirectory = Path.Combine(
-                    workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, action.Key),
-                    $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{AppActionVersionStore.HashSuffix(AppActionVersionStore.ReadCurrentHash(currentDirectory))}");
-                Directory.CreateDirectory(Path.GetDirectoryName(versionDirectory)!);
-                Directory.Move(currentDirectory, versionDirectory);
-            }
-
-            Directory.Move(stagingDirectory, currentDirectory);
-            versionStore.PruneVersions(appId, deploymentTargetId, action.Key);
+            await versionStore.PublishAsync(appId, deploymentTargetId, action.Key,
+                stagingDirectory, contentHash, cancellationToken);
             return new AppActionDeploymentResult
             {
                 ActionKey = action.Key,

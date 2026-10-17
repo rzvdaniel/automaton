@@ -16,6 +16,8 @@ public sealed class RunnerExecutionAdmissionService(
             : authorization.GetAccessibleRunnersQuery();
         var runner = await query.AsNoTracking().SingleOrDefaultAsync(r => r.Id == runnerId, token)
             ?? throw new UnauthorizedAccessException("Runner is not accessible.");
+        if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
+            throw new UnauthorizedAccessException("Raw workflow and custom-step execution is disabled on Machine Management Runners.");
         if (RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose)
             && !await IsAdministratorAsync(db, actor, token))
             throw new UnauthorizedAccessException("Only administrators may execute on Infrastructure Runners.");

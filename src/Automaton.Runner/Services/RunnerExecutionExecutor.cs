@@ -42,9 +42,17 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
                 scope.ServiceProvider.GetRequiredService<AppActionDeploymentService>(),
                 scope.ServiceProvider.GetRequiredService<RunnerDeploymentService>()).ExecuteAsync(request.Action, token);
         }
+        EnsureRawExecutionAllowed(request);
         await workflowGate.WaitAsync(token);
         try { return await ExecuteWorkflowOrStepAsync(scope.ServiceProvider, request, token); }
         finally { workflowGate.Release(); }
+    }
+
+    private static void EnsureRawExecutionAllowed(RunnerExecutionRequest request)
+    {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement && (request.FlowId.HasValue || request.Step is not null))
+            throw new UnauthorizedAccessException("Raw workflow and custom-step execution is disabled on Machine Management Runners.");
     }
 
     private static void EnsureSinglePayload(RunnerExecutionRequest request)

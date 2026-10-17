@@ -66,7 +66,8 @@ internal sealed class MachineActionContainerFixture : IAsyncDisposable
               runtime: python
               entrypoint: main.py
             """);
-        File.WriteAllText(Path.Combine(actionPath, "main.py"), "print('{}')");
+        File.WriteAllText(Path.Combine(actionPath, "main.py"), "from pathlib import Path; print(Path('companion.txt').read_text())");
+        File.WriteAllText(Path.Combine(actionPath, "companion.txt"), "relative-action-data");
         if (operation == HostContainerOperationKinds.PrepareActionDependencies)
             File.WriteAllText(Path.Combine(actionPath, "requirements.txt"), "fixture-package==1.0");
 
@@ -126,6 +127,8 @@ internal sealed class MachineActionContainerFixture : IAsyncDisposable
             Assert.That(dockerRun, Does.Contain("--cpus"));
             Assert.That(dockerRun, Does.Contain("--memory"));
             Assert.That(dockerRun, Does.Contain("--pids-limit"));
+            Assert.That(dockerRun, Does.Contain("--workdir"));
+            Assert.That(dockerRun, Does.Contain("/automaton/action"));
             Assert.That(dockerRun, Does.Contain("--cap-drop"));
             Assert.That(dockerRun, Does.Contain("ALL"));
             Assert.That(dockerRun, Does.Not.Contain("--privileged"));

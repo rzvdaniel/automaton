@@ -1,6 +1,8 @@
 using NUnit.Framework;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Runner.Console.Tests;
 
@@ -17,6 +19,29 @@ public sealed class RunnerExecutionProcessorTests
         var first = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
         var replay = await new RunnerExecutionProcessor(journal, executor).ProcessAsync(id, new(Guid.NewGuid(), null), CancellationToken.None);
         Assert.That(executor.Calls, Is.EqualTo(1)); Assert.That(replay.Output, Is.EqualTo(first.Output));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MachineManagementRunnerRejectsRawWorkflowAndCustomStepPayloads(bool customStep)
+    {
+        var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", RunnerApplicationProfiles.MachineManagement);
+        try
+        {
+            using var services = new ServiceCollection().BuildServiceProvider();
+            using var executor = new RunnerExecutionExecutor(services);
+            var request = customStep
+                ? new RunnerExecutionRequest(null, new() { Id = Guid.NewGuid(), Code = "print('unsafe')", Language = "python" })
+                : new RunnerExecutionRequest(Guid.NewGuid(), null);
+
+            Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                await executor.ExecuteAsync(request, CancellationToken.None));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", previousProfile);
+        }
     }
 
     [Test]

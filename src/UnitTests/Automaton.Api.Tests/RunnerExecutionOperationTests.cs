@@ -148,6 +148,23 @@ public sealed class RunnerExecutionOperationTests
             .AuthorizeAsync(runner.Id, actor, CancellationToken.None));
     }
 
+    [Test]
+    public async Task MachineManagementApiAdmissionRejectsRawWorkflowExecution()
+    {
+        await using var db = Db();
+        var actor = Guid.NewGuid();
+        var runner = Runner();
+        runner.ApplicationProfile = RunnerApplicationProfiles.MachineManagement;
+        runner.CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\",\"WorkflowExecution\"]";
+        runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
+        db.Runners.Add(runner);
+        await db.SaveChangesAsync();
+
+        var admission = new RunnerExecutionAdmissionService(db, null!, null!);
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
+    }
+
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
     private static async Task<string?> ApplyWorkflowResultAsync(ApplicationDbContext db, RunnerExecutionOperationService service, Guid keyId, Guid id)
     {

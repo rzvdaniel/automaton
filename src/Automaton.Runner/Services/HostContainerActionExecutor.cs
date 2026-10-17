@@ -128,6 +128,8 @@ internal sealed class HostContainerActionExecutor(
         arguments.Add(VolumeMount(HostContainerResourcePolicy.VolumeName(request.Scope),
             RunnerWorkspaceService.GetAppActionExecutionInputVolumeSubpath(app, target, request.ActionKey!, request.ActionExecutionId),
             "/automaton/input", readOnly: true));
+        arguments.Add("--workdir");
+        arguments.Add("/automaton/action");
         foreach (var variable in request.Environment.OrderBy(item => item.Key, StringComparer.Ordinal))
             AddEnvironment(arguments, variable.Key, variable.Value);
         arguments.Add("--entrypoint");

@@ -16,6 +16,16 @@ public sealed class MachineActionDependencyPreparationIntegrationTests
         Assert.That(results.Single().Status, Is.EqualTo("deployed"));
         fixture.AssertBoundedInstallCommand();
     }
+
+    [Test]
+    [Platform("Linux")]
+    public async Task DependencyHookSymlinkCannotRedirectMetadataWriteOutsideStaging()
+    {
+        await using var fixture = new MachineActionDependencyPreparationFixture(createMetadataSymlink: true);
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await fixture.PrepareAsync());
+        Assert.That(File.ReadAllText(fixture.SentinelPath), Is.EqualTo("unchanged sentinel"));
+    }
 }
 
 internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposable
@@ -29,9 +39,13 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
     private readonly List<IReadOnlyList<string>> commands = [];
     private readonly Dictionary<string, string?> priorEnvironment = [];
     private readonly AppActionDeploymentService deployment;
+    private readonly bool createMetadataSymlink;
+    public string SentinelPath { get; } = Path.Combine(Path.GetTempPath(), $"automaton-action-sentinel-{Guid.NewGuid():N}.txt");
 
-    public MachineActionDependencyPreparationFixture()
+    public MachineActionDependencyPreparationFixture(bool createMetadataSymlink = false)
     {
+        this.createMetadataSymlink = createMetadataSymlink;
+        File.WriteAllText(SentinelPath, "unchanged sentinel");
         SetEnvironment("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
         SetEnvironment("AUTOMATON_RUNNER_PURPOSE", "Managed");
         SetEnvironment("AUTOMATON_RUNNER_APPLICATION_PROFILE", "MachineManagement");
@@ -76,6 +90,12 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
         _ = timeout;
         _ = cancellationToken;
         commands.Add(arguments);
+        if (createMetadataSymlink && arguments.Count > 1 && arguments[1] == "run")
+        {
+            var actionRoot = workspace.GetAppActionRuntimeRoot(appId, targetId, ActionKey);
+            var staging = Directory.GetDirectories(actionRoot, ".staging-*").Single();
+            File.CreateSymbolicLink(Path.Combine(staging, ".automaton-action-deployment.json"), SentinelPath);
+        }
         var output = arguments.Contains("volume", StringComparer.Ordinal) ? CreateVolumeLabels() : "{}";
         return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
     }
@@ -110,6 +130,7 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
     {
         foreach (var pair in priorEnvironment) Environment.SetEnvironmentVariable(pair.Key, pair.Value);
         if (Directory.Exists(workspaceRoot)) Directory.Delete(workspaceRoot, recursive: true);
+        if (File.Exists(SentinelPath)) File.Delete(SentinelPath);
         return ValueTask.CompletedTask;
     }
 }
