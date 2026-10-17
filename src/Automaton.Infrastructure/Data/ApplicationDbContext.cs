@@ -32,7 +32,6 @@ namespace Automaton.Api.Data
             base.OnModelCreating(modelBuilder);
             CoreModelConfiguration.Apply(modelBuilder);
             RunnerModelConfiguration.Apply(modelBuilder);
-            NodeEnrollmentModelConfiguration.Apply(modelBuilder);
             RunnerStorageModelConfiguration.Apply(modelBuilder);
             SchedulingModelConfiguration.Apply(modelBuilder);
             ApplicationModelConfiguration.Apply(modelBuilder);

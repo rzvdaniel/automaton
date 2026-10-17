@@ -16,9 +16,9 @@ This is the only active roadmap. It supersedes the staged master plan, archived 
 
 Existing Automaton already deploys and serves apps, runs Actions, routes traffic and groups account containers with resource controls. Infrastructure and Hosted Runners use the same executable, but differ in permissions, assignment, provisioning, storage and execution paths. Combining their names or registrations would leave that duplication and its security implications intact.
 
-At preparation time, remote `main` is `775622c8`. It still contains the uncomposed Node preparation work. The separately prepared restoration commit `649761f6`, based on `57941d99` with registration blocking and the GitHub login fix retained, has not been verified on remote `main`. This documentation change does not perform that restoration, remove Node code or change a database.
+At PR preparation, remote `main` is `f8cd9985`. The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes in `649761f6`, reconciled onto current main while retaining its roadmap, repository guidance, Symphony cleanup and unrelated shared DbContext cleanup. This PR removes Node API and executable code, persistence models and migration files, project/test wiring, and Node-specific documentation. It adds no Runner behavior. The resulting source revision is recorded in this PR.
 
-Before runtime work, establish one agreed source baseline: reconcile and review the restoration branch, preserve the registration fixes, and record the resulting revision here. Inventory any database that has received newer migrations before deleting migration files or applying an older executable. A source rollback is not a database rollback. Do not implement this plan on top of an assumed restoration or restart the abandoned Node work.
+The source model and EF snapshot return to the pre-Node shape, but source changes do not reverse SQL already applied to a database. The removed migrations are `20261012183817_AddNodeEnrollmentAuthentication` and `20261013095351_AddNodeActivationPersistence`. Before deploying this source, inspect each target database's `__EFMigrationsHistory`. If either migration was applied, deployment requires a reviewed forward-only compatibility or cleanup plan; deleting migration files does not undo their schema changes. This PR does not inspect production or change any database, so migration status remains a release limitation.
 
 ## Architecture to build toward
 
@@ -87,7 +87,7 @@ All four milestones are pending. Deliver cohesive working changes; use several P
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
-Prerequisite: agree and record the restored source baseline above. Inspect the existing web deployment, Action and storage paths together before changing ownership.
+Prerequisite: merge the source-baseline PR so implementation starts from the reconciled tree. Inspect the existing web deployment, Action and storage paths together before changing ownership. Database migration inventory is required before release, but does not block isolated implementation work.
 
 - Establish machine/workspace/app assignment and capacity ownership without allocating a per-user Hosted Runner. Preserve existing API authorization and durable operation semantics.
 - Implement a complete API-to-Runner web deployment on ext4: build or pull, create/start, health/readiness, routing, logs, stop/update and explicit persistent data.
@@ -125,9 +125,9 @@ Depends on end-to-end acceptance of the replacement path. Inventory real retaine
 - Provide an explicit mapping from legacy Hosted Runner/account storage to machine/workspace workloads. Preserve app identities, URLs/access policy, data and pending execution outcomes.
 - Rehearse migration and rollback on a disposable copy. Never replay an uncertain external effect to make a migration appear complete.
 - Remove per-user Hosted Runner provisioning, duplicate role-specific management paths and obsolete public managed-fleet/subscription compute logic once their remaining consumers are migrated or deliberately excluded. Preserve useful generic subscription/identity features where still used.
-- Retire abandoned Node projects, registrations, tests and documentation if the agreed restoration did not already remove them. Handle schema cleanup through a reviewed migration strategy, not by deleting already-applied history.
+- Handle schema compatibility through a reviewed forward-only migration strategy. Source history and already-applied database history are separate concerns.
 
-Acceptance: retained-workload migration is demonstrated with data, routing and schedule checks; replacement installation works without the old role split, XFS requirement or Node authority services. The final source/registration/queue audit finds no active legacy execution consumer. Production migration/deployment requires a separate explicit request; this roadmap does not authorize it.
+Acceptance: retained-workload migration is demonstrated with data, routing and schedule checks; replacement installation works without the old role split or XFS requirement. The final source/registration/queue audit finds no active legacy execution consumer. Production migration/deployment requires a separate explicit request; this roadmap does not authorize it.
 
 ## Verification and working rules
 
@@ -141,4 +141,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** reconcile the restoration baseline, then implement milestone 1 as working web deployment and isolated job execution through the existing Runner.
+**Next action:** merge the source-baseline PR, then begin milestone 1 as working web deployment and isolated job execution through the existing Runner. Resolve the recorded database migration limitation before deploying this source to any environment whose migration history is unknown.

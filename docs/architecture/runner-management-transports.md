@@ -1,10 +1,10 @@
 # Runner management transports
 
-The separate [Node preparation experiment](node-preparation.md) is uncomposed and does not replace the Runner paths described here. The [self-hosted roadmap](../roadmap/README.md) selects refactoring the existing Runner; it supersedes the proposed Runner/Node extraction. This guide describes the existing transport, not completion of that refactoring.
+The [self-hosted roadmap](../roadmap/README.md) selects refactoring the existing Runner. This guide describes the current transport and does not claim that refactoring is complete.
 
 Updated: 5 October 2026.
 
-Slice 5 and the isolation corrections are released; automatic cutover recovery from PR #348 is live as `3d890c29`. Both retained Runners use protocol v5 and CI #4978 immutable digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`. Published media, BYO tunnel responses, two-account denial/authentication toggles, and rapid rollback/rollforward with queued earlier targets passed in production. No manual tunnel reconciliation was used in the final round trips; durable validation completed and queues drained. RM is complete for the installed x64 cohort; M1 remains complete. See the [automatic recovery evidence](https://github.com/rzvdaniel/automaton/blob/57941d9971f58409356a74cbcf2529292c2f8a61/docs/roadmap/managed-platform-completion-plan.md#automatic-recovery-acceptance--2026-10-05). Cross-host package/artifact availability remains unverified.
+Slice 5 and the isolation corrections are released; automatic cutover recovery from PR #348 is live as `3d890c29`. Both retained Runners use protocol v5 and CI #4978 immutable digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`. Published media, BYO tunnel responses, two-account denial/authentication toggles, and rapid rollback/rollforward with queued earlier targets passed in production. No manual tunnel reconciliation was used in the final round trips; durable validation completed and queues drained. RM is complete for the installed x64 cohort. See the [historical automatic recovery evidence](https://github.com/rzvdaniel/automaton/blob/57941d9971f58409356a74cbcf2529292c2f8a61/docs/roadmap/managed-platform-completion-plan.md#automatic-recovery-acceptance--2026-10-05). Cross-host package/artifact availability remains unverified.
 
 ## Durable operation path
 
