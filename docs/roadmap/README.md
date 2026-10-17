@@ -141,4 +141,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** merge the source-baseline PR, then begin milestone 1 as working web deployment and isolated job execution through the existing Runner. Resolve the recorded database migration limitation before deploying this source to any environment whose migration history is unknown.
+**Next action:** begin milestone 1 using the implementation guide, delivering working web deployment and isolated job execution through the existing Runner. Resolve the recorded database migration limitation before deploying this source to any environment whose migration history is unknown.
