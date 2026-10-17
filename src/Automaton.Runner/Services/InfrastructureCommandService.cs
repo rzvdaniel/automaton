@@ -78,22 +78,21 @@ public sealed class InfrastructureCommandService
         {
             if (!process.Start())
                 return Failure("Failed to start the typed Docker process.");
+            var actionContainer = IsActionContainerRun(arguments);
             var boundedOutput = ShouldBoundDockerOutput(arguments);
-            var outputTask = boundedOutput
-                ? ReadLogTailAsync(process.StandardOutput, timeoutCts.Token)
-                : process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            var errorTask = boundedOutput
-                ? ReadLogTailAsync(process.StandardError, timeoutCts.Token)
-                : process.StandardError.ReadToEndAsync(timeoutCts.Token);
+            var outputTask = CaptureOutputAsync(process.StandardOutput, actionContainer, boundedOutput, keepTail: false, timeoutCts.Token);
+            var errorTask = CaptureOutputAsync(process.StandardError, actionContainer, boundedOutput, keepTail: true, timeoutCts.Token);
             await process.WaitForExitAsync(timeoutCts.Token);
-            var output = await outputTask;
-            var error = await errorTask;
+            var outputCapture = await outputTask;
+            var errorCapture = await errorTask;
             return new InfrastructureCommandResponse
             {
                 Success = process.ExitCode == 0,
                 ExitStatus = process.ExitCode,
-                Output = output,
-                Error = error
+                Output = outputCapture.Content,
+                Error = errorCapture.Content,
+                OutputExceededLimit = outputCapture.ExceededLimit,
+                ErrorTruncated = errorCapture.ExceededLimit
             };
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
@@ -122,8 +121,60 @@ public sealed class InfrastructureCommandService
         return tail.ToString();
     }
 
+    private static async Task<BoundedCapture> ReadBoundedCaptureAsync(
+        TextReader reader,
+        int maximumCharacters,
+        bool keepTail,
+        CancellationToken cancellationToken)
+    {
+        var content = new StringBuilder(maximumCharacters);
+        var buffer = new char[4096];
+        var exceededLimit = false;
+        int count;
+        while ((count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken)) != 0)
+        {
+            var available = maximumCharacters - content.Length;
+            if (available >= count)
+            {
+                content.Append(buffer, 0, count);
+                continue;
+            }
+
+            exceededLimit = true;
+            if (keepTail)
+            {
+                content.Append(buffer, 0, count);
+                content.Remove(0, content.Length - maximumCharacters);
+            }
+            else if (available > 0)
+                content.Append(buffer, 0, available);
+        }
+        return new(content.ToString(), exceededLimit);
+    }
+
+    private static async Task<BoundedCapture> CaptureOutputAsync(
+        TextReader reader,
+        bool actionContainer,
+        bool boundedOutput,
+        bool keepTail,
+        CancellationToken cancellationToken)
+    {
+        if (!actionContainer && !boundedOutput)
+            return new(await reader.ReadToEndAsync(cancellationToken), false);
+        var maximumCharacters = actionContainer
+            ? keepTail ? AppActionProcessExecutor.MaximumLogBytes : AppActionProcessExecutor.MaximumResultBytes
+            : HostContainerExecutionService.MaximumLogCharacters;
+        return await ReadBoundedCaptureAsync(reader, maximumCharacters, keepTail, cancellationToken);
+    }
+
     private static bool ShouldBoundDockerOutput(IReadOnlyList<string> arguments)
         => arguments.Count > 1 && (arguments[1] is "logs" or "run");
+
+    private static bool IsActionContainerRun(IReadOnlyList<string> arguments)
+        => arguments.Count > 1 && arguments[1] == "run"
+            && arguments.Contains("automaton.resource=action-job", StringComparer.Ordinal);
+
+    private sealed record BoundedCapture(string Content, bool ExceededLimit);
 
     private static InfrastructureCommandResponse Failure(string message, int exitStatus = -1)
         => new()

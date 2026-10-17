@@ -2,7 +2,7 @@
 
 The [self-hosted roadmap](../roadmap/README.md) selects refactoring the existing Runner. This guide describes the current transport and does not claim that refactoring is complete.
 
-Updated: 5 October 2026.
+Updated: 18 October 2026.
 
 Slice 5 and the isolation corrections are released; automatic cutover recovery from PR #348 is live as `3d890c29`. Both retained Runners use protocol v5 and CI #4978 immutable digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`. Published media, BYO tunnel responses, two-account denial/authentication toggles, and rapid rollback/rollforward with queued earlier targets passed in production. No manual tunnel reconciliation was used in the final round trips; durable validation completed and queues drained. RM is complete for the installed x64 cohort. See the [historical automatic recovery evidence](https://github.com/rzvdaniel/automaton/blob/57941d9971f58409356a74cbcf2529292c2f8a61/docs/roadmap/managed-platform-completion-plan.md#automatic-recovery-acceptance--2026-10-05). Cross-host package/artifact availability remains unverified.
 
@@ -62,6 +62,14 @@ The Hosted Runner's existing package-deployment RabbitMQ/HTTPS path remains sepa
 - Inputs are deleted after a terminal result. Download outputs are deleted under the shared AppData storage lock after the API receives the persisted terminal result and finishes streaming them, so ordinary media reads do not accumulate files; abandoned outputs remain covered by expiry cleanup. Incomplete operations retain required inputs and outputs so retry/recovery can proceed.
 - Each app-file download HTTP attempt gets a fresh operation ID, while the requested file session remains in the command. A prior `404`, or a successful operation whose output was later cleaned up, cannot poison a later retry using the same session.
 - Blue/green API slots on the same host share `AppData/deployment-operations`. Availability when slots run on different hosts is **not established**. Do not treat same-host slot acceptance as proof of cross-host storage.
+
+## Machine Management Runner Actions — stacked implementation pending
+
+The isolated Action implementation is being prepared on a branch stacked on open PR #394 (`codex/self-hosted-web-deployment`). It depends on that web-deployment change and its Linux/ext4 acceptance; source review alone does not establish a working end-to-end deployment. Do not treat this code as released until both PRs and their required acceptance runs are complete.
+
+Machine Management Action requests continue through the existing protected `RunnerExecutionOperationService` operation and authenticated assignment/result endpoints. Immediately before assignment, `MachineActionAssignmentRevalidator` checks the current Runner, Action capability, app target assignment, active `AppModuleExecution`, actor workspace access and workspace-to-Runner assignment. On the Runner, `AppActionExecutionService` keeps durable execution IDs, duplicate-result reuse and restart terminalization. For the Machine Management profile it delegates to `MachineActionExecutionHandler`, which invokes typed `HostContainerExecutionService` operations. `HostContainerActionExecutor` runs the Action against the machine workspace volume in a resource-bounded Docker container with a read-only deployment mount, no added capabilities and no Docker socket. Result and log bounds/redaction continue through `AppActionProcessExecutor` before the usual durable HTTPS result callback.
+
+Python dependency preparation is also isolated: `AppActionDeploymentService` delegates Machine Management preparation to `MachineActionDependencyPreparer`, which invokes a bounded typed container over the deployment staging subpath. `pip install` and package build hooks therefore run inside the container. If the Machine Management profile lacks a valid server-derived Action container policy, preparation and execution fail closed. Other Runner profiles retain their existing execution path. Linux Docker acceptance for preparation, execution, cancellation, restart recovery, duplicate delivery and user isolation remains pending on the isolated fixture; production was not used.
 
 ## SignalR after Slice 4
 

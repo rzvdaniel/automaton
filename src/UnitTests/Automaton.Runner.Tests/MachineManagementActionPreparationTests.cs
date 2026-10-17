@@ -58,7 +58,7 @@ public sealed class MachineManagementActionPreparationTests
         Assert.Multiple(() =>
         {
             Assert.That(result.Success, Is.False);
-            Assert.That(result.Message, Does.Contain("Action dependency preparation is disabled"));
+            Assert.That(result.Message, Does.Contain("Bounded Action dependency preparation is unavailable"));
             Assert.That(build.Context, Is.Null, "The build must not start before Action preparation is rejected.");
             Assert.That(runtime.ApplyCount, Is.Zero);
             Assert.That(Directory.Exists(workspace.GetAppSourceRoot(appId, targetId)), Is.False);

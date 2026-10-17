@@ -13,9 +13,14 @@ public sealed class MachineContainerResourceOptions
     public int SharedMemoryMb { get; set; } = 64;
     public int DockerLogMaxSizeMb { get; set; } = 20;
     public int DockerLogMaxFiles { get; set; } = 5;
+    public string ActionRuntimeImage { get; set; } = "python:3.12-slim";
+
+    public ActionContainerPolicy ToActionContainerPolicy()
+        => new(new(CpuLimitCores, MemoryLimitMb, PidsLimit), SharedMemoryMb,
+            DockerLogMaxSizeMb, DockerLogMaxFiles, ActionRuntimeImage);
 
     public bool IsValid() => new HostContainerResourceLimits(CpuLimitCores, MemoryLimitMb, PidsLimit).IsValid()
         && SharedMemoryMb is >= 16 and <= 1024
         && DockerLogMaxSizeMb is >= 1 and <= 1024
-        && DockerLogMaxFiles is >= 1 and <= 20;
+        && ToActionContainerPolicy().IsValid();
 }

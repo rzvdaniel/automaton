@@ -119,7 +119,7 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
         CancellationToken cancellationToken)
     {
         var capabilities = enrollment.ApplicationProfile == RunnerApplicationProfiles.MachineManagement
-            ? [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.ManagedContainerExecution]
+            ? [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution, RunnerCapabilities.ManagedContainerExecution]
             : RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
         var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
             enrollment.UserId,

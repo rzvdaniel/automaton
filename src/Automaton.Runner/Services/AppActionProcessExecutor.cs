@@ -8,8 +8,8 @@ namespace Automaton.Runner.Console.Services;
 
 internal static class AppActionProcessExecutor
 {
-    private const int MaximumResultBytes = 1_048_576;
-    private const int MaximumLogBytes = 4_194_304;
+    internal const int MaximumResultBytes = 1_048_576;
+    internal const int MaximumLogBytes = 4_194_304;
 
     public static async Task<AppActionExecutionResult> ExecuteAsync(
         ExecuteAppActionModuleRequest request,
@@ -115,23 +115,65 @@ internal static class AppActionProcessExecutor
     {
         var stdout = await outputTasks.Stdout;
         var stderr = await outputTasks.Stderr;
-        var redactedStdout = RedactSecrets(stdout.Content, secrets);
-        var redactedStderr = RedactSecrets(stderr.Content, secrets);
-        await File.WriteAllTextAsync(logsPath, redactedStderr, CancellationToken.None);
-        if (stdout.ExceededLimit)
-            return CreateFailedResult(request, process.ExitCode, AppModuleExecutionErrorCodes.ResultTooLarge,
+        return await CompleteContainerOutputAsync(
+            request, manifest, stdout.Content, stderr.Content, stdout.ExceededLimit,
+            process.ExitCode, logsPath, resultPath, secrets, deploymentHash, startedAt);
+    }
+
+    public static async Task<AppActionExecutionResult> CompleteContainerOutputAsync(
+        ExecuteAppActionModuleRequest request,
+        AppActionManifest manifest,
+        string stdout,
+        string stderr,
+        bool outputExceededLimit,
+        int exitCode,
+        string logsPath,
+        string resultPath,
+        string? deploymentHash,
+        DateTime startedAt,
+        CancellationToken cancellationToken = default)
+        => await CompleteContainerOutputAsync(
+            request, manifest, stdout, stderr, outputExceededLimit, exitCode,
+            logsPath, resultPath, GetSecretValues(request), deploymentHash, startedAt, cancellationToken);
+
+    public static Task WriteRedactedLogsAsync(
+        ExecuteAppActionModuleRequest request,
+        string logsPath,
+        string logs,
+        CancellationToken cancellationToken = default)
+        => File.WriteAllTextAsync(logsPath, RedactSecrets(logs, GetSecretValues(request)), cancellationToken);
+
+    private static async Task<AppActionExecutionResult> CompleteContainerOutputAsync(
+        ExecuteAppActionModuleRequest request,
+        AppActionManifest manifest,
+        string stdout,
+        string stderr,
+        bool outputExceededLimit,
+        int exitCode,
+        string logsPath,
+        string resultPath,
+        IReadOnlyCollection<string> secrets,
+        string? deploymentHash,
+        DateTime startedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var redactedStdout = RedactSecrets(stdout, secrets);
+        var redactedStderr = RedactSecrets(stderr, secrets);
+        await File.WriteAllTextAsync(logsPath, redactedStderr, cancellationToken);
+        if (outputExceededLimit || Encoding.UTF8.GetByteCount(redactedStdout) > MaximumResultBytes)
+            return CreateFailedResult(request, exitCode, AppModuleExecutionErrorCodes.ResultTooLarge,
                 "Action output exceeded its configured limit.", deploymentHash, startedAt);
-        if (process.ExitCode != 0)
-            return CreateFailedResult(request, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed,
+        if (exitCode != 0)
+            return CreateFailedResult(request, exitCode, AppModuleExecutionErrorCodes.ProcessFailed,
                 Limit(redactedStderr, 1000), deploymentHash, startedAt);
 
         var validationError = ValidateOutput(redactedStdout, manifest.Spec.Output);
         if (validationError is not null)
-            return CreateFailedResult(request, process.ExitCode, AppModuleExecutionErrorCodes.InvalidResult,
+            return CreateFailedResult(request, exitCode, AppModuleExecutionErrorCodes.InvalidResult,
                 validationError, deploymentHash, startedAt);
-        await File.WriteAllTextAsync(resultPath, redactedStdout, CancellationToken.None);
+        await File.WriteAllTextAsync(resultPath, redactedStdout, cancellationToken);
         return AppActionExecutionResultFactory.Create(
-            request.ExecutionId, AppModuleExecutionStatuses.Succeeded, process.ExitCode, null, null,
+            request.ExecutionId, AppModuleExecutionStatuses.Succeeded, exitCode, null, null,
             deploymentHash, startedAt, logs: true, result: true);
     }
 

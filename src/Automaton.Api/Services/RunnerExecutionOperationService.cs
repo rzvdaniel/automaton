@@ -249,6 +249,8 @@ public sealed class RunnerExecutionOperationService(
 
         var result = request.HostContainer is not null
             ? CreateFailedHostContainerResult(failure)
+            : request.Action is { Kind: "execute" }
+                ? MachineActionAssignmentRevalidator.CreateFailedResult(operation.Id, failure)
             : CreateFailedFileTransferResult(failure);
         await ApplyAsync(keyId, operationId, result, token, authenticatedUserId, runnerId);
         return true;
@@ -265,6 +267,9 @@ public sealed class RunnerExecutionOperationService(
         if (request.FileTransfer is { Kind: RunnerFileTransferKinds.DeployPackage } transferRequest)
             return await identity.RevalidateMachineDeploymentAssignmentAsync(
                 keyId, operation.RunnerId, operation.RequestedByUserId, transferRequest, token);
+        if (request.Action is { Kind: "execute" } actionRequest)
+            return await identity.RevalidateMachineActionAssignmentAsync(keyId, operation.RunnerId,
+                operation.RequestedByUserId, operation.Id, actionRequest, token);
         return null;
     }
 

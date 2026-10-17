@@ -195,11 +195,45 @@ public class RunnerWorkspaceService
     public string GetAppActionCurrentDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "current");
 
+    internal static string GetAppActionCurrentVolumeSubpath(Guid appId, Guid deploymentTargetId, string actionKey)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        return $"workspace/apps/{appId:D}/targets/{deploymentTargetId:D}/artifacts/current/actions/{actionKey}/current";
+    }
+
+    internal string GetAppActionStagingDirectory(Guid appId, Guid deploymentTargetId, string actionKey, Guid stagingId)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        if (stagingId == Guid.Empty) throw new ArgumentException("Action staging identity is required.", nameof(stagingId));
+        return GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), $".staging-{stagingId:N}");
+    }
+
+    internal static string GetAppActionStagingVolumeSubpath(Guid appId, Guid deploymentTargetId, string actionKey, Guid stagingId)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        if (stagingId == Guid.Empty) throw new ArgumentException("Action staging identity is required.", nameof(stagingId));
+        return $"workspace/apps/{appId:D}/targets/{deploymentTargetId:D}/artifacts/current/actions/{actionKey}/.staging-{stagingId:N}";
+    }
+
     public string GetAppActionVersionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "versions");
 
     public string GetAppActionExecutionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
         => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "executions");
+
+    internal string GetAppActionExecutionInputDirectory(Guid appId, Guid deploymentTargetId, string actionKey, Guid executionId)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        if (executionId == Guid.Empty) throw new ArgumentException("Action execution identity is required.", nameof(executionId));
+        return GetFullPath(GetAppActionExecutionsDirectory(appId, deploymentTargetId, actionKey), executionId.ToString("N"), "container-input");
+    }
+
+    internal static string GetAppActionExecutionInputVolumeSubpath(Guid appId, Guid deploymentTargetId, string actionKey, Guid executionId)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        if (executionId == Guid.Empty) throw new ArgumentException("Action execution identity is required.", nameof(executionId));
+        return $"workspace/apps/{appId:D}/targets/{deploymentTargetId:D}/artifacts/current/actions/{actionKey}/executions/{executionId:N}/container-input";
+    }
 
     /// <summary>
     /// Legacy control-plane compatibility location. Generic applications must

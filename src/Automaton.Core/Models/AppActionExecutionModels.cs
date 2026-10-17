@@ -74,6 +74,7 @@ public sealed class ExecuteAppActionModuleRequest
     public bool SystemInfrastructure { get; set; }
     public JsonElement Input { get; set; }
     public Dictionary<string, string> Secrets { get; set; } = [];
+    public ActionContainerPolicy? ContainerPolicy { get; set; }
 }
 
 public sealed class AppActionExecutionResult

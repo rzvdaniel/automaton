@@ -2,15 +2,19 @@ using System.Security.Cryptography;
 using System.Text;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
 /// <summary>Transfers a deployment package through the Runner's durable execution queue.</summary>
-public sealed class DeploymentPackageRunnerService(IRunnerFileTransferGateway transfers)
+public sealed class DeploymentPackageRunnerService(
+    IRunnerFileTransferGateway transfers,
+    IOptions<MachineContainerResourceOptions>? machineResources = null)
 {
     public async Task<DeployAppPackageResult> DeployAsync(
         Guid appId,
@@ -29,6 +33,12 @@ public sealed class DeploymentPackageRunnerService(IRunnerFileTransferGateway tr
             RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(runner);
 
         var operationId = CreateOperationId(deploymentOperationId, executionAttemptId, runner.Id);
+        var isMachineManagement = RunnerApplicationProfiles.Normalize(runner.ApplicationProfile)
+            == RunnerApplicationProfiles.MachineManagement;
+        var actionResources = isMachineManagement ? machineResources?.Value : null;
+        if (isMachineManagement && actionResources?.IsValid() != true)
+            throw new InvalidOperationException("Machine Action preparation is paused because valid bounded container settings are unavailable.");
+
         var command = new RunnerFileTransferCommand(
             RunnerFileTransferKinds.DeployPackage,
             appId,
@@ -40,7 +50,8 @@ public sealed class DeploymentPackageRunnerService(IRunnerFileTransferGateway tr
             DeploymentOperationId: deploymentOperationId,
             ExecutionAttemptId: executionAttemptId,
             SystemInfrastructure: InfrastructureAppTrust.IsTrustedApp(appId)
-                && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal));
+                && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal),
+            ActionContainerPolicy: actionResources?.ToActionContainerPolicy());
 
         var (_, result) = await transfers.ExecuteAsync(operationId, runner.Id, ownerId,
             command, file, cancellationToken);

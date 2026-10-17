@@ -4,6 +4,8 @@ using Automaton.Core.Models;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Automaton.Api.Models;
 
 namespace Automaton.Api.Services;
 
@@ -29,7 +31,8 @@ public sealed class AppActionExecutionService
         ResourceAuthorizationService authorizationService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
-        AppActionRunnerGateway runnerGateway)
+        AppActionRunnerGateway runnerGateway,
+        IOptions<MachineContainerResourceOptions>? machineResources = null)
     {
         this.db = db;
         this.appsService = appsService;
@@ -37,7 +40,10 @@ public sealed class AppActionExecutionService
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerGateway = runnerGateway;
+        this.machineResources = machineResources?.Value;
     }
+
+    private readonly MachineContainerResourceOptions? machineResources;
 
     public async Task<AppModuleExecution> ExecuteAsync(Guid appId, string actionKey, Guid userId, JsonElement input, CancellationToken cancellationToken)
         => await ExecuteAsync(appId, actionKey, userId, input, null, AppModuleTriggerTypes.Manual, cancellationToken);
@@ -154,6 +160,12 @@ public sealed class AppActionExecutionService
             SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
                 && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
         };
+        if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
+        {
+            if (machineResources?.IsValid() != true)
+                throw new InvalidOperationException("Machine Action execution is paused because valid bounded container settings are unavailable.");
+            request.ContainerPolicy = machineResources.ToActionContainerPolicy();
+        }
         await runnerGateway.QueueExecutionAsync(runner.Id, userId ?? Guid.Empty, execution.Id, request, cancellationToken);
         return execution;
     }

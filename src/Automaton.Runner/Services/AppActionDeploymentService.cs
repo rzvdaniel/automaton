@@ -12,11 +12,16 @@ public sealed class AppActionDeploymentService
     private readonly AppActionExecutionCoordinator coordinator;
     private readonly ILogger logger = Log.ForContext<AppActionDeploymentService>();
     private readonly AppActionVersionStore versionStore;
+    private readonly MachineActionDependencyPreparer? machineDependencyPreparer;
 
-    public AppActionDeploymentService(RunnerWorkspaceService workspace, AppActionExecutionCoordinator? coordinator = null)
+    public AppActionDeploymentService(
+        RunnerWorkspaceService workspace,
+        AppActionExecutionCoordinator? coordinator = null,
+        MachineActionDependencyPreparer? machineDependencyPreparer = null)
     {
         this.workspace = workspace;
         this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
+        this.machineDependencyPreparer = machineDependencyPreparer;
         versionStore = new AppActionVersionStore(workspace);
     }
 
@@ -24,21 +29,36 @@ public sealed class AppActionDeploymentService
         Guid appId,
         Guid deploymentTargetId,
         bool allowPrivilegedCapabilities = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ActionContainerPolicy? containerPolicy = null)
     {
         if (allowPrivilegedCapabilities && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")) != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
             throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
         var actions = AppActionManifestParser.Discover(
             workspace.GetAppSourceRoot(appId, deploymentTargetId),
             allowPrivilegedCapabilities);
+        if (actions.Count > 0) EnsureMachineActionPreparationAvailable(
+            workspace.GetAppSourceRoot(appId, deploymentTargetId), containerPolicy);
 
         var results = new List<AppActionDeploymentResult>(actions.Count);
         foreach (var action in actions)
         {
-            results.Add(await PrepareAsync(appId, deploymentTargetId, action, cancellationToken));
+            results.Add(await PrepareAsync(appId, deploymentTargetId, action, cancellationToken,
+                containerPolicy));
         }
 
         return results;
+    }
+
+    internal void EnsureMachineActionPreparationAvailable(string sourceRoot, ActionContainerPolicy? policy)
+    {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            != RunnerApplicationProfiles.MachineManagement)
+            return;
+        if (AppActionManifestParser.Discover(sourceRoot, allowPrivilegedCapabilities: false).Count == 0) return;
+        if (machineDependencyPreparer is null)
+            throw new InvalidOperationException("Bounded Action dependency preparation is unavailable on this Machine Management Runner.");
+        MachineActionDependencyPreparer.EnsurePolicy(policy);
     }
 
     public AppActionModulesResponse ListModules(Guid appId, Guid deploymentTargetId)
@@ -70,7 +90,8 @@ public sealed class AppActionDeploymentService
     }
 
     public Task<AppActionDeploymentResult> PrepareModuleAsync(PrepareAppActionModuleRequest request, CancellationToken cancellationToken)
-        => AppActionModuleSourcePreparer.PrepareAsync(request, cancellationToken, PrepareAsync);
+        => AppActionModuleSourcePreparer.PrepareAsync(request, cancellationToken,
+            (appId, targetId, action, token) => PrepareAsync(appId, targetId, action, token));
 
     public int SynchronizeModules(SynchronizeAppActionModulesRequest request)
     {
@@ -128,14 +149,13 @@ public sealed class AppActionDeploymentService
         Guid appId,
         Guid deploymentTargetId,
         DiscoveredAppAction action,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ActionContainerPolicy? containerPolicy = null)
     {
-        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
-            == RunnerApplicationProfiles.MachineManagement)
-        {
-            throw new InvalidOperationException(
-                "Action dependency preparation is not available on a Machine Management Runner until it runs in an isolated container.");
-        }
+        var machineManagement = RunnerApplicationProfiles.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement;
+        if (machineManagement) MachineActionDependencyPreparer.EnsurePolicy(containerPolicy);
 
         using var actionLock = await coordinator.EnterAsync(
             appId,
@@ -159,7 +179,8 @@ public sealed class AppActionDeploymentService
         }
 
         var actionRoot = workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, action.Key);
-        var stagingDirectory = Path.Combine(actionRoot, $".staging-{Guid.NewGuid():N}");
+        var stagingId = Guid.NewGuid();
+        var stagingDirectory = workspace.GetAppActionStagingDirectory(appId, deploymentTargetId, action.Key, stagingId);
         Directory.CreateDirectory(actionRoot);
         try
         {
@@ -170,7 +191,17 @@ public sealed class AppActionDeploymentService
                 throw new InvalidOperationException($"Action '{action.Key}' entrypoint '{action.Manifest.Spec.Entrypoint}' does not exist.");
 
             if (action.Manifest.Spec.Runtime == AppActionRuntimes.Python)
-                await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
+            {
+                if (machineManagement)
+                {
+                    if (machineDependencyPreparer is null)
+                        throw new InvalidOperationException("Bounded Action dependency preparation is unavailable on this Machine Management Runner.");
+                    await machineDependencyPreparer.PreparePythonAsync(appId, deploymentTargetId,
+                        action.Key, stagingId, containerPolicy!, cancellationToken);
+                }
+                else
+                    await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
+            }
 
             await File.WriteAllTextAsync(
                 Path.Combine(stagingDirectory, DeploymentMetadataFileName),
@@ -207,5 +238,6 @@ public sealed class AppActionDeploymentService
                 Directory.Delete(stagingDirectory, recursive: true);
         }
     }
+
 
 }

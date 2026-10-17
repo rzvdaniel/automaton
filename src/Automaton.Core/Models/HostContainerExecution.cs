@@ -12,6 +12,9 @@ public static class HostContainerOperationKinds
     public const string GetContainerLogs = "get-container-logs";
     public const string RemoveContainer = "remove-container";
     public const string RemoveTargetContainers = "remove-target-containers";
+    public const string PrepareActionDependencies = "prepare-action-dependencies";
+    public const string ExecuteAction = "execute-action";
+    public const string RemoveActionContainer = "remove-action-container";
 }
 
 public static class HostContainerExecutionCommandKinds
@@ -46,6 +49,22 @@ public sealed record HostContainerResourceLimits(decimal CpuLimitCores, int Memo
         && PidsLimit is >= 32 and <= 4096;
 }
 
+public sealed record ActionContainerPolicy(
+    HostContainerResourceLimits Limits,
+    int SharedMemoryMb,
+    int DockerLogMaxSizeMb,
+    int DockerLogMaxFiles,
+    string RuntimeImage)
+{
+    public bool IsValid() => Limits.IsValid()
+        && SharedMemoryMb is >= 16 and <= 1024
+        && DockerLogMaxSizeMb is >= 1 and <= 1024
+        && DockerLogMaxFiles is >= 1 and <= 20
+        && !string.IsNullOrWhiteSpace(RuntimeImage)
+        && !RuntimeImage.Any(char.IsWhiteSpace)
+        && !RuntimeImage.Contains('\0');
+}
+
 public sealed record HostContainerExecutionRequest
 {
     public Guid OperationId { get; init; }
@@ -53,6 +72,10 @@ public sealed record HostContainerExecutionRequest
     public string Operation { get; init; } = string.Empty;
     public string? RequestedImage { get; init; }
     public string? ContainerId { get; init; }
+    public string? ActionKey { get; init; }
+    public Guid ActionExecutionId { get; init; }
+    public Guid ActionStagingId { get; init; }
+    public string? ActionInputJson { get; init; }
     public Guid CandidateId { get; init; }
     public ApplicationStorageSpec? Storage { get; init; }
     public ApplicationCommandSpec? Command { get; init; }
@@ -84,6 +107,10 @@ public sealed record HostContainerExecutionResponse
     public int? ContainerPort { get; init; }
     public IReadOnlyDictionary<string, string> Labels { get; init; } = new Dictionary<string, string>();
     public string Logs { get; init; } = string.Empty;
+    public string Output { get; init; } = string.Empty;
+    public int? ExitCode { get; init; }
+    public bool OutputExceededLimit { get; init; }
+    public bool TimedOut { get; init; }
 }
 
 public sealed record HostContainerExecutionOperationResponse(

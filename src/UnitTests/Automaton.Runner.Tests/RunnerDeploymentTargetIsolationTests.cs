@@ -44,10 +44,7 @@ public class RunnerDeploymentTargetIsolationTests
     {
         var workspace = new RunnerWorkspaceService();
         var processManager = new StubBackendProcessManager();
-        var service = new RunnerDeploymentService(
-            workspace,
-            processManager,
-            new AppActionDeploymentService(workspace));
+        var service = CreateDeploymentService(workspace, processManager);
         var appId = Guid.NewGuid();
         var firstTargetId = Guid.NewGuid();
         var secondTargetId = Guid.NewGuid();
@@ -231,10 +228,7 @@ public class RunnerDeploymentTargetIsolationTests
     {
         var workspace = new RunnerWorkspaceService();
         var processManager = new StubBackendProcessManager();
-        var service = new RunnerDeploymentService(
-            workspace,
-            processManager,
-            new AppActionDeploymentService(workspace));
+        var service = CreateDeploymentService(workspace, processManager);
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var firstAttemptId = Guid.NewGuid();
@@ -329,6 +323,11 @@ public class RunnerDeploymentTargetIsolationTests
         }
         return packagePath;
     }
+
+    private static RunnerDeploymentService CreateDeploymentService(
+        RunnerWorkspaceService workspace,
+        StubBackendProcessManager processManager)
+        => new(workspace, processManager, new AppActionDeploymentService(workspace));
 
     private static void WriteEntry(ZipArchive archive, string path, string content)
     {

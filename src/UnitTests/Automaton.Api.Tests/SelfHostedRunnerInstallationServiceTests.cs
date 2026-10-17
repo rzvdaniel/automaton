@@ -96,7 +96,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     }
 
     [Test]
-    public async Task MachineManagementInstallation_RequiresAcknowledgementAndGrantsOnlyTypedContainerAccess()
+    public async Task MachineManagementInstallation_RequiresAcknowledgementAndGrantsBoundedContainerAndWorkflowAccess()
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
         var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
@@ -115,7 +115,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         {
             Assert.That(response.RequiresHostAccessAcknowledgement, Is.True);
             Assert.That(response.HostAccessWarning, Does.Contain("Docker socket"));
-            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution"));
+            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,WorkflowExecution,ManagedContainerExecution"));
             Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace'"));
             Assert.That(response.InstallationCommand, Does.Contain(
                 $"machine_workspace_volume='automaton-machine-runner-{response.InstallationId}-workspace'"));

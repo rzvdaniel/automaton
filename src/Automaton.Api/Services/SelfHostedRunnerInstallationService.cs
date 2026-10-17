@@ -169,7 +169,7 @@ public sealed class SelfHostedRunnerInstallationService(
             (isMachineManagement ? "--group-add \"$docker_socket_gid\"" : string.Empty),
             (requiresRuntimeNetwork ? "--network \"$runtime_network\"" : string.Empty),
             (requiresRuntimeNetwork ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
-            (isMachineManagement ? "-e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution" : string.Empty),
+            (isMachineManagement ? "-e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,WorkflowExecution,ManagedContainerExecution" : string.Empty),
             (isMachineManagement ? $"-e AUTOMATON_RUNNER_INSTALLATION_ID={Quote(enrollment.InstallationId)} -e AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace' -v \"$machine_workspace_volume:/automaton/storage\"" : string.Empty),
             "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
             "-e \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image\"",

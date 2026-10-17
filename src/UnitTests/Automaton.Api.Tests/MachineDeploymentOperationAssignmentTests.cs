@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -52,6 +53,12 @@ public sealed class MachineDeploymentOperationAssignmentTests
             fixture.Runner.ApiKeyId!.Value, fixture.TransferOperationId, CancellationToken.None,
             authenticatedUserId: fixture.ActorId, runnerId: fixture.Runner.Id);
         var result = await fixture.Service.WaitAsync(fixture.TransferOperationId, CancellationToken.None);
+        var expectedFailure = change switch
+        {
+            "attempt" => "attempt",
+            "target" => "assigned",
+            _ => "permission"
+        };
 
         Assert.Multiple(() =>
         {
@@ -59,8 +66,31 @@ public sealed class MachineDeploymentOperationAssignmentTests
             Assert.That(assignment.Request, Is.Null);
             Assert.That(result.Outcome, Is.EqualTo("Failed"));
             Assert.That(result.FileTransferResult!.Success, Is.False);
-            Assert.That(result.Error, Does.Contain(change == "attempt" ? "attempt" : change == "target" ? "assigned" : "permission"));
+            Assert.That(result.Error, Does.Contain(expectedFailure));
         });
+    }
+
+    [TestCase("workspace")]
+    [TestCase("target")]
+    public async Task QueuedActionIsTerminalizedWhenItsBindingChanges(string change)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var operationId = await fixture.QueueActionAsync();
+        fixture.RevokeOrReplace(change);
+
+        var assignment = await fixture.Service.AssignmentAsync(
+            fixture.Runner.ApiKeyId!.Value, operationId, CancellationToken.None,
+            authenticatedUserId: fixture.ActorId, runnerId: fixture.Runner.Id);
+        var result = await fixture.Service.WaitAsync(operationId, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
+            Assert.That(assignment.Request, Is.Null);
+            Assert.That(result.Outcome, Is.EqualTo("Failed"));
+            Assert.That(result.Error, Is.Not.Empty);
+        });
+        Assert.That(await fixture.ReadActionStatusAsync(operationId), Is.EqualTo(AppModuleExecutionStatuses.RunnerUnavailable));
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -73,7 +103,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
         {
             Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "machine",
             Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
-            CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\"]"
+            CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\",\"WorkflowExecution\"]"
         };
         public WebApp App { get; } = new() { Id = Guid.NewGuid(), Name = "project app", Summary = "", Description = "", Definition = "" };
         public AppDeploymentTarget Target { get; private set; } = null!;
@@ -148,6 +178,39 @@ public sealed class MachineDeploymentOperationAssignmentTests
                 CancellationToken.None, transferId);
             return transferId;
         }
+
+        public async Task<Guid> QueueActionAsync()
+        {
+            var operationId = Guid.NewGuid();
+            db.AppModuleExecutions.Add(new AppModuleExecution
+            {
+                Id = operationId,
+                AppId = App.Id,
+                DeploymentTargetId = Target.Id,
+                RunnerId = Runner.Id,
+                RequestedByUserId = ActorId,
+                ModuleType = AppModuleTypes.Action,
+                ModuleKey = "queued-action",
+                TriggerType = "Manual",
+                Status = AppModuleExecutionStatuses.Dispatching,
+                ExecutionDeadlineUtc = DateTime.UtcNow.AddMinutes(5)
+            });
+            await db.SaveChangesAsync();
+            var command = AppActionCommand.Create("execute", new ExecuteAppActionModuleRequest
+            {
+                ExecutionId = operationId,
+                AppId = App.Id,
+                DeploymentTargetId = Target.Id,
+                ActionKey = "queued-action",
+                Input = JsonSerializer.SerializeToElement(new { value = "queued" })
+            });
+            await Service.QueueAsync(Runner.Id, ActorId, new(null, null, Action: command), CancellationToken.None, operationId);
+            return operationId;
+        }
+
+        public Task<string> ReadActionStatusAsync(Guid operationId)
+            => db.AppModuleExecutions.AsNoTracking().Where(execution => execution.Id == operationId)
+                .Select(execution => execution.Status).SingleAsync();
 
         public void RevokeOrReplace(string change)
         {

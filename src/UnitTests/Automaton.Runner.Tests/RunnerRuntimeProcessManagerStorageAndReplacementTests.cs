@@ -191,10 +191,7 @@ public sealed class RunnerRuntimeProcessManagerStorageAndReplacementTests : Runn
         var workspace = new RunnerWorkspaceService();
         var registry = new RunnerRuntimeRegistry();
         var processManager = CreateManager(workspace, registry);
-        var deployment = new RunnerDeploymentService(
-            workspace,
-            processManager,
-            new AppActionDeploymentService(workspace));
+        var deployment = CreateDeployment(workspace, processManager);
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var packagePath = CreateRuntimePackage(root, appId);
@@ -230,6 +227,11 @@ public sealed class RunnerRuntimeProcessManagerStorageAndReplacementTests : Runn
                 File.Delete(packagePath);
         }
     }
+
+    private static RunnerDeploymentService CreateDeployment(
+        RunnerWorkspaceService workspace,
+        IAppRuntimeProcessManager processManager)
+        => new(workspace, processManager, new AppActionDeploymentService(workspace));
 
 
 }

@@ -44,10 +44,9 @@ public sealed class TrustedInfrastructureActionExecutorTests
         {
             var workspace = new RunnerWorkspaceService();
             var coordinator = new AppActionExecutionCoordinator();
-            var deployment = new AppActionDeploymentService(workspace, coordinator);
             var execution = new AppActionExecutionService(workspace, coordinator);
             var secrets = new TerminalSecretProvider();
-            var executor = new TrustedInfrastructureActionExecutor(deployment, execution, secrets);
+            var executor = CreateExecutor(workspace, coordinator, execution, secrets);
             var command = Command("restart-hosted-runner") with { SecretGrantIds = [Guid.NewGuid()] };
 
             var result = await executor.ExecuteAsync(command, CancellationToken.None);
@@ -75,6 +74,13 @@ public sealed class TrustedInfrastructureActionExecutorTests
         var operationId = Guid.NewGuid();
         return new(operationId, operationId, Guid.NewGuid(), Guid.NewGuid(), actionKey, "{}", [], DateTime.UtcNow);
     }
+
+    private static TrustedInfrastructureActionExecutor CreateExecutor(
+        RunnerWorkspaceService workspace,
+        AppActionExecutionCoordinator coordinator,
+        AppActionExecutionService execution,
+        TerminalSecretProvider secrets)
+        => new(new AppActionDeploymentService(workspace, coordinator), execution, secrets);
 
     private sealed class TerminalSecretProvider : IInfrastructureSecretProvider
     {
