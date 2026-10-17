@@ -164,7 +164,8 @@ public sealed class RunnerFileTransferStorageTests
 
         private static RunnerFileTransferGateway CreateGateway(ApplicationDbContext db,
             DeploymentPackageStore store, string root)
-            => new(db, store, RunnerExecutionTestServices.Operations(db, artifactRoot: root));
+            => new(db, store, RunnerExecutionTestServices.Operations(db, artifactRoot: root),
+                new ResourceAuthorizationService(db, null!));
 
         public ValueTask DisposeAsync() => db.DisposeAsync();
     }

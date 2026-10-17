@@ -18,6 +18,15 @@ public sealed class RunnerExecutionIdentityService(ApplicationDbContext db, Reso
         return resolution.Failure;
     }
 
+    public async Task<HostContainerExecutionResponse?> RevalidateMachineDeploymentAssignmentAsync(
+        Guid apiKeyId,
+        Guid runnerId,
+        Guid actorId,
+        RunnerFileTransferCommand request,
+        CancellationToken token)
+        => await new MachineDeploymentAssignmentRevalidator(db, authorization)
+            .RevalidateAsync(apiKeyId, runnerId, actorId, request, token);
+
     public async Task EnsureAsync(Guid keyId, Guid runnerId, Guid authenticatedUserId, CancellationToken token)
     {
         if (keyId == Guid.Empty || runnerId == Guid.Empty)

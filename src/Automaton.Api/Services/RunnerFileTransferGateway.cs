@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,8 @@ public interface IRunnerFileTransferGateway
 public sealed class RunnerFileTransferGateway(
     ApplicationDbContext db,
     DeploymentPackageStore store,
-    RunnerExecutionOperationService operations) : IRunnerFileTransferGateway
+    RunnerExecutionOperationService operations,
+    ResourceAuthorizationService authorization) : IRunnerFileTransferGateway
 {
     public async Task<(Guid OperationId, RunnerExecutionResult Result)> ExecuteAsync(
         Guid operationId, Guid runnerId, Guid ownerId, RunnerFileTransferCommand command,
@@ -27,7 +29,7 @@ public sealed class RunnerFileTransferGateway(
         var reachedTerminalResult = false;
         try
         {
-            await EnsureOwnerStillOwnsRunnerAsync(runnerId, ownerId, command.AppId, command.DeploymentTargetId, token);
+            await EnsureOwnerCanDeployThroughRunnerAsync(runnerId, ownerId, command.AppId, command.DeploymentTargetId, token);
             if (input is not null)
             {
                 await using var stream = input.OpenReadStream();
@@ -36,7 +38,7 @@ public sealed class RunnerFileTransferGateway(
                 command = command with { Length = input.Length, Sha256 = sha256 };
             }
 
-            await EnsureOwnerStillOwnsRunnerAsync(runnerId, ownerId, command.AppId, command.DeploymentTargetId, token);
+            await EnsureOwnerCanDeployThroughRunnerAsync(runnerId, ownerId, command.AppId, command.DeploymentTargetId, token);
             await operations.QueueFileTransferAsync(operationId, runnerId, ownerId, command, token);
             using var deadline = timeout.HasValue
                 ? CancellationTokenSource.CreateLinkedTokenSource(token)
@@ -70,14 +72,33 @@ public sealed class RunnerFileTransferGateway(
         }
     }
 
-    private async Task EnsureOwnerStillOwnsRunnerAsync(
+    private async Task EnsureOwnerCanDeployThroughRunnerAsync(
         Guid runnerId, Guid ownerId, Guid appId, Guid? deploymentTargetId, CancellationToken token)
     {
-        var ownsAssignment = await db.AppDeploymentTargets.AsNoTracking()
-            .AnyAsync(target => target.WebAppId == appId && target.ExecutionRunnerId == runnerId
-                && (!deploymentTargetId.HasValue || target.Id == deploymentTargetId.Value)
-                && target.WebApp!.WebAppUsers.Any(user => user.UserId == ownerId), token);
-        if (!ownsAssignment)
-            throw new UnauthorizedAccessException("The Runner is not assigned to an application owned by this account.");
+        var target = await db.AppDeploymentTargets.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.WebAppId == appId
+                && item.ExecutionRunnerId == runnerId
+                && (!deploymentTargetId.HasValue || item.Id == deploymentTargetId.Value), token);
+        if (target is null || !await authorization.CanUpdateAppAsync(appId, ownerId, token))
+            throw new UnauthorizedAccessException("The Runner is not assigned to an application this user can deploy.");
+
+        var runnerProfile = await db.Runners.AsNoTracking()
+            .Where(runner => runner.Id == runnerId && runner.Purpose == RunnerPurposes.Managed)
+            .Select(runner => runner.ApplicationProfile)
+            .SingleOrDefaultAsync(token);
+        var isMachineRunner = RunnerApplicationProfiles.Normalize(runnerProfile)
+            == RunnerApplicationProfiles.MachineManagement;
+        if (!isMachineRunner) return;
+
+        var projectId = await db.WebApps.AsNoTracking()
+            .Where(app => app.Id == appId)
+            .Select(app => app.ProjectId)
+            .SingleOrDefaultAsync(token);
+        var workspaceAssigned = projectId is Guid assignedProjectId
+            ? await db.ProjectRunners.AnyAsync(link => link.ProjectId == assignedProjectId && link.RunnerId == runnerId, token)
+            : await db.WebAppUsers.AnyAsync(link => link.WebAppId == appId && link.UserId == ownerId, token)
+              && await db.RunnerUsers.AnyAsync(link => link.RunnerId == runnerId && link.UserId == ownerId, token);
+        if (!workspaceAssigned)
+            throw new UnauthorizedAccessException("The workspace is not assigned to this Machine Management Runner.");
     }
 }

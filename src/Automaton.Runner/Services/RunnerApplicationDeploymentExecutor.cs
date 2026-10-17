@@ -1,5 +1,6 @@
 using Automaton.Core.Models;
 using Automaton.Core.Services;
+using Automaton.Core.Enums;
 using Serilog;
 
 namespace Automaton.Runner.Console.Services;
@@ -55,6 +56,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         Action ensureAttemptIsCurrent)
     {
         var manifest = PreparePackage(attempt, request);
+        EnsureMachineActionPreparationIsUnavailable(attempt.StagingRoot);
         attempt.PreserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
         var buildResult = await BuildApplicationAsync(attempt, request, manifest.Application, cancellationToken);
         attempt.Logs.AddRange(buildResult.Logs);
@@ -108,6 +110,20 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         var manifest = RunnerDeploymentWorkspace.LoadManifest(attempt.StagingRoot, attempt.AppId);
         RunnerDeploymentWorkspace.ValidateIncomingActions(attempt.StagingRoot, request.SystemInfrastructure);
         return manifest;
+    }
+
+    private static void EnsureMachineActionPreparationIsUnavailable(string stagingRoot)
+    {
+        if (RunnerApplicationProfiles.Normalize(
+                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            != RunnerApplicationProfiles.MachineManagement)
+            return;
+
+        var incomingActions = AppActionManifestParser.Discover(
+            Path.Combine(stagingRoot, "source"), allowPrivilegedCapabilities: false);
+        if (incomingActions.Count > 0)
+            throw new InvalidOperationException(
+                "Deployment includes Actions, but Action dependency preparation is disabled on a Machine Management Runner until isolated preparation is available.");
     }
 
     private async Task<ApplicationBuildExecutionResult> BuildApplicationAsync(

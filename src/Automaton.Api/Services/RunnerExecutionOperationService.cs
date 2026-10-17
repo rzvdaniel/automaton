@@ -218,22 +218,11 @@ public sealed class RunnerExecutionOperationService(
         var request = includeRequest
             ? JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions)
             : null;
-        if (!operation.CancellationRequested && request?.HostContainer is { } containerRequest)
-        {
-            var failure = await identity.RevalidateHostContainerAssignmentAsync(keyId, containerRequest, token);
-            if (failure is not null)
-            {
-                await ApplyAsync(keyId, operationId, new RunnerExecutionResult
-                {
-                    Outcome = "Failed",
-                    Started = DateTime.UtcNow,
-                    Finished = DateTime.UtcNow,
-                    Error = failure.Error,
-                    HostContainerResult = failure
-                }, token, authenticatedUserId, runnerId);
-                return new("already-applied", null);
-            }
-        }
+        if (!operation.CancellationRequested && request is not null
+            && await TryTerminalizeStaleAssignmentAsync(
+                keyId, operation, operationId, request, token, authenticatedUserId, runnerId))
+            return new("already-applied", null);
+
         var actions = new AppActionExecutionResultPersistence(db);
         if (await actions.IsExpiredAsync(operationId, token))
         {
@@ -245,6 +234,53 @@ public sealed class RunnerExecutionOperationService(
 
         return new(operation.CancellationRequested ? "cancel" : "execute", request);
     }
+
+    private async Task<bool> TryTerminalizeStaleAssignmentAsync(
+        Guid keyId,
+        RunnerExecutionOperation operation,
+        Guid operationId,
+        RunnerExecutionRequest request,
+        CancellationToken token,
+        Guid authenticatedUserId,
+        Guid runnerId)
+    {
+        var failure = await ResolveAssignmentFailureAsync(keyId, operation, request, token);
+        if (failure is null) return false;
+
+        var result = request.HostContainer is not null
+            ? CreateFailedHostContainerResult(failure)
+            : CreateFailedFileTransferResult(failure);
+        await ApplyAsync(keyId, operationId, result, token, authenticatedUserId, runnerId);
+        return true;
+    }
+
+    private async Task<HostContainerExecutionResponse?> ResolveAssignmentFailureAsync(
+        Guid keyId,
+        RunnerExecutionOperation operation,
+        RunnerExecutionRequest request,
+        CancellationToken token)
+    {
+        if (request.HostContainer is { } containerRequest)
+            return await identity.RevalidateHostContainerAssignmentAsync(keyId, containerRequest, token);
+        if (request.FileTransfer is { Kind: RunnerFileTransferKinds.DeployPackage } transferRequest)
+            return await identity.RevalidateMachineDeploymentAssignmentAsync(
+                keyId, operation.RunnerId, operation.RequestedByUserId, transferRequest, token);
+        return null;
+    }
+
+    private static RunnerExecutionResult CreateFailedHostContainerResult(HostContainerExecutionResponse failure)
+        => new()
+        {
+            Outcome = "Failed", Started = DateTime.UtcNow, Finished = DateTime.UtcNow,
+            Error = failure.Error, HostContainerResult = failure
+        };
+
+    private static RunnerExecutionResult CreateFailedFileTransferResult(HostContainerExecutionResponse failure)
+        => new()
+        {
+            Outcome = "Failed", Started = DateTime.UtcNow, Finished = DateTime.UtcNow,
+            Error = failure.Error, FileTransferResult = new RunnerFileTransferResult { Success = false, Error = failure.Error }
+        };
 
     public async Task<RunnerExecutionReceipt> ApplyAsync(Guid keyId, Guid operationId, RunnerExecutionResult result,
         CancellationToken token, Guid authenticatedUserId = default, Guid runnerId = default)
