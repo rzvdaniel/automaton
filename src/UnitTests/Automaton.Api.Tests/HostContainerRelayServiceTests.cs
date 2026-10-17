@@ -105,10 +105,130 @@ public sealed class HostContainerRelayServiceTests
         Assert.That(await fixture.Db.RunnerExecutionOperations.CountAsync(), Is.Zero);
     }
 
+    [Test]
+    public async Task AssignmentAfterWorkspaceRevocationTerminalizesQueuedContainerRequest()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+        fixture.Db.RunnerUsers.Remove(await fixture.Db.RunnerUsers.SingleAsync(link => link.RunnerId == fixture.MachineRunnerId));
+        await fixture.Db.SaveChangesAsync();
+
+        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+        var operation = await fixture.RunnerOperations.ReadHostContainerOperationAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, ownerId, fixture.MachineRunnerId, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
+            Assert.That(assignment.Request, Is.Null);
+            Assert.That(operation!.Completed, Is.True);
+            Assert.That(operation.Result!.ErrorCode, Is.EqualTo("workspace_assignment_missing"));
+        });
+    }
+
+    [Test]
+    public async Task AssignmentAfterTargetReassignmentTerminalizesQueuedContainerRequest()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+        fixture.Target.ExecutionRunnerId = Guid.NewGuid();
+        await fixture.Db.SaveChangesAsync();
+
+        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+        var operation = await fixture.RunnerOperations.ReadHostContainerOperationAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, ownerId, fixture.MachineRunnerId, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
+            Assert.That(assignment.Request, Is.Null);
+            Assert.That(operation!.Completed, Is.True);
+            Assert.That(operation.Result!.ErrorCode, Is.EqualTo("app_assignment_mismatch"));
+        });
+    }
+
+    [Test]
+    public async Task AssignmentAfterCapabilityRevocationTerminalizesQueuedContainerRequest()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+        fixture.MachineRunner.CapabilitiesJson = "[\"ApplicationHosting\"]";
+        await fixture.Db.SaveChangesAsync();
+
+        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+        var operation = await fixture.RunnerOperations.ReadHostContainerOperationAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, ownerId, fixture.MachineRunnerId, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
+            Assert.That(assignment.Request, Is.Null);
+            Assert.That(operation!.Completed, Is.True);
+            Assert.That(operation.Result!.ErrorCode, Is.EqualTo("machine_container_capability_missing"));
+        });
+    }
+
+    [Test]
+    public async Task MachineBuildAssignmentRechecksActiveAttemptAndCarriesServerDerivedLimits()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
+        await fixture.Db.SaveChangesAsync();
+        var request = fixture.BuildRequest(attemptId);
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, request, CancellationToken.None);
+        var initialAssignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+        fixture.Target.ActiveDeploymentExecutionAttemptId = Guid.NewGuid();
+        await fixture.Db.SaveChangesAsync();
+
+        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+        var terminal = await fixture.RunnerOperations.ReadHostContainerOperationAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, ownerId, fixture.MachineRunnerId, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
+            Assert.That(assignment.Request, Is.Null);
+            Assert.That(terminal!.Result!.ErrorCode, Is.EqualTo("deployment_attempt_mismatch"));
+            Assert.That(initialAssignment.Disposition, Is.EqualTo("execute"));
+            Assert.That(initialAssignment.Request!.HostContainer!.ContainerLimits,
+                Is.EqualTo(new HostContainerResourceLimits(1.0m, 1024, 256)));
+        });
+    }
+
+    [Test]
+    public async Task MachineContainerDispatchFailsClosedWhenResourcePolicyIsInvalid()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.AssignMachineRunnerToPersonalWorkspace();
+        fixture.MachineResources.MemoryLimitMb = 0;
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
+        await fixture.Db.SaveChangesAsync();
+
+        var result = await fixture.Service.SubmitAsync(
+            fixture.MachineApiKeyId, fixture.BuildRequest(attemptId), CancellationToken.None);
+
+        Assert.That(result.Result?.ErrorCode, Is.EqualTo("machine_resource_policy_unavailable"));
+        Assert.That(fixture.Events.RunnerEvents, Is.Empty);
+        Assert.That(await fixture.Db.RunnerExecutionOperations.CountAsync(), Is.Zero);
+    }
+
     private sealed class RelayFixture : IDisposable
     {
         public ApplicationDbContext Db { get; }
         public HostContainerRelayService Service { get; }
+        public RunnerExecutionOperationService RunnerOperations { get; private set; } = null!;
+        public MachineContainerResourceOptions MachineResources { get; } = new();
         public RecordingPublisher Events { get; } = new();
         public Guid ApiKeyId { get; } = Guid.NewGuid();
         public Guid OtherAccountApiKeyId { get; } = Guid.NewGuid();
@@ -120,6 +240,7 @@ public sealed class HostContainerRelayServiceTests
         public Runner Infrastructure { get; private set; } = null!;
         public WebApp App { get; private set; } = null!;
         public AppDeploymentTarget Target { get; private set; } = null!;
+        public Runner MachineRunner { get; private set; } = null!;
 
         private RelayFixture()
         {
@@ -177,10 +298,11 @@ public sealed class HostContainerRelayServiceTests
 
         private HostContainerRelayService CreateService()
         {
-            var runnerOperations = RunnerExecutionTestServices.Operations(Db, Events);
-            var operations = new HostContainerExecutionOperationService(Db, Events, runnerOperations);
+            RunnerOperations = RunnerExecutionTestServices.Operations(Db, Events);
+            var operations = new HostContainerExecutionOperationService(Db, Events, RunnerOperations);
             return new HostContainerRelayService(
-                new HostContainerRelayStateResolver(Db), operations, runnerOperations, Options.Create(new StorageTelemetryOptions()));
+                new HostContainerRelayStateResolver(Db), operations, RunnerOperations,
+                Options.Create(new StorageTelemetryOptions()), Options.Create(MachineResources));
         }
 
         public static RelayFixture Create() => new();
@@ -193,10 +315,20 @@ public sealed class HostContainerRelayServiceTests
             Scope = new(Guid.Empty, Guid.Empty, App.Id, Target.Id)
         };
 
+        public HostContainerExecutionRequest BuildRequest(Guid attemptId) => new()
+        {
+            OperationId = OperationId,
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "node:22-slim",
+            TimeoutSeconds = 300,
+            Command = new() { Executable = "npm", Arguments = ["run", "build"] },
+            Scope = new(Guid.Empty, Guid.Empty, App.Id, Target.Id, attemptId)
+        };
+
         public Guid AssignMachineRunnerToPersonalWorkspace(bool assignRunnerToUser = true)
         {
             var ownerId = Guid.NewGuid();
-            var machineRunner = new Runner
+            MachineRunner = new Runner
             {
                 Id = MachineRunnerId,
                 Name = "machine-management",
@@ -205,11 +337,11 @@ public sealed class HostContainerRelayServiceTests
                 ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
                 CapabilitiesJson = "[\"ApplicationHosting\",\"ManagedContainerExecution\"]"
             };
-            Target.ExecutionRunnerId = machineRunner.Id;
-            Db.Runners.Add(machineRunner);
+            Target.ExecutionRunnerId = MachineRunner.Id;
+            Db.Runners.Add(MachineRunner);
             Db.WebAppUsers.Add(new WebAppUser { WebAppId = App.Id, UserId = ownerId });
             if (assignRunnerToUser)
-                Db.RunnerUsers.Add(new RunnerUser { RunnerId = machineRunner.Id, UserId = ownerId });
+                Db.RunnerUsers.Add(new RunnerUser { RunnerId = MachineRunner.Id, UserId = ownerId });
             Db.SaveChanges();
             return ownerId;
         }

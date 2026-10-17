@@ -215,6 +215,25 @@ public sealed class RunnerExecutionOperationService(
     {
         var operation = await AuthorizeAsync(keyId, operationId, authenticatedUserId, runnerId, token);
         if (operation.CompletedAtUtc.HasValue) return new("already-applied", null);
+        var request = includeRequest
+            ? JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions)
+            : null;
+        if (!operation.CancellationRequested && request?.HostContainer is { } containerRequest)
+        {
+            var failure = await identity.RevalidateHostContainerAssignmentAsync(keyId, containerRequest, token);
+            if (failure is not null)
+            {
+                await ApplyAsync(keyId, operationId, new RunnerExecutionResult
+                {
+                    Outcome = "Failed",
+                    Started = DateTime.UtcNow,
+                    Finished = DateTime.UtcNow,
+                    Error = failure.Error,
+                    HostContainerResult = failure
+                }, token, authenticatedUserId, runnerId);
+                return new("already-applied", null);
+            }
+        }
         var actions = new AppActionExecutionResultPersistence(db);
         if (await actions.IsExpiredAsync(operationId, token))
         {
@@ -224,8 +243,7 @@ public sealed class RunnerExecutionOperationService(
         }
         if (includeRequest && !operation.CancellationRequested) await actions.MarkStartedAsync(operationId, token);
 
-        return new(operation.CancellationRequested ? "cancel" : "execute",
-            includeRequest ? JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions) : null);
+        return new(operation.CancellationRequested ? "cancel" : "execute", request);
     }
 
     public async Task<RunnerExecutionReceipt> ApplyAsync(Guid keyId, Guid operationId, RunnerExecutionResult result,

@@ -39,6 +39,7 @@ public sealed partial class HostContainerExecutionService
                 "/automaton/data", readOnly: false)
         };
         HostContainerResourcePolicy.AddCgroupParent(args, scope);
+        HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
         if (request.User is not null)
         {
             args.Add("--user");

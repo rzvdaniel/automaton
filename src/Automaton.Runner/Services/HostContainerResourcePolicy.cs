@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -90,6 +91,19 @@ internal static class HostContainerResourcePolicy
         if (scope.MachineRunnerId != Guid.Empty || scope.HostedRunnerId == Guid.Empty) return;
         arguments.Add("--cgroup-parent");
         arguments.Add(HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId));
+    }
+
+    public static void AddContainerLimits(List<string> arguments, HostContainerResourceLimits? limits)
+    {
+        if (limits is null) return;
+        if (!limits.IsValid())
+            throw new InvalidOperationException("The server supplied invalid container resource limits.");
+        arguments.Add("--cpus");
+        arguments.Add(limits.CpuLimitCores.ToString(CultureInfo.InvariantCulture));
+        arguments.Add("--memory");
+        arguments.Add($"{limits.MemoryLimitMb}m");
+        arguments.Add("--pids-limit");
+        arguments.Add(limits.PidsLimit.ToString(CultureInfo.InvariantCulture));
     }
 
 }

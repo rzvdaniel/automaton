@@ -612,6 +612,7 @@ internal static class ApiRunnerRegistration
         services.AddScoped<RunnerStorageTelemetryService>();
         services.AddScoped<RunnerStorageTelemetrySubmissionService>();
         services.Configure<StorageTelemetryOptions>(applicationBuilder.Configuration.GetSection("StorageTelemetry"));
+        services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));
         services.AddScoped<RunnerEnrollmentService>();
         services.AddScoped<RunnerEnrollmentAdministrationService>();
         services.AddScoped<HostedRunnerEnrollmentProvisioningService>();

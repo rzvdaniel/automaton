@@ -73,8 +73,10 @@ public sealed partial class HostContainerExecutionService
         return request.SharedMemoryMb is >= 16 and <= 1024
             && request.DockerLogMaxSizeMb is >= 1 and <= 1024
             && request.DockerLogMaxFiles is >= 1 and <= 20
+            && (request.ContainerLimits is null || request.ContainerLimits.IsValid())
+            && (request.Scope.MachineRunnerId == Guid.Empty || request.ContainerLimits is not null)
                 ? null
-                : Failure("trusted_policy_unavailable", "Valid Hosted Runner container limits are unavailable.");
+                : Failure("trusted_policy_unavailable", "Valid server-derived CPU, memory, PID, and runtime limits are unavailable.");
     }
 
     private static void AddWritablePathArguments(

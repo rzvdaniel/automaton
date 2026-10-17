@@ -91,6 +91,7 @@ internal sealed class HostContainerBuildExecutor(
                 "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}"]);
         }
         HostContainerResourcePolicy.AddCgroupParent(args, scope);
+        HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
         HostContainerWritablePathPolicy.AddTo(
             args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
         var command = request.Command!;
