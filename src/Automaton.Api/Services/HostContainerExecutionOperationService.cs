@@ -13,7 +13,8 @@ namespace Automaton.Api.Services;
 
 public sealed class HostContainerExecutionOperationService(
     ApplicationDbContext db,
-    IEventPublisher events)
+    IEventPublisher events,
+    RunnerExecutionOperationService runnerOperations)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -69,6 +70,15 @@ public sealed class HostContainerExecutionOperationService(
         var runner = await GetRunnerForApiKeyAsync(apiKeyId, RunnerPurposes.Managed, cancellationToken);
         if (runner is null)
             return null;
+        if (RunnerApplicationProfiles.TryNormalize(runner.ApplicationProfile, out var profile)
+            && profile == RunnerApplicationProfiles.MachineManagement)
+        {
+            if (!await db.RunnerExecutionOperations.AsNoTracking()
+                    .AnyAsync(item => item.Id == operationId && item.RunnerId == runner.Id, cancellationToken))
+                return null;
+            return await runnerOperations.ReadHostContainerOperationAsync(
+                apiKeyId, operationId, Guid.Empty, runner.Id, cancellationToken);
+        }
         var hostedRunnerId = await db.HostedRunners.AsNoTracking()
             .Where(hosted => hosted.RunnerId == runner.Id && hosted.DeletedAt == null)
             .Select(hosted => (Guid?)hosted.Id)

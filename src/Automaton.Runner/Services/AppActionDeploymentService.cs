@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Serilog;
 
@@ -30,6 +31,7 @@ public sealed class AppActionDeploymentService
         var actions = AppActionManifestParser.Discover(
             workspace.GetAppSourceRoot(appId, deploymentTargetId),
             allowPrivilegedCapabilities);
+
         var results = new List<AppActionDeploymentResult>(actions.Count);
         foreach (var action in actions)
         {
@@ -128,6 +130,13 @@ public sealed class AppActionDeploymentService
         DiscoveredAppAction action,
         CancellationToken cancellationToken)
     {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement)
+        {
+            throw new InvalidOperationException(
+                "Action dependency preparation is not available on a Machine Management Runner until it runs in an isolated container.");
+        }
+
         using var actionLock = await coordinator.EnterAsync(
             appId,
             deploymentTargetId,

@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Core.Models;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,16 @@ namespace Automaton.Api.Services;
 /// <summary>Preserves enrolled-key binding and existing owner-key BYO registration authorization.</summary>
 public sealed class RunnerExecutionIdentityService(ApplicationDbContext db, ResourceAuthorizationService authorization)
 {
+    public async Task<HostContainerExecutionResponse?> RevalidateHostContainerAssignmentAsync(
+        Guid apiKeyId,
+        HostContainerExecutionRequest request,
+        CancellationToken token)
+    {
+        var resolution = await new HostContainerRelayStateResolver(db)
+            .ResolveAsync(apiKeyId, request, token, serverPrepared: true);
+        return resolution.Failure;
+    }
+
     public async Task EnsureAsync(Guid keyId, Guid runnerId, Guid authenticatedUserId, CancellationToken token)
     {
         if (keyId == Guid.Empty || runnerId == Guid.Empty)

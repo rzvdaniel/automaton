@@ -22,6 +22,7 @@ public static class RunnerCapabilities
 
     public const string ApplicationHosting = "ApplicationHosting";
     public const string WorkflowExecution = "WorkflowExecution";
+    public const string ManagedContainerExecution = "ManagedContainerExecution";
     public const string DockerManagement = "DockerManagement";
     public const string HostContainerExecution = "HostContainerExecution";
     public const string HostExecution = "HostExecution";

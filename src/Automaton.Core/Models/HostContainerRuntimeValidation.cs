@@ -37,7 +37,7 @@ public static class HostContainerRuntimeValidation
             return "A valid container ID or name is required.";
         if (request.RequestedImage is not null || request.Command is not null || request.Storage is not null
             || request.User is not null
-            || request.Resources is not null || request.CandidateId != Guid.Empty
+            || request.Resources is not null || request.ContainerLimits is not null || request.CandidateId != Guid.Empty
             || request.ContainerPort != 0 || request.Environment!.Count != 0)
             return "Existing-container operations accept only scope and container identity.";
         return null;

@@ -60,8 +60,8 @@ public sealed partial class HostContainerExecutionService
     }
 
     private static HostContainerExecutionResponse? ValidateRequest(HostContainerExecutionRequest request)
-        => ValidateRunnerAuthorization()
-            ?? ValidateScope(request)
+        => HostContainerRunnerAuthorization.Validate()
+            ?? HostContainerRunnerAuthorization.ValidateScope(request)
             ?? ValidateOperation(request)
             ?? ValidateRequestedImage(request);
 
@@ -73,8 +73,10 @@ public sealed partial class HostContainerExecutionService
         return request.SharedMemoryMb is >= 16 and <= 1024
             && request.DockerLogMaxSizeMb is >= 1 and <= 1024
             && request.DockerLogMaxFiles is >= 1 and <= 20
+            && (request.ContainerLimits is null || request.ContainerLimits.IsValid())
+            && (request.Scope.MachineRunnerId == Guid.Empty || request.ContainerLimits is not null)
                 ? null
-                : Failure("trusted_policy_unavailable", "Valid Hosted Runner container limits are unavailable.");
+                : Failure("trusted_policy_unavailable", "Valid server-derived CPU, memory, PID, and runtime limits are unavailable.");
     }
 
     private static void AddWritablePathArguments(
@@ -94,34 +96,6 @@ public sealed partial class HostContainerExecutionService
         arguments.Add($"max-size={dockerLogMaxSizeMb}m");
         arguments.Add("--log-opt");
         arguments.Add($"max-file={dockerLogMaxFiles}");
-    }
-
-    private static HostContainerExecutionResponse? ValidateRunnerAuthorization()
-    {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
-                RunnerPurposes.Infrastructure,
-                StringComparison.Ordinal))
-            return Failure("authorization", "Host container execution requires an Infrastructure Runner.");
-
-        return RunnerCapabilities.Normalize(
-                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                RunnerPurposes.Infrastructure)
-            .Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase)
-            ? null
-            : Failure("capability", "Host container execution is not enabled for this Runner.");
-    }
-
-    private static HostContainerExecutionResponse? ValidateScope(HostContainerExecutionRequest request)
-    {
-        var scope = request.Scope;
-        return scope is not null
-            && scope.HostedRunnerId != Guid.Empty
-            && scope.RunnerHostId != Guid.Empty
-            && scope.AppId != Guid.Empty
-            && scope.DeploymentTargetId != Guid.Empty
-                ? null
-                : Failure("scope", "A complete host-container scope is required.");
     }
 
     private static HostContainerExecutionResponse? ValidateOperation(HostContainerExecutionRequest request)
@@ -194,6 +168,11 @@ public sealed partial class HostContainerExecutionService
         }
         catch (JsonException) { return false; }
     }
+
+    internal static bool HasExpectedVolumeLabels(string json, HostContainerScope scope)
+        => scope.MachineRunnerId == Guid.Empty
+            ? HasExpectedVolumeLabels(json, scope.HostedRunnerId)
+            : HostContainerResourcePolicy.HasExpectedVolumeLabels(json, scope);
 
     private static HostContainerExecutionResponse Failure(string code, string error)
         => new() { ErrorCode = code, Error = error };

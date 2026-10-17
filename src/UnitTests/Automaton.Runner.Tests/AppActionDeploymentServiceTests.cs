@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace Automaton.Runner.Console.Tests;
 
-[TestFixture]
+[TestFixture, NonParallelizable]
 public class AppActionDeploymentServiceTests
 {
     private string root = null!;
@@ -67,6 +67,39 @@ public class AppActionDeploymentServiceTests
         Assert.That(() => service.DeleteVersion(appId, targetId, "hello", "current"), Throws.TypeOf<InvalidOperationException>());
         Assert.That(service.DeleteVersion(appId, targetId, "hello", oldVersion.Version).Success, Is.True);
         Assert.That(service.ListVersions(appId, targetId, "hello").Versions, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task MachineManagementRejectsPythonDependencyPreparationBeforeCreatingEnvironment()
+    {
+        var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var directory = Path.Combine(workspace.GetAppSourceRoot(appId, targetId), "actions", "dependency-hook");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "action.yaml"), """
+            apiVersion: automaton.dev/v1
+            kind: Action
+            metadata:
+              key: dependency-hook
+            spec:
+              runtime: python
+              entrypoint: main.py
+            """);
+        File.WriteAllText(Path.Combine(directory, "main.py"), "print('should not run')");
+        File.WriteAllText(Path.Combine(directory, "requirements.txt"), "hook-package==1.0");
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", "MachineManagement");
+        try
+        {
+            Assert.That(async () => await service.PrepareAllAsync(appId, targetId),
+                Throws.TypeOf<InvalidOperationException>());
+            Assert.That(Directory.Exists(Path.Combine(
+                workspace.GetAppActionCurrentDirectory(appId, targetId, "dependency-hook"), ".venv")), Is.False);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", previousProfile);
+        }
     }
 
     private string CreateBashAction(Guid appId, Guid targetId, string script)

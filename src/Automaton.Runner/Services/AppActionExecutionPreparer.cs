@@ -6,6 +6,13 @@ namespace Automaton.Runner.Console.Services;
 
 internal static class AppActionExecutionPreparer
 {
+    public static void EnsureProfileAllowsExecution()
+    {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement)
+            throw new UnauthorizedAccessException("Action execution is disabled for Machine Management Runners until isolated job execution is available.");
+    }
+
     public static AppActionExecutionPreparation Prepare(
         ExecuteAppActionModuleRequest request,
         RunnerWorkspaceService workspace)

@@ -11,6 +11,7 @@ namespace Automaton.Runner.Console.Tests;
 public sealed class BrokeredApplicationContainerRuntimeTests
 {
     private string? previousHostedRunnerId;
+    private string? previousMachineRunnerId;
     private readonly Guid hostedRunnerId = Guid.NewGuid();
     private readonly Guid runnerHostId = Guid.NewGuid();
     private readonly List<HostContainerExecutionRequest> requests = [];
@@ -20,12 +21,16 @@ public sealed class BrokeredApplicationContainerRuntimeTests
     {
         requests.Clear();
         previousHostedRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");
+        previousMachineRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
         Environment.SetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID", hostedRunnerId.ToString());
     }
 
     [TearDown]
     public void TearDown()
-        => Environment.SetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID", previousHostedRunnerId);
+    {
+        Environment.SetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID", previousHostedRunnerId);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", previousMachineRunnerId);
+    }
 
     [Test]
     public async Task CreateSendsTypedCandidateAndOriginalStorageWithoutResourcesOrPhysicalPaths()
@@ -103,11 +108,41 @@ public sealed class BrokeredApplicationContainerRuntimeTests
 
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard, true, true)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, true, false)]
+    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false, true)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard, false, false)]
     [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard, true, false)]
-    public void RuntimeSelectionRequiresStandardManagedHostedShape(string purpose, string profile, bool hasHostedId, bool expected)
+    public void RuntimeSelectionRequiresSupportedManagedBrokerShape(string purpose, string profile, bool hasHostedId, bool expected)
         => Assert.That(RunnerApplicationContainerRuntimeSelection.UsesBroker(
             purpose, profile, hasHostedId ? Guid.NewGuid().ToString() : null), Is.EqualTo(expected));
+
+    [Test]
+    public async Task MachineManagementScopeUsesStableRunnerIdentityWithoutHostedBinding()
+    {
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", runnerId.ToString());
+        var runtime = new BrokeredApplicationContainerRuntime(
+            (request, _) =>
+            {
+                requests.Add(request);
+                return Task.FromResult(new HostContainerExecutionResponse { Success = true });
+            },
+            () => Task.FromResult<RunnerInstallationProfile?>(new()
+            {
+                Purpose = RunnerPurposes.Managed,
+                ApplicationProfile = RunnerApplicationProfiles.MachineManagement
+            }));
+
+        await runtime.RemoveTargetContainersAsync(new(appId, targetId));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requests.Single().Scope.MachineRunnerId, Is.EqualTo(runnerId));
+            Assert.That(requests.Single().Scope.HostedRunnerId, Is.EqualTo(Guid.Empty));
+            Assert.That(requests.Single().Scope.RunnerHostId, Is.EqualTo(Guid.Empty));
+        });
+    }
 
     private BrokeredApplicationContainerRuntime Runtime(Func<HostContainerExecutionRequest, HostContainerExecutionResponse> response)
         => new(

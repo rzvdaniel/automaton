@@ -49,6 +49,7 @@ export function runnerSourceLabel(runner: Runner): string {
   switch (classifyRunner(runner)) {
     case 'automaton-hosted': return 'Automaton-hosted'
     case 'self-hosted-privileged': return 'Self-hosted · Privileged Host'
+    case 'self-hosted-machine-management': return 'Self-hosted · Machine Management'
     default: return 'Self-hosted · Standard'
   }
 }

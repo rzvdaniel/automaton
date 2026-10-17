@@ -25,6 +25,8 @@ public sealed class SelfHostedRunnerInstallationService(
         "Privileged Host applications may read and modify host files, inspect host processes, " +
         "inspect and control Docker containers, affect services and system state, and access " +
         "secrets available on the host.";
+    private const string MachineManagementWarning =
+        "The management Runner receives access to this machine's Docker socket. Automaton exposes typed app-container operations and disables Actions and workflows, but the Runner itself is trusted infrastructure: a compromise could control host Docker. Keep ordinary app and build code in isolated containers.";
 
     public async Task<SelfHostedRunnerInstallationResponse> CreateAsync(
         CreateSelfHostedRunnerInstallationRequest request,
@@ -39,6 +41,8 @@ public sealed class SelfHostedRunnerInstallationService(
             throw new ArgumentException("RunnerName must be between 1 and 120 characters.");
 
         var profile = RunnerApplicationProfiles.Normalize(request.ApplicationProfile);
+        if (profile == RunnerApplicationProfiles.MachineManagement && !request.AcknowledgeHostAccess)
+            throw new UnauthorizedAccessException("Host access must be explicitly acknowledged for this Runner profile.");
         var now = DateTime.UtcNow;
         var expiresAtUtc = now.AddMinutes(Math.Clamp(enrollmentOptions.Value.TokenLifetimeMinutes, 1, 60));
         var token = GenerateToken();
@@ -69,8 +73,13 @@ public sealed class SelfHostedRunnerInstallationService(
             ApplicationProfile = profile,
             ExpiresAtUtc = expiresAtUtc,
             InstallationCommand = BuildCommand(enrollment, token),
-            RequiresHostAccessAcknowledgement = profile == RunnerApplicationProfiles.PrivilegedHost,
-            HostAccessWarning = profile == RunnerApplicationProfiles.PrivilegedHost ? HostAccessWarning : null,
+            RequiresHostAccessAcknowledgement = profile is RunnerApplicationProfiles.PrivilegedHost or RunnerApplicationProfiles.MachineManagement,
+            HostAccessWarning = profile switch
+            {
+                RunnerApplicationProfiles.PrivilegedHost => HostAccessWarning,
+                RunnerApplicationProfiles.MachineManagement => MachineManagementWarning,
+                _ => null
+            },
             Status = SelfHostedRunnerInstallationStatuses.CommandCreated
         };
     }
@@ -137,6 +146,8 @@ public sealed class SelfHostedRunnerInstallationService(
         var workspace = $"{root}/workspace";
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
         var isPrivilegedHost = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost;
+        var isMachineManagement = enrollment.ApplicationProfile == RunnerApplicationProfiles.MachineManagement;
+        var machineWorkspaceVolume = $"automaton-machine-runner-{enrollment.InstallationId}-workspace";
         var network = $"automaton-self-hosted-{enrollment.InstallationId}-runtime";
         var args = isPrivilegedHost
             ? $" {RunnerDockerArguments.PrivilegedHostApplication}"
@@ -156,10 +167,13 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
             (isPrivilegedHost ? "--network \"$runtime_network\"" : string.Empty),
             (isPrivilegedHost ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
+            (isMachineManagement ? "-e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution" : string.Empty),
+            (isMachineManagement ? $"-e AUTOMATON_RUNNER_INSTALLATION_ID={Quote(enrollment.InstallationId)} -e AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace' -v \"$machine_workspace_volume:/automaton/storage\"" : string.Empty),
             "-e \"AUTOMATON_RUNNER_IMAGE=$resolved_image\"",
             "-e \"AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image\"",
             $"-v {Quote(root + ":/app/config")}",
             workspaceArgs,
+            (isMachineManagement ? "-v /var/run/docker.sock:/var/run/docker.sock" : string.Empty),
             args.Trim(),
             "\"$resolved_image\"");
 
@@ -185,6 +199,7 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
+            BuildMachineWorkspaceSetupCommands(isMachineManagement, machineWorkspaceVolume, enrollment.InstallationId),
             BuildNetworkSetupCommands(isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
@@ -213,6 +228,20 @@ public sealed class SelfHostedRunnerInstallationService(
             "esac",
             "AUTOMATON_RUNNER_INSTALL");
     }
+
+    private static string BuildMachineWorkspaceSetupCommands(
+        bool isMachineManagement,
+        string volumeName,
+        string installationId)
+        => isMachineManagement
+            ? string.Join('\n',
+                $"machine_workspace_volume={Quote(volumeName)}",
+                "if ! docker volume create --label automaton.managed=true --label automaton.resource=machine-workspace-volume " +
+                $"--label automaton.installation-id={Quote(installationId)} --label automaton.storage-scope=workspace \"$machine_workspace_volume\" >/dev/null; then",
+                "  echo 'The shared Machine Management workspace volume could not be created.' >&2",
+                "  exit 1",
+                "fi")
+            : string.Empty;
 
     private static string BuildNetworkSetupCommands(bool isPrivilegedHost, string network, string root, string workspace)
     {

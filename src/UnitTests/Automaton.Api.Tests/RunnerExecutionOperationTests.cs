@@ -33,15 +33,26 @@ public sealed class RunnerExecutionOperationTests
     [Test]
     public async Task PayloadIsProtectedAndCommandContainsOnlyStableIdentities()
     {
+        var queued = await QueueWorkflowOperationAsync();
+        Assert.That(queued.ProtectedRequest, Does.Not.Contain("private-secret"));
+        Assert.That(queued.Command, Is.EqualTo(new RunnerExecutionRequestedEvent(queued.OperationId, queued.RunnerId)));
+    }
+
+    private static async Task<QueuedWorkflowOperation> QueueWorkflowOperationAsync()
+    {
         await using var db = Db();
         var publisher = new Publisher();
         var service = RunnerExecutionTestServices.Operations(db, publisher);
         var runnerId = Guid.NewGuid();
         var id = await service.QueueAsync(runnerId, Guid.NewGuid(), new(null,
             new() { Id = Guid.NewGuid(), Code = "private-secret", Language = "python" }), CancellationToken.None);
-        Assert.That((await db.RunnerExecutionOperations.SingleAsync()).ProtectedRequest, Does.Not.Contain("private-secret"));
-        Assert.That(publisher.Command, Is.EqualTo(new RunnerExecutionRequestedEvent(id, runnerId)));
+        var protectedRequest = (await db.RunnerExecutionOperations.SingleAsync()).ProtectedRequest;
+        return new QueuedWorkflowOperation(id, runnerId, protectedRequest, publisher.Command);
     }
+
+    private sealed record QueuedWorkflowOperation(
+        Guid OperationId, Guid RunnerId, string ProtectedRequest, RunnerExecutionRequestedEvent? Command);
+
 
     [Test]
     public async Task AnotherApiInstanceCanApplyResultAndCompletedReplayDoesNotRewriteIt()

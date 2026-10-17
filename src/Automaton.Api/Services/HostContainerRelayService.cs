@@ -9,7 +9,9 @@ namespace Automaton.Api.Services;
 public sealed class HostContainerRelayService(
     HostContainerRelayStateResolver stateResolver,
     HostContainerExecutionOperationService operations,
-    IOptions<StorageTelemetryOptions> storageTelemetryOptions)
+    RunnerExecutionOperationService runnerOperations,
+    IOptions<StorageTelemetryOptions> storageTelemetryOptions,
+    IOptions<MachineContainerResourceOptions> machineContainerResources)
 {
     public async Task<HostContainerExecutionOperationResponse> SubmitAsync(
         Guid apiKeyId,
@@ -29,6 +31,25 @@ public sealed class HostContainerRelayService(
         }
 
         var state = resolution.State!;
+        if (state.MachineRunner is not null)
+        {
+            if (HostContainerRelayRequestPreparer.RequiresContainerLimits(request.Operation)
+                && !machineContainerResources.Value.IsValid())
+                return Completed(request.OperationId, Failure(
+                    "machine_resource_policy_unavailable",
+                    "Machine container execution is paused because valid CPU, memory, and PID limits are not configured."));
+
+            var managedRequest = HostContainerRelayRequestPreparer.PrepareForMachine(
+                request, state, machineContainerResources.Value);
+            await runnerOperations.QueueHostContainerAsync(
+                managedRequest.OperationId,
+                state.MachineRunner.Id,
+                state.OperationActorUserId,
+                managedRequest,
+                cancellationToken);
+            return new(managedRequest.OperationId, false, null);
+        }
+
         if (!HostContainerRelayAdmission.CanRun(request, state, storageTelemetryOptions.Value))
         {
             return Completed(request.OperationId, Failure(
@@ -66,10 +87,12 @@ internal static class HostContainerRelayAdmission
         HostContainerExecutionRequest request,
         HostContainerRelayState state,
         StorageTelemetryOptions options)
-        => request.Operation is not (HostContainerOperationKinds.ResolveImage
+        => state.MachineRunner is not null
+            || request.Operation is not (HostContainerOperationKinds.ResolveImage
                 or HostContainerOperationKinds.RunBuild
                 or HostContainerOperationKinds.CreateApplicationContainer)
-            || StorageTelemetryPolicy.CanRunDockerStorageOperation(state.Hosted.RunnerHost!, DateTime.UtcNow, options);
+            || state.Hosted?.RunnerHost is { } host
+                && StorageTelemetryPolicy.CanRunDockerStorageOperation(host, DateTime.UtcNow, options);
 }
 
 internal static class HostContainerRelayRequestPreparer
@@ -84,12 +107,16 @@ internal static class HostContainerRelayRequestPreparer
             ? new HostContainerResourceRef(HostContainerResourceKinds.Source,
                 HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData)
             : null;
-        var activeResources = state.Hosted.SpecificationSnapshot.Resources;
+        var activeResources = state.Hosted!.SpecificationSnapshot.Resources;
+        var limits = requiresContainerLimits
+            ? new HostContainerResourceLimits(activeResources.CpuLimit, activeResources.MemoryLimitMb, activeResources.PidsLimit)
+            : null;
         return request with
         {
             Scope = new HostContainerScope(state.Hosted.Id, state.HostId, state.Target.WebAppId,
                 state.Target.Id, request.Scope.DeploymentAttemptId),
             Resources = resources,
+            ContainerLimits = limits,
             SharedMemoryMb = requiresContainerLimits ? activeResources.SharedMemoryMb : null,
             DockerLogMaxSizeMb = requiresContainerLimits ? activeResources.DockerLogMaxSizeMb : null,
             DockerLogMaxFiles = requiresContainerLimits ? activeResources.DockerLogMaxFiles : null,
@@ -98,4 +125,35 @@ internal static class HostContainerRelayRequestPreparer
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
         };
     }
+
+    public static HostContainerExecutionRequest PrepareForMachine(
+        HostContainerExecutionRequest request,
+        HostContainerRelayState state,
+        MachineContainerResourceOptions resourceOptions)
+    {
+        var requiresContainerLimits = RequiresContainerLimits(request.Operation);
+        return request with
+        {
+            Scope = new HostContainerScope(
+                Guid.Empty, Guid.Empty, state.Target.WebAppId, state.Target.Id,
+                request.Scope.DeploymentAttemptId, state.MachineRunner!.Id),
+            Resources = requiresContainerLimits
+                ? new HostContainerResourceRef(HostContainerResourceKinds.Source,
+                    HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData)
+                : null,
+            ContainerLimits = requiresContainerLimits
+                ? new HostContainerResourceLimits(resourceOptions.CpuLimitCores,
+                    resourceOptions.MemoryLimitMb, resourceOptions.PidsLimit)
+                : null,
+            SharedMemoryMb = requiresContainerLimits ? resourceOptions.SharedMemoryMb : null,
+            DockerLogMaxSizeMb = requiresContainerLimits ? resourceOptions.DockerLogMaxSizeMb : null,
+            DockerLogMaxFiles = requiresContainerLimits ? resourceOptions.DockerLogMaxFiles : null,
+            HostPort = 0,
+            Environment = request.Environment.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+        };
+    }
+
+    public static bool RequiresContainerLimits(string operation)
+        => operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer;
 }

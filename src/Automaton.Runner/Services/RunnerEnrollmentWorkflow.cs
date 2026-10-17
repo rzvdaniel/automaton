@@ -77,6 +77,7 @@ internal sealed class RunnerEnrollmentWorkflow
             await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
             {
                 Purpose = enrollment.Purpose,
+                ApplicationProfile = enrollment.ApplicationProfile,
                 Capabilities = enrollment.Capabilities,
                 RunnerHostId = enrollment.RunnerHostId,
                 InstallationId = enrollment.InstallationId
@@ -162,6 +163,8 @@ internal sealed class RunnerEnrollmentWorkflow
         }
 
         ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", profile.ApplicationProfile);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID", profile.InstallationId);
     }
 
     private static void ApplyInstallationProfile(

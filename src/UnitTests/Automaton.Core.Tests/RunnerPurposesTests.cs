@@ -82,5 +82,26 @@ public class RunnerPurposesTests
                 RunnerPurposes.Managed,
                 RunnerApplicationProfiles.PrivilegedHost),
             Is.False);
+        Assert.That(
+            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
+                RunnerPurposes.Managed,
+                RunnerApplicationProfiles.MachineManagement),
+            Is.False);
+    }
+
+    [Test]
+    public void MachineManagementProfileIsAnApplicationRunnerWithoutWorkflowOrInfrastructureCapabilities()
+    {
+        var capabilities = new[]
+        {
+            RunnerCapabilities.ApplicationHosting,
+            RunnerCapabilities.ManagedContainerExecution
+        };
+
+        Assert.That(RunnerProfileRules.IsValid(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement), Is.True);
+        Assert.That(RunnerProfileRules.CanExecuteApplications(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, capabilities), Is.True);
+        Assert.That(RunnerCapabilities.RequiresAdministrator(capabilities, RunnerPurposes.Managed), Is.False);
+        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.WorkflowExecution));
+        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
     }
 }

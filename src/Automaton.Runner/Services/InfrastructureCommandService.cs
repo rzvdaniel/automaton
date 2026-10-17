@@ -35,15 +35,18 @@ public sealed class InfrastructureCommandService
             return Task.FromResult(Failure("Only typed Docker operations are supported."));
 
         var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
-        if (!string.Equals(purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal))
-            return Task.FromResult(Failure("Typed host-container execution requires an Infrastructure Runner."));
-
         var capabilities = RunnerCapabilities.Normalize(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             purpose);
-        if (!capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase))
-            return Task.FromResult(Failure("Host container execution capability is not enabled."));
+        var profile = RunnerApplicationProfiles.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"));
+        var authorized = purpose == RunnerPurposes.Infrastructure
+            ? capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase)
+            : profile == RunnerApplicationProfiles.MachineManagement
+                && capabilities.Contains(RunnerCapabilities.ManagedContainerExecution, StringComparer.OrdinalIgnoreCase);
+        if (!authorized)
+            return Task.FromResult(Failure("Typed container execution is not enabled for this Runner profile."));
 
         if (timeout < TimeSpan.FromSeconds(1) || timeout > TimeSpan.FromSeconds(86_400))
             return Task.FromResult(Failure("Typed Docker timeout must be between 1 and 86400 seconds."));

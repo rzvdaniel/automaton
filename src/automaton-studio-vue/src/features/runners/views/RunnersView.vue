@@ -129,6 +129,8 @@ function getRunnerSourceLabel(runner: Runner): string {
       return 'Automaton-hosted'
     case 'self-hosted-privileged':
       return 'Self-hosted · Privileged Host'
+    case 'self-hosted-machine-management':
+      return 'Self-hosted · Machine Management'
     default:
       return 'Self-hosted · Standard'
   }
@@ -139,6 +141,7 @@ function getRunnerSourceSeverity(runner: Runner): 'contrast' | 'warn' | 'info' {
     case 'automaton-hosted':
       return 'contrast'
     case 'self-hosted-privileged':
+    case 'self-hosted-machine-management':
       return 'warn'
     default:
       return 'info'

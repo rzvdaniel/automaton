@@ -13,12 +13,9 @@ public sealed partial class HostContainerExecutionService
         HostContainerExecutionRequest request, CancellationToken cancellationToken)
     {
         var scope = request.Scope;
-        var volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
-        var volumeInspection = await executor(
-            ["docker", "volume", "inspect", "--format", "{{json .Labels}}", volume],
-            RuntimeOperationTimeout, cancellationToken);
-        if (!volumeInspection.Success || !HasExpectedVolumeLabels(volumeInspection.Output, scope.HostedRunnerId))
-            return Failure("trusted_storage", "The Hosted Runner user volume is missing or has invalid ownership labels.");
+        var volume = HostContainerResourcePolicy.VolumeName(scope);
+        if (!await HostContainerResourcePolicy.EnsureVolumeAsync(scope, executor, cancellationToken))
+            return Failure("trusted_storage", "The app workspace volume is missing or has invalid ownership labels.");
 
         string hostAddress;
         try { hostAddress = HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress(); }
@@ -32,7 +29,6 @@ public sealed partial class HostContainerExecutionService
         var args = new List<string>
         {
             "docker", "create", "--name", name, "--network", "bridge",
-            "--cgroup-parent", HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId),
             "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--publish", $"{FormatPublishAddress(hostAddress)}::{request.ContainerPort}",
             "--mount", VolumeMount(volume,
@@ -42,6 +38,8 @@ public sealed partial class HostContainerExecutionService
                 RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, request.Storage!.DataDirectory),
                 "/automaton/data", readOnly: false)
         };
+        HostContainerResourcePolicy.AddCgroupParent(args, scope);
+        HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
         if (request.User is not null)
         {
             args.Add("--user");
@@ -217,15 +215,24 @@ public sealed partial class HostContainerExecutionService
         Dictionary<string, string> labels)
         => new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
 
-    private static Dictionary<string, string> RuntimeLabels(HostContainerScope scope) => new(StringComparer.Ordinal)
+    private static Dictionary<string, string> RuntimeLabels(HostContainerScope scope)
     {
-        ["com.automaton.managed"] = "true",
-        ["com.automaton.runtime-kind"] = "generic",
-        ["com.automaton.app-id"] = scope.AppId.ToString(),
-        ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString(),
-        ["com.automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString(),
-        ["com.automaton.runner-host-id"] = scope.RunnerHostId.ToString()
-    };
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["com.automaton.managed"] = "true",
+            ["com.automaton.runtime-kind"] = "generic",
+            ["com.automaton.app-id"] = scope.AppId.ToString(),
+            ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString()
+        };
+        if (scope.MachineRunnerId != Guid.Empty)
+            labels["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString();
+        else
+        {
+            labels["com.automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString();
+            labels["com.automaton.runner-host-id"] = scope.RunnerHostId.ToString();
+        }
+        return labels;
+    }
 
     private static string VolumeMount(string volume, string subpath, string target, bool readOnly)
         => string.Join(',', new[] { "type=volume", $"source={volume}", $"target={target}", $"volume-subpath={subpath}", "volume-nocopy" }

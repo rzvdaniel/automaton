@@ -31,12 +31,20 @@ public sealed record HostContainerScope(
     Guid RunnerHostId,
     Guid AppId,
     Guid DeploymentTargetId,
-    Guid DeploymentAttemptId = default);
+    Guid DeploymentAttemptId = default,
+    Guid MachineRunnerId = default);
 
 public sealed record HostContainerResourceRef(
     string SourceKind,
     string ArtifactKind,
     string DataKind);
+
+public sealed record HostContainerResourceLimits(decimal CpuLimitCores, int MemoryLimitMb, int PidsLimit)
+{
+    public bool IsValid() => CpuLimitCores is >= 0.10m and <= 8.0m
+        && MemoryLimitMb is >= 256 and <= 16_384
+        && PidsLimit is >= 32 and <= 4096;
+}
 
 public sealed record HostContainerExecutionRequest
 {
@@ -53,6 +61,7 @@ public sealed record HostContainerExecutionRequest
     public int HostPort { get; init; }
     public int TimeoutSeconds { get; init; } = 900;
     public HostContainerResourceRef? Resources { get; init; }
+    public HostContainerResourceLimits? ContainerLimits { get; init; }
     public int? SharedMemoryMb { get; init; }
     public int? DockerLogMaxSizeMb { get; init; }
     public int? DockerLogMaxFiles { get; init; }

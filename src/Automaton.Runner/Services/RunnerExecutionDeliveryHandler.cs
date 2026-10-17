@@ -6,7 +6,8 @@ namespace Automaton.Runner.Console.Services;
 internal sealed class RunnerExecutionDeliveryHandler(
     RunnerExecutionProcessor processor,
     IRuntimeTunnelReconnectRequester tunnelReconnect,
-    RunnerFileTransferExecutor? fileTransfers = null)
+    RunnerFileTransferExecutor? fileTransfers = null,
+    HostContainerBuildCleanupService? buildCleanup = null)
 {
     internal async Task<bool> HandleAsync(ReadOnlyMemory<byte> body, string? messageId, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
@@ -65,8 +66,17 @@ internal sealed class RunnerExecutionDeliveryHandler(
             ? await processor.CancelAsync(command.OperationId, token)
             : await ExecuteAsync(command, assignment, api, token);
         await api.SubmitAsync(command.OperationId, result, token);
+        await CleanupBuildAfterResultAsync(assignment);
         processor.Forget(command.OperationId);
         return true;
+    }
+
+    private Task CleanupBuildAfterResultAsync(RunnerExecutionAssignment assignment)
+    {
+        if (buildCleanup is null
+            || assignment.Request?.HostContainer is not { Operation: HostContainerOperationKinds.RunBuild } request)
+            return Task.CompletedTask;
+        return buildCleanup.CleanupAfterResultAsync(request);
     }
 
     private static async Task RejectKnownAsync(Guid id, RunnerExecutionApiClient api, CancellationToken token)
