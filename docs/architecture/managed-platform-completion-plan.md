@@ -1,6 +1,6 @@
 # Managed platform completion plan
 
-> Historical assessment: the current execution order and milestone status are maintained in the [hosting and platform completion roadmap](../roadmap/managed-platform-completion-plan.md). The assessment below is retained as its original source-review baseline; it does not describe the latest rollout status.
+> Historical assessment: this source-review baseline predates the [current self-hosted roadmap](../roadmap/README.md), which changes the product direction and milestone order. This document is retained as historical context and does not describe the current execution order or rollout status.
 
 ## Assessment baseline
 
