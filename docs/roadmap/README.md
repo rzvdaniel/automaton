@@ -16,7 +16,7 @@ This is the only active roadmap. It supersedes the staged master plan, archived 
 
 Existing Automaton already deploys and serves apps, runs Actions, routes traffic and groups account containers with resource controls. Infrastructure and Hosted Runners use the same executable, but differ in permissions, assignment, provisioning, storage and execution paths. Combining their names or registrations would leave that duplication and its security implications intact.
 
-At PR preparation, remote `main` is `f8cd9985`. The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes in `649761f6`, reconciled onto current main while retaining its roadmap, repository guidance, Symphony cleanup and unrelated shared DbContext cleanup. This PR removes Node API and executable code, persistence models and migration files, project/test wiring, and Node-specific documentation. It adds no Runner behavior. The resulting source revision is recorded in this PR.
+The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes from `649761f6`, reconciled with current main by PR #391. Its reviewed head was `489a4004d5f79a72f78e5982634a7cedb3fe25e3`; it merged as `bb12bf68f36b1b271f4ebfe6986add1ad190e125`. It removed the abandoned Node implementation and retained the roadmap, repository guidance, approved Symphony cleanup and shared DbContext cleanup. It added no Runner behavior. The [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) is based on that merged source.
 
 The source model and EF snapshot return to the pre-Node shape, but source changes do not reverse SQL already applied to a database. The removed migrations are `20261012183817_AddNodeEnrollmentAuthentication` and `20261013095351_AddNodeActivationPersistence`. Before deploying this source, inspect each target database's `__EFMigrationsHistory`. If either migration was applied, deployment requires a reviewed forward-only compatibility or cleanup plan; deleting migration files does not undo their schema changes. This PR does not inspect production or change any database, so migration status remains a release limitation.
 
@@ -87,7 +87,7 @@ All four milestones are pending. Deliver cohesive working changes; use several P
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
-Prerequisite: merge the source-baseline PR so implementation starts from the reconciled tree. Inspect the existing web deployment, Action and storage paths together before changing ownership. Database migration inventory is required before release, but does not block isolated implementation work.
+Prerequisite: use the reconciled source baseline from PR #391. Inspect the existing web deployment, Action and storage paths together before changing ownership. Database migration inventory is required before release, but does not block isolated implementation work. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for the verified source trace, implementation sequence and focused acceptance evidence.
 
 - Establish machine/workspace/app assignment and capacity ownership without allocating a per-user Hosted Runner. Preserve existing API authorization and durable operation semantics.
 - Implement a complete API-to-Runner web deployment on ext4: build or pull, create/start, health/readiness, routing, logs, stop/update and explicit persistent data.
