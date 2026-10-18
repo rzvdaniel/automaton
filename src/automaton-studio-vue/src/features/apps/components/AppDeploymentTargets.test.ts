@@ -226,6 +226,24 @@ describe('AppDeploymentTargets', () => {
     expect(card.text()).not.toContain('Privileged access')
   })
 
+  it('identifies Machine Management deployments and explains the Action limitation', async () => {
+    const machine = target({
+      runner: {
+        id: 'machine-runner',
+        name: 'Machine Runner',
+        purpose: 'Managed',
+        applicationProfile: 'MachineManagement',
+        isHostedRunner: false,
+        isOnline: true,
+      },
+    })
+    const wrapper = await mountTargets([machine])
+
+    expect(wrapper.text()).toContain('Self-hosted · Machine Management')
+    expect(wrapper.text()).toContain('Packages containing Actions are not supported yet')
+    expect(wrapper.text()).toContain('automaton deploy live')
+  })
+
   it('retains privileged access metadata when a privileged environment is Live', async () => {
     const livePrivileged = target({
       runner: {

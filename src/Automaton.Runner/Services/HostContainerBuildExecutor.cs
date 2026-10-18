@@ -75,7 +75,9 @@ internal sealed class HostContainerBuildExecutor(
         string image)
     {
         var args = new List<string> { "docker", "run", "--name", container, "--network", "bridge",
-            "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
+            // The Runner image creates its non-root automaton account with uid/gid 1000.
+            // Build output must remain removable by the Runner after the isolated build exits.
+            "--user", "1000:1000", "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
             "--label", "automaton.managed=true", "--label", "automaton.runtime-kind=build",
             "--label", $"automaton.app-id={scope.AppId:N}",
             "--label", $"automaton.deployment-target-id={scope.DeploymentTargetId:N}",

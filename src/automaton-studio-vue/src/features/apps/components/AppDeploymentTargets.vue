@@ -61,6 +61,7 @@ const selectedRunnerIsPrivileged = computed(() =>
   isPrivilegedSelfHostedRunner(selectedRunner.value)
 )
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
+const hasMachineManagementTarget = computed(() => targets.value.some(isMachineManagementTarget))
 const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
 const additionalTargets = computed(() => targets.value.filter((target) => !target.isDefault))
 const hostedRunners = computed(() => runners.value.filter((runner) => runner.isHostedRunner))
@@ -307,9 +308,16 @@ function isPrivilegedTarget(target: AppDeploymentTarget): boolean {
   )
 }
 
+function isMachineManagementTarget(target: AppDeploymentTarget): boolean {
+  return target.runner?.applicationProfile === 'MachineManagement'
+}
+
 function destinationLabel(target: AppDeploymentTarget): string {
   if (!target.runner) return 'No runtime assigned'
-  return target.runner.isHostedRunner ? 'Automaton Hosted' : 'Self-hosted'
+  if (target.runner.isHostedRunner) return 'Automaton Hosted'
+  if (isMachineManagementTarget(target)) return 'Self-hosted · Machine Management'
+  if (target.runner.applicationProfile === 'PrivilegedHost') return 'Self-hosted · Privileged Host'
+  return 'Self-hosted · Standard'
 }
 
 function runtimeTransport(target: AppDeploymentTarget): string {
@@ -488,6 +496,9 @@ watch(() => props.refreshRevision, load)
       <p class="source-deploy-guidance">
         Deploy source changes from your local project with Automaton CLI. Studio manages environments and runtime operations here.
       </p>
+      <Message v-if="hasMachineManagementTarget" severity="info" :closable="false">
+        Machine Management targets deploy web apps through bounded containers. Packages containing Actions are not supported yet; Action dependency preparation and execution remain disabled on this Runner.
+      </Message>
       <section class="target-group">
         <div class="target-group__heading">
           <h3>Live environment</h3>

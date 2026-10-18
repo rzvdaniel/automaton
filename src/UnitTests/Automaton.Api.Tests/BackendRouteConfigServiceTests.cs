@@ -268,10 +268,10 @@ public class BackendRouteConfigServiceTests
         dbContext.Runners.Add(new Runner
         {
             Id = runnerId,
-            Name = "Privileged host",
+            Name = "Machine management",
             Status = "connected",
             Purpose = "Managed",
-            ApplicationProfile = "PrivilegedHost"
+            ApplicationProfile = "MachineManagement"
         });
         dbContext.WebApps.Add(new WebApp
         {

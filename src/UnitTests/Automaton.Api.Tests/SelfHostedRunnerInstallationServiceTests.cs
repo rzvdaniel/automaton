@@ -123,8 +123,20 @@ public sealed class SelfHostedRunnerInstallationServiceTests
                 $"--label automaton.installation-id='{response.InstallationId}'"));
             Assert.That(response.InstallationCommand, Does.Contain(
                 "docker volume create --label automaton.managed=true --label automaton.resource=machine-workspace-volume"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker run --rm --user 0:0 -v '/opt/automaton/self-hosted-runners/" +
+                response.InstallationId + ":/app/config' --entrypoint chown \"$resolved_image\" automaton:automaton /app/config"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker_socket_gid=$(stat -c '%g' /var/run/docker.sock)"));
+            Assert.That(response.InstallationCommand, Does.Contain("--group-add \"$docker_socket_gid\""));
             Assert.That(response.InstallationCommand, Does.Contain("volume:/automaton/storage"));
             Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                $"runtime_network='automaton-self-hosted-{response.InstallationId}-runtime'"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\""));
+            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\""));
+            Assert.That(response.InstallationCommand, Does.Contain("--network \"$runtime_network\""));
             Assert.That(response.InstallationCommand, Does.Not.Contain("--privileged"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("/:/host"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));

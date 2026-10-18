@@ -562,6 +562,45 @@ internal static class DeploymentOperationTestScenarios
 
 internal static class DeploymentAcceptanceTestScenarios
 {
+    public static async Task AssertViewerCannotDeployAsync(
+        ApplicationDeploymentServiceTests.DeploymentFixture fixture)
+    {
+        await SetViewerMembershipAsync(fixture);
+
+        var acceptance = DeploymentAcceptanceServiceFactory.Create(fixture);
+        var exception = Assert.ThrowsAsync<KeyNotFoundException>(() => acceptance.Operations.AcceptAsync(
+            fixture.AppId,
+            fixture.OwnerId,
+            fixture.Target.Slug,
+            fixture.CreatePackage(hasRuntime: true),
+            clean: false,
+            CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("permission to deploy"));
+            Assert.That(fixture.Db.DeploymentOperations, Is.Empty);
+        });
+    }
+
+    private static async Task SetViewerMembershipAsync(
+        ApplicationDeploymentServiceTests.DeploymentFixture fixture)
+    {
+        var projectId = Guid.NewGuid();
+        var app = await fixture.Db.WebApps.SingleAsync(item => item.Id == fixture.AppId);
+        app.ProjectId = projectId;
+        fixture.Db.ProjectApps.Add(new ProjectApp { ProjectId = projectId, WebAppId = fixture.AppId });
+        fixture.Db.ProjectMembers.Add(new ProjectMember
+        {
+            ProjectId = projectId,
+            UserId = fixture.OwnerId,
+            Role = ProjectRole.Viewer,
+            IsActive = true
+        });
+        fixture.Db.WebAppUsers.RemoveRange(fixture.Db.WebAppUsers.Where(item => item.WebAppId == fixture.AppId));
+        await fixture.Db.SaveChangesAsync();
+    }
+
     public static async Task<AcceptanceSnapshot> AcceptPackageAsync(
         ApplicationDeploymentServiceTests.DeploymentFixture fixture)
     {

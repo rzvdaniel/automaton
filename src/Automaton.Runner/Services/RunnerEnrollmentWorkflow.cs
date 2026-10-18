@@ -165,6 +165,13 @@ internal sealed class RunnerEnrollmentWorkflow
         ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", profile.ApplicationProfile);
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID", profile.InstallationId);
+
+        var runnerId = storageService.GetRunnerId();
+        Environment.SetEnvironmentVariable(
+            "AUTOMATON_RUNNER_ID",
+            Guid.TryParse(runnerId, out var parsedRunnerId) && parsedRunnerId != Guid.Empty
+                ? parsedRunnerId.ToString()
+                : null);
     }
 
     private static void ApplyInstallationProfile(

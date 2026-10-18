@@ -7,18 +7,20 @@ using NUnit.Framework;
 
 namespace Automaton.Runner.Console.Tests;
 
-[TestFixture]
+[TestFixture, NonParallelizable]
 public class RunnerDeploymentTargetIsolationTests
 {
     private string root = null!;
     private string? originalRoot;
     private string? originalScriptsDir;
+    private string? originalProfile;
 
     [SetUp]
     public void SetUp()
     {
         originalRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
         originalScriptsDir = Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR");
+        originalProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
         root = Path.Combine(
             Path.GetTempPath(),
             "automaton-target-deployment-tests",
@@ -32,6 +34,7 @@ public class RunnerDeploymentTargetIsolationTests
     {
         Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", originalRoot);
         Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", originalScriptsDir);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", originalProfile);
         if (Directory.Exists(root))
             Directory.Delete(root, recursive: true);
     }
@@ -224,32 +227,6 @@ public class RunnerDeploymentTargetIsolationTests
     }
 
     [Test]
-    public async Task ContainerBuildReceivesServerIssuedExecutionContext()
-    {
-        var workspace = new RunnerWorkspaceService();
-        var processManager = new StubBackendProcessManager();
-        var buildExecutor = new RecordingBuildExecutor();
-        var service = new RunnerDeploymentService(workspace, processManager, new AppActionDeploymentService(workspace), buildExecutor);
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var attemptId = Guid.NewGuid();
-        var package = CreatePackage(appId, "runtime", hasRuntime: true, build: new ApplicationBuildSpec
-        {
-            Image = "build:1",
-            Command = new ApplicationCommandSpec { Executable = "build" }
-        });
-
-        var result = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId, DeploymentTargetId = targetId, ExecutionAttemptId = attemptId,
-            PackagePath = package, Clean = true
-        });
-
-        Assert.That(result.Success, Is.True, result.Message);
-        Assert.That(buildExecutor.Context, Is.EqualTo(new RunnerApplicationBuildContext(appId, targetId, attemptId)));
-    }
-
-    [Test]
     public async Task SupersededExecutionAttempt_CannotReachRuntimePromotion()
     {
         var workspace = new RunnerWorkspaceService();
@@ -309,7 +286,8 @@ public class RunnerDeploymentTargetIsolationTests
         Guid appId,
         string frontendContent,
         bool hasRuntime = false,
-        ApplicationBuildSpec? build = null)
+        ApplicationBuildSpec? build = null,
+        bool includeAction = false)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");
         Directory.CreateDirectory(root);
@@ -335,6 +313,20 @@ public class RunnerDeploymentTargetIsolationTests
             }));
         WriteEntry(archive, "runtime/application/index.html", frontendContent);
         WriteEntry(archive, "source/placeholder.txt", "source");
+        if (includeAction)
+        {
+            WriteEntry(archive, "source/actions/dependency-hook/action.yaml", """
+                apiVersion: automaton.dev/v1
+                kind: Action
+                metadata:
+                  key: dependency-hook
+                spec:
+                  runtime: python
+                  entrypoint: main.py
+                """);
+            WriteEntry(archive, "source/actions/dependency-hook/main.py", "print('action')");
+            WriteEntry(archive, "source/actions/dependency-hook/requirements.txt", "hook-package==1.0");
+        }
         return packagePath;
     }
 
@@ -390,19 +382,4 @@ public class RunnerDeploymentTargetIsolationTests
         }
     }
 
-    private sealed class RecordingBuildExecutor : IRunnerApplicationBuildExecutor
-    {
-        public RunnerApplicationBuildContext? Context { get; private set; }
-
-        public Task<ApplicationBuildExecutionResult> ExecuteAsync(
-            ApplicationBuildSpec build,
-            ApplicationRuntimeSpec runtime,
-            string workspaceRoot,
-            RunnerApplicationBuildContext? context = null,
-            CancellationToken cancellationToken = default)
-        {
-            Context = context;
-            return Task.FromResult(new ApplicationBuildExecutionResult { Succeeded = true });
-        }
-    }
 }

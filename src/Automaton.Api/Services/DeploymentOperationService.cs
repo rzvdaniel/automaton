@@ -44,8 +44,8 @@ public sealed class DeploymentOperationService(
         if (file is null || file.Length <= 0)
             throw new InvalidOperationException("A deployment package file is required.");
 
-        if (!await authorizationService.CanAccessAppAsync(appId, ownerId, cancellationToken))
-            throw new KeyNotFoundException("App not found.");
+        if (!await authorizationService.CanUpdateAppAsync(appId, ownerId, cancellationToken))
+            throw new KeyNotFoundException("App not found or you do not have permission to deploy it.");
 
         _ = await DeployPackageContractService.ReadAsync(file, appId, cancellationToken);
 

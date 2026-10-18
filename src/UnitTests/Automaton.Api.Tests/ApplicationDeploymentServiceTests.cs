@@ -117,6 +117,13 @@ public sealed class ApplicationDeploymentServiceTests
     }
 
     [Test]
+    public async Task AcceptingPackage_RequiresAppUpdatePermission()
+    {
+        await using var fixture = await DeploymentFixture.CreateAsync();
+        await DeploymentAcceptanceTestScenarios.AssertViewerCannotDeployAsync(fixture);
+    }
+
+    [Test]
     public async Task DeployPackageAsync_PersistsOpaqueGenericSourceFiles()
     {
         await using var fixture = await DeploymentFixture.CreateAsync();
