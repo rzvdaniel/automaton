@@ -53,6 +53,17 @@ Use the existing checkout for Automaton work. Do not create or move work into an
 - Never log or commit credentials, access tokens, API keys, connection strings, or raw secrets.
 - Run the smallest relevant verification after each change. Report unavailable checks exactly.
 
+## Keep implementation simple
+
+- Before substantial work, briefly state the required outcome and what completes the task. Reuse the existing task or roadmap; do not create another plan or report by default.
+- Choose the smallest complete change through existing code paths. Add an abstraction, interface, service, configuration option, or lifecycle state only when a concrete requirement or actual consumers justify it.
+- Do not build speculative provider support, frameworks, compatibility layers, or future milestones. Prioritize a working user flow over disconnected preparation slices.
+- Address concrete security and correctness failures with the simplest effective boundary. Preserve isolation, authorization, data integrity, and recovery guarantees; simplicity does not justify weakening them.
+- Keep validation proportional to the change: run required builds and focused tests of changed behavior and identified failure cases. Broaden or repeat checks only for a specific unresolved concern. Record unavailable checks and agreed deferred acceptance accurately without creating additional gates.
+- Before handoff, review the diff for unnecessary helpers, configuration, documentation, and indirection introduced by the change, and remove what the task does not need.
+- If scope grows substantially, explain the concrete reason and simplest viable approach. Do not silently turn a bounded fix into a redesign or add approval stages for routine implementation choices.
+- When writing implementation prompts, describe the outcome, constraints, concrete failure, and acceptance evidence. Let the implementing agent choose the smallest safe solution; prescribe architecture only when an established contract or verified need requires it. Distinguish required fixes from optional improvements in reviews.
+
 ## Maintainability guardrails
 
 - Before extending a service, identify the feature and responsibility that own the new behavior. Keep application services focused on coordinating use cases; place cohesive business decisions and invariants in their owning object or policy.
