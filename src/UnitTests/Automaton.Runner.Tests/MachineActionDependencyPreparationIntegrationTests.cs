@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
@@ -19,12 +20,45 @@ public sealed class MachineActionDependencyPreparationIntegrationTests
 
     [Test]
     [Platform("Linux")]
+    public async Task RealPythonVirtualEnvironmentLinksArePublishedAndVersionedSafely()
+    {
+        await using var fixture = new MachineActionDependencyPreparationFixture(createVirtualEnvironment: true);
+        var results = await fixture.PrepareAsync();
+
+        var current = fixture.CurrentDirectory;
+        Assert.Multiple(() =>
+        {
+            Assert.That(results.Single().Status, Is.EqualTo("deployed"));
+            AssertPublishedVirtualEnvironment(current);
+            Assert.That(fixture.ListVersions().Versions, Has.Count.EqualTo(1));
+        });
+        fixture.AssertBoundedInstallCommand();
+
+        fixture.UpdateActionSource();
+        Assert.That((await fixture.PrepareAsync()).Single().Status, Is.EqualTo("deployed"));
+        var previous = fixture.ListVersions().Versions.Single(version => !version.IsCurrent);
+        Assert.That(fixture.RestoreVersion(previous.Version).Success, Is.True);
+        AssertPublishedVirtualEnvironment(fixture.CurrentDirectory);
+    }
+
+    private static void AssertPublishedVirtualEnvironment(string current)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(current, ".automaton-action-deployment.json")), Is.True);
+            Assert.That(new FileInfo(Path.Combine(current, ".venv", "bin", "python3")).LinkTarget, Is.Not.Null);
+            Assert.That(new DirectoryInfo(Path.Combine(current, ".venv", "lib64")).LinkTarget, Is.EqualTo("lib"));
+        });
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async Task DependencyHookSymlinkCannotRedirectMetadataWriteOutsideStaging()
     {
         await using var fixture = new MachineActionDependencyPreparationFixture(createMetadataSymlink: true);
 
         Assert.ThrowsAsync<InvalidOperationException>(async () => await fixture.PrepareAsync());
-        Assert.That(File.ReadAllText(fixture.SentinelPath), Is.EqualTo("unchanged sentinel"));
+        Assert.That(await File.ReadAllTextAsync(fixture.SentinelPath), Is.EqualTo("unchanged sentinel"));
     }
 }
 
@@ -40,11 +74,14 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
     private readonly Dictionary<string, string?> priorEnvironment = [];
     private readonly AppActionDeploymentService deployment;
     private readonly bool createMetadataSymlink;
+    private readonly bool createVirtualEnvironment;
+    public string CurrentDirectory => workspace.GetAppActionCurrentDirectory(appId, targetId, ActionKey);
     public string SentinelPath { get; } = Path.Combine(Path.GetTempPath(), $"automaton-action-sentinel-{Guid.NewGuid():N}.txt");
 
-    public MachineActionDependencyPreparationFixture(bool createMetadataSymlink = false)
+    public MachineActionDependencyPreparationFixture(bool createMetadataSymlink = false, bool createVirtualEnvironment = false)
     {
         this.createMetadataSymlink = createMetadataSymlink;
+        this.createVirtualEnvironment = createVirtualEnvironment;
         File.WriteAllText(SentinelPath, "unchanged sentinel");
         SetEnvironment("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
         SetEnvironment("AUTOMATON_RUNNER_PURPOSE", "Managed");
@@ -59,6 +96,17 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
     public Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAsync()
         => deployment.PrepareAllAsync(appId, targetId, containerPolicy: new(
             new HostContainerResourceLimits(1.5m, 1024, 128), 64, 20, 5, "python:3.12-slim"));
+
+    public AppActionVersionsResponse ListVersions() => deployment.ListVersions(appId, targetId, ActionKey);
+
+    public void UpdateActionSource()
+    {
+        var source = Path.Combine(workspace.GetAppSourceRoot(appId, targetId), "actions", ActionKey, "main.py");
+        File.WriteAllText(source, "print('{\"updated\":true}')");
+    }
+
+    public AppActionVersionOperationResponse RestoreVersion(string version)
+        => deployment.RestoreVersion(appId, targetId, ActionKey, version);
 
     public void AssertBoundedInstallCommand()
     {
@@ -82,7 +130,7 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
             machineDependencyPreparer: new MachineActionDependencyPreparer(container));
     }
 
-    private Task<InfrastructureCommandResponse> ExecuteDockerAsync(
+    private async Task<InfrastructureCommandResponse> ExecuteDockerAsync(
         IReadOnlyList<string> arguments,
         TimeSpan timeout,
         CancellationToken cancellationToken)
@@ -96,8 +144,29 @@ internal sealed class MachineActionDependencyPreparationFixture : IAsyncDisposab
             var staging = Directory.GetDirectories(actionRoot, ".staging-*").Single();
             File.CreateSymbolicLink(Path.Combine(staging, ".automaton-action-deployment.json"), SentinelPath);
         }
+        if (createVirtualEnvironment && arguments.Count > 1 && arguments[1] == "run")
+            await CreateVirtualEnvironmentAsync();
         var output = arguments.Contains("volume", StringComparer.Ordinal) ? CreateVolumeLabels() : "{}";
-        return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = output });
+        return new InfrastructureCommandResponse { Success = true, Output = output };
+    }
+
+    private async Task CreateVirtualEnvironmentAsync()
+    {
+        // Create only Python's standard virtual-environment structure; dependency installation
+        // remains represented by the bounded Docker command asserted by this fixture.
+        var actionRoot = workspace.GetAppActionRuntimeRoot(appId, targetId, ActionKey);
+        var staging = Directory.GetDirectories(actionRoot, ".staging-*").Single();
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "python3",
+            ArgumentList = { "-m", "venv", Path.Combine(staging, ".venv") },
+            RedirectStandardError = true,
+            UseShellExecute = false
+        }) ?? throw new InvalidOperationException("Could not start python3 to prepare the virtual-environment fixture.");
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"Could not create the Python virtual-environment fixture: {error}");
     }
 
     private string CreateVolumeLabels()

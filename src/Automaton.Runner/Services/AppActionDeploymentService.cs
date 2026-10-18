@@ -104,7 +104,7 @@ public sealed class AppActionDeploymentService
         {
             var key = Path.GetFileName(directory);
             if (expected.Contains(key)) continue;
-            Directory.Delete(directory, recursive: true);
+            AppActionDeploymentOutputGuard.DeleteTree(directory);
             removed++;
         }
         return removed;
@@ -179,15 +179,16 @@ public sealed class AppActionDeploymentService
         var actionRoot = workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, action.Key);
         var stagingId = Guid.NewGuid();
         var stagingDirectory = workspace.GetAppActionStagingDirectory(appId, deploymentTargetId, action.Key, stagingId);
+        var publishingDirectory = Path.Combine(actionRoot, $".publish-{stagingId:N}");
         Directory.CreateDirectory(actionRoot);
         try
         {
-            AppActionDeploymentOutputGuard.EnsureNoLinks(action.DirectoryPath);
+            AppActionDeploymentOutputGuard.EnsureSafeTree(action.DirectoryPath);
             AppActionSourceFiles.CopyToRuntime(action.DirectoryPath, stagingDirectory);
-            AppActionDeploymentOutputGuard.EnsureNoLinks(stagingDirectory);
+            AppActionDeploymentOutputGuard.EnsureSafeTree(stagingDirectory);
             var entrypoint = Path.GetFullPath(Path.Combine(stagingDirectory, action.Manifest.Spec.Entrypoint));
             AppActionSourceFiles.EnsureInside(stagingDirectory, entrypoint);
-            if (!File.Exists(entrypoint))
+            if (AppActionDeploymentOutputGuard.IsLink(entrypoint) || !File.Exists(entrypoint))
                 throw new InvalidOperationException($"Action '{action.Key}' entrypoint '{action.Manifest.Spec.Entrypoint}' does not exist.");
 
             if (action.Manifest.Spec.Runtime == AppActionRuntimes.Python)
@@ -203,8 +204,9 @@ public sealed class AppActionDeploymentService
                     await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
             }
 
+            AppActionDeploymentOutputGuard.CopyValidatedTree(stagingDirectory, publishingDirectory);
             await versionStore.PublishAsync(appId, deploymentTargetId, action.Key,
-                stagingDirectory, contentHash, cancellationToken);
+                publishingDirectory, contentHash, cancellationToken);
             return new AppActionDeploymentResult
             {
                 ActionKey = action.Key,
@@ -220,8 +222,8 @@ public sealed class AppActionDeploymentService
         }
         finally
         {
-            if (Directory.Exists(stagingDirectory))
-                Directory.Delete(stagingDirectory, recursive: true);
+            AppActionDeploymentOutputGuard.DeleteTree(stagingDirectory);
+            AppActionDeploymentOutputGuard.DeleteTree(publishingDirectory);
         }
     }
 
