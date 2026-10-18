@@ -166,6 +166,7 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_RUNNER_PURPOSE={Quote(RunnerPurposes.Managed)}",
             $"-e AUTOMATON_RUNNER_APPLICATION_PROFILE={Quote(enrollment.ApplicationProfile)}",
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
+            (isMachineManagement ? "--group-add \"$docker_socket_gid\"" : string.Empty),
             (requiresRuntimeNetwork ? "--network \"$runtime_network\"" : string.Empty),
             (requiresRuntimeNetwork ? "-e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\"" : string.Empty),
             (isMachineManagement ? "-e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,ManagedContainerExecution" : string.Empty),
@@ -247,7 +248,12 @@ public sealed class SelfHostedRunnerInstallationService(
                 $"-v {Quote(configDirectory + ":/app/config")} --entrypoint chown \"$resolved_image\" automaton:automaton /app/config; then",
                 "  echo 'The Machine Management Runner config directory could not be prepared.' >&2",
                 "  exit 1",
-                "fi")
+                "fi",
+                "if ! docker_socket_gid=$(stat -c '%g' /var/run/docker.sock) || [ -z \"$docker_socket_gid\" ]; then",
+                "  echo 'The Docker socket group could not be resolved for the Machine Management Runner.' >&2",
+                "  exit 1",
+                "fi",
+                "case \"$docker_socket_gid\" in *[!0-9]*) echo 'The Docker socket group is invalid.' >&2; exit 1 ;; esac")
             : string.Empty;
 
     private static string BuildNetworkSetupCommands(

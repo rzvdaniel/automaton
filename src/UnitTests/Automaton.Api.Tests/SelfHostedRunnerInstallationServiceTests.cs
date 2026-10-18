@@ -126,6 +126,9 @@ public sealed class SelfHostedRunnerInstallationServiceTests
             Assert.That(response.InstallationCommand, Does.Contain(
                 "docker run --rm --user 0:0 -v '/opt/automaton/self-hosted-runners/" +
                 response.InstallationId + ":/app/config' --entrypoint chown \"$resolved_image\" automaton:automaton /app/config"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker_socket_gid=$(stat -c '%g' /var/run/docker.sock)"));
+            Assert.That(response.InstallationCommand, Does.Contain("--group-add \"$docker_socket_gid\""));
             Assert.That(response.InstallationCommand, Does.Contain("volume:/automaton/storage"));
             Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
             Assert.That(response.InstallationCommand, Does.Contain(
