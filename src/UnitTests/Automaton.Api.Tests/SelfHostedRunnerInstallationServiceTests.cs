@@ -123,6 +123,9 @@ public sealed class SelfHostedRunnerInstallationServiceTests
                 $"--label automaton.installation-id='{response.InstallationId}'"));
             Assert.That(response.InstallationCommand, Does.Contain(
                 "docker volume create --label automaton.managed=true --label automaton.resource=machine-workspace-volume"));
+            Assert.That(response.InstallationCommand, Does.Contain(
+                "docker run --rm --user 0:0 -v '/opt/automaton/self-hosted-runners/" +
+                response.InstallationId + ":/app/config' --entrypoint chown \"$resolved_image\" automaton:automaton /app/config"));
             Assert.That(response.InstallationCommand, Does.Contain("volume:/automaton/storage"));
             Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
             Assert.That(response.InstallationCommand, Does.Contain(

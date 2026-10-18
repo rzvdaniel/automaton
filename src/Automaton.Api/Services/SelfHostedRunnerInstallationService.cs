@@ -200,7 +200,7 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
-            BuildMachineWorkspaceSetupCommands(isMachineManagement, machineWorkspaceVolume, enrollment.InstallationId),
+            BuildMachineWorkspaceSetupCommands(isMachineManagement, machineWorkspaceVolume, enrollment.InstallationId, root),
             BuildNetworkSetupCommands(requiresRuntimeNetwork, isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
             "  echo \"Runner container $container_name could not be created or started.\" >&2",
@@ -233,13 +233,19 @@ public sealed class SelfHostedRunnerInstallationService(
     private static string BuildMachineWorkspaceSetupCommands(
         bool isMachineManagement,
         string volumeName,
-        string installationId)
+        string installationId,
+        string configDirectory)
         => isMachineManagement
             ? string.Join('\n',
                 $"machine_workspace_volume={Quote(volumeName)}",
                 "if ! docker volume create --label automaton.managed=true --label automaton.resource=machine-workspace-volume " +
                 $"--label automaton.installation-id={Quote(installationId)} --label automaton.storage-scope=workspace \"$machine_workspace_volume\" >/dev/null; then",
                 "  echo 'The shared Machine Management workspace volume could not be created.' >&2",
+                "  exit 1",
+                "fi",
+                "if ! docker run --rm --user 0:0 " +
+                $"-v {Quote(configDirectory + ":/app/config")} --entrypoint chown \"$resolved_image\" automaton:automaton /app/config; then",
+                "  echo 'The Machine Management Runner config directory could not be prepared.' >&2",
                 "  exit 1",
                 "fi")
             : string.Empty;
