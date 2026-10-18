@@ -17,4 +17,6 @@ public sealed class InfrastructureCommandResponse
     public int ExitStatus { get; init; }
     public string Output { get; init; } = string.Empty;
     public string Error { get; init; } = string.Empty;
+    public bool OutputExceededLimit { get; init; }
+    public bool ErrorTruncated { get; init; }
 }

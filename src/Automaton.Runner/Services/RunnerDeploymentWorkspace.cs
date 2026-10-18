@@ -64,6 +64,23 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
             CopyDirectory(runtime, workspace.GetAppArtifactsRoot(appId, deploymentTargetId));
     }
 
+    public void RestoreActionRoots(Guid appId, Guid deploymentTargetId, string? snapshotPath)
+    {
+        var sourceActions = workspace.GetAppSourceActionsDirectory(appId, deploymentTargetId);
+        var runtimeActions = workspace.GetAppRuntimeActionsDirectory(appId, deploymentTargetId);
+        DeleteDirectoryIfExists(sourceActions);
+        DeleteDirectoryIfExists(runtimeActions);
+        if (snapshotPath is null) return;
+
+        CopySnapshotDirectory(Path.Combine(snapshotPath, "source", "actions"), sourceActions);
+        CopySnapshotDirectory(Path.Combine(snapshotPath, "artifacts", "current", "actions"), runtimeActions);
+    }
+
+    private static void CopySnapshotDirectory(string source, string destination)
+    {
+        if (Directory.Exists(source)) CopyDirectory(source, destination);
+    }
+
     public static void ValidateIncomingActions(string extractRoot, bool allowPrivilegedCapabilities)
     {
         var sourceRoot = Path.Combine(extractRoot, "source");

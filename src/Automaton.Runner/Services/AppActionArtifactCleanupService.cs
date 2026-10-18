@@ -12,6 +12,7 @@ public sealed class AppActionArtifactCleanupService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await executions.CleanupInterruptedActionContainersAsync(stoppingToken);
         Cleanup();
         using var timer = new PeriodicTimer(Interval);
         while (await timer.WaitForNextTickAsync(stoppingToken))

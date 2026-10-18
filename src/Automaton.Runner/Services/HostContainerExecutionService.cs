@@ -14,6 +14,7 @@ public sealed partial class HostContainerExecutionService
 {
     private readonly Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor;
     private readonly HostContainerBuildExecutor buildExecutor;
+    private readonly HostContainerActionExecutor actionExecutor;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
         : this((arguments, timeout, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, timeout, cancellationToken))
@@ -25,6 +26,7 @@ public sealed partial class HostContainerExecutionService
     {
         this.executor = executor;
         buildExecutor = new HostContainerBuildExecutor(executor);
+        actionExecutor = new HostContainerActionExecutor(executor, new RunnerWorkspaceService());
     }
 
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
@@ -34,7 +36,8 @@ public sealed partial class HostContainerExecutionService
         var validationFailure = ValidateRequest(request);
         if (validationFailure is not null) return validationFailure;
 
-        if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer)
+        if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction)
             && !HasTrustedResources(request.Resources))
             return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
 
@@ -46,6 +49,11 @@ public sealed partial class HostContainerExecutionService
 
         if (request.Operation == HostContainerOperationKinds.RunBuild)
             return await buildExecutor.ExecuteAsync(request, cancellationToken);
+
+        if (request.Operation is HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction)
+            return await actionExecutor.ExecuteAsync(request, cancellationToken);
+        if (request.Operation == HostContainerOperationKinds.RemoveActionContainer)
+            return await actionExecutor.RemoveAsync(request, cancellationToken);
 
         var error = HostContainerRuntimeValidation.Validate(request);
         if (error is not null)
@@ -67,7 +75,8 @@ public sealed partial class HostContainerExecutionService
 
     private static HostContainerExecutionResponse? ValidateRuntimeLimits(HostContainerExecutionRequest request)
     {
-        if (request.Operation is not (HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer))
+        if (request.Operation is not (HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction))
             return null;
 
         return request.SharedMemoryMb is >= 16 and <= 1024
@@ -107,6 +116,9 @@ public sealed partial class HostContainerExecutionService
             or HostContainerOperationKinds.GetContainerLogs
             or HostContainerOperationKinds.RemoveContainer
             or HostContainerOperationKinds.RemoveTargetContainers
+            or HostContainerOperationKinds.PrepareActionDependencies
+            or HostContainerOperationKinds.ExecuteAction
+            or HostContainerOperationKinds.RemoveActionContainer
                 ? null
                 : Failure("operation", "The host-container operation is not supported.");
 

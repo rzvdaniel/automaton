@@ -56,7 +56,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         Action ensureAttemptIsCurrent)
     {
         var manifest = PreparePackage(attempt, request);
-        EnsureMachineActionPreparationIsUnavailable(attempt.StagingRoot);
+        actionDeploymentService.EnsureMachineActionPreparationAvailable(
+            Path.Combine(attempt.StagingRoot, "source"), request.ActionContainerPolicy);
         attempt.PreserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
         var buildResult = await BuildApplicationAsync(attempt, request, manifest.Application, cancellationToken);
         attempt.Logs.AddRange(buildResult.Logs);
@@ -64,6 +65,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         ensureAttemptIsCurrent();
         attempt.SnapshotPath = deploymentWorkspace.CreateSnapshotIfNeeded(attempt.AppId, attempt.TargetId);
         await CleanPreviousDeploymentAsync(attempt, request, manifest.Application);
+        attempt.ActionRootsChanged = true;
         var (sourceCount, runtimeCount, candidate) = CopyPackageFiles(attempt, manifest.Application);
         attempt.CandidateRuntimeRoot = candidate.RuntimeRoot;
         attempt.CandidateArtifactRoot = candidate.ArtifactRoot;
@@ -110,20 +112,6 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         var manifest = RunnerDeploymentWorkspace.LoadManifest(attempt.StagingRoot, attempt.AppId);
         RunnerDeploymentWorkspace.ValidateIncomingActions(attempt.StagingRoot, request.SystemInfrastructure);
         return manifest;
-    }
-
-    private static void EnsureMachineActionPreparationIsUnavailable(string stagingRoot)
-    {
-        if (RunnerApplicationProfiles.Normalize(
-                Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
-            != RunnerApplicationProfiles.MachineManagement)
-            return;
-
-        var incomingActions = AppActionManifestParser.Discover(
-            Path.Combine(stagingRoot, "source"), allowPrivilegedCapabilities: false);
-        if (incomingActions.Count > 0)
-            throw new InvalidOperationException(
-                "Deployment includes Actions, but Action dependency preparation is disabled on a Machine Management Runner until isolated preparation is available.");
     }
 
     private async Task<ApplicationBuildExecutionResult> BuildApplicationAsync(
@@ -213,7 +201,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         CancellationToken cancellationToken)
     {
         var actions = await actionDeploymentService.PrepareAllAsync(
-            attempt.AppId, attempt.TargetId, request.SystemInfrastructure, cancellationToken);
+            attempt.AppId, attempt.TargetId, request.SystemInfrastructure, cancellationToken,
+            request.ActionContainerPolicy);
         attempt.Logs.AddRange(actions.Select(result => $"Action {result.ActionKey}: {result.Status}."));
         return actions;
     }
@@ -258,7 +247,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         DeployAppPackageRequest request,
         Exception exception)
     {
-        if (attempt.SnapshotPath is not null)
+        if (attempt.SnapshotPath is not null || attempt.ActionRootsChanged)
         {
             RestoreAfterFailure(attempt);
         }
@@ -275,16 +264,33 @@ internal sealed class RunnerApplicationDeploymentExecutor(
 
     private void RestoreAfterFailure(DeploymentAttempt attempt)
     {
+        if (attempt.SnapshotPath is { } snapshotPath)
+        {
+            try
+            {
+                deploymentWorkspace.RestoreSnapshot(
+                    attempt.AppId, attempt.TargetId, snapshotPath, restoreRuntime: !attempt.PreserveCurrentRuntime);
+                attempt.Logs.Add("Deployment failed; the previous App snapshot was restored.");
+            }
+            catch (Exception restoreException)
+            {
+                logger.Error(restoreException, "Failed to restore App snapshot after deployment failure for {AppId}", attempt.AppId);
+                attempt.Logs.Add("Deployment failed and automatic snapshot restoration also failed.");
+            }
+        }
+        if (attempt.ActionRootsChanged) RestoreActionRootsAfterFailure(attempt);
+    }
+
+    private void RestoreActionRootsAfterFailure(DeploymentAttempt attempt)
+    {
         try
         {
-            deploymentWorkspace.RestoreSnapshot(
-                attempt.AppId, attempt.TargetId, attempt.SnapshotPath!, restoreRuntime: !attempt.PreserveCurrentRuntime);
-            attempt.Logs.Add("Deployment failed; the previous App snapshot was restored.");
+            deploymentWorkspace.RestoreActionRoots(attempt.AppId, attempt.TargetId, attempt.SnapshotPath);
         }
         catch (Exception restoreException)
         {
-            logger.Error(restoreException, "Failed to restore App snapshot after deployment failure for {AppId}", attempt.AppId);
-            attempt.Logs.Add("Deployment failed and automatic snapshot restoration also failed.");
+            logger.Error(restoreException, "Failed to restore Action files after deployment failure for app {AppId}", attempt.AppId);
+            attempt.Logs.Add("Deployment failed and automatic Action restoration also failed.");
         }
     }
 
@@ -312,6 +318,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         public Guid? RuntimeCandidateId { get; set; }
         public bool CandidatePromoted { get; set; }
         public bool PreserveCurrentRuntime { get; set; }
+        public bool ActionRootsChanged { get; set; }
     }
 
     private sealed record RuntimeCandidate(Guid? Id, string? RuntimeRoot, string? ArtifactRoot);

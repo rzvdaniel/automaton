@@ -113,7 +113,8 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
                     Clean = command.Clean,
                     DeploymentOperationId = command.DeploymentOperationId,
                     ExecutionAttemptId = command.ExecutionAttemptId,
-                    SystemInfrastructure = command.SystemInfrastructure
+                    SystemInfrastructure = command.SystemInfrastructure,
+                    ActionContainerPolicy = command.ActionContainerPolicy
                 });
             return new() { Success = deployment.Success, Error = deployment.Message, Deployment = deployment };
         }

@@ -18,6 +18,8 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<HostedRunnerInvalidCommandRecovery>();
         services.AddSingleton<HostedRunnerDeploymentCommandQueueConsumer>();
         services.AddSingleton<HostContainerExecutionService>();
+        services.AddSingleton<MachineActionDependencyPreparer>();
+        services.AddSingleton<MachineActionExecutionHandler>();
         services.AddSingleton<HostContainerBuildCleanupService>();
         services.AddSingleton<HostContainerExecutionApiClient>();
         services.AddSingleton<TunnelForwarderService>();

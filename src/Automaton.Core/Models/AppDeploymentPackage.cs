@@ -16,6 +16,7 @@ public sealed class DeployAppPackageRequest
     public bool SystemInfrastructure { get; set; }
     public Guid? DeploymentOperationId { get; set; }
     public Guid? ExecutionAttemptId { get; set; }
+    public ActionContainerPolicy? ActionContainerPolicy { get; set; }
 }
 
 public sealed class DeployAppPackageResult

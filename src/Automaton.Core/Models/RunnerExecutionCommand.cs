@@ -78,7 +78,8 @@ public sealed record RunnerFileTransferCommand(
     bool Clean = false,
     Guid? DeploymentOperationId = null,
     Guid? ExecutionAttemptId = null,
-    bool SystemInfrastructure = false);
+    bool SystemInfrastructure = false,
+    ActionContainerPolicy? ActionContainerPolicy = null);
 
 public sealed class RunnerFileTransferResult
 {

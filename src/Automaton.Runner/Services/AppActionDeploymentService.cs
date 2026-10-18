@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Serilog;
@@ -7,16 +6,20 @@ namespace Automaton.Runner.Console.Services;
 
 public sealed class AppActionDeploymentService
 {
-    private const string DeploymentMetadataFileName = ".automaton-action-deployment.json";
     private readonly RunnerWorkspaceService workspace;
     private readonly AppActionExecutionCoordinator coordinator;
     private readonly ILogger logger = Log.ForContext<AppActionDeploymentService>();
     private readonly AppActionVersionStore versionStore;
+    private readonly MachineActionDependencyPreparer? machineDependencyPreparer;
 
-    public AppActionDeploymentService(RunnerWorkspaceService workspace, AppActionExecutionCoordinator? coordinator = null)
+    public AppActionDeploymentService(
+        RunnerWorkspaceService workspace,
+        AppActionExecutionCoordinator? coordinator = null,
+        MachineActionDependencyPreparer? machineDependencyPreparer = null)
     {
         this.workspace = workspace;
         this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
+        this.machineDependencyPreparer = machineDependencyPreparer;
         versionStore = new AppActionVersionStore(workspace);
     }
 
@@ -24,21 +27,36 @@ public sealed class AppActionDeploymentService
         Guid appId,
         Guid deploymentTargetId,
         bool allowPrivilegedCapabilities = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ActionContainerPolicy? containerPolicy = null)
     {
         if (allowPrivilegedCapabilities && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")) != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
             throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
         var actions = AppActionManifestParser.Discover(
             workspace.GetAppSourceRoot(appId, deploymentTargetId),
             allowPrivilegedCapabilities);
+        if (actions.Count > 0) EnsureMachineActionPreparationAvailable(
+            workspace.GetAppSourceRoot(appId, deploymentTargetId), containerPolicy);
 
         var results = new List<AppActionDeploymentResult>(actions.Count);
         foreach (var action in actions)
         {
-            results.Add(await PrepareAsync(appId, deploymentTargetId, action, cancellationToken));
+            results.Add(await PrepareAsync(appId, deploymentTargetId, action, cancellationToken,
+                containerPolicy));
         }
 
         return results;
+    }
+
+    internal void EnsureMachineActionPreparationAvailable(string sourceRoot, ActionContainerPolicy? policy)
+    {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            != RunnerApplicationProfiles.MachineManagement)
+            return;
+        if (AppActionManifestParser.Discover(sourceRoot, allowPrivilegedCapabilities: false).Count == 0) return;
+        if (machineDependencyPreparer is null)
+            throw new InvalidOperationException("Bounded Action dependency preparation is unavailable on this Machine Management Runner.");
+        MachineActionDependencyPreparer.EnsurePolicy(policy);
     }
 
     public AppActionModulesResponse ListModules(Guid appId, Guid deploymentTargetId)
@@ -70,7 +88,8 @@ public sealed class AppActionDeploymentService
     }
 
     public Task<AppActionDeploymentResult> PrepareModuleAsync(PrepareAppActionModuleRequest request, CancellationToken cancellationToken)
-        => AppActionModuleSourcePreparer.PrepareAsync(request, cancellationToken, PrepareAsync);
+        => AppActionModuleSourcePreparer.PrepareAsync(request, cancellationToken,
+            (appId, targetId, action, token) => PrepareAsync(appId, targetId, action, token));
 
     public int SynchronizeModules(SynchronizeAppActionModulesRequest request)
     {
@@ -85,7 +104,7 @@ public sealed class AppActionDeploymentService
         {
             var key = Path.GetFileName(directory);
             if (expected.Contains(key)) continue;
-            Directory.Delete(directory, recursive: true);
+            AppActionDeploymentOutputGuard.DeleteTree(directory);
             removed++;
         }
         return removed;
@@ -128,14 +147,13 @@ public sealed class AppActionDeploymentService
         Guid appId,
         Guid deploymentTargetId,
         DiscoveredAppAction action,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ActionContainerPolicy? containerPolicy = null)
     {
-        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
-            == RunnerApplicationProfiles.MachineManagement)
-        {
-            throw new InvalidOperationException(
-                "Action dependency preparation is not available on a Machine Management Runner until it runs in an isolated container.");
-        }
+        var machineManagement = RunnerApplicationProfiles.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement;
+        if (machineManagement) MachineActionDependencyPreparer.EnsurePolicy(containerPolicy);
 
         using var actionLock = await coordinator.EnterAsync(
             appId,
@@ -159,35 +177,36 @@ public sealed class AppActionDeploymentService
         }
 
         var actionRoot = workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, action.Key);
-        var stagingDirectory = Path.Combine(actionRoot, $".staging-{Guid.NewGuid():N}");
+        var stagingId = Guid.NewGuid();
+        var stagingDirectory = workspace.GetAppActionStagingDirectory(appId, deploymentTargetId, action.Key, stagingId);
+        var publishingDirectory = Path.Combine(actionRoot, $".publish-{stagingId:N}");
         Directory.CreateDirectory(actionRoot);
         try
         {
+            AppActionDeploymentOutputGuard.EnsureSafeTree(action.DirectoryPath);
             AppActionSourceFiles.CopyToRuntime(action.DirectoryPath, stagingDirectory);
+            AppActionDeploymentOutputGuard.EnsureSafeTree(stagingDirectory);
             var entrypoint = Path.GetFullPath(Path.Combine(stagingDirectory, action.Manifest.Spec.Entrypoint));
             AppActionSourceFiles.EnsureInside(stagingDirectory, entrypoint);
-            if (!File.Exists(entrypoint))
+            if (AppActionDeploymentOutputGuard.IsLink(entrypoint) || !File.Exists(entrypoint))
                 throw new InvalidOperationException($"Action '{action.Key}' entrypoint '{action.Manifest.Spec.Entrypoint}' does not exist.");
 
             if (action.Manifest.Spec.Runtime == AppActionRuntimes.Python)
-                await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
-
-            await File.WriteAllTextAsync(
-                Path.Combine(stagingDirectory, DeploymentMetadataFileName),
-                JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow }),
-                cancellationToken);
-
-            if (Directory.Exists(currentDirectory))
             {
-                var versionDirectory = Path.Combine(
-                    workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, action.Key),
-                    $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{AppActionVersionStore.HashSuffix(AppActionVersionStore.ReadCurrentHash(currentDirectory))}");
-                Directory.CreateDirectory(Path.GetDirectoryName(versionDirectory)!);
-                Directory.Move(currentDirectory, versionDirectory);
+                if (machineManagement)
+                {
+                    if (machineDependencyPreparer is null)
+                        throw new InvalidOperationException("Bounded Action dependency preparation is unavailable on this Machine Management Runner.");
+                    await machineDependencyPreparer.PreparePythonAsync(appId, deploymentTargetId,
+                        action.Key, stagingId, containerPolicy!, cancellationToken);
+                }
+                else
+                    await AppActionRuntimePreparer.PreparePythonAsync(stagingDirectory, cancellationToken);
             }
 
-            Directory.Move(stagingDirectory, currentDirectory);
-            versionStore.PruneVersions(appId, deploymentTargetId, action.Key);
+            AppActionDeploymentOutputGuard.CopyValidatedTree(stagingDirectory, publishingDirectory);
+            await versionStore.PublishAsync(appId, deploymentTargetId, action.Key,
+                publishingDirectory, contentHash, cancellationToken);
             return new AppActionDeploymentResult
             {
                 ActionKey = action.Key,
@@ -203,9 +222,10 @@ public sealed class AppActionDeploymentService
         }
         finally
         {
-            if (Directory.Exists(stagingDirectory))
-                Directory.Delete(stagingDirectory, recursive: true);
+            AppActionDeploymentOutputGuard.DeleteTree(stagingDirectory);
+            AppActionDeploymentOutputGuard.DeleteTree(publishingDirectory);
         }
     }
+
 
 }

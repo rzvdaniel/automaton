@@ -35,16 +35,24 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         if (!Directory.Exists(selected)) return new(false, "Action version was not found.");
         var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
         var staging = Path.Combine(workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), $".restore-{Guid.NewGuid():N}");
-        CopyDirectory(selected, staging);
-        ValidatePreparedDeployment(staging, actionKey);
-        if (Directory.Exists(current))
+        try
         {
-            var backup = Path.Combine(versionsRoot, $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{HashSuffix(ReadCurrentHash(current))}");
-            Directory.CreateDirectory(versionsRoot);
-            Directory.Move(current, backup);
+            AppActionDeploymentOutputGuard.EnsureSafeTree(selected);
+            AppActionDeploymentOutputGuard.CopyValidatedTree(selected, staging);
+            ValidatePreparedDeployment(staging, actionKey);
+            if (Directory.Exists(current))
+            {
+                var backup = Path.Combine(versionsRoot, $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{HashSuffix(ReadCurrentHash(current))}");
+                Directory.CreateDirectory(versionsRoot);
+                Directory.Move(current, backup);
+            }
+            Directory.Move(staging, current);
+            return new(true, $"Restored Action '{actionKey}' to version '{version}'.", ReadCurrentHash(current));
         }
-        Directory.Move(staging, current);
-        return new(true, $"Restored Action '{actionKey}' to version '{version}'.", ReadCurrentHash(current));
+        finally
+        {
+            AppActionDeploymentOutputGuard.DeleteTree(staging);
+        }
     }
 
     public AppActionVersionOperationResponse DeleteVersion(
@@ -56,15 +64,46 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         ValidateVersionName(version);
         var path = EnsureChildPath(workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey), version);
         if (!Directory.Exists(path)) return new(false, "Action version was not found.");
-        Directory.Delete(path, recursive: true);
+        AppActionDeploymentOutputGuard.EnsureSafeTree(path);
+        AppActionDeploymentOutputGuard.DeleteTree(path);
         return new(true, $"Deleted Action version '{version}'.");
+    }
+
+    public async Task PublishAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey,
+        string stagingDirectory,
+        string contentHash,
+        CancellationToken cancellationToken)
+    {
+        var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
+        await AppActionDeploymentOutputGuard.WriteMetadataAsync(
+            stagingDirectory,
+            DeploymentMetadataFileName,
+            JsonSerializer.Serialize(new { contentHash, preparedAtUtc = DateTime.UtcNow }),
+            cancellationToken);
+        AppActionDeploymentOutputGuard.EnsureSafeTree(stagingDirectory);
+
+        if (Directory.Exists(current))
+        {
+            var version = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{HashSuffix(ReadCurrentHash(current))}";
+            var versionDirectory = Path.Combine(workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey), version);
+            Directory.CreateDirectory(Path.GetDirectoryName(versionDirectory)!);
+            Directory.Move(current, versionDirectory);
+        }
+
+        Directory.Move(stagingDirectory, current);
+        PruneVersions(appId, deploymentTargetId, actionKey);
     }
 
     public void PruneVersions(Guid appId, Guid deploymentTargetId, string actionKey)
     {
         var root = workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey);
         if (!Directory.Exists(root)) return;
-        var versions = Directory.GetDirectories(root)
+        var paths = Directory.GetDirectories(root);
+        foreach (var path in paths) AppActionDeploymentOutputGuard.EnsureSafeTree(path);
+        var versions = paths
             .Select(path => new VersionEntry(path, Directory.GetCreationTimeUtc(path), GetDirectorySize(path)))
             .OrderByDescending(item => item.Created)
             .ToList();
@@ -75,6 +114,7 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
 
     public static string? ReadCurrentHash(string currentDirectory)
     {
+        if (Directory.Exists(currentDirectory)) AppActionDeploymentOutputGuard.EnsureSafeTree(currentDirectory);
         var path = Path.Combine(currentDirectory, DeploymentMetadataFileName);
         if (!File.Exists(path)) return null;
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -85,7 +125,7 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         => !string.IsNullOrWhiteSpace(hash) && hash.Length >= 20 ? hash[12..20] : "unknown";
 
     private static long GetDirectorySize(string path)
-        => Directory.GetFiles(path, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length);
+        => AppActionDeploymentOutputGuard.GetSafeTreeSize(path);
 
     private static void PruneToLimits(IReadOnlyList<VersionEntry> versions, int maximumVersions, long maximumBytes)
     {
@@ -98,7 +138,8 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
                 retainedBytes += version.Size;
                 continue;
             }
-            Directory.Delete(version.Path, recursive: true);
+            AppActionDeploymentOutputGuard.EnsureSafeTree(version.Path);
+            AppActionDeploymentOutputGuard.DeleteTree(version.Path);
         }
     }
 
@@ -110,6 +151,7 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
 
     private static string? ReadCurrentHashFromPath(string directory)
     {
+        AppActionDeploymentOutputGuard.EnsureSafeTree(directory);
         var path = Path.Combine(directory, DeploymentMetadataFileName);
         if (!File.Exists(path)) return null;
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -118,35 +160,20 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
 
     private static void ValidatePreparedDeployment(string directory, string actionKey)
     {
+        AppActionDeploymentOutputGuard.EnsureSafeTree(directory);
         var manifestPath = Path.Combine(directory, "action.yaml");
         if (!File.Exists(manifestPath)) throw new InvalidOperationException("Action version is missing action.yaml.");
         var manifest = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
         var entrypoint = Path.GetFullPath(Path.Combine(directory, manifest.Spec.Entrypoint));
         EnsureInside(directory, entrypoint);
-        if (!File.Exists(entrypoint)) throw new InvalidOperationException("Action version entrypoint is missing.");
+        if (AppActionDeploymentOutputGuard.IsLink(entrypoint) || !File.Exists(entrypoint))
+            throw new InvalidOperationException("Action version entrypoint is missing.");
         if (manifest.Spec.Runtime == AppActionRuntimes.Python && !PythonEnvironmentExists(directory))
             throw new InvalidOperationException("Python Action version is missing its prepared virtual environment.");
     }
 
     private static bool PythonEnvironmentExists(string directory)
-    {
-        var python = OperatingSystem.IsWindows()
-            ? Path.Combine(directory, ".venv", "Scripts", "python.exe")
-            : Path.Combine(directory, ".venv", "bin", "python");
-        return File.Exists(python);
-    }
-
-    private static void CopyDirectory(string source, string destination)
-    {
-        Directory.CreateDirectory(destination);
-        foreach (var sourceFile in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
-        {
-            var target = Path.Combine(destination, Path.GetRelativePath(source, sourceFile));
-            EnsureInside(destination, target);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(sourceFile, target, overwrite: true);
-        }
-    }
+        => File.Exists(Path.Combine(directory, ".venv", "pyvenv.cfg"));
 
     private static void ValidateVersionName(string version)
     {
