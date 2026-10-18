@@ -281,7 +281,8 @@ public sealed class HostContainerExecutionTests
         Assert.That(result.BuildCommand, Does.Contain(
             $"volume-subpath=workspace/runner/deployments/{result.AppId:D}/{result.DeploymentTargetId:D}/{result.DeploymentAttemptId:D}/source"));
         Assert.That(result.BuildCommand, Does.Contain("--cap-drop"));
-        Assert.That(result.BuildCommand, Does.Contain("--cap-add DAC_OVERRIDE"));
+        Assert.That(result.BuildCommand, Does.Contain("--user 1000:1000"));
+        Assert.That(result.BuildCommand, Does.Not.Contain("DAC_OVERRIDE"));
         Assert.That(result.BuildCommand, Does.Contain("--read-only"));
         Assert.That(result.BuildCommand, Does.Contain("/tmp:rw,nosuid,nodev,size=32m,mode=1777"));
         Assert.That(result.BuildCommand, Does.Contain("--shm-size 64m"));
