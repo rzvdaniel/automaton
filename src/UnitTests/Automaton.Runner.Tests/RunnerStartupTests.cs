@@ -51,6 +51,30 @@ public sealed class RunnerStartupTests
     }
 
     [Test]
+    public async Task MachineManagementProfileReload_RestoresPersistedRunnerIdentityAfterRestart()
+    {
+        using var environment = TestEnvironment.Managed();
+        var storage = new FileStorageService();
+        var runnerId = Guid.NewGuid();
+        await storage.SaveRunnerConfigAsync(runnerId.ToString(), "machine-runner");
+        await storage.SaveInstallationProfileAsync(new RunnerInstallationProfile
+        {
+            Purpose = "Managed",
+            ApplicationProfile = "MachineManagement",
+            Capabilities = ["MachineManagement"],
+            InstallationId = "ri_test"
+        });
+
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", null);
+        var workflow = new RunnerEnrollmentWorkflow(null!, storage, null!, new HttpClient(), Serilog.Log.Logger);
+
+        await workflow.ApplyInstallationProfileAsync();
+
+        Assert.That(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID"), Is.EqualTo(runnerId.ToString()));
+        Assert.That(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), Is.EqualTo("MachineManagement"));
+    }
+
+    [Test]
     public async Task FastApiReadinessWait_StopsWhenServiceIsStopping()
     {
         using var host = Program.CreateHostBuilder([]).Build();
