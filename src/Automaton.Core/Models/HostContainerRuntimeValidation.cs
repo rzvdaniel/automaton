@@ -5,7 +5,10 @@ namespace Automaton.Core.Models;
 public static class HostContainerRuntimeValidation
 {
     public static bool IsRuntimeOperation(string operation) => operation is
-        HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.StartContainer
+        HostContainerOperationKinds.CreateApplicationContainer
+        or HostContainerOperationKinds.ApplyComposeProject or HostContainerOperationKinds.InspectComposeProject
+        or HostContainerOperationKinds.RemoveComposeProject
+        or HostContainerOperationKinds.StartContainer
         or HostContainerOperationKinds.InspectContainer or HostContainerOperationKinds.GetContainerLogs
         or HostContainerOperationKinds.RemoveContainer or HostContainerOperationKinds.RemoveTargetContainers;
 
@@ -25,9 +28,43 @@ public static class HostContainerRuntimeValidation
         if (request.Environment is null)
             return "The environment must be an object.";
 
-        return request.Operation == HostContainerOperationKinds.CreateApplicationContainer
-            ? ValidateCreateRequest(request)
-            : ValidateExistingContainerRequest(request);
+        return request.Operation switch
+        {
+            HostContainerOperationKinds.CreateApplicationContainer => ValidateCreateRequest(request),
+            HostContainerOperationKinds.ApplyComposeProject => ValidateComposeRequest(request),
+            HostContainerOperationKinds.InspectComposeProject => ValidateInspectComposeRequest(request),
+            HostContainerOperationKinds.RemoveComposeProject => ValidateRemoveComposeRequest(request),
+            _ => ValidateExistingContainerRequest(request)
+        };
+    }
+
+    private static string? ValidateComposeRequest(HostContainerExecutionRequest request)
+    {
+        if (request.CandidateId == Guid.Empty || request.Compose is null || request.ContainerId is not null
+            || request.RequestedImage is not null || request.Command is not null || request.Storage is not null
+            || request.User is not null || request.ContainerPort != 0 || request.Environment!.Count != 0)
+            return "ApplyComposeProject requires a normalized Compose model and candidate identity only.";
+        var errors = ApplicationContractValidator.ValidateForDeployment(new ApplicationContract { Compose = request.Compose });
+        return errors.Count == 0 ? null : string.Join("; ", errors);
+    }
+
+    private static string? ValidateRemoveComposeRequest(HostContainerExecutionRequest request)
+    {
+        if (request.CandidateId == Guid.Empty || request.Compose is not null || request.ContainerId is not null
+            || request.RequestedImage is not null || request.Command is not null || request.Storage is not null
+            || request.User is not null || request.ContainerPort != 0 || request.Environment!.Count != 0)
+            return "RemoveComposeProject requires only the candidate identity and scope.";
+        return null;
+    }
+
+    private static string? ValidateInspectComposeRequest(HostContainerExecutionRequest request)
+    {
+        if (request.CandidateId == Guid.Empty || request.Compose is null || request.ContainerId is not null
+            || request.RequestedImage is not null || request.Command is not null || request.Storage is not null
+            || request.User is not null || request.ContainerPort != 0 || request.Environment!.Count != 0)
+            return "InspectComposeProject requires a normalized Compose model and candidate identity only.";
+        var errors = ApplicationContractValidator.ValidateForDeployment(new ApplicationContract { Compose = request.Compose });
+        return errors.Count == 0 ? null : string.Join("; ", errors);
     }
 
     private static string? ValidateExistingContainerRequest(HostContainerExecutionRequest request)
@@ -36,7 +73,7 @@ public static class HostContainerRuntimeValidation
             ? request.ContainerId is not null : !IsContainerReference(request.ContainerId))
             return "A valid container ID or name is required.";
         if (request.RequestedImage is not null || request.Command is not null || request.Storage is not null
-            || request.User is not null
+            || request.Compose is not null || request.User is not null
             || request.Resources is not null || request.ContainerLimits is not null || request.CandidateId != Guid.Empty
             || request.ContainerPort != 0 || request.Environment!.Count != 0)
             return "Existing-container operations accept only scope and container identity.";
@@ -46,7 +83,7 @@ public static class HostContainerRuntimeValidation
     private static string? ValidateCreateRequest(HostContainerExecutionRequest request)
     {
         if (request.ContainerId is not null || request.CandidateId == Guid.Empty
-            || request.Command is null || request.Storage is null)
+            || request.Command is null || request.Storage is null || request.Compose is not null)
             return "Create requires a candidate ID, command, and storage semantics, without a container ID.";
         var errors = ApplicationContractValidator.Validate(new ApplicationContract
         {

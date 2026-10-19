@@ -63,6 +63,22 @@ public class ConfigService
         }
     }
 
+    public void LoadComposeConfiguration(ApplicationContract application, string projectDirectory)
+        => application.Compose = ApplicationComposeParser.LoadFromDirectory(projectDirectory);
+
+    public ApplicationContract ResolveDeploymentApplication(
+        ApplicationContract application,
+        string projectDirectory,
+        string? directoryOverride)
+    {
+        var copy = JsonSerializer.Deserialize<ApplicationContract>(JsonSerializer.Serialize(application))
+            ?? throw new InvalidOperationException("The application contract could not be copied for deployment.");
+        LoadComposeConfiguration(copy, projectDirectory);
+        if (!string.IsNullOrWhiteSpace(directoryOverride)) copy.Build.OutputDirectory = directoryOverride;
+        ApplicationContractValidator.EnsureValid(copy);
+        return copy;
+    }
+
     public AutomatonConfig LoadProjectConfig(string directory)
     {
         var config = TryLoadProjectConfig(directory);

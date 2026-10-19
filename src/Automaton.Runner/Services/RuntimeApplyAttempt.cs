@@ -12,6 +12,7 @@ internal sealed record RuntimeApplyAttempt(
     string RuntimeImage,
     int InitialPort,
     Guid CandidateId,
+    Guid? DeploymentAttemptId,
     IScopedApplicationContainerRuntime? ScopedRuntime,
     RunnerRuntimeDeploymentMetadata Candidate,
     RunnerRuntimeDeploymentMetadata Pending,

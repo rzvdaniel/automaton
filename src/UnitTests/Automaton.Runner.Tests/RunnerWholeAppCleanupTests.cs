@@ -73,7 +73,8 @@ public sealed class RunnerWholeAppCleanupTests
         public Task StopAsync(Guid appId, Guid deploymentTargetId)
             => StopFailure is null ? Task.CompletedTask : Task.FromException(StopFailure);
         public Task<RuntimeApplyResult> ApplyAsync(Guid appId, Guid deploymentTargetId, ApplicationContract contract,
-            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null)
+            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
             => throw new NotSupportedException();
     }
 }

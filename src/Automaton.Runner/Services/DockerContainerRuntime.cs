@@ -36,7 +36,15 @@ public sealed record DockerApplicationContainerRequest(
 public sealed record DockerApplicationContainer(
     string Id,
     string Name,
-    DockerImageIdentity Image);
+    DockerImageIdentity Image,
+    int? HostPort = null);
+
+public sealed record DockerApplicationComposeRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    Guid CandidateId,
+    ApplicationComposeSpec Compose,
+    Guid? DeploymentAttemptId = null);
 
 public sealed record DockerContainerIdentity(
     string Id,
@@ -103,6 +111,12 @@ public interface IApplicationContainerRuntime
     Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default);
     Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default);
     Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default);
+    Task<DockerApplicationContainer> CreateComposeProjectAsync(Guid appId, Guid deploymentTargetId, Guid candidateId, ApplicationContract contract, Guid? deploymentAttemptId = null, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This application container runtime does not support managed Compose projects.");
+    Task<DockerApplicationContainer?> InspectComposeProjectAsync(Guid appId, Guid deploymentTargetId, Guid candidateId, ApplicationContract contract, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This application container runtime does not support managed Compose projects.");
+    Task RemoveComposeProjectAsync(ApplicationContainerScope scope, Guid candidateId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This application container runtime does not support managed Compose projects.");
 }
 
 public interface IStagedApplicationContainerRuntime

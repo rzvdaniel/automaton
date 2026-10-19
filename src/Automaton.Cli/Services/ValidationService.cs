@@ -60,7 +60,7 @@ public sealed class ValidationService
         var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, resolvedAppId, resolvedServer, nextSteps);
         checks.Add(appLinkCheck);
 
-        checks.Add(ValidateApplicationContract(projectConfig));
+        checks.Add(ValidateApplicationContract(projectConfig, directory));
 
         checks.AddRange(CollectWarnings(directory, projectConfig, strict, nextSteps));
 
@@ -160,7 +160,9 @@ public sealed class ValidationService
             $"linked app {resolvedAppId} on {resolvedServer}");
     }
 
-    private static ValidationCheckResult ValidateApplicationContract(Models.AutomatonConfig? projectConfig)
+    private ValidationCheckResult ValidateApplicationContract(
+        Models.AutomatonConfig? projectConfig,
+        string projectDirectory)
     {
         if (projectConfig is null)
         {
@@ -170,7 +172,16 @@ public sealed class ValidationService
                 "application contract is unavailable because automaton.json could not be loaded");
         }
 
-        var errors = ApplicationContractValidator.Validate(projectConfig.Application);
+        IReadOnlyList<string> errors;
+        try
+        {
+            _config.LoadComposeConfiguration(projectConfig.Application, projectDirectory);
+            errors = ApplicationContractValidator.Validate(projectConfig.Application);
+        }
+        catch (InvalidOperationException exception)
+        {
+            errors = [exception.Message];
+        }
         if (errors.Count > 0)
         {
             return new ValidationCheckResult(

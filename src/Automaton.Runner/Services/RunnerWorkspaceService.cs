@@ -28,6 +28,37 @@ public class RunnerWorkspaceService
     // RUNNER_SCRIPTS_DIR is retained only by the deferred controller bridge.
     public string AppsRoot => GetFullPath(WorkspaceRoot, "apps");
 
+    public IEnumerable<string> EnumerateDeploymentMetadataPaths()
+        => Directory.Exists(AppsRoot)
+            ? Directory.EnumerateFiles(AppsRoot, "deployment.json", SearchOption.AllDirectories)
+            : [];
+
+    public bool RuntimeArtifactExists(string? path)
+        => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
+
+    public void CreateRuntimeArtifactRoot(string path)
+        => Directory.CreateDirectory(path);
+
+    public string GetRuntimeArtifactId(string artifactRoot)
+        => Path.GetFileName(Path.GetDirectoryName(artifactRoot) ?? artifactRoot);
+
+    public string ValidateRuntimeArtifactRoot(Guid appId, Guid targetId, string path)
+    {
+        var candidateRoot = Path.GetFullPath(GetAppRuntimeCandidateDirectory(appId, targetId, Guid.NewGuid()));
+        var artifact = Path.GetFullPath(path);
+        var candidatesRoot = Path.GetDirectoryName(candidateRoot)!;
+        if (!artifact.StartsWith(candidatesRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Application artifact is outside the managed candidate boundary.");
+        return artifact;
+    }
+
+    public static void TryDeletePreviousRuntimeArtifact(string artifactRoot, ICollection<string> warnings)
+    {
+        if (!Directory.Exists(artifactRoot)) return;
+        try { Directory.Delete(artifactRoot, recursive: true); }
+        catch (Exception ex) { warnings.Add($"Previous runtime artifact cleanup deferred: {ex.Message}"); }
+    }
+
     public string DataRoot => GetFullPath(WorkspaceRoot, "data");
 
     public string CacheRoot => GetFullPath(WorkspaceRoot, "cache");

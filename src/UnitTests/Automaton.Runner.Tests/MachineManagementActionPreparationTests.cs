@@ -116,7 +116,8 @@ public sealed class MachineManagementActionPreparationTests
         public int ApplyCount { get; private set; }
 
         public Task<RuntimeApplyResult> ApplyAsync(Guid appId, Guid deploymentTargetId, ApplicationContract contract,
-            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null)
+            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
         {
             ApplyCount++;
             return Task.FromResult(new RuntimeApplyResult());

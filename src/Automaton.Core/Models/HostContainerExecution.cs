@@ -7,6 +7,9 @@ public static class HostContainerOperationKinds
     public const string ResolveImage = "resolve-image";
     public const string RunBuild = "run-build";
     public const string CreateApplicationContainer = "create-application-container";
+    public const string ApplyComposeProject = "apply-compose-project";
+    public const string InspectComposeProject = "inspect-compose-project";
+    public const string RemoveComposeProject = "remove-compose-project";
     public const string StartContainer = "start-container";
     public const string InspectContainer = "inspect-container";
     public const string GetContainerLogs = "get-container-logs";
@@ -78,6 +81,7 @@ public sealed record HostContainerExecutionRequest
     public string? ActionInputJson { get; init; }
     public Guid CandidateId { get; init; }
     public ApplicationStorageSpec? Storage { get; init; }
+    public ApplicationComposeSpec? Compose { get; init; }
     public ApplicationCommandSpec? Command { get; init; }
     public string? User { get; init; }
     public int ContainerPort { get; init; }

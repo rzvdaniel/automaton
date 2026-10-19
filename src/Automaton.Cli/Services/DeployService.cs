@@ -98,7 +98,7 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, directoryOverride, uploadResult, runtimeResult, target);
         }
 
-        var deploymentApplication = ResolveDeploymentApplication(projectConfig!.Application, directoryOverride);
+        var deploymentApplication = config.ResolveDeploymentApplication(projectConfig!.Application, directory, directoryOverride);
 
         try
         {
@@ -260,7 +260,16 @@ public sealed class DeployService
             return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
         }
 
-        var deploymentApplication = ResolveDeploymentApplication(projectConfig.Application, directoryOverride);
+        var deploymentApplication = projectConfig.Application;
+        try
+        {
+            deploymentApplication = config.ResolveDeploymentApplication(projectConfig.Application, directory, directoryOverride);
+        }
+        catch (InvalidOperationException exception)
+        {
+            checks.Add(new DeployCheckResult(ValidationCheckNames.ApplicationContract, false, exception.Message));
+            return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
+        }
         var buildCheck = ValidateBuildForRunner(deploymentApplication.Build, directory, nextSteps);
         checks.Add(buildCheck);
         if (!buildCheck.Success)
@@ -279,11 +288,12 @@ public sealed class DeployService
             directory,
             ApplicationBuildArtifactSelector.GetRelativeDirectory(deploymentApplication),
             actionCount > 0,
-            deploymentApplication.Runtime.Command is not null,
+            deploymentApplication.Runtime.Command is not null || deploymentApplication.Compose is not null,
             deploymentApplication.Build.Command is not null,
             nextSteps,
             out var deployDirectory);
-        if (!applicationCheck.Success && deploymentApplication.Runtime.Command is null && actionCount == 0)
+        if (!applicationCheck.Success && deploymentApplication.Runtime.Command is null
+            && deploymentApplication.Compose is null && actionCount == 0)
         {
             nextSteps.Add("Add application.runtime.command.executable to automaton.json, or define at least one Action for an Actions-only app");
         }
@@ -436,18 +446,6 @@ public sealed class DeployService
 
         var status = buildOnRunner ? "runtime artifact directory will be produced by the assigned Runner" : "runtime artifact directory ready";
         return new DeployCheckResult(DeployCheckNames.ApplicationPackage, true, $"{status}: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
-    }
-
-    private static ApplicationContract ResolveDeploymentApplication(ApplicationContract application, string? directoryOverride)
-    {
-        if (string.IsNullOrWhiteSpace(directoryOverride))
-            return application;
-
-        var copy = JsonSerializer.Deserialize<ApplicationContract>(JsonSerializer.Serialize(application))
-            ?? throw new InvalidOperationException("The application contract could not be copied for deployment.");
-        copy.Build.OutputDirectory = directoryOverride;
-        ApplicationContractValidator.EnsureValid(copy);
-        return copy;
     }
 
     private static DeployResult CreateResult(

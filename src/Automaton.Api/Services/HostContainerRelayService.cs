@@ -90,7 +90,8 @@ internal static class HostContainerRelayAdmission
         => state.MachineRunner is not null
             || request.Operation is not (HostContainerOperationKinds.ResolveImage
                 or HostContainerOperationKinds.RunBuild
-                or HostContainerOperationKinds.CreateApplicationContainer)
+                or HostContainerOperationKinds.CreateApplicationContainer
+                or HostContainerOperationKinds.ApplyComposeProject)
             || state.Hosted?.RunnerHost is { } host
                 && StorageTelemetryPolicy.CanRunDockerStorageOperation(host, DateTime.UtcNow, options);
 }
@@ -101,8 +102,7 @@ internal static class HostContainerRelayRequestPreparer
         HostContainerExecutionRequest request,
         HostContainerRelayState state)
     {
-        var requiresContainerLimits = request.Operation is HostContainerOperationKinds.RunBuild
-            or HostContainerOperationKinds.CreateApplicationContainer;
+        var requiresContainerLimits = RequiresContainerLimits(request.Operation);
         var resources = requiresContainerLimits
             ? new HostContainerResourceRef(HostContainerResourceKinds.Source,
                 HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData)
@@ -155,5 +155,6 @@ internal static class HostContainerRelayRequestPreparer
     }
 
     public static bool RequiresContainerLimits(string operation)
-        => operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer;
+        => operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.ApplyComposeProject;
 }
