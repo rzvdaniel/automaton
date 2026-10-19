@@ -584,6 +584,7 @@ internal static class ApiAppExecutionRegistration
         services.AddHostedService(sp => sp.GetRequiredService<DeploymentOperationDispatcher>());
         services.AddScoped<AppActionExecutionService>();
         services.AddScoped<AppActionRunnerGateway>();
+        services.AddScoped<IAppActionExecutionGateway>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<ActionScheduleService>();
         services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();

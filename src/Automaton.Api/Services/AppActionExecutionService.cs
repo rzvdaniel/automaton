@@ -21,23 +21,20 @@ public sealed class AppActionExecutionService
     private readonly ApplicationDbContext db;
     private readonly AppsService appsService;
     private readonly ResourceAuthorizationService authorizationService;
-    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
-    private readonly AppActionRunnerGateway runnerGateway;
+    private readonly IAppActionExecutionGateway runnerGateway;
 
     public AppActionExecutionService(
         ApplicationDbContext db,
         AppsService appsService,
         ResourceAuthorizationService authorizationService,
-        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IAppDeploymentTargetResolver deploymentTargetResolver,
-        AppActionRunnerGateway runnerGateway,
+        IAppActionExecutionGateway runnerGateway,
         IOptions<MachineContainerResourceOptions>? machineResources = null)
     {
         this.db = db;
         this.appsService = appsService;
         this.authorizationService = authorizationService;
-        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerGateway = runnerGateway;
         this.machineResources = machineResources?.Value;
@@ -73,15 +70,11 @@ public sealed class AppActionExecutionService
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
-            ?? throw new KeyNotFoundException("App not found.");
         if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
-        var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
-            appId,
-            userId,
-            requireOnline: false,
-            cancellationToken: cancellationToken);
+        var target = await deploymentTargetResolver.ResolveForActionExecutionAsync(
+            appId, targetSlug: null, userId, cancellationToken);
+        var runner = target.ExecutionRunner!;
         if (!RunnerCapabilities.Includes(
                 runner.CapabilitiesJson,
                 RunnerCapabilities.WorkflowExecution,
@@ -89,12 +82,6 @@ public sealed class AppActionExecutionService
         {
             throw new InvalidOperationException("The assigned Runner does not support isolated Action execution.");
         }
-        var target = await deploymentTargetResolver.ResolveAsync(
-            appId,
-            targetSlug: null,
-            userId,
-            cancellationToken);
-
         EnsureAvailable(runner);
         var deployed = await runnerGateway.ListModulesAsync(
             runner.Id, appId, target.Id, actionKey, cancellationToken);
@@ -172,8 +159,7 @@ public sealed class AppActionExecutionService
 
     public async Task<IReadOnlyList<AppModuleExecution>> ListAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
     {
-        _ = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
-            ?? throw new KeyNotFoundException("App not found.");
+        await EnsureCanExecuteAsync(appId, userId, cancellationToken);
         return await db.AppModuleExecutions.AsNoTracking().Where(x => x.AppId == appId)
             .OrderByDescending(x => x.CreatedAtUtc).Take(100).ToListAsync(cancellationToken);
     }
@@ -217,8 +203,7 @@ public sealed class AppActionExecutionService
 
     public async Task<AppModuleExecution> GetAsync(Guid appId, Guid executionId, Guid userId, CancellationToken cancellationToken)
     {
-        _ = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
-            ?? throw new KeyNotFoundException("App not found.");
+        await EnsureCanExecuteAsync(appId, userId, cancellationToken);
         return await db.AppModuleExecutions.AsNoTracking().SingleOrDefaultAsync(x => x.AppId == appId && x.Id == executionId, cancellationToken)
             ?? throw new KeyNotFoundException("Execution not found.");
     }
@@ -254,16 +239,9 @@ public sealed class AppActionExecutionService
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
-            appId,
-            userId,
-            requireOnline: false,
-            cancellationToken: cancellationToken);
-        var target = await deploymentTargetResolver.ResolveAsync(
-            appId,
-            targetSlug: null,
-            userId,
-            cancellationToken);
+        var target = await deploymentTargetResolver.ResolveForActionExecutionAsync(
+            appId, targetSlug: null, userId, cancellationToken);
+        var runner = target.ExecutionRunner!;
         EnsureAvailable(runner);
         return (runner.Id, target.Id);
     }
@@ -280,6 +258,14 @@ public sealed class AppActionExecutionService
             ?? throw new KeyNotFoundException("App not found.");
         if (!await authorizationService.CanUpdateAppAsync(appId, userId, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to deploy or modify this App.");
+    }
+
+    private async Task EnsureCanExecuteAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
+        {
+            throw new KeyNotFoundException("App not found.");
+        }
     }
 
 }

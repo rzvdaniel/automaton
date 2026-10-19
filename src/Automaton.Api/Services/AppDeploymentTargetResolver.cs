@@ -9,6 +9,41 @@ public sealed class AppDeploymentTargetResolver(
     ResourceAuthorizationService authorizationService,
     IAppRunnerAuthorizationPolicy runnerAuthorizationPolicy) : IAppDeploymentTargetResolver
 {
+    public async Task<AppDeploymentTarget> ResolveForActionExecutionAsync(
+        Guid appId,
+        string? targetSlug,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
+        {
+            throw new KeyNotFoundException("App not found.");
+        }
+
+        var app = await dbContext.WebApps.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == appId, cancellationToken)
+            ?? throw new KeyNotFoundException("App not found.");
+        var normalizedSlug = targetSlug?.Trim().ToLowerInvariant();
+        var targets = dbContext.AppDeploymentTargets.AsNoTracking().Where(target => target.WebAppId == appId);
+        var target = string.IsNullOrWhiteSpace(normalizedSlug)
+            ? await targets.SingleOrDefaultAsync(item => item.IsDefault, cancellationToken)
+            : await targets.SingleOrDefaultAsync(item => item.Slug == normalizedSlug, cancellationToken);
+        if (target is null)
+        {
+            throw new KeyNotFoundException("The App has no matching deployment target.");
+        }
+
+        if (!target.ExecutionRunnerId.HasValue)
+        {
+            throw new AppDeploymentTargetUnassignedException(target.Slug);
+        }
+
+        target.ExecutionRunner = await runnerAuthorizationPolicy.AuthorizeActionExecutionAsync(
+            app, target.ExecutionRunnerId.Value, userId, cancellationToken);
+        PrivilegedHostAssignmentGuard.EnsureApproved(target, target.ExecutionRunner);
+        return target;
+    }
+
     public async Task<AppDeploymentTarget> ResolveByIdAsync(
         Guid appId,
         Guid deploymentTargetId,

@@ -9,6 +9,12 @@ namespace Automaton.Api.Services;
 
 public interface IAppRunnerAuthorizationPolicy
 {
+    Task<Runner> AuthorizeActionExecutionAsync(
+        WebApp app,
+        Guid runnerId,
+        Guid userId,
+        CancellationToken cancellationToken = default) => AuthorizeAsync(app, runnerId, userId, cancellationToken);
+
     Task<Runner> AuthorizeAsync(
         WebApp app,
         Guid runnerId,
@@ -20,6 +26,35 @@ public sealed class AppRunnerAuthorizationPolicy(
     ApplicationDbContext dbContext,
     ResourceAuthorizationService authorizationService) : IAppRunnerAuthorizationPolicy
 {
+    public async Task<Runner> AuthorizeActionExecutionAsync(
+        WebApp app,
+        Guid runnerId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (await authorizationService.CanAccessAppAsync(app.Id, userId, cancellationToken))
+        {
+            return await AuthorizeAsync(app, runnerId, userId, cancellationToken);
+        }
+
+        if (!await authorizationService.CanExecuteAssignedOrganizationAppAsync(app.Id, userId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
+        }
+
+        var runner = await dbContext.Runners.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == runnerId, cancellationToken)
+            ?? throw new InvalidOperationException("Execution Runner not found.");
+        if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement
+            || !RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose)
+            || !RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.WorkflowExecution, runner.Purpose))
+        {
+            throw new UnauthorizedAccessException("Assigned Action access is limited to isolated Machine Management Runner execution.");
+        }
+
+        return runner;
+    }
+
     public async Task<Runner> AuthorizeAsync(
         WebApp app,
         Guid runnerId,
