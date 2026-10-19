@@ -4,6 +4,12 @@ namespace Automaton.Api.Services;
 
 public interface IAppDeploymentTargetResolver
 {
+    Task<AppDeploymentTarget> ResolveForActionExecutionAsync(
+        Guid appId,
+        string? targetSlug,
+        Guid userId,
+        CancellationToken cancellationToken = default) => ResolveAsync(appId, targetSlug, userId, cancellationToken);
+
     Task<AppDeploymentTarget> ResolveAsync(
         Guid appId,
         string? targetSlug,

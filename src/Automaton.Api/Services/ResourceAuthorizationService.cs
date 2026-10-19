@@ -176,7 +176,7 @@ public class ResourceAuthorizationService
             return true;
         }
 
-        return await HasAssignedOrganizationAppExecutionAccessAsync(appId, userId, cancellationToken);
+        return await CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken);
     }
 
     private Task<bool> HasProjectAppExecutionAccessAsync(
@@ -205,7 +205,7 @@ public class ResourceAuthorizationService
                                      member.IsActive))))),
                 cancellationToken);
 
-    private Task<bool> HasAssignedOrganizationAppExecutionAccessAsync(
+    public Task<bool> CanExecuteAssignedOrganizationAppAsync(
         Guid appId,
         Guid userId,
         CancellationToken cancellationToken) => dbContext.OrganizationAppAssignments

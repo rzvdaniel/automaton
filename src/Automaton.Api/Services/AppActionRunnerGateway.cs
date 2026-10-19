@@ -4,7 +4,8 @@ using System.Text.Json;
 namespace Automaton.Api.Services;
 
 /// <summary>Addresses App Action management by stable Runner identity using durable commands and HTTPS results.</summary>
-public sealed class AppActionRunnerGateway(RunnerExecutionOperationService operations, UserContextService userContext) : IRunnerActionCommands
+public sealed class AppActionRunnerGateway(RunnerExecutionOperationService operations, UserContextService userContext)
+    : IRunnerActionCommands, IAppActionExecutionGateway
 {
     public async Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
     {
