@@ -175,7 +175,7 @@ public static class ApplicationComposeParser
     {
         if (!node.Children.TryGetValue(Key(key), out var value)) return [];
         if (value is YamlSequenceNode sequence) return sequence.Children.Select(item => Scalar(item, $"services.*.{key}")).ToList();
-        return [Scalar(value, $"services.*.{key}")];
+        throw Unsupported($"services.*.{key}", "a string array; scalar forms are not supported");
     }
 
     private static List<string> OptionalStringArray(YamlMappingNode node, string key)

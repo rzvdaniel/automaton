@@ -65,7 +65,7 @@ internal static class HostContainerComposeDocumentBuilder
             ["mem_limit"] = $"{limits.MemoryLimitMb}M",
             ["pids_limit"] = limits.PidsLimit,
             ["logging"] = new { driver = "local", options = new Dictionary<string, string> { ["max-size"] = $"{logMaxSizeMb}m", ["max-file"] = logMaxFiles.ToString(CultureInfo.InvariantCulture) } },
-            ["labels"] = ContainerLabels(scope, candidateId, service.Name, image)
+            ["labels"] = ContainerLabels(scope, candidateId, image)
         };
         AddOptionalConfiguration(config, service, scope);
         if (string.Equals(service.Name, compose.PublicService, StringComparison.Ordinal))
@@ -85,13 +85,12 @@ internal static class HostContainerComposeDocumentBuilder
         if (service.DependsOn.Count > 0) config["depends_on"] = service.DependsOn;
         if (service.Mounts.Count == 0) return;
         config["volumes"] = service.Mounts.Select(mount =>
-            $"{VolumeName(scope, mount.Name)}:{mount.Target}{(mount.ReadOnly ? ":ro" : string.Empty)}").ToArray();
+            $"{mount.Name}:{mount.Target}{(mount.ReadOnly ? ":ro" : string.Empty)}").ToArray();
     }
 
     private static Dictionary<string, string> ContainerLabels(
         HostContainerScope scope,
         Guid candidateId,
-        string service,
         string resolvedImage)
     {
         var labels = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -101,7 +100,6 @@ internal static class HostContainerComposeDocumentBuilder
             ["com.automaton.app-id"] = scope.AppId.ToString(),
             ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString(),
             ["com.automaton.compose-candidate"] = candidateId.ToString("N"),
-            ["com.docker.compose.service"] = service,
             ["com.automaton.resolved-image"] = resolvedImage
         };
         if (scope.MachineRunnerId != Guid.Empty)

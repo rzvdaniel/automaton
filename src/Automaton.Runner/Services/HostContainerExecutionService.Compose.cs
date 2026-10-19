@@ -238,21 +238,21 @@ internal sealed class HostContainerComposeProjectExecutor(
         Dictionary<string, string> labels,
         string expectedAddress)
     {
-        var portBindings = root.GetProperty("HostConfig").GetProperty("PortBindings");
+        var portBindings = root.GetProperty("NetworkSettings").GetProperty("Ports");
         if (portBindings.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             return new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
         if (portBindings.ValueKind != JsonValueKind.Object)
-            return Failure("compose_ports", "A Compose service returned invalid port bindings.");
+            return Failure("compose_ports", "A Compose service returned invalid runtime port bindings.");
         var published = portBindings.EnumerateObject().ToArray();
         if (published.Length == 0)
             return new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
         if (published.Length != 1 || !published[0].Name.EndsWith("/tcp", StringComparison.Ordinal))
-            return Failure("compose_ports", "A Compose service has an unexpected port publication.");
+            return Failure("compose_ports", "A Compose service has an unexpected runtime port publication.");
         if (!int.TryParse(published[0].Name[..^4], NumberStyles.None, CultureInfo.InvariantCulture, out var containerPort))
             return Failure("compose_ports", "A Compose service has an invalid published port.");
         var bindings = published[0].Value;
         if (bindings.ValueKind != JsonValueKind.Array || bindings.GetArrayLength() != 1)
-            return Failure("compose_ports", "A Compose service must have exactly one private host binding.");
+            return Failure("compose_ports", "A Compose service must have exactly one private runtime binding.");
         var binding = bindings[0];
         var hostIp = binding.GetProperty("HostIp").GetString();
         var hostPort = binding.GetProperty("HostPort").GetString();

@@ -94,4 +94,28 @@ public sealed class ApplicationComposeParserTests
                   API_PASSWORD: ${API_PASSWORD}
             """));
     }
+
+    [TestCase("command: \"python -m http.server 8080\"")]
+    [TestCase("entrypoint: \"python -m http.server 8080\"")]
+    public void Parse_RejectsScalarCommandAndEntrypoint(string field)
+    {
+        var yaml = $"services:\n  web:\n    image: python:3.12\n    {field}";
+        Assert.Throws<InvalidOperationException>(() => ApplicationComposeParser.Parse(yaml));
+    }
+
+    [Test]
+    public void Parse_PreservesListFormCommandAndEntrypointArguments()
+    {
+        var compose = ApplicationComposeParser.Parse("""
+            services:
+              web:
+                image: python:3.12
+                ports: ["8080"]
+                command: [python, -m, http.server, "8080"]
+                entrypoint: [/usr/local/bin/python]
+            """);
+
+        Assert.That(compose.Services.Single().Command, Is.EqualTo(new[] { "python", "-m", "http.server", "8080" }));
+        Assert.That(compose.Services.Single().Entrypoint, Is.EqualTo(new[] { "/usr/local/bin/python" }));
+    }
 }

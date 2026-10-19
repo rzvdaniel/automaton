@@ -5,7 +5,7 @@ This is the accepted Compose contract for the M2 multi-service deployment slice.
 ## Supported
 
 - Image-based services. Images go through Automaton's existing image validation and immutable digest resolution policy.
-- Any number of internal services on the project network, with list-form `depends_on`, `expose`, `command`, `entrypoint`, `working_dir` and non-sensitive literal `environment` values.
+- Any number of internal services on the project network, with list-form `depends_on`, `expose`, `command` and `entrypoint`, plus `working_dir` and non-sensitive literal `environment` values. Scalar `command` and `entrypoint` are rejected; use argument lists so execution is unambiguous.
 - At most one externally routed HTTP service, with one container port. Use a container-port-only entry such as `ports: ["8080"]`; Automaton binds it to the configured private runtime address and supplies the existing app route/access policy. Host IPs, host ports and published UDP ports are not accepted.
 - Named app data volumes declared with an empty mapping (`data: {}`) and mounted at absolute container paths, optionally read-only. Automaton creates app/deployment-target-scoped Docker volumes with ownership labels. Updates reuse these volumes; project cleanup does not remove them.
 - The existing server-derived CPU, memory, PID, shared-memory and log limits, applied to each service container.
