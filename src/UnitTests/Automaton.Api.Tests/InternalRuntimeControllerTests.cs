@@ -65,7 +65,6 @@ public class InternalRuntimeControllerTests
 
         Assert.That(result, Is.InstanceOf<NoContentResult>());
     }
-
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -97,7 +96,7 @@ public class InternalRuntimeControllerTests
         await dbContext.SaveChangesAsync();
     }
 
-    private static AuthorizedRuntimeRequest CreateAuthorizedRequest(Guid appId, Guid userId)
+    internal static AuthorizedRuntimeRequest CreateAuthorizedRequest(Guid appId, Guid userId)
     {
         var cookieService = CreateRuntimeCookieService();
         var cookie = cookieService.CreateRuntimeCookie(appId, userId, DateTimeOffset.UtcNow.AddMinutes(5));
@@ -108,7 +107,7 @@ public class InternalRuntimeControllerTests
         return new AuthorizedRuntimeRequest(httpContext, cookieService);
     }
 
-    private static InternalRuntimeController CreateController(
+    internal static InternalRuntimeController CreateController(
         ApplicationDbContext dbContext,
         DefaultHttpContext httpContext,
         RuntimeCookieService cookieService)
@@ -126,7 +125,7 @@ public class InternalRuntimeControllerTests
         };
     }
 
-    private sealed record AuthorizedRuntimeRequest(
+    internal sealed record AuthorizedRuntimeRequest(
         DefaultHttpContext HttpContext,
         RuntimeCookieService CookieService);
 
@@ -144,7 +143,7 @@ public class InternalRuntimeControllerTests
         });
     }
 
-    private static RuntimeCookieService CreateRuntimeCookieService()
+    internal static RuntimeCookieService CreateRuntimeCookieService()
     {
         var provider = Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create(
             Directory.CreateTempSubdirectory("automaton-runtime-internal-auth-"));
@@ -157,4 +156,104 @@ public class InternalRuntimeControllerTests
                 ApiBaseUrl = "https://api.automaton.monster"
             }));
     }
+}
+[TestFixture]
+public sealed class AssignedOrganizationRuntimeAuthorizationTests
+{
+    [Test]
+    public async Task AssignedMemberCanUseRuntimeAndRevocationStopsRequests()
+    {
+        var evidence = await AssignedRuntimeScenario.RunAsync();
+        Assert.That(evidence.Allowed, Is.True);
+        Assert.That(evidence.MembershipRevoked, Is.True);
+        Assert.That(evidence.AssignmentRevoked, Is.True);
+    }
+}
+
+internal sealed record AssignedRuntimeEvidence(bool Allowed, bool MembershipRevoked, bool AssignmentRevoked);
+
+internal static class AssignedRuntimeScenario
+{
+    public static async Task<AssignedRuntimeEvidence> RunAsync()
+    {
+        var dbContext = CreateDbContext();
+        await using (dbContext)
+        {
+            var fixture = await SeedAssignedAppAsync(dbContext);
+            var request = CreateRequest(fixture.AppId, fixture.UserId);
+            var controller = CreateController(dbContext, request);
+            var allowed = await AuthorizeAsync(controller, request);
+            dbContext.OrganizationMembers.Single().IsActive = false;
+            await dbContext.SaveChangesAsync();
+            var membershipRevoked = await AuthorizeAsync(controller, request);
+            dbContext.OrganizationMembers.Single().IsActive = true;
+            fixture.Assignment.IsActive = false;
+            await dbContext.SaveChangesAsync();
+            var assignmentRevoked = await AuthorizeAsync(controller, request);
+            return new AssignedRuntimeEvidence(
+                allowed is NoContentResult,
+                membershipRevoked is ForbidResult,
+                assignmentRevoked is ForbidResult);
+        }
+    }
+
+    private static ApplicationDbContext CreateDbContext() => new(
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+
+    private static async Task<AssignedRuntimeFixture> SeedAssignedAppAsync(ApplicationDbContext dbContext)
+    {
+        var organizationId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.Organizations.Add(new Organization
+        {
+            Id = organizationId, Name = "Org", Slug = $"org-{organizationId:N}", OwnerId = Guid.NewGuid(),
+            CreatedAt = now, IsActive = true
+        });
+        var project = AppAuthorizationTestData.CreateProject(projectId, Guid.NewGuid(), "assigned-project");
+        project.OrganizationId = organizationId;
+        dbContext.Projects.Add(project);
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId, Name = "Assigned", Summary = "", Description = "", Definition = "{}",
+            ProjectId = projectId, Scope = AccessScope.Project,
+            AccessStatus = AppAccessStatuses.Active, Created = now, Updated = now
+        });
+        dbContext.ProjectApps.Add(new ProjectApp { ProjectId = projectId, WebAppId = appId, AddedAt = now });
+        dbContext.OrganizationMembers.Add(new OrganizationMember
+        {
+            Id = Guid.NewGuid(), OrganizationId = organizationId, UserId = userId,
+            Role = OrganizationRole.AppUser, JoinedAt = now, IsActive = true
+        });
+        var assignment = new OrganizationAppAssignment
+        {
+            Id = Guid.NewGuid(), OrganizationId = organizationId, AppId = appId, UserId = userId,
+            AssignedAt = now, IsActive = true
+        };
+        dbContext.OrganizationAppAssignments.Add(assignment);
+        await dbContext.SaveChangesAsync();
+        return new AssignedRuntimeFixture(appId, userId, assignment);
+    }
+
+    private static InternalRuntimeControllerTests.AuthorizedRuntimeRequest CreateRequest(Guid appId, Guid userId)
+        => InternalRuntimeControllerTests.CreateAuthorizedRequest(appId, userId);
+
+    private static InternalRuntimeController CreateController(
+        ApplicationDbContext dbContext,
+        InternalRuntimeControllerTests.AuthorizedRuntimeRequest request)
+        => InternalRuntimeControllerTests.CreateController(dbContext, request.HttpContext, request.CookieService);
+
+    private static Task<IActionResult> AuthorizeAsync(
+        InternalRuntimeController controller,
+        InternalRuntimeControllerTests.AuthorizedRuntimeRequest request)
+        => controller.AuthorizeRuntimeRequest(
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.AppIdHeader].ToArray(),
+            request.HttpContext.Request.Headers[RuntimeCookieConstants.ProxyAuthHeader].ToArray(),
+            CancellationToken.None);
+
+    private sealed record AssignedRuntimeFixture(Guid AppId, Guid UserId, OrganizationAppAssignment Assignment);
 }

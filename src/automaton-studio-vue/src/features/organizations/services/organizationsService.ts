@@ -15,6 +15,15 @@ import type {
   AssignAppRequest,
 } from '../types';
 
+export interface OrganizationAppSummary {
+  id: string;
+  name: string;
+  summary?: string;
+  description?: string;
+  thumbnailUrl?: string;
+  isPublished: boolean;
+}
+
 class OrganizationsService {
 
   // =====================================================
@@ -143,16 +152,19 @@ class OrganizationsService {
   /**
    * Get all apps from projects in the organization
    */
-  async getOrganizationApps(organizationId: string): Promise<any[]> {
-    const response = await apiClient.get(`/api/organizations/${organizationId}/apps`);
+  async getOrganizationApps(organizationId: string): Promise<OrganizationAppSummary[]> {
+    const response = await apiClient.get<OrganizationAppSummary[]>(`/api/organizations/${organizationId}/apps`);
     return response.data;
   }
 
   /**
    * Get all apps assigned to the current user in an organization
    */
-  async getMyAssignedApps(organizationId: string): Promise<any[]> {
-    const response = await apiClient.get(`/api/organizations/${organizationId}/apps/assigned`);
+  async getMyAssignedApps(organizationId?: string): Promise<OrganizationAppSummary[]> {
+    const endpoint = organizationId
+      ? `/api/organizations/${organizationId}/apps/assigned`
+      : '/api/organizations/apps/assigned';
+    const response = await apiClient.get<OrganizationAppSummary[]>(endpoint);
     return response.data;
   }
 

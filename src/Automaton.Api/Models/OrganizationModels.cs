@@ -153,6 +153,15 @@ public class OrganizationAppAssignmentDto
     public string? AssignedByName { get; set; }
     public DateTime AssignedAt { get; set; }
 }
+
+/// <summary>Safe app metadata shown to organization members; excludes source and administration state.</summary>
+public sealed record OrganizationAppSummaryDto(
+    Guid Id,
+    string Name,
+    string? Summary,
+    string? Description,
+    string? ThumbnailUrl,
+    bool IsPublished);
 /// <summary>
 /// Response model for pending organization invitations
 /// </summary>

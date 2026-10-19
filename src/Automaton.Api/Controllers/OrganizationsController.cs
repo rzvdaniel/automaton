@@ -1,4 +1,5 @@
 using Automaton.Api.Models;
+using Automaton.Api.Entities;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -477,7 +478,7 @@ public class OrganizationsController : BaseController
         try
         {
             var apps = await organizationService.GetOrganizationAppsAsync(id);
-            return Ok(apps);
+            return Ok(apps.Select(ToAppSummary));
         }
         catch (UnauthorizedAccessException)
         {
@@ -490,6 +491,15 @@ public class OrganizationsController : BaseController
         }
     }
 
+    /// <summary>Get safe metadata for apps assigned to the current user across active organizations.</summary>
+    [HttpGet("apps/assigned")]
+    public async Task<ActionResult<IReadOnlyList<OrganizationAppSummaryDto>>> GetCurrentUserAssignedApps(
+        CancellationToken cancellationToken)
+    {
+        var apps = await organizationService.GetMyAssignedAppsAsync(GetUserId(), cancellationToken);
+        return Ok(apps.Select(ToAppSummary));
+    }
+
     /// <summary>
     /// Get all apps assigned to the current user in an organization.
     /// </summary>
@@ -499,7 +509,7 @@ public class OrganizationsController : BaseController
         try
         {
             var apps = await organizationService.GetAssignedAppsAsync(id, GetUserId());
-            return Ok(apps);
+            return Ok(apps.Select(ToAppSummary));
         }
         catch (UnauthorizedAccessException)
         {
@@ -511,6 +521,15 @@ public class OrganizationsController : BaseController
             return StatusCode(500, new { message = "Error retrieving assigned apps" });
         }
     }
+
+    private static OrganizationAppSummaryDto ToAppSummary(WebApp app)
+        => new(
+            app.Id,
+            app.Name,
+            app.Summary,
+            app.Description,
+            app.ThumbnailUrl,
+            app.IsPublished);
 
     /// <summary>
     /// Assign an app to a user within the organization.

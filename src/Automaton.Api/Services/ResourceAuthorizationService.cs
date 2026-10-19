@@ -72,6 +72,11 @@ public class ResourceAuthorizationService
         return hasProjectAccess;
     }
 
+    /// <summary>Checks app runtime use, including explicit organization assignment, without granting app administration.</summary>
+    public async Task<bool> CanUseAppRuntimeAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
+        => await CanAccessAppAsync(appId, userId, cancellationToken) ||
+           await CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken);
+
     /// <summary>
     /// Check if user can update/modify an app
     /// User can update if:
@@ -213,6 +218,9 @@ public class ResourceAuthorizationService
                 assignment.AppId == appId &&
                 assignment.UserId == userId &&
                 assignment.IsActive &&
+                dbContext.Organizations.Any(organization =>
+                    organization.Id == assignment.OrganizationId &&
+                    organization.IsActive) &&
                 dbContext.OrganizationMembers.Any(member =>
                     member.OrganizationId == assignment.OrganizationId &&
                     member.UserId == userId &&

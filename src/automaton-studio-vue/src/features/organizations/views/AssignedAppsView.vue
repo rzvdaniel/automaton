@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import Card from 'primevue/card'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { appsService } from '@/features/apps/services/apps.service'
 import type { App } from '@/features/apps/types/apps.types'
+import { organizationsService } from '../services/organizationsService'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 
-const apps = ref<App[]>([])
+interface MyAppCard {
+  id: string
+  name: string
+  summary?: string
+  description?: string
+  thumbnailUrl?: string | null
+  isPublished: boolean
+  publicUrl?: string
+  isAssigned: boolean
+}
+
+const apps = ref<MyAppCard[]>([])
 const loading = ref(true)
+const router = useRouter()
 
 onMounted(async () => {
   await loadApps()
@@ -18,7 +33,26 @@ onMounted(async () => {
 async function loadApps() {
   try {
     loading.value = true
-    apps.value = await appsService.list()
+    const [accessibleApps, assignedApps] = await Promise.all([
+      appsService.list(),
+      organizationsService.getMyAssignedApps(),
+    ])
+    const cards = new Map<string, MyAppCard>(accessibleApps.map((app: App) => [app.id, {
+      id: app.id,
+      name: app.name,
+      summary: app.summary,
+      description: app.description,
+      thumbnailUrl: app.thumbnailUrl,
+      isPublished: app.isPublished,
+      publicUrl: app.publicUrl,
+      isAssigned: false,
+    }]))
+    for (const app of assignedApps) {
+      const existing = cards.get(app.id)
+      if (existing) existing.isAssigned = true
+      else cards.set(app.id, { ...app, isAssigned: true })
+    }
+    apps.value = Array.from(cards.values())
   } catch {
     // handled by axios interceptor
   } finally {
@@ -34,16 +68,22 @@ function setHovering(id: string, value: boolean) {
 }
 
 // Full thumbnail URL with API base URL
-function thumbnailSrc(app: App): string {
+function thumbnailSrc(app: MyAppCard): string {
   if (!app.thumbnailUrl) return ''
   if (app.thumbnailUrl.startsWith('http')) return app.thumbnailUrl
   return `${import.meta.env.VITE_API_BASE_URL ?? ''}${app.thumbnailUrl}`
 }
 
-function openApp(app: App) {
+function openApp(app: MyAppCard) {
   if (app.publicUrl) {
     window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
+  } else if (app.isAssigned) {
+    void router.push(`/my-apps/${app.id}`)
   }
+}
+
+function openAssignedUseView(app: MyAppCard) {
+  void router.push(`/my-apps/${app.id}`)
 }
 </script>
 
@@ -67,7 +107,7 @@ function openApp(app: App) {
     />
 
     <div v-else class="apps-grid">
-      <div
+      <Card
         v-for="app in apps"
         :key="app.id"
         class="app-card"
@@ -75,6 +115,7 @@ function openApp(app: App) {
         @mouseleave="setHovering(app.id, false)"
         @click="openApp(app)"
       >
+        <template #header>
         <!-- Image -->
         <div class="card-image">
           <img v-if="app.thumbnailUrl" :src="thumbnailSrc(app)" :alt="app.name" loading="lazy" class="cover-img" />
@@ -92,16 +133,19 @@ function openApp(app: App) {
           <transition name="fade">
             <div v-if="hovering[app.id]" class="hover-overlay">
               <Button
-                v-tooltip.top="'Open app'"
+                v-tooltip.top="app.isAssigned && !app.publicUrl ? 'Use app' : 'Open app'"
                 icon="pi pi-play"
                 rounded
                 class="play-btn"
+                aria-label="Open app"
                 @click.stop="openApp(app)"
               />
             </div>
           </transition>
         </div>
+        </template>
 
+        <template #content>
         <!-- Text -->
         <div class="card-body">
           <p class="card-title">{{ app.name }}</p>
@@ -109,7 +153,10 @@ function openApp(app: App) {
             {{ app.description || app.summary }}
           </p>
         </div>
-      </div>
+        <Button v-if="app.isAssigned" label="Run Actions" icon="pi pi-bolt" text @click.stop="openAssignedUseView(app)" />
+        <Button v-else-if="app.publicUrl" label="Open app" icon="pi pi-arrow-right" text @click.stop="openApp(app)" />
+        </template>
+      </Card>
     </div>
   </div>
 </template>
@@ -153,18 +200,8 @@ function openApp(app: App) {
 }
 
 /* Card */
-.app-card {
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  overflow: hidden;
-  transition: transform 0.2s ease;
-}
-
-.app-card:hover {
-  transform: translateY(-4px);
-}
+.app-card { cursor: pointer; }
+.app-card :deep(.p-card-body) { padding: 0; }
 
 /* Image area — 16:9 ratio */
 .card-image {
@@ -228,7 +265,7 @@ function openApp(app: App) {
 
 /* Card text */
 .card-body {
-  padding: 0.6rem 0 0.25rem;
+  padding: 0.75rem 1rem 0.25rem;
 }
 
 .card-title {
