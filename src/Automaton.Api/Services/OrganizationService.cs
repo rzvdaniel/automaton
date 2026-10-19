@@ -925,29 +925,59 @@ public class OrganizationService : IOrganizationService
         }
 
         // Get all apps from projects in this organization
-        var apps = await dbContext.ProjectApps
+        return await dbContext.ProjectApps
             .Where(pa => pa.Project.OrganizationId == organizationId && pa.Project.IsActive)
-            .Include(pa => pa.WebApp)
             .Select(pa => pa.WebApp!)
             .Distinct()
             .ToListAsync(cancellationToken);
-
-        return apps;
     }
 
     public async Task<IEnumerable<WebApp>> GetAssignedAppsAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var apps = await dbContext.OrganizationAppAssignments
-            .Where(oa => oa.OrganizationId == organizationId && oa.UserId == userId && oa.IsActive)
-            .Include(oa => oa.App)
-            .Select(oa => oa.App!)
-            .ToListAsync(cancellationToken);
+        if (!await CanAccessOrganizationAsync(organizationId, userId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("You do not have access to this organization.");
+        }
 
-        return apps;
+        var apps = await GetAssignedAppsQuery(userId, organizationId)
+            .Select(assignment => assignment.App!)
+            .ToListAsync(cancellationToken);
+        return apps.DistinctBy(app => app.Id).ToArray();
     }
+
+    public async Task<IReadOnlyList<WebApp>> GetMyAssignedAppsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var apps = await GetAssignedAppsQuery(userId, null)
+            .Select(assignment => assignment.App!)
+            .ToListAsync(cancellationToken);
+        return apps
+            .DistinctBy(app => app.Id)
+            .ToArray();
+    }
+
+    private IQueryable<OrganizationAppAssignment> GetAssignedAppsQuery(Guid userId, Guid? organizationId)
+        => dbContext.OrganizationAppAssignments.Where(assignment =>
+            assignment.UserId == userId &&
+            assignment.IsActive &&
+            (!organizationId.HasValue || assignment.OrganizationId == organizationId.Value) &&
+            dbContext.Organizations.Any(organization =>
+                organization.Id == assignment.OrganizationId && organization.IsActive) &&
+            dbContext.OrganizationMembers.Any(member =>
+                member.OrganizationId == assignment.OrganizationId && member.UserId == userId && member.IsActive) &&
+            dbContext.ProjectApps.Any(projectApp =>
+                projectApp.WebAppId == assignment.AppId &&
+                projectApp.Project!.OrganizationId == assignment.OrganizationId &&
+                projectApp.Project.IsActive));
 
     public async Task<IEnumerable<ApplicationUser>> GetAppAssignedUsersAsync(Guid organizationId, Guid appId, CancellationToken cancellationToken = default)
     {
+        if (!await IsOrgAdminAsync(organizationId, UserId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("Only organization administrators can view app assignments.");
+        }
+
         var users = await dbContext.OrganizationAppAssignments
             .Where(oa => oa.OrganizationId == organizationId && oa.AppId == appId && oa.IsActive)
             .Include(oa => oa.User)

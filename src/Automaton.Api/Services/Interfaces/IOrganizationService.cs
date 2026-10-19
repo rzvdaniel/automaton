@@ -129,6 +129,9 @@ public interface IOrganizationService
     /// Get all apps assigned to a user in an organization
     /// </summary>
     Task<IEnumerable<WebApp>> GetAssignedAppsAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Get the current user's assigned apps across active organization memberships.</summary>
+    Task<IReadOnlyList<WebApp>> GetMyAssignedAppsAsync(Guid userId, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get all users that have access to a specific app in an organization

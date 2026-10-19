@@ -76,7 +76,7 @@ public class InternalRuntimeController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await authorizationService.CanAccessAppAsync(appId, validation.UserId, cancellationToken))
+        if (!await authorizationService.CanUseAppRuntimeAsync(appId, validation.UserId, cancellationToken))
         {
             logger.LogDebug("Runtime auth forbidden for app {AppId} and user {UserId}.", appId, validation.UserId);
             return Forbid();

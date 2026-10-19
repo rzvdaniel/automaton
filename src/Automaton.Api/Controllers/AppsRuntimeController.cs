@@ -13,15 +13,16 @@ public sealed class AppsRuntimeController(
     AppsService appsService,
     UserContextService userContextService,
     RuntimeCookieService runtimeCookieService,
+    ResourceAuthorizationService authorizationService,
     IOptions<PublishedAppsConfig> publishedAppsOptions) : ControllerBase
 {
     private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
     [HttpPost("{id}/runtime-launch")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> CreateRuntimeLaunch(Guid id)
+    public async Task<IActionResult> CreateRuntimeLaunch(Guid id, CancellationToken cancellationToken)
     {
-        if (await appsService.GetAccessibleAppInfoByIdAsync(id) is null)
+        if (!await CanUseAppAsync(id, cancellationToken))
         {
             return NotFound(new { message = "App not found" });
         }
@@ -31,15 +32,22 @@ public sealed class AppsRuntimeController(
     }
 
     [HttpGet("{id}/launch-runtime")]
-    public async Task<IActionResult> LaunchRuntime(Guid id)
+    public async Task<IActionResult> LaunchRuntime(Guid id, CancellationToken cancellationToken)
     {
-        if (await appsService.GetAccessibleAppInfoByIdAsync(id) is null)
+        if (!await CanUseAppAsync(id, cancellationToken))
         {
             return NotFound(new { message = "App not found" });
         }
 
         AppendRuntimeCookie(id);
         return Redirect(BuildRestrictedRuntimeUrl(id));
+    }
+
+    private async Task<bool> CanUseAppAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        var userId = userContextService.GetUserId();
+        return await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken) is not null ||
+               await authorizationService.CanExecuteAssignedOrganizationAppAsync(appId, userId, cancellationToken);
     }
 
     private void AppendRuntimeCookie(Guid appId)

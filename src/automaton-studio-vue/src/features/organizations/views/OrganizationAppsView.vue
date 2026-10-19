@@ -21,6 +21,7 @@ const loading = ref(true)
 const showAssignDialog = ref(false)
 const selectedApp = ref<any>(null)
 const currentUserRole = ref<string | null>(null)
+const isOrgAdmin = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
 
 const organizationId = computed(() => route.params.id as string)
 const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
@@ -59,7 +60,9 @@ async function loadApps() {
     const appsWithCounts = await Promise.all(
       appsData.map(async (app) => {
         try {
-          const assignedUsers = await organizationsService.getAppAssignedUsers(organizationId.value, app.id)
+          const assignedUsers = isOrgAdmin.value
+            ? await organizationsService.getAppAssignedUsers(organizationId.value, app.id)
+            : []
           return {
             ...app,
             assignedUsers: assignedUsers.length
@@ -150,13 +153,13 @@ function navigateBack() {
         </template>
       </Column>
 
-      <Column field="assignedUsers" header="Assigned Users">
+      <Column v-if="isOrgAdmin" field="assignedUsers" header="Assigned Users">
         <template #body="{ data }">
           <Tag :value="`${data.assignedUsers || 0} users`" severity="info" />
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 12rem">
+      <Column v-if="isOrgAdmin" header="Actions" style="width: 12rem">
         <template #body="{ data }">
           <Button
             label="Manage Access"

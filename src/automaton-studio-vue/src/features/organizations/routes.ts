@@ -49,4 +49,10 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/AssignedAppsView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/my-apps/:appId',
+    name: 'assigned-app-use',
+    component: () => import('./views/AssignedAppUseView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]

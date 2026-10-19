@@ -1,6 +1,6 @@
 # Automaton self-hosted roadmap
 
-Updated: 16 October 2026. Status: proposed refactoring direction; implementation has not started under this roadmap.
+Updated: 19 October 2026. Status: M1 implementation is merged and combined acceptance is deferred; M2 is underway.
 
 ## Product decision
 
@@ -83,11 +83,11 @@ Offer a small optional system-app catalog: monitoring first, then backup and sel
 
 ## Delivery milestones
 
-All four milestones are pending. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
+Milestone 1 acceptance remains open; milestone 2 is in progress; milestones 3–4 are pending. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
-Prerequisite: use the reconciled source baseline from PR #391. Inspect the existing web deployment, Action and storage paths together before changing ownership. Database migration inventory is required before release, but does not block isolated implementation work. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for the verified source trace, implementation sequence and focused acceptance evidence.
+The implementation PRs are merged on the reconciled source baseline from PR #391 and retain the existing control plane and durable Runner operation mechanisms. Production database migration inventory remains required before release but does not block further development. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for source details and acceptance cases to revisit before relying on the assembled flow for other users or replacing the active Runner.
 
 - Establish machine/workspace/app assignment and capacity ownership without allocating a per-user Hosted Runner. Preserve existing API authorization and durable operation semantics.
 - Implement a complete API-to-Runner web deployment on ext4: build or pull, create/start, health/readiness, routing, logs, stop/update and explicit persistent data.
@@ -96,13 +96,16 @@ Prerequisite: use the reconciled source baseline from PR #391. Inspect the exist
 
 Acceptance: on a disposable Linux machine, two users deploy apps and run jobs through one management Runner. Cross-user files, secrets, logs and operations are denied. There is no placeholder Hosted Runner record or per-user management container required for new workloads. Restart/lost-response checks demonstrate safe result recovery and no automatic replay of uncertain Actions. Source/artifacts and persistent data survive the applicable restart/update scenarios.
 
+M1 implementation PRs are merged. Combined integration acceptance is deferred because a suitable isolated environment is unavailable. Real Action execution, two-user isolation, cancellation and combined restart/replay behavior remain unverified.
+
 ### 2. Make personal and shared apps useful with low overhead
 
 Depends on milestone 1's execution and permission boundary.
 
-- Finish personal/project/organization app access and explicit machine placement using the existing organization model.
-- Support a documented Compose subset for multi-service apps, with scoped networks, secrets and volumes.
-- Add shared static publishing with independent hostnames and authentication. Make publish, share and source-copy behavior clear in Studio and API.
+- PR #396 completed Action authorization for explicitly assigned organization apps. Current task: complete the organization app use flow—assignment, My Apps listing, opening the app, running Actions and revoking access—while keeping app use separate from source, secrets and machine administration.
+- Capacity work means configurable machine/workload safeguards and admission budgets, not subscription quotas or per-user resource accounting.
+- Next, support a documented Compose subset for multi-service apps, then add shared static publishing with independent hostnames and authentication.
+- Make publish, share and source-copy behavior clear in Studio and API.
 - Show capacity, workload limits and unsupported guarantees accurately; reject deployments that exceed configured admission budgets.
 
 Acceptance: a small-team fixture publishes two static sites through the shared service, a multi-service web app and an automation. Intended colleagues can use shared apps; unauthorized users cannot inspect their internals. Static sites remain separated, source copies exclude secrets/data, and capacity refusal is understandable and leaves no orphan deployment.
@@ -141,4 +144,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** begin milestone 1 using the implementation guide, delivering working web deployment and isolated job execution through the existing Runner. Resolve the recorded database migration limitation before deploying this source to any environment whose migration history is unknown.
+**Next action:** complete the organization-assigned app use flow in the current M2 task. Then deliver the documented Compose subset and shared static publishing. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.

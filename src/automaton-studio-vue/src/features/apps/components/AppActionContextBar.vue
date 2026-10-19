@@ -6,7 +6,9 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { appsService, type AppActionExecution, type AppActionVersion } from '../services/apps.service'
 
-const props = defineProps<{ appId: string; actionKey: string }>()
+const props = withDefaults(defineProps<{ appId: string; actionKey: string; allowVersionManagement?: boolean }>(), {
+  allowVersionManagement: true,
+})
 const toast = useToast()
 const visible = ref(false)
 const input = ref('{}')
@@ -24,7 +26,7 @@ async function refreshContext() {
   try {
     const [allExecutions, actionVersions] = await Promise.all([
       appsService.listActionExecutions(props.appId),
-      appsService.listActionVersions(props.appId, props.actionKey),
+      props.allowVersionManagement ? appsService.listActionVersions(props.appId, props.actionKey) : Promise.resolve([]),
     ])
     recent.value = allExecutions.filter(item => item.moduleKey === props.actionKey).slice(0, 5)
     versions.value = actionVersions
@@ -113,7 +115,7 @@ watch(() => props.actionKey, refreshContext)
       <strong>Recent executions</strong>
       <div v-for="item in recent" :key="item.id" class="context-row"><code>{{ item.id.slice(0, 8) }}</code><span>{{ item.status }}</span><span>{{ new Date(item.createdAtUtc).toLocaleString() }}</span></div>
     </div>
-    <div v-if="versions.length" class="context-section">
+    <div v-if="allowVersionManagement && versions.length" class="context-section">
       <strong>Runner-local versions</strong>
       <div v-for="item in versions" :key="item.version" class="context-row">
         <code>{{ item.version }}</code><span>{{ Math.ceil(item.sizeBytes / 1024) }} KB</span>
