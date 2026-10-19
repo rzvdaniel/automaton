@@ -243,7 +243,9 @@ internal sealed class HostContainerComposeProjectExecutor(
             return new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
         if (portBindings.ValueKind != JsonValueKind.Object)
             return Failure("compose_ports", "A Compose service returned invalid runtime port bindings.");
-        var published = portBindings.EnumerateObject().ToArray();
+        var published = portBindings.EnumerateObject()
+            .Where(binding => binding.Value.ValueKind != JsonValueKind.Null)
+            .ToArray();
         if (published.Length == 0)
             return new() { Success = true, Exists = true, Running = running, ContainerId = id, Labels = labels };
         if (published.Length != 1 || !published[0].Name.EndsWith("/tcp", StringComparison.Ordinal))

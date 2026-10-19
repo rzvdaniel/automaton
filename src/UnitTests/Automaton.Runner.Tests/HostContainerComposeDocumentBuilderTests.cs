@@ -23,12 +23,31 @@ public sealed class HostContainerComposeDocumentBuilderTests
     }
 
     [Test]
+    public void ReadComposeEndpoint_IgnoresUnpublishedImagePortsForInternalService()
+    {
+        using var json = JsonDocument.Parse("""{"NetworkSettings":{"Ports":{"6379/tcp":null}}}""");
+
+        var result = HostContainerComposeProjectExecutor.ReadComposeEndpoint(
+            json.RootElement, new string('a', 64), true, new Dictionary<string, string>(), "10.20.30.40");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.True);
+            Assert.That(result.Running, Is.True);
+            Assert.That(result.HostPort, Is.Null);
+        });
+    }
+
+    [Test]
     public void ReadComposeEndpoint_UsesAllocatedRuntimeBindingAndValidatesPrivateAddress()
     {
         using var json = JsonDocument.Parse("""
             {
               "HostConfig":{"PortBindings":{"8080/tcp":[{"HostIp":"10.20.30.40","HostPort":"0"}]}},
-              "NetworkSettings":{"Ports":{"8080/tcp":[{"HostIp":"10.20.30.40","HostPort":"32768"}]}}
+              "NetworkSettings":{"Ports":{
+                "8080/tcp":[{"HostIp":"10.20.30.40","HostPort":"32768"}],
+                "6379/tcp":null
+              }}
             }
             """);
 
