@@ -171,8 +171,18 @@ public class ResourceAuthorizationService
             return true;
         }
 
-        // Check project membership with execute permission
-        var hasProjectAccess = await dbContext.ProjectApps
+        if (await HasProjectAppExecutionAccessAsync(appId, userId, cancellationToken))
+        {
+            return true;
+        }
+
+        return await HasAssignedOrganizationAppExecutionAccessAsync(appId, userId, cancellationToken);
+    }
+
+    private Task<bool> HasProjectAppExecutionAccessAsync(
+        Guid appId,
+        Guid userId,
+        CancellationToken cancellationToken) => dbContext.ProjectApps
             .Where(pa => pa.WebAppId == appId)
             .Join(
                 dbContext.ProjectMembers,
@@ -182,11 +192,36 @@ public class ResourceAuthorizationService
             .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
                           (x.pm.Role == ProjectRole.ProjectAdmin ||
                            x.pm.Role == ProjectRole.Developer ||
-                           x.pm.Role == ProjectRole.AppUser),
-                      cancellationToken);
+                           (x.pm.Role == ProjectRole.AppUser &&
+                            (!x.pa.Project!.OrganizationId.HasValue ||
+                             dbContext.OrganizationAppAssignments.Any(assignment =>
+                                 assignment.OrganizationId == x.pa.Project.OrganizationId &&
+                                 assignment.AppId == appId &&
+                                 assignment.UserId == userId &&
+                                 assignment.IsActive &&
+                                 dbContext.OrganizationMembers.Any(member =>
+                                     member.OrganizationId == assignment.OrganizationId &&
+                                     member.UserId == userId &&
+                                     member.IsActive))))),
+                cancellationToken);
 
-        return hasProjectAccess;
-    }
+    private Task<bool> HasAssignedOrganizationAppExecutionAccessAsync(
+        Guid appId,
+        Guid userId,
+        CancellationToken cancellationToken) => dbContext.OrganizationAppAssignments
+            .AnyAsync(assignment =>
+                assignment.AppId == appId &&
+                assignment.UserId == userId &&
+                assignment.IsActive &&
+                dbContext.OrganizationMembers.Any(member =>
+                    member.OrganizationId == assignment.OrganizationId &&
+                    member.UserId == userId &&
+                    member.IsActive) &&
+                dbContext.ProjectApps.Any(projectApp =>
+                    projectApp.WebAppId == appId &&
+                    projectApp.Project!.OrganizationId == assignment.OrganizationId &&
+                    projectApp.Project.IsActive),
+                cancellationToken);
 
     #endregion
 
