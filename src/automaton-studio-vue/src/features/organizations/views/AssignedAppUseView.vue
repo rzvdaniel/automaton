@@ -15,6 +15,7 @@ const app = ref<OrganizationAppSummary | null>(null)
 const actions = ref<ActionModule[]>([])
 const loading = ref(true)
 const error = ref('')
+const actionsError = ref('')
 const opening = ref(false)
 const appId = String(route.params.appId)
 
@@ -26,11 +27,18 @@ onMounted(async () => {
       error.value = 'This app is no longer assigned to your account.'
       return
     }
-    actions.value = await actionSchedulesService.listActions(appId)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : 'App access could not be verified.'
   } finally {
     loading.value = false
+  }
+
+  if (app.value) {
+    try {
+      actions.value = await actionSchedulesService.listActions(appId)
+    } catch (reason) {
+      actionsError.value = reason instanceof Error ? reason.message : 'Actions could not be loaded.'
+    }
   }
 })
 
@@ -72,6 +80,7 @@ async function openRuntime() {
             </div>
           </template>
         </Card>
+        <Message v-else-if="actionsError" severity="warn" :closable="false">Actions could not be loaded. {{ actionsError }}</Message>
         <Message v-else severity="secondary" :closable="false">No Actions are available for this app.</Message>
       </section>
     </template>
