@@ -32,9 +32,14 @@ public sealed class AppRunnerAuthorizationPolicy(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        if (!await authorizationService.CanExecuteAssignedOrganizationAppAsync(app.Id, userId, cancellationToken))
+        if (await authorizationService.CanAccessAppAsync(app.Id, userId, cancellationToken))
         {
             return await AuthorizeAsync(app, runnerId, userId, cancellationToken);
+        }
+
+        if (!await authorizationService.CanExecuteAssignedOrganizationAppAsync(app.Id, userId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
         }
 
         var runner = await dbContext.Runners.AsNoTracking()

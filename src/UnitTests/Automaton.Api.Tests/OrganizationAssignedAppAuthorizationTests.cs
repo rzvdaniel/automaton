@@ -116,26 +116,60 @@ public sealed class OrganizationAssignedAppAuthorizationTests
         Assert.That(gateway.DispatchCount, Is.Zero);
     }
 
+    [Test]
+    public async Task ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned()
+    {
+        await using var fixture = await AppFixture.CreateAsync(assignApp: true, projectRole: ProjectRole.Developer);
+        var runnerId = await fixture.AssignMachineRunnerAsync(RunnerApplicationProfiles.Standard);
+        var gateway = new RecordingActionGateway();
+        var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
+        using var input = JsonDocument.Parse("{}");
+
+        await service.ExecuteAsync(fixture.AppId, "hello", fixture.UserId, input.RootElement, CancellationToken.None);
+
+        Assert.That(gateway.QueuedRunnerId, Is.EqualTo(runnerId));
+    }
+
+    [Test]
+    public async Task ExecuteAsync_RequiresPersistedApprovalForPrivilegedHostTarget()
+    {
+        await using var fixture = await AppFixture.CreateAsync(
+            assignApp: true, projectRole: ProjectRole.Developer);
+        await fixture.AssignMachineRunnerAsync(RunnerApplicationProfiles.PrivilegedHost);
+        var gateway = new RecordingActionGateway();
+        var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
+        using var input = JsonDocument.Parse("{}");
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await service.ExecuteAsync(
+            fixture.AppId, "hello", fixture.UserId, input.RootElement, CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("persisted Privileged Host access approval"));
+        Assert.That(gateway.DispatchCount, Is.Zero);
+    }
+
     private sealed class AppFixture : IAsyncDisposable
     {
         private AppFixture(
             ApplicationDbContext dbContext,
             ResourceAuthorizationService authorization,
             Guid appId,
-            Guid userId)
+            Guid userId,
+            Guid projectId)
         {
             DbContext = dbContext;
             Authorization = authorization;
             AppId = appId;
             UserId = userId;
+            ProjectId = projectId;
         }
 
         public ApplicationDbContext DbContext { get; }
         public ResourceAuthorizationService Authorization { get; }
         public Guid AppId { get; }
         public Guid UserId { get; }
+        public Guid ProjectId { get; }
 
-        public async Task<Guid> AssignMachineRunnerAsync()
+        public async Task<Guid> AssignMachineRunnerAsync(string applicationProfile = RunnerApplicationProfiles.MachineManagement)
         {
             var runnerId = Guid.NewGuid();
             var target = await DbContext.AppDeploymentTargets.SingleAsync(x => x.WebAppId == AppId);
@@ -144,10 +178,16 @@ public sealed class OrganizationAssignedAppAuthorizationTests
                 Id = runnerId,
                 Name = "machine management",
                 Purpose = RunnerPurposes.Managed,
-                ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+                ApplicationProfile = applicationProfile,
                 CapabilitiesJson = RunnerCapabilities.Serialize(
                     [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution], RunnerPurposes.Managed),
                 LastHeartbeatAtUtc = DateTime.UtcNow
+            });
+            DbContext.ProjectRunners.Add(new ProjectRunner
+            {
+                ProjectId = ProjectId,
+                RunnerId = runnerId,
+                AddedAt = DateTime.UtcNow
             });
             target.ExecutionRunnerId = runnerId;
             await DbContext.SaveChangesAsync();
@@ -235,7 +275,8 @@ public sealed class OrganizationAssignedAppAuthorizationTests
                 dbContext,
                 new ResourceAuthorizationService(dbContext, AppAuthorizationTestData.CreateUserContextService(userId)),
                 appId,
-                userId);
+                userId,
+                projectId);
         }
 
         public ValueTask DisposeAsync() => DbContext.DisposeAsync();
