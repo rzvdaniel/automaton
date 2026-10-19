@@ -336,7 +336,8 @@ internal static class GenericRuntimeAcceptanceSupport
             ApplicationContract contract,
             CancellationToken cancellationToken = default,
             string? artifactRoot = null,
-            Guid? candidateId = null)
+            Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
         {
             ArtifactRoot = artifactRoot;
             return Task.FromResult(new RuntimeApplyResult

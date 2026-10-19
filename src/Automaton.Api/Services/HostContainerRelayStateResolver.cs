@@ -89,7 +89,7 @@ public sealed class HostContainerRelayStateResolver(
         if (target is null || target.ExecutionRunnerId != caller.Id)
             return HostContainerRelayResolution.Rejected(
                 Failure("app_assignment_mismatch", "The target is not assigned to this machine Runner."));
-        if (request.Operation == HostContainerOperationKinds.RunBuild
+        if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.ApplyComposeProject)
             && target.ActiveDeploymentExecutionAttemptId != request.Scope.DeploymentAttemptId)
             return HostContainerRelayResolution.Rejected(
                 Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt."));

@@ -206,6 +206,40 @@ public sealed class HostContainerRelayServiceTests
     }
 
     [Test]
+    public async Task MachineComposeAssignmentCarriesServerDerivedPerContainerLimits()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
+        var attemptId = Guid.NewGuid();
+        fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
+        await fixture.Db.SaveChangesAsync();
+        var request = new HostContainerExecutionRequest
+        {
+            OperationId = fixture.OperationId,
+            Operation = HostContainerOperationKinds.ApplyComposeProject,
+            CandidateId = Guid.NewGuid(),
+            Compose = new ApplicationComposeSpec
+            {
+                PublicService = "web",
+                Services = [new() { Name = "web", Image = "nginx:1.27", Port = 8080 }]
+            },
+            Scope = new(Guid.Empty, Guid.Empty, fixture.App.Id, fixture.Target.Id, attemptId)
+        };
+
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, request, CancellationToken.None);
+        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
+            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assignment.Disposition, Is.EqualTo("execute"));
+            Assert.That(assignment.Request!.HostContainer!.ContainerLimits,
+                Is.EqualTo(new HostContainerResourceLimits(1.0m, 1024, 256)));
+            Assert.That(assignment.Request.HostContainer.Compose!.PublicService, Is.EqualTo("web"));
+        });
+    }
+
+    [Test]
     public async Task MachineContainerDispatchFailsClosedWhenResourcePolicyIsInvalid()
     {
         using var fixture = RelayFixture.Create();

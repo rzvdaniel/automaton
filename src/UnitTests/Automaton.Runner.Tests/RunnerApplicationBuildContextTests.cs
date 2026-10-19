@@ -94,7 +94,8 @@ public sealed class RunnerApplicationBuildContextTests
     private sealed class NoopRuntimeManager : IAppRuntimeProcessManager
     {
         public Task<RuntimeApplyResult> ApplyAsync(Guid appId, Guid deploymentTargetId, ApplicationContract contract,
-            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null)
+            CancellationToken cancellationToken = default, string? artifactRoot = null, Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
             => Task.FromResult(new RuntimeApplyResult());
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;

@@ -56,6 +56,70 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         return new DockerApplicationContainer(result.ContainerId, result.ContainerName, new(request.Image, result.ResolvedImage));
     }
 
+    public async Task<DockerApplicationContainer> CreateComposeProjectAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid candidateId,
+        ApplicationContract contract,
+        Guid? deploymentAttemptId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var compose = contract.Compose ?? throw new InvalidOperationException("A managed Compose deployment is required.");
+        var result = await execute(new()
+        {
+            OperationId = candidateId,
+            Scope = await ScopeAsync(appId, deploymentTargetId, deploymentAttemptId ?? Guid.Empty),
+            Operation = HostContainerOperationKinds.ApplyComposeProject,
+            CandidateId = candidateId,
+            Compose = compose
+        }, cancellationToken);
+        EnsureSuccess(result);
+        if (!HostContainerRuntimeValidation.IsContainerId(result.ContainerId) || result.HostPort is not > 0)
+            throw new InvalidOperationException("Docker Compose did not return a public runtime endpoint.");
+        var service = compose.Services.Single(item => item.Name == compose.PublicService);
+        return new(result.ContainerId, result.ContainerId,
+            new(service.Image, result.ResolvedImage), result.HostPort);
+    }
+
+    public async Task<DockerApplicationContainer?> InspectComposeProjectAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid candidateId,
+        ApplicationContract contract,
+        CancellationToken cancellationToken = default)
+    {
+        var compose = contract.Compose ?? throw new InvalidOperationException("A managed Compose deployment is required.");
+        var result = await execute(new()
+        {
+            OperationId = Guid.NewGuid(),
+            Scope = await ScopeAsync(appId, deploymentTargetId, Guid.Empty),
+            Operation = HostContainerOperationKinds.InspectComposeProject,
+            CandidateId = candidateId,
+            Compose = compose
+        }, cancellationToken);
+        EnsureSuccess(result);
+        if (!result.Exists) return null;
+        if (!HostContainerRuntimeValidation.IsContainerId(result.ContainerId) || result.HostPort is not > 0)
+            throw new InvalidOperationException("Docker Compose did not return a public runtime endpoint.");
+        var service = compose.Services.Single(item => item.Name == compose.PublicService);
+        return new(result.ContainerId, result.ContainerId,
+            new(service.Image, result.ResolvedImage), result.HostPort);
+    }
+
+    public async Task RemoveComposeProjectAsync(
+        ApplicationContainerScope scope,
+        Guid candidateId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureSuccess(await execute(new()
+        {
+            OperationId = Guid.NewGuid(),
+            Scope = await ScopeAsync(scope.AppId, scope.DeploymentTargetId, Guid.Empty),
+            Operation = HostContainerOperationKinds.RemoveComposeProject,
+            CandidateId = candidateId
+        }, cancellationToken));
+    }
+
     public async Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
         => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
 

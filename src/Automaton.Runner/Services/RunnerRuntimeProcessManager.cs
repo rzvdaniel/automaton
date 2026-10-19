@@ -14,7 +14,8 @@ public interface IAppRuntimeProcessManager
         ApplicationContract contract,
         CancellationToken cancellationToken = default,
         string? artifactRoot = null,
-        Guid? candidateId = null);
+        Guid? candidateId = null,
+        Guid? deploymentAttemptId = null);
 
     Task StopAsync(Guid appId, Guid deploymentTargetId);
 }
@@ -112,9 +113,11 @@ public sealed class RunnerRuntimeProcessManager : IAppRuntimeProcessManager, IHo
         ApplicationContract contract,
         CancellationToken cancellationToken = default,
         string? artifactRoot = null,
-        Guid? candidateId = null)
+        Guid? candidateId = null,
+        Guid? deploymentAttemptId = null)
     {
         ApplicationContractValidator.EnsureValid(contract);
+        ApplicationContractValidator.EnsureProcessRuntime(contract);
         var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var previousMetadata = File.Exists(metadataPath)
             ? await metadataStore.ReadAsync(metadataPath, cancellationToken)
@@ -737,6 +740,10 @@ public sealed class RunnerRuntimeDeploymentMetadata
     public ApplicationRuntimeSpec? Runtime { get; set; }
     public ApplicationHealthSpec? Health { get; set; }
     public ApplicationStorageSpec? Storage { get; set; }
+    public string? ComposeJson { get; set; }
+    public string? ComposeProjectId { get; set; }
+    public Guid? ComposeCandidateId { get; set; }
+    public Guid? DeploymentAttemptId { get; set; }
     public int? EffectivePort { get; set; }
     public int? ProcessId { get; set; }
     public DateTimeOffset? ProcessStartTimeUtc { get; set; }

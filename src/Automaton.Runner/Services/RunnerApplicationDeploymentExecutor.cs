@@ -58,7 +58,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         var manifest = PreparePackage(attempt, request);
         actionDeploymentService.EnsureMachineActionPreparationAvailable(
             Path.Combine(attempt.StagingRoot, "source"), request.ActionContainerPolicy);
-        attempt.PreserveCurrentRuntime = manifest.Application.Runtime.Command is not null;
+        attempt.PreserveCurrentRuntime = HasRuntime(manifest.Application);
         var buildResult = await BuildApplicationAsync(attempt, request, manifest.Application, cancellationToken);
         attempt.Logs.AddRange(buildResult.Logs);
         EnsureBuildSucceeded(manifest.Application.Build, buildResult);
@@ -77,7 +77,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
             attempt.AppId, attempt.TargetId, manifest.Application,
             cancellationToken: cancellationToken,
             artifactRoot: candidate.ArtifactRoot,
-            candidateId: candidate.Id);
+            candidateId: candidate.Id,
+            deploymentAttemptId: request.ExecutionAttemptId);
         attempt.CandidatePromoted = candidate.ArtifactRoot is not null && applyResult.PromotionIrreversible;
         if (applyResult.Warning is not null) attempt.Logs.Add(applyResult.Warning);
         return CreateSuccessResult(attempt, request, sourceCount, runtimeCount, actions);
@@ -157,7 +158,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         ApplicationContract application)
     {
         if (!request.Clean) return;
-        if (application.Runtime.Command is null)
+        if (!HasRuntime(application))
         {
             await runtimeProcessManager.StopAsync(attempt.AppId, attempt.TargetId);
             deploymentWorkspace.CleanDeploymentRoots(attempt.AppId, attempt.TargetId);
@@ -173,10 +174,13 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         deploymentWorkspace.SynchronizeActionRoots(attempt.AppId, attempt.TargetId, attempt.StagingRoot);
         var sourceCount = RunnerDeploymentWorkspace.CopyTreeIfExists(
             Path.Combine(attempt.StagingRoot, "source"), workspace.GetAppSourceRoot(attempt.AppId, attempt.TargetId));
-        return application.Runtime.Command is not null
+        return HasRuntime(application)
             ? CopyCandidateRuntime(attempt, sourceCount)
             : CopyCurrentRuntime(attempt, sourceCount);
     }
+
+    private static bool HasRuntime(ApplicationContract application)
+        => application.Runtime.Command is not null || application.Compose is not null;
 
     private (int, int, RuntimeCandidate) CopyCandidateRuntime(DeploymentAttempt attempt, int sourceCount)
     {

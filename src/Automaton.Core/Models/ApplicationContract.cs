@@ -13,6 +13,35 @@ public sealed class ApplicationContract
     public ApplicationRuntimeSpec Runtime { get; set; } = new();
     public ApplicationHealthSpec Health { get; set; } = new();
     public ApplicationStorageSpec Storage { get; set; } = new();
+    public ApplicationComposeSpec? Compose { get; set; }
+}
+
+/// <summary>A normalized, deliberately small Docker Compose deployment contract.</summary>
+public sealed class ApplicationComposeSpec
+{
+    public string PublicService { get; set; } = string.Empty;
+    public List<ApplicationComposeService> Services { get; set; } = [];
+    public List<string> Volumes { get; set; } = [];
+}
+
+public sealed class ApplicationComposeService
+{
+    public string Name { get; set; } = string.Empty;
+    public string Image { get; set; } = string.Empty;
+    public int? Port { get; set; }
+    public List<string> Command { get; set; } = [];
+    public List<string> Entrypoint { get; set; } = [];
+    public string? WorkingDirectory { get; set; }
+    public Dictionary<string, string> Environment { get; set; } = new(StringComparer.Ordinal);
+    public List<string> DependsOn { get; set; } = [];
+    public List<ApplicationComposeVolumeMount> Mounts { get; set; } = [];
+}
+
+public sealed class ApplicationComposeVolumeMount
+{
+    public string Name { get; set; } = string.Empty;
+    public string Target { get; set; } = string.Empty;
+    public bool ReadOnly { get; set; }
 }
 
 public sealed class ApplicationBuildSpec
@@ -120,6 +149,12 @@ public static class ApplicationContractSerialization
 
 public static class ApplicationContractValidator
 {
+    public static void EnsureProcessRuntime(ApplicationContract contract)
+    {
+        if (contract.Runtime.Command is null && contract.Compose is not null)
+            throw new InvalidOperationException("Compose deployments require the typed managed-container runtime.");
+    }
+
     public static IReadOnlyList<string> Validate(ApplicationContract? contract)
     {
         var errors = new List<string>();
@@ -138,6 +173,7 @@ public static class ApplicationContractValidator
         ValidateRuntime(contract.Runtime, errors);
         ValidateHealth(contract.Health, errors);
         ValidateStorage(contract.Storage, errors);
+        ValidateCompose(contract, errors);
 
         return errors;
     }
@@ -226,6 +262,122 @@ public static class ApplicationContractValidator
         }
     }
 
+    private static void ValidateCompose(ApplicationContract contract, ICollection<string> errors)
+    {
+        var compose = contract.Compose;
+        if (compose is null) return;
+        if (contract.Build?.Command is not null)
+            errors.Add("compose deployments cannot declare a build command; Compose builds are deferred");
+        if (contract.Runtime?.Command is not null)
+            errors.Add("compose deployments cannot also declare runtime.command");
+        if (compose.Services is null || compose.Services.Count is < 1 or > 16)
+        { errors.Add("compose.services must contain between 1 and 16 services"); return; }
+        var services = ValidateComposeServices(compose.Services, errors);
+        ValidatePublicComposeService(compose.PublicService, services, errors);
+        var volumes = ValidateComposeVolumeNames(compose.Volumes, errors);
+        ValidateComposeRelations(services, volumes, errors);
+    }
+
+    private static Dictionary<string, ApplicationComposeService> ValidateComposeServices(
+        IEnumerable<ApplicationComposeService> source,
+        ICollection<string> errors)
+    {
+        var services = new Dictionary<string, ApplicationComposeService>(StringComparer.Ordinal);
+        foreach (var service in source)
+        {
+            if (service is null || !IsComposeIdentifier(service.Name) || !services.TryAdd(service.Name, service))
+            { errors.Add("compose service names must be unique valid identifiers"); continue; }
+            ValidateComposeService(service, errors);
+        }
+        return services;
+    }
+
+    private static void ValidateComposeService(ApplicationComposeService service, ICollection<string> errors)
+    {
+        ValidateImage(service.Image, $"compose.services.{service.Name}.image", errors);
+        if (service.Port.HasValue) ValidatePort(service.Port.Value, $"compose.services.{service.Name}.port", errors);
+        if (service.Environment is null || service.Environment.Any(pair => HasInvalidEnvironment(pair.Key, pair.Value)))
+            errors.Add($"compose.services.{service.Name}.environment contains an invalid name or value");
+        if (service.Command is null || service.Entrypoint is null || service.DependsOn is null || service.Mounts is null)
+        { errors.Add($"compose.services.{service.Name} contains an invalid collection"); return; }
+        if (service.Command.Concat(service.Entrypoint).Any(value => value is null || value.Contains('\0')))
+            errors.Add($"compose.services.{service.Name} command contains an invalid value");
+        if (service.WorkingDirectory is not null && !IsValidComposeWorkingDirectory(service.WorkingDirectory))
+            errors.Add($"compose.services.{service.Name}.workingDirectory must be a valid container path without traversal");
+    }
+
+    private static bool HasInvalidEnvironment(string name, string value)
+        => string.IsNullOrWhiteSpace(name) || name.Contains('=') || name.Contains('\0')
+            || value is null || value.Contains('\0');
+
+    private static void ValidatePublicComposeService(
+        string? publicName,
+        IReadOnlyDictionary<string, ApplicationComposeService> services,
+        ICollection<string> errors)
+    {
+        if (!IsComposeIdentifier(publicName) || !services.TryGetValue(publicName!, out var service))
+            errors.Add("compose.publicService must identify a declared service");
+        else if (service.Port is null)
+            errors.Add("compose.publicService must declare exactly one container port");
+        if (services.Values.Count(item => item.Port.HasValue) != 1)
+            errors.Add("compose must declare exactly one externally routed service and container port");
+    }
+
+    private static HashSet<string> ValidateComposeVolumeNames(IEnumerable<string>? source, ICollection<string> errors)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        if (source is null || source.Any(name => !IsComposeIdentifier(name) || !result.Add(name)))
+            errors.Add("compose.volumes must contain unique valid managed named volumes");
+        return result;
+    }
+
+    private static void ValidateComposeRelations(
+        IReadOnlyDictionary<string, ApplicationComposeService> services,
+        ISet<string> volumes,
+        ICollection<string> errors)
+    {
+        foreach (var service in services.Values)
+        {
+            ValidateComposeDependencies(service, services, errors);
+            ValidateComposeMounts(service, volumes, errors);
+        }
+    }
+
+    private static void ValidateComposeDependencies(
+        ApplicationComposeService service,
+        IReadOnlyDictionary<string, ApplicationComposeService> services,
+        ICollection<string> errors)
+    {
+        if (service.DependsOn is null) return;
+        foreach (var dependency in service.DependsOn)
+            if (!services.ContainsKey(dependency))
+                errors.Add($"compose.services.{service.Name}.dependsOn references an undeclared service");
+    }
+
+    private static void ValidateComposeMounts(
+        ApplicationComposeService service,
+        ISet<string> volumes,
+        ICollection<string> errors)
+    {
+        if (service.Mounts is null) return;
+        foreach (var mount in service.Mounts)
+            if (mount is null || !volumes.Contains(mount.Name) || !IsValidContainerPath(mount.Target))
+                errors.Add($"compose.services.{service.Name}.volumes must use declared managed volumes and absolute container targets");
+    }
+
+    private static bool IsValidContainerPath(string? target)
+        => !string.IsNullOrWhiteSpace(target) && target.StartsWith("/", StringComparison.Ordinal)
+            && !target.Contains("..", StringComparison.Ordinal) && !target.Contains('\0');
+
+    private static bool IsValidComposeWorkingDirectory(string value)
+        => !string.IsNullOrWhiteSpace(value) && !value.Contains('\0')
+            && !LooksLikeWindowsRootedPath(value) && !ContainsTraversalSegment(value);
+
+    private static bool IsComposeIdentifier(string? value) => value is not null
+        && value.Length is >= 1 and <= 63
+        && (char.IsLetterOrDigit(value[0]) || value[0] == '_')
+        && value.All(character => char.IsLetterOrDigit(character) || character is '_' or '-' or '.');
+
     private static void ValidateMount(
         ApplicationStorageMount? mount,
         ISet<string> environmentNames,
@@ -257,6 +409,8 @@ public static class ApplicationContractValidator
     public static IReadOnlyList<string> ValidateForDeployment(ApplicationContract? contract)
     {
         var errors = Validate(contract).ToList();
+        if (contract?.Compose is not null)
+            return errors;
         if (contract?.Runtime?.Command is not null && string.IsNullOrWhiteSpace(contract.Runtime.Image))
             errors.Add("runtime.image is required when runtime.command is declared for container deployment");
         if (contract?.Build?.Command is not null

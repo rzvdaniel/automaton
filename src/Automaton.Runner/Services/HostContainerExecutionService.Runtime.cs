@@ -186,6 +186,10 @@ public sealed partial class HostContainerExecutionService
             var inspection = ReadContainerIdentity(root, scope);
             if (inspection.Failure is not null) return inspection.Failure;
             if (!discoverEndpoint) return CreateInspectionResponse(inspection.Id!, inspection.Running, inspection.Labels!);
+            if (inspection.Labels!.ContainsKey("com.automaton.compose-candidate"))
+                return HostContainerComposeProjectExecutor.ReadComposeEndpoint(
+                    root, inspection.Id!, inspection.Running, inspection.Labels,
+                    HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress());
             return HostContainerRuntimeEndpoint.Read(root, inspection.Id!, inspection.Running, inspection.Labels!);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)

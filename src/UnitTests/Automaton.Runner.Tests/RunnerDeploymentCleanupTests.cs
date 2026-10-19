@@ -187,7 +187,8 @@ public sealed class RunnerDeploymentCleanupTests
             ApplicationContract contract,
             CancellationToken cancellationToken = default,
             string? artifactRoot = null,
-            Guid? candidateId = null)
+            Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
             => Task.FromResult(new RuntimeApplyResult());
 
         public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;
@@ -203,7 +204,8 @@ public sealed class RunnerDeploymentCleanupTests
             ApplicationContract contract,
             CancellationToken cancellationToken = default,
             string? artifactRoot = null,
-            Guid? candidateId = null)
+            Guid? candidateId = null,
+            Guid? deploymentAttemptId = null)
         {
             ApplyCount++;
             return Task.FromResult(new RuntimeApplyResult { PromotionIrreversible = true });

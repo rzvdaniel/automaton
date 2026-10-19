@@ -20,6 +20,9 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         if (!Guid.TryParse(manifest.AppId, out var manifestAppId) || manifestAppId != requestAppId)
             throw new InvalidOperationException("Deployment package manifest app ID does not match the deployment request.");
         ApplicationContractValidator.EnsureDeployable(manifest.Application);
+        var packagedCompose = ApplicationComposeParser.LoadFromDirectory(Path.Combine(extractRoot, "source"));
+        if (!ApplicationComposeParser.AreEquivalent(packagedCompose, manifest.Application.Compose))
+            throw new InvalidOperationException("Deployment package Compose source does not match its normalized manifest.");
         return manifest;
     }
 

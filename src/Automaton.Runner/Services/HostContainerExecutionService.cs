@@ -15,6 +15,7 @@ public sealed partial class HostContainerExecutionService
     private readonly Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor;
     private readonly HostContainerBuildExecutor buildExecutor;
     private readonly HostContainerActionExecutor actionExecutor;
+    private readonly HostContainerComposeProjectExecutor composeExecutor;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
         : this((arguments, timeout, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, timeout, cancellationToken))
@@ -27,6 +28,7 @@ public sealed partial class HostContainerExecutionService
         this.executor = executor;
         buildExecutor = new HostContainerBuildExecutor(executor);
         actionExecutor = new HostContainerActionExecutor(executor, new RunnerWorkspaceService());
+        composeExecutor = new HostContainerComposeProjectExecutor(executor);
     }
 
     public async Task<HostContainerExecutionResponse> ExecuteAsync(
@@ -37,9 +39,10 @@ public sealed partial class HostContainerExecutionService
         if (validationFailure is not null) return validationFailure;
 
         if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.ApplyComposeProject
             or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction)
             && !HasTrustedResources(request.Resources))
-            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
+            return Failure("trusted_mapping_unavailable", "The trusted application resource mapping is unavailable.");
 
         var runtimeLimitsFailure = ValidateRuntimeLimits(request);
         if (runtimeLimitsFailure is not null) return runtimeLimitsFailure;
@@ -58,6 +61,9 @@ public sealed partial class HostContainerExecutionService
         var error = HostContainerRuntimeValidation.Validate(request);
         if (error is not null)
             return Failure("invalid_request", error);
+        if (request.Operation is HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.InspectComposeProject or HostContainerOperationKinds.RemoveComposeProject)
+            return await composeExecutor.ExecuteAsync(request, cancellationToken);
         if (request.Operation == HostContainerOperationKinds.RemoveTargetContainers)
             return await new HostContainerRuntimeCleanup(executor, ExecuteContainerOperationAsync)
                 .ExecuteAsync(request, RuntimeLabels(request.Scope), cancellationToken);
@@ -76,6 +82,8 @@ public sealed partial class HostContainerExecutionService
     private static HostContainerExecutionResponse? ValidateRuntimeLimits(HostContainerExecutionRequest request)
     {
         if (request.Operation is not (HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.InspectComposeProject
             or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction))
             return null;
 
@@ -111,6 +119,8 @@ public sealed partial class HostContainerExecutionService
         => request.Operation is HostContainerOperationKinds.ResolveImage
             or HostContainerOperationKinds.RunBuild
             or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.RemoveComposeProject
             or HostContainerOperationKinds.StartContainer
             or HostContainerOperationKinds.InspectContainer
             or HostContainerOperationKinds.GetContainerLogs

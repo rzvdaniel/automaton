@@ -13,7 +13,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     private readonly RunnerWorkspaceService workspace;
     private readonly RunnerRuntimeMetadataStore metadataStore;
     private readonly RunnerRuntimeNetworkPolicy networkPolicy;
-    private readonly RunnerRuntimeContainerArtifactStore artifactStore;
     private readonly RunnerRuntimeRegistry registry;
     private readonly IApplicationContainerRuntime containers;
     private readonly ILogger<RunnerRuntimeContainerManager> logger;
@@ -33,7 +32,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         this.workspace = workspace;
         metadataStore = new RunnerRuntimeMetadataStore(workspace);
-        artifactStore = new RunnerRuntimeContainerArtifactStore(workspace);
         this.registry = registry;
         networkPolicy = new RunnerRuntimeNetworkPolicy(registry);
         this.containers = containers;
@@ -47,7 +45,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         // their recovery until supervision is running so host startup can
         // complete and establish that connection first.
         var deferReconciliation = containers is IScopedApplicationContainerRuntime;
-        foreach (var metadataPath in artifactStore.EnumerateDeploymentMetadataPaths())
+        foreach (var metadataPath in workspace.EnumerateDeploymentMetadataPaths())
         {
             if (deferReconciliation)
             {
@@ -97,6 +95,25 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         var candidate = metadata.Candidate;
         if (!RunnerRuntimeMetadataPolicy.IsOciCandidate(candidate) || candidate is null) return false;
+        if (RunnerRuntimeMetadataPolicy.HasComposeMetadata(candidate) && string.IsNullOrWhiteSpace(candidate.ContainerId))
+        {
+            if (candidate.ComposeCandidateId is not Guid composeCandidateId)
+                throw new InvalidOperationException("Compose candidate recovery requires the typed project runtime and candidate identity.");
+            var contract = RunnerRuntimeMetadataPolicy.CreateApplicationContract(candidate);
+            var resumed = await containers.InspectComposeProjectAsync(
+                appId, targetId, composeCandidateId, contract, cancellationToken);
+            if (resumed is null)
+            {
+                var missing = new DockerContainerIdentity(string.Empty, false, false, new Dictionary<string, string>());
+                await DiscardInvalidCandidateAsync(metadata, candidate, missing, appId, targetId, cancellationToken);
+                return false;
+            }
+            candidate.ContainerId = resumed.Id;
+            candidate.ContainerName = resumed.Name;
+            candidate.ResolvedRuntimeImage = resumed.Image.ResolvedReference;
+            candidate.EffectivePort = resumed.HostPort;
+            await metadataStore.WriteAsync(metadata, cancellationToken);
+        }
         var identity = await InspectAsync(appId, targetId, candidate.ContainerId ?? candidate.ContainerName!, cancellationToken);
         if (await PromoteReconciledCandidateAsync(metadata, candidate, identity, appId, targetId, currentIsOci, cancellationToken))
             return true;
@@ -122,7 +139,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         promoted.Candidate = null;
         promoted.State = RuntimeReadinessState.Ready;
         await metadataStore.WriteAsync(promoted, cancellationToken);
-        Register(appId, targetId, identity.Id, promoted.ContainerName, promoted.EffectivePort);
+        Register(appId, targetId, identity.Id, promoted.ContainerName, promoted.EffectivePort, promoted.ComposeCandidateId);
         return true;
     }
 
@@ -136,6 +153,18 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         if (!currentIsOci || string.IsNullOrWhiteSpace(metadata.ContainerId)
             || string.Equals(metadata.ContainerId, candidate.ContainerId, StringComparison.Ordinal)) return;
+        if (metadata.ComposeCandidateId is Guid composeCandidateId)
+        {
+            try
+            {
+                await containers.RemoveComposeProjectAsync(new(appId, targetId), composeCandidateId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not remove previous managed Compose project {CandidateId}.", composeCandidateId);
+            }
+            return;
+        }
         var previous = await InspectAsync(appId, targetId, metadata.ContainerId, cancellationToken);
         if (previous.Exists && RunnerRuntimeMetadataPolicy.HasExpectedIdentity(previous, appId, targetId))
             await StopAndRemoveAsync(appId, targetId, previous.Id, CancellationToken.None);
@@ -151,9 +180,13 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         Guid targetId,
         CancellationToken cancellationToken)
     {
-        if (identity.Exists && !RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
+        if (candidate.ComposeCandidateId is Guid composeCandidateId)
+        {
+            await containers.RemoveComposeProjectAsync(new(appId, targetId), composeCandidateId, CancellationToken.None);
+        }
+        else if (identity.Exists && !RunnerRuntimeMetadataPolicy.HasExpectedIdentity(identity, appId, targetId))
             throw new InvalidOperationException($"Refusing to reconcile candidate container '{candidate.ContainerId}' without verified Automaton ownership labels.");
-        if (identity.Exists)
+        else if (identity.Exists)
         {
             logger.LogWarning("Discarding an uncommitted managed runtime candidate {ContainerId}.", candidate.ContainerId);
             try
@@ -183,11 +216,11 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         {
             if (identity.HostPort is > 0) metadata.EffectivePort = identity.HostPort;
             await metadataStore.WriteAsync(metadata, cancellationToken);
-            Register(appId, targetId, identity.Id, metadata.ContainerName, metadata.EffectivePort);
+            Register(appId, targetId, identity.Id, metadata.ContainerName, metadata.EffectivePort, metadata.ComposeCandidateId);
             return;
         }
         logger.LogWarning("Refusing to adopt container {ContainerId}: it is missing, stopped, or does not have the expected Automaton identity.", metadata.ContainerId);
-        if (!artifactStore.Exists(metadata.ArtifactRoot)) return;
+        if (!workspace.RuntimeArtifactExists(metadata.ArtifactRoot)) return;
         await ApplyAsync(appId, targetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata), cancellationToken,
             metadata.ArtifactRoot, metadata.CandidateId);
     }
@@ -220,16 +253,17 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         ApplicationContract contract,
         CancellationToken cancellationToken = default,
         string? artifactRoot = null,
-        Guid? candidateId = null)
+        Guid? candidateId = null,
+        Guid? deploymentAttemptId = null)
     {
         RunnerRuntimeMetadataPolicy.ValidateApplyRequest(contract, acceptingLifecycleWork);
         var metadataPath = metadataStore.GetPath(appId, deploymentTargetId);
         var previous = await ReadExistingMetadataAsync(metadataPath, cancellationToken);
-        if (contract.Runtime.Command is null)
+        if (RunnerRuntimeMetadataPolicy.IsStoppedContract(contract))
             return await StopConfiguredRuntimeAsync(appId, deploymentTargetId, contract, cancellationToken);
 
         var attempt = await PrepareRuntimeCandidateAsync(
-            appId, deploymentTargetId, contract, previous, metadataPath, artifactRoot, candidateId, cancellationToken);
+            appId, deploymentTargetId, contract, previous, metadataPath, artifactRoot, candidateId, deploymentAttemptId, cancellationToken);
         return await StartAndPromoteCandidateAsync(attempt, previous, cancellationToken);
     }
 
@@ -260,6 +294,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             Runtime = contract.Runtime,
             Health = contract.Health,
             Storage = contract.Storage,
+            ComposeJson = RunnerRuntimeMetadataPolicy.SerializeCompose(contract.Compose),
             State = RuntimeReadinessState.Stopped
         };
 
@@ -271,22 +306,23 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         string metadataPath,
         string? artifactRoot,
         Guid? candidateId,
+        Guid? deploymentAttemptId,
         CancellationToken cancellationToken)
     {
-        var runtimeImage = contract.Runtime.Image!;
+        var runtimeImage = RunnerRuntimeMetadataPolicy.RuntimeImage(contract);
         var scopedRuntime = containers as IScopedApplicationContainerRuntime;
         var effectivePort = scopedRuntime is null ? networkPolicy.AllocatePort(contract.Runtime.Port) : 0;
         var resolvedCandidateId = candidateId ?? Guid.NewGuid();
         var artifact = artifactRoot ?? workspace.GetAppRuntimeCandidateApplicationDirectory(appId, targetId, resolvedCandidateId);
-        artifact = artifactStore.ValidateRoot(appId, targetId, artifact);
-        artifactStore.CreateRoot(artifact);
+        artifact = workspace.ValidateRuntimeArtifactRoot(appId, targetId, artifact);
+        workspace.CreateRuntimeArtifactRoot(artifact);
         var storage = workspace.PrepareApplicationStorage(appId, contract.Storage);
-        var candidate = CreateCandidateMetadata(appId, targetId, contract, artifact, resolvedCandidateId, runtimeImage, effectivePort);
+        var candidate = CreateCandidateMetadata(appId, targetId, contract, artifact, resolvedCandidateId, deploymentAttemptId, runtimeImage, effectivePort);
         var pending = CreatePendingMetadata(appId, targetId, contract, previous, candidate);
         await metadataStore.WriteAsync(pending, cancellationToken);
         return new RuntimeApplyAttempt(
             appId, targetId, contract, metadataPath, artifact, storage, runtimeImage, effectivePort,
-            resolvedCandidateId, scopedRuntime, candidate, pending, previous);
+            resolvedCandidateId, deploymentAttemptId, scopedRuntime, candidate, pending, previous);
     }
 
     private RunnerRuntimeDeploymentMetadata CreateCandidateMetadata(
@@ -295,6 +331,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         ApplicationContract contract,
         string artifact,
         Guid candidateId,
+        Guid? deploymentAttemptId,
         string runtimeImage,
         int effectivePort)
         => new()
@@ -304,8 +341,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             Runtime = contract.Runtime,
             Health = contract.Health,
             Storage = contract.Storage,
+            ComposeJson = RunnerRuntimeMetadataPolicy.SerializeCompose(contract.Compose),
+            ComposeProjectId = contract.Compose is null ? null : candidateId.ToString("N"),
+            ComposeCandidateId = contract.Compose is null ? null : candidateId,
+            DeploymentAttemptId = deploymentAttemptId,
             ArtifactRoot = artifact,
-            ArtifactId = artifactStore.GetArtifactId(artifact),
+            ArtifactId = workspace.GetRuntimeArtifactId(artifact),
             CandidateId = candidateId,
             ContainerName = $"automaton-app-{appId:N}-{targetId:N}-{Guid.NewGuid():N}",
             RequestedRuntimeImage = runtimeImage,
@@ -328,6 +369,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 Runtime = contract.Runtime,
                 Health = contract.Health,
                 Storage = contract.Storage,
+                ComposeJson = RunnerRuntimeMetadataPolicy.SerializeCompose(contract.Compose),
                 State = RuntimeReadinessState.Starting
             }
             : metadataStore.Clone(previous);
@@ -363,6 +405,18 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         RuntimeApplyAttempt attempt,
         CancellationToken cancellationToken)
     {
+        if (RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract))
+        {
+            var composeCandidate = await containers.CreateComposeProjectAsync(
+                attempt.AppId, attempt.TargetId, attempt.CandidateId, attempt.Contract,
+                attempt.DeploymentAttemptId, cancellationToken);
+            attempt.Candidate.ContainerId = composeCandidate.Id;
+            attempt.Candidate.ContainerName = composeCandidate.Name;
+            attempt.Candidate.ResolvedRuntimeImage = composeCandidate.Image.ResolvedReference;
+            attempt.Candidate.EffectivePort = composeCandidate.HostPort;
+            await metadataStore.WriteAsync(attempt.Pending, cancellationToken);
+            return composeCandidate;
+        }
         if (containers is not IStagedApplicationContainerRuntime stagedContainers)
             throw new InvalidOperationException("Managed application lifecycle requires the staged Docker container boundary.");
         var command = attempt.Contract.Runtime.Command!;
@@ -386,6 +440,14 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         DockerApplicationContainer started,
         CancellationToken cancellationToken)
     {
+        if (RunnerRuntimeMetadataPolicy.HasComposeContract(attempt.Contract))
+        {
+            attempt.EffectivePort = started.HostPort
+                ?? throw new InvalidOperationException("The Compose public service did not return a routed endpoint.");
+            attempt.Candidate.EffectivePort = attempt.EffectivePort;
+            await metadataStore.WriteAsync(attempt.Pending, cancellationToken);
+            return;
+        }
         if (attempt.ScopedRuntime is null)
         {
             var stagedContainers = (IStagedApplicationContainerRuntime)containers;
@@ -409,9 +471,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         await LogFailedCandidateAsync(attempt, started);
         var cleanupWarnings = new List<string>();
-        var cleaned = await TryStopOwnedContainerAsync(
-            started?.Id ?? attempt.Candidate.ContainerName!, attempt.AppId, attempt.TargetId,
-            cleanupWarnings, "failed runtime candidate");
+        var cleaned = attempt.Candidate.ComposeCandidateId is Guid composeCandidateId
+            ? await TryRemoveComposeProjectAsync(composeCandidateId, attempt.AppId, attempt.TargetId,
+                cleanupWarnings, "failed runtime candidate")
+            : await TryStopOwnedContainerAsync(
+                started?.Id ?? attempt.Candidate.ContainerName!, attempt.AppId, attempt.TargetId,
+                cleanupWarnings, "failed runtime candidate");
         foreach (var warning in cleanupWarnings) logger.LogWarning("{Warning}", warning);
         try
         {
@@ -477,10 +542,14 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         var metadata = File.Exists(metadataPath)
             ? await metadataStore.ReadAsync(metadataPath, CancellationToken.None)
             : null;
+        var warnings = new List<string>();
+        await TryRemoveComposeProjectAsync(current?.ComposeCandidateId ?? metadata?.ComposeCandidateId,
+            appId, deploymentTargetId, warnings, "explicit runtime stop");
+        await TryRemoveComposeProjectAsync(metadata?.Candidate?.ComposeCandidateId,
+            appId, deploymentTargetId, warnings, "pending runtime candidate");
         var ids = GetCleanupContainerReferences(current?.ContainerId, metadata);
         if (containers is IApplicationContainerCleanupRuntime cleanup)
             await cleanup.RemoveTargetContainersAsync(new(appId, deploymentTargetId));
-        var warnings = new List<string>();
         foreach (var id in ids)
             await TryStopOwnedContainerAsync(id, appId, deploymentTargetId, warnings, "explicit runtime stop");
         foreach (var warning in warnings)
@@ -540,6 +609,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             Runtime = readyCandidate.Runtime,
             Health = readyCandidate.Health,
             Storage = readyCandidate.Storage,
+            ComposeJson = readyCandidate.ComposeJson,
+            ComposeProjectId = readyCandidate.ComposeProjectId,
+            ComposeCandidateId = readyCandidate.ComposeCandidateId,
             State = RuntimeReadinessState.Starting
         };
 
@@ -555,7 +627,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             active.TryGetValue(key, out var old);
             old ??= CreatePreviousRuntime(appId, targetId, previous);
             active[key] = new ActiveContainer(
-                appId, targetId, readyCandidate.ContainerId!, readyCandidate.ContainerName!, readyCandidate.EffectivePort!.Value);
+                appId, targetId, readyCandidate.ContainerId!, readyCandidate.ContainerName!, readyCandidate.EffectivePort!.Value,
+                readyCandidate.ComposeCandidateId);
             registry.Register(appId, targetId, readyCandidate.EffectivePort.Value);
             return old;
         }
@@ -572,7 +645,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 targetId,
                 previous.ContainerId!,
                 previous.ContainerName ?? previous.ContainerId!,
-                previous.EffectivePort ?? 0);
+                previous.EffectivePort ?? 0,
+                previous.ComposeCandidateId);
 
     private async Task<List<string>> RemovePreviousRuntimeAsync(
         Guid appId,
@@ -583,10 +657,12 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         var warnings = new List<string>();
         if (string.IsNullOrWhiteSpace(old?.ContainerId)) return warnings;
-        var oldRemoved = await TryStopOwnedContainerAsync(old.ContainerId, appId, targetId, warnings, "previous runtime");
+        var oldRemoved = previous?.ComposeCandidateId is Guid composeCandidateId
+            ? await TryRemoveComposeProjectAsync(composeCandidateId, appId, targetId, warnings, "previous runtime")
+            : await TryStopOwnedContainerAsync(old.ContainerId, appId, targetId, warnings, "previous runtime");
         if (oldRemoved && previous?.ArtifactRoot is not null
             && !string.Equals(previous.ArtifactRoot, candidate.ArtifactRoot, StringComparison.OrdinalIgnoreCase))
-            RunnerRuntimeContainerArtifactStore.TryDeletePrevious(previous.ArtifactRoot, warnings);
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(previous.ArtifactRoot, warnings);
         return warnings;
     }
 
@@ -629,6 +705,26 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         try
         {
             await StopAndRemoveAsync(appId, targetId, identity.Id, CancellationToken.None);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"{description} cleanup deferred: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<bool> TryRemoveComposeProjectAsync(
+        Guid? candidateId,
+        Guid appId,
+        Guid targetId,
+        ICollection<string> warnings,
+        string description)
+    {
+        if (candidateId is null) return true;
+        try
+        {
+            await containers.RemoveComposeProjectAsync(new(appId, targetId), candidateId.Value, CancellationToken.None);
             return true;
         }
         catch (Exception ex)
@@ -734,10 +830,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
-    private void Register(Guid appId, Guid targetId, string id, string? name, int? port)
+    private void Register(Guid appId, Guid targetId, string id, string? name, int? port, Guid? composeCandidateId = null)
     {
         if (port is not > 0) return;
-        lock (gate) active[new DeploymentRuntimeKey(appId, targetId)] = new ActiveContainer(appId, targetId, id, name ?? id, port.Value);
+        lock (gate) active[new DeploymentRuntimeKey(appId, targetId)] = new ActiveContainer(appId, targetId, id, name ?? id, port.Value, composeCandidateId);
         registry.Register(appId, targetId, port.Value);
     }
 
@@ -761,5 +857,6 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
             ? scoped.StopAndRemoveAsync(new(appId, targetId), id, cancellationToken)
             : containers.StopAndRemoveAsync(id, cancellationToken);
 
-    private sealed record ActiveContainer(Guid AppId, Guid TargetId, string ContainerId, string ContainerName, int Port);
+    private sealed record ActiveContainer(
+        Guid AppId, Guid TargetId, string ContainerId, string ContainerName, int Port, Guid? ComposeCandidateId = null);
 }

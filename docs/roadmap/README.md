@@ -51,7 +51,7 @@ Retain stable app, deployment and execution identities. Container names and mach
 
 Support Linux container workloads: HTTP services, background workers and finite jobs/Actions. Accept an OCI image, a reproducible Dockerfile/source build, or a documented subset of Compose for related services. Translate existing app contracts into this model rather than maintaining two execution engines indefinitely.
 
-The first implementation must state its accepted Compose fields and reject unsupported ones before deployment. Generic app deployment must not accept arbitrary host mounts, privileged containers, host networking or a Docker socket. Builds also execute untrusted code and need a separate bounded container boundary.
+The current M2 Compose task supports the bounded [image-based Compose subset](../implementation/compose-supported-subset.md): internal service networking, one private externally routed HTTP service, app-scoped named data volumes and existing per-container resource limits. Unsupported fields are rejected before resource creation. Compose builds and secure secret delivery remain deferred; Compose environment values are non-sensitive literals only. Generic deployment must not accept arbitrary host mounts, privileged containers, host networking or a Docker socket. Builds execute untrusted code and require a separate bounded container boundary.
 
 Static output can use one shared static-serving service per machine. Each site's files, hostname/origin and access policy remain separate. Publishing must never expose another site's private files, editable source, credentials or logs.
 
@@ -102,9 +102,9 @@ M1 implementation PRs are merged. Combined integration acceptance is deferred be
 
 Depends on milestone 1's execution and permission boundary.
 
-- PR #396 completed Action authorization for explicitly assigned organization apps. Current task: complete the organization app use flow—assignment, My Apps listing, opening the app, running Actions and revoking access—while keeping app use separate from source, secrets and machine administration.
+- PR #396 completed Action authorization for explicitly assigned organization apps. PR #397 completed the organization app use flow—assignment, My Apps listing, runtime launch, Action access and revocation—while keeping app use separate from source, secrets and machine administration.
 - Capacity work means configurable machine/workload safeguards and admission budgets, not subscription quotas or per-user resource accounting.
-- Next, support a documented Compose subset for multi-service apps, then add shared static publishing with independent hostnames and authentication.
+- Current task: land the documented, bounded Compose subset for multi-service apps. Compose builds and secret delivery remain deferred and are not implied by this support. Then add shared static publishing with independent hostnames and authentication.
 - Make publish, share and source-copy behavior clear in Studio and API.
 - Show capacity, workload limits and unsupported guarantees accurately; reject deployments that exceed configured admission budgets.
 
@@ -144,4 +144,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** complete the organization-assigned app use flow in the current M2 task. Then deliver the documented Compose subset and shared static publishing. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.
+**Next action:** complete review of the Compose subset PR, then implement shared static publishing. Compose builds and secure secret delivery remain deferred. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.
