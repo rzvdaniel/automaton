@@ -48,7 +48,7 @@ const profileOptions = [
     label: 'Machine Management',
     value: RunnerApplicationProfiles.MachineManagement,
     description:
-      'Runs one trusted management Runner on this machine. Requires Ubuntu with Docker storage on ext4; the install command checks both. Action and workflow execution remain disabled until isolated execution is available.',
+      'Runs one trusted management Runner on this machine. Requires Ubuntu and Docker Engine; ext4 is the tested storage baseline, and other working Docker filesystems are accepted. Actions run in isolated containers; raw workflows and management-process custom steps remain disabled.',
   },
   {
     label: 'Privileged Host',
@@ -205,7 +205,7 @@ function close() {
         :closable="false"
         class="mb-4"
       >
-        Prepare an Ubuntu host with Docker Engine installed and its data root on ext4. The command verifies these prerequisites before pulling the Runner image; it does not install Docker or move Docker data.
+        Prepare an Ubuntu host with Docker Engine installed and running. ext4 is the tested storage baseline; working Docker storage on XFS or another filesystem does not need to be moved. The command checks Ubuntu and Docker availability, but does not install Docker or move or reconfigure its data.
       </Message>
       <div class="field">
         <label for="self-hosted-runner-name" class="font-semibold block mb-2">Runner name</label>

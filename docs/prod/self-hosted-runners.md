@@ -26,12 +26,12 @@ only in this response and is stored by the API as a hash.
 For the supported self-hosted machine flow, open **Runners → Install Self-Hosted
 Runner**, choose **Machine Management**, acknowledge the Docker access warning, and
 run the generated command on the customer machine. Prepare an Ubuntu host with Docker
-Engine installed and running, and put Docker's configured data root on the ordinary
-ext4 filesystem intended for Automaton workloads. Before pulling the Runner image, the
-generated command checks the operating system and the filesystem containing Docker's
-actual data root. It does not install Docker, configure the data root, or move existing
-Docker data. After the checks pass, it creates an installation-scoped workspace volume
-and mounts it at `/automaton/storage`.
+Engine installed and running. The generated command checks Ubuntu and Docker
+availability before pulling the Runner image. ext4 is the tested storage baseline;
+other filesystems supported by the customer's working Docker installation, including
+XFS, do not need to be changed. The command does not install Docker, configure its
+data root, or move existing Docker data. After the checks pass, it creates an
+installation-scoped workspace volume and mounts it at `/automaton/storage`.
 
 To add another machine, repeat the Studio installation flow with a distinct Runner
 name on that machine. Each installation has its own identity and workspace volume;
