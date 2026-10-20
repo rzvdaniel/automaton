@@ -40,7 +40,6 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("AUTOMATON_HOST_WORKSPACE_ROOT"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("/automaton/workspace"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("manage-runner.sh"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("findmnt"));
         Assert.That(enrollment.EnrollmentTokenHash, Does.Not.Contain("AUTOMATON_ENROLLMENT_TOKEN"));
         Assert.That(enrollment.EnrollmentTokenHash, Is.Not.EqualTo(string.Empty));
@@ -149,14 +148,6 @@ public sealed class SelfHostedRunnerInstallationServiceTests
                 "docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\""));
             Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\""));
             Assert.That(response.InstallationCommand, Does.Contain("--network \"$runtime_network\""));
-            Assert.That(response.InstallationCommand, Does.Contain("manage-runner.sh"));
-            Assert.That(response.InstallationCommand, Does.Contain("chmod 755 '/opt/automaton/self-hosted-runners/" + response.InstallationId + "/manage-runner.sh'"));
-            Assert.That(response.InstallationCommand, Does.Contain("update|rollback"));
-            Assert.That(response.InstallationCommand, Does.Contain("automaton-self-hosted-rollback:" + response.InstallationId));
-            Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_IMAGE_DIGEST=\"$2\""));
-            Assert.That(response.InstallationCommand, Does.Contain("restoring the previous image"));
-            Assert.That(response.InstallationCommand, Does.Contain("{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}"));
-            Assert.That(response.InstallationCommand, Does.Contain("docker image tag \"$current_image\" \"$rollback_tag\""));
             Assert.That(response.InstallationCommand, Does.Not.Contain("--privileged"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("/:/host"));
             Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));

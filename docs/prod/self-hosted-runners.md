@@ -4,9 +4,8 @@ Studio can create a one-time Docker installation command for the existing Automa
 Runner. The Machine Management profile installs one trusted management Runner on a
 customer-owned machine. Workloads run in separate containers. This document describes
 the current installation and the data customers must protect manually; machine
-storage telemetry is shown in Studio for Machine Management Runners. Machine
-Management installation commands also install a host-side Runner update/rollback
-script.
+storage telemetry is shown in Studio for Machine Management Runners. There is not
+yet a supported update procedure for Machine Management installations.
 
 ## Installation
 
@@ -101,26 +100,11 @@ to an isolated replacement, verify ownership and app data, and rehearse rollback
 
 ## Machine Management Runner updates
 
-The Studio installation command enrolls a new Runner; it is not an update command.
-Machine Management installation commands create
-`/opt/automaton/self-hosted-runners/<installation-id>/manage-runner.sh`. Run
-`sudo /opt/automaton/self-hosted-runners/<installation-id>/manage-runner.sh update`
-to pull the configured Runner image, resolve its immutable digest, and recreate the
-container with the existing installation identity, config directory, private runtime
-network and workspace volume. The script retains the previous digest under an
-installation-specific local Docker tag. It restores that image automatically if the
-replacement fails local startup. After a successful local restart, verify that Studio
-shows the Runner online and on the expected version. If it does not reconnect, run
-the same script with `rollback` and verify the restored Runner reconnects.
-
-This updates only the Runner container; it does not update Ubuntu, Docker, or reboot
-the host. It retains one previous Runner image for rollback and is not a backup of
-Runner configuration or workload data. Installation commands created before this
-maintenance script was introduced do not contain it; do not repeat enrollment as an
-upgrade or move an app target to a new machine expecting its data to follow. The
-Compose pull/recreate commands in
-[`deploying-runner.md`](deploying-runner.md) apply to Compose-managed Runner installs,
-not this generated Machine Management installation.
+Machine Management installations do not yet have a supported Runner update or
+rollback procedure. The generated Studio command is for enrolling a new installation;
+do not rerun it as an upgrade. Existing Infrastructure Runner repair/update commands
+and Compose-managed Runner instructions do not apply to Machine Management
+installations. Runner self-update and rollback remain deferred work.
 
 ## Manual testing
 
