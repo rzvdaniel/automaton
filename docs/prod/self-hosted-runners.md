@@ -4,8 +4,9 @@ Studio can create a one-time Docker installation command for the existing Automa
 Runner. The Machine Management profile installs one trusted management Runner on a
 customer-owned machine. Workloads run in separate containers. This document describes
 the current installation and the data customers must protect manually; machine
-storage telemetry and a supported in-place Machine Management update/rollback action
-are not yet available.
+storage telemetry is shown in Studio for Machine Management Runners. Machine
+Management installation commands also install a host-side Runner update/rollback
+script.
 
 ## Installation
 
@@ -43,6 +44,12 @@ The Runner later exchanges that enrollment through the existing
 `POST /api/runner-enrollments/exchange` operation. The server-side enrollment is
 authoritative for ownership, purpose, capabilities, installation identity, and
 application profile. Reconnect and heartbeat payloads cannot change those values.
+
+Studio periodically shows total and free space for the installation's persistent
+workspace filesystem, with the measurement time and any reporting error. This is a
+capacity observation, not a disk quota or a measurement of every Docker volume. The
+Runner's online state, heartbeat and software version provide the current connection
+health signals.
 
 ## Profiles
 
@@ -95,12 +102,23 @@ to an isolated replacement, verify ownership and app data, and rehearse rollback
 ## Machine Management Runner updates
 
 The Studio installation command enrolls a new Runner; it is not an update command.
-Machine Management installations do not yet have a supported in-place update or
-rollback procedure. Do not repeat enrollment as an upgrade or move an app target to a
-new machine expecting its data to follow. The Runner release pipeline publishes
-immutable image digests; the M3 update slice must define how to recreate this Runner
-with the same installation identity, configuration and data volumes while retaining
-the previous digest for rollback. The Compose pull/recreate commands in
+Machine Management installation commands create
+`/opt/automaton/self-hosted-runners/<installation-id>/manage-runner.sh`. Run
+`sudo /opt/automaton/self-hosted-runners/<installation-id>/manage-runner.sh update`
+to pull the configured Runner image, resolve its immutable digest, and recreate the
+container with the existing installation identity, config directory, private runtime
+network and workspace volume. The script retains the previous digest under an
+installation-specific local Docker tag. It restores that image automatically if the
+replacement fails local startup. After a successful local restart, verify that Studio
+shows the Runner online and on the expected version. If it does not reconnect, run
+the same script with `rollback` and verify the restored Runner reconnects.
+
+This updates only the Runner container; it does not update Ubuntu, Docker, or reboot
+the host. It retains one previous Runner image for rollback and is not a backup of
+Runner configuration or workload data. Installation commands created before this
+maintenance script was introduced do not contain it; do not repeat enrollment as an
+upgrade or move an app target to a new machine expecting its data to follow. The
+Compose pull/recreate commands in
 [`deploying-runner.md`](deploying-runner.md) apply to Compose-managed Runner installs,
 not this generated Machine Management installation.
 

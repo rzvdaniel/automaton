@@ -45,7 +45,9 @@ public sealed class StorageTelemetryBackgroundService(RunnerStorageTelemetryApiC
         {
             return purpose == RunnerPurposes.Infrastructure
                 ? await MeasureHostAsync(stoppingToken)
-                : await MeasureHostedRunnerAsync(stoppingToken);
+                : string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), RunnerApplicationProfiles.MachineManagement, StringComparison.OrdinalIgnoreCase)
+                    ? await MeasureMachineRunnerAsync(stoppingToken)
+                    : await MeasureHostedRunnerAsync(stoppingToken);
         }
         finally { measurementLock.Release(); }
     }
@@ -117,6 +119,49 @@ public sealed class StorageTelemetryBackgroundService(RunnerStorageTelemetryApiC
             }
             return false;
         }
+    }
+
+    private async Task<bool> MeasureMachineRunnerAsync(CancellationToken stoppingToken)
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID")))
+            return false;
+
+        var measuredAt = DateTime.UtcNow;
+        try
+        {
+            var capacity = ReadFilesystemCapacity("/automaton/storage");
+
+            await telemetryClient.ReportMachineRunnerAsync(new(
+                measuredAt,
+                capacity.TotalBytes,
+                capacity.AvailableBytes,
+                true,
+                null,
+                typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await telemetryClient.ReportMachineRunnerAsync(new(
+                    measuredAt, 0, 0, false, ex.Message,
+                    typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
+            }
+            catch (Exception reportError) when (!stoppingToken.IsCancellationRequested)
+            {
+                Log.Warning(reportError, "Could not report Machine Management Runner storage measurement failure.");
+            }
+            return false;
+        }
+    }
+
+    internal static (long TotalBytes, long AvailableBytes) ReadFilesystemCapacity(string path)
+    {
+        var volume = new DriveInfo(path);
+        if (!volume.IsReady || volume.TotalSize <= 0 || volume.AvailableFreeSpace < 0 || volume.AvailableFreeSpace > volume.TotalSize)
+            throw new InvalidOperationException("The Machine Management workspace filesystem returned invalid capacity.");
+        return (volume.TotalSize, volume.AvailableFreeSpace);
     }
 
     public sealed record FilesystemMeasurement(string Path, long TotalBytes, long UsedBytes, long AvailableBytes);

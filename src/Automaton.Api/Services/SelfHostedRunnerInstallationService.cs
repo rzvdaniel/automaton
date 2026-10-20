@@ -202,6 +202,9 @@ public sealed class SelfHostedRunnerInstallationService(
             "  *@sha256:*) ;;",
             "  *) echo 'The Runner image did not resolve to an immutable repository digest.' >&2; exit 1 ;;",
             "esac",
+            BuildMachineManagementMaintenanceScript(
+                isMachineManagement, container, enrollment, root, machineWorkspaceVolume, network,
+                hostedRunnerOptions.Value.DockerImage, hostedRunnerOptions.Value.ServerUrl),
             BuildMachineWorkspaceSetupCommands(isMachineManagement, machineWorkspaceVolume, enrollment.InstallationId, root),
             BuildNetworkSetupCommands(requiresRuntimeNetwork, isPrivilegedHost, network, root, workspace),
             $"if ! container_id=$({dockerRun}); then",
@@ -230,6 +233,66 @@ public sealed class SelfHostedRunnerInstallationService(
             "    ;;",
             "esac",
             "AUTOMATON_RUNNER_INSTALL");
+    }
+
+    private static string BuildMachineManagementMaintenanceScript(
+        bool enabled,
+        string container,
+        SelfHostedRunnerEnrollment enrollment,
+        string configDirectory,
+        string workspaceVolume,
+        string network,
+        string runnerImage,
+        string serverUrl)
+    {
+        if (!enabled) return string.Empty;
+        var rollbackTag = $"automaton-self-hosted-rollback:{enrollment.InstallationId}";
+        return string.Join('\n',
+            $"mkdir -p {Quote(configDirectory)}",
+            $"cat > {Quote(configDirectory + "/manage-runner.sh")} <<'AUTOMATON_RUNNER_MAINTENANCE'",
+            "#!/bin/sh",
+            "set -eu",
+            $"container={Quote(container)}",
+            $"runner_image={Quote(runnerImage)}",
+            $"rollback_tag={Quote(rollbackTag)}",
+            $"runner_name={Quote(enrollment.RunnerName)}",
+            $"installation_id={Quote(enrollment.InstallationId)}",
+            $"config_directory={Quote(configDirectory)}",
+            $"workspace_volume={Quote(workspaceVolume)}",
+            $"runtime_network={Quote(network)}",
+            $"server_url={Quote(serverUrl.TrimEnd('/'))}",
+            "current_image=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \"$container\" | sed -n 's/^AUTOMATON_RUNNER_IMAGE_DIGEST=//p' | head -n 1)",
+            "if [ -z \"$current_image\" ]; then echo 'The installed Runner image digest could not be read.' >&2; exit 1; fi",
+            "case \"${1:-update}\" in",
+            "  update)",
+            "    docker pull \"$runner_image\"",
+            "    target_image=$(docker image inspect --format '{{index .RepoDigests 0}}' \"$runner_image\")",
+            "    case \"$target_image\" in *@sha256:*) ;; *) echo 'The update image did not resolve to an immutable digest.' >&2; exit 1 ;; esac",
+            "    [ \"$target_image\" != \"$current_image\" ] || { echo 'The installed Runner already uses this image digest.'; exit 0; }",
+            "    target_digest=\"$target_image\"",
+            "    ;;",
+            "  rollback)",
+            "    docker image inspect \"$rollback_tag\" >/dev/null 2>&1 || { echo 'No previous Runner image is available for rollback.' >&2; exit 1; }",
+            "    target_image=\"$rollback_tag\"",
+            "    target_digest=$(docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}' \"$target_image\")",
+            "    case \"$target_digest\" in *@sha256:*|sha256:*) ;; *) echo 'The rollback image does not have a usable immutable identifier.' >&2; exit 1 ;; esac",
+            "    ;;",
+            "  *) echo 'Usage: manage-runner.sh [update|rollback]' >&2; exit 2 ;;",
+            "esac",
+            "socket_gid=$(stat -c '%g' /var/run/docker.sock)",
+            "runtime_host_address=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\")",
+            "[ -n \"$socket_gid\" ] && [ -n \"$runtime_host_address\" ] || { echo 'The Docker socket group or runtime address could not be resolved.' >&2; exit 1; }",
+            "docker stop \"$container\" >/dev/null || true",
+            "docker rm \"$container\" >/dev/null || true",
+            "start_runner() { docker run -d --name \"$container\" --restart unless-stopped --group-add \"$socket_gid\" --network \"$runtime_network\" -e AUTOMATON_SERVER_URL=\"$server_url\" -e AUTOMATON_RUNNER_NAME=\"$runner_name\" -e AUTOMATON_RUNNER_PURPOSE=Managed -e AUTOMATON_RUNNER_APPLICATION_PROFILE=MachineManagement -e AUTOMATON_RUNNER_INSTALLATION_ID=\"$installation_id\" -e AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,WorkflowExecution,ManagedContainerExecution -e AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\" -e AUTOMATON_WORKSPACE_ROOT=/automaton/storage/workspace -e AUTOMATON_RUNNER_IMAGE=\"$1\" -e AUTOMATON_RUNNER_IMAGE_DIGEST=\"$2\" -v \"$config_directory:/app/config\" -v \"$workspace_volume:/automaton/storage\" -v /var/run/docker.sock:/var/run/docker.sock \"$1\"; }",
+            "if ! start_runner \"$target_image\" \"$target_digest\" >/dev/null; then docker rm -f \"$container\" >/dev/null 2>&1 || true; echo 'The replacement Runner could not start; restoring the previous image.' >&2; start_runner \"$current_image\" \"$current_image\" >/dev/null || { echo 'Automatic restoration failed. Start the Runner with image ' \"$current_image\" >&2; exit 1; }; exit 1; fi",
+            "sleep 5",
+            "status=$(docker inspect --format '{{.State.Status}}' \"$container\" 2>/dev/null || true)",
+            "if [ \"$status\" != running ]; then docker logs --tail 80 \"$container\" >&2 || true; docker rm -f \"$container\" >/dev/null 2>&1 || true; echo 'The replacement Runner failed local startup; restoring the previous image.' >&2; start_runner \"$current_image\" \"$current_image\" >/dev/null || { echo 'Automatic restoration failed. Start the Runner with image ' \"$current_image\" >&2; exit 1; }; exit 1; fi",
+            "docker image tag \"$current_image\" \"$rollback_tag\"",
+            "echo \"Runner container restarted on image $target_image. Verify it reconnects in Studio; run '$0 rollback' to restore $current_image if it does not.\"",
+            "AUTOMATON_RUNNER_MAINTENANCE",
+            $"chmod 755 {Quote(configDirectory + "/manage-runner.sh")}");
     }
 
     private static string BuildMachineHostPreflightCommands(bool isMachineManagement)

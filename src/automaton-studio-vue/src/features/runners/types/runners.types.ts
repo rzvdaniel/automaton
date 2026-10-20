@@ -62,6 +62,11 @@ export interface Runner {
   storageMeasurementStatus?: string | null
   storageState?: string | null
   storageMeasurementError?: string | null
+  machineStorageTotalBytes?: number | null
+  machineStorageAvailableBytes?: number | null
+  machineStorageMeasuredAtUtc?: string | null
+  machineStorageMeasurementStatus?: string | null
+  machineStorageMeasurementError?: string | null
 }
 
 export const RunnerApplicationProfiles = {

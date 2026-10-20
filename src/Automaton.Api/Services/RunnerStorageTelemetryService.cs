@@ -163,6 +163,51 @@ public sealed class RunnerStorageTelemetryService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ReportMachineRunnerAsync(
+        RunnerDetails authenticatedRunner,
+        MachineRunnerStorageTelemetry report,
+        CancellationToken cancellationToken)
+    {
+        EnsureMachineRunnerIdentity(authenticatedRunner);
+        ValidateMachineRunnerReport(report);
+
+        var runner = await db.Runners.SingleOrDefaultAsync(
+            x => x.Id == authenticatedRunner.Id &&
+                x.Purpose == RunnerPurposes.Managed &&
+                x.ApplicationProfile == RunnerApplicationProfiles.MachineManagement &&
+                x.InstallationId == authenticatedRunner.InstallationId,
+            cancellationToken)
+            ?? throw new UnauthorizedAccessException("The Machine Management Runner identity changed before storage was reported.");
+        if (runner.MachineStorageMeasuredAtUtc >= report.MeasuredAtUtc) return;
+
+        runner.MachineStorageMeasuredAtUtc = report.MeasuredAtUtc;
+        runner.MachineStorageMeasurementStatus = report.Success ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
+        runner.MachineStorageMeasurementError = report.Success ? null : Truncate(report.Error ?? "Machine storage measurement failed.", 2000);
+        if (report.Success)
+        {
+            runner.MachineStorageTotalBytes = report.TotalBytes;
+            runner.MachineStorageAvailableBytes = report.AvailableBytes;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void EnsureMachineRunnerIdentity(RunnerDetails runner)
+    {
+        if (runner.Purpose != RunnerPurposes.Managed ||
+            runner.ApplicationProfile != RunnerApplicationProfiles.MachineManagement ||
+            string.IsNullOrWhiteSpace(runner.InstallationId))
+            throw new UnauthorizedAccessException("Only an enrolled Machine Management Runner can report machine storage.");
+    }
+
+    private static void ValidateMachineRunnerReport(MachineRunnerStorageTelemetry report)
+    {
+        ValidateTimestamp(report.MeasuredAtUtc);
+        ValidateText(report.Error, 2000, nameof(report.Error));
+        ValidateText(report.RunnerVersion, 80, nameof(report.RunnerVersion));
+        if (report.TotalBytes < 0 || report.AvailableBytes < 0 || report.AvailableBytes > report.TotalBytes)
+            throw new ArgumentException("Machine storage values must be non-negative and internally consistent.");
+    }
+
     private static void ValidateRunnerHostReport(RunnerDetails authenticatedRunner, RunnerHostStorageTelemetry report)
     {
         if (authenticatedRunner.Purpose != RunnerPurposes.Infrastructure ||

@@ -627,12 +627,32 @@ onUnmounted(() => {
                 <span>{{ formatRelativeTime(runner.storageMeasuredAtUtc) }} · {{ runner.storageMeasurementSource || 'Unknown source' }}</span>
               </div>
             </template>
+            <template v-else-if="runner.applicationProfile === 'MachineManagement'">
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Workspace storage</span>
+                <span>{{ formatStorage(runner.machineStorageAvailableBytes) }} free / {{ formatStorage(runner.machineStorageTotalBytes) }}</span>
+              </div>
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Storage measurement</span>
+                <Tag :value="runner.machineStorageMeasurementStatus || 'Not measured'" :severity="runner.machineStorageMeasurementStatus === 'Succeeded' ? 'success' : runner.machineStorageMeasurementStatus === 'Failed' ? 'danger' : 'secondary'" />
+              </div>
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Measured</span>
+                <span>{{ formatRelativeTime(runner.machineStorageMeasuredAtUtc) }}</span>
+              </div>
+            </template>
           </div>
           <Message v-if="runner.isHostedRunner" severity="info" :closable="false" class="mt-3">
             Hosted Runner storage uses a hard XFS project quota on supported managed Runner Hosts. It includes the Hosted Runner system and user volumes, including application data and build workspaces; Docker images, shared cache, Docker logs, and container writable layers are outside this quota.
           </Message>
           <Message v-if="runner.isHostedRunner && runner.storageMeasurementError" severity="warn" :closable="false" class="mt-2">
             {{ runner.storageMeasurementError }}
+          </Message>
+          <Message v-if="runner.applicationProfile === 'MachineManagement'" severity="info" :closable="false" class="mt-3">
+            Storage reports free and total space on this installation's persistent workspace filesystem. It is a periodic capacity reading, not a disk quota or a measurement of every Docker volume.
+          </Message>
+          <Message v-if="runner.applicationProfile === 'MachineManagement' && runner.machineStorageMeasurementError" severity="warn" :closable="false" class="mt-2">
+            {{ runner.machineStorageMeasurementError }}
           </Message>
         </template>
       </Card>

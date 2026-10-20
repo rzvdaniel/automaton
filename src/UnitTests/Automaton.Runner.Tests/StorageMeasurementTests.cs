@@ -15,6 +15,24 @@ namespace Automaton.Runner.Console.Tests;
 public class StorageMeasurementTests
 {
     [Test]
+    public void ReadFilesystemCapacity_ReturnsValidatedCapacityForWorkspaceFilesystem()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"automaton-runner-volume-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(path);
+        try
+        {
+            var capacity = StorageTelemetryBackgroundService.ReadFilesystemCapacity(path);
+
+            Assert.That(capacity.TotalBytes, Is.GreaterThan(0));
+            Assert.That(capacity.AvailableBytes, Is.InRange(0, capacity.TotalBytes));
+        }
+        finally
+        {
+            Directory.Delete(path);
+        }
+    }
+
+    [Test]
     public async Task TelemetryClient_PostsAuthenticatedReportToConfiguredApi()
     {
         var previousApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
@@ -46,6 +64,49 @@ public class StorageMeasurementTests
             Assert.That(handler.ApiKey, Is.EqualTo("test-runner-key"));
             Assert.That(handler.Report, Is.Not.Null);
             Assert.That(handler.Report!.HostedRunnerId, Is.EqualTo(report.HostedRunnerId));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", previousApiKey);
+            Environment.SetEnvironmentVariable("AUTOMATON_SERVER_URL", previousServerUrl);
+            Environment.SetEnvironmentVariable("APPDATA", previousAppData);
+            Environment.SetEnvironmentVariable("USERPROFILE", previousUserProfile);
+            if (Directory.Exists(isolatedAppData))
+                Directory.Delete(isolatedAppData, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task TelemetryClient_PostsMachineWorkspaceCapacityToAuthenticatedMachineEndpoint()
+    {
+        var previousApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        var previousServerUrl = Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL");
+        var previousAppData = Environment.GetEnvironmentVariable("APPDATA");
+        var previousUserProfile = Environment.GetEnvironmentVariable("USERPROFILE");
+        var isolatedAppData = Path.Combine(Path.GetTempPath(), $"automaton-runner-config-{Guid.NewGuid():N}");
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "test-runner-key");
+        Environment.SetEnvironmentVariable("AUTOMATON_SERVER_URL", "https://api.example.test/");
+        Environment.SetEnvironmentVariable("APPDATA", isolatedAppData);
+        Environment.SetEnvironmentVariable("USERPROFILE", "test-user");
+        try
+        {
+            var handler = new RecordingHttpMessageHandler();
+            var storage = new FileStorageService();
+            var client = new RunnerStorageTelemetryApiClient(
+                new ConfigurationService(
+                    Options.Create(new AppConfig { BaseUrl = "https://api.example.test/" }),
+                    new ConfigurationBuilder().Build(), storage),
+                storage, new SingleClientFactory(handler));
+            var report = new MachineRunnerStorageTelemetry(DateTime.UtcNow, 1000, 400, true, null, "test");
+
+            await client.ReportMachineRunnerAsync(report, CancellationToken.None);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(handler.RequestUri, Is.EqualTo(new Uri("https://api.example.test/api/runner-storage/machine")));
+                Assert.That(handler.ApiKey, Is.EqualTo("test-runner-key"));
+                Assert.That(handler.MachineReport, Is.EqualTo(report));
+            });
         }
         finally
         {
@@ -127,12 +188,16 @@ public class StorageMeasurementTests
         public Uri? RequestUri { get; private set; }
         public string? ApiKey { get; private set; }
         public HostedRunnerStorageTelemetry? Report { get; private set; }
+        public MachineRunnerStorageTelemetry? MachineReport { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
             ApiKey = request.Headers.GetValues("X-API-Key").Single();
-            Report = await request.Content!.ReadFromJsonAsync<HostedRunnerStorageTelemetry>(cancellationToken);
+            if (request.RequestUri?.AbsolutePath.EndsWith("/machine", StringComparison.Ordinal) == true)
+                MachineReport = await request.Content!.ReadFromJsonAsync<MachineRunnerStorageTelemetry>(cancellationToken);
+            else
+                Report = await request.Content!.ReadFromJsonAsync<HostedRunnerStorageTelemetry>(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         }
     }

@@ -28,6 +28,18 @@ public sealed class RunnerStorageTelemetrySubmissionService(
         await telemetryService.ReportRunnerHostAsync(runner, report, cancellationToken);
     }
 
+    public async Task ReportMachineRunnerAsync(
+        Guid apiKeyId,
+        MachineRunnerStorageTelemetry report,
+        CancellationToken cancellationToken)
+    {
+        var runner = await ResolveRunnerAsync(apiKeyId, RunnerPurposes.Managed, cancellationToken);
+        if (runner.ApplicationProfile != RunnerApplicationProfiles.MachineManagement ||
+            string.IsNullOrWhiteSpace(runner.InstallationId))
+            throw new UnauthorizedAccessException("The API key is not assigned to a Machine Management Runner.");
+        await telemetryService.ReportMachineRunnerAsync(runner, report, cancellationToken);
+    }
+
     private async Task<RunnerDetails> ResolveHostedRunnerAsync(
         Guid apiKeyId,
         CancellationToken cancellationToken)
@@ -70,7 +82,9 @@ public sealed class RunnerStorageTelemetrySubmissionService(
         {
             Id = runner.Id,
             Name = runner.Name,
-            Purpose = runner.Purpose
+            Purpose = runner.Purpose,
+            ApplicationProfile = runner.ApplicationProfile,
+            InstallationId = runner.InstallationId
         };
     }
 }
