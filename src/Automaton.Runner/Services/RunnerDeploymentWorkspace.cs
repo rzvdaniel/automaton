@@ -131,6 +131,53 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         return files.Length;
     }
 
+    public static int CopyDirectoryRejectingLinks(string sourceRoot, string destinationRoot, string containmentRoot)
+    {
+        var fullRoot = Path.GetFullPath(containmentRoot);
+        var fullSource = Path.GetFullPath(sourceRoot);
+        var relativeSource = Path.GetRelativePath(fullRoot, fullSource);
+        if (Path.IsPathRooted(relativeSource) || relativeSource == ".."
+            || relativeSource.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Build output is outside the build workspace.");
+
+        RejectLink(fullRoot);
+        var current = fullRoot;
+        foreach (var segment in relativeSource.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            RejectLink(current);
+        }
+
+        Directory.CreateDirectory(destinationRoot);
+        return CopyBuildOutputTree(fullSource, Path.GetFullPath(destinationRoot));
+    }
+
+    private static int CopyBuildOutputTree(string sourceRoot, string destinationRoot)
+    {
+        var copiedFiles = 0;
+        foreach (var entry in Directory.EnumerateFileSystemEntries(sourceRoot))
+        {
+            RejectLink(entry);
+            var destination = Path.Combine(destinationRoot, Path.GetFileName(entry));
+            if ((File.GetAttributes(entry) & FileAttributes.Directory) != 0)
+            {
+                Directory.CreateDirectory(destination);
+                copiedFiles += CopyBuildOutputTree(entry, destination);
+                continue;
+            }
+
+            File.Copy(entry, destination, overwrite: true);
+            copiedFiles++;
+        }
+        return copiedFiles;
+    }
+
+    private static void RejectLink(string path)
+    {
+        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Build output may not contain symbolic links or reparse points.");
+    }
+
     public static void DeleteDirectoryIfExists(string path)
     {
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);

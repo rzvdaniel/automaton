@@ -79,8 +79,32 @@ public sealed class MachineStaticSitePublisherTests
             Assert.That(File.ReadAllText(secondPublishedFile), Is.EqualTo("second site"));
             Assert.That(config, Does.Contain($"location ^~ /{firstApp:D}/"));
             Assert.That(config, Does.Contain($"location ^~ /{secondApp:D}/"));
-            Assert.That(config, Does.Contain($"/{firstApp:D}/{firstOperation:D}/"));
-            Assert.That(config, Does.Contain($"/{secondApp:D}/{secondOperation:D}/"));
+            Assert.That(config, Does.Contain($"location ^~ /{firstApp:D}/{firstOperation:D}/"));
+            Assert.That(config, Does.Contain($"location ^~ /{secondApp:D}/{secondOperation:D}/"));
+            Assert.That(config, Does.Not.Contain("rewrite "));
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_ProvidesCurrentVersionPrefixForTheTunnelRequest()
+    {
+        var appId = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        WriteOutput(appId, target, "dist", "site content");
+        var publisher = new MachineStaticSitePublisher(
+            new RunnerWorkspaceService(),
+            new MachineStaticServingOptions(),
+            (_, _) => Task.FromResult<MachineStaticServerEndpoint?>(new("127.0.0.1", 32123)),
+            (_, _) => Task.FromResult(true));
+
+        var published = await publisher.PublishAsync(operationId, appId, target, "dist", CancellationToken.None);
+        var current = await publisher.GetEndpointAsync(appId, target, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(published?.PathPrefix, Is.EqualTo($"/{appId:D}/{operationId:D}/"));
+            Assert.That(current?.PathPrefix, Is.EqualTo($"/{appId:D}/{operationId:D}/"));
         });
     }
 

@@ -43,6 +43,31 @@ public sealed class MachineStaticTunnelTests
         });
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ForwardAsync_PreservesRuntimeGatewayForDynamicAndComposeApps(bool compose)
+    {
+        var contract = compose
+            ? new ApplicationContract
+            {
+                Compose = new ApplicationComposeSpec
+                {
+                    PublicService = "web",
+                    Services = [new ApplicationComposeService { Name = "web", Image = "nginx:alpine", Port = 8080 }]
+                }
+            }
+            : new ApplicationContract { Runtime = { Command = new ApplicationCommandSpec { Executable = "serve" } } };
+        await using var fixture = await StaticSiteFixture.CreateAsync(contract);
+
+        var response = await fixture.ForwardAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status200OK));
+            Assert.That(fixture.LastRequest?.Destination, Is.EqualTo(TunnelDestinations.RuntimeGateway));
+        });
+    }
+
     private sealed class StaticSiteFixture : IAsyncDisposable
     {
         private const string PublicHost = "static-site-one.apps.automaton.monster";
@@ -64,15 +89,24 @@ public sealed class MachineStaticTunnelTests
         public CapturingHubContext Hub { get; }
         public TunnelRequest? LastRequest => Hub.LastRequest;
 
-        public static async Task<StaticSiteFixture> CreateAsync()
+        public static async Task<StaticSiteFixture> CreateAsync(ApplicationContract? contract = null)
         {
             var db = CreateDbContext();
             var identity = new ApiInstanceIdentityService();
             var appId = Guid.NewGuid();
-            var targetId = await AddPublishedSiteAsync(db, appId, identity);
+            var targetId = await AddPublishedSiteAsync(db, appId, identity, contract ?? StaticContract());
             var (service, hub) = CreateRuntimeService(db, identity);
             return new StaticSiteFixture(db, service, appId, targetId, hub);
         }
+
+        private static ApplicationContract StaticContract() => new()
+        {
+            Build = new ApplicationBuildSpec
+            {
+                Command = new ApplicationCommandSpec { Executable = "build" },
+                OutputDirectory = "dist"
+            }
+        };
 
         public Task<TunnelResponse> ForwardAsync()
         {
@@ -91,7 +125,7 @@ public sealed class MachineStaticTunnelTests
     }
 
     private static async Task<Guid> AddPublishedSiteAsync(
-        ApplicationDbContext db, Guid appId, ApiInstanceIdentityService identity)
+        ApplicationDbContext db, Guid appId, ApiInstanceIdentityService identity, ApplicationContract contract)
     {
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
@@ -117,6 +151,7 @@ public sealed class MachineStaticTunnelTests
             Updated = DateTime.UtcNow,
             IsPublished = true,
             PublicUrl = PublicSlug,
+            ApplicationContractJson = ApplicationContractSerialization.Serialize(contract),
             RuntimeVisibility = AppRuntimeVisibilities.Public,
             AccessStatus = AppAccessStatuses.Active,
             RequiresAuthentication = true,

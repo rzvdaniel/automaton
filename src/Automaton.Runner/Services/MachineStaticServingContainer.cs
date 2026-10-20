@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text.Json;
 using Automaton.Core.Models;
 
@@ -24,21 +25,22 @@ internal sealed class MachineStaticServingContainer(
     {
         if (!IsAuthorized(scope) || !options.IsValid()) return null;
         if (!await HostContainerResourcePolicy.EnsureVolumeAsync(scope, execute, cancellationToken)) return null;
+        var runtimeHostAddress = HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress();
 
         var inspection = await InspectAsync(scope, cancellationToken);
         if (inspection is null)
         {
             var pull = await execute(["docker", "pull", options.Image], DockerTimeout, cancellationToken);
             if (!pull.Success) return null;
-            var run = await execute(BuildRunArguments(scope), DockerTimeout, cancellationToken);
+            var run = await execute(BuildRunArguments(scope, runtimeHostAddress), DockerTimeout, cancellationToken);
             if (!run.Success) return null;
-            inspection = await InspectAsync(scope, cancellationToken);
+            inspection = await InspectAsync(scope, runtimeHostAddress, cancellationToken);
         }
         else if (!inspection.Running)
         {
             var start = await execute(["docker", "start", ContainerName()], DockerTimeout, cancellationToken);
             if (!start.Success) return null;
-            inspection = await InspectAsync(scope, cancellationToken);
+            inspection = await InspectAsync(scope, runtimeHostAddress, cancellationToken);
         }
         return inspection?.Endpoint;
     }
@@ -58,6 +60,12 @@ internal sealed class MachineStaticServingContainer(
     private async Task<ContainerInspection?> InspectAsync(
         HostContainerScope scope,
         CancellationToken cancellationToken)
+        => await InspectAsync(scope, HostContainerRuntimeEndpoint.GetPrivateRuntimeHostAddress(), cancellationToken);
+
+    private async Task<ContainerInspection?> InspectAsync(
+        HostContainerScope scope,
+        string runtimeHostAddress,
+        CancellationToken cancellationToken)
     {
         var result = await execute(
             ["docker", "container", "inspect", "--format", "{{json .}}", ContainerName()],
@@ -74,14 +82,14 @@ internal sealed class MachineStaticServingContainer(
         var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(
             root.GetProperty("Config").GetProperty("Labels")) ?? [];
         var expected = ExpectedLabels(scope);
-        if (labels.Count != expected.Count || expected.Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
+        if (expected.Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
             throw new UnauthorizedAccessException("The existing static-serving container is not owned by this Machine Management Runner.");
 
         var running = root.GetProperty("State").GetProperty("Running").GetBoolean();
-        return new ContainerInspection(running, running ? ReadEndpoint(root, options.ContainerPort) : null);
+        return new ContainerInspection(running, running ? ReadEndpoint(root, options.ContainerPort, runtimeHostAddress) : null);
     }
 
-    private IReadOnlyList<string> BuildRunArguments(HostContainerScope scope)
+    private IReadOnlyList<string> BuildRunArguments(HostContainerScope scope, string runtimeHostAddress)
     {
         var installationId = RequireInstallationId();
         var volume = HostContainerResourcePolicy.VolumeName(scope);
@@ -105,10 +113,17 @@ internal sealed class MachineStaticServingContainer(
             "--pids-limit", limits.PidsLimit.ToString(CultureInfo.InvariantCulture),
             "--mount", VolumeMount(volume, "workspace/published-static/sites", "/sites"),
             "--mount", VolumeMount(volume, "workspace/published-static/metadata/nginx", "/etc/nginx/conf.d"),
-            "--publish", $"127.0.0.1::{options.ContainerPort}/tcp",
+            "--publish", $"{FormatDockerHostAddress(runtimeHostAddress)}::{options.ContainerPort}/tcp",
             options.Image
         };
         return arguments;
+    }
+
+    private static string FormatDockerHostAddress(string address)
+    {
+        if (!IPAddress.TryParse(address, out var parsed))
+            throw new InvalidOperationException("The configured private runtime host address is invalid.");
+        return parsed.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? $"[{parsed}]" : parsed.ToString();
     }
 
     private static bool IsAuthorized(HostContainerScope scope)
@@ -143,7 +158,7 @@ internal sealed class MachineStaticServingContainer(
             "type=volume", $"source={volume}", $"target={target}", $"volume-subpath={subpath}", "volume-nocopy", "readonly"
         }.Select(value => "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""));
 
-    private static MachineStaticServerEndpoint ReadEndpoint(JsonElement root, int containerPort)
+    private static MachineStaticServerEndpoint ReadEndpoint(JsonElement root, int containerPort, string runtimeHostAddress)
     {
         var bindings = root.GetProperty("NetworkSettings").GetProperty("Ports")
             .GetProperty($"{containerPort}/tcp");
@@ -151,9 +166,11 @@ internal sealed class MachineStaticServingContainer(
             throw new InvalidDataException("Docker did not publish exactly one static-server endpoint.");
         var binding = bindings[0];
         var host = binding.GetProperty("HostIp").GetString();
-        if (host != "127.0.0.1" || !int.TryParse(binding.GetProperty("HostPort").GetString(), out var port)
+        if (!IPAddress.TryParse(host, out var actualAddress)
+            || !actualAddress.Equals(IPAddress.Parse(runtimeHostAddress))
+            || !int.TryParse(binding.GetProperty("HostPort").GetString(), out var port)
             || port is < 1 or > 65_535)
-            throw new InvalidDataException("Docker returned an invalid loopback static-server endpoint.");
+            throw new InvalidDataException("Docker returned an invalid private static-server endpoint.");
         return new MachineStaticServerEndpoint(host, port);
     }
 

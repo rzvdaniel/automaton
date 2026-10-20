@@ -22,17 +22,18 @@ public sealed class MachineStaticAppPublicationService(
         CancellationToken cancellationToken)
     {
         if (runtimeVisibility != AppRuntimeVisibilities.Public) return false;
+        var contract = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson);
+        if (!contract.IsStaticSite) return false;
         var target = await FindMachineTargetAsync(app.Id, cancellationToken);
         if (target is null) return false;
 
         await PersistAssignmentBeforeDispatchAsync(cancellationToken);
-        var outputDirectory = ReadDeclaredOutputDirectory(app.ApplicationContractJson);
         var operationId = Guid.NewGuid();
         var command = new RunnerFileTransferCommand(
             RunnerFileTransferKinds.PublishStaticSite,
             app.Id,
             operationId.ToString("N"),
-            RelativePath: outputDirectory,
+            RelativePath: contract.Build.OutputDirectory!,
             DeploymentTargetId: target.Id,
             DeploymentOperationId: operationId);
         var (_, result) = await transfers.ExecuteAsync(
@@ -42,6 +43,9 @@ public sealed class MachineStaticAppPublicationService(
                 result.FileTransferResult?.Error ?? result.Error ?? "The Machine Management Runner rejected static publishing.");
         return true;
     }
+
+    public async Task<bool> HasAssignedMachineRunnerAsync(Guid appId, CancellationToken cancellationToken)
+        => await FindMachineTargetAsync(appId, cancellationToken) is not null;
 
     public async Task QueueRemovalIfAssignedAsync(
         Guid appId,
@@ -82,15 +86,6 @@ public sealed class MachineStaticAppPublicationService(
 
     private Task PersistAssignmentBeforeDispatchAsync(CancellationToken cancellationToken)
         => dataContext.SaveChangesAsync(cancellationToken);
-
-    private static string ReadDeclaredOutputDirectory(string contractJson)
-    {
-        var contract = ApplicationContractSerialization.Deserialize(contractJson);
-        if (contract.Build.Command is null || string.IsNullOrWhiteSpace(contract.Build.OutputDirectory))
-            throw new InvalidOperationException(
-                "Machine Management Runner static publishing requires a build command and a declared build.outputDirectory.");
-        return contract.Build.OutputDirectory;
-    }
 
     private sealed record MachineTarget(Guid Id, Guid RunnerId);
 }

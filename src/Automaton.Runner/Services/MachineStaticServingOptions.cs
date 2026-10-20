@@ -24,7 +24,7 @@ public sealed class MachineStaticServingOptions
             && MaximumPublishedFiles > 0;
 }
 
-public sealed record MachineStaticServerEndpoint(string Address, int Port)
+public sealed record MachineStaticServerEndpoint(string Address, int Port, string PathPrefix = "")
 {
     public Uri BaseAddress => new UriBuilder(Uri.UriSchemeHttp, Address, Port).Uri;
 }

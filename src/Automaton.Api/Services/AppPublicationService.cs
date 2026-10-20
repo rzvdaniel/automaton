@@ -61,11 +61,8 @@ public sealed class AppPublicationService(
 
         var isMachineStaticPublication = machineStaticPublication is not null
             && await machineStaticPublication.PublishIfAssignedAsync(entity, runtimeVisibility, UserId, cancellationToken);
-        if (runtimeVisibility == AppRuntimeVisibilities.Public && requiresAuthentication && !isMachineStaticPublication)
-        {
-            throw new InvalidOperationException(
-                "Restricted published apps require a Machine Management Runner static publication. Use Studio preview for unsupported Runner profiles.");
-        }
+        await EnsureAuthenticatedPublicationSupportedAsync(
+            id, runtimeVisibility, requiresAuthentication, isMachineStaticPublication, cancellationToken);
 
         var ownerId = ResolveAppOwnerId(entity) ?? UserId;
         entity.IsPublished = true;
@@ -106,6 +103,24 @@ public sealed class AppPublicationService(
         await RecordUnpublishedAppAsync(entity, id);
         if (machineStaticPublication is not null)
             await machineStaticPublication.QueueRemovalIfAssignedAsync(id, UserId, cancellationToken);
+    }
+
+    private async Task EnsureAuthenticatedPublicationSupportedAsync(
+        Guid appId,
+        string runtimeVisibility,
+        bool requiresAuthentication,
+        bool isMachineStaticPublication,
+        CancellationToken cancellationToken)
+    {
+        if (runtimeVisibility != AppRuntimeVisibilities.Public || !requiresAuthentication || isMachineStaticPublication)
+            return;
+
+        if (machineStaticPublication is null
+            || !await machineStaticPublication.HasAssignedMachineRunnerAsync(appId, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                "Restricted published apps require a Machine Management Runner so runtime authentication can be enforced.");
+        }
     }
 
     public async Task UpdateRunner(Guid id, Guid? executionRunnerId)

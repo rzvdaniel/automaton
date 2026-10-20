@@ -142,6 +142,7 @@ public sealed class RuntimeTunnelService(
         => target.IsDefault
             && target.WebApp.IsPublished
             && target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public
+            && ApplicationContractSerialization.Deserialize(target.WebApp.ApplicationContractJson).IsStaticSite
             && !string.IsNullOrWhiteSpace(target.WebApp.PublicUrl)
             && RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement
             && string.Equals(host,

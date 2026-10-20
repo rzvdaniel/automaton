@@ -150,7 +150,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
             throw new DirectoryNotFoundException($"Runtime artifact directory does not exist after the build: {output}");
         var packaged = Path.Combine(attempt.StagingRoot, "runtime", "application", Path.GetRelativePath(buildWorkspace, output));
         RunnerDeploymentWorkspace.DeleteDirectoryIfExists(packaged);
-        RunnerDeploymentWorkspace.CopyDirectory(output, packaged);
+        RunnerDeploymentWorkspace.CopyDirectoryRejectingLinks(output, packaged, buildWorkspace);
     }
 
     private async Task CleanPreviousDeploymentAsync(

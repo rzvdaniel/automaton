@@ -80,7 +80,8 @@ public class TunnelForwarderService
             var endpoint = await staticSitePublisher.GetEndpointAsync(appId, targetId, cancellationToken);
             return endpoint is null
                 ? null
-                : (_staticSiteClient, new Uri(endpoint.BaseAddress, staticPath.TrimStart('/')).AbsoluteUri, true);
+                : (_staticSiteClient, new Uri(endpoint.BaseAddress,
+                    endpoint.PathPrefix + staticPath.TrimStart('/')).AbsoluteUri, true);
         }
 
         var isRuntimeGateway = string.Equals(request.Destination, TunnelDestinations.RuntimeGateway, StringComparison.Ordinal);
@@ -202,7 +203,7 @@ public class TunnelForwarderService
         if (request.RuntimeAppId is not { } appId || request.RuntimeDeploymentTargetId is null
             || !TryReadSafeRuntimePath(request.RuntimePath, out var rawPath, out var query))
             return false;
-        staticSitePath = $"/{appId:D}/{rawPath}{query}";
+        staticSitePath = rawPath + query;
         return true;
     }
 

@@ -78,7 +78,9 @@ public sealed class MachineStaticSitePublisher
     {
         await WriteConfigurationAsync(index, cancellationToken);
         var endpoint = await ensureContainer(scope, cancellationToken);
-        return endpoint is not null && await reloadContainer(scope, cancellationToken) ? endpoint : null;
+        return endpoint is not null && await reloadContainer(scope, cancellationToken)
+            ? WithSitePath(endpoint, scope.AppId, index[scope.AppId])
+            : null;
     }
 
     private async Task<MachineStaticServerEndpoint?> StageAndPublishAsync(
@@ -114,7 +116,7 @@ public sealed class MachineStaticSitePublisher
             }
 
             CleanupOlderReleasesSafely(appId, operationId, previous);
-            return endpoint;
+            return WithSitePath(endpoint, appId, operationId);
         }
         catch
         {
@@ -235,9 +237,11 @@ public sealed class MachineStaticSitePublisher
         CancellationToken cancellationToken)
     {
         var scope = CreateScope(appId, targetId);
-        if (!ValidIdentity(Guid.NewGuid(), scope) || !settings.IsValid() || !ReadIndex().ContainsKey(appId))
+        var index = ReadIndex();
+        if (!ValidIdentity(Guid.NewGuid(), scope) || !settings.IsValid() || !index.TryGetValue(appId, out var releaseId))
             return null;
-        return await ensureContainer(scope, cancellationToken);
+        var endpoint = await ensureContainer(scope, cancellationToken);
+        return endpoint is null ? null : WithSitePath(endpoint, appId, releaseId);
     }
 
     internal static string BuildNginxConfiguration(IReadOnlyDictionary<Guid, Guid> sites, int port)
@@ -252,9 +256,9 @@ public sealed class MachineStaticSitePublisher
         {
             var app = appId.ToString("D");
             var release = releaseId.ToString("D");
-            builder.AppendLine($"    location ^~ /{app}/ {{");
-            builder.AppendLine($"        rewrite ^/{app}/(.*)$ /{app}/{release}/$1 break;");
+            builder.AppendLine($"    location ^~ /{app}/{release}/ {{");
             builder.AppendLine("        root /sites;");
+            builder.AppendLine("        index index.html;");
             builder.AppendLine($"        try_files $uri $uri/ /{app}/{release}/index.html;");
             builder.AppendLine("    }");
         }
@@ -262,6 +266,12 @@ public sealed class MachineStaticSitePublisher
         builder.AppendLine("}");
         return builder.ToString();
     }
+
+    private static MachineStaticServerEndpoint WithSitePath(
+        MachineStaticServerEndpoint endpoint,
+        Guid appId,
+        Guid releaseId)
+        => endpoint with { PathPrefix = $"/{appId:D}/{releaseId:D}/" };
 
     private async Task WriteConfigurationAsync(
         IReadOnlyDictionary<Guid, Guid> sites,
