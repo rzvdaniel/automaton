@@ -115,6 +115,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         {
             Assert.That(response.RequiresHostAccessAcknowledgement, Is.True);
             Assert.That(response.HostAccessWarning, Does.Contain("Docker socket"));
+            Assert.That(response.HostAccessWarning, Does.Contain("Actions run in bounded containers"));
+            Assert.That(response.HostAccessWarning, Does.Contain("raw workflows and custom steps"));
             Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_CAPABILITIES=ApplicationHosting,WorkflowExecution,ManagedContainerExecution"));
             Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/storage/workspace'"));
             Assert.That(response.InstallationCommand, Does.Contain(

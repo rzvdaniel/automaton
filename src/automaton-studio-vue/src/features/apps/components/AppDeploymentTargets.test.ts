@@ -152,7 +152,7 @@ describe('AppDeploymentTargets', () => {
     expect(wrapper.text()).not.toContain('No destination assigned')
   })
 
-  it('shows privileged access separately from the self-hosted destination', async () => {
+  it('shows privileged access and its self-hosted destination', async () => {
     const privileged = target({
       id: 'privileged-id',
       name: 'Privileged',
@@ -185,7 +185,7 @@ describe('AppDeploymentTargets', () => {
 
     expect(wrapper.text()).toContain('Self-hosted')
     expect(wrapper.text()).toContain('Privileged access')
-    expect(wrapper.text()).not.toContain('Privileged Host')
+    expect(wrapper.text()).toContain('Self-hosted · Privileged Host')
     expect(
       wrapper.findAll('.p-tag').filter((tag) => tag.text() === 'Privileged access')
     ).toHaveLength(1)
@@ -226,7 +226,7 @@ describe('AppDeploymentTargets', () => {
     expect(card.text()).not.toContain('Privileged access')
   })
 
-  it('identifies Machine Management deployments and explains the Action limitation', async () => {
+  it('identifies Machine Management deployments and explains isolated Action support', async () => {
     const machine = target({
       runner: {
         id: 'machine-runner',
@@ -240,7 +240,8 @@ describe('AppDeploymentTargets', () => {
     const wrapper = await mountTargets([machine])
 
     expect(wrapper.text()).toContain('Self-hosted · Machine Management')
-    expect(wrapper.text()).toContain('Packages containing Actions are not supported yet')
+    expect(wrapper.text()).toContain('Actions and Python dependencies run in isolated, resource-bounded containers')
+    expect(wrapper.text()).toContain('raw workflows and custom-step code remain disabled')
     expect(wrapper.text()).toContain('automaton deploy live')
   })
 
