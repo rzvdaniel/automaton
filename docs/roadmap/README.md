@@ -51,9 +51,9 @@ Retain stable app, deployment and execution identities. Container names and mach
 
 Support Linux container workloads: HTTP services, background workers and finite jobs/Actions. Accept an OCI image, a reproducible Dockerfile/source build, or a documented subset of Compose for related services. Translate existing app contracts into this model rather than maintaining two execution engines indefinitely.
 
-The current M2 Compose task supports the bounded [image-based Compose subset](../implementation/compose-supported-subset.md): internal service networking, one private externally routed HTTP service, app-scoped named data volumes and existing per-container resource limits. Unsupported fields are rejected before resource creation. Compose builds and secure secret delivery remain deferred; Compose environment values are non-sensitive literals only. Generic deployment must not accept arbitrary host mounts, privileged containers, host networking or a Docker socket. Builds execute untrusted code and require a separate bounded container boundary.
+The M2 Compose subset is implemented in PR #398: internal service networking, one private externally routed HTTP service, app-scoped named data volumes and existing per-container resource limits. Unsupported fields are rejected before resource creation. Compose builds and secure secret delivery remain deferred; Compose environment values are non-sensitive literals only. Generic deployment must not accept arbitrary host mounts, privileged containers, host networking or a Docker socket. Builds execute untrusted code and require a separate bounded container boundary.
 
-Static output can use one shared static-serving service per machine. Each site's files, hostname/origin and access policy remain separate. Publishing must never expose another site's private files, editable source, credentials or logs.
+Shared static publishing is the current M2 task: one Runner-managed serving container per machine, with site-specific output directories mounted read-only. API authorization and runtime authentication govern each hostname; the Runner publishes only declared static output. A failed update must leave the prior site version serving. Source, credentials, logs and private data are excluded.
 
 Actions and workflows keep their existing product semantics, schedules, results, cancellation and logs, but their user-controlled code moves to finite job containers. Do this before ordinary user Actions can reach the combined management Runner. Do not merely reuse the current child-process execution path inside a privileged Runner.
 
@@ -104,7 +104,7 @@ Depends on milestone 1's execution and permission boundary.
 
 - PR #396 completed Action authorization for explicitly assigned organization apps. PR #397 completed the organization app use flow—assignment, My Apps listing, runtime launch, Action access and revocation—while keeping app use separate from source, secrets and machine administration.
 - Capacity work means configurable machine/workload safeguards and admission budgets, not subscription quotas or per-user resource accounting.
-- Current task: land the documented, bounded Compose subset for multi-service apps. Compose builds and secret delivery remain deferred and are not implied by this support. Then add shared static publishing with independent hostnames and authentication.
+- Current task: implement shared static publishing with per-site output, hostnames and access policies through one Runner-managed service per machine. Compose builds and secure secret delivery remain deferred and are not implied by the supported Compose subset.
 - Make publish, share and source-copy behavior clear in Studio and API.
 - Show capacity, workload limits and unsupported guarantees accurately; reject deployments that exceed configured admission budgets.
 
@@ -144,4 +144,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** complete review of the Compose subset PR, then implement shared static publishing. Compose builds and secure secret delivery remain deferred. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.
+**Next action:** complete the shared static publishing change, then proceed to capacity safeguards. Compose builds and secure secret delivery remain deferred. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.

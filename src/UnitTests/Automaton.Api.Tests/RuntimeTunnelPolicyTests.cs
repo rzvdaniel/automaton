@@ -149,6 +149,7 @@ public class RuntimeTunnelPolicyTests
             Definition = "{}",
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
+            IsPublished = true,
             RuntimeVisibility = AppRuntimeVisibilities.Public,
             AccessStatus = AppAccessStatuses.Active,
             PublicUrl = "runner-deployment-diagnostic-20260804"

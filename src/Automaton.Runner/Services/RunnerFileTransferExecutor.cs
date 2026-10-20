@@ -21,6 +21,8 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
             RunnerFileTransferKinds.DownloadAppFile => await DownloadAppFileAsync(operationId, command, api, token),
             RunnerFileTransferKinds.DownloadMedia => await DownloadMediaAsync(operationId, command, api, token),
             RunnerFileTransferKinds.DeployPackage => await DeployPackageAsync(operationId, command, api, token),
+            RunnerFileTransferKinds.PublishStaticSite => await PublishStaticSiteAsync(operationId, command, token),
+            RunnerFileTransferKinds.UnpublishStaticSite => await UnpublishStaticSiteAsync(command, token),
             _ => throw new InvalidDataException($"Unsupported Runner file-transfer operation '{command.Kind}'.")
         };
         return ToExecutionResult(result);
@@ -122,6 +124,37 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
         {
             TryDelete(packagePath);
         }
+    }
+
+    private async Task<RunnerFileTransferResult> PublishStaticSiteAsync(
+        Guid operationId, RunnerFileTransferCommand command, CancellationToken token)
+    {
+        var appId = command.AppId;
+        var targetId = command.DeploymentTargetId
+            ?? throw new InvalidDataException("A deployment target is required for static publishing.");
+        var outputDirectory = Required(command.RelativePath, "Declared static output directory");
+        using var scope = scopes.CreateScope();
+        var publisher = scope.ServiceProvider.GetRequiredService<MachineStaticSitePublisher>();
+        var endpoint = await publisher.PublishAsync(operationId, appId, targetId, outputDirectory, token);
+        return endpoint is null
+            ? new() { Success = false, Error = "The Machine Management Runner could not start its bounded static-serving container." }
+            : new() { Success = true, SessionId = command.SessionId };
+    }
+
+    private async Task<RunnerFileTransferResult> UnpublishStaticSiteAsync(
+        RunnerFileTransferCommand command, CancellationToken token)
+    {
+        var targetId = command.DeploymentTargetId
+            ?? throw new InvalidDataException("A deployment target is required for static unpublishing.");
+        using var scope = scopes.CreateScope();
+        var publisher = scope.ServiceProvider.GetRequiredService<MachineStaticSitePublisher>();
+        var success = await publisher.UnpublishAsync(command.AppId, targetId, token);
+        return new()
+        {
+            Success = success,
+            SessionId = command.SessionId,
+            Error = success ? null : "The Machine Management Runner could not update its static-serving container."
+        };
     }
 
     private static async Task DownloadInputAsync(

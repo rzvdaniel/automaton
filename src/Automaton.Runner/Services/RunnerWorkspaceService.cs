@@ -156,6 +156,15 @@ public class RunnerWorkspaceService
         return GetFullPath(GetAppLogsRoot(appId, deploymentTargetId), runtimeIdentity);
     }
 
+    public string GetPublishedStaticRoot() => GetFullPath(WorkspaceRoot, "published-static");
+
+    public string GetPublishedStaticSitesRoot() => GetFullPath(GetPublishedStaticRoot(), "sites");
+
+    public string GetPublishedStaticMetadataRoot() => GetFullPath(GetPublishedStaticRoot(), "metadata");
+
+    public string GetPublishedStaticSiteVersionsRoot(Guid appId)
+        => GetFullPath(GetPublishedStaticSitesRoot(), appId.ToString("D"));
+
     public RunnerApplicationStoragePaths GetApplicationStoragePaths(Guid appId, Guid deploymentTargetId)
         => new(
             GetAppRoot(appId),

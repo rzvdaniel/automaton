@@ -142,7 +142,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         string buildWorkspace,
         ApplicationBuildExecutionResult result)
     {
-        if (!result.Succeeded || application.Runtime.Command is null) return;
+        if (!result.Succeeded || application.Runtime.Command is null
+            && string.IsNullOrWhiteSpace(application.Build.OutputDirectory)) return;
         var relative = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);
         var output = ApplicationBuildExecutor.ResolveWorkspacePath(buildWorkspace, relative, "runtime artifact directory");
         if (!Directory.Exists(output))

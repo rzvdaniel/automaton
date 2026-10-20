@@ -104,12 +104,14 @@ public class AppsService
         bool isForkable = false,
         string runtimeVisibility = AppRuntimeVisibilities.Public,
         string catalogVisibility = AppCatalogVisibilities.Listed,
-        string marketplacePreviewMode = MarketplacePreviewModes.Launchable)
+        string marketplacePreviewMode = MarketplacePreviewModes.Launchable,
+        CancellationToken cancellationToken = default)
         => appPublicationService.Publish(
             id, publicUrl, requiresAuthentication, executionRunnerId, category, tags, isForkable,
-            runtimeVisibility, catalogVisibility, marketplacePreviewMode);
+            runtimeVisibility, catalogVisibility, marketplacePreviewMode, cancellationToken);
 
-    public Task Unpublish(Guid id) => appPublicationService.Unpublish(id);
+    public Task Unpublish(Guid id, CancellationToken cancellationToken = default)
+        => appPublicationService.Unpublish(id, cancellationToken);
 
     /// <summary>
     /// Update the execution runner for an app

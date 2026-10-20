@@ -15,6 +15,7 @@ internal static class RunnerHostBuilder
             {
                 services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
                 services.Configure<TunnelForwarderConfig>(context.Configuration.GetSection("TunnelForwarder"));
+                services.Configure<MachineStaticServingOptions>(context.Configuration.GetSection("MachineStaticServing"));
                 RunnerBaseServicesRegistration.Add(services);
                 RunnerRuntimeServicesRegistration.Add(services);
                 RunnerExecutionServicesRegistration.Add(services);

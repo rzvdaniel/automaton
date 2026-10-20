@@ -21,7 +21,8 @@ public sealed class AppPublicationService(
     IAuditEventService auditEventService,
     IApplicationEventService applicationEventService,
     RecentActivityService recentActivityService,
-    BackendRouteConfigService backendRouteConfigService)
+    BackendRouteConfigService backendRouteConfigService,
+    MachineStaticAppPublicationService? machineStaticPublication = null)
 {
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<AppPublicationService>();
     private Guid UserId => userContextService.GetUserId();
@@ -36,14 +37,15 @@ public sealed class AppPublicationService(
         bool isForkable = false,
         string runtimeVisibility = AppRuntimeVisibilities.Public,
         string catalogVisibility = AppCatalogVisibilities.Listed,
-        string marketplacePreviewMode = MarketplacePreviewModes.Launchable)
+        string marketplacePreviewMode = MarketplacePreviewModes.Launchable,
+        CancellationToken cancellationToken = default)
     {
         if (!await authorizationService.CanUpdateAppAsync(id))
             throw new UnauthorizedAccessException($"You do not have permission to publish app {id}");
 
-        var entity = dataContext.WebApps
+        var entity = await dataContext.WebApps
             .Include(app => app.WebAppUsers)
-            .SingleOrDefault(app => app.Id == id);
+            .SingleOrDefaultAsync(app => app.Id == id, cancellationToken);
         if (entity == null)
             throw new InvalidOperationException($"App {id} not found");
 
@@ -51,17 +53,19 @@ public sealed class AppPublicationService(
             throw new InvalidOperationException("Invalid URL slug format. Use lowercase letters, numbers, and hyphens only.");
 
         AppVisibilityPolicy.EnsureValidConfiguration(runtimeVisibility, catalogVisibility, marketplacePreviewMode);
-        if (runtimeVisibility == AppRuntimeVisibilities.Public && requiresAuthentication)
-        {
-            throw new InvalidOperationException(
-                "Restricted published apps are not supported by the public static app host yet. Use Studio preview for private and organization apps.");
-        }
-
-        if (dataContext.WebApps.Any(app => app.PublicUrl == publicUrl && app.Id != id))
+        if (await dataContext.WebApps.AnyAsync(app => app.PublicUrl == publicUrl && app.Id != id, cancellationToken))
             throw new InvalidOperationException("This URL is already taken");
 
         if (executionRunnerId.HasValue)
             await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
+
+        var isMachineStaticPublication = machineStaticPublication is not null
+            && await machineStaticPublication.PublishIfAssignedAsync(entity, runtimeVisibility, UserId, cancellationToken);
+        if (runtimeVisibility == AppRuntimeVisibilities.Public && requiresAuthentication && !isMachineStaticPublication)
+        {
+            throw new InvalidOperationException(
+                "Restricted published apps require a Machine Management Runner static publication. Use Studio preview for unsupported Runner profiles.");
+        }
 
         var ownerId = ResolveAppOwnerId(entity) ?? UserId;
         entity.IsPublished = true;
@@ -77,18 +81,18 @@ public sealed class AppPublicationService(
         entity.Version++;
         entity.Updated = DateTime.UtcNow;
 
-        await dataContext.SaveChangesAsync();
+        await dataContext.SaveChangesAsync(cancellationToken);
         await RecordPublishedAppAsync(entity, id, ownerId, publicUrl, requiresAuthentication, isForkable);
     }
 
-    public async Task Unpublish(Guid id)
+    public async Task Unpublish(Guid id, CancellationToken cancellationToken = default)
     {
         if (!await authorizationService.CanUpdateAppAsync(id))
             throw new UnauthorizedAccessException($"You do not have permission to unpublish app {id}");
 
-        var entity = dataContext.WebApps
+        var entity = await dataContext.WebApps
             .Include(app => app.DeploymentTargets)
-            .SingleOrDefault(app => app.Id == id);
+            .SingleOrDefaultAsync(app => app.Id == id, cancellationToken);
         if (entity == null)
             throw new InvalidOperationException($"App {id} not found");
 
@@ -98,8 +102,10 @@ public sealed class AppPublicationService(
         entity.PublishedAt = null;
         entity.Updated = DateTime.UtcNow;
         // Keep PublicUrl for re-publishing with the same slug.
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync(cancellationToken);
         await RecordUnpublishedAppAsync(entity, id);
+        if (machineStaticPublication is not null)
+            await machineStaticPublication.QueueRemovalIfAssignedAsync(id, UserId, cancellationToken);
     }
 
     public async Task UpdateRunner(Guid id, Guid? executionRunnerId)

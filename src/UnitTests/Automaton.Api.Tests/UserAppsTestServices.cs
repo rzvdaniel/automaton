@@ -49,15 +49,9 @@ internal static class UserAppsTestServices
                 null!,
                 runnerAssignmentPolicy,
                 new AppDeletionService(dbContext, null!)),
-            new AppPublicationService(
-                dbContext,
-                userContextService,
-                authorizationService,
-                runnerAssignmentPolicy,
-                auditEventService,
-                applicationEventService,
-                null!,
-                null!),
+            CreatePublicationService(
+                dbContext, userContextService, authorizationService,
+                runnerAssignmentPolicy, auditEventService, applicationEventService),
             new AppForkingService(
                 dbContext,
                 userContextService,
@@ -67,6 +61,16 @@ internal static class UserAppsTestServices
                 auditEventService),
             new AppQueryService(dbContext, userContextService, authorizationService, null!));
     }
+
+    private static AppPublicationService CreatePublicationService(
+        ApplicationDbContext dbContext,
+        UserContextService userContextService,
+        ResourceAuthorizationService authorizationService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        IAuditEventService auditEventService,
+        IApplicationEventService applicationEventService)
+        => new(dbContext, userContextService, authorizationService, runnerAssignmentPolicy,
+            auditEventService, applicationEventService, null!, null!);
 
     private sealed class StubWebHostEnvironment : IWebHostEnvironment
     {

@@ -104,6 +104,7 @@ public class BackendRouteConfigService
                     RuntimeEndpoint = runner.RuntimeEndpoint!,
                     RequiresAuthentication = target.WebApp.RequiresAuthentication,
                     Slug = target.IsDefault &&
+                        target.WebApp.IsPublished &&
                         target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                         target.WebApp.AccessStatus == AppAccessStatuses.Active
                         ? target.WebApp.PublicUrl
@@ -153,6 +154,7 @@ public class BackendRouteConfigService
                 candidate.Target.IsDefault,
                 RequiresAuthentication = candidate.Target.WebApp.RequiresAuthentication,
                 Slug = candidate.Target.IsDefault &&
+                    candidate.Target.WebApp.IsPublished &&
                     candidate.Target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     candidate.Target.WebApp.AccessStatus == AppAccessStatuses.Active
                     ? candidate.Target.WebApp.PublicUrl

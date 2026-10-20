@@ -1,16 +1,9 @@
+using Automaton.Core.Models;
+
 namespace Automaton.Api.Services;
 
 public static class WebAppRuntimeFilePolicy
 {
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".html", ".htm", ".css", ".js", ".mjs", ".json",
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
-        ".ico", ".txt", ".xml", ".webmanifest",
-        ".wasm", ".woff", ".woff2", ".ttf", ".eot", ".otf",
-        ".mp3", ".mp4", ".webm", ".pdf"
-    };
-
     public static bool IsAllowedPublicPath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -18,8 +11,7 @@ public static class WebAppRuntimeFilePolicy
             return true;
         }
 
-        var extension = Path.GetExtension(path);
-        return !string.IsNullOrEmpty(extension) && AllowedExtensions.Contains(extension);
+        return PublishedStaticOutputFilePolicy.IsAllowedFilePath(path);
     }
 
     public static string GetContentType(string path)

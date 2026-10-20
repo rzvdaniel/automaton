@@ -140,6 +140,9 @@ public sealed class AppFileDownloadServiceTests
             return new MemoryStream(outputBytes, writable: false);
         }
 
+        public Task QueueAsync(Guid operationId, Guid runnerId, Guid ownerId,
+            RunnerFileTransferCommand command, CancellationToken token) => Task.CompletedTask;
+
         public Task CleanupOutputAsync(Guid operationId)
         {
             CleanedOutputIds.Add(operationId);
