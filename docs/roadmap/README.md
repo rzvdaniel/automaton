@@ -12,7 +12,7 @@ The target is **one management Runner per machine**, responsible for both machin
 
 This is the only active roadmap. It supersedes the staged master plan, archived backlog and Node N0–N4 briefs. Their history remains in Git; their unfinished tasks are not implicit requirements of this plan. Do not introduce a separate Node executable or shared Runner/Node framework.
 
-The current refactoring deliverable is a working single-server install/deploy flow **and removal of the superseded execution and hosting paths**. Finish that flow, then make legacy cleanup the next major objective. Optional operations and feature expansion listed below are deferred until after cleanup; they must not become prerequisites for reaching the simpler implementation.
+The current refactoring deliverable is a working single-server install/deploy flow **and removal of the superseded execution and hosting paths**, targeting fresh installations. Automatic migration of legacy Hosted Runner/account-storage installations, compatibility adapters, and preservation of their app IDs or URLs are not required. Finish the new flow, then remove the obsolete paths. Existing installations and their data are not changed by this source cleanup; any retirement, export or manual move needs a separate explicit decision. Optional operations and feature expansion remain deferred until after cleanup.
 
 ## Starting point and baseline
 
@@ -20,7 +20,7 @@ Existing Automaton already deploys and serves apps, runs Actions, routes traffic
 
 The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes from `649761f6`, reconciled with current main by PR #391. Its reviewed head was `489a4004d5f79a72f78e5982634a7cedb3fe25e3`; it merged as `bb12bf68f36b1b271f4ebfe6986add1ad190e125`. It removed the abandoned Node implementation and retained the roadmap, repository guidance, approved Symphony cleanup and shared DbContext cleanup. It added no Runner behavior. The [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) is based on that merged source.
 
-The source model and EF snapshot return to the pre-Node shape, but source changes do not reverse SQL already applied to a database. The removed migrations are `20261012183817_AddNodeEnrollmentAuthentication` and `20261013095351_AddNodeActivationPersistence`. Before deploying this source, inspect each target database's `__EFMigrationsHistory`. If either migration was applied, deployment requires a reviewed forward-only compatibility or cleanup plan; deleting migration files does not undo their schema changes. This PR does not inspect production or change any database, so migration status remains a release limitation.
+The source model and EF snapshot returned to the pre-Node shape, but source changes do not reverse applied SQL. The removed migrations were `20261012183817_AddNodeEnrollmentAuthentication` and `20261013095351_AddNodeActivationPersistence`. Fresh installation does not require converting an old database. Reusing an existing database would require a separate review of its `__EFMigrationsHistory` and an explicit reuse/reset/compatibility decision; this roadmap does not provide an automatic upgrade path or authorize database changes.
 
 ## Architecture to build toward
 
@@ -47,7 +47,7 @@ Start at these existing seams, confirming them against the agreed baseline befor
 | [Hosted app capacity](../../src/Automaton.Api/Services/HostedRunnerAppCapacityService.cs) | Move placement and capacity ownership to machines and workloads instead of manufacturing a Hosted Runner per user. |
 | [Runner management transport](../architecture/runner-management-transports.md) | Preserve durable operation IDs, protected assignments, journal/retry behavior, logs and result delivery. Adapt identity bindings where necessary. |
 
-Retain stable app, deployment and execution identities. Container names and machine names are not ownership evidence. Keep source editing separate from disposable runtime output; a running container must not become the only copy of an app's source.
+Within the new path, retain stable app, deployment and execution identities across normal operations. This does not require preserving legacy-installation IDs or URLs. Container names and machine names are not ownership evidence. Keep source editing separate from disposable runtime output; a running container must not become the only copy of an app's source.
 
 ### Deployment contract
 
@@ -67,7 +67,7 @@ A customer can dedicate a machine to a person, team or environment, or share it 
 
 ### Resources and storage
 
-Use a normal Ubuntu machine as the initial supported installation target; ext4 is the tested storage baseline, not a runtime requirement. Working Docker storage on XFS or another supported filesystem remains valid. Basic deployment must not require XFS project quotas, a Hetzner volume or any provider-specific storage attachment. Persistent app data uses explicit, owned directories/volumes on configured storage roots. Preserve existing data and storage affinity when converting current deployments.
+Use a normal Ubuntu machine as the initial supported installation target; ext4 is the tested storage baseline, not a runtime requirement. Working Docker storage on XFS or another supported filesystem remains valid. Basic deployment must not require XFS project quotas, a Hetzner volume or any provider-specific storage attachment. Persistent app data uses explicit, owned directories/volumes on configured storage roots and survives normal redeployment. Converting legacy deployments is outside the fresh-install scope.
 
 Reuse configured CPU/memory/process limits, bounded build/job concurrency, log rotation and minimum-free-disk admission. Basic workspace-filesystem capacity and measurement status are sufficient for the current refactoring. Additional image/layer/volume/log/build usage breakdowns and automated retention/cleanup are deferred until after legacy cleanup. Any cleanup must delete only identified disposable resources and preserve owned persistent data.
 
@@ -79,22 +79,22 @@ Bind Runner credentials and accepted operations to a machine and authorized app/
 
 Keep authoritative state durable and safe with multiple API/Worker replicas. Duplicate delivery must return the existing result or safely resume a known operation. An Action with an uncertain external effect must not be blindly rerun. Reuse the existing journal/result protocol instead of introducing another queue or operation store. The existing cross-host artifact-availability limitation must be resolved or explicitly constrained in supported deployment topology before claiming replica/host failover.
 
-After a database restore or a machine identity conflict, stop new effects until machine ownership and outstanding operations are reconciled. Existing app containers may continue serving during a control-plane outage; recovery must not silently adopt foreign volumes or start duplicate jobs. Before migrating retained state, rehearse the relevant manual recovery/rollback on a disposable copy. This does not require a backup product or the abandoned Node authority system.
+After a database restore or a machine identity conflict, stop new effects until machine ownership and outstanding operations are reconciled. Existing app containers may continue serving during a control-plane outage; recovery must not silently adopt foreign volumes or start duplicate jobs. Normal app replacement must preserve its persistent data and recover from a failed update. Automatic legacy migration, a backup product and the abandoned Node authority system are not prerequisites for this refactoring.
 
 An optional system-app catalog for monitoring, backup and selected maintenance is later work. Do not build it before the core flow and legacy cleanup. Any future host-privileged maintenance needs explicit administrator authorization and a narrow trusted capability.
 
 ## Delivery milestones
 
-M1/M2 implementation is merged; their broader integration acceptance remains deferred. M3 now closes with the single-server demonstration below, followed directly by M4 retained-workload migration and legacy removal. Source inventory and isolated cleanup work can begin while that demonstration is assembled. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
+M1/M2 implementation is merged; their broader integration acceptance remains deferred. M3 now closes with the fresh single-server demonstration below, followed directly by M4 legacy removal without a migration product. Source inventory and isolated cleanup work can begin while that demonstration is assembled. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
-The implementation PRs are merged on the reconciled source baseline from PR #391 and retain the existing control plane and durable Runner operation mechanisms. Production database migration inventory remains required before release but does not block further development. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for source details and acceptance cases to revisit before relying on the assembled flow for other users or replacing the active Runner.
+The implementation PRs are merged on the reconciled source baseline from PR #391 and retain the existing control plane and durable Runner operation mechanisms. Reusing or changing an existing installation/database is separate from fresh-install development and requires an explicit operational decision. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for source details and acceptance cases to revisit before relying on the assembled flow for other users or replacing the active Runner.
 
 - Establish machine/workspace/app assignment and capacity ownership without allocating a per-user Hosted Runner. Preserve existing API authorization and durable operation semantics.
 - Implement a complete API-to-Runner web deployment on ext4: build or pull, create/start, health/readiness, routing, logs, stop/update and explicit persistent data.
 - Run a finite Action in an isolated job container with results, cancellation, bounded resources and cleanup. Keep user code out of the management service.
-- Update the affected Studio/CLI/API surfaces and administrator documentation in the same changes. Keep legacy workloads on their existing path until migrated; do not broaden infrastructure permissions as a shortcut.
+- Update the affected Studio/CLI/API surfaces and administrator documentation in the same changes. The M1 implementation retained legacy execution alongside the new path; M4 now removes that code without adding migration support. Do not broaden infrastructure permissions as a shortcut.
 
 Acceptance: on a disposable Linux machine, two users deploy apps and run jobs through one management Runner. Cross-user files, secrets, logs and operations are denied. There is no placeholder Hosted Runner record or per-user management container required for new workloads. Restart/lost-response checks demonstrate safe result recovery and no automatic replay of uncertain Actions. Source/artifacts and persistent data survive the applicable restart/update scenarios.
 
@@ -124,21 +124,21 @@ Remaining sequence:
 3. Redeploy the app and verify its explicit persistent data survives. A failed replacement must preserve the prior healthy app. Fix only concrete installation, assignment, CLI, readiness, routing or persistence blockers encountered.
 4. Keep the working prerequisites and commands in the existing [self-hosted operations guide](../prod/self-hosted-runners.md) and relevant CLI documentation; record the tested revision and result in the implementation PR.
 
-This single-server flow is the immediate M3 completion target. It does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence. Preserve the existing authorization, isolation, resource limits and recovery behavior; validate the applicable cases before cutting over retained consumers that depend on them.
+This single-server flow is the immediate M3 completion target. It does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence. Preserve the new path's authorization, isolation, resource limits, durable operation behavior and app-update recovery; legacy compatibility is not a reason to retain old execution branches.
 
 Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
 
-### 4. Migrate retained workloads and retire obsolete paths
+### 4. Remove superseded execution and hosting paths
 
-This is the next major implementation objective after the core single-server flow. Begin the source/consumer inventory and isolated refactoring without waiting for optional M3 features or the entire broad acceptance fixture. Live cutover still requires the relevant replacement behavior and retained-data recovery to be demonstrated.
+This is the next major implementation objective after the fresh single-server flow. Begin the source/consumer inventory and isolated refactoring without waiting for optional M3 features or the entire broad acceptance fixture. No automatic workload migration, old/new dual execution, legacy-ID/URL preservation or generic compatibility framework is required.
 
-- Identify remaining consumers of per-user Hosted Runner provisioning, duplicate Infrastructure/Hosted role-specific execution and management, account/subscription compute allocation, mandatory XFS/project-quota storage, and provider-specific storage/provisioning assumptions. Include their API, Studio, CLI, Worker, registration and queue paths.
-- Identify which apps, Actions/jobs, schedules, routes, source files, persistent data and pending outcomes must be retained. Map them to the existing machine/workspace/app/target identities. Use disposable fixtures/copies for implementation and rehearsals; target-system inventory remains required before live cutover.
-- For actual retained consumers, rehearse migration and rollback with a recoverable copy. Preserve app identities, URLs/access policy, source, data and execution outcomes. Cover the authorization, isolation, cancellation, restart and duplicate-delivery cases relevant to those consumers; never automatically replay an uncertain Action.
-- Remove superseded paths once their consumers are migrated or deliberately excluded. If a path has no retained consumers, remove it directly instead of building a generic migration framework. Do not retain duplicate execution engines merely to avoid deleting obsolete code. Keep useful generic identity, organization, subscription and operation/journal behavior wherever it still has a consumer.
-- Handle schema compatibility through reviewed forward-only changes where needed. Source deletion does not undo applied SQL. Removing an XFS/Hetzner dependency from code does not authorize detaching a live volume or deleting data.
+- Find callers and dependencies of per-user Hosted Runner provisioning, duplicate Infrastructure/Hosted role-specific execution and management, account/subscription compute allocation, mandatory XFS/project-quota storage, and provider-specific storage/provisioning assumptions. Include API, Studio, CLI, Worker, registration and queue paths.
+- Move the new path's actual callers to the existing machine/workspace/app/target model and remove the obsolete branches, endpoints, UI, handlers and configuration. Remove their obsolete tests and documentation; keep focused coverage of the replacement flow. Do not preserve an old execution engine solely for legacy installations.
+- Keep generic identity, organization, subscription and operation/journal behavior that the new path still uses. Preserve its app data across ordinary updates and prevent automatic replay of uncertain Actions. Removing migration support does not remove those normal runtime guarantees.
+- Keep the schema/model required by fresh installations consistent. Add only the schema changes the new path needs; do not build old-data conversion machinery or claim an automatic upgrade of existing databases.
+- Document the breaking installation boundary. Existing legacy installations may remain on their current release; retirement, export, manual redeployment, database reset/reuse and volume removal are separate operator decisions. This source cleanup must not access or delete their data.
 
-Completion: a fresh machine installation and CLI deployment work through one management Runner, retained-consumer migration/recovery checks pass, and the final source/registration/queue audit finds no active legacy execution consumer. Code cleanup is part of the refactoring deliverable; adding the new path alongside the old paths is not completion. Production inventory, migration, deployment and storage removal require separate explicit authorization.
+Completion: a fresh machine installation, CLI deployment, routed app and redeployment with preserved data work through one management Runner, and the final source/registration/queue audit finds no active legacy execution consumer in the replacement implementation. Old-installation migration and preservation of old app identities/routes are not acceptance criteria. Production deployment, database changes and storage removal remain separately authorized operations.
 
 ### Deferred until after the core flow and legacy cleanup
 
@@ -147,7 +147,7 @@ These are later improvements, not prerequisites for M3's single-server target or
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
 - Additional monitoring, per-category storage breakdowns, automated retention/cleanup and system-app catalog work.
 - Runner self-update/rollback and bootstrap/update helpers.
-- Backup automation, scheduling, destinations and restore tooling. Keep the documented manual backup set and retained-workload migration/rollback rehearsal.
+- Backup automation, scheduling, destinations and restore tooling. Keep the documented manual backup guidance; it does not imply a legacy migration feature.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.
 
 The broader M1/M2 acceptance remains recorded in the [M1 guide](../implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
@@ -164,4 +164,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** demonstrate one management Runner installed on an Ubuntu/Docker server, CLI app creation/assignment/deployment, a working URL, and redeployment with preserved data. Fix only blockers to that flow, then proceed directly to M4 consumer migration and legacy deletion. Optional operations and feature expansion stay deferred until after cleanup. Keep previously deferred acceptance and production migration/deployment authorization separate from isolated implementation work.
+**Next action:** demonstrate one management Runner installed on an Ubuntu/Docker server, CLI app creation/assignment/deployment, a working URL, and redeployment with preserved data. Fix only blockers to that flow, then proceed directly to M4 legacy deletion for the fresh-install target. Optional operations and feature expansion stay deferred until after cleanup. Automatic legacy migration and compatibility preservation are outside scope. Keep previously deferred acceptance and any existing-system deployment/data decisions separate from isolated implementation work.
