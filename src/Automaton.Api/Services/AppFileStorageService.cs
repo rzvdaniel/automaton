@@ -1,5 +1,6 @@
 using Automaton.Api.Models;
 using Serilog;
+using System.IO.Enumeration;
 using System.Text.Json;
 
 namespace Automaton.Api.Services;
@@ -818,14 +819,21 @@ public class AppFileStorageService
         if (rule.EndsWith("/**", StringComparison.Ordinal))
             return MatchesDirectoryPrefix(normalizedPath, rule);
 
-        if (rule.StartsWith("*.", StringComparison.Ordinal))
-            return fileName.EndsWith(rule[1..], StringComparison.OrdinalIgnoreCase);
-
         if (rule.Contains('/', StringComparison.Ordinal))
-            return string.Equals(normalizedPath, rule.Trim('/'), StringComparison.OrdinalIgnoreCase);
+        {
+            var pathPattern = rule.Trim('/');
+            return HasWildcard(pathPattern)
+                ? FileSystemName.MatchesSimpleExpression(pathPattern, normalizedPath, ignoreCase: true)
+                : string.Equals(normalizedPath, pathPattern, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (HasWildcard(rule))
+            return segments.Any(segment => FileSystemName.MatchesSimpleExpression(rule, segment, ignoreCase: true));
 
         return MatchesPathSegment(fileName, segments, rule);
     }
+
+    private static bool HasWildcard(string pattern) => pattern.Contains('*') || pattern.Contains('?');
 
     private static bool MatchesDirectoryPrefix(string normalizedPath, string rule)
     {

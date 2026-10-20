@@ -16,6 +16,9 @@ public sealed class AppArchiveExportSafetyTests
         {
             Assert.That(entries, Does.Contain("README.md"));
             Assert.That(entries, Does.Not.Contain("backend/.env"));
+            Assert.That(entries, Does.Not.Contain("backend/.env.production"));
+            Assert.That(entries, Does.Not.Contain("backend/appsettings.Production.json"));
+            Assert.That(entries, Does.Not.Contain("backend/credentials.local.json"));
             Assert.That(entries, Does.Not.Contain("backend/secrets.json"));
             Assert.That(entries, Does.Not.Contain("backend/private/token.json"));
             Assert.That(entries, Does.Not.Contain("backend/data/app-data.json"));
@@ -83,8 +86,18 @@ public sealed class AppArchiveExportSafetyTests
         Directory.CreateDirectory(Path.GetDirectoryName(environmentFile)!);
         await File.WriteAllTextAsync(environmentFile, "TOKEN=secret");
         await storage.WriteSourceFileAsync(userId, appId, "backend/secrets.json", "{\"key\":\"secret\"}");
+        WriteSourceFile(storage.GetAppSourceDirectoryPath(userId, appId), "backend/.env.production", "TOKEN=secret");
+        WriteSourceFile(storage.GetAppSourceDirectoryPath(userId, appId), "backend/appsettings.Production.json", "{\"Password\":\"secret\"}");
+        WriteSourceFile(storage.GetAppSourceDirectoryPath(userId, appId), "backend/credentials.local.json", "{\"key\":\"private\"}");
         await storage.WriteSourceFileAsync(userId, appId, "backend/private/token.json", "private");
         await storage.WriteSourceFileAsync(userId, appId, "backend/data/app-data.json", "private data");
         await storage.WriteSourceFileAsync(userId, appId, "backend/.git/config", "remote=private");
+    }
+
+    private static void WriteSourceFile(string rootPath, string relativePath, string content)
+    {
+        var path = Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
     }
 }

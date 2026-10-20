@@ -49,7 +49,8 @@ internal static class AppAuthorizationTestServiceFactory
             {
                 RemixSourceExclude = [
                     ".git", ".svn", ".hg", ".env", ".env.*", "*.pem", "*.key", "*.pfx", "*.p12",
-                    "secrets.json", "secrets", "secrets/**", "private", "private/**", "data", "data/**",
+                    "secrets.json", "secrets", "secrets/**", "appsettings.json", "appsettings.*.json", "*.local.*",
+                    "private", "private/**", "data", "data/**",
                     "uploads", "uploads/**"
                 ],
                 RemixFrontendExclude = []
