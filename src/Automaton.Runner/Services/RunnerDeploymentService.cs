@@ -17,14 +17,16 @@ public class RunnerDeploymentService
         RunnerWorkspaceService runnerWorkspaceService,
         IAppRuntimeProcessManager runtimeProcessManager,
         AppActionDeploymentService actionDeploymentService,
-        IRunnerApplicationBuildExecutor? buildExecutor = null)
+        IRunnerApplicationBuildExecutor? buildExecutor = null,
+        MachineWorkloadDiskAdmission? diskAdmission = null)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         resultJournal = new HostedRunnerDeploymentResultJournal(runnerWorkspaceService);
         this.runtimeProcessManager = runtimeProcessManager;
         var resolvedBuildExecutor = buildExecutor ?? new RunnerApplicationBuildExecutor(new DockerContainerRuntime());
         deploymentExecutor = new RunnerApplicationDeploymentExecutor(
-            runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, resolvedBuildExecutor, resultJournal);
+            runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, resolvedBuildExecutor, resultJournal,
+            diskAdmission ?? new MachineWorkloadDiskAdmission());
     }
 
     public async Task<DeployAppPackageResult> DeployPackage(DeployAppPackageRequest request)

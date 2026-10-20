@@ -202,6 +202,7 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(initialAssignment.Disposition, Is.EqualTo("execute"));
             Assert.That(initialAssignment.Request!.HostContainer!.ContainerLimits,
                 Is.EqualTo(new HostContainerResourceLimits(1.0m, 1024, 256)));
+            Assert.That(initialAssignment.Request.HostContainer.MinimumFreeDiskMb, Is.EqualTo(1024));
         });
     }
 
@@ -235,6 +236,7 @@ public sealed class HostContainerRelayServiceTests
             Assert.That(assignment.Disposition, Is.EqualTo("execute"));
             Assert.That(assignment.Request!.HostContainer!.ContainerLimits,
                 Is.EqualTo(new HostContainerResourceLimits(1.0m, 1024, 256)));
+            Assert.That(assignment.Request.HostContainer.MinimumFreeDiskMb, Is.EqualTo(1024));
             Assert.That(assignment.Request.HostContainer.Compose!.PublicService, Is.EqualTo("web"));
         });
     }
@@ -244,7 +246,7 @@ public sealed class HostContainerRelayServiceTests
     {
         using var fixture = RelayFixture.Create();
         fixture.AssignMachineRunnerToPersonalWorkspace();
-        fixture.MachineResources.MemoryLimitMb = 0;
+        fixture.MachineResources.MinimumFreeDiskMb = 0;
         var attemptId = Guid.NewGuid();
         fixture.Target.ActiveDeploymentExecutionAttemptId = attemptId;
         await fixture.Db.SaveChangesAsync();

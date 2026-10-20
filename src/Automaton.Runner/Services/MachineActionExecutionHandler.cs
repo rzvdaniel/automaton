@@ -85,6 +85,7 @@ public sealed class MachineActionExecutionHandler(HostContainerExecutionService 
             SharedMemoryMb = policy.SharedMemoryMb,
             DockerLogMaxSizeMb = policy.DockerLogMaxSizeMb,
             DockerLogMaxFiles = policy.DockerLogMaxFiles,
+            MinimumFreeDiskMb = policy.MinimumFreeDiskMb,
             Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact,
                 HostContainerResourceKinds.ApplicationData),
             Environment = new Dictionary<string, string>(request.Secrets, StringComparer.Ordinal)

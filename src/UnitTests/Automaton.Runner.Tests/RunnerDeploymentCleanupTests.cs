@@ -56,6 +56,7 @@ public sealed class RunnerDeploymentCleanupTests
         Assert.That(Directory.Exists(workspace.WorkspaceRoot), Is.True);
     }
 
+
     [Test]
     public async Task ResultJournalFailureDoesNotReportPromotedRuntimeAsFailed()
     {

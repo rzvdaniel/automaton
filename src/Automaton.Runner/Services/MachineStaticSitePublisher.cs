@@ -12,6 +12,7 @@ public sealed class MachineStaticSitePublisher
     private readonly SemaphoreSlim operationGate = new(1, 1);
     private readonly RunnerWorkspaceService workspace;
     private readonly MachineStaticServingOptions settings;
+    private readonly MachineWorkloadDiskAdmission diskAdmission;
     private readonly Func<HostContainerScope, CancellationToken, Task<MachineStaticServerEndpoint?>> ensureContainer;
     private readonly Func<HostContainerScope, CancellationToken, Task<bool>> reloadContainer;
 
@@ -21,6 +22,7 @@ public sealed class MachineStaticSitePublisher
     {
         workspace = new RunnerWorkspaceService();
         settings = options.Value;
+        diskAdmission = new MachineWorkloadDiskAdmission();
         var containers = new MachineStaticServingContainer(docker, options.Value);
         ensureContainer = containers.EnsureAsync;
         reloadContainer = containers.ReloadAsync;
@@ -30,10 +32,12 @@ public sealed class MachineStaticSitePublisher
         RunnerWorkspaceService workspace,
         MachineStaticServingOptions settings,
         Func<HostContainerScope, CancellationToken, Task<MachineStaticServerEndpoint?>> ensureContainer,
-        Func<HostContainerScope, CancellationToken, Task<bool>> reloadContainer)
+        Func<HostContainerScope, CancellationToken, Task<bool>> reloadContainer,
+        MachineWorkloadDiskAdmission? diskAdmission = null)
     {
         this.workspace = workspace;
         this.settings = settings;
+        this.diskAdmission = diskAdmission ?? new MachineWorkloadDiskAdmission();
         this.ensureContainer = ensureContainer;
         this.reloadContainer = reloadContainer;
     }
@@ -43,10 +47,11 @@ public sealed class MachineStaticSitePublisher
         Guid appId,
         Guid targetId,
         string outputDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int minimumFreeDiskMb = 1024)
     {
         await operationGate.WaitAsync(cancellationToken);
-        try { return await PublishCoreAsync(operationId, appId, targetId, outputDirectory, cancellationToken); }
+        try { return await PublishCoreAsync(operationId, appId, targetId, outputDirectory, cancellationToken, minimumFreeDiskMb); }
         finally { operationGate.Release(); }
     }
 
@@ -55,7 +60,8 @@ public sealed class MachineStaticSitePublisher
         Guid appId,
         Guid targetId,
         string outputDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int minimumFreeDiskMb)
     {
         var scope = CreateScope(appId, targetId);
         if (!ValidIdentity(operationId, scope) || !settings.IsValid()) return null;
@@ -63,6 +69,8 @@ public sealed class MachineStaticSitePublisher
         var index = ReadIndex();
         if (IsSamePublication(index, appId, operationId))
             return await EnsureExistingPublicationAsync(index, scope, cancellationToken);
+
+        diskAdmission.EnsureAvailable(workspace, minimumFreeDiskMb);
 
         var sourceRoot = ResolveOutputDirectory(appId, targetId, outputDirectory);
         var files = EnumerateSafeFiles(sourceRoot, cancellationToken);

@@ -36,6 +36,7 @@ public sealed class MachineActionDependencyPreparer(HostContainerExecutionServic
             SharedMemoryMb = policy.SharedMemoryMb,
             DockerLogMaxSizeMb = policy.DockerLogMaxSizeMb,
             DockerLogMaxFiles = policy.DockerLogMaxFiles,
+            MinimumFreeDiskMb = policy.MinimumFreeDiskMb,
             Resources = Resources(),
             TimeoutSeconds = 600
         }, cancellationToken);

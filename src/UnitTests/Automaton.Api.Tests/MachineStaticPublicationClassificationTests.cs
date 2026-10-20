@@ -60,6 +60,7 @@ public sealed class MachineStaticPublicationClassificationTests
             Assert.That(fixture.Transfers.ExecuteCalls, Is.EqualTo(1));
             Assert.That(fixture.Transfers.Command?.Kind, Is.EqualTo(RunnerFileTransferKinds.PublishStaticSite));
             Assert.That(fixture.Transfers.Command?.RelativePath, Is.EqualTo("dist"));
+            Assert.That(fixture.Transfers.Command?.MinimumFreeDiskMb, Is.EqualTo(1024));
         });
     }
 
