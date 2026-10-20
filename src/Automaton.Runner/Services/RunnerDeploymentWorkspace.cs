@@ -149,27 +149,67 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         }
 
         Directory.CreateDirectory(destinationRoot);
-        return CopyBuildOutputTree(fullSource, Path.GetFullPath(destinationRoot));
+        return CopyBuildOutputTree(
+            fullSource,
+            Path.GetFullPath(destinationRoot),
+            fullSource,
+            new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal));
     }
 
-    private static int CopyBuildOutputTree(string sourceRoot, string destinationRoot)
+    private static int CopyBuildOutputTree(
+        string sourceRoot,
+        string destinationRoot,
+        string allowedRoot,
+        HashSet<string> activeDirectories)
     {
-        var copiedFiles = 0;
-        foreach (var entry in Directory.EnumerateFileSystemEntries(sourceRoot))
+        var resolvedRoot = Path.GetFullPath(sourceRoot);
+        if (!activeDirectories.Add(resolvedRoot))
+            throw new InvalidOperationException("Build output contains a cyclic directory link.");
+
+        try
         {
-            RejectLink(entry);
-            var destination = Path.Combine(destinationRoot, Path.GetFileName(entry));
-            if ((File.GetAttributes(entry) & FileAttributes.Directory) != 0)
+            var copiedFiles = 0;
+            foreach (var entry in Directory.EnumerateFileSystemEntries(resolvedRoot))
             {
-                Directory.CreateDirectory(destination);
-                copiedFiles += CopyBuildOutputTree(entry, destination);
-                continue;
+                var source = ResolveBuildOutputEntry(entry, allowedRoot);
+                var destination = Path.Combine(destinationRoot, Path.GetFileName(entry));
+                if ((File.GetAttributes(source) & FileAttributes.Directory) != 0)
+                {
+                    Directory.CreateDirectory(destination);
+                    copiedFiles += CopyBuildOutputTree(source, destination, allowedRoot, activeDirectories);
+                    continue;
+                }
+
+                File.Copy(source, destination, overwrite: true);
+                copiedFiles++;
             }
 
-            File.Copy(entry, destination, overwrite: true);
-            copiedFiles++;
+            return copiedFiles;
         }
-        return copiedFiles;
+        finally
+        {
+            activeDirectories.Remove(resolvedRoot);
+        }
+    }
+
+    private static string ResolveBuildOutputEntry(string entry, string allowedRoot)
+    {
+        if ((File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0)
+            return entry;
+
+        FileSystemInfo fileSystemEntry = (File.GetAttributes(entry) & FileAttributes.Directory) != 0
+            ? new DirectoryInfo(entry)
+            : new FileInfo(entry);
+        var target = fileSystemEntry.ResolveLinkTarget(returnFinalTarget: true)
+            ?? throw new InvalidOperationException($"Build output contains a broken link at '{entry}'.");
+        var resolvedTarget = Path.GetFullPath(target.FullName);
+        var relativeTarget = Path.GetRelativePath(allowedRoot, resolvedTarget);
+        if (Path.IsPathRooted(relativeTarget)
+            || relativeTarget == ".."
+            || relativeTarget.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Build output link escapes the declared output directory at '{entry}'.");
+
+        return resolvedTarget;
     }
 
     private static void RejectLink(string path)

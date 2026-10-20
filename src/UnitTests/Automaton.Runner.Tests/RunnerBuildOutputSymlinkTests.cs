@@ -17,9 +17,20 @@ public sealed class RunnerBuildOutputSymlinkTests
         if (!OperatingSystem.IsLinux())
             Assert.Ignore("Build-output link boundary regression requires Linux symlink semantics.");
 
-        using var fixture = await BuildOutputLinkFixture.CreateAsync(linkOutputAncestor);
+        using var fixture = await BuildOutputLinkFixture.CreateAsync(linkOutputAncestor, internalLink: false);
         var result = await fixture.DeployAsync();
         fixture.AssertPrivateFileWasNotCopied(result);
+    }
+
+    [Test]
+    public async Task DynamicAppBuildCopiesInternalNodeModulesBinLink()
+    {
+        if (!OperatingSystem.IsLinux())
+            Assert.Ignore("Build-output link regression requires Linux symlink semantics.");
+
+        using var fixture = await BuildOutputLinkFixture.CreateAsync(linkOutputAncestor: false, internalLink: true);
+        var result = await fixture.DeployAsync();
+        fixture.AssertInternalLinkWasCopied(result);
     }
 
     private sealed class BuildOutputLinkFixture : IDisposable
@@ -34,27 +45,29 @@ public sealed class RunnerBuildOutputSymlinkTests
         private readonly string sentinelPath;
         private readonly GenericRuntimeAcceptanceSupport.RecordingRuntimeProcessManager runtime;
         private readonly bool linkOutputAncestor;
+        private readonly bool internalLink;
 
-        private BuildOutputLinkFixture(bool linkOutputAncestor)
+        private BuildOutputLinkFixture(bool linkOutputAncestor, bool internalLink)
         {
             this.linkOutputAncestor = linkOutputAncestor;
+            this.internalLink = internalLink;
             testWorkspace = RunnerRuntimeContainerTestWorkspace.Create();
             workspace = new RunnerWorkspaceService();
             appId = Guid.NewGuid();
             targetId = Guid.NewGuid();
             externalRoot = CreateExternalSentinel(out sentinelPath);
-            packagePath = CreatePackage(appId);
+            packagePath = CreatePackage(appId, internalLink);
             runtime = new GenericRuntimeAcceptanceSupport.RecordingRuntimeProcessManager();
         }
 
-        public static Task<BuildOutputLinkFixture> CreateAsync(bool linkOutputAncestor)
-            => Task.FromResult(new BuildOutputLinkFixture(linkOutputAncestor));
+        public static Task<BuildOutputLinkFixture> CreateAsync(bool linkOutputAncestor, bool internalLink)
+            => Task.FromResult(new BuildOutputLinkFixture(linkOutputAncestor, internalLink));
 
         public async Task<DeployAppPackageResult> DeployAsync()
         {
             var deployment = new RunnerDeploymentService(workspace, runtime,
                 new AppActionDeploymentService(workspace),
-                new SymlinkBuildExecutor(externalRoot, linkOutputAncestor));
+                new SymlinkBuildExecutor(externalRoot, linkOutputAncestor, internalLink));
             return await deployment.DeployPackage(new DeployAppPackageRequest
             {
                 AppId = appId,
@@ -78,6 +91,20 @@ public sealed class RunnerBuildOutputSymlinkTests
             });
         }
 
+        public void AssertInternalLinkWasCopied(DeployAppPackageResult result)
+        {
+            Assert.That(result.Success, Is.True, result.Message);
+            Assert.That(runtime.ArtifactRoot, Is.Not.Null);
+            var copiedExecutable = Path.Combine(runtime.ArtifactRoot!, "node_modules", ".bin", "cli");
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.Exists(copiedExecutable), Is.True);
+                Assert.That(File.ReadAllText(copiedExecutable), Is.EqualTo("internal executable"));
+                if (OperatingSystem.IsLinux())
+                    Assert.That(File.GetUnixFileMode(copiedExecutable).HasFlag(UnixFileMode.UserExecute), Is.True);
+            });
+        }
+
         public void Dispose()
         {
             testWorkspace.Dispose();
@@ -95,7 +122,7 @@ public sealed class RunnerBuildOutputSymlinkTests
             return root;
         }
 
-        private static string CreatePackage(Guid appId)
+        private static string CreatePackage(Guid appId, bool dynamicApp)
         {
             var path = Path.Combine(Path.GetTempPath(), "automaton-build-output-link-test", $"{Guid.NewGuid():N}.zip");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -104,11 +131,23 @@ public sealed class RunnerBuildOutputSymlinkTests
                 AppId = appId.ToString(),
                 Application = new ApplicationContract
                 {
+                    Runtime = dynamicApp
+                        ? new ApplicationRuntimeSpec
+                        {
+                            Image = "node:20",
+                            Command = new ApplicationCommandSpec
+                            {
+                                Executable = "node",
+                                Arguments = ["node_modules/.bin/cli"],
+                                WorkingDirectory = "."
+                            }
+                        }
+                        : new ApplicationRuntimeSpec(),
                     Build = new ApplicationBuildSpec
                     {
                         Image = "example/build:1",
                         Command = new ApplicationCommandSpec { Executable = "build" },
-                        OutputDirectory = "dist/site"
+                        OutputDirectory = dynamicApp ? null : "dist/site"
                     }
                 }
             };
@@ -125,7 +164,7 @@ public sealed class RunnerBuildOutputSymlinkTests
         }
     }
 
-    private sealed class SymlinkBuildExecutor(string externalRoot, bool linkOutputAncestor) : IRunnerApplicationBuildExecutor
+    private sealed class SymlinkBuildExecutor(string externalRoot, bool linkOutputAncestor, bool internalLink) : IRunnerApplicationBuildExecutor
     {
         public Task<ApplicationBuildExecutionResult> ExecuteAsync(
             ApplicationBuildSpec build,
@@ -135,7 +174,22 @@ public sealed class RunnerBuildOutputSymlinkTests
             CancellationToken cancellationToken = default)
         {
             var dist = Path.Combine(workspaceRoot, "dist");
-            if (linkOutputAncestor)
+            if (internalLink)
+            {
+                var package = Path.Combine(workspaceRoot, "node_modules", "pkg", "bin");
+                var bin = Path.Combine(workspaceRoot, "node_modules", ".bin");
+                Directory.CreateDirectory(package);
+                Directory.CreateDirectory(bin);
+                var executable = Path.Combine(package, "cli.js");
+                File.WriteAllText(executable, "internal executable");
+                if (OperatingSystem.IsLinux())
+                    File.SetUnixFileMode(executable,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                        | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+                        | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                File.CreateSymbolicLink(Path.Combine(bin, "cli"), Path.Combine("..", "pkg", "bin", "cli.js"));
+            }
+            else if (linkOutputAncestor)
             {
                 Directory.CreateSymbolicLink(dist, externalRoot);
             }
