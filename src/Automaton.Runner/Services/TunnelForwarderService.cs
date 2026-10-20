@@ -17,19 +17,25 @@ public class TunnelForwarderService
 
     private readonly HttpClient _fastApiClient;
     private readonly HttpClient _runtimeGatewayClient;
+    private readonly HttpClient _staticSiteClient = new();
+    private readonly MachineStaticSitePublisher? staticSitePublisher;
     private readonly int _maxBodyBytes;
 
-    public TunnelForwarderService(IOptions<TunnelForwarderConfig> config)
-        : this(config, null, null)
+    public TunnelForwarderService(
+        IOptions<TunnelForwarderConfig> config,
+        MachineStaticSitePublisher? staticSitePublisher = null)
+        : this(config, null, null, staticSitePublisher)
     {
     }
 
     internal TunnelForwarderService(
         IOptions<TunnelForwarderConfig> config,
         HttpMessageHandler? fastApiHandler,
-        HttpMessageHandler? runtimeGatewayHandler)
+        HttpMessageHandler? runtimeGatewayHandler,
+        MachineStaticSitePublisher? staticSitePublisher = null)
     {
         _maxBodyBytes = config.Value.MaxBodyBytes;
+        this.staticSitePublisher = staticSitePublisher;
         _fastApiClient = new HttpClient(fastApiHandler ?? new HttpClientHandler())
         {
             BaseAddress = new Uri("http://localhost:8001"),
@@ -46,7 +52,7 @@ public class TunnelForwarderService
     {
         try
         {
-            var route = ResolveRoute(request);
+            var route = await ResolveRouteAsync(request, CancellationToken.None);
             if (route is null)
                 return InvalidRuntimeDestination(request.RequestId);
 
@@ -62,8 +68,22 @@ public class TunnelForwarderService
         }
     }
 
-    private (HttpClient Client, string Path, bool IsRuntimeGateway)? ResolveRoute(TunnelRequest request)
+    private async Task<(HttpClient Client, string Path, bool IsRuntimeGateway)?> ResolveRouteAsync(
+        TunnelRequest request,
+        CancellationToken cancellationToken)
     {
+        if (string.Equals(request.Destination, TunnelDestinations.StaticSite, StringComparison.Ordinal))
+        {
+            if (staticSitePublisher is null || !TryBuildStaticSitePath(request, out var staticPath)
+                || request.RuntimeAppId is not { } appId || request.RuntimeDeploymentTargetId is not { } targetId)
+                return null;
+            var endpoint = await staticSitePublisher.GetEndpointAsync(appId, targetId, cancellationToken);
+            return endpoint is null
+                ? null
+                : (_staticSiteClient, new Uri(endpoint.BaseAddress,
+                    endpoint.PathPrefix + staticPath.TrimStart('/')).AbsoluteUri, true);
+        }
+
         var isRuntimeGateway = string.Equals(request.Destination, TunnelDestinations.RuntimeGateway, StringComparison.Ordinal);
         if (!isRuntimeGateway) return (_fastApiClient, request.Path, false);
         return TryBuildRuntimeGatewayPath(request, out var path)
@@ -172,34 +192,40 @@ public class TunnelForwarderService
         runtimeGatewayPath = string.Empty;
         if (request.RuntimeAppId is not { } appId || request.RuntimeDeploymentTargetId is not { } targetId)
             return false;
+        if (!TryReadSafeRuntimePath(request.RuntimePath, out var rawPath, out var query)) return false;
+        runtimeGatewayPath = $"/apps/{appId:D}/targets/{targetId:D}/{rawPath}{query}";
+        return true;
+    }
 
-        var relativePath = request.RuntimePath ?? string.Empty;
-        if (relativePath.StartsWith('/') || relativePath.StartsWith('\\') || relativePath.Contains("\\", StringComparison.Ordinal))
+    internal static bool TryBuildStaticSitePath(TunnelRequest request, out string staticSitePath)
+    {
+        staticSitePath = string.Empty;
+        if (request.RuntimeAppId is not { } appId || request.RuntimeDeploymentTargetId is null
+            || !TryReadSafeRuntimePath(request.RuntimePath, out var rawPath, out var query))
             return false;
+        staticSitePath = rawPath + query;
+        return true;
+    }
+
+    private static bool TryReadSafeRuntimePath(string? relativePath, out string rawPath, out string query)
+    {
+        rawPath = string.Empty;
+        query = string.Empty;
+        relativePath ??= string.Empty;
+        if (relativePath.StartsWith('/') || relativePath.StartsWith('\\') || relativePath.Contains('\\')) return false;
 
         var queryIndex = relativePath.IndexOf('?');
-        var rawPath = queryIndex >= 0 ? relativePath[..queryIndex] : relativePath;
-        var query = queryIndex >= 0 ? relativePath[queryIndex..] : string.Empty;
-        if (rawPath.Contains("://", StringComparison.Ordinal))
-            return false;
+        rawPath = queryIndex >= 0 ? relativePath[..queryIndex] : relativePath;
+        query = queryIndex >= 0 ? relativePath[queryIndex..] : string.Empty;
+        if (rawPath.Contains("://", StringComparison.Ordinal)) return false;
 
         foreach (var segment in rawPath.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
             string decodedSegment;
-            try
-            {
-                decodedSegment = Uri.UnescapeDataString(segment);
-            }
-            catch (UriFormatException)
-            {
-                return false;
-            }
-
-            if (decodedSegment is "." or ".." || decodedSegment.Contains('\\'))
-                return false;
+            try { decodedSegment = Uri.UnescapeDataString(segment); }
+            catch (UriFormatException) { return false; }
+            if (decodedSegment is "." or ".." || decodedSegment.Contains('\\') || decodedSegment.Contains('/')) return false;
         }
-
-        runtimeGatewayPath = $"/apps/{appId:D}/targets/{targetId:D}/{rawPath}{query}";
         return true;
     }
 

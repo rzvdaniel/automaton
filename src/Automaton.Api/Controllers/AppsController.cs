@@ -239,7 +239,7 @@ public class AppsController : BaseController
 
     [HttpPost("{id}/publish")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request)
+    public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request, CancellationToken cancellationToken)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
@@ -258,7 +258,8 @@ public class AppsController : BaseController
                 request.IsForkable,
                 request.RuntimeVisibility,
                 request.CatalogVisibility,
-                request.MarketplacePreviewMode);
+                request.MarketplacePreviewMode,
+                cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
@@ -280,7 +281,7 @@ public class AppsController : BaseController
 
     [HttpPost("{id}/unpublish")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> Unpublish(Guid id)
+    public async Task<IActionResult> Unpublish(Guid id, CancellationToken cancellationToken)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
@@ -289,7 +290,7 @@ public class AppsController : BaseController
 
         try
         {
-            await appsService.Unpublish(id);
+            await appsService.Unpublish(id, cancellationToken);
         }
         catch (InvalidOperationException ex)
         {

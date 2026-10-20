@@ -699,6 +699,9 @@ internal sealed class PackageTransferGateway(
 
     public Stream OpenOutput(Guid operationId) => File.OpenRead(packagePath);
 
+    public Task QueueAsync(Guid operationId, Guid runnerId, Guid ownerId,
+        RunnerFileTransferCommand command, CancellationToken token) => Task.CompletedTask;
+
     public Task CleanupOutputAsync(Guid operationId) => Task.CompletedTask;
     public DeployAppPackageResult RunnerResult { get; } = runnerResult;
 }

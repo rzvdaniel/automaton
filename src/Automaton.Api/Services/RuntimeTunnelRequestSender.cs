@@ -28,7 +28,8 @@ public sealed class RuntimeTunnelRequestSender(
         Runner runner,
         HttpRequest request,
         string path,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool staticSite = false)
     {
         if (request.ContentLength is > 0 && request.ContentLength > config.MaxBodyBytes)
         {
@@ -43,7 +44,7 @@ public sealed class RuntimeTunnelRequestSender(
 
         var (requestId, responseTask) = registry.Register(
             TimeSpan.FromSeconds(config.TimeoutSeconds), cancellationToken);
-        var tunnelRequest = CreateTunnelRequest(requestId, appId, deploymentTargetId, request, path, body);
+        var tunnelRequest = CreateTunnelRequest(requestId, appId, deploymentTargetId, request, path, body, staticSite);
 
         return await SendAndWaitAsync(
             tunnelRequest, responseTask, runner, appId, deploymentTargetId, request.Host.Host, path, cancellationToken);
@@ -109,7 +110,8 @@ public sealed class RuntimeTunnelRequestSender(
         Guid deploymentTargetId,
         HttpRequest request,
         string path,
-        byte[]? body)
+        byte[]? body,
+        bool staticSite)
         => new()
         {
             RequestId = requestId,
@@ -118,7 +120,7 @@ public sealed class RuntimeTunnelRequestSender(
             HeaderValues = request.Headers
                 .Where(header => !HopByHopHeaders.Contains(header.Key))
                 .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
-            Destination = TunnelDestinations.RuntimeGateway,
+            Destination = staticSite ? TunnelDestinations.StaticSite : TunnelDestinations.RuntimeGateway,
             RuntimeAppId = appId,
             RuntimeDeploymentTargetId = deploymentTargetId,
             RuntimePath = path.TrimStart('/') + request.QueryString

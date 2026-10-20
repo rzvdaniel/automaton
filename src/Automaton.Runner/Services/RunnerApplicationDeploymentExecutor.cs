@@ -142,14 +142,15 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         string buildWorkspace,
         ApplicationBuildExecutionResult result)
     {
-        if (!result.Succeeded || application.Runtime.Command is null) return;
+        if (!result.Succeeded || application.Runtime.Command is null
+            && string.IsNullOrWhiteSpace(application.Build.OutputDirectory)) return;
         var relative = ApplicationBuildArtifactSelector.GetRelativeDirectory(application);
         var output = ApplicationBuildExecutor.ResolveWorkspacePath(buildWorkspace, relative, "runtime artifact directory");
         if (!Directory.Exists(output))
             throw new DirectoryNotFoundException($"Runtime artifact directory does not exist after the build: {output}");
         var packaged = Path.Combine(attempt.StagingRoot, "runtime", "application", Path.GetRelativePath(buildWorkspace, output));
         RunnerDeploymentWorkspace.DeleteDirectoryIfExists(packaged);
-        RunnerDeploymentWorkspace.CopyDirectory(output, packaged);
+        RunnerDeploymentWorkspace.CopyDirectoryPreservingInternalLinks(output, packaged, buildWorkspace);
     }
 
     private async Task CleanPreviousDeploymentAsync(
@@ -187,14 +188,15 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         var id = Guid.NewGuid();
         var runtimeRoot = workspace.GetAppRuntimeCandidateDirectory(attempt.AppId, attempt.TargetId, id);
         var artifactRoot = workspace.GetAppRuntimeCandidateApplicationDirectory(attempt.AppId, attempt.TargetId, id);
-        var runtimeCount = RunnerDeploymentWorkspace.CopyTreeIfExists(Path.Combine(attempt.StagingRoot, "runtime"), runtimeRoot);
+        var runtimeCount = RunnerDeploymentWorkspace.CopyRuntimeTreeIfExists(
+            Path.Combine(attempt.StagingRoot, "runtime"), runtimeRoot);
         Directory.CreateDirectory(artifactRoot);
         return (sourceCount, runtimeCount, new RuntimeCandidate(id, runtimeRoot, artifactRoot));
     }
 
     private (int, int, RuntimeCandidate) CopyCurrentRuntime(DeploymentAttempt attempt, int sourceCount)
     {
-        var runtimeCount = RunnerDeploymentWorkspace.CopyTreeIfExists(
+        var runtimeCount = RunnerDeploymentWorkspace.CopyRuntimeTreeIfExists(
             Path.Combine(attempt.StagingRoot, "runtime"), workspace.GetAppRuntimeCurrentDirectory(attempt.AppId, attempt.TargetId));
         return (sourceCount, runtimeCount, new RuntimeCandidate(null, null, null));
     }

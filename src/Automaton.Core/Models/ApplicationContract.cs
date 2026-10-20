@@ -14,6 +14,11 @@ public sealed class ApplicationContract
     public ApplicationHealthSpec Health { get; set; } = new();
     public ApplicationStorageSpec Storage { get; set; } = new();
     public ApplicationComposeSpec? Compose { get; set; }
+
+    public bool IsStaticSite => Runtime.Command is null
+        && Compose is null
+        && Build.Command is not null
+        && !string.IsNullOrWhiteSpace(Build.OutputDirectory);
 }
 
 /// <summary>A normalized, deliberately small Docker Compose deployment contract.</summary>

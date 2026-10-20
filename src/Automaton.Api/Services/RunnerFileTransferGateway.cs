@@ -11,6 +11,8 @@ public interface IRunnerFileTransferGateway
 {
     Task<(Guid OperationId, RunnerExecutionResult Result)> ExecuteAsync(Guid operationId, Guid runnerId, Guid ownerId,
         RunnerFileTransferCommand command, IFormFile? input, CancellationToken token, TimeSpan? timeout = null);
+    Task QueueAsync(Guid operationId, Guid runnerId, Guid ownerId,
+        RunnerFileTransferCommand command, CancellationToken token);
     Stream OpenOutput(Guid operationId);
     Task CleanupOutputAsync(Guid operationId);
 }
@@ -56,6 +58,18 @@ public sealed class RunnerFileTransferGateway(
     }
 
     public Stream OpenOutput(Guid operationId) => store.OpenRunnerTransfer(operationId, input: false);
+
+    public async Task QueueAsync(
+        Guid operationId,
+        Guid runnerId,
+        Guid ownerId,
+        RunnerFileTransferCommand command,
+        CancellationToken token)
+    {
+        await EnsureOwnerCanDeployThroughRunnerAsync(
+            runnerId, ownerId, command.AppId, command.DeploymentTargetId, token);
+        await operations.QueueFileTransferAsync(operationId, runnerId, ownerId, command, token);
+    }
 
     public async Task CleanupOutputAsync(Guid operationId)
     {

@@ -125,6 +125,9 @@ public sealed class AppMediaStorageServiceTests
 
         public Stream OpenOutput(Guid operationId) => new MemoryStream(OutputBytes, writable: false);
 
+        public Task QueueAsync(Guid operationId, Guid runnerId, Guid ownerId,
+            RunnerFileTransferCommand command, CancellationToken token) => Task.CompletedTask;
+
         public Task CleanupOutputAsync(Guid operationId)
         {
             CleanedOutputIds.Add(operationId);

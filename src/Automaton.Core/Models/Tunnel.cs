@@ -49,6 +49,7 @@ public static class TunnelDestinations
 {
     public const string FastApi = "fast-api";
     public const string RuntimeGateway = "runtime-gateway";
+    public const string StaticSite = "static-site";
 }
 
 /// <summary>

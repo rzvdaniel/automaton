@@ -3,6 +3,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Enums;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -92,7 +93,9 @@ public sealed class RuntimeTunnelService(
             return Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is not connected.");
         }
 
-        return await requestSender.ForwardAsync(appId, deploymentTargetId, runner, request, path, cancellationToken);
+        var staticSite = UsesMachineStaticSite(target, runner, request.Host.Host);
+        return await requestSender.ForwardAsync(
+            appId, deploymentTargetId, runner, request, path, cancellationToken, staticSite);
     }
 
     private static TunnelResponse Failure(int statusCode, string error) => new()
@@ -120,6 +123,7 @@ public sealed class RuntimeTunnelService(
             return true;
 
         if (!target.IsDefault ||
+            !target.WebApp.IsPublished ||
             target.WebApp.RuntimeVisibility != AppRuntimeVisibilities.Public ||
             target.WebApp.AccessStatus != AppAccessStatuses.Active ||
             string.IsNullOrWhiteSpace(target.WebApp.PublicUrl))
@@ -133,4 +137,15 @@ public sealed class RuntimeTunnelService(
     internal static bool IsCurrentApiInstance(string? runnerApiInstanceId, string currentApiInstanceId)
         => !string.IsNullOrWhiteSpace(runnerApiInstanceId) &&
             string.Equals(runnerApiInstanceId, currentApiInstanceId, StringComparison.Ordinal);
+
+    private bool UsesMachineStaticSite(AppDeploymentTarget target, Runner runner, string host)
+        => target.IsDefault
+            && target.WebApp.IsPublished
+            && target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public
+            && ApplicationContractSerialization.Deserialize(target.WebApp.ApplicationContractJson).IsStaticSite
+            && !string.IsNullOrWhiteSpace(target.WebApp.PublicUrl)
+            && RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement
+            && string.Equals(host,
+                PublishedAppHostNames.BuildPublishedAppHost(target.WebApp.PublicUrl!, publishedAppsConfig.PublicBaseUrlHost),
+                StringComparison.OrdinalIgnoreCase);
 }

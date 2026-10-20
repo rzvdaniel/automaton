@@ -58,6 +58,8 @@ public static class RunnerFileTransferKinds
     public const string ReadMediaMetadata = "read-media-metadata";
     public const string DownloadMedia = "download-media";
     public const string DeployPackage = "deploy-package";
+    public const string PublishStaticSite = "publish-static-site";
+    public const string UnpublishStaticSite = "unpublish-static-site";
 }
 
 public static class RunnerFileTransferBounds
