@@ -65,7 +65,7 @@ A customer can dedicate a machine to a person, team or environment, or share it 
 
 ### Resources and storage
 
-Make a normal Ubuntu machine with ext4 the initial supported installation target. Basic deployment must not require XFS project quotas, a Hetzner volume or any provider-specific storage attachment. Persistent app data uses explicit, owned directories/volumes on configured storage roots. Preserve existing data and storage affinity when converting current deployments.
+Use a normal Ubuntu machine as the initial supported installation target; ext4 is the tested storage baseline, not a runtime requirement. Working Docker storage on XFS or another supported filesystem remains valid. Basic deployment must not require XFS project quotas, a Hetzner volume or any provider-specific storage attachment. Persistent app data uses explicit, owned directories/volumes on configured storage roots. Preserve existing data and storage affinity when converting current deployments.
 
 Use machine CPU, memory and disk capacity as the overall budget. Apply supported CPU/memory/process limits, bounded build/job concurrency, log rotation and reserved free space. Show usage for images, writable layers, volumes, logs and temporary/build data. Cleanup may delete only identified disposable resources; it must not delete owned persistent data to make space.
 
@@ -113,7 +113,7 @@ Implementation slices are complete, including organization app use (#396–#397)
 
 Depends on the stable machine/workload contract from milestones 1–2. Produce an installable release rather than a separate provisioning framework.
 
-- Make the existing Studio Machine Management installation straightforward on Ubuntu with Docker storage on ordinary ext4; document prerequisites, enrollment, and how to add a second independent machine. The current command stores workspace and app data in Docker volumes and does not verify or configure the host filesystem.
+- Make the existing Studio Machine Management installation straightforward on Ubuntu; document prerequisites, enrollment, and how to add a second independent machine. The generated command verifies Ubuntu and a working Docker Engine before pulling the Runner image. ext4 is the tested storage baseline, but any filesystem supported by the customer's working Docker installation is accepted. It stores workspace and app data in installation-scoped Docker volumes; it does not install Docker, move data, or configure the host filesystem.
 - Show machine health, storage usage, assigned workloads and recovery instructions. Runner connection/version/heartbeat are visible; Machine Management storage telemetry is not yet reported or shown.
 - Give customers practical manual backup and Runner update/rollback instructions. They must protect the control-plane database, configured API app storage, required keys/configuration, each machine's installation configuration, and its Docker volumes. Backup automation, schedules, destinations and restore tooling are deferred. Before M4 workload migration, require a recoverable copy and a rehearsed rollback procedure; this does not require a backup product.
 - Define trusted package provenance and safe Runner update/rollback. The current Machine Management installation has no supported in-place update/rollback action. Privileged maintenance stays opt-in and administrator-controlled. Do not automatically update a customer's OS or reboot it.

@@ -48,7 +48,7 @@ const profileOptions = [
     label: 'Machine Management',
     value: RunnerApplicationProfiles.MachineManagement,
     description:
-      'Runs one trusted management Runner on this machine. Automaton exposes typed app-container operations; Action and workflow execution remain disabled until isolated execution is available.',
+      'Runs one trusted management Runner on this machine. Requires Ubuntu and Docker Engine; ext4 is the tested storage baseline, and other working Docker filesystems are accepted. Actions run in isolated containers; raw workflows and management-process custom steps remain disabled.',
   },
   {
     label: 'Privileged Host',
@@ -199,6 +199,14 @@ function close() {
       <p class="text-color-secondary mt-0">
         Create a one-time Docker installation command for a machine you own.
       </p>
+      <Message
+        v-if="profile === RunnerApplicationProfiles.MachineManagement"
+        severity="info"
+        :closable="false"
+        class="mb-4"
+      >
+        Prepare an Ubuntu host with Docker Engine installed and running. ext4 is the tested storage baseline; working Docker storage on XFS or another filesystem does not need to be moved. The command checks Ubuntu and Docker availability, but does not install Docker or move or reconfigure its data.
+      </Message>
       <div class="field">
         <label for="self-hosted-runner-name" class="font-semibold block mb-2">Runner name</label>
         <InputText
