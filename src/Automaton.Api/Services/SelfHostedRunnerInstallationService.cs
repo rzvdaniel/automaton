@@ -192,6 +192,7 @@ public sealed class SelfHostedRunnerInstallationService(
             "  echo 'Docker is installed but the daemon is unavailable.' >&2",
             "  exit 1",
             "fi",
+            BuildMachineStoragePreflightCommands(isMachineManagement),
             "docker pull \"$runner_image\"",
             "if ! resolved_image=$(docker image inspect --format '{{index .RepoDigests 0}}' \"$runner_image\"); then",
             "  echo 'The Runner image digest could not be resolved after pulling the image.' >&2",
@@ -230,6 +231,28 @@ public sealed class SelfHostedRunnerInstallationService(
             "esac",
             "AUTOMATON_RUNNER_INSTALL");
     }
+
+    private static string BuildMachineStoragePreflightCommands(bool isMachineManagement)
+        => isMachineManagement
+            ? string.Join('\n',
+                "if [ \"$(uname -s)\" != 'Linux' ] || [ ! -r /etc/os-release ]; then",
+                "  echo 'Machine Management installation requires an Ubuntu Linux host.' >&2",
+                "  exit 1",
+                "fi",
+                ". /etc/os-release",
+                "if [ \"${ID:-}\" != 'ubuntu' ]; then",
+                "  echo 'Machine Management installation currently supports Ubuntu. Use an Ubuntu host and retry.' >&2",
+                "  exit 1",
+                "fi",
+                "if ! docker_root=$(docker info --format '{{.DockerRootDir}}') || [ -z \"$docker_root\" ]; then",
+                "  echo 'Docker data root could not be determined.' >&2",
+                "  exit 1",
+                "fi",
+                "if ! docker_storage_fs=$(findmnt -n -o FSTYPE --target \"$docker_root\" 2>/dev/null) || [ \"$docker_storage_fs\" != 'ext4' ]; then",
+                "  echo \"Docker data root must be on ext4 (found ${docker_storage_fs:-unknown} at $docker_root). Configure Docker to use an ext4 filesystem and retry.\" >&2",
+                "  exit 1",
+                "fi")
+            : string.Empty;
 
     private static string BuildMachineWorkspaceSetupCommands(
         bool isMachineManagement,
