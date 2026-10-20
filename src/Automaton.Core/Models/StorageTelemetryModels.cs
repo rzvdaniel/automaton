@@ -28,3 +28,11 @@ public sealed record RunnerHostStorageTelemetry(
     string? Error,
     string? InfrastructureRunnerVersion,
     bool ImageStoreFilesystemBounded = false);
+
+public sealed record MachineRunnerStorageTelemetry(
+    DateTime MeasuredAtUtc,
+    long TotalBytes,
+    long AvailableBytes,
+    bool Success,
+    string? Error,
+    string? RunnerVersion);

@@ -51,4 +51,9 @@ public class RunnerDetails
     public string? StorageMeasurementStatus { get; set; }
     public string? StorageState { get; set; }
     public string? StorageMeasurementError { get; set; }
+    public long? MachineStorageTotalBytes { get; set; }
+    public long? MachineStorageAvailableBytes { get; set; }
+    public DateTime? MachineStorageMeasuredAtUtc { get; set; }
+    public string? MachineStorageMeasurementStatus { get; set; }
+    public string? MachineStorageMeasurementError { get; set; }
 }

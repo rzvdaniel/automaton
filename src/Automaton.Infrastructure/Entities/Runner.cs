@@ -29,6 +29,12 @@ public class Runner
     [MaxLength(40)] public string? Architecture { get; set; }
     [MaxLength(40)] public string? ContainerHealth { get; set; }
 
+    public DateTime? MachineStorageMeasuredAtUtc { get; set; }
+    public long? MachineStorageTotalBytes { get; set; }
+    public long? MachineStorageAvailableBytes { get; set; }
+    [MaxLength(32)] public string? MachineStorageMeasurementStatus { get; set; }
+    [MaxLength(2000)] public string? MachineStorageMeasurementError { get; set; }
+
     /// <summary>
     /// Installation purpose. This does not grant privileges; the installation
     /// profile does that. Infrastructure runners are administrator-owned.

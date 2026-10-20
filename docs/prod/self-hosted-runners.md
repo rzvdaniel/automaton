@@ -4,8 +4,8 @@ Studio can create a one-time Docker installation command for the existing Automa
 Runner. The Machine Management profile installs one trusted management Runner on a
 customer-owned machine. Workloads run in separate containers. This document describes
 the current installation and the data customers must protect manually; machine
-storage telemetry and a supported in-place Machine Management update/rollback action
-are not yet available.
+storage telemetry is shown in Studio for Machine Management Runners. There is not
+yet a supported update procedure for Machine Management installations.
 
 ## Installation
 
@@ -43,6 +43,12 @@ The Runner later exchanges that enrollment through the existing
 `POST /api/runner-enrollments/exchange` operation. The server-side enrollment is
 authoritative for ownership, purpose, capabilities, installation identity, and
 application profile. Reconnect and heartbeat payloads cannot change those values.
+
+Studio periodically shows total and free space for the installation's persistent
+workspace filesystem, with the measurement time and any reporting error. This is a
+capacity observation, not a disk quota or a measurement of every Docker volume. The
+Runner's online state, heartbeat and software version provide the current connection
+health signals.
 
 ## Profiles
 
@@ -94,15 +100,11 @@ to an isolated replacement, verify ownership and app data, and rehearse rollback
 
 ## Machine Management Runner updates
 
-The Studio installation command enrolls a new Runner; it is not an update command.
-Machine Management installations do not yet have a supported in-place update or
-rollback procedure. Do not repeat enrollment as an upgrade or move an app target to a
-new machine expecting its data to follow. The Runner release pipeline publishes
-immutable image digests; the M3 update slice must define how to recreate this Runner
-with the same installation identity, configuration and data volumes while retaining
-the previous digest for rollback. The Compose pull/recreate commands in
-[`deploying-runner.md`](deploying-runner.md) apply to Compose-managed Runner installs,
-not this generated Machine Management installation.
+Machine Management installations do not yet have a supported Runner update or
+rollback procedure. The generated Studio command is for enrolling a new installation;
+do not rerun it as an upgrade. Existing Infrastructure Runner repair/update commands
+and Compose-managed Runner instructions do not apply to Machine Management
+installations. Runner self-update and rollback remain deferred work.
 
 ## Manual testing
 

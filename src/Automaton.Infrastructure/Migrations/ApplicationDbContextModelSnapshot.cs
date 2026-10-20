@@ -3121,6 +3121,23 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
+                    b.Property<long?>("MachineStorageAvailableBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("MachineStorageMeasuredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("MachineStorageMeasurementError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("MachineStorageMeasurementStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<long?>("MachineStorageTotalBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");

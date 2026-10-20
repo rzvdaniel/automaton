@@ -35,6 +35,18 @@ public sealed class RunnerStorageTelemetryController(
             () => submissionService.ReportRunnerHostAsync(apiKeyId, report, cancellationToken));
     }
 
+    [HttpPost("machine")]
+    public async Task<IActionResult> ReportMachineRunnerStorage(
+        [FromBody] MachineRunnerStorageTelemetry report,
+        CancellationToken cancellationToken)
+    {
+        if (!TryApiKeyId(out var apiKeyId))
+            return Unauthorized();
+
+        return await SubmitAsync(
+            () => submissionService.ReportMachineRunnerAsync(apiKeyId, report, cancellationToken));
+    }
+
     private async Task<IActionResult> SubmitAsync(Func<Task> submit)
     {
         try
