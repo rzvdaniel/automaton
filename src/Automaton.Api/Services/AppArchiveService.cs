@@ -34,6 +34,7 @@ public class AppArchiveService
         var ownerId = app.UserId ?? userContextService.GetUserId();
         var sourcePath = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
         var archiveFileName = $"{SanitizeArchiveFileName(app.Name)}.zip";
+        var sourceCopyExclusions = await fileStorageService.GetSourceCopyExclusionRulesAsync();
 
         await using var memoryStream = new MemoryStream();
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
@@ -42,12 +43,13 @@ public class AppArchiveService
 
             if (Directory.Exists(sourcePath))
             {
-                foreach (var sourceFile in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
+                foreach (var sourceFile in AppArchiveStorageBounds.EnumerateRegularFilesWithoutLinks(sourcePath))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var relativePath = Path.GetRelativePath(sourcePath, sourceFile).Replace('\\', '/');
-                    if (ShouldSkipExportFile(relativePath))
+                    if (ShouldSkipExportFile(relativePath) ||
+                        AppFileStorageService.MatchesExcludeRule(relativePath, sourceCopyExclusions))
                     {
                         continue;
                     }

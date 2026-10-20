@@ -186,6 +186,7 @@ export interface AppDeploymentTarget {
   status: DeploymentTargetStatus
   genericRuntimeDeployed: boolean
   lastDeploymentAt?: string | null
+  lastDeploymentError?: string | null
   lastSuccessfulDeploymentAt?: string | null
   cleanupPending: boolean
   lastCleanupError?: string | null

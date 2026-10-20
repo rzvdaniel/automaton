@@ -36,6 +36,31 @@ internal static class AppArchiveStorageBounds
         MeasureDirectory(rootPath, maximumBytes, maximumEntries);
     }
 
+    internal static IEnumerable<string> EnumerateRegularFilesWithoutLinks(string rootPath)
+    {
+        if (!Directory.Exists(rootPath))
+            yield break;
+        if ((File.GetAttributes(rootPath) & FileAttributes.ReparsePoint) != 0)
+            yield break;
+
+        var pending = new Stack<string>();
+        pending.Push(rootPath);
+        while (pending.TryPop(out var directory))
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    continue;
+
+                if ((attributes & FileAttributes.Directory) != 0)
+                    pending.Push(entry);
+                else
+                    yield return entry;
+            }
+        }
+    }
+
     public static void ValidateFileWrite(
         string rootPath,
         string relativePath,
@@ -144,7 +169,7 @@ internal static class AppArchiveStorageBounds
         var excludedPath = excludedFilePath is null ? null : Path.GetFullPath(excludedFilePath);
         long totalBytes = 0;
         var fileCount = 0;
-        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
+        foreach (var filePath in EnumerateRegularFilesWithoutLinks(rootPath))
         {
             var fullFilePath = Path.GetFullPath(filePath);
             if (excludedPath is not null && comparer.Equals(fullFilePath, excludedPath))

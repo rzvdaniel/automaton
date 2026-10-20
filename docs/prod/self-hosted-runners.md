@@ -1,8 +1,11 @@
 # Self-Hosted Runners
 
-PR 2 adds an API-only installation flow for the existing generic Automaton Runner.
-It does not add Studio UI, deployment-target selection, scheduling policy, or remote
-lifecycle management.
+Studio can create a one-time Docker installation command for the existing Automaton
+Runner. The Machine Management profile installs one trusted management Runner on a
+customer-owned machine. Workloads run in separate containers. This document describes
+the current installation and the data customers must protect manually; machine
+storage telemetry and a supported in-place Machine Management update/rollback action
+are not yet available.
 
 ## Installation
 
@@ -19,6 +22,20 @@ The response contains a one-time Docker command, an expiry time, the enrollment 
 installation identifiers, and the selected profile. The command is intended to be
 copied and run on the user's own Linux machine. The enrollment secret is returned
 only in this response and is stored by the API as a hash.
+
+For the supported self-hosted machine flow, open **Runners → Install Self-Hosted
+Runner**, choose **Machine Management**, acknowledge the Docker access warning, and
+run the generated command on the customer machine. The command requires an installed,
+running Docker Engine and uses the host's configured Docker data root. On Ubuntu, place
+that data root on the ordinary ext4 filesystem intended for Automaton workloads; the
+installer does not change Docker's data root or verify the filesystem type. It creates
+an installation-scoped workspace volume and mounts it at `/automaton/storage`.
+
+To add another machine, repeat the Studio installation flow with a distinct Runner
+name on that machine. Each installation has its own identity and workspace volume;
+do not clone the first machine's Runner configuration or volume. After the new Runner
+is connected, assign it to the intended app deployment targets. Moving a target does
+not move its host-local persistent data.
 
 The Runner later exchanges that enrollment through the existing
 `POST /api/runner-enrollments/exchange` operation. The server-side enrollment is
@@ -54,6 +71,36 @@ containers. A running container means local startup succeeded; Studio separately
 reports enrollment and connection state. Self-hosted application traffic continues to
 use the existing outbound Runner connection and API tunnel. Direct Traefik runtime
 routes remain a Hosted Runner feature backed by `HostedRunner.RuntimeEndpoint`.
+
+## What to back up manually
+
+There is no Automaton backup scheduler or restore tool for self-hosted installations.
+Customers must protect and test recoverable copies of:
+
+- The control-plane database and the API's configured persistent app/source storage.
+- Required API encryption/signing keys and deployment configuration, stored separately
+  from the database backup and protected as credentials.
+- On each Machine Management host, `/opt/automaton/self-hosted-runners/<installation-id>`
+  and the Docker volumes labeled for that installation, including the workspace and
+  app-owned persistent data volumes. The Docker data-root configuration is needed to
+  locate those volumes after host recovery.
+
+Use database-consistent backups and quiesce app writes or use an application-consistent
+method for writable volumes. Keep backups off the machine they protect. A copied
+volume is not a verified recovery: before migrating retained workloads in M4, restore
+to an isolated replacement, verify ownership and app data, and rehearse rollback.
+
+## Machine Management Runner updates
+
+The Studio installation command enrolls a new Runner; it is not an update command.
+Machine Management installations do not yet have a supported in-place update or
+rollback procedure. Do not repeat enrollment as an upgrade or move an app target to a
+new machine expecting its data to follow. The Runner release pipeline publishes
+immutable image digests; the M3 update slice must define how to recreate this Runner
+with the same installation identity, configuration and data volumes while retaining
+the previous digest for rollback. The Compose pull/recreate commands in
+[`deploying-runner.md`](deploying-runner.md) apply to Compose-managed Runner installs,
+not this generated Machine Management installation.
 
 ## Manual testing
 

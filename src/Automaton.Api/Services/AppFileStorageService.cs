@@ -427,7 +427,7 @@ public class AppFileStorageService
     /// </summary>
     public async Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
     {
-        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        var remixSourceExclude = await GetSourceCopyExclusionRulesAsync();
         AppArchiveStorageBounds.ValidateDirectory(GetSourcePath(srcUserId, srcAppId));
         await CopyAppSubdirectoryFilesAsync(
             GetSourcePath(srcUserId, srcAppId),
@@ -437,8 +437,11 @@ public class AppFileStorageService
             srcUserId,
             dstAppId,
             dstUserId,
-            relativePath => MatchesExcludeRule(relativePath, rules.RemixSourceExclude));
+            relativePath => MatchesExcludeRule(relativePath, remixSourceExclude));
     }
+
+    public async Task<IReadOnlyList<string>> GetSourceCopyExclusionRulesAsync()
+        => (await settingsService.GetEffectiveAppDeployRulesAsync()).RemixSourceExclude;
 
 
     /// <summary>
@@ -854,7 +857,7 @@ public class AppFileStorageService
             return;
         }
 
-        foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+        foreach (var sourceFile in AppArchiveStorageBounds.EnumerateRegularFilesWithoutLinks(srcPath))
         {
             var relativePath = Path.GetRelativePath(srcPath, sourceFile);
             if (shouldSkip?.Invoke(relativePath) ?? false)

@@ -1,6 +1,6 @@
 # Automaton self-hosted roadmap
 
-Updated: 19 October 2026. Status: M1 implementation is merged and combined acceptance is deferred; M2 is underway.
+Updated: 20 October 2026. Status: M1 and M2 implementation slices are merged; combined acceptance remains deferred; M3 is underway.
 
 ## Product decision
 
@@ -83,7 +83,7 @@ Offer a small optional system-app catalog: monitoring first, then backup and sel
 
 ## Delivery milestones
 
-Milestone 1 acceptance remains open; milestone 2 is in progress; milestones 3–4 are pending. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
+Milestone 1 acceptance remains open; M2 implementation is complete but integrated acceptance remains deferred; M3 is in progress; M4 is pending. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
@@ -105,21 +105,20 @@ Depends on milestone 1's execution and permission boundary.
 - PR #396 completed Action authorization for explicitly assigned organization apps. PR #397 completed the organization app use flow—assignment, My Apps listing, runtime launch, Action access and revocation—while keeping app use separate from source, secrets and machine administration.
 - Capacity safeguards in PR #401 reuse configured per-container CPU, memory and PID limits for builds, app/Compose containers, Action jobs and dependency preparation. Deployment dispatch and the Runner Action queue already bound concurrent deployments and jobs. Machine Management work also checks free space on the configured workspace and Runner storage filesystems against `MachineContainerResources:MinimumFreeDiskMb` (default 1024 MB) before deployment preparation, container creation, Action work and static publication; deployment refusal cleans staging and preserves the current runtime. This is admission only, not a hard ext4 quota. Aggregate reservations across concurrent API replicas and per-app/per-user disk accounting are outside scope; subscription quotas are also outside scope.
 - Compose builds and secure secret delivery remain deferred and are not implied by the supported Compose subset.
-- Make publish, share and source-copy behavior clear in Studio and API.
-- Show capacity, workload limits and unsupported guarantees accurately; reject deployments that exceed configured admission budgets.
+- Source copies and marketplace forks copy portable source only. They exclude configured secret/private/runtime paths and filesystem links; environment values in build, runtime and Compose contracts are cleared from fork previews and copies because the contract has no secret/non-secret distinction. Failed deployment summaries expose the latest stored failure reason, including configured disk-reserve refusal.
 
-Acceptance: a small-team fixture publishes two static sites through the shared service, a multi-service web app and an automation. Intended colleagues can use shared apps; unauthorized users cannot inspect their internals. Static sites remain separated, source copies exclude secrets/data, and capacity refusal is understandable and leaves no orphan deployment.
+Implementation slices are complete, including organization app use (#396–#397), the supported Compose subset (#398), shared static publishing (#400), and basic capacity safeguards (#401). Focused copy/fork, authorization, deployment, and limit checks exist; the integrated small-team acceptance across two static sites, Compose, Actions, authorization and duplicate delivery has not been completed. Compose builds and secure secret delivery remain deferred.
 
 ### 3. Make installation and routine operation practical
 
 Depends on the stable machine/workload contract from milestones 1–2. Produce an installable release rather than a separate provisioning framework.
 
-- Package a documented single-machine Ubuntu/ext4 installation with configurable domains, storage and credentials; support adding a second customer machine through explicit enrollment.
-- Show machine health, storage usage, workloads and recovery instructions. Implement bounded retention/cleanup and preserve control-plane headroom.
-- Provide read-only monitoring and a backup/restore path through the system-app/job mechanism where suitable. Include the database, required keys/configuration and app data; state recovery limits for host-local storage.
-- Define trusted package provenance, Runner update/rollback and revocation. Privileged maintenance stays opt-in and administrator-controlled. Do not automatically update a customer's OS or reboot it.
+- Make the existing Studio Machine Management installation straightforward on Ubuntu with Docker storage on ordinary ext4; document prerequisites, enrollment, and how to add a second independent machine. The current command stores workspace and app data in Docker volumes and does not verify or configure the host filesystem.
+- Show machine health, storage usage, assigned workloads and recovery instructions. Runner connection/version/heartbeat are visible; Machine Management storage telemetry is not yet reported or shown.
+- Give customers practical manual backup and Runner update/rollback instructions. They must protect the control-plane database, configured API app storage, required keys/configuration, each machine's installation configuration, and its Docker volumes. Backup automation, schedules, destinations and restore tooling are deferred. Before M4 workload migration, require a recoverable copy and a rehearsed rollback procedure; this does not require a backup product.
+- Define trusted package provenance and safe Runner update/rollback. The current Machine Management installation has no supported in-place update/rollback action. Privileged maintenance stays opt-in and administrator-controlled. Do not automatically update a customer's OS or reboot it.
 
-Acceptance: install on a fresh fixture, deploy an app and job, add a second machine, update/rollback the Runner, and restore a backup to an isolated replacement. Demonstrate revoked access, ownership reconciliation and an app's recovered data. Document supported versions/topology and operations that remain manual.
+Acceptance: install on a fresh Ubuntu/ext4 fixture, deploy an app and job, enroll and assign a second machine, show health/storage/workloads, and verify the documented Runner update/rollback steps. Document the manual backup set and rehearse restoring it to an isolated replacement before M4. Demonstrate revoked access, ownership reconciliation and recovered app data. Document supported versions/topology and operations that remain manual.
 
 ### 4. Migrate retained workloads and retire obsolete paths
 
@@ -144,4 +143,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** continue the remaining M2 user-facing publish/share/source-copy and capacity visibility work. Compose builds and secure secret delivery remain deferred. Revisit the deferred milestone 1 acceptance cases before broader use or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.
+**Next action:** M3 single-machine installation on Ubuntu/ext4, then second-machine enrollment and practical manual backup/update/rollback instructions. Machine Management storage visibility and a supported in-place Runner update/rollback path are concrete gaps. Backup automation, scheduling, destinations and restore tooling remain deferred. M1/M2 combined acceptance is still deferred; revisit it before relying on the assembled flow for other users or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.

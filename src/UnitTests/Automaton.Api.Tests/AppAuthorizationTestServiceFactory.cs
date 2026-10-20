@@ -47,7 +47,11 @@ internal static class AppAuthorizationTestServiceFactory
             userContext,
             Options.Create(new AppFileRuleBaselineOptions
             {
-                RemixSourceExclude = [".env", ".env.*", "secrets.json", "secrets", "secrets/**"],
+                RemixSourceExclude = [
+                    ".git", ".svn", ".hg", ".env", ".env.*", "*.pem", "*.key", "*.pfx", "*.p12",
+                    "secrets.json", "secrets", "secrets/**", "private", "private/**", "data", "data/**",
+                    "uploads", "uploads/**"
+                ],
                 RemixFrontendExclude = []
             }));
         var storage = new AppFileStorageService(environment, settings);

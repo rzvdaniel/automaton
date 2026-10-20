@@ -133,7 +133,7 @@ export function getAppOperationalSummary(
   } else if (target.status === DeploymentTargetStatus.Failed) {
     diagnostic = {
       title: 'The latest deployment failed',
-      detail: 'Review this target in Deployments and check Logs for recent activity.',
+      detail: target.lastDeploymentError || 'Review this target in Deployments and check Logs for recent activity.',
       action: { label: 'View deployments', view: 'deployments' },
       secondaryAction: { label: 'View logs', view: 'logs' },
     }

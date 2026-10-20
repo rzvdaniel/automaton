@@ -27,14 +27,17 @@ public sealed partial class AppDeploymentTargetManagementService(
             .OrderByDescending(target => target.IsDefault)
             .ThenBy(target => target.Name)
             .ToListAsync(cancellationToken);
-        return targets.Select(ToSummary).ToList();
+        var summaries = new List<AppDeploymentTargetSummary>(targets.Count);
+        foreach (var target in targets)
+            summaries.Add(await ToSummaryAsync(target, cancellationToken));
+        return summaries;
     }
 
     public async Task<AppDeploymentTargetSummary> GetAsync(
         Guid appId, Guid targetId, Guid userId, CancellationToken cancellationToken = default)
     {
         await EnsureCanAccessAsync(appId, userId, cancellationToken);
-        return ToSummary(await GetTargetAsync(appId, targetId, cancellationToken));
+        return await ToSummaryAsync(await GetTargetAsync(appId, targetId, cancellationToken), cancellationToken);
     }
 
     public async Task<AppDeploymentTargetSummary> CreateAsync(
@@ -175,7 +178,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return ToSummary(target);
+        return await ToSummaryAsync(target, cancellationToken);
     }
 
     public async Task<AppDeploymentTargetSummary> AssignRunnerAsync(
@@ -210,7 +213,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                 target.Status = originalStatus;
                 await dbContext.SaveChangesAsync(cancellationToken);
                 completed = true;
-                return ToSummary(target);
+                return await ToSummaryAsync(target, cancellationToken);
             }
 
             if (IsDeployed(target))
@@ -459,6 +462,26 @@ public sealed partial class AppDeploymentTargetManagementService(
                 "Target slug must use lowercase letters, numbers, and single hyphens between segments.");
         }
         return normalized;
+    }
+
+    private async Task<AppDeploymentTargetSummary> ToSummaryAsync(
+        AppDeploymentTarget target,
+        CancellationToken cancellationToken)
+    {
+        var summary = ToSummary(target);
+        if (target.Status != DeploymentTargetStatus.Failed)
+            return summary;
+
+        var latestOperation = await dbContext.DeploymentOperations
+            .AsNoTracking()
+            .Where(operation => operation.WebAppId == target.WebAppId &&
+                (operation.TargetSlug == target.Slug || target.IsDefault && operation.TargetSlug == null))
+            .OrderByDescending(operation => operation.CreatedAtUtc)
+            .Select(operation => new { operation.Status, operation.ErrorMessage })
+            .FirstOrDefaultAsync(cancellationToken);
+        return latestOperation?.Status == DeploymentOperationStatuses.Failed
+            ? summary with { LastDeploymentError = latestOperation.ErrorMessage }
+            : summary;
     }
 
     private AppDeploymentTargetSummary ToSummary(AppDeploymentTarget target) =>

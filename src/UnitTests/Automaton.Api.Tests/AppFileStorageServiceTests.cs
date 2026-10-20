@@ -143,6 +143,7 @@ public class AppFileStorageServiceTests
                 "backend/.env",
                 "TOKEN=secret");
             await service.WriteSourceFileAsync(srcUserId, srcAppId, "backend/secrets.json", "{\"token\":\"secret\"}");
+            await service.WriteSourceFileAsync(srcUserId, srcAppId, "backend/.git/config", "credential=private");
             await service.WriteSourceFileAsync(srcUserId, srcAppId, "README.md", "do not remix root files");
             await service.CopySourceFilesAsync(srcUserId, srcAppId, dstUserId, dstAppId);
 
@@ -151,6 +152,7 @@ public class AppFileStorageServiceTests
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/notes.txt"), Is.EqualTo("safe text"));
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.env"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/secrets.json"), Is.Null);
+            Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.git/config"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "README.md"), Is.EqualTo("do not remix root files"));
         }
         finally
@@ -396,7 +398,7 @@ public class AppFileStorageServiceTests
         }
     }
 
-    private static AppFileStorageService CreateStorageService(string contentRootPath)
+    internal static AppFileStorageService CreateStorageService(string contentRootPath)
     {
         var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -408,7 +410,7 @@ public class AppFileStorageServiceTests
             userContext,
             Options.Create(new AppFileRuleBaselineOptions
             {
-                RemixSourceExclude = [".env", ".env.*", "secrets.json", "secrets", "secrets/**"],
+                RemixSourceExclude = [".git", ".env", ".env.*", "secrets.json", "secrets", "secrets/**"],
                 RemixFrontendExclude = []
             }));
 

@@ -67,6 +67,17 @@ describe('getAppOperationalSummary', () => {
     })
   })
 
+  it('shows the useful deployment failure reason when the API provides one', () => {
+    expect(getAppOperationalSummary(target({
+      status: DeploymentTargetStatus.Failed,
+      lastDeploymentError: 'Machine storage is below the configured 1024 MB free-space reserve.',
+    }))).toMatchObject({
+      diagnostic: {
+        detail: 'Machine storage is below the configured 1024 MB free-space reserve.',
+      },
+    })
+  })
+
   it('keeps the prior deployment fact separate from a failed redeploy', () => {
     expect(getAppOperationalSummary(target({
       status: DeploymentTargetStatus.Failed,
