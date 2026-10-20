@@ -52,7 +52,9 @@ public sealed class MachineManagementActionPreparationTests
             AppId = appId,
             DeploymentTargetId = targetId,
             PackagePath = packagePath,
-            ExecutionAttemptId = Guid.NewGuid()
+            ExecutionAttemptId = Guid.NewGuid(),
+            ActionContainerPolicy = new ActionContainerPolicy(
+                new HostContainerResourceLimits(1m, 1024, 256), 64, 20, 5, "python:3.12-slim")
         });
 
         Assert.Multiple(() =>

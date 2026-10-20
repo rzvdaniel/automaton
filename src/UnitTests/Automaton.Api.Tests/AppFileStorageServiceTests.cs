@@ -113,6 +113,9 @@ public class AppFileStorageServiceTests
         {
             Assert.That(AppFileStorageService.MatchesExcludeRule("secrets\\token.json", ["secrets/**"]), Is.True);
             Assert.That(AppFileStorageService.MatchesExcludeRule("backend\\settings.env", ["*.env"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/.env.production", [".env.*"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/appsettings.Production.json", ["appsettings.*.json"]), Is.True);
+            Assert.That(AppFileStorageService.MatchesExcludeRule("backend/credentials.local.json", ["*.local.*"]), Is.True);
             Assert.That(AppFileStorageService.MatchesExcludeRule("frontend/config.json", ["frontend/config.json"]), Is.True);
             Assert.That(AppFileStorageService.MatchesExcludeRule("backend/.env", [".env"]), Is.True);
             Assert.That(AppFileStorageService.MatchesExcludeRule("backend/notes.md", [".env"]), Is.False);
@@ -143,6 +146,10 @@ public class AppFileStorageServiceTests
                 "backend/.env",
                 "TOKEN=secret");
             await service.WriteSourceFileAsync(srcUserId, srcAppId, "backend/secrets.json", "{\"token\":\"secret\"}");
+            WriteFile(service.GetAppSourceDirectoryPath(srcUserId, srcAppId), "backend/.env.production", "TOKEN=secret");
+            WriteFile(service.GetAppSourceDirectoryPath(srcUserId, srcAppId), "backend/appsettings.Production.json", "{\"Password\":\"secret\"}");
+            WriteFile(service.GetAppSourceDirectoryPath(srcUserId, srcAppId), "backend/credentials.local.json", "{\"key\":\"private\"}");
+            await service.WriteSourceFileAsync(srcUserId, srcAppId, "backend/.git/config", "credential=private");
             await service.WriteSourceFileAsync(srcUserId, srcAppId, "README.md", "do not remix root files");
             await service.CopySourceFilesAsync(srcUserId, srcAppId, dstUserId, dstAppId);
 
@@ -151,6 +158,10 @@ public class AppFileStorageServiceTests
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/notes.txt"), Is.EqualTo("safe text"));
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.env"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/secrets.json"), Is.Null);
+            Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.env.production"), Is.Null);
+            Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/appsettings.Production.json"), Is.Null);
+            Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/credentials.local.json"), Is.Null);
+            Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "backend/.git/config"), Is.Null);
             Assert.That(await service.ReadSourceFileAsync(dstUserId, dstAppId, "README.md"), Is.EqualTo("do not remix root files"));
         }
         finally
@@ -396,7 +407,7 @@ public class AppFileStorageServiceTests
         }
     }
 
-    private static AppFileStorageService CreateStorageService(string contentRootPath)
+    internal static AppFileStorageService CreateStorageService(string contentRootPath)
     {
         var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -408,7 +419,7 @@ public class AppFileStorageServiceTests
             userContext,
             Options.Create(new AppFileRuleBaselineOptions
             {
-                RemixSourceExclude = [".env", ".env.*", "secrets.json", "secrets", "secrets/**"],
+                RemixSourceExclude = [".git", ".env", ".env.*", "appsettings.*.json", "*.local.*", "secrets.json", "secrets", "secrets/**"],
                 RemixFrontendExclude = []
             }));
 

@@ -28,7 +28,8 @@ public sealed record AppDeploymentTargetSummary(
     string RoutePath,
     bool PrivilegedHostAccessApproved = false,
     DateTimeOffset? PrivilegedHostAccessApprovedAtUtc = null,
-    Guid? PrivilegedHostAccessApprovedByUserId = null);
+    Guid? PrivilegedHostAccessApprovedByUserId = null,
+    string? LastDeploymentError = null);
 
 public sealed class CreateAppDeploymentTargetRequest
 {

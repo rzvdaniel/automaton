@@ -39,7 +39,7 @@ public sealed class AppForkingService(
             Summary = source.Summary,
             Description = source.Description,
             Definition = "{}",
-            ApplicationContractJson = source.ApplicationContractJson,
+            ApplicationContractJson = CreateCopyApplicationContractJson(source.ApplicationContractJson),
             IsPublished = false,
             PublicUrl = null,
             PublishedAt = null,
@@ -133,7 +133,7 @@ public sealed class AppForkingService(
             CreatorPublicUsername = creator?.PublicUsername,
             CreatorDisplayName = creator?.DisplayName ?? "Automaton creator",
             HasApplicationSource = hasApplicationSource,
-            Application = ApplicationContractSerialization.Deserialize(source.ApplicationContractJson)
+            Application = DeserializeCopyApplicationContract(source.ApplicationContractJson)
         };
     }
 
@@ -157,7 +157,7 @@ public sealed class AppForkingService(
             Summary = source.Summary,
             Description = source.Description,
             Definition = "{}",
-            ApplicationContractJson = source.ApplicationContractJson,
+            ApplicationContractJson = CreateCopyApplicationContractJson(source.ApplicationContractJson),
             IsPublished = false,
             IsForkable = false,
             PublicUrl = null,
@@ -258,6 +258,24 @@ public sealed class AppForkingService(
     }
 
     private sealed record ForkSourceInfo(Entities.WebApp Source, Guid OwnerId, string? CreatorDisplayName);
+
+    private static string CreateCopyApplicationContractJson(string contractJson) =>
+        ApplicationContractSerialization.Serialize(DeserializeCopyApplicationContract(contractJson));
+
+    private static ApplicationContract DeserializeCopyApplicationContract(string contractJson)
+    {
+        var contract = ApplicationContractSerialization.Deserialize(contractJson);
+        ClearEnvironment(contract.Build.Command);
+        ClearEnvironment(contract.Runtime.Command);
+        if (contract.Compose is not null)
+        {
+            foreach (var service in contract.Compose.Services)
+                service.Environment.Clear();
+        }
+        return contract;
+    }
+
+    private static void ClearEnvironment(ApplicationCommandSpec? command) => command?.Environment.Clear();
 
     private static string NormalizeForkName(string? requestedName, string sourceName)
     {
