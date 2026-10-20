@@ -131,7 +131,10 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         return files.Length;
     }
 
-    public static int CopyDirectoryRejectingLinks(string sourceRoot, string destinationRoot, string containmentRoot)
+    public static int CopyDirectoryPreservingInternalLinks(
+        string sourceRoot,
+        string destinationRoot,
+        string containmentRoot)
     {
         var fullRoot = Path.GetFullPath(containmentRoot);
         var fullSource = Path.GetFullPath(sourceRoot);
@@ -148,68 +151,124 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
             RejectLink(current);
         }
 
+        ValidateContainedTree(fullSource);
         Directory.CreateDirectory(destinationRoot);
-        return CopyBuildOutputTree(
+        return CopyContainedTree(
             fullSource,
             Path.GetFullPath(destinationRoot),
             fullSource,
-            new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal));
+            Path.GetFullPath(destinationRoot));
     }
 
-    private static int CopyBuildOutputTree(
-        string sourceRoot,
-        string destinationRoot,
-        string allowedRoot,
-        HashSet<string> activeDirectories)
-    {
-        var resolvedRoot = Path.GetFullPath(sourceRoot);
-        if (!activeDirectories.Add(resolvedRoot))
-            throw new InvalidOperationException("Build output contains a cyclic directory link.");
+    public static int CopyRuntimeTreeIfExists(string sourceRoot, string destinationRoot)
+        => Directory.Exists(sourceRoot)
+            ? CopyDirectoryPreservingInternalLinks(sourceRoot, destinationRoot, sourceRoot)
+            : 0;
 
+    private static void ValidateContainedTree(string sourceRoot)
+    {
+        var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        ValidateContainedDirectory(
+            sourceRoot,
+            sourceRoot,
+            new HashSet<string>(pathComparer),
+            new HashSet<string>(pathComparer));
+    }
+
+    private static void ValidateContainedDirectory(
+        string directory,
+        string allowedRoot,
+        HashSet<string> activeDirectories,
+        HashSet<string> validatedDirectories)
+    {
+        var resolvedDirectory = Path.GetFullPath(directory);
+        if (activeDirectories.Contains(resolvedDirectory))
+            throw new InvalidOperationException("Deployment artifact contains a cyclic directory link.");
+        if (validatedDirectories.Contains(resolvedDirectory)) return;
+
+        activeDirectories.Add(resolvedDirectory);
         try
         {
-            var copiedFiles = 0;
-            foreach (var entry in Directory.EnumerateFileSystemEntries(resolvedRoot))
+            foreach (var entry in Directory.EnumerateFileSystemEntries(resolvedDirectory))
             {
-                var source = ResolveBuildOutputEntry(entry, allowedRoot);
-                var destination = Path.Combine(destinationRoot, Path.GetFileName(entry));
-                if ((File.GetAttributes(source) & FileAttributes.Directory) != 0)
-                {
-                    Directory.CreateDirectory(destination);
-                    copiedFiles += CopyBuildOutputTree(source, destination, allowedRoot, activeDirectories);
-                    continue;
-                }
-
-                File.Copy(source, destination, overwrite: true);
-                copiedFiles++;
+                var resolvedEntry = ResolveContainedTreeEntry(entry, allowedRoot);
+                if (resolvedEntry.IsDirectory)
+                    ValidateContainedDirectory(
+                        resolvedEntry.TargetPath,
+                        allowedRoot,
+                        activeDirectories,
+                        validatedDirectories);
             }
-
-            return copiedFiles;
         }
         finally
         {
-            activeDirectories.Remove(resolvedRoot);
+            activeDirectories.Remove(resolvedDirectory);
         }
+
+        validatedDirectories.Add(resolvedDirectory);
     }
 
-    private static string ResolveBuildOutputEntry(string entry, string allowedRoot)
+    private static int CopyContainedTree(
+        string sourceRoot,
+        string destinationRoot,
+        string allowedRoot,
+        string destinationTreeRoot)
     {
-        if ((File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0)
-            return entry;
+        var copiedFiles = 0;
+        foreach (var entry in Directory.EnumerateFileSystemEntries(sourceRoot))
+        {
+            var resolvedEntry = ResolveContainedTreeEntry(entry, allowedRoot);
+            var destination = Path.Combine(destinationRoot, Path.GetFileName(entry));
+            if (resolvedEntry.IsLink)
+            {
+                var targetDestination = Path.GetFullPath(Path.Combine(destinationTreeRoot, resolvedEntry.RelativeTargetPath!));
+                var linkTarget = Path.GetRelativePath(Path.GetDirectoryName(destination)!, targetDestination);
+                if (resolvedEntry.IsDirectory)
+                    Directory.CreateSymbolicLink(destination, linkTarget);
+                else
+                    File.CreateSymbolicLink(destination, linkTarget);
+                copiedFiles++;
+            }
+            else if (resolvedEntry.IsDirectory)
+            {
+                Directory.CreateDirectory(destination);
+                copiedFiles += CopyContainedTree(resolvedEntry.TargetPath, destination, allowedRoot, destinationTreeRoot);
+            }
+            else
+            {
+                File.Copy(resolvedEntry.TargetPath, destination, overwrite: true);
+                copiedFiles++;
+            }
+        }
 
-        FileSystemInfo fileSystemEntry = (File.GetAttributes(entry) & FileAttributes.Directory) != 0
+        return copiedFiles;
+    }
+
+    private static ContainedTreeEntry ResolveContainedTreeEntry(string entry, string allowedRoot)
+    {
+        var attributes = File.GetAttributes(entry);
+        if ((attributes & FileAttributes.ReparsePoint) == 0)
+            return new ContainedTreeEntry(entry, null, (attributes & FileAttributes.Directory) != 0);
+
+        FileSystemInfo fileSystemEntry = (attributes & FileAttributes.Directory) != 0
             ? new DirectoryInfo(entry)
             : new FileInfo(entry);
         var target = fileSystemEntry.ResolveLinkTarget(returnFinalTarget: true)
-            ?? throw new InvalidOperationException($"Build output contains a broken link at '{entry}'.");
-        var resolvedTarget = Path.GetFullPath(target.FullName);
-        var relativeTarget = Path.GetRelativePath(allowedRoot, resolvedTarget);
-        if (Path.IsPathRooted(relativeTarget)
-            || relativeTarget == ".."
-            || relativeTarget.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            throw new InvalidOperationException($"Build output link escapes the declared output directory at '{entry}'.");
+            ?? throw new InvalidOperationException($"Deployment artifact contains a broken link at '{entry}'.");
+        var targetPath = Path.GetFullPath(target.FullName);
+        var relativeTargetPath = Path.GetRelativePath(allowedRoot, targetPath);
+        if (Path.IsPathRooted(relativeTargetPath)
+            || relativeTargetPath == ".."
+            || relativeTargetPath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Deployment artifact link escapes its declared output directory at '{entry}'.");
 
-        return resolvedTarget;
+        return new ContainedTreeEntry(targetPath, relativeTargetPath,
+            (File.GetAttributes(targetPath) & FileAttributes.Directory) != 0);
+    }
+
+    private sealed record ContainedTreeEntry(string TargetPath, string? RelativeTargetPath, bool IsDirectory)
+    {
+        public bool IsLink => RelativeTargetPath is not null;
     }
 
     private static void RejectLink(string path)
