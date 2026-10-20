@@ -26,7 +26,7 @@ public sealed class SelfHostedRunnerInstallationService(
         "inspect and control Docker containers, affect services and system state, and access " +
         "secrets available on the host.";
     private const string MachineManagementWarning =
-        "The management Runner receives access to this machine's Docker socket. Automaton exposes typed app-container operations and disables Actions and workflows, but the Runner itself is trusted infrastructure: a compromise could control host Docker. Keep ordinary app and build code in isolated containers.";
+        "The management Runner receives access to this machine's Docker socket. App deployments and Actions run in bounded containers; raw workflows and custom steps that execute code in the management process remain disabled. The Runner itself is trusted infrastructure: a compromise could control host Docker. Keep ordinary app, build and Action code in isolated containers.";
 
     public async Task<SelfHostedRunnerInstallationResponse> CreateAsync(
         CreateSelfHostedRunnerInstallationRequest request,

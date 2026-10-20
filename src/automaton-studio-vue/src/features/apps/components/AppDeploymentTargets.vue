@@ -497,7 +497,7 @@ watch(() => props.refreshRevision, load)
         Deploy source changes from your local project with Automaton CLI. Studio manages environments and runtime operations here.
       </p>
       <Message v-if="hasMachineManagementTarget" severity="info" :closable="false">
-        Machine Management targets deploy web apps through bounded containers. Packages containing Actions are not supported yet; Action dependency preparation and execution remain disabled on this Runner.
+        Machine Management targets deploy web apps through bounded containers. Actions and Python dependencies run in isolated, resource-bounded containers; raw workflows and custom-step code remain disabled on this Runner.
       </Message>
       <section class="target-group">
         <div class="target-group__heading">
