@@ -95,8 +95,11 @@ Customers must protect and test recoverable copies of:
 
 Use database-consistent backups and quiesce app writes or use an application-consistent
 method for writable volumes. Keep backups off the machine they protect. A copied
-volume is not a verified recovery: before migrating retained workloads in M4, restore
-to an isolated replacement, verify ownership and app data, and rehearse rollback.
+volume is not a verified recovery: test restoration on an isolated replacement before
+relying on a backup. The refactoring targets fresh installations and does not provide
+automatic migration from legacy Hosted Runner/account-storage installations. Any
+retirement, export, manual redeployment or deletion of an old installation's data is
+a separate operator decision.
 
 ## Machine Management Runner updates
 
