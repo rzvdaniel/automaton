@@ -1,6 +1,6 @@
 # Automaton self-hosted roadmap
 
-Updated: 20 October 2026. Status: M1 and M2 implementation slices are merged; combined acceptance remains deferred; M3 is underway.
+Updated: 21 October 2026. Status: M1/M2 implementation and the M3 installation/telemetry slices are merged. Next: demonstrate the single-server CLI deployment flow, then complete M4 legacy cleanup. Broader acceptance remains deferred.
 
 ## Product decision
 
@@ -11,6 +11,8 @@ Refactor the existing product aggressively. Keep the working API, Studio, Worker
 The target is **one management Runner per machine**, responsible for both machine management and application orchestration. User applications, builds and Actions run in separate containers. A shared Runner is a trusted management service, not a shared process in which users execute arbitrary code.
 
 This is the only active roadmap. It supersedes the staged master plan, archived backlog and Node N0–N4 briefs. Their history remains in Git; their unfinished tasks are not implicit requirements of this plan. Do not introduce a separate Node executable or shared Runner/Node framework.
+
+The current refactoring deliverable is a working single-server install/deploy flow **and removal of the superseded execution and hosting paths**. Finish that flow, then make legacy cleanup the next major objective. Optional operations and feature expansion listed below are deferred until after cleanup; they must not become prerequisites for reaching the simpler implementation.
 
 ## Starting point and baseline
 
@@ -55,7 +57,7 @@ The M2 Compose subset is implemented in PR #398: internal service networking, on
 
 Shared static publishing is complete in merged PR #400: one Runner-managed serving container per machine, with site-specific output directories mounted read-only. API authorization and runtime authentication govern each hostname; the Runner publishes only declared static output. A failed update leaves the prior site version serving. Source, credentials, logs and private data are excluded.
 
-Actions and workflows keep their existing product semantics, schedules, results, cancellation and logs, but their user-controlled code moves to finite job containers. Do this before ordinary user Actions can reach the combined management Runner. Do not merely reuse the current child-process execution path inside a privileged Runner.
+Machine Management Actions and Python dependency preparation use bounded containers, retaining their existing execution identities, schedules, results, cancellation and logs. Raw workflows and management-process custom steps remain disabled on this profile. Preserve these boundaries during cleanup; implementing another workflow execution path is not required for the current refactoring.
 
 ### Workspaces and machines
 
@@ -67,7 +69,7 @@ A customer can dedicate a machine to a person, team or environment, or share it 
 
 Use a normal Ubuntu machine as the initial supported installation target; ext4 is the tested storage baseline, not a runtime requirement. Working Docker storage on XFS or another supported filesystem remains valid. Basic deployment must not require XFS project quotas, a Hetzner volume or any provider-specific storage attachment. Persistent app data uses explicit, owned directories/volumes on configured storage roots. Preserve existing data and storage affinity when converting current deployments.
 
-Use machine CPU, memory and disk capacity as the overall budget. Apply supported CPU/memory/process limits, bounded build/job concurrency, log rotation and reserved free space. Show usage for images, writable layers, volumes, logs and temporary/build data. Cleanup may delete only identified disposable resources; it must not delete owned persistent data to make space.
+Reuse configured CPU/memory/process limits, bounded build/job concurrency, log rotation and minimum-free-disk admission. Basic workspace-filesystem capacity and measurement status are sufficient for the current refactoring. Additional image/layer/volume/log/build usage breakdowns and automated retention/cleanup are deferred until after legacy cleanup. Any cleanup must delete only identified disposable resources and preserve owned persistent data.
 
 Report disk monitoring and admission checks honestly: these do not enforce a hard per-user disk limit on ext4. Optional hard storage quotas need an actually supported backend and explicit capability reporting. Customers requiring a hard whole-workload boundary can supply a dedicated VM; do not build a hypervisor manager for this release.
 
@@ -77,13 +79,13 @@ Bind Runner credentials and accepted operations to a machine and authorized app/
 
 Keep authoritative state durable and safe with multiple API/Worker replicas. Duplicate delivery must return the existing result or safely resume a known operation. An Action with an uncertain external effect must not be blindly rerun. Reuse the existing journal/result protocol instead of introducing another queue or operation store. The existing cross-host artifact-availability limitation must be resolved or explicitly constrained in supported deployment topology before claiming replica/host failover.
 
-After a database restore or a machine identity conflict, stop new effects until machine ownership and outstanding operations are reconciled. Existing app containers may continue serving during a control-plane outage; recovery must not silently adopt foreign volumes or start duplicate jobs. Define and test the actual restore procedure without importing the abandoned Node authority system by default.
+After a database restore or a machine identity conflict, stop new effects until machine ownership and outstanding operations are reconciled. Existing app containers may continue serving during a control-plane outage; recovery must not silently adopt foreign volumes or start duplicate jobs. Before migrating retained state, rehearse the relevant manual recovery/rollback on a disposable copy. This does not require a backup product or the abandoned Node authority system.
 
-Offer a small optional system-app catalog: monitoring first, then backup and selected maintenance. Monitoring is read-only by default. Backup credentials, destinations and restores are explicit. Any operation needing host privileges requires administrator approval and a narrow trusted capability; an app being listed in the catalog does not automatically make its code trusted. Keep Runner installation, repair and update recoverable independently of these apps.
+An optional system-app catalog for monitoring, backup and selected maintenance is later work. Do not build it before the core flow and legacy cleanup. Any future host-privileged maintenance needs explicit administrator authorization and a narrow trusted capability.
 
 ## Delivery milestones
 
-Milestone 1 acceptance remains open; M2 implementation is complete but integrated acceptance remains deferred; M3 is in progress; M4 is pending. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
+M1/M2 implementation is merged; their broader integration acceptance remains deferred. M3 now closes with the single-server demonstration below, followed directly by M4 retained-workload migration and legacy removal. Source inventory and isolated cleanup work can begin while that demonstration is assembled. Deliver cohesive working changes; use several PRs only where reviewability or a necessary dependency warrants it. Do not create another tree of speculative briefs or implement supporting abstractions without a current consumer.
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
@@ -105,31 +107,50 @@ Depends on milestone 1's execution and permission boundary.
 - PR #396 completed Action authorization for explicitly assigned organization apps. PR #397 completed the organization app use flow—assignment, My Apps listing, runtime launch, Action access and revocation—while keeping app use separate from source, secrets and machine administration.
 - Capacity safeguards in PR #401 reuse configured per-container CPU, memory and PID limits for builds, app/Compose containers, Action jobs and dependency preparation. Deployment dispatch and the Runner Action queue already bound concurrent deployments and jobs. Machine Management work also checks free space on the configured workspace and Runner storage filesystems against `MachineContainerResources:MinimumFreeDiskMb` (default 1024 MB) before deployment preparation, container creation, Action work and static publication; deployment refusal cleans staging and preserves the current runtime. This is admission only, not a hard ext4 quota. Aggregate reservations across concurrent API replicas and per-app/per-user disk accounting are outside scope; subscription quotas are also outside scope.
 - Compose builds and secure secret delivery remain deferred and are not implied by the supported Compose subset.
-- Source copies and marketplace forks copy portable source only. They exclude configured secret/private/runtime paths and filesystem links; environment values in build, runtime and Compose contracts are cleared from fork previews and copies because the contract has no secret/non-secret distinction. Failed deployment summaries expose the latest stored failure reason, including configured disk-reserve refusal.
+- PR #403 completed the source-copy/archive safeguards and deployment failure details. Source copies and marketplace forks copy portable source only. They exclude configured secret/private/runtime paths and filesystem links; environment values in build, runtime and Compose contracts are cleared from fork previews and copies because the contract has no secret/non-secret distinction. Failed deployment summaries expose the latest stored failure reason, including configured disk-reserve refusal.
 
 Implementation slices are complete, including organization app use (#396–#397), the supported Compose subset (#398), shared static publishing (#400), and basic capacity safeguards (#401). Focused copy/fork, authorization, deployment, and limit checks exist; the integrated small-team acceptance across two static sites, Compose, Actions, authorization and duplicate delivery has not been completed. Compose builds and secure secret delivery remain deferred.
 
 ### 3. Make installation and routine operation practical
 
-Depends on the stable machine/workload contract from milestones 1–2. Produce an installable release rather than a separate provisioning framework.
+Use the existing API, Studio, Worker and durable operation path. The immediate goal is one customer-owned Ubuntu server with one Machine Management Runner; a new control-plane installer or second-machine acceptance is not a prerequisite for this demonstration.
 
-- Make the existing Studio Machine Management installation straightforward on Ubuntu; document prerequisites, enrollment, and how to add a second independent machine. The generated command verifies Ubuntu and a working Docker Engine before pulling the Runner image. ext4 is the tested storage baseline, but any filesystem supported by the customer's working Docker installation is accepted. It stores workspace and app data in installation-scoped Docker volumes; it does not install Docker, move data, or configure the host filesystem.
-- Show machine health, storage usage, assigned workloads and recovery instructions. Runner online state, version and heartbeat are visible. Machine Management Runners report periodic total/free capacity for the installation's persistent workspace filesystem; this does not measure every Docker volume or enforce a quota. Assigned workloads remain visible through their deployment targets.
-- Document the manual backup set: control-plane database, configured API app storage, required keys/configuration, each machine's installation configuration, and its Docker volumes. Backup automation, scheduling, destinations and restore tooling are deferred. Before M4 workload migration, require a recoverable copy and a rehearsed rollback procedure; this does not require a backup product.
-- Runner self-update and rollback are deferred. Machine Management installations do not yet have a supported update procedure; do not present re-enrollment or legacy Infrastructure Runner commands as safe upgrades. Keep this limitation explicit until a reviewed update/rollback path exists.
+Implemented: PR #404 checks Ubuntu and Docker availability without requiring ext4 specifically. PR #405 adds periodic workspace-filesystem total/free capacity, measurement age/status and errors in Studio. Online state, version, heartbeat and assigned deployment targets are already available. These implementation slices do not establish live installation acceptance.
 
-Acceptance: install on a fresh Ubuntu fixture using the tested ext4 baseline, deploy an app and job, enroll and assign a second machine, and show health/storage/workloads. Document the manual backup set and rehearse restoring it to an isolated replacement before M4. Demonstrate revoked access, ownership reconciliation and recovered app data. Document supported versions/topology and operations that remain manual, including the lack of a supported Machine Management Runner update procedure.
+Remaining sequence:
+
+1. On an isolated Ubuntu/Docker host, run the existing Studio-generated installation command and confirm the management Runner enrolls and connects.
+2. Follow the actual CLI flow to create an app, assign its workspace/deployment target to that Runner, deploy it and open its routed URL. New workloads must not need a per-user Hosted Runner.
+3. Redeploy the app and verify its explicit persistent data survives. A failed replacement must preserve the prior healthy app. Fix only concrete installation, assignment, CLI, readiness, routing or persistence blockers encountered.
+4. Keep the working prerequisites and commands in the existing [self-hosted operations guide](../prod/self-hosted-runners.md) and relevant CLI documentation; record the tested revision and result in the implementation PR.
+
+This single-server flow is the immediate M3 completion target. It does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence. Preserve the existing authorization, isolation, resource limits and recovery behavior; validate the applicable cases before cutting over retained consumers that depend on them.
+
+Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
 
 ### 4. Migrate retained workloads and retire obsolete paths
 
-Depends on end-to-end acceptance of the replacement path. Inventory real retained apps, jobs, schedules, routes, files and data before cutover.
+This is the next major implementation objective after the core single-server flow. Begin the source/consumer inventory and isolated refactoring without waiting for optional M3 features or the entire broad acceptance fixture. Live cutover still requires the relevant replacement behavior and retained-data recovery to be demonstrated.
 
-- Provide an explicit mapping from legacy Hosted Runner/account storage to machine/workspace workloads. Preserve app identities, URLs/access policy, data and pending execution outcomes.
-- Rehearse migration and rollback on a disposable copy. Never replay an uncertain external effect to make a migration appear complete.
-- Remove per-user Hosted Runner provisioning, duplicate role-specific management paths and obsolete public managed-fleet/subscription compute logic once their remaining consumers are migrated or deliberately excluded. Preserve useful generic subscription/identity features where still used.
-- Handle schema compatibility through a reviewed forward-only migration strategy. Source history and already-applied database history are separate concerns.
+- Identify remaining consumers of per-user Hosted Runner provisioning, duplicate Infrastructure/Hosted role-specific execution and management, account/subscription compute allocation, mandatory XFS/project-quota storage, and provider-specific storage/provisioning assumptions. Include their API, Studio, CLI, Worker, registration and queue paths.
+- Identify which apps, Actions/jobs, schedules, routes, source files, persistent data and pending outcomes must be retained. Map them to the existing machine/workspace/app/target identities. Use disposable fixtures/copies for implementation and rehearsals; target-system inventory remains required before live cutover.
+- For actual retained consumers, rehearse migration and rollback with a recoverable copy. Preserve app identities, URLs/access policy, source, data and execution outcomes. Cover the authorization, isolation, cancellation, restart and duplicate-delivery cases relevant to those consumers; never automatically replay an uncertain Action.
+- Remove superseded paths once their consumers are migrated or deliberately excluded. If a path has no retained consumers, remove it directly instead of building a generic migration framework. Do not retain duplicate execution engines merely to avoid deleting obsolete code. Keep useful generic identity, organization, subscription and operation/journal behavior wherever it still has a consumer.
+- Handle schema compatibility through reviewed forward-only changes where needed. Source deletion does not undo applied SQL. Removing an XFS/Hetzner dependency from code does not authorize detaching a live volume or deleting data.
 
-Acceptance: retained-workload migration is demonstrated with data, routing and schedule checks; replacement installation works without the old role split or XFS requirement. The final source/registration/queue audit finds no active legacy execution consumer. Production migration/deployment requires a separate explicit request; this roadmap does not authorize it.
+Completion: a fresh machine installation and CLI deployment work through one management Runner, retained-consumer migration/recovery checks pass, and the final source/registration/queue audit finds no active legacy execution consumer. Code cleanup is part of the refactoring deliverable; adding the new path alongside the old paths is not completion. Production inventory, migration, deployment and storage removal require separate explicit authorization.
+
+### Deferred until after the core flow and legacy cleanup
+
+These are later improvements, not prerequisites for M3's single-server target or M4 source cleanup:
+
+- Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
+- Additional monitoring, per-category storage breakdowns, automated retention/cleanup and system-app catalog work.
+- Runner self-update/rollback and bootstrap/update helpers.
+- Backup automation, scheduling, destinations and restore tooling. Keep the documented manual backup set and retained-workload migration/rollback rehearsal.
+- Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.
+
+The broader M1/M2 acceptance remains recorded in the [M1 guide](../implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
 
 ## Verification and working rules
 
@@ -143,4 +164,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** M3 second-machine enrollment and practical operations guidance. Studio shows periodic workspace-filesystem capacity; this is filesystem capacity, not a quota or usage measurement for every Docker volume. Runner self-update/rollback and backup automation, scheduling, destinations and restore tooling are explicitly deferred, not blockers for the current refactoring. Machine Management installations do not yet have a supported update procedure; customers should not treat re-enrollment or legacy Infrastructure Runner commands as upgrades. Customers must continue to protect the documented data and configuration manually. M1/M2 combined acceptance is still deferred; revisit it before relying on the assembled flow for other users or replacing the active Runner. Production migration inventory and deployment approval remain separate release work.
+**Next action:** demonstrate one management Runner installed on an Ubuntu/Docker server, CLI app creation/assignment/deployment, a working URL, and redeployment with preserved data. Fix only blockers to that flow, then proceed directly to M4 consumer migration and legacy deletion. Optional operations and feature expansion stay deferred until after cleanup. Keep previously deferred acceptance and production migration/deployment authorization separate from isolated implementation work.
