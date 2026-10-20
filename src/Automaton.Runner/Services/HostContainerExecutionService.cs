@@ -16,6 +16,8 @@ public sealed partial class HostContainerExecutionService
     private readonly HostContainerBuildExecutor buildExecutor;
     private readonly HostContainerActionExecutor actionExecutor;
     private readonly HostContainerComposeProjectExecutor composeExecutor;
+    private readonly RunnerWorkspaceService workspace;
+    private readonly MachineWorkloadDiskAdmission diskAdmission;
 
     public HostContainerExecutionService(InfrastructureCommandService infrastructureCommandService)
         : this((arguments, timeout, cancellationToken) => infrastructureCommandService.ExecuteTypedDockerAsync(arguments, timeout, cancellationToken))
@@ -23,11 +25,14 @@ public sealed partial class HostContainerExecutionService
     }
 
     internal HostContainerExecutionService(
-        Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor)
+        Func<IReadOnlyList<string>, TimeSpan, CancellationToken, Task<InfrastructureCommandResponse>> executor,
+        MachineWorkloadDiskAdmission? diskAdmission = null)
     {
         this.executor = executor;
+        workspace = new RunnerWorkspaceService();
+        this.diskAdmission = diskAdmission ?? new MachineWorkloadDiskAdmission();
         buildExecutor = new HostContainerBuildExecutor(executor);
-        actionExecutor = new HostContainerActionExecutor(executor, new RunnerWorkspaceService());
+        actionExecutor = new HostContainerActionExecutor(executor, workspace);
         composeExecutor = new HostContainerComposeProjectExecutor(executor);
     }
 
@@ -35,17 +40,11 @@ public sealed partial class HostContainerExecutionService
         HostContainerExecutionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validationFailure = ValidateRequest(request);
+        var validationFailure = ValidateRequest(request)
+            ?? ValidateRequiredResources(request)
+            ?? ValidateRuntimeLimits(request)
+            ?? CheckMachineDiskAdmission(request);
         if (validationFailure is not null) return validationFailure;
-
-        if ((request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
-            or HostContainerOperationKinds.ApplyComposeProject
-            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction)
-            && !HasTrustedResources(request.Resources))
-            return Failure("trusted_mapping_unavailable", "The trusted application resource mapping is unavailable.");
-
-        var runtimeLimitsFailure = ValidateRuntimeLimits(request);
-        if (runtimeLimitsFailure is not null) return runtimeLimitsFailure;
 
         if (request.Operation == HostContainerOperationKinds.ResolveImage)
             return await ResolveImageAsync(request, cancellationToken);
@@ -79,6 +78,14 @@ public sealed partial class HostContainerExecutionService
             ?? ValidateOperation(request)
             ?? ValidateRequestedImage(request);
 
+    private static HostContainerExecutionResponse? ValidateRequiredResources(HostContainerExecutionRequest request)
+        => (request.Operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
+            or HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction)
+            && !HasTrustedResources(request.Resources)
+                ? Failure("trusted_mapping_unavailable", "The trusted application resource mapping is unavailable.")
+                : null;
+
     private static HostContainerExecutionResponse? ValidateRuntimeLimits(HostContainerExecutionRequest request)
     {
         if (request.Operation is not (HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
@@ -94,6 +101,25 @@ public sealed partial class HostContainerExecutionService
             && (request.Scope.MachineRunnerId == Guid.Empty || request.ContainerLimits is not null)
                 ? null
                 : Failure("trusted_policy_unavailable", "Valid server-derived CPU, memory, PID, and runtime limits are unavailable.");
+    }
+
+    private static bool RequiresDiskAdmission(string operation)
+        => operation is HostContainerOperationKinds.ResolveImage or HostContainerOperationKinds.RunBuild
+            or HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction;
+
+    private HostContainerExecutionResponse? CheckMachineDiskAdmission(HostContainerExecutionRequest request)
+    {
+        if (request.Scope.MachineRunnerId == Guid.Empty || !RequiresDiskAdmission(request.Operation)) return null;
+        try
+        {
+            diskAdmission.EnsureAvailable(workspace, request.MinimumFreeDiskMb ?? 0);
+            return null;
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Failure("machine_disk_reserve_unavailable", exception.Message);
+        }
     }
 
     private static void AddWritablePathArguments(

@@ -10,7 +10,8 @@ internal sealed class RunnerApplicationDeploymentExecutor(
     IAppRuntimeProcessManager runtimeProcessManager,
     AppActionDeploymentService actionDeploymentService,
     IRunnerApplicationBuildExecutor buildExecutor,
-    HostedRunnerDeploymentResultJournal resultJournal)
+    HostedRunnerDeploymentResultJournal resultJournal,
+    MachineWorkloadDiskAdmission diskAdmission)
 {
     private const long MaximumPackageBytes = 100L * 1024 * 1024;
     private readonly ILogger logger = Log.ForContext<RunnerApplicationDeploymentExecutor>();
@@ -55,6 +56,13 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         CancellationToken cancellationToken,
         Action ensureAttemptIsCurrent)
     {
+        if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+            == RunnerApplicationProfiles.MachineManagement)
+        {
+            diskAdmission.EnsureAvailable(workspace,
+                request.ActionContainerPolicy?.MinimumFreeDiskMb ?? 0);
+        }
+
         var manifest = PreparePackage(attempt, request);
         actionDeploymentService.EnsureMachineActionPreparationAvailable(
             Path.Combine(attempt.StagingRoot, "source"), request.ActionContainerPolicy);

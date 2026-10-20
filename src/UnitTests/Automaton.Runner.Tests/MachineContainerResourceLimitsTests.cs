@@ -36,6 +36,21 @@ public sealed class MachineContainerResourceLimitsTests
         });
     }
 
+    [Test]
+    public async Task BuildContainerIsRefusedBelowTheConfiguredFreeDiskReserve()
+    {
+        using var environment = MachineContainerTestEnvironment.Create();
+        var result = await MachineBuildContainerLowDiskScenario.ExecuteAsync(environment);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.ErrorCode, Is.EqualTo("machine_disk_reserve_unavailable"));
+            Assert.That(result.Error, Does.Contain("configured minimum is 1024 MB"));
+            Assert.That(result.CommandCount, Is.Zero);
+        });
+    }
+
     private static void AssertContainerLimits(IReadOnlyList<string> arguments)
     {
         var values = arguments.ToArray();
@@ -48,7 +63,8 @@ public sealed class MachineContainerResourceLimitsTests
     }
 }
 
-internal sealed record MachineContainerRunResult(bool Success, IReadOnlyList<string> Arguments);
+internal sealed record MachineContainerRunResult(bool Success, IReadOnlyList<string> Arguments,
+    int CommandCount = 0, string ErrorCode = "", string Error = "");
 
 internal static class MachineBuildContainerLimitScenario
 {
@@ -69,10 +85,38 @@ internal static class MachineBuildContainerLimitScenario
             ContainerLimits = new(1.0m, 1024, 256),
             SharedMemoryMb = 64,
             DockerLogMaxSizeMb = 20,
-            DockerLogMaxFiles = 5
+            DockerLogMaxFiles = 5,
+            MinimumFreeDiskMb = 1024
         };
         var result = await service.ExecuteAsync(request);
         return new(result.Success, docker.FindCommand("run"));
+    }
+}
+
+internal static class MachineBuildContainerLowDiskScenario
+{
+    public static async Task<MachineContainerRunResult> ExecuteAsync(MachineContainerTestEnvironment environment)
+    {
+        var docker = new MachineContainerDockerExecutor(environment.InstallationId);
+        var service = new HostContainerExecutionService(
+            docker.ExecuteAsync, new MachineWorkloadDiskAdmission(_ => 0));
+        var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+        {
+            OperationId = Guid.NewGuid(),
+            Scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), environment.RunnerId),
+            Operation = HostContainerOperationKinds.RunBuild,
+            RequestedImage = "example/build:1",
+            TimeoutSeconds = 30,
+            Command = new() { Executable = "npm", Arguments = ["run", "build"] },
+            Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact,
+                HostContainerResourceKinds.ApplicationData),
+            ContainerLimits = new(1.0m, 1024, 256),
+            SharedMemoryMb = 64,
+            DockerLogMaxSizeMb = 20,
+            DockerLogMaxFiles = 5,
+            MinimumFreeDiskMb = 1024
+        });
+        return new(result.Success, [], docker.Commands.Count, result.ErrorCode, result.Error);
     }
 }
 
@@ -97,7 +141,8 @@ internal static class MachineAppContainerLimitScenario
             ContainerLimits = new(1.0m, 1024, 256),
             SharedMemoryMb = 64,
             DockerLogMaxSizeMb = 20,
-            DockerLogMaxFiles = 5
+            DockerLogMaxFiles = 5,
+            MinimumFreeDiskMb = 1024
         };
         var result = await service.ExecuteAsync(request);
         return new(result.Success, docker.FindCommand("create"));
@@ -149,6 +194,7 @@ internal sealed class MachineContainerTestEnvironment : IDisposable
 internal sealed class MachineContainerDockerExecutor(string installationId)
 {
     private readonly List<IReadOnlyList<string>> commands = [];
+    public IReadOnlyList<IReadOnlyList<string>> Commands => commands;
     private readonly string volumeLabels = $$"""{"automaton.managed":"true","automaton.resource":"machine-workspace-volume","automaton.installation-id":"{{installationId}}","automaton.storage-scope":"workspace"}""";
 
     public Task<InfrastructureCommandResponse> ExecuteAsync(

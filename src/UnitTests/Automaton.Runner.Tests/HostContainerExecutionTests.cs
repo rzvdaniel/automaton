@@ -77,38 +77,29 @@ public sealed class HostContainerExecutionTests
 
     [Test]
     public async Task MachineManagementRunsTypedOperationOnlyForItsStableIdentity()
+        => await MachineManagementIdentityScenario.ExecuteAsync();
+
+    private static class MachineManagementIdentityScenario
     {
-        var commands = new List<IReadOnlyList<string>>();
-        var service = new HostContainerExecutionService((arguments, _, _) =>
+        public static async Task ExecuteAsync()
         {
-            commands.Add(arguments);
-            return Task.FromResult(new InfrastructureCommandResponse
+            var commands = new List<IReadOnlyList<string>>();
+            var service = new HostContainerExecutionService((arguments, _, _) =>
             {
-                Success = true,
-                Output = arguments.Contains("pull") ? "pulled" : "python:3.13-slim@sha256:abc"
+                commands.Add(arguments);
+                return Task.FromResult(new InfrastructureCommandResponse
+                {
+                    Success = true,
+                    Output = arguments.Contains("pull") ? "pulled" : "python:3.13-slim@sha256:abc"
+                });
             });
-        });
-        var runnerId = Guid.NewGuid();
-        var previous = new Dictionary<string, string?>
-        {
-            ["AUTOMATON_RUNNER_PURPOSE"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"),
-            ["AUTOMATON_RUNNER_APPLICATION_PROFILE"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"),
-            ["AUTOMATON_RUNNER_CAPABILITIES"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES"),
-            ["AUTOMATON_RUNNER_ID"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID"),
-            ["AUTOMATON_RUNNER_INSTALLATION_ID"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID")
-        };
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", RunnerApplicationProfiles.MachineManagement);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.ManagedContainerExecution);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", runnerId.ToString());
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID", "sh_" + Guid.NewGuid().ToString("N"));
+            using var machine = MachineContainerTestEnvironment.Create();
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
             {
-                Scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: runnerId),
+                Scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: machine.RunnerId),
                 Operation = HostContainerOperationKinds.ResolveImage,
-                RequestedImage = "python:3.13-slim"
+                RequestedImage = "python:3.13-slim",
+                MinimumFreeDiskMb = 1024
             });
 
             Assert.That(result.Success, Is.True);
@@ -118,14 +109,11 @@ public sealed class HostContainerExecutionTests
             {
                 Scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: Guid.NewGuid()),
                 Operation = HostContainerOperationKinds.ResolveImage,
-                RequestedImage = "python:3.13-slim"
+                RequestedImage = "python:3.13-slim",
+                MinimumFreeDiskMb = 1024
             });
             Assert.That(mismatch.ErrorCode, Is.EqualTo("scope"));
             Assert.That(commands, Has.Count.EqualTo(2));
-        }
-        finally
-        {
-            foreach (var pair in previous) Environment.SetEnvironmentVariable(pair.Key, pair.Value);
         }
     }
 

@@ -1,9 +1,11 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 namespace Automaton.Api.Services;
@@ -11,9 +13,11 @@ namespace Automaton.Api.Services;
 /// <summary>Coordinates static output publication with its assigned Machine Management Runner.</summary>
 public sealed class MachineStaticAppPublicationService(
     ApplicationDbContext dataContext,
-    IRunnerFileTransferGateway transfers)
+    IRunnerFileTransferGateway transfers,
+    IOptions<MachineContainerResourceOptions>? machineResources = null)
 {
     private static readonly Serilog.ILogger Logger = Log.ForContext<MachineStaticAppPublicationService>();
+    private readonly MachineContainerResourceOptions resourceOptions = machineResources?.Value ?? new();
 
     public async Task<bool> PublishIfAssignedAsync(
         WebApp app,
@@ -35,7 +39,8 @@ public sealed class MachineStaticAppPublicationService(
             operationId.ToString("N"),
             RelativePath: contract.Build.OutputDirectory!,
             DeploymentTargetId: target.Id,
-            DeploymentOperationId: operationId);
+            DeploymentOperationId: operationId,
+            MinimumFreeDiskMb: resourceOptions.MinimumFreeDiskMb);
         var (_, result) = await transfers.ExecuteAsync(
             operationId, target.RunnerId, ownerId, command, input: null, cancellationToken, TimeSpan.FromMinutes(15));
         if (result.FileTransferResult is not { Success: true })

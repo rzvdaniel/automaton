@@ -33,11 +33,12 @@ public sealed class HostContainerRelayService(
         var state = resolution.State!;
         if (state.MachineRunner is not null)
         {
-            if (HostContainerRelayRequestPreparer.RequiresContainerLimits(request.Operation)
+            if ((HostContainerRelayRequestPreparer.RequiresContainerLimits(request.Operation)
+                    || HostContainerRelayRequestPreparer.RequiresDiskAdmission(request.Operation))
                 && !machineContainerResources.Value.IsValid())
                 return Completed(request.OperationId, Failure(
                     "machine_resource_policy_unavailable",
-                    "Machine container execution is paused because valid CPU, memory, and PID limits are not configured."));
+                    "Machine container execution is paused because valid CPU, memory, PID, and minimum free-disk settings are not configured."));
 
             var managedRequest = HostContainerRelayRequestPreparer.PrepareForMachine(
                 request, state, machineContainerResources.Value);
@@ -148,6 +149,7 @@ internal static class HostContainerRelayRequestPreparer
             SharedMemoryMb = requiresContainerLimits ? resourceOptions.SharedMemoryMb : null,
             DockerLogMaxSizeMb = requiresContainerLimits ? resourceOptions.DockerLogMaxSizeMb : null,
             DockerLogMaxFiles = requiresContainerLimits ? resourceOptions.DockerLogMaxFiles : null,
+            MinimumFreeDiskMb = RequiresDiskAdmission(request.Operation) ? resourceOptions.MinimumFreeDiskMb : null,
             HostPort = 0,
             Environment = request.Environment.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
@@ -157,4 +159,9 @@ internal static class HostContainerRelayRequestPreparer
     public static bool RequiresContainerLimits(string operation)
         => operation is HostContainerOperationKinds.RunBuild or HostContainerOperationKinds.CreateApplicationContainer
             or HostContainerOperationKinds.ApplyComposeProject;
+
+    public static bool RequiresDiskAdmission(string operation)
+        => operation is HostContainerOperationKinds.ResolveImage or HostContainerOperationKinds.RunBuild
+            or HostContainerOperationKinds.CreateApplicationContainer or HostContainerOperationKinds.ApplyComposeProject
+            or HostContainerOperationKinds.PrepareActionDependencies or HostContainerOperationKinds.ExecuteAction;
 }

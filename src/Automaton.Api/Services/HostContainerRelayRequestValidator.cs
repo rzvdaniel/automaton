@@ -24,6 +24,11 @@ internal static class HostContainerRelayRequestValidator
                 || request.DockerLogMaxFiles is not (>= 1 and <= 20)))
             return Failure("resource_policy_unavailable", "The queued container operation has no valid server-derived resource bounds.");
 
+        if (serverPrepared && request.Scope.MachineRunnerId != Guid.Empty
+            && HostContainerRelayRequestPreparer.RequiresDiskAdmission(request.Operation)
+            && request.MinimumFreeDiskMb is not (>= 256 and <= 1_048_576))
+            return Failure("resource_policy_unavailable", "The queued machine operation has no valid server-derived free-disk reserve.");
+
         if (HostContainerRuntimeValidation.IsRuntimeOperation(request.Operation))
         {
             return ValidateRuntimeRequest(request, serverPrepared);
@@ -61,7 +66,7 @@ internal static class HostContainerRelayRequestValidator
         HostContainerExecutionRequest request,
         bool serverPrepared)
     {
-        if ((!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null))
+        if ((!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null || request.MinimumFreeDiskMb is not null))
             || request.ContainerId is not null || request.Command is not null
             || request.CandidateId != Guid.Empty || request.Storage is not null
             || request.HostPort != 0 || request.ContainerPort != 0 || request.Environment is null || request.Environment.Count != 0)
@@ -113,7 +118,7 @@ internal static class HostContainerRelayRequestValidator
         bool serverPrepared)
     {
         if (request.Command is null
-            || (!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null))
+            || (!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null || request.MinimumFreeDiskMb is not null))
             || request.CandidateId != Guid.Empty || request.Storage is not null
             || request.HostPort != 0 || request.ContainerPort != 0)
         {
@@ -141,6 +146,8 @@ internal static class HostContainerRelayRequestValidator
     {
         if (!serverPrepared && request.ContainerLimits is not null)
             return Failure("invalid_request", "Container resource limits are derived by the server.");
+        if (!serverPrepared && request.MinimumFreeDiskMb is not null)
+            return Failure("invalid_request", "The minimum free-disk reserve is derived by the server.");
         if (!serverPrepared && request.Resources is not null)
         {
             return Failure("invalid_request", "Container resources are derived by the server.");

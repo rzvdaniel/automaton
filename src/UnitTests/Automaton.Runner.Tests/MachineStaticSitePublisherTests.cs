@@ -86,6 +86,40 @@ public sealed class MachineStaticSitePublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_RefusesLowDiskReplacementWithoutReplacingCurrentVersion()
+    {
+        var availableBytes = 2L * 1024 * 1024 * 1024;
+        var appId = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var firstOperation = Guid.NewGuid();
+        var replacementOperation = Guid.NewGuid();
+        var publisher = new MachineStaticSitePublisher(
+            new RunnerWorkspaceService(),
+            new MachineStaticServingOptions(),
+            (_, _) => Task.FromResult<MachineStaticServerEndpoint?>(new("127.0.0.1", 32123)),
+            (_, _) => Task.FromResult(true),
+            new MachineWorkloadDiskAdmission(_ => availableBytes));
+        WriteOutput(appId, target, "dist", "healthy publication");
+        Assert.That(await publisher.PublishAsync(firstOperation, appId, target, "dist", CancellationToken.None), Is.Not.Null);
+        WriteOutput(appId, target, "dist", "replacement publication");
+        availableBytes = 0;
+
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(() => publisher.PublishAsync(
+            replacementOperation, appId, target, "dist", CancellationToken.None));
+
+        var indexPath = Path.Combine(new RunnerWorkspaceService().GetPublishedStaticMetadataRoot(), "sites.json");
+        var index = JsonSerializer.Deserialize<Dictionary<Guid, Guid>>(await File.ReadAllTextAsync(indexPath));
+        var healthyFile = Path.Combine(new RunnerWorkspaceService().GetPublishedStaticSiteVersionsRoot(appId),
+            firstOperation.ToString("D"), "index.html");
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure!.Message, Does.Contain("configured minimum is 1024 MB"));
+            Assert.That(index![appId], Is.EqualTo(firstOperation));
+            Assert.That(File.ReadAllText(healthyFile), Is.EqualTo("healthy publication"));
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_ProvidesCurrentVersionPrefixForTheTunnelRequest()
     {
         var appId = Guid.NewGuid();
@@ -106,6 +140,51 @@ public sealed class MachineStaticSitePublisherTests
             Assert.That(published?.PathPrefix, Is.EqualTo($"/{appId:D}/{operationId:D}/"));
             Assert.That(current?.PathPrefix, Is.EqualTo($"/{appId:D}/{operationId:D}/"));
         });
+    }
+
+    [Test]
+    public void PublishAsync_RefusesNewPublicationBelowConfiguredFreeDiskReserve()
+    {
+        var appId = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        WriteOutput(appId, target, "dist", "site content");
+        var containerStarted = false;
+        var publisher = new MachineStaticSitePublisher(
+            new RunnerWorkspaceService(),
+            new MachineStaticServingOptions(),
+            (_, _) =>
+            {
+                containerStarted = true;
+                return Task.FromResult<MachineStaticServerEndpoint?>(new("127.0.0.1", 32123));
+            },
+            (_, _) => Task.FromResult(true),
+            new MachineWorkloadDiskAdmission(_ => 0));
+
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(() => publisher.PublishAsync(
+            Guid.NewGuid(), appId, target, "dist", CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure!.Message, Does.Contain("configured minimum is 1024 MB"));
+            Assert.That(containerStarted, Is.False);
+            Assert.That(Directory.Exists(new RunnerWorkspaceService().GetPublishedStaticSitesRoot()), Is.False);
+        });
+    }
+
+    [Test]
+    public void DiskAdmissionMeasuresWorkspaceAndRunnerFilesystems()
+    {
+        var paths = new List<string>();
+        var admission = new MachineWorkloadDiskAdmission(path =>
+        {
+            paths.Add(path);
+            return 2L * 1024 * 1024 * 1024;
+        });
+
+        admission.EnsureAvailable(new RunnerWorkspaceService(), 1024);
+
+        Assert.That(paths, Does.Contain(workspaceRoot));
+        Assert.That(paths, Does.Contain(Path.GetPathRoot(AppContext.BaseDirectory)));
     }
 
     [Test]

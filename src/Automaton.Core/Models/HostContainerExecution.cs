@@ -59,10 +59,13 @@ public sealed record ActionContainerPolicy(
     int DockerLogMaxFiles,
     string RuntimeImage)
 {
+    public int MinimumFreeDiskMb { get; init; } = 1024;
+
     public bool IsValid() => Limits.IsValid()
         && SharedMemoryMb is >= 16 and <= 1024
         && DockerLogMaxSizeMb is >= 1 and <= 1024
         && DockerLogMaxFiles is >= 1 and <= 20
+        && MinimumFreeDiskMb is >= 256 and <= 1_048_576
         && !string.IsNullOrWhiteSpace(RuntimeImage)
         && !RuntimeImage.Any(char.IsWhiteSpace)
         && !RuntimeImage.Contains('\0');
@@ -92,6 +95,7 @@ public sealed record HostContainerExecutionRequest
     public int? SharedMemoryMb { get; init; }
     public int? DockerLogMaxSizeMb { get; init; }
     public int? DockerLogMaxFiles { get; init; }
+    public int? MinimumFreeDiskMb { get; init; }
     public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
 }
 

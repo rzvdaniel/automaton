@@ -87,6 +87,7 @@ internal sealed class MachineActionContainerFixture : IAsyncDisposable
             SharedMemoryMb = 64,
             DockerLogMaxSizeMb = 20,
             DockerLogMaxFiles = 4,
+            MinimumFreeDiskMb = 1024,
             Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact,
                 HostContainerResourceKinds.ApplicationData),
             TimeoutSeconds = 60

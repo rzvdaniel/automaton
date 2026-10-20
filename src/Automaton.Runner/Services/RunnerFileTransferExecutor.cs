@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
@@ -102,10 +103,18 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
         Guid id, RunnerFileTransferCommand command, RunnerExecutionApiClient api, CancellationToken token)
     {
         var packagePath = Path.Combine(Path.GetTempPath(), $"automaton-deploy-{id:N}.zip");
+        using var scope = scopes.CreateScope();
         try
         {
+            if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
+                == RunnerApplicationProfiles.MachineManagement)
+            {
+                var workspace = scope.ServiceProvider.GetRequiredService<RunnerWorkspaceService>();
+                new MachineWorkloadDiskAdmission().EnsureAvailable(workspace,
+                    command.ActionContainerPolicy?.MinimumFreeDiskMb ?? 0);
+            }
+
             await DownloadInputAsync(id, command, api, packagePath, token);
-            using var scope = scopes.CreateScope();
             var deployment = await scope.ServiceProvider.GetRequiredService<RunnerDeploymentService>().DeployPackage(
                 new DeployAppPackageRequest
                 {
@@ -135,7 +144,8 @@ internal sealed class RunnerFileTransferExecutor(IServiceScopeFactory scopes)
         var outputDirectory = Required(command.RelativePath, "Declared static output directory");
         using var scope = scopes.CreateScope();
         var publisher = scope.ServiceProvider.GetRequiredService<MachineStaticSitePublisher>();
-        var endpoint = await publisher.PublishAsync(operationId, appId, targetId, outputDirectory, token);
+        var endpoint = await publisher.PublishAsync(operationId, appId, targetId, outputDirectory, token,
+            command.MinimumFreeDiskMb ?? 0);
         return endpoint is null
             ? new() { Success = false, Error = "The Machine Management Runner could not start its bounded static-serving container." }
             : new() { Success = true, SessionId = command.SessionId };
