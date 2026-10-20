@@ -17,8 +17,18 @@ public class RunnerDeploymentService
         RunnerWorkspaceService runnerWorkspaceService,
         IAppRuntimeProcessManager runtimeProcessManager,
         AppActionDeploymentService actionDeploymentService,
-        IRunnerApplicationBuildExecutor? buildExecutor = null,
-        MachineWorkloadDiskAdmission? diskAdmission = null)
+        IRunnerApplicationBuildExecutor? buildExecutor = null)
+        : this(runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, buildExecutor,
+            new MachineWorkloadDiskAdmission())
+    {
+    }
+
+    internal RunnerDeploymentService(
+        RunnerWorkspaceService runnerWorkspaceService,
+        IAppRuntimeProcessManager runtimeProcessManager,
+        AppActionDeploymentService actionDeploymentService,
+        IRunnerApplicationBuildExecutor? buildExecutor,
+        MachineWorkloadDiskAdmission diskAdmission)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         resultJournal = new HostedRunnerDeploymentResultJournal(runnerWorkspaceService);
@@ -26,7 +36,7 @@ public class RunnerDeploymentService
         var resolvedBuildExecutor = buildExecutor ?? new RunnerApplicationBuildExecutor(new DockerContainerRuntime());
         deploymentExecutor = new RunnerApplicationDeploymentExecutor(
             runnerWorkspaceService, runtimeProcessManager, actionDeploymentService, resolvedBuildExecutor, resultJournal,
-            diskAdmission ?? new MachineWorkloadDiskAdmission());
+            diskAdmission);
     }
 
     public async Task<DeployAppPackageResult> DeployPackage(DeployAppPackageRequest request)

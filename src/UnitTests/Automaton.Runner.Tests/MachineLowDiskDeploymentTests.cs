@@ -75,6 +75,7 @@ internal sealed class MachineLowDiskDeploymentFixture : IDisposable
         runtimeManager = new RecordingRuntimeManager();
         deployments = new RunnerDeploymentService(workspace, runtimeManager,
             new AppActionDeploymentService(workspace),
+            buildExecutor: null,
             diskAdmission: new MachineWorkloadDiskAdmission(_ => availableBytes));
     }
 
