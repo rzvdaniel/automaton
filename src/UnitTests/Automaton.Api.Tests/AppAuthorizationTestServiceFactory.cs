@@ -84,7 +84,6 @@ internal static class AppAuthorizationTestServiceFactory
         var runnerAuthorization = new AppRunnerAuthorizationPolicy(db, authorization);
         return new AppRunnerAssignmentPolicy(
             db,
-            new HostedRunnerAppCapacityService(db),
             runnerAuthorization,
             new AppDeploymentTargetResolver(db, authorization, runnerAuthorization));
     }

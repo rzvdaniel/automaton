@@ -646,7 +646,6 @@ internal static class ApiRunnerRegistration
         services.AddScoped<BackendRouteConfigService>();
         services.AddScoped<ManagedRunnerBootstrapService>();
         services.AddScoped<ManagedRunnerAppAssignmentService>();
-        services.AddScoped<HostedRunnerAppCapacityService>();
         return services;
     }
 }
