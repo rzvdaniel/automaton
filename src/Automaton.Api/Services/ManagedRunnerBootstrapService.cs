@@ -4,8 +4,6 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
-using Automaton.Messaging.Abstractions;
-using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -13,21 +11,15 @@ namespace Automaton.Api.Services;
 public sealed class ManagedRunnerBootstrapService
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly HostedRunnerProvisioningService hostedRunnerProvisioningService;
-    private readonly IEventPublisher eventPublisher;
     private readonly IApplicationEventService applicationEventService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
 
     public ManagedRunnerBootstrapService(
         ApplicationDbContext dbContext,
-        HostedRunnerProvisioningService hostedRunnerProvisioningService,
-        IEventPublisher eventPublisher,
         IApplicationEventService applicationEventService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy)
     {
         this.dbContext = dbContext;
-        this.hostedRunnerProvisioningService = hostedRunnerProvisioningService;
-        this.eventPublisher = eventPublisher;
         this.applicationEventService = applicationEventService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
     }
@@ -43,7 +35,8 @@ public sealed class ManagedRunnerBootstrapService
         }
         catch (AppDeploymentTargetUnassignedException)
         {
-            // Provisioning below creates and assigns the user's managed Runner.
+            return ManagedRunnerBootstrapResult.Unavailable(
+                "Assign a Management Runner to this app before deploying.");
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -54,7 +47,6 @@ public sealed class ManagedRunnerBootstrapService
             return ManagedRunnerBootstrapResult.Unavailable(ex.Message);
         }
 
-        return await BootstrapMissingAssignmentAsync(appId, ownerId, cancellationToken);
     }
 
     private async Task<ManagedRunnerBootstrapResult> GetAssignedRunnerResultAsync(
@@ -88,132 +80,6 @@ public sealed class ManagedRunnerBootstrapService
         return GetRunnerPresenceResult(assignedRunner);
     }
 
-    private async Task<ManagedRunnerBootstrapResult> BootstrapMissingAssignmentAsync(
-        Guid appId,
-        Guid ownerId,
-        CancellationToken cancellationToken)
-    {
-        var user = await dbContext.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == ownerId, cancellationToken)
-            ?? throw new InvalidOperationException("App owner not found.");
-
-        var hostedRunner = await dbContext.HostedRunners
-            .Include(x => x.Runner)
-            .FirstOrDefaultAsync(x =>
-                x.UserId == ownerId &&
-                x.DeletedAt == null &&
-                x.Status != HostedRunnerStatuses.Disabled,
-                cancellationToken);
-
-        var assignedRunner = await TryAssignOnlineHostedRunnerAsync(appId, ownerId, hostedRunner, cancellationToken);
-        if (assignedRunner != null)
-            return assignedRunner;
-
-        var existingState = await GetExistingHostedRunnerStateAsync(appId, hostedRunner, cancellationToken);
-        if (existingState != null)
-            return existingState;
-
-        return await ProvisionManagedRunnerAsync(appId, ownerId, cancellationToken);
-    }
-
-    private async Task<ManagedRunnerBootstrapResult?> TryAssignOnlineHostedRunnerAsync(
-        Guid appId,
-        Guid ownerId,
-        HostedRunner? hostedRunner,
-        CancellationToken cancellationToken)
-    {
-        if (hostedRunner?.RunnerId is not Guid runnerId
-            || hostedRunner.Runner is not { } runner
-            || !RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose)
-            || !SupportsContainerApplicationExecution(runner)
-            || !RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-            return null;
-
-        var app = await dbContext.WebApps.Include(item => item.DeploymentTargets)
-            .SingleAsync(item => item.Id == appId, cancellationToken);
-        await runnerAssignmentPolicy.AssignAsync(app, runnerId, ownerId, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return ManagedRunnerBootstrapResult.Ready(runnerId);
-    }
-
-    private async Task<ManagedRunnerBootstrapResult?> GetExistingHostedRunnerStateAsync(
-        Guid appId,
-        HostedRunner? hostedRunner,
-        CancellationToken cancellationToken)
-    {
-        if (IsRunningHostedRunnerIncompatible(hostedRunner))
-        {
-            const string message = "No compatible application Runner is currently available. The assigned Hosted Runner requires an upgrade for the current Generic Runtime deployment protocol.";
-            return ManagedRunnerBootstrapResult.Unavailable(message);
-        }
-
-        if (hostedRunner?.Status == HostedRunnerStatuses.Failed)
-        {
-            var result = CreateHostedRunnerFailureResult(hostedRunner, "Managed runner could not be provisioned.");
-            await WriteManagedRuntimeEventAsync(appId, ApplicationEventTypes.ManagedRuntimeProvisionFailed, result.Message, cancellationToken);
-            return result;
-        }
-
-        if (hostedRunner?.Status is HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Pending)
-            return await GetInProgressResultAsync(appId, hostedRunner, cancellationToken);
-
-        return null;
-    }
-
-    private async Task<ManagedRunnerBootstrapResult> ProvisionManagedRunnerAsync(
-        Guid appId,
-        Guid ownerId,
-        CancellationToken cancellationToken)
-    {
-
-        HostedRunnerPreparationResult preparation;
-        try
-        {
-            preparation = await hostedRunnerProvisioningService.PrepareProvisioningAsync(ownerId, Guid.Empty, cancellationToken);
-        }
-        catch (InvalidOperationException ex)
-        {
-            var result = ManagedRunnerBootstrapResult.ProvisionFailed(ex.Message);
-            await WriteManagedRuntimeEventAsync(appId, ApplicationEventTypes.ManagedRuntimeProvisionFailed, result.Message, cancellationToken);
-            return result;
-        }
-        if (!preparation.ShouldPublishProvisionRequest)
-        {
-            if (preparation.HostedRunner.Status == HostedRunnerStatuses.Failed)
-            {
-                var result = ManagedRunnerBootstrapResult.ProvisionFailed(
-                    string.IsNullOrWhiteSpace(preparation.HostedRunner.LastError)
-                        ? "Managed runner could not be provisioned."
-                        : $"Managed runner could not be provisioned. {preparation.HostedRunner.LastError}");
-                await WriteManagedRuntimeEventAsync(appId, ApplicationEventTypes.ManagedRuntimeProvisionFailed, result.Message, cancellationToken);
-                return result;
-            }
-
-            return await GetInProgressResultAsync(appId, preparation.HostedRunner, cancellationToken);
-        }
-
-        await eventPublisher.PublishAsync(
-            new ManagedRunnerProvisionRequestedEvent
-            {
-                OperationId = preparation.OperationId,
-                HostedRunnerId = preparation.HostedRunner.Id,
-                UserId = ownerId,
-                RunnerHostId = preparation.HostedRunner.RunnerHostId ?? Guid.Empty,
-                SecretGrantIds = preparation.SecretGrantIds
-            },
-            cancellationToken);
-
-        await WriteManagedRuntimeEventAsync(
-            appId,
-            ApplicationEventTypes.ManagedRuntimePreparing,
-            "Managed runtime is being prepared.",
-            cancellationToken);
-
-        return ManagedRunnerBootstrapResult.Preparing(
-            "Managed runtime is being prepared. Try deploying again in a moment.");
-    }
-
     private ManagedRunnerBootstrapResult GetRunnerPresenceResult(Runner runner)
         => RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow)
             ? ManagedRunnerBootstrapResult.Ready(runner.Id)
@@ -222,12 +88,6 @@ public sealed class ManagedRunnerBootstrapService
     private static ManagedRunnerBootstrapResult CreateHostedRunnerFailureResult(HostedRunner runner, string prefix)
         => ManagedRunnerBootstrapResult.ProvisionFailed(
             string.IsNullOrWhiteSpace(runner.LastError) ? prefix : $"{prefix} {runner.LastError}");
-
-    private static bool IsRunningHostedRunnerIncompatible(HostedRunner? hostedRunner)
-        => hostedRunner?.Status == HostedRunnerStatuses.Running
-           && hostedRunner.Runner is { } runner
-           && RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose)
-           && !SupportsContainerApplicationExecution(runner);
 
     private static bool SupportsContainerApplicationExecution(Runner runner)
         => int.TryParse(runner.ApiCompatibilityVersion, out var version)
@@ -261,8 +121,7 @@ public sealed class ManagedRunnerBootstrapService
         string eventType,
         string message,
         CancellationToken cancellationToken)
-    {
-        return applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+        => applicationEventService.WriteAsync(new ApplicationEventWriteRequest
         {
             AppId = appId,
             Level = ApplicationEventLevels.Info,
@@ -270,7 +129,6 @@ public sealed class ManagedRunnerBootstrapService
             EventType = eventType,
             Message = message
         }, cancellationToken);
-    }
 }
 
 public sealed class ManagedRunnerBootstrapResult

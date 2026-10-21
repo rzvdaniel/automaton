@@ -126,11 +126,15 @@ Remaining sequence:
 
 This single-server flow is the immediate M3 completion target. It does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence. Preserve the new path's authorization, isolation, resource limits, durable operation behavior and app-update recovery; legacy compatibility is not a reason to retain old execution branches.
 
+M3 live demonstration remains unverified. From `automaton-runner-01`, `api.automaton.test` did not resolve and a direct connection to the local development API on port 8443 timed out. The missing prerequisite is a routable development API endpoint, with the matching API/Studio/Worker revision and RabbitMQ reachable from the workload host. No Runner installation or service/database changes were made; second-machine acceptance remains deferred.
+
 Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
 
 ### 4. Remove superseded execution and hosting paths
 
 This is the next major implementation objective after the fresh single-server flow. Begin the source/consumer inventory and isolated refactoring without waiting for optional M3 features or the entire broad acceptance fixture. No automatic workload migration, old/new dual execution, legacy-ID/URL preservation or generic compatibility framework is required.
+
+This PR's first cleanup slice removes the unassigned-app fallback from `ManagedRunnerBootstrapService`: it no longer discovers an unassigned user's Hosted Runner for automatic assignment or invokes `HostedRunnerProvisioningService` / `ManagedRunnerProvisionRequestedEvent`. Existing explicitly assigned Hosted Runner status handling remains. App creation stays independent of machine assignment, and readiness now asks for an explicit Management Runner. Hosted Runner provisioning still has separate active admin and Worker consumers; those are not removed by this slice.
 
 - Find callers and dependencies of per-user Hosted Runner provisioning, duplicate Infrastructure/Hosted role-specific execution and management, account/subscription compute allocation, mandatory XFS/project-quota storage, and provider-specific storage/provisioning assumptions. Include API, Studio, CLI, Worker, registration and queue paths.
 - Move the new path's actual callers to the existing machine/workspace/app/target model and remove the obsolete branches, endpoints, UI, handlers and configuration. Remove their obsolete tests and documentation; keep focused coverage of the replacement flow. Do not preserve an old execution engine solely for legacy installations.

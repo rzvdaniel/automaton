@@ -25,4 +25,4 @@ public interface IAppDeploymentTargetResolver
 
 public sealed class AppDeploymentTargetUnassignedException(string targetSlug)
     : InvalidOperationException(
-        $"Deployment target '{targetSlug}' has no assigned Runner.");
+        $"Deployment target '{targetSlug}' has no assigned Runner. Assign a Management Runner to use this target.");

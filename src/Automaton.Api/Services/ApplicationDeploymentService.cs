@@ -83,7 +83,7 @@ public sealed class ApplicationDeploymentService
                 targetSlug: target.Slug,
                 cancellationToken: cancellationToken);
             if (runner is null)
-                throw new InvalidOperationException("No Runner is assigned to this app.");
+                throw new InvalidOperationException("Assign a Management Runner to this app before deploying.");
 
             var result = await packageRunnerService.DeployAsync(
                 appId,
