@@ -159,6 +159,7 @@ public class AppDeploymentTargetResolverTests
                 .ResolveAsync(app.Id, null, userId));
 
         Assert.That(exception!.Message, Does.Contain("no assigned Runner"));
+        Assert.That(exception.Message, Does.Contain("Assign a Management Runner"));
     }
 
     [Test]
