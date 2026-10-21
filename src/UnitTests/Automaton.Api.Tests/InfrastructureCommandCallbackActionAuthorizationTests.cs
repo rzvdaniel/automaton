@@ -23,8 +23,6 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
     }
 
     [TestCase(HostedRunnerDeploymentActions.Restart, "restart-hosted-runner")]
-    [TestCase(HostedRunnerDeploymentActions.Provision, "provision-hosted-runner")]
-    [TestCase(HostedRunnerDeploymentActions.Reprovision, "reprovision-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Suspend, "suspend-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Resume, "resume-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Deprovision, "delete-hosted-runner")]
@@ -33,6 +31,11 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
         => Assert.That(
             InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction),
             Is.EqualTo(actionKey));
+
+    [TestCase(HostedRunnerDeploymentActions.Provision)]
+    [TestCase(HostedRunnerDeploymentActions.Reprovision)]
+    public void RetiredProvisioningActionsNoLongerHaveTrustedCallbacks(string deploymentAction)
+        => Assert.That(InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction), Is.Null);
 
     [Test]
     public async Task MismatchedActionIsRejectedForBothSecretsAndResultsWithoutMutation()

@@ -15,7 +15,6 @@ public record SubscriptionPlanResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }
-
 public record CreateSubscriptionPlanRequest
 {
     public string Name { get; init; } = string.Empty;
@@ -49,15 +48,9 @@ public record UserPlanResponse
     public string Name { get; init; } = string.Empty;
     public Guid? SubscriptionPlanId { get; init; }
     public string? PlanName { get; init; }
-    public bool CanAccessHostedRunnerTestPlans { get; init; }
 }
 
 public record AssignPlanRequest
 {
     public Guid? PlanId { get; init; }
-}
-
-public record SetHostedRunnerTestAccessRequest
-{
-    public bool Enabled { get; init; }
 }

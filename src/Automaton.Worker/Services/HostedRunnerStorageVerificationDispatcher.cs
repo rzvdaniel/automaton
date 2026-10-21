@@ -58,7 +58,8 @@ internal sealed class HostedRunnerStorageVerificationDispatcher(
         {
             verification.Status = StorageVerificationStatuses.Failed;
             verification.CompletedAtUtc = now;
-            verification.Error = "Hosted Runner storage quota identity is not initialized; reprovision is required.";
+            verification.Error = "Hosted Runner storage quota identity is missing; per-user reprovisioning is no longer available for this legacy record.";
+            await db.SaveChangesAsync(cancellationToken);
             return;
         }
         AccountStorageAllocation storageAllocation;

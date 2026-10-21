@@ -40,23 +40,10 @@ onMounted(async () => {
 })
 
 const showPlanCatalog = computed(() => subscriptionsEnabled && hasPaidPlans.value)
-const pageTitle = computed(() => showPlanCatalog.value ? 'Choose your runner plan' : 'Free for now')
+const pageTitle = computed(() => showPlanCatalog.value ? 'Choose your plan' : 'Free for now')
 const pageSubtitle = computed(() => showPlanCatalog.value
-  ? 'Upgrade when you want Automaton to host a ready-to-use runner for your apps.'
-  : 'Future paid plans will add hosted runners, so users can run app backends without configuring infrastructure.')
-
-function planFeatures(plan: SubscriptionPlan): string[] {
-  const runner = plan.capabilities.hostedRunner
-  if (!runner.enabled) {
-    return ['Self-hosted runners', 'Create apps and projects', 'Use your own infrastructure']
-  }
-
-  return [
-    'Hosted runner included',
-    'Managed resource specification',
-    'Persistent backend execution',
-  ]
-}
+  ? 'Review available Automaton subscription plans.'
+  : 'Automaton is free for now.')
 
 // Highlight the middle plan (Pro / highest non-last paid plan)
 const highlightedIndex = computed(() => {
@@ -129,7 +116,6 @@ const isDisabled = (plan: SubscriptionPlan) =>
       <h2>Paid subscriptions coming later</h2>
       <p class="text-color-secondary">
         Everyone is on the <strong>Free</strong> plan for now.
-        The free plan is here to stay. Future paid plans will add hosted runners for users who want Automaton-managed backend execution.
       </p>
     </div>
 
@@ -150,11 +136,6 @@ const isDisabled = (plan: SubscriptionPlan) =>
             <span v-else class="price-amount">Free</span>
           </div>
           <p class="plan-description text-color-secondary text-sm">{{ plan.description }}</p>
-          <ul class="plan-features">
-            <li v-for="feature in planFeatures(plan)" :key="feature">
-              <i class="pi pi-check text-green-500 mr-2" />{{ feature }}
-            </li>
-          </ul>
           <Button
             :label="buttonLabel(plan)"
             :disabled="isDisabled(plan)"

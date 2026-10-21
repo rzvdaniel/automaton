@@ -10,11 +10,6 @@ internal static class RunnerHostAdminResponseMapper
 {
     public static RunnerHostResponse ToResponse(RunnerHost host)
     {
-        var assigned = host.HostedRunners
-            .Where(HostedRunnerComputeReservationPolicy.OccupiesCapacity)
-            .ToList();
-        var computeReservations = assigned.Select(HostedRunnerComputeReservationPolicy.Calculate).ToArray();
-
         return new RunnerHostResponse
         {
             Id = host.Id,
@@ -28,7 +23,6 @@ internal static class RunnerHostAdminResponseMapper
             ProviderImageId = host.ProviderImageId,
             ProvisioningTransport = host.ProvisioningTransport,
             RuntimeConnectivityMode = host.RuntimeConnectivityMode,
-            HostedRunnerSchedulingEnabled = host.HostedRunnerSchedulingEnabled,
             Status = host.Status,
             ProvisioningStatus = host.ProvisioningStatus,
             ProvisioningStartedAtUtc = host.ProvisioningStartedAtUtc,
@@ -38,23 +32,13 @@ internal static class RunnerHostAdminResponseMapper
             ApprovedByUserId = host.ApprovedByUserId,
             ProvisioningFailureCode = host.ProvisioningFailureCode,
             ProvisioningFailureMessage = host.ProvisioningFailureMessage,
-            IsSchedulingEligible = host.IsSchedulingEligible,
-            TotalCpuCores = host.TotalCpuCores,
-            ReservedCpuCores = host.ReservedCpuCores,
-            UsedCpuCores = computeReservations.Sum(x => x.CpuCores),
-            TotalMemoryMb = host.TotalMemoryMb,
-            ReservedMemoryMb = host.ReservedMemoryMb,
-            UsedMemoryMb = computeReservations.Sum(x => x.MemoryMb),
-            TotalDiskMb = host.TotalDiskMb,
-            ReservedDiskMb = host.ReservedDiskMb,
-            UsedDiskMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.DiskLimitMb),
             StorageMeasuredAtUtc = host.StorageMeasuredAtUtc,
             StorageAvailableBytes = host.StorageAvailableBytes,
             StorageReserveRequiredBytes = host.StorageReserveRequiredBytes,
             StorageState = host.StorageState,
             StorageMeasurementStatus = host.StorageMeasurementStatus,
             StorageMeasurementError = host.StorageMeasurementError,
-            HostedRunnerCount = assigned.Count,
+            HostedRunnerCount = host.HostedRunners.Count(x => x.DeletedAt == null),
             CreatedAt = host.CreatedAt,
             UpdatedAt = host.UpdatedAt,
             InfrastructureRunnerId = host.InfrastructureRunnerId,

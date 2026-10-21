@@ -97,11 +97,6 @@ onMounted(async () => {
 })
 
 const sidebarPlansLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans soon')
-const runnerSummary = computed(() => {
-  const runner = billingStatus.value?.capabilities.hostedRunner
-  if (!runner?.enabled) return 'Self-hosted runner'
-  return `${runner.cpuCores} vCPU · ${runner.memoryMb} MB`
-})
 const isAdmin = computed(() => {
   const roles = authStore.user?.roles
   if (!roles) return false
@@ -277,7 +272,7 @@ const isActive = (to: string) => {
           <span v-if="billingStatus.hasActiveSubscription" class="billing-status">Active</span>
         </div>
         <div class="billing-widget-footer">
-          <span class="text-color-secondary">{{ runnerSummary }}</span>
+          <span class="text-color-secondary">Apps run on your assigned machine</span>
           <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate({ label: 'Pricing', icon: 'pi pi-credit-card', to: '/pricing' })">{{ sidebarPlansLabel }}</span>
         </div>
       </div>

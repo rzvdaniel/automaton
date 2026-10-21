@@ -31,11 +31,6 @@ internal static class TestRunnerEnrollmentFactory
         var grants = new ExecutionSecretGrantService(db, protector);
         var service = new RunnerEnrollmentService(
             db,
-            new HostedRunnerEnrollmentExchangeService(
-                db,
-                apiKeyService,
-                auditEventService,
-                NullLogger<HostedRunnerEnrollmentExchangeService>.Instance),
             new InfrastructureRunnerEnrollmentExchangeService(
                 db,
                 apiKeyService,
@@ -45,14 +40,7 @@ internal static class TestRunnerEnrollmentFactory
                 db,
                 auditEventService,
                 Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-                hostedOptions),
-            new HostedRunnerEnrollmentProvisioningService(
-                db,
-                apiKeyService,
-                auditEventService,
-                Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-                new SecretStore(db, protector),
-                grants));
+                hostedOptions));
         return new RunnerEnrollmentTestServices(service, grants);
     }
 }

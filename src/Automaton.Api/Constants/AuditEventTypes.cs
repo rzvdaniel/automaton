@@ -32,7 +32,6 @@ public static class AuditEventTypes
     public const string ExecutionSecretGrantDelivered = "ExecutionSecretGrantDelivered";
     public const string InfrastructureWorkflowExecuted = "InfrastructureWorkflowExecuted";
     public const string InfrastructureRunnerHostApproved = "InfrastructureRunnerHostApproved";
-    public const string InfrastructureRunnerHostSchedulingDisabled = "InfrastructureRunnerHostSchedulingDisabled";
     public const string InfrastructureRunnerRevoked = "InfrastructureRunnerRevoked";
     public const string RunnerDeleted = "RunnerDeleted";
     public const string RunnerAssignedToProject = "RunnerAssignedToProject";

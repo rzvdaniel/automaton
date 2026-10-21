@@ -48,7 +48,6 @@ public sealed class RunnerHostProvisioningReconciliationService(
             operation.RunnerHost.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
             operation.RunnerHost.ProvisioningFailureCode = operation.FailureCode;
             operation.RunnerHost.ProvisioningFailureMessage = operation.Error;
-            operation.RunnerHost.HostedRunnerSchedulingEnabled = false;
         }
         if (operations.Count > 0)
         {

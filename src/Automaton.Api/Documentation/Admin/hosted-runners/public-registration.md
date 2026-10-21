@@ -5,7 +5,7 @@ order: 21
 
 # Pause public registration
 
-Signup and Hosted Runner provisioning have separate switches. Pausing signup does not disable existing accounts, revoke keys, change plans, delete data or stop workloads.
+Pausing signup does not disable existing accounts, revoke keys, change plans, delete data or stop workloads. Hosted Runner provisioning is retired and is not controlled by signup or plan assignment.
 
 The reconciled source baseline retains the public-registration gate and GitHub login fixes. Preparing or merging this source change does not change the running API configuration or database. Before deploying it, inspect the target database migration history for the removed migrations. The repository self-hosted roadmap records the exact migration IDs and release prerequisite.
 
@@ -29,9 +29,9 @@ To reopen, set the same property to `true` and apply it through the normal API d
 
 ## Existing-account execution review
 
-Signup is not an execution safeguard. Review each account in Administration > Users for roles, assigned/effective plan and hosted-runner test-plan access, then inspect its runners, apps and pending execution operations. Unassigned accounts may inherit the default active plan. Test-plan visibility controls catalog access; it is not an execution suspension.
+Signup is not an execution safeguard. Review each account in Administration > Users for roles and assigned/effective plan, then inspect its runners, apps and pending execution operations. Unassigned accounts may inherit the default active plan. Plan assignment does not create a Hosted Runner or determine Machine Management Runner access.
 
-Hosted provisioning checks the platform provisioning switch, effective plan capability, active specification, account runner count, host capacity and storage locality. Existing execution depends on runner/app/project access and API-key permissions. Administrators have broader management rights.
+Machine Management Runner assignment and execution depend on the existing app, workspace, and Runner authorization checks. Administrators manage Infrastructure Runner hosts separately. Existing Hosted Runner records may remain available for legacy lifecycle operations, but the platform no longer creates or provisions per-user containers.
 
 Before wider access, independently validate live image provenance, tenant authorization on execution and secret grants, privileged Infrastructure Runner separation, CPU/memory/PID limits, capability dropping/no-new-privileges, filesystem and Docker-socket isolation, writable-layer/durable-storage limits, outbound network restrictions, cancellation/timeouts and retry behavior. Source inspection and unit tests do not establish live enforcement. Do not revoke permissions, change subscriptions or stop workloads as part of this review.
 

@@ -92,7 +92,7 @@ internal static class SecretDeliveryTestScenarios
     private static SecretGrantScope CreateScope(Guid ownerId) => new(
         Guid.NewGuid(),
         InfrastructureAppTrust.PlatformAppId,
-        "provision-hosted-runner",
+        "restart-hosted-runner",
         Guid.NewGuid(),
         Guid.NewGuid(),
         SecretOwnerTypes.HostedRunner,

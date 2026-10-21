@@ -1,27 +1,11 @@
-using System.Security.Claims;
-using System.Data.Common;
 using System.Text.Json;
-using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
-using Automaton.Api.Controllers.Admin;
-using Automaton.Api.Services.Interfaces;
-using Automaton.Core.Models;
 using Automaton.Core.Enums;
-using Automaton.Core.Constants;
-using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
-
-using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-
 
 namespace Automaton.Api.Tests;
 
@@ -143,46 +127,4 @@ public class HostedRunnerAdminLifecycleAuditTests
         Assert.That(db.AuditEvents.Any(x => x.EventType == AuditEventTypes.RunnerRestartFailed), Is.False);
         Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
     }
-
-
-    [Test]
-    public async Task ReprovisionAsAdminAsync_WritesRequestedAuditAndWaitsForRegistration()
-    {
-        using var db = HostedRunnerAuditTestData.CreateDbContext();
-        var userId = Guid.NewGuid();
-        var planId = HostedRunnerAuditTestData.SeedHostedRunnerPlan(db);
-        HostedRunnerAuditTestData.SeedRunnerHost(db);
-        var hostedRunner = HostedRunnerAuditTestData.SeedManagedHostedRunner(db, userId, planId);
-
-        var managementService = HostedRunnerManagementTestServiceFactory.Create(
-            db,
-            userId);
-
-        await HostedRunnerAdminAuditAssertions.AssertReprovisionRequestAwaitsRegistrationAsync(
-            db, managementService, hostedRunner.Id);
-    }
-
-
-    [Test]
-    public async Task ReprovisionAsAdminAsync_RejectsDisabledPlan()
-    {
-        using var db = HostedRunnerAuditTestData.CreateDbContext();
-        var userId = Guid.NewGuid();
-        var planId = HostedRunnerAuditTestData.SeedDisabledHostedRunnerPlan(db);
-        var hostedRunner = HostedRunnerAuditTestData.SeedManagedHostedRunner(db, userId, planId);
-
-        var managementService = HostedRunnerManagementTestServiceFactory.Create(
-            db,
-            userId);
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            managementService.ReprovisionAsAdminAsync(hostedRunner.Id, CancellationToken.None));
-
-        Assert.That(exception!.Message, Does.Contain("does not include a hosted runner"));
-    }
-
-    [TestCase(false, "subscription allows")]
-    [TestCase(true, "multiple Runner Hosts")]
-    public async Task AdminReprovisionRejection_PreservesTheWorkingRunner(bool conflictingHistory, string expectedMessage)
-        => await HostedRunnerAdminReprovisionRejectionScenario.VerifyAsync(conflictingHistory, expectedMessage);
 }

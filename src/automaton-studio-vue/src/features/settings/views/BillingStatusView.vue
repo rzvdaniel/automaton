@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -8,18 +8,15 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
-import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 
 const router = useRouter()
 const subscriptionsEnabled = useSubscriptionsEnabled()
-const { hasPaidPlans, ensureLoaded } = usePaidPlansAvailable()
 
 const status = ref<BillingStatusResponse | null>(null)
 const loading = ref(true)
 const portalLoading = ref(false)
 const error = ref<string | null>(null)
 
-const hostedRunner = computed(() => status.value?.capabilities.hostedRunner)
 
 onMounted(async () => {
   try {
@@ -27,7 +24,6 @@ onMounted(async () => {
       billingService.getBillingStatus().then((result) => {
         status.value = result
       }),
-      ensureLoaded(),
     ])
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? 'Failed to load billing status'
@@ -47,7 +43,6 @@ async function goToPortal() {
   }
 }
 
-const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Plans Soon')
 </script>
 
 <template>
@@ -79,37 +74,6 @@ const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Pl
           </template>
         </Card>
 
-        <!-- Hosted Runner Card -->
-        <Card class="billing-card">
-          <template #content>
-            <div class="billing-card-label">Hosted Runner</div>
-
-            <template v-if="hostedRunner?.enabled">
-              <div class="billing-card-value">
-                <i class="pi pi-server mr-2 text-primary"></i>
-                Included
-              </div>
-              <div class="runner-specs">
-                <span>{{ hostedRunner.cpuCores }} vCPU</span>
-                <span>{{ hostedRunner.memoryMb }} MB RAM</span>
-                <span>{{ hostedRunner.diskMb }} MB disk</span>
-                <span>{{ hostedRunner.maxApps }} apps</span>
-              </div>
-            </template>
-
-            <template v-else>
-              <div class="billing-card-value" style="font-size: 1.1rem">
-                <i class="pi pi-server mr-2 text-color-secondary"></i>
-                Self-hosted
-              </div>
-              <div class="billing-card-meta mb-3">Use your own runner infrastructure.</div>
-              <div class="flex gap-2">
-                <Button :label="plansActionLabel" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
-              </div>
-            </template>
-          </template>
-        </Card>
-
         <!-- Infrastructure Card -->
         <Card class="billing-card">
           <template #content>
@@ -135,7 +99,7 @@ const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Pl
           @click="goToPortal"
         />
         <Button
-          :label="plansActionLabel"
+          label="View plans"
           icon="pi pi-tag"
           severity="secondary"
           @click="router.push('/pricing')"
@@ -153,7 +117,7 @@ const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Pl
 
 .billing-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -198,17 +162,4 @@ const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Pl
   gap: 0.4rem;
 }
 
-.runner-specs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
-}
-
-.runner-specs span {
-  border: 1px solid var(--p-surface-200);
-  border-radius: 999px;
-  padding: 0.2rem 0.45rem;
-}
 </style>

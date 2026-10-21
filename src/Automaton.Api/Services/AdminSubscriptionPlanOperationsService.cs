@@ -11,24 +11,13 @@ namespace Automaton.Api.Services;
 
 public sealed class AdminSubscriptionPlanOperationsService(
     ApplicationDbContext dbContext,
-    HostedRunnerProvisioningService hostedRunnerProvisioningService,
-    HostedRunnerPlanCapabilityValidator capabilityValidator,
     IAuditEventService auditEventService,
     ITransactionalEventExecutor transactionalEventExecutor)
 {
-    public Task<string?> ValidateCapabilitiesAsync(PlanCapabilities capabilities, CancellationToken cancellationToken)
-        => capabilityValidator.ValidateAsync(capabilities, cancellationToken);
-
-    public async Task<(SubscriptionPlan? Plan, string? Error)> CreateAsync(
+    public async Task<SubscriptionPlan> CreateAsync(
         CreateSubscriptionPlanRequest request,
         CancellationToken cancellationToken)
     {
-        var capabilityError = await capabilityValidator.ValidateAsync(request.Capabilities, cancellationToken);
-        if (capabilityError is not null)
-        {
-            return (null, capabilityError);
-        }
-
         var isActive = request.IsActive;
         var isDefault = isActive && request.IsDefault;
         await using var transaction = dbContext.Database.IsRelational()
@@ -54,7 +43,7 @@ public sealed class AdminSubscriptionPlanOperationsService(
             await transaction.CommitAsync(cancellationToken);
         }
 
-        return (plan, null);
+        return plan;
     }
 
     public async Task<PlanAssignmentResult> AssignAsync(
@@ -77,40 +66,10 @@ public sealed class AdminSubscriptionPlanOperationsService(
                 return new PlanAssignmentResult(PlanAssignmentFailure.PlanNotFound);
             }
 
-            var capabilityError = await capabilityValidator.ValidateAsync(
-                PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson), cancellationToken);
-            if (capabilityError is not null)
-            {
-                return new PlanAssignmentResult(PlanAssignmentFailure.InvalidCapability, capabilityError);
-            }
         }
 
         await CompleteAssignmentAsync(user, plan, planId);
         return new PlanAssignmentResult(PlanAssignmentFailure.None);
-    }
-
-    public async Task<bool> SetHostedRunnerTestAccessAsync(Guid userId, bool enabled)
-    {
-        var user = await dbContext.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId);
-        if (user is null)
-        {
-            return false;
-        }
-
-        user.CanAccessHostedRunnerTestPlans = enabled;
-        await dbContext.SaveChangesAsync();
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            EventType = AuditEventTypes.HostedRunnerTestPlanAccessChanged,
-            Action = AuditActions.Changed,
-            EntityType = AuditEntityTypes.User,
-            EntityId = user.Id,
-            TargetUserId = user.Id,
-            Message = $"Hosted runner test-plan access for user '{user.Email ?? user.Id.ToString()}' was set to {enabled}",
-            Metadata = new { user.Email, Enabled = enabled }
-        });
-
-        return true;
     }
 
     private Task CompleteAssignmentAsync(ApplicationUser user, SubscriptionPlan? plan, Guid? planId)
@@ -118,18 +77,6 @@ public sealed class AdminSubscriptionPlanOperationsService(
         {
             user.SubscriptionPlanId = planId;
             await dbContext.SaveChangesAsync(durableCancellationToken);
-
-            var hostedRunnerEnabled = plan is not null &&
-                PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner.Enabled;
-            if (hostedRunnerEnabled)
-            {
-                await hostedRunnerProvisioningService.EnsureHostedRunnerAsync(user.Id, durableCancellationToken);
-            }
-            else
-            {
-                await hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
-                    user.Id, "Admin removed subscription plan.", durableCancellationToken);
-            }
 
             await auditEventService.WriteAsync(new AuditEventWriteRequest
             {
@@ -145,8 +92,7 @@ public sealed class AdminSubscriptionPlanOperationsService(
                 {
                     user.Email,
                     PlanId = planId,
-                    PlanName = plan?.Name,
-                    HostedRunnerProvisioningTriggered = planId.HasValue
+                    PlanName = plan?.Name
                 },
                 FailOnError = true
             }, durableCancellationToken);
@@ -198,8 +144,7 @@ public enum PlanAssignmentFailure
 {
     None,
     UserNotFound,
-    PlanNotFound,
-    InvalidCapability
+    PlanNotFound
 }
 
 public sealed record PlanAssignmentResult(PlanAssignmentFailure Failure, string? Error = null);

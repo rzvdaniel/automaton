@@ -16,18 +16,15 @@ namespace Automaton.Api.Controllers.Admin;
 public class AdminHostedRunnersController : ControllerBase
 {
     private readonly ApplicationDbContext db;
-    private readonly HostedRunnerProvisioningService provisioningService;
     private readonly HostedRunnerManagementService managementService;
     private readonly UserContextService userContextService;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
-        HostedRunnerProvisioningService provisioningService,
         HostedRunnerManagementService managementService,
         UserContextService userContextService)
     {
         this.db = db;
-        this.provisioningService = provisioningService;
         this.managementService = managementService;
         this.userContextService = userContextService;
     }
@@ -49,55 +46,10 @@ public class AdminHostedRunnersController : ControllerBase
         return Ok(runners.Select(HostedRunnerAdminResponseMapper.ToResponse));
     }
 
-    [HttpPost("users/{userId:guid}/provision")]
-    public async Task<ActionResult<HostedRunnerResponse>> ProvisionForUser(Guid userId, ProvisionHostedRunnerRequest request, CancellationToken cancellationToken)
-    {
-        HostedRunner? hostedRunner;
-        try
-        {
-            hostedRunner = await provisioningService.EnsureHostedRunnerAsync(userId, cancellationToken);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-
-        if (hostedRunner == null) return BadRequest(new { message = "Hosted runner provisioning could not be prepared." });
-
-        var responseRunner = await LoadHostedRunnerResponseDataAsync(hostedRunner.Id, cancellationToken);
-
-        return Ok(HostedRunnerAdminResponseMapper.ToResponse(responseRunner));
-    }
-
-    private Task<HostedRunner> LoadHostedRunnerResponseDataAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
-        => db.HostedRunners
-            .AsNoTracking()
-            .Include(x => x.User)
-            .Include(x => x.RunnerHost)
-            .Include(x => x.Runner)
-            .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
-            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
-            .Where(x => x.Id == hostedRunnerId)
-            .FirstAsync(cancellationToken);
-
     [HttpPost("runners/{id:guid}/restart")]
     public async Task<ActionResult<HostedRunnerResponse>> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
     {
         await managementService.RestartAsAdminAsync(id, cancellationToken);
-        return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
-    }
-
-    [HttpPost("runners/{id:guid}/reprovision")]
-    public async Task<ActionResult<HostedRunnerResponse>> ReprovisionHostedRunner(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await managementService.ReprovisionAsAdminAsync(id, cancellationToken);
-        }
-        catch (HostedRunnerProvisioningConflictException exception)
-        {
-            return Conflict(new { message = exception.Message });
-        }
         return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
     }
 

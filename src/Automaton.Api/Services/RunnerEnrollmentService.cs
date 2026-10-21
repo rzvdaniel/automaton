@@ -11,10 +11,8 @@ namespace Automaton.Api.Services;
 
 public sealed class RunnerEnrollmentService(
     ApplicationDbContext db,
-    HostedRunnerEnrollmentExchangeService hostedRunnerEnrollmentExchangeService,
     InfrastructureRunnerEnrollmentExchangeService infrastructureRunnerEnrollmentExchangeService,
-    RunnerEnrollmentAdministrationService administrationService,
-    HostedRunnerEnrollmentProvisioningService hostedRunnerProvisioningService)
+    RunnerEnrollmentAdministrationService administrationService)
 {
     public Task<RunnerEnrollmentCreatedResponse> CreateAsync(
         Guid runnerHostId,
@@ -82,15 +80,6 @@ public sealed class RunnerEnrollmentService(
         return host != null && !host.InfrastructureRunnerId.HasValue;
     }
 
-    public Task<HostedRunnerEnrollmentMaterial> CreateHostedRunnerAsync(
-        Guid hostedRunnerId,
-        Guid operationId,
-        string actionKey,
-        Guid infrastructureRunnerId,
-        CancellationToken cancellationToken) =>
-        hostedRunnerProvisioningService.CreateAsync(
-            hostedRunnerId, operationId, actionKey, infrastructureRunnerId, cancellationToken);
-
     public Task<bool> RevokeAsync(
         Guid runnerHostId,
         Guid enrollmentId,
@@ -132,7 +121,12 @@ public sealed class RunnerEnrollmentService(
         }
 
         if (enrollment.HostedRunnerId.HasValue)
-            return await hostedRunnerEnrollmentExchangeService.ExchangeAsync(enrollment, host, request, now, cancellationToken);
+        {
+            enrollment.Status = RunnerEnrollmentStatuses.Failed;
+            enrollment.FailureReason = "Per-user Hosted Runner enrollment is no longer supported. Assign a Management Runner instead.";
+            await db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
 
         return await infrastructureRunnerEnrollmentExchangeService.CompleteAsync(
             enrollment, host, request, now, cancellationToken);

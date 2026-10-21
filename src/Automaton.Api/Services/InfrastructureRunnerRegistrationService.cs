@@ -185,7 +185,6 @@ public sealed class InfrastructureRunnerRegistrationService(
             PrivateIp = request.PrivateIp,
             ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
-            HostedRunnerSchedulingEnabled = false,
             Status = RunnerHostStatuses.Active,
             ProvisioningStatus = RunnerHostProvisioningStatuses.Validating,
             ProvisioningStartedAtUtc = now,

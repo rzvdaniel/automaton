@@ -16,7 +16,6 @@ internal static class ApiApplicationInitializationExtensions
     internal static async Task InitializeAutomatonApiAsync(this WebApplication app)
     {
         await app.ApplyMigrationsAsync();
-        await app.Services.SeedLocalRunnerHostAsync();
         await InfrastructurePlatformAppInitializer.EnsureExistsAsync(app.Services);
     }
 }

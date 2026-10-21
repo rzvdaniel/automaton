@@ -78,9 +78,6 @@ public sealed class AdminSubscriptionPlanAssignmentAuditTests
         Id = Guid.NewGuid(),
         Name = name,
         IsActive = true,
-        CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-        {
-            HostedRunner = new HostedRunnerCapability { Enabled = false }
-        })
+        CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
     };
 }

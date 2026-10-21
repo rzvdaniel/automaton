@@ -93,7 +93,6 @@ internal static class HostedRunnerAdminResponseMapper
                 FinishedAt = deployment.FinishedAt
             };
 }
-
 public sealed record DeleteHostedRunnerRequest(string DataDisposition);
 public sealed record ExtendStorageGracePeriodRequest(int Hours);
 
@@ -110,7 +109,6 @@ public record RunnerHostResponse
     public string? ProviderImageId { get; init; }
     public string ProvisioningTransport { get; init; } = RunnerHostProvisioningTransports.InfrastructureRunner;
     public string RuntimeConnectivityMode { get; init; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
-    public bool HostedRunnerSchedulingEnabled { get; init; } = true;
     public string Status { get; init; } = RunnerHostStatuses.Active;
     public string ProvisioningStatus { get; init; } = RunnerHostProvisioningStatuses.Manual;
     public DateTime? ProvisioningStartedAtUtc { get; init; }
@@ -120,16 +118,6 @@ public record RunnerHostResponse
     public Guid? ApprovedByUserId { get; init; }
     public string? ProvisioningFailureCode { get; init; }
     public string? ProvisioningFailureMessage { get; init; }
-    public bool IsSchedulingEligible { get; init; }
-    public decimal TotalCpuCores { get; init; }
-    public decimal ReservedCpuCores { get; init; }
-    public decimal UsedCpuCores { get; init; }
-    public int TotalMemoryMb { get; init; }
-    public int ReservedMemoryMb { get; init; }
-    public int UsedMemoryMb { get; init; }
-    public int TotalDiskMb { get; init; }
-    public int ReservedDiskMb { get; init; }
-    public int UsedDiskMb { get; init; }
     public DateTime? StorageMeasuredAtUtc { get; init; }
     public long? StorageAvailableBytes { get; init; }
     public long? StorageReserveRequiredBytes { get; init; }
@@ -169,14 +157,7 @@ public record UpdateRunnerHostRequest
     public string? PrivateIp { get; init; }
     public string? ProvisioningTransport { get; init; }
     public string? RuntimeConnectivityMode { get; init; }
-    public bool? HostedRunnerSchedulingEnabled { get; init; }
     public string? Status { get; init; }
-    public decimal? TotalCpuCores { get; init; }
-    public decimal? ReservedCpuCores { get; init; }
-    public int? TotalMemoryMb { get; init; }
-    public int? ReservedMemoryMb { get; init; }
-    public int? TotalDiskMb { get; init; }
-    public int? ReservedDiskMb { get; init; }
 }
 
 public record HostedRunnerResponse
@@ -251,8 +232,4 @@ public record HostedRunnerDeploymentResponse
     public string? Error { get; init; }
     public DateTime StartedAt { get; init; }
     public DateTime? FinishedAt { get; init; }
-}
-
-public record ProvisionHostedRunnerRequest
-{
 }

@@ -165,7 +165,7 @@ public sealed class InfrastructureCommandSecretResolutionTests
     }
 
     private static InfrastructureCommandSecretsRequest SecretsRequest(ResolutionFixture fixture, Guid grantId) => new(
-        fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "reprovision-hosted-runner", [grantId]);
+        fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "restart-hosted-runner", [grantId]);
 
     private static Task<ResolutionFixture> CreateResolutionFixture(
         ApplicationDbContext db,

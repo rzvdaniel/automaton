@@ -68,6 +68,11 @@ public sealed class HostedRunnerLifecycleReconciler(
         if (operation == null || !RecoverableStatuses.Contains(operation.Status))
             return false;
 
+        if (IsRetiredProvisioningAction(operation.Action))
+            return await FailAsync(operation,
+                "Per-user Hosted Runner provisioning is no longer supported. Assign a Management Runner instead.",
+                now, cancellationToken);
+
         var execution = await db.AppModuleExecutions.AsNoTracking()
             .SingleOrDefaultAsync(x => x.HostedRunnerOperationId == operationId, cancellationToken);
         if (execution != null)
@@ -98,13 +103,14 @@ public sealed class HostedRunnerLifecycleReconciler(
     }
 
     private static bool IsInfrastructureAction(string action)
-        => action is HostedRunnerDeploymentActions.Provision
-            or HostedRunnerDeploymentActions.Reprovision
-            or HostedRunnerDeploymentActions.Restart
+        => action is HostedRunnerDeploymentActions.Restart
             or HostedRunnerDeploymentActions.Deprovision
             or HostedRunnerDeploymentActions.Suspend
             or HostedRunnerDeploymentActions.Resume
             or HostedRunnerDeploymentActions.VerifyStorage;
+
+    private static bool IsRetiredProvisioningAction(string action)
+        => action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision;
 
     private async Task<bool> RepublishAsync(
         HostedRunnerDeployment operation,
@@ -118,26 +124,7 @@ public sealed class HostedRunnerLifecycleReconciler(
         if (!host.InfrastructureRunnerId.HasValue)
             return await FailAsync(operation, "The hosted Runner host has no assigned Infrastructure Runner.", now, cancellationToken);
 
-        var isProvision = operation.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision;
-        IReadOnlyList<Guid> grantIds = isProvision
-            ? await db.ExecutionSecretGrants.AsNoTracking()
-                .Where(x => x.OperationId == operation.Id
-                    && x.RevokedAtUtc == null && x.ConsumedAtUtc == null
-                    && x.DeliveredAtUtc == null && x.ExpiresAtUtc > now)
-                .Select(x => x.Id).ToListAsync(cancellationToken)
-            : [];
-        if (isProvision && grantIds.Count == 0)
-            return await FailAsync(operation, "The stale provisioning operation no longer has valid enrollment material.", now, cancellationToken);
-
-        object message = isProvision
-            ? new ManagedRunnerProvisionRequestedEvent
-            {
-                OperationId = operation.Id, HostedRunnerId = hostedRunner.Id, UserId = hostedRunner.UserId,
-                RunnerHostId = host.Id, SecretGrantIds = grantIds,
-                CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
-            }
-            : BuildInfrastructureRequest(operation, hostedRunner, host);
-
+        var message = BuildInfrastructureRequest(operation, hostedRunner, host);
         return await TryClaimAndPublishAsync(operation, message, now, recoveryCutoff, cancellationToken);
     }
 
@@ -189,12 +176,9 @@ public sealed class HostedRunnerLifecycleReconciler(
     }
 
     private Task PublishRecoveryMessageAsync(object message, CancellationToken cancellationToken)
-        => message switch
-        {
-            ManagedRunnerProvisionRequestedEvent managed => eventPublisher.PublishAsync(managed, cancellationToken),
-            InfrastructureCommandRequestedEvent infrastructure => eventPublisher.PublishAsync(infrastructure, cancellationToken),
-            _ => throw new InvalidOperationException("Unsupported hosted Runner recovery message type.")
-        };
+        => message is InfrastructureCommandRequestedEvent infrastructure
+            ? eventPublisher.PublishAsync(infrastructure, cancellationToken)
+            : throw new InvalidOperationException("Unsupported hosted Runner recovery message type.");
 
     private async Task<bool> FailAsync(
         HostedRunnerDeployment operation,
@@ -210,7 +194,6 @@ public sealed class HostedRunnerLifecycleReconciler(
 
             failed = true;
             await WriteFailureAuditAsync(operation, reason, token);
-            await PublishProvisioningFailureAsync(operation, reason, token);
         }, cancellationToken);
         return failed;
     }
@@ -277,23 +260,6 @@ public sealed class HostedRunnerLifecycleReconciler(
             TargetUserId = operation.HostedRunner.UserId,
             Metadata = new { OperationId = operation.Id, operation.Action, Error = reason },
             FailOnError = true
-        }, cancellationToken);
-    }
-
-    private Task PublishProvisioningFailureAsync(
-        HostedRunnerDeployment operation,
-        string reason,
-        CancellationToken cancellationToken)
-    {
-        if (operation.Action is not (HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision))
-            return Task.CompletedTask;
-
-        return eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
-        {
-            HostedRunnerId = operation.HostedRunnerId,
-            UserId = operation.HostedRunner.UserId,
-            Error = reason,
-            CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
         }, cancellationToken);
     }
 

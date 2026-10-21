@@ -27,7 +27,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
             ValidateApprovalRequirements(host, now);
 
             host.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
-            host.HostedRunnerSchedulingEnabled = true;
             host.ApprovedAtUtc = now;
             host.ApprovedByUserId = approvedByUserId;
             host.UpdatedAt = now;
@@ -40,7 +39,7 @@ public sealed class InfrastructureRunnerHostApprovalService(
             EntityType = AuditEntityTypes.Runner,
             EntityId = host!.InfrastructureRunnerId!.Value,
             EventType = AuditEventTypes.InfrastructureRunnerHostApproved,
-            Message = $"Infrastructure Runner host '{host.Name}' was approved for managed Runner scheduling.",
+            Message = $"Infrastructure Runner host '{host.Name}' was approved.",
             Outcome = AuditOutcomes.Success,
             ActorUserId = approvedByUserId,
             Metadata = new { HostId = host.Id, host.InfrastructureRunnerId }
@@ -69,29 +68,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
                 host.InfrastructureRunner.LastHeartbeatAtUtc,
                 now))
             throw new InvalidOperationException("The Infrastructure Runner must be online before approval.");
-    }
-
-    public async Task<RunnerHost?> DisableSchedulingAsync(Guid hostId, Guid adminUserId, CancellationToken cancellationToken)
-    {
-        var host = await LoadHostAsync(hostId, cancellationToken);
-        if (host == null) return null;
-
-        host.HostedRunnerSchedulingEnabled = false;
-        host.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Disabled,
-            EntityType = AuditEntityTypes.Runner,
-            EntityId = host.InfrastructureRunnerId ?? host.Id,
-            EventType = AuditEventTypes.InfrastructureRunnerHostSchedulingDisabled,
-            Message = $"Managed Runner scheduling was disabled for host '{host.Name}'.",
-            Outcome = AuditOutcomes.Success,
-            ActorUserId = adminUserId,
-            Metadata = new { HostId = host.Id }
-        }, cancellationToken);
-
-        return host;
     }
 
     public async Task<RunnerHost?> RevokeAsync(Guid hostId, Guid adminUserId, CancellationToken cancellationToken)
@@ -139,7 +115,6 @@ public sealed class InfrastructureRunnerHostApprovalService(
             target.Status = DeploymentTargetStatus.Unassigned;
             target.UpdatedAt = DateTimeOffset.UtcNow;
         }
-        host.HostedRunnerSchedulingEnabled = false;
         host.Status = RunnerHostStatuses.Disabled;
         host.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);

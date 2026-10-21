@@ -18,7 +18,7 @@ namespace Automaton.Api.Tests;
 public sealed class InfrastructureRunnerHostApprovalTests
 {
     [Test]
-    public async Task HostApproval_EnablesSchedulingAfterValidationButStorageTelemetryIsStillRequired()
+    public async Task HostApproval_RequiresValidatedOnlineInfrastructureRunner()
     {
         await using var db = CreateDbContext();
         var host = await SeedApprovalHostAsync(db, "8.8.8.8");
@@ -27,10 +27,8 @@ public sealed class InfrastructureRunnerHostApprovalTests
         var approved = await service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
 
         Assert.That(approved.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.Ready));
-        Assert.That(approved.HostedRunnerSchedulingEnabled, Is.True);
         Assert.That(approved.ApprovedAtUtc, Is.Not.Null);
         Assert.That(approved.ApprovedByUserId, Is.Not.Null);
-        Assert.That(approved.IsSchedulingEligible, Is.False);
     }
 
     [Test]
@@ -44,7 +42,6 @@ public sealed class InfrastructureRunnerHostApprovalTests
             () => service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None));
 
         Assert.That(exception!.Message, Does.Contain("public IPv4"));
-        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
     }
 
     private static async Task<RunnerHost> SeedApprovalHostAsync(ApplicationDbContext db, string? publicIp)
@@ -76,7 +73,6 @@ public sealed class InfrastructureRunnerHostApprovalTests
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
             ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
             ValidatedAtUtc = DateTime.UtcNow,
-            HostedRunnerSchedulingEnabled = false,
             InfrastructureRunner = runner,
             InfrastructureRunnerId = runner.Id
         };

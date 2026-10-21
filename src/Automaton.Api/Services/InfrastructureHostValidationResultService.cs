@@ -121,7 +121,6 @@ public sealed class InfrastructureHostValidationResultService(
             host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
             host.ProvisioningFailureCode = "HostValidationExecutionFailed";
             host.ProvisioningFailureMessage = operation.Error;
-            host.HostedRunnerSchedulingEnabled = false;
             host.ValidatedAtUtc = null;
         }
         var provisioning = await db.RunnerHostProvisioningOperations.Where(item =>

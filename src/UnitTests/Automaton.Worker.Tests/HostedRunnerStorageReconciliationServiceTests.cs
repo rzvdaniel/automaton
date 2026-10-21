@@ -77,6 +77,25 @@ public class HostedRunnerStorageReconciliationServiceTests
     }
 
     [Test]
+    public async Task MissingLegacyQuotaIdentity_FailsVerificationWithoutSuggestingRetiredReprovisioning()
+    {
+        await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync();
+        await fixture.SeedRunnerAsync(storageProjectId: 0);
+        var verificationId = await fixture.AddVerificationAsync(StorageVerificationStatuses.Pending, "AdministratorRequested");
+
+        await fixture.ReconcileAsync();
+        var status = await fixture.VerificationStatusAsync(verificationId);
+        var error = await fixture.VerificationErrorAsync(verificationId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(status, Is.EqualTo(StorageVerificationStatuses.Failed));
+            Assert.That(error, Does.Contain("no longer available"));
+            Assert.That(fixture.CommandCount, Is.Zero);
+        });
+    }
+
+    [Test]
     public async Task TimedOutDispatch_WithTerminalDeployment_IsFailedInsteadOfRedispatched()
     {
         await using var fixture = await HostedRunnerStorageDispatchHarness.CreateAsync(maxPerHost: 2);

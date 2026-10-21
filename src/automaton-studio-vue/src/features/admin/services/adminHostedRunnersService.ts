@@ -1,16 +1,12 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   HostedRunner,
-  ProvisionHostedRunnerRequest,
   RunnerHost,
   RunnerEnrollment,
   InfrastructureRunnerEnrollmentKey,
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
   UpdateRunnerHostRequest,
-  HostedRunnerSpecification,
-  HostedRunnerSpecificationRequest,
-  HostedRunnerPlatformSettings,
 } from '../types/admin.types'
 
 class AdminHostedRunnersService {
@@ -44,11 +40,6 @@ class AdminHostedRunnersService {
 
   async approveHost(id: string): Promise<RunnerHost> {
     const response = await apiClient.post<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}/approve`)
-    return response.data
-  }
-
-  async disableHostScheduling(id: string): Promise<RunnerHost> {
-    const response = await apiClient.post<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}/disable-scheduling`)
     return response.data
   }
 
@@ -96,18 +87,8 @@ class AdminHostedRunnersService {
     return response.data
   }
 
-  async provisionForUser(userId: string, request: ProvisionHostedRunnerRequest = {}): Promise<HostedRunner> {
-    const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/users/${userId}/provision`, request)
-    return response.data
-  }
-
   async restartHostedRunner(id: string): Promise<HostedRunner> {
     const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/restart`)
-    return response.data
-  }
-
-  async reprovisionHostedRunner(id: string): Promise<HostedRunner> {
-    const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/reprovision`)
     return response.data
   }
 
@@ -137,45 +118,6 @@ class AdminHostedRunnersService {
     })
   }
 
-  async getSpecifications(): Promise<HostedRunnerSpecification[]> {
-    const response = await apiClient.get<HostedRunnerSpecification[]>('/api/admin/hosted-runner-specifications')
-    return response.data
-  }
-
-  async getSpecification(id: string): Promise<HostedRunnerSpecification> {
-    const response = await apiClient.get<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}`)
-    return response.data
-  }
-
-  async createSpecification(request: HostedRunnerSpecificationRequest): Promise<HostedRunnerSpecification> {
-    const response = await apiClient.post<HostedRunnerSpecification>('/api/admin/hosted-runner-specifications', request)
-    return response.data
-  }
-
-  async updateSpecification(id: string, request: HostedRunnerSpecificationRequest): Promise<HostedRunnerSpecification> {
-    const response = await apiClient.put<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}`, request)
-    return response.data
-  }
-
-  async duplicateSpecification(id: string): Promise<HostedRunnerSpecification> {
-    const response = await apiClient.post<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}/duplicate`)
-    return response.data
-  }
-
-  async setSpecificationActive(id: string, active: boolean): Promise<HostedRunnerSpecification> {
-    const response = await apiClient.post<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}/${active ? 'activate' : 'deactivate'}`)
-    return response.data
-  }
-
-  async getSpecificationSettings(): Promise<HostedRunnerPlatformSettings> {
-    const response = await apiClient.get<HostedRunnerPlatformSettings>('/api/admin/hosted-runner-settings')
-    return response.data
-  }
-
-  async updateSpecificationSettings(request: Pick<HostedRunnerPlatformSettings, 'provisioningEnabled'>): Promise<HostedRunnerPlatformSettings> {
-    const response = await apiClient.put<HostedRunnerPlatformSettings>('/api/admin/hosted-runner-settings', request)
-    return response.data
-  }
 }
 
 export const adminHostedRunnersService = new AdminHostedRunnersService()

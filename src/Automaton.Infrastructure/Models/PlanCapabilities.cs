@@ -6,7 +6,6 @@ namespace Automaton.Api.Models;
 public sealed class PlanCapabilities
 {
     public int Version { get; set; } = 1;
-    public HostedRunnerCapability HostedRunner { get; set; } = new();
     public ScheduledActionsCapability ScheduledActions { get; set; } = new();
 
     public static PlanCapabilities Default => new();
@@ -21,35 +20,9 @@ public sealed class ScheduledActionsCapability
     public int MonthlyExecutionLimit { get; set; } = 5000;
 }
 
-public sealed class HostedRunnerCapability
-{
-    public bool Enabled { get; set; }
-    public string Visibility { get; set; } = HostedRunnerVisibility.Disabled;
-    public Guid? SpecificationId { get; set; }
-}
-
 public static class SubscriptionPlanIds
 {
     public static readonly Guid Free = new("6f03b7e0-3d96-4e51-8c49-1a4c03d7f4f7");
-}
-
-public static class HostedRunnerVisibility
-{
-    public const string Disabled = "disabled";
-    public const string TestUsersOnly = "testUsersOnly";
-    public const string Public = "public";
-
-    public static bool IsValid(string? value) => value is Disabled or TestUsersOnly or Public;
-}
-
-public static class HostedRunnerPlanVisibility
-{
-    public static bool IsVisibleInCatalog(PlanCapabilities capabilities, bool canAccessHostedRunnerTestPlans)
-    {
-        var visibility = capabilities.HostedRunner.Visibility;
-        return visibility == HostedRunnerVisibility.Public
-            || (visibility == HostedRunnerVisibility.TestUsersOnly && canAccessHostedRunnerTestPlans);
-    }
 }
 
 public static class PlanCapabilitiesSerializer
@@ -87,18 +60,31 @@ public static class PlanCapabilitiesSerializer
     public static void Normalize(PlanCapabilities capabilities)
     {
         capabilities.Version = capabilities.Version <= 0 ? 1 : capabilities.Version;
-        capabilities.HostedRunner ??= new HostedRunnerCapability();
         capabilities.ScheduledActions ??= new ScheduledActionsCapability();
-
-        var runner = capabilities.HostedRunner;
-        runner.Visibility = HostedRunnerVisibility.IsValid(runner.Visibility)
-            ? runner.Visibility
-            : HostedRunnerVisibility.Disabled;
 
         var schedules = capabilities.ScheduledActions;
         schedules.MaximumSchedules = schedules.MaximumSchedules > 0 ? schedules.MaximumSchedules : 10;
         schedules.MinimumIntervalSeconds = schedules.MinimumIntervalSeconds > 0 ? schedules.MinimumIntervalSeconds : 300;
         schedules.MaximumConcurrentExecutions = schedules.MaximumConcurrentExecutions > 0 ? schedules.MaximumConcurrentExecutions : 1;
         schedules.MonthlyExecutionLimit = schedules.MonthlyExecutionLimit > 0 ? schedules.MonthlyExecutionLimit : 5000;
+    }
+
+    public static bool HasLegacyHostedRunnerEntitlement(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.TryGetProperty("hostedRunner", out var hostedRunner)
+                && hostedRunner.ValueKind == JsonValueKind.Object
+                && hostedRunner.TryGetProperty("enabled", out var enabled)
+                && enabled.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 }

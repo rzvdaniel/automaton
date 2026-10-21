@@ -53,7 +53,6 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         var validatedHost = await db.RunnerHosts.FindAsync(hostId);
         Assert.That(validatedHost!.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.AwaitingApproval));
         Assert.That(validatedHost.ValidatedAtUtc, Is.Not.Null);
-        Assert.That(validatedHost.IsSchedulingEligible, Is.False);
         Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(1));
     }
 
@@ -160,11 +159,10 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
     }
 
     [Test]
-    public async Task HostValidation_FailedActionClosesOperationAndDisablesScheduling()
+    public async Task HostValidation_FailedActionClosesOperationAndMarksHostInvalid()
     {
         await using var db = CreateDbContext();
         var host = await SeedValidationHostAsync(db);
-        host.HostedRunnerSchedulingEnabled = true;
         var publisher = new RecordingPublisher();
         await CreateWorkflowExecutionService(db, publisher).StartHostValidationAsync(
             new StartHostValidationRequest { RunnerHostId = host.Id }, Guid.NewGuid(), CancellationToken.None);
@@ -174,7 +172,6 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         request.Execution.FailureSummary = "Docker unavailable";
         await new InfrastructureHostValidationResultService(db, new RecordingAuditEventService())
             .ApplyAsync(host.InfrastructureRunner!.ApiKeyId!.Value, command.CommandId, request, CancellationToken.None);
-        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
         Assert.That(host.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.ValidationFailed));
         await AssertFailedExecutionAsync(db);
     }
