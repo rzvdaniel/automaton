@@ -77,15 +77,7 @@ internal static class ManagedRunnerBootstrapTestData
             Id = Guid.NewGuid(),
             Name = enabled ? "Hosted" : "No Hosted",
             IsActive = true,
-            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-            {
-                HostedRunner = new HostedRunnerCapability
-                {
-                    Enabled = enabled,
-                    Visibility = HostedRunnerVisibility.Public,
-                    SpecificationId = specification.Id
-                }
-            })
+            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
         };
 
         db.HostedRunnerSpecifications.Add(specification);

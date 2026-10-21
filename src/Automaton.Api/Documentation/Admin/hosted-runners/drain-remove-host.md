@@ -5,12 +5,10 @@ order: 80
 
 # Drain and Remove a Host Safely
 
-1. Disable scheduling on the host.
-2. Confirm that no new containers are assigned there.
-3. Review the existing containers on the host.
-4. Reprovision or migrate them to other eligible hosts.
-5. Confirm that the runner count is zero.
-6. Revoke the Infrastructure Runner.
-7. Remove or archive the host record.
+1. Review the existing Hosted Runner records and their host-local data.
+2. Keep the host and its Docker storage in place while any required legacy workload or data remains there.
+3. Use the existing per-record delete operation only after the data disposition is deliberately chosen.
+4. Revoke the Infrastructure Runner when the host no longer needs infrastructure operations.
+5. Remove or archive the host record only after its remaining consumers are understood.
 
-Disabling scheduling prevents new placements but does not move existing containers. Existing containers must be explicitly reprovisioned before the host can be safely removed.
+Per-user Hosted Runner provisioning and migration to another host are no longer supported. This procedure does not migrate data or workloads. New workloads should use a separately installed and assigned Machine Management Runner.

@@ -18,7 +18,7 @@ Use this page when adding a new Runner Host or maintaining an existing Infrastru
 
 The initial installer may authenticate with either the generated enrollment token or an Infrastructure Runner API key. Enrollment-token installs use the one-time token only to fetch the protected broker bootstrap configuration; the Runner still exchanges that token through the normal enrollment endpoint and persists its durable API key.
 
-Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, **Ready**, successfully validated, and shows the expected image digest. The server is then ready to host managed Runners. For the canonical host onboarding details, see **Add a Runner Host**.
+Approval enables Infrastructure Runner host operations. Confirm that the host is **Online**, **Ready**, successfully validated, and shows the expected image digest. New customer workloads use installed Machine Management Runners rather than per-user Hosted Runner containers. For existing legacy host records, see **Add a Runner Host**.
 
 Infrastructure capability profiles are issued by the enrollment flow; the installer and Repair command do not expose an operator capability override. `AUTOMATON_RUNNER_CAPABILITIES` is a generated runtime projection of that profile. When an existing installation reconnects or is repaired, the current canonical Infrastructure profile is written back before advertisement. The API still authorizes privileged host operations only when the connected Runner explicitly reports the capability and meets the required protocol version.
 
@@ -46,7 +46,7 @@ It preserves the installation ID, API credential, `runner.json`, `installation-p
 4. Wait for the installer to finish, then return to Studio and refresh the details.
 5. Confirm that the runner reconnected, is **Online** and **Ready**, passed health validation, retained its identity, and still shows the installed digest.
 
-Existing Hosted Runner containers normally continue running. New provisioning and host workflows are temporarily unavailable while the Infrastructure Runner is disconnected. If repair fails, inspect the host and container logs before retrying.
+Existing Hosted Runner containers normally continue running. Host operations are temporarily unavailable while the Infrastructure Runner is disconnected. If repair fails, inspect the host and container logs before retrying.
 
 [![Maintain an existing Infrastructure Runner](./assets/infrastructure-runner-maintenance.png)](./assets/infrastructure-runner-maintenance.png)
 
@@ -58,7 +58,7 @@ Use **Replace** only when the existing identity or credentials must no longer be
 2. Select **Replace** for the server, read the warning, and confirm.
 3. Copy the new enrollment command shown by Studio.
 4. Run it with `sudo` on the server, then select **Validate** in Studio.
-5. Select **Approve** after validation succeeds. Approval enables scheduling.
+5. Select **Approve** after validation succeeds. Approval records administrator review for the Infrastructure Runner host.
 
 This creates a new installation identity and credentials. Do not use it for normal repair.
 
@@ -66,7 +66,7 @@ This creates a new installation identity and credentials. Do not use it for norm
 
 Use **Revoke** when a server is retired, lost, or compromised.
 
-1. Disable Hosted Runner scheduling and confirm that no required Hosted Runners depend on the server.
+1. Review any existing Hosted Runner records and confirm whether their workloads or host-local data must be retained.
 2. Open **Admin → Runners → Runner Hosts**, select **Revoke**, review the warning, and confirm.
 
 After revocation, the runner cannot reconnect or perform host operations. Revocation is not a repair operation.
@@ -115,10 +115,6 @@ Open **Admin → Runners → Runner Hosts**, run **Validate**, correct the repor
 ### The image digest did not change
 
 Repair intentionally reuses the installed immutable image. Do not assume **Repair** deploys a newer digest; use the separately supported image update process when one is available.
-
-### Scheduling remains disabled
-
-Confirm the runner is Online, Ready, approved, and successfully validated. Check available CPU, memory, and disk capacity.
 
 ### Repair fails
 

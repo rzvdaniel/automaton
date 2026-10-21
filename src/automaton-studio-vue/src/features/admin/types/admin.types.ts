@@ -372,13 +372,15 @@ export interface SubscriptionPlan {
 
 export interface PlanCapabilities {
   version: number
-  hostedRunner: HostedRunnerCapability
+  scheduledActions?: ScheduledActionsCapability
 }
 
-export interface HostedRunnerCapability {
+export interface ScheduledActionsCapability {
   enabled: boolean
-  visibility: 'disabled' | 'testUsersOnly' | 'public'
-  specificationId?: string | null
+  maximumSchedules: number
+  minimumIntervalSeconds: number
+  maximumConcurrentExecutions: number
+  monthlyExecutionLimit: number
 }
 
 export interface CreateSubscriptionPlanRequest {
@@ -411,7 +413,6 @@ export interface UserPlan {
   name: string
   subscriptionPlanId?: string
   planName?: string
-  canAccessHostedRunnerTestPlans: boolean
 }
 
 export interface AssignPlanRequest {
@@ -432,7 +433,6 @@ export interface RunnerHost {
   providerImageId?: string
   provisioningTransport: string
   runtimeConnectivityMode: string
-  hostedRunnerSchedulingEnabled: boolean
   status: 'active' | 'draining' | 'disabled'
   provisioningStatus: string
   provisioningStartedAtUtc?: string
@@ -442,16 +442,6 @@ export interface RunnerHost {
   approvedByUserId?: string
   provisioningFailureCode?: string
   provisioningFailureMessage?: string
-  isSchedulingEligible: boolean
-  totalCpuCores: number
-  reservedCpuCores: number
-  usedCpuCores: number
-  totalMemoryMb: number
-  reservedMemoryMb: number
-  usedMemoryMb: number
-  totalDiskMb: number
-  reservedDiskMb: number
-  usedDiskMb: number
   hostedRunnerCount: number
   infrastructureRunnerId?: string
   infrastructureRunnerName?: string
@@ -490,14 +480,7 @@ export interface UpdateRunnerHostRequest {
   privateIp?: string
   provisioningTransport?: string
   runtimeConnectivityMode?: string
-  hostedRunnerSchedulingEnabled?: boolean
   status?: 'active' | 'draining' | 'disabled'
-  totalCpuCores?: number
-  reservedCpuCores?: number
-  totalMemoryMb?: number
-  reservedMemoryMb?: number
-  totalDiskMb?: number
-  reservedDiskMb?: number
 }
 
 export interface RunnerEnrollment {
@@ -640,37 +623,6 @@ export interface HostedRunnerSpecificationSnapshot {
   sourceSpecificationRevision: number
   resources: HostedRunnerResources
   capturedAtUtc: string
-}
-
-export interface HostedRunnerSpecification {
-  id: string
-  code: string
-  name: string
-  description?: string
-  revision: number
-  schemaVersion: number
-  isActive: boolean
-  resources: HostedRunnerResources
-  runnerCount: number
-  outdatedRunnerCount: number
-  createdAtUtc: string
-  updatedAtUtc: string
-}
-
-export interface HostedRunnerSpecificationRequest {
-  name: string
-  code?: string
-  description?: string
-  isActive?: boolean
-  resources: HostedRunnerResources
-}
-
-export interface HostedRunnerPlatformSettings {
-  provisioningEnabled: boolean
-  updatedAtUtc: string
-}
-
-export interface ProvisionHostedRunnerRequest {
 }
 
 export interface AdminAppDetails {

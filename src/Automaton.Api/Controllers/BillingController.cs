@@ -102,19 +102,15 @@ public class BillingController : BaseController
                 u.Id,
                 u.StripeSubscriptionId,
                 PlanName = u.SubscriptionPlan != null ? u.SubscriptionPlan.Name : null,
-                PlanPriceUsd = u.SubscriptionPlan != null ? u.SubscriptionPlan.PriceUsd : 0m,
-                CapabilitiesJson = u.SubscriptionPlan != null ? u.SubscriptionPlan.CapabilitiesJson : null
+                PlanPriceUsd = u.SubscriptionPlan != null ? u.SubscriptionPlan.PriceUsd : 0m
             })
             .FirstOrDefaultAsync(u => u.Id == userId);
-
-        var capabilities = PlanCapabilitiesSerializer.Deserialize(user?.CapabilitiesJson);
 
         return Ok(new
         {
             planName            = user?.PlanName ?? "Free",
             priceUsd            = user?.PlanPriceUsd ?? 0m,
-            hasActiveSubscription = !string.IsNullOrEmpty(user?.StripeSubscriptionId),
-            capabilities,
+            hasActiveSubscription = !string.IsNullOrEmpty(user?.StripeSubscriptionId)
         });
     }
 }

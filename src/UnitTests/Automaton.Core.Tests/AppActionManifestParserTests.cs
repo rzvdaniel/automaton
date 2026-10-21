@@ -169,8 +169,6 @@ public class AppActionManifestParserTests
         Assert.That(AppActionSchemaValidator.Validate(valid.RootElement, manifest.Spec.Input), Is.Null);
     }
 
-    [TestCase("provision-hosted-runner")]
-    [TestCase("reprovision-hosted-runner")]
     [TestCase("restart-hosted-runner")]
     [TestCase("delete-hosted-runner")]
     [TestCase("measure-hosted-runner-storage")]

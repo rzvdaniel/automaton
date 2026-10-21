@@ -2,7 +2,6 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Messaging.Abstractions;
-using Automaton.Messaging.Events;
 using Automaton.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -13,7 +12,6 @@ namespace Automaton.Worker.Tests;
 internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
 {
     private readonly ApplicationDbContext db;
-    private readonly RecordingPublisher publisher;
     private readonly HostedRunnerRegistrationReconciler reconciler;
     private readonly Guid operationId;
     private readonly Guid retryOperationId;
@@ -22,7 +20,6 @@ internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
 
     private HostedRunnerRegistrationTimeoutScenario(
         ApplicationDbContext db,
-        RecordingPublisher publisher,
         HostedRunnerRegistrationReconciler reconciler,
         Guid operationId,
         Guid retryOperationId,
@@ -30,7 +27,6 @@ internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
         Guid retrySecretVersionId)
     {
         this.db = db;
-        this.publisher = publisher;
         this.reconciler = reconciler;
         this.operationId = operationId;
         this.retryOperationId = retryOperationId;
@@ -55,12 +51,11 @@ internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
         AddEnrollments(db, hostedRunnerId, operationId, retryOperationId, secretVersionId, retrySecretVersionId, now);
         AddSecretsAndGrants(db, operationId, retryOperationId, secretVersionId, retrySecretVersionId, now);
         await db.SaveChangesAsync();
-        var publisher = new RecordingPublisher();
         var reconciler = new HostedRunnerRegistrationReconciler(
-            db, new InlineTransactionalExecutor(), publisher,
+            db, new InlineTransactionalExecutor(),
             NullLogger<HostedRunnerRegistrationReconciler>.Instance);
         return new HostedRunnerRegistrationTimeoutScenario(
-            db, publisher, reconciler, operationId, retryOperationId, secretVersionId, retrySecretVersionId);
+            db, reconciler, operationId, retryOperationId, secretVersionId, retrySecretVersionId);
     }
 
     internal async Task ReconcileAndAssertAsync()
@@ -72,7 +67,6 @@ internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
         await AssertDeploymentAndRunnerAsync();
         await AssertEnrollmentsAsync();
         await AssertSecretsAndGrantsAsync();
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionFailedEvent>().Count(), Is.EqualTo(1));
     }
 
     private static void AddRunner(ApplicationDbContext db, Guid runnerId, Guid apiKeyId)
@@ -190,16 +184,6 @@ internal sealed class HostedRunnerRegistrationTimeoutScenario : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => db.DisposeAsync();
-
-    private sealed class RecordingPublisher : IEventPublisher
-    {
-        public List<object> Messages { get; } = [];
-        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
-        {
-            Messages.Add(message);
-            return Task.CompletedTask;
-        }
-    }
 
     private sealed class InlineTransactionalExecutor : ITransactionalEventExecutor
     {

@@ -41,10 +41,8 @@ internal static class HostedRunnerAuditTestData
 
     public static Guid ConfigureSpecificationResources(ApplicationDbContext db, Guid planId)
     {
-        var specificationId = PlanCapabilitiesSerializer.Deserialize(
-            db.SubscriptionPlans.Single(x => x.Id == planId).CapabilitiesJson)
-            .HostedRunner.SpecificationId!.Value;
-        var specification = db.HostedRunnerSpecifications.Single(x => x.Id == specificationId);
+        var plan = db.SubscriptionPlans.Single(x => x.Id == planId);
+        var specification = db.HostedRunnerSpecifications.Single(x => x.Name == $"{plan.Name} legacy specification");
         specification.Resources = new HostedRunnerResources
         {
             CpuLimit = 0.75m,
@@ -58,7 +56,7 @@ internal static class HostedRunnerAuditTestData
             MaximumApps = 7
         };
         db.SaveChanges();
-        return specificationId;
+        return specification.Id;
     }
 
     public static void SeedCoLocatedRunnersWithDifferentDiskLimits(ApplicationDbContext db, Guid userId, Guid planId)
@@ -123,8 +121,9 @@ internal static class HostedRunnerAuditTestData
     {
         var host = db.RunnerHosts.FirstOrDefault() ?? SeedRunnerHost(db);
         var effectivePlanId = planId ?? SeedHostedRunnerPlan(db);
-        var specificationId = PlanCapabilitiesSerializer.Deserialize(
-            db.SubscriptionPlans.Single(x => x.Id == effectivePlanId).CapabilitiesJson).HostedRunner.SpecificationId!.Value;
+        var plan = db.SubscriptionPlans.Single(x => x.Id == effectivePlanId);
+        var specificationId = db.HostedRunnerSpecifications
+            .Single(x => x.Name == $"{plan.Name} legacy specification").Id;
         EnsureUserExists(db, userId, effectivePlanId);
         var runner = new Runner
         {
@@ -158,27 +157,20 @@ internal static class HostedRunnerAuditTestData
     private static Guid SeedPlan(ApplicationDbContext db, bool enabled, string? uniqueCodeSuffix = null)
     {
         var codeSuffix = string.IsNullOrWhiteSpace(uniqueCodeSuffix) ? string.Empty : $"-{uniqueCodeSuffix}";
+        var planName = enabled ? "Hosted" : "No Hosted";
         var specification = new HostedRunnerSpecification
         {
             Id = Guid.NewGuid(),
             Code = enabled ? $"test-hosted{codeSuffix}" : $"test-disabled{codeSuffix}",
-            Name = enabled ? "Test Hosted Runner" : "Test Disabled Runner",
+            Name = $"{planName}{codeSuffix} legacy specification",
             IsActive = true
         };
         var plan = new SubscriptionPlan
         {
             Id = Guid.NewGuid(),
-            Name = enabled ? "Hosted" : "No Hosted",
+            Name = $"{planName}{codeSuffix}",
             IsActive = true,
-            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
-            {
-                HostedRunner = new HostedRunnerCapability
-                {
-                    Enabled = enabled,
-                    Visibility = HostedRunnerVisibility.Public,
-                    SpecificationId = specification.Id
-                }
-            })
+            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(PlanCapabilities.Default)
         };
         db.HostedRunnerSpecifications.Add(specification);
         db.SubscriptionPlans.Add(plan);

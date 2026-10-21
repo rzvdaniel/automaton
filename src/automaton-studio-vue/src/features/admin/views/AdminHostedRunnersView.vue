@@ -3,11 +3,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
-import Checkbox from 'primevue/checkbox'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
-import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
@@ -15,7 +13,6 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useRoute } from 'vue-router'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
-import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
 import {
@@ -29,7 +26,6 @@ import type {
   RunnerEnrollment,
   InfrastructureRunnerEnrollmentKey,
   RunnerHost,
-  UserPlan,
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
   UpdateRunnerHostRequest,
@@ -43,10 +39,7 @@ const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
 const loadingHosts = ref(false)
 const loadingRunners = ref(false)
-const loadingProvisioningOptions = ref(false)
-const provisioningUserId = ref<string | null>(null)
 const restartingRunnerId = ref<string | null>(null)
-const reprovisioningRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
 const verifyingStorageRunnerId = ref<string | null>(null)
 const suspendingRunnerId = ref<string | null>(null)
@@ -124,15 +117,10 @@ const repairDialogVisible = ref(false)
 const repairHost = ref<RunnerHost | null>(null)
 const validatingHostId = ref<string | null>(null)
 const approvingHostId = ref<string | null>(null)
-const disablingSchedulingHostId = ref<string | null>(null)
 const revokingInfrastructureRunnerHostId = ref<string | null>(null)
 const validationDialogVisible = ref(false)
 const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
 const validationLogs = ref<InfrastructureWorkflowExecutionLog[]>([])
-const provisionDialogVisible = ref(false)
-const provisioningNewRunner = ref(false)
-const users = ref<UserPlan[]>([])
-const selectedProvisionUserId = ref<string | null>(null)
 const statusFilter = ref<string | null>(null)
 const hostFilter = ref<string | null>(null)
 const specificationFilter = ref<string | null>(null)
@@ -161,18 +149,11 @@ const runtimeConnectivityOptions = [
   { label: 'Local Docker network', value: 'localDockerNetwork' },
 ] as const
 
-const userOptions = computed(() =>
-  users.value.map((user) => ({
-    label: user.name ? `${user.name} (${user.email})` : user.email,
-    value: user.userId,
-  })),
-)
-
 const isContainersView = computed(() => route.path.endsWith('/containers'))
 
 function openHostedRunnersHandbook() {
   openDocumentation(
-    isContainersView.value ? 'admin.hosted-runners.provision-runner-container' : 'admin.hosted-runners.add-runner-host',
+    isContainersView.value ? 'admin.hosted-runners.troubleshooting' : 'admin.hosted-runners.add-runner-host',
     'Hosted Runners Administration Guide',
   )
 }
@@ -231,21 +212,6 @@ function hostHealthSummary(host: RunnerHost): string {
   return [health.docker, health.network, health.disk, health.apiConnectivity].filter(Boolean).join(' · ')
 }
 
-const totals = computed(() => {
-  return hosts.value.reduce(
-    (acc, host) => {
-      acc.cpu += host.totalCpuCores
-      acc.usedCpu += host.usedCpuCores + host.reservedCpuCores
-      acc.memory += host.totalMemoryMb
-      acc.usedMemory += host.usedMemoryMb + host.reservedMemoryMb
-      acc.disk += host.totalDiskMb
-      acc.usedDisk += host.usedDiskMb + host.reservedDiskMb
-      return acc
-    },
-    { cpu: 0, usedCpu: 0, memory: 0, usedMemory: 0, disk: 0, usedDisk: 0 },
-  )
-})
-
 async function loadHosts() {
   loadingHosts.value = true
   try {
@@ -301,18 +267,6 @@ async function pollHostedRunnerDeletion(hostedRunnerId: string): Promise<'succee
   }
 
   return 'pending'
-}
-
-async function loadProvisioningOptions() {
-  loadingProvisioningOptions.value = true
-  try {
-    const loadedUsers = await adminSubscriptionPlansService.getUsers()
-    users.value = loadedUsers
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load users or plans', life: 3000 })
-  } finally {
-    loadingProvisioningOptions.value = false
-  }
 }
 
 async function refreshAll() {
@@ -407,14 +361,7 @@ function openEditHost(host: RunnerHost) {
     privateIp: host.privateIp ?? '',
     provisioningTransport: host.provisioningTransport,
     runtimeConnectivityMode: host.runtimeConnectivityMode,
-    hostedRunnerSchedulingEnabled: host.hostedRunnerSchedulingEnabled,
     status: host.status,
-    totalCpuCores: host.totalCpuCores,
-    reservedCpuCores: host.reservedCpuCores,
-    totalMemoryMb: host.totalMemoryMb,
-    reservedMemoryMb: host.reservedMemoryMb,
-    totalDiskMb: host.totalDiskMb,
-    reservedDiskMb: host.reservedDiskMb,
   }
   hostDialogVisible.value = true
 }
@@ -488,7 +435,7 @@ async function approveHost(host: RunnerHost) {
   approvingHostId.value = host.id
   try {
     await adminHostedRunnersService.approveHost(host.id)
-    toast.add({ severity: 'success', summary: 'Host approved', detail: 'Managed Runner scheduling is now enabled.', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Host approved', detail: 'The Infrastructure Runner host was approved.', life: 3000 })
     await loadHosts()
   } catch (error) {
     toast.add({ severity: 'error', summary: 'Approval failed', detail: error instanceof Error ? error.message : 'Host approval failed.', life: 4000 })
@@ -497,21 +444,8 @@ async function approveHost(host: RunnerHost) {
   }
 }
 
-async function disableHostScheduling(host: RunnerHost) {
-  disablingSchedulingHostId.value = host.id
-  try {
-    await adminHostedRunnersService.disableHostScheduling(host.id)
-    toast.add({ severity: 'success', summary: 'Scheduling disabled', detail: 'Existing Hosted Runners were preserved.', life: 3000 })
-    await loadHosts()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Action failed', detail: 'Could not disable host scheduling.', life: 3500 })
-  } finally {
-    disablingSchedulingHostId.value = null
-  }
-}
-
 async function revokeInfrastructureRunner(host: RunnerHost) {
-  if (!window.confirm(`Revoke the Infrastructure Runner for ${host.name}? Scheduling will be disabled.`)) return
+  if (!window.confirm(`Revoke the Infrastructure Runner for ${host.name}?`)) return
   revokingInfrastructureRunnerHostId.value = host.id
   try {
     await adminHostedRunnersService.revokeInfrastructureRunner(host.id)
@@ -521,19 +455,6 @@ async function revokeInfrastructureRunner(host: RunnerHost) {
     toast.add({ severity: 'error', summary: 'Revocation failed', detail: error instanceof Error ? error.message : 'Could not revoke the Infrastructure Runner.', life: 4000 })
   } finally {
     revokingInfrastructureRunnerHostId.value = null
-  }
-}
-
-async function retryProvisioning(runner: HostedRunner) {
-  provisioningUserId.value = runner.userId
-  try {
-    await adminHostedRunnersService.provisionForUser(runner.userId)
-    toast.add({ severity: 'success', summary: 'Provisioning requested', detail: 'Hosted runner deployment was queued again.', life: 3000 })
-    await refreshAll()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to request hosted runner provisioning', life: 3000 })
-  } finally {
-    provisioningUserId.value = null
   }
 }
 
@@ -570,24 +491,6 @@ async function restartHostedRunner(runner: HostedRunner) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to restart hosted runner', life: 3000 })
   } finally {
     restartingRunnerId.value = null
-  }
-}
-
-async function reprovisionHostedRunner(runner: HostedRunner) {
-  reprovisioningRunnerId.value = runner.id
-  try {
-    await adminHostedRunnersService.reprovisionHostedRunner(runner.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Reprovision requested',
-      detail: `Reprovision started for ${runner.name}.`,
-      life: 3000,
-    })
-    await refreshAll()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to reprovision hosted runner', life: 3000 })
-  } finally {
-    reprovisioningRunnerId.value = null
   }
 }
 
@@ -653,33 +556,6 @@ async function confirmDeleteHostedRunner(runner: HostedRunner, dataDisposition: 
     deletingRunnerId.value = null
     deleteConfirmationRunnerId.value = null
     deleteDataConfirmation.value = ''
-  }
-}
-
-async function openProvisionDialog() {
-  selectedProvisionUserId.value = null
-  provisionDialogVisible.value = true
-  await loadProvisioningOptions()
-}
-
-async function provisionHostedRunner() {
-  if (!selectedProvisionUserId.value) return
-
-  provisioningNewRunner.value = true
-  try {
-    await adminHostedRunnersService.provisionForUser(selectedProvisionUserId.value)
-    toast.add({
-      severity: 'success',
-      summary: 'Provisioning requested',
-      detail: 'Hosted runner provisioning has started for the selected user.',
-      life: 3000,
-    })
-    provisionDialogVisible.value = false
-    await refreshAll()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to provision hosted runner', life: 3000 })
-  } finally {
-    provisioningNewRunner.value = false
   }
 }
 
@@ -767,8 +643,8 @@ watch(() => route.path, refreshAll)
         <h1 class="m-0">Runners</h1>
         <p class="text-color-secondary mt-2 mb-0">
           {{ isContainersView
-            ? 'Manage tenant runner containers, their specifications, lifecycle, and runtime state.'
-            : 'Manage infrastructure capacity, Infrastructure Runner connectivity, validation, and scheduling.' }}
+            ? 'Review retained legacy Hosted Runner records and their lifecycle and runtime state.'
+            : 'Manage Infrastructure Runner connectivity, validation, and host operations.' }}
         </p>
       </div>
       <div class="flex gap-2">
@@ -792,71 +668,11 @@ watch(() => route.path, refreshAll)
       <template #content>
         <div class="infrastructure-note__eyebrow">Experimental Infrastructure</div>
         <div class="infrastructure-note__copy">
-          Hosted runners and deployment cutovers are still in preview. Short-lived disconnects,
-          reconnect lag, or manual intervention may still be required while the platform evolves.
+          Infrastructure Runner installation and validation are still evolving. Short-lived disconnects,
+          reconnect lag, or manual intervention may be required during host operations.
         </div>
       </template>
     </Card>
-
-    <div v-if="!isContainersView" class="grid mb-4">
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">Host CPU capacity</div>
-            <div class="text-2xl font-semibold">{{ totals.usedCpu }} / {{ totals.cpu }} cores</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">Host memory capacity</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} / {{ formatMb(totals.memory) }}</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">Host disk capacity</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} / {{ formatMb(totals.disk) }}</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-    </div>
-
-    <div v-else class="grid mb-4">
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">CPU allocated</div>
-            <div class="text-2xl font-semibold">{{ totals.usedCpu }} / {{ totals.cpu }} cores</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">Memory allocated</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} / {{ formatMb(totals.memory) }}</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-4">
-        <Card>
-          <template #content>
-            <div class="text-color-secondary text-sm mb-2">Disk allocated</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} / {{ formatMb(totals.disk) }}</div>
-            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
-          </template>
-        </Card>
-      </div>
-    </div>
 
     <Card v-if="!isContainersView" class="mb-4">
       <template #title>
@@ -901,20 +717,8 @@ watch(() => route.path, refreshAll)
                 </span>
                 <span v-if="data.provisioningFailureCode" class="text-red-500 text-xs">{{ data.provisioningFailureCode }}</span>
                 <span v-if="data.approvedAtUtc" class="text-color-secondary text-xs">Approved: {{ formatDateTime(data.approvedAtUtc) }}</span>
-                <span v-if="data.provisioningStatus === 'ready'" class="text-color-secondary text-xs">
-                  Scheduling: {{ data.hostedRunnerSchedulingEnabled ? 'Enabled' : 'Disabled' }}
-                </span>
               </div>
             </template>
-          </Column>
-          <Column header="CPU">
-            <template #body="{ data }">{{ data.usedCpuCores + data.reservedCpuCores }} / {{ data.totalCpuCores }}</template>
-          </Column>
-          <Column header="Memory">
-            <template #body="{ data }">{{ formatMb(data.usedMemoryMb + data.reservedMemoryMb) }} / {{ formatMb(data.totalMemoryMb) }}</template>
-          </Column>
-          <Column header="Disk">
-            <template #body="{ data }">{{ formatMb(data.usedDiskMb + data.reservedDiskMb) }} / {{ formatMb(data.totalDiskMb) }}</template>
           </Column>
           <Column field="hostedRunnerCount" header="Runners" />
           <Column header="Actions" :frozen="true" align-frozen="right">
@@ -965,16 +769,6 @@ watch(() => route.path, refreshAll)
                   @click="approveHost(data)"
                 />
                 <Button
-                  v-if="data.provisioningStatus === 'ready' && data.hostedRunnerSchedulingEnabled"
-                  label="Disable scheduling"
-                  icon="pi pi-pause"
-                  size="small"
-                  severity="warning"
-                  outlined
-                  :loading="disablingSchedulingHostId === data.id"
-                  @click="disableHostScheduling(data)"
-                />
-                <Button
                   v-if="data.infrastructureRunnerId"
                   label="Revoke"
                   icon="pi pi-ban"
@@ -1004,7 +798,6 @@ watch(() => route.path, refreshAll)
           <Select v-model="statusFilter" :options="containerStatusOptions" placeholder="Status" show-clear aria-label="Filter by status" />
           <Select v-model="hostFilter" :options="containerHostOptions" placeholder="Host" show-clear aria-label="Filter by host" />
           <Select v-model="specificationFilter" :options="containerSpecificationOptions" placeholder="Specification" show-clear aria-label="Filter by specification" />
-          <Button label="Provision Runner" icon="pi pi-play" size="small" class="container-filters__action" @click="openProvisionDialog" />
         </div>
         <DataTable :value="filteredHostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" scrollable :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
           <Column field="userEmail" header="User" />
@@ -1048,16 +841,6 @@ watch(() => route.path, refreshAll)
                   @click="restartHostedRunner(data)"
                 />
                 <Button
-                  v-if="!isDeletedRunner(data)"
-                  label="Reprovision"
-                  icon="pi pi-replay"
-                  size="small"
-                  severity="secondary"
-                  outlined
-                  :loading="reprovisioningRunnerId === data.id"
-                  @click="reprovisionHostedRunner(data)"
-                />
-                <Button
                   v-if="canSuspendHostedRunner(data)"
                   label="Suspend"
                   icon="pi pi-pause"
@@ -1079,51 +862,12 @@ watch(() => route.path, refreshAll)
                   :disabled="isHostedRunnerActionPending(data.id, resumingRunnerId)"
                   @click="resumeHostedRunner(data)"
                 />
-                <Button
-                  v-if="!isDeletedRunner(data) && data.status !== 'running'"
-                  label="Retry"
-                  icon="pi pi-play"
-                  size="small"
-                  outlined
-                  :loading="provisioningUserId === data.userId"
-                  @click="retryProvisioning(data)"
-                />
               </div>
             </template>
           </Column>
         </DataTable>
       </template>
     </Card>
-
-    <Dialog v-model:visible="provisionDialogVisible" header="Provision Hosted Runner" modal :style="{ width: '36rem' }">
-      <div class="flex flex-column gap-3">
-        <div>
-          <label class="block text-sm font-medium mb-2">User</label>
-          <Select
-            v-model="selectedProvisionUserId"
-            :options="userOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-            placeholder="Select a user"
-            :loading="loadingProvisioningOptions"
-          />
-        </div>
-        <div class="text-color-secondary text-sm">
-          This uses the same provisioning endpoint as plan assignment and Stripe-driven subscriptions, but lets admins run the first smoke test directly.
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancel" text @click="provisionDialogVisible = false" />
-        <Button
-          label="Provision"
-          icon="pi pi-play"
-          :disabled="!selectedProvisionUserId"
-          :loading="provisioningNewRunner"
-          @click="provisionHostedRunner"
-        />
-      </template>
-    </Dialog>
 
     <Dialog v-model:visible="enrollmentDialogVisible" header="Install Infrastructure Runner" modal :style="{ width: '48rem' }">
       <div v-if="enrollment" class="flex flex-column gap-3">
@@ -1258,7 +1002,7 @@ watch(() => route.path, refreshAll)
           The Infrastructure Runner will report the provider details, network addresses, capacity, metadata, and health after enrollment. You only need to name the host now.
         </div>
         <Message v-if="editingHost" severity="info" :closable="false">
-          Capacity, metadata, health, and heartbeat values reported by the Infrastructure Runner are authoritative. Use these fields only for administrative corrections or initial scheduling values.
+          Metadata, health, and heartbeat values reported by the Infrastructure Runner are read-only. Edit only the host identity, connectivity, or status.
         </Message>
         <div v-if="editingHost" class="runner-host-form__reported">
           <div class="text-sm font-semibold mb-2">Reported by Infrastructure Runner</div>
@@ -1332,46 +1076,6 @@ watch(() => route.path, refreshAll)
           <div>
             <label class="block text-sm font-medium mb-2">Private IP</label>
             <InputText v-model="hostForm.privateIp" class="w-full" />
-          </div>
-        </div>
-        <div v-if="editingHost" class="runner-host-form__three-column">
-          <div>
-            <label class="block text-sm font-medium mb-2">CPU cores</label>
-            <InputNumber v-model="hostForm.totalCpuCores" class="w-full" :min="0.25" :step="0.25" :min-fraction-digits="0" :max-fraction-digits="2" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Reserved CPU cores</label>
-            <InputNumber v-model="hostForm.reservedCpuCores" class="w-full" :min="0" :step="0.25" :min-fraction-digits="0" :max-fraction-digits="2" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Memory MB</label>
-            <InputNumber v-model="hostForm.totalMemoryMb" class="w-full" :min="128" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Reserved memory MB</label>
-            <InputNumber v-model="hostForm.reservedMemoryMb" class="w-full" :min="0" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Disk MB</label>
-            <InputNumber v-model="hostForm.totalDiskMb" class="w-full" :min="512" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Reserved disk MB</label>
-            <InputNumber v-model="hostForm.reservedDiskMb" class="w-full" :min="0" />
-          </div>
-        </div>
-        <div class="flex align-items-start gap-2">
-          <Checkbox
-            v-model="hostForm.hostedRunnerSchedulingEnabled"
-            binary
-            input-id="hostedRunnerSchedulingEnabled"
-            :disabled="editingHost?.provisioningTransport === 'localDocker'"
-          />
-          <div>
-            <label for="hostedRunnerSchedulingEnabled">Allow managed Runner placement on this host</label>
-            <div v-if="editingHost?.provisioningTransport === 'localDocker'" class="text-color-secondary text-sm mt-1">
-              The control-plane host is reserved for platform services and Infrastructure Runner workflows.
-            </div>
           </div>
         </div>
       </div>

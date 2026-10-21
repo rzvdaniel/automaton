@@ -12,21 +12,6 @@ export interface BillingStatusResponse {
   planName: string
   priceUsd: number
   hasActiveSubscription: boolean
-  capabilities: PlanCapabilities
-}
-
-export interface PlanCapabilities {
-  version: number
-  hostedRunner: HostedRunnerCapability
-}
-
-export interface HostedRunnerCapability {
-  enabled: boolean
-  cpuCores: number
-  memoryMb: number
-  diskMb: number
-  maxApps: number
-  visibility: 'disabled' | 'testUsersOnly' | 'public'
 }
 
 const billingService = {

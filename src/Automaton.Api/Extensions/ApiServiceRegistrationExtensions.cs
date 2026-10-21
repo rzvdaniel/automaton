@@ -617,8 +617,6 @@ internal static class ApiRunnerRegistration
         services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));
         services.AddScoped<RunnerEnrollmentService>();
         services.AddScoped<RunnerEnrollmentAdministrationService>();
-        services.AddScoped<HostedRunnerEnrollmentProvisioningService>();
-        services.AddScoped<HostedRunnerEnrollmentExchangeService>();
         services.AddScoped<InfrastructureRunnerEnrollmentExchangeService>();
         services.AddScoped<SelfHostedRunnerInstallationService>();
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
@@ -703,11 +701,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
         services.AddScoped<AdminAiGuidanceService>();
         services.AddScoped<AdminDocumentationService>();
-        services.AddScoped<HostedRunnerHostPlacementService>();
-        services.AddScoped<HostedRunnerProvisioningPolicyService>();
-        services.AddScoped<HostedRunnerProvisioningPreparationService>();
-        services.AddScoped<HostedRunnerStorageLocalityResolver>();
-        services.AddScoped<HostedRunnerProvisioningService>();
         services.AddScoped<RunnerAuditService>();
         services.AddScoped<RunnerRegistrationService>();
         services.AddScoped<RunnerDeletionService>();
@@ -727,15 +720,10 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerExecutionCommandPublisher>();
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
-        services.AddScoped<HostedRunnerPlanCapabilityValidator>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
-        services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
-        services.AddScoped<ISubscriptionResourcePolicyResolver, SubscriptionResourcePolicyResolver>();
-        services.AddScoped<IAccountStorageProjectAllocationService, AccountStorageProjectAllocationService>();
         services.AddScoped<HostedRunnerManagementService>();
         services.AddScoped<InfrastructureWorkflowExecutionService>();
         services.AddScoped<InfrastructureHostValidationResultService>();
-        services.AddScoped<LocalRunnerHostBootstrapService>();
         return services;
     }
 }

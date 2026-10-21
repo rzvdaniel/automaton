@@ -12,7 +12,7 @@ public sealed class AccountStorageProjectMigrationTests
     private const string StorageIdentityMigration = "20260923051139_MoveStorageProjectIdentityToAccount";
 
     [Test]
-    public async Task Migration_AdoptsExistingIdsAndAllowsLazyAccountsAndSharedHostedRunnerIdentity()
+    public async Task Migration_AdoptsExistingIdsAndLeavesUnassignedAccountsUnallocated()
     {
         using var connection = CreateOpenConnection();
         using var db = CreatePreMigrationDbContext(connection);
@@ -32,8 +32,7 @@ public sealed class AccountStorageProjectMigrationTests
         Assert.That(firstProject, Is.EqualTo(1_234_567));
         Assert.That(secondProject, Is.EqualTo(1_234_568));
 
-        var lazyProject = await new AccountStorageProjectAllocationService(db).GetOrCreateAsync(accountWithoutRunner);
-        Assert.That(lazyProject, Is.GreaterThan(0).And.Not.EqualTo(firstProject).And.Not.EqualTo(secondProject));
+        Assert.That(await db.AccountStorageAllocations.AnyAsync(x => x.AccountId == accountWithoutRunner), Is.False);
 
         var duplicateAccount = Guid.NewGuid();
         await AddAccountAsync(db, duplicateAccount);
@@ -44,7 +43,6 @@ public sealed class AccountStorageProjectMigrationTests
 
         await AddHostedRunnerAsync(db, firstAccount, firstProject);
         Assert.That(await CountHostedRunnersAsync(db, firstAccount, firstProject), Is.EqualTo(2));
-        Assert.That(await new AccountStorageProjectAllocationService(db).GetOrCreateAsync(firstAccount), Is.EqualTo(firstProject));
     }
 
     [Test]

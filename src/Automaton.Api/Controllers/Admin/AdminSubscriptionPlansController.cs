@@ -61,10 +61,8 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SubscriptionPlanResponse>> CreatePlan([FromBody] CreateSubscriptionPlanRequest req, CancellationToken cancellationToken)
     {
-        var (plan, capabilityError) = await _planOperations.CreateAsync(req, cancellationToken);
-        if (capabilityError is not null) return BadRequest(new { message = capabilityError });
-
-        return CreatedAtAction(nameof(GetPlan), new { id = plan!.Id }, ToResponse(plan));
+        var plan = await _planOperations.CreateAsync(req, cancellationToken);
+        return CreatedAtAction(nameof(GetPlan), new { id = plan.Id }, ToResponse(plan));
     }
 
     [HttpPut("{id:guid}")]
@@ -72,12 +70,6 @@ public class AdminSubscriptionPlansController : ControllerBase
     {
         var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (plan == null) return NotFound();
-
-        if (req.Capabilities != null)
-        {
-            var capabilityError = await _planOperations.ValidateCapabilitiesAsync(req.Capabilities, cancellationToken);
-            if (capabilityError != null) return BadRequest(new { message = capabilityError });
-        }
 
         var newIsActive = req.IsActive ?? plan.IsActive;
         var newIsDefault = (req.IsDefault ?? plan.IsDefault) && newIsActive;
@@ -126,8 +118,7 @@ public class AdminSubscriptionPlansController : ControllerBase
                 Email               = u.Email ?? string.Empty,
                 Name                = u.Name ?? u.Email ?? string.Empty,
                 SubscriptionPlanId  = u.SubscriptionPlanId,
-                PlanName            = u.SubscriptionPlan?.Name,
-                CanAccessHostedRunnerTestPlans = u.CanAccessHostedRunnerTestPlans
+                PlanName            = u.SubscriptionPlan?.Name
             };
         });
 
@@ -145,17 +136,8 @@ public class AdminSubscriptionPlansController : ControllerBase
         {
             PlanAssignmentFailure.UserNotFound => NotFound("User not found."),
             PlanAssignmentFailure.PlanNotFound => NotFound("Subscription plan not found."),
-            PlanAssignmentFailure.InvalidCapability => BadRequest(new { message = result.Error }),
             _ => NoContent()
         };
-    }
-
-    [HttpPost("users/{userId:guid}/hosted-runner-test-access")]
-    public async Task<IActionResult> SetHostedRunnerTestAccess(Guid userId, [FromBody] SetHostedRunnerTestAccessRequest req)
-    {
-        return await _planOperations.SetHostedRunnerTestAccessAsync(userId, req.Enabled)
-            ? NoContent()
-            : NotFound("User not found.");
     }
 
     #endregion

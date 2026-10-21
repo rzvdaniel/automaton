@@ -60,8 +60,7 @@ public sealed class InfrastructureHostValidationReplayTests
         {
             host.MetadataJson, host.HealthJson, host.PrivateIp, host.TotalCpuCores,
             host.TotalMemoryMb, host.TotalDiskMb, host.ValidatedAtUtc, host.UpdatedAt,
-            host.ProvisioningStatus, host.ProvisioningFailureCode, host.ProvisioningFailureMessage,
-            host.HostedRunnerSchedulingEnabled
+            host.ProvisioningStatus, host.ProvisioningFailureCode, host.ProvisioningFailureMessage
         }), JsonSerializer.Serialize(operation), JsonSerializer.Serialize(logs));
     }
 }

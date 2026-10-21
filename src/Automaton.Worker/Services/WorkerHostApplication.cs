@@ -64,7 +64,6 @@ internal static class WorkerHostApplication
         services.AddScoped<HostedRunnerStorageLocalityAdoptionService>();
         services.AddAutomatonInfrastructure(builder.Configuration);
         services.AddAutomatonWorkerIdentity();
-        services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));
         services.Configure<StorageTelemetryOptions>(builder.Configuration.GetSection("StorageTelemetry"));
         ConfigureDataProtection(builder);
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
@@ -80,8 +79,6 @@ internal static class WorkerHostApplication
         services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
         services.AddTransient<UserRegisteredCapSubscriber>();
         services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
-        services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
-        services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
         services.AddHostedService<CliAuthorizationCleanupService>();
         services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
         services.AddHostedService<ActionSchedulePollingService>();

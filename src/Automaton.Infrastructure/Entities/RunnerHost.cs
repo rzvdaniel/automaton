@@ -119,12 +119,4 @@ public class RunnerHost
     public virtual ICollection<HostedRunner> HostedRunners { get; set; } = new List<HostedRunner>();
     public virtual ICollection<RunnerEnrollment> RunnerEnrollments { get; set; } = new List<RunnerEnrollment>();
 
-    [NotMapped]
-    public bool IsSchedulingEligible =>
-        ProvisioningStatus == RunnerHostProvisioningStatuses.Ready &&
-        Status == RunnerHostStatuses.Active &&
-        HostedRunnerSchedulingEnabled &&
-        StorageState is RunnerHostStorageStates.Healthy or RunnerHostStorageStates.LowSpace &&
-        ValidatedAtUtc.HasValue &&
-        (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker || InfrastructureRunnerId.HasValue);
 }

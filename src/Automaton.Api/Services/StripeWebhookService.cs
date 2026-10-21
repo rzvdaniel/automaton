@@ -12,7 +12,6 @@ public sealed class StripeWebhookService(
     ApplicationDbContext db,
     UserManager<ApplicationUser> userManager,
     IOptionsSnapshot<StripeOptions> options,
-    HostedRunnerProvisioningService hostedRunnerProvisioningService,
     ILogger<StripeWebhookService> logger)
 {
     private readonly string webhookSecret = options.Value.WebhookSecret;
@@ -175,16 +174,6 @@ public sealed class StripeWebhookService(
 
         user.SubscriptionPlanId = plan.Id;
         await userManager.UpdateAsync(user);
-
-        try
-        {
-            await hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId);
-        }
-        catch (Exception exception)
-        {
-            // Stripe webhooks must stay idempotent and retryable; provisioning failures are tracked separately.
-            logger.LogError(exception, "Hosted runner provisioning failed after assigning plan {PlanId} to user {UserId}", plan.Id, userId);
-        }
     }
 
     private async Task DowngradeToFreeAsync(Guid userId)
@@ -198,8 +187,5 @@ public sealed class StripeWebhookService(
 
         user.SubscriptionPlanId = freePlan?.Id;
         await userManager.UpdateAsync(user);
-        await hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
-            userId,
-            "Subscription was downgraded or cancelled.");
     }
 }

@@ -6,8 +6,6 @@ public static class TrustedInfrastructureActions
 {
     public static IReadOnlySet<string> Keys { get; } = new[]
     {
-        "provision-hosted-runner",
-        "reprovision-hosted-runner",
         "restart-hosted-runner",
         "suspend-hosted-runner",
         "resume-hosted-runner",

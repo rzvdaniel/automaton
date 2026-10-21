@@ -12,11 +12,9 @@ import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
-import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import type {
   SubscriptionPlan,
   CreateSubscriptionPlanRequest,
-  HostedRunnerSpecification,
   UserPlan,
 } from '../types/admin.types'
 
@@ -24,7 +22,6 @@ const toast = useToast()
 
 const plans = ref<SubscriptionPlan[]>([])
 const users = ref<UserPlan[]>([])
-const specifications = ref<HostedRunnerSpecification[]>([])
 const loadingPlans = ref(false)
 const loadingUsers = ref(false)
 
@@ -36,19 +33,14 @@ const assignDialogVisible = ref(false)
 const assigningUser = ref<UserPlan | null>(null)
 const selectedPlanId = ref<string | null>(null)
 const assigning = ref(false)
-const togglingHostedRunnerTestAccessUserId = ref<string | null>(null)
 
-const visibilityOptions = [
-  { label: 'Disabled', value: 'disabled' },
-  { label: 'Test users only', value: 'testUsersOnly' },
-  { label: 'Public', value: 'public' },
-]
-
-function defaultHostedRunner() {
+function defaultScheduledActions() {
   return {
-    enabled: false,
-    visibility: 'disabled' as const,
-    specificationId: null,
+    enabled: true,
+    maximumSchedules: 10,
+    minimumIntervalSeconds: 300,
+    maximumConcurrentExecutions: 1,
+    monthlyExecutionLimit: 5000,
   }
 }
 
@@ -62,10 +54,7 @@ function defaultPlanForm(): CreateSubscriptionPlanRequest {
     isDefault: false,
     isActive: true,
     sortOrder: 0,
-    capabilities: {
-      version: 1,
-      hostedRunner: defaultHostedRunner(),
-    },
+    capabilities: { version: 1, scheduledActions: defaultScheduledActions() },
   }
 }
 
@@ -77,13 +66,6 @@ const planOptions = computed(() => [
     .filter((plan) => plan.isActive)
     .map((plan) => ({ label: plan.priceUsd > 0 ? `${plan.name} ($${plan.priceUsd}/mo)` : `${plan.name} (Free)`, value: plan.id })),
 ])
-
-const specificationOptions = computed(() => specifications.value
-  .filter((specification) => specification.isActive)
-  .map((specification) => ({
-    label: `${specification.name} (${specification.resources.cpuLimit} CPU · ${specification.resources.memoryLimitMb} MB · ${specification.resources.maximumApps} apps)`,
-    value: specification.id,
-  })))
 
 async function loadPlans() {
   loadingPlans.value = true
@@ -110,9 +92,6 @@ async function loadUsers() {
 onMounted(() => {
   loadPlans()
   loadUsers()
-  adminHostedRunnersService.getSpecifications().then((value) => { specifications.value = value }).catch(() => {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load hosted runner specifications', life: 3000 })
-  })
 })
 
 function openCreatePlan() {
@@ -134,10 +113,7 @@ function openEditPlan(plan: SubscriptionPlan) {
     sortOrder: plan.sortOrder,
     capabilities: {
       version: plan.capabilities?.version ?? 1,
-      hostedRunner: {
-        ...defaultHostedRunner(),
-        ...(plan.capabilities?.hostedRunner ?? {}),
-      },
+      scheduledActions: plan.capabilities?.scheduledActions ?? defaultScheduledActions(),
     },
   }
   planDialogVisible.value = true
@@ -201,41 +177,6 @@ async function confirmAssign() {
   }
 }
 
-async function toggleHostedRunnerTestAccess(user: UserPlan) {
-  togglingHostedRunnerTestAccessUserId.value = user.userId
-  try {
-    await adminSubscriptionPlansService.setHostedRunnerTestAccess(
-      user.userId,
-      !user.canAccessHostedRunnerTestPlans,
-    )
-    toast.add({
-      severity: 'success',
-      summary: 'Test access updated',
-      detail: `${user.email} ${user.canAccessHostedRunnerTestPlans ? 'lost' : 'gained'} access to test-only runner plans.`,
-      life: 2500,
-    })
-    await loadUsers()
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update test plan access', life: 3000 })
-  } finally {
-    togglingHostedRunnerTestAccessUserId.value = null
-  }
-}
-
-function runnerSummary(plan: SubscriptionPlan) {
-  const runner = plan.capabilities.hostedRunner
-  if (!runner.enabled) return 'No hosted runner'
-  const specification = specifications.value.find((item) => item.id === runner.specificationId)
-  return specification
-    ? `${specification.name} · ${specification.resources.cpuLimit} CPU · ${specification.resources.memoryLimitMb} MB · ${specification.resources.maximumApps} apps`
-    : 'Hosted runner specification not configured'
-}
-
-function onHostedRunnerEnabledChanged() {
-  if (!planForm.value.capabilities.hostedRunner.enabled) {
-    planForm.value.capabilities.hostedRunner.specificationId = null
-  }
-}
 </script>
 
 <template>
@@ -244,7 +185,7 @@ function onHostedRunnerEnabledChanged() {
       <div class="flex align-items-center justify-content-between mb-3">
         <div>
           <div class="text-xl font-semibold">Subscription Plans</div>
-          <div class="text-color-secondary text-sm">Define Stripe plans and the hosted runner resources each plan includes.</div>
+          <div class="text-color-secondary text-sm">Define Stripe subscription plans.</div>
         </div>
         <Button label="New Plan" icon="pi pi-plus" size="small" @click="openCreatePlan" />
       </div>
@@ -256,16 +197,6 @@ function onHostedRunnerEnabledChanged() {
           <template #body="{ data }">
             <span v-if="data.priceUsd > 0">${{ data.priceUsd.toFixed(2) }}/mo</span>
             <span v-else class="text-color-secondary">Free</span>
-          </template>
-        </Column>
-        <Column header="Hosted Runner">
-          <template #body="{ data }">
-            <span>{{ runnerSummary(data) }}</span>
-          </template>
-        </Column>
-        <Column header="Visibility" style="width: 130px">
-          <template #body="{ data }">
-            <Tag :value="data.capabilities.hostedRunner.visibility" severity="secondary" />
           </template>
         </Column>
         <Column header="Default" style="width: 90px">
@@ -299,7 +230,7 @@ function onHostedRunnerEnabledChanged() {
     <div>
       <div class="mb-3">
         <div class="text-xl font-semibold">User Plans</div>
-        <div class="text-color-secondary text-sm">Assign subscription plans to users while testing Stripe and hosted runners.</div>
+        <div class="text-color-secondary text-sm">Assign subscription plans to users.</div>
       </div>
 
       <DataTable :value="users" :loading="loadingUsers" :global-filter-fields="['email', 'name', 'planName']">
@@ -308,18 +239,6 @@ function onHostedRunnerEnabledChanged() {
           <template #body="{ data }">
             <span v-if="data.planName">{{ data.planName }}</span>
             <span v-else class="text-color-secondary text-sm">None</span>
-          </template>
-        </Column>
-        <Column header="Test runner plans" style="width: 170px">
-          <template #body="{ data }">
-            <Button
-              :label="data.canAccessHostedRunnerTestPlans ? 'Allowed' : 'Blocked'"
-              :severity="data.canAccessHostedRunnerTestPlans ? 'success' : 'secondary'"
-              :outlined="!data.canAccessHostedRunnerTestPlans"
-              size="small"
-              :loading="togglingHostedRunnerTestAccessUserId === data.userId"
-              @click="toggleHostedRunnerTestAccess(data)"
-            />
           </template>
         </Column>
         <Column header="" style="width: 100px">
@@ -335,7 +254,7 @@ function onHostedRunnerEnabledChanged() {
     <div class="flex flex-column gap-3">
       <div class="flex flex-column gap-1">
         <label class="font-medium text-sm">Name *</label>
-        <InputText v-model="planForm.name" placeholder="e.g. Hosted Runner Small" class="w-full" />
+        <InputText v-model="planForm.name" placeholder="e.g. Team" class="w-full" />
       </div>
       <div class="flex flex-column gap-1">
         <label class="font-medium text-sm">Description</label>
@@ -354,27 +273,6 @@ function onHostedRunnerEnabledChanged() {
         <InputText v-model="planForm.stripePriceId" placeholder="price_..." class="w-full" />
       </div>
 
-      <div class="font-medium text-sm mt-1">Hosted Runner</div>
-      <div class="flex align-items-center gap-2">
-        <Checkbox v-model="planForm.capabilities.hostedRunner.enabled" :binary="true" input-id="runnerEnabled" @change="onHostedRunnerEnabledChanged" />
-        <label for="runnerEnabled" class="text-sm">Includes hosted runner</label>
-      </div>
-      <div class="flex flex-column gap-1">
-        <label class="font-medium text-sm">Visibility</label>
-        <Select v-model="planForm.capabilities.hostedRunner.visibility" :options="visibilityOptions" option-label="label" option-value="value" class="w-full" />
-      </div>
-      <div v-if="planForm.capabilities.hostedRunner.enabled" class="flex flex-column gap-1">
-        <label class="font-medium text-sm">Specification</label>
-        <Select
-          v-model="planForm.capabilities.hostedRunner.specificationId"
-          :options="specificationOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Select a specification"
-          class="w-full"
-        />
-        <small v-if="!planForm.capabilities.hostedRunner.specificationId" class="text-red-500">A specification is required for hosted runner plans.</small>
-      </div>
 
       <div class="flex align-items-center gap-2">
         <Checkbox v-model="planForm.isDefault" :binary="true" input-id="isDefault" />
@@ -391,7 +289,7 @@ function onHostedRunnerEnabledChanged() {
     </div>
     <template #footer>
       <Button label="Cancel" text @click="planDialogVisible = false" />
-      <Button :label="editingPlan ? 'Save' : 'Create'" icon="pi pi-check" :loading="savingPlan" :disabled="!planForm.name.trim() || (planForm.capabilities.hostedRunner.enabled && !planForm.capabilities.hostedRunner.specificationId)" @click="savePlan" />
+      <Button :label="editingPlan ? 'Save' : 'Create'" icon="pi pi-check" :loading="savingPlan" :disabled="!planForm.name.trim()" @click="savePlan" />
     </template>
   </Dialog>
 

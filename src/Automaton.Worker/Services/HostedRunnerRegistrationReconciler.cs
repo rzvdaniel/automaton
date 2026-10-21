@@ -2,7 +2,6 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Messaging.Abstractions;
-using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Worker.Services;
@@ -10,7 +9,6 @@ namespace Automaton.Worker.Services;
 public sealed class HostedRunnerRegistrationReconciler(
     ApplicationDbContext db,
     ITransactionalEventExecutor transactionExecutor,
-    IEventPublisher eventPublisher,
     ILogger<HostedRunnerRegistrationReconciler> logger)
 {
     public async Task<int> ReconcileAsync(DateTime now, CancellationToken cancellationToken)
@@ -50,7 +48,6 @@ public sealed class HostedRunnerRegistrationReconciler(
             await FailHostedRunnerAsync(hostedRunner, now, transactionalToken);
             await RevokeEnrollmentAsync(hostedRunner.Id, operationId, now, transactionalToken);
             await db.SaveChangesAsync(transactionalToken);
-            await PublishTimeoutAsync(hostedRunner, operationId, transactionalToken);
         }, cancellationToken);
         return claimed;
     }
@@ -126,13 +123,4 @@ public sealed class HostedRunnerRegistrationReconciler(
         foreach (var version in versions) version.RevokedAtUtc = now;
         foreach (var grant in grants) grant.RevokedAtUtc = now;
     }
-
-    private Task PublishTimeoutAsync(HostedRunner hostedRunner, Guid operationId, CancellationToken cancellationToken)
-        => eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
-        {
-            HostedRunnerId = hostedRunner.Id,
-            UserId = hostedRunner.UserId,
-            Error = HostedRunnerDeploymentErrors.RegistrationTimedOut,
-            CorrelationId = $"hosted-runner-registration-timeout:{operationId:N}"
-        }, cancellationToken);
 }

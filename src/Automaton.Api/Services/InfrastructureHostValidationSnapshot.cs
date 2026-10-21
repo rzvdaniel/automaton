@@ -75,8 +75,6 @@ internal static class InfrastructureHostValidationSnapshot
         host.ValidatedAtUtc = DateTime.UtcNow;
         host.ProvisioningFailureCode = null;
         host.ProvisioningFailureMessage = null;
-        if (!isLocalDevelopmentHost && !wasApproved)
-            host.HostedRunnerSchedulingEnabled = false;
     }
 
     private static void MarkHostValidationFailed(RunnerHost host, string message)
@@ -85,7 +83,6 @@ internal static class InfrastructureHostValidationSnapshot
         host.ValidatedAtUtc = null;
         host.ProvisioningFailureCode = "HostValidationFailed";
         host.ProvisioningFailureMessage = message;
-        host.HostedRunnerSchedulingEnabled = false;
     }
 
     private static void ApplyNetworkSnapshot(RunnerHost host, JsonElement root)

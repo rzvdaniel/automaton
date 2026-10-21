@@ -1,13 +1,16 @@
 ---
-title: Hosted Runners Administration Guide
+title: Runner Administration
 order: 20
 ---
 
-# Hosted Runners Administration Guide
+# Runner Administration
 
-End-to-end onboarding and operational procedures for runner hosts, runner containers, hosted runner specifications, and subscription-plan entitlements.
+New workloads should use a customer-installed Machine Management Runner assigned to an app or environment. Per-user Hosted Runner creation and provisioning have been retired; plan assignment, billing, or signup no longer creates a Runner container.
 
-- [Environments and Runner relationships](./deployment-targets.md)
-- [Infrastructure Runner installation, maintenance, and the development command probe](./infrastructure-runners.md)
-
+- [Environments, deployment targets, and Runner assignments](./deployment-targets.md)
+- [Runner Hosts and Infrastructure Runner operations](./infrastructure-runners.md)
+- [Add or inspect an Infrastructure Runner Host](./add-runner-host.md)
+- [Hosted Runner legacy operations and troubleshooting](./troubleshooting.md)
 - [Pause public registration](./public-registration.md)
+
+Existing Hosted Runner records and their persisted data remain in the database. The remaining admin view supports legacy record inspection, restart, deletion, and storage operations where available. It does not create or reprovision per-user Runner containers. Existing records are not upgraded by this change.

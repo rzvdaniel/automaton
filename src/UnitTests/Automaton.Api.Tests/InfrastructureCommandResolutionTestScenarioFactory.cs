@@ -71,7 +71,7 @@ internal static class InfrastructureCommandResolutionTestScenarioFactory
             Id = Guid.NewGuid(),
             HostedRunnerId = hostedRunner.Id,
             HostedRunner = hostedRunner,
-            Action = HostedRunnerDeploymentActions.Reprovision,
+            Action = HostedRunnerDeploymentActions.Restart,
             Status = status
         };
         db.AddRange(runner, host, hostedRunner, deployment);
@@ -89,7 +89,7 @@ internal static class InfrastructureCommandResolutionTestScenarioFactory
         var scope = new SecretGrantScope(
             operation.Deployment.Id,
             InfrastructureAppTrust.PlatformAppId,
-            "reprovision-hosted-runner",
+            "restart-hosted-runner",
             operation.Runner.Id,
             operation.Host.Id,
             SecretOwnerTypes.HostedRunner,

@@ -163,7 +163,6 @@ public class RunnerStorageTelemetryServiceTests
             Assert.That(host.StorageMeasurementStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
             Assert.That(host.StorageState, Is.EqualTo(RunnerHostStorageStates.MeasurementFailed));
             Assert.That(host.StorageMeasurementError, Does.Contain("did not verify Docker image/cache storage"));
-            Assert.That(host.IsSchedulingEligible, Is.False);
         });
     }
 

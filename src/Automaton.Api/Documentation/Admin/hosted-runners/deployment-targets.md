@@ -129,7 +129,7 @@ Changing a deployed target's Runner requires confirmation because the selected t
 
 ## Operational rule
 
-Do not use the Hosted Runner Container actions to manage an Infrastructure Runner. Repair or replace an Infrastructure Runner from **Admin → Runners → Runner Hosts**, then use Hosted Runner reprovisioning for the managed tenant container.
+New workloads should use an explicitly assigned Machine Management Runner. The legacy **Runner Containers** view may be used for inspection and supported lifecycle operations on existing Hosted Runner records; it cannot create or reprovision per-user Runner containers. Repair an Infrastructure Runner from **Admin → Runners → Runner Hosts**.
 
 ## Recover an interrupted whole-app deletion
 

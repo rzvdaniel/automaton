@@ -105,30 +105,6 @@ public class RunnerEnrollmentServiceTests
         Assert.That(first.EnrollmentToken, Is.Not.EqualTo(second.EnrollmentToken));
     }
 
-    [Test]
-    public async Task HostedRunnerEnrollment_RejectsTimedOutAttemptAndAllowsFreshOperation()
-    {
-        using var db = CreateDbContext();
-        var result = await HostedRunnerEnrollmentScenario.RunAsync(db, new RecordingAuditEventService());
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.PriorTokenRejected, Is.True);
-            Assert.That(result.FreshGrantIssued, Is.True);
-            Assert.That(result.ProtectedSecretStored, Is.True);
-            Assert.That(result.EnrollmentTokenIsValid, Is.True);
-            Assert.That(result.StoredHashExcludesToken, Is.True);
-            Assert.That(result.EnrollmentStatus, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
-            Assert.That(result.RunnerCountForInstallation, Is.EqualTo(1));
-            Assert.That(result.RunnerHasApiKey, Is.True);
-            Assert.That(result.HostedRunnerUsesExchangedRunner, Is.True);
-            Assert.That(result.SecretWasRevoked, Is.True);
-            Assert.That(result.GrantWasConsumedAndRevoked, Is.True);
-            Assert.That(result.ExchangeSucceeded, Is.True);
-            Assert.That(result.ReplayRejected, Is.True);
-            Assert.That(result.ApiKeyCount, Is.EqualTo(1));
-        });
-    }
     private static RunnerEnrollmentService CreateService(ApplicationDbContext db)
     {
         var httpContextAccessor = new HttpContextAccessor();

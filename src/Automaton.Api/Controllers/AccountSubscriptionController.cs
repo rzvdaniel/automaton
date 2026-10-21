@@ -15,12 +15,6 @@ public sealed class AccountSubscriptionController(ApplicationDbContext db) : Bas
     [Authorize]
     public async Task<IActionResult> GetSubscriptionPlans()
     {
-        var canAccessHostedRunnerTestPlans = await db.Users
-            .AsNoTracking()
-            .Where(user => user.Id == GetUserId())
-            .Select(user => user.CanAccessHostedRunnerTestPlans)
-            .FirstOrDefaultAsync();
-
         var plans = await db.SubscriptionPlans
             .AsNoTracking()
             .Where(plan => plan.IsActive)
@@ -32,14 +26,25 @@ public sealed class AccountSubscriptionController(ApplicationDbContext db) : Bas
                 plan.Name,
                 plan.Description,
                 plan.PriceUsd,
-                Capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson),
+                plan.CapabilitiesJson,
                 plan.IsDefault,
                 plan.IsActive,
                 plan.SortOrder
             })
             .ToListAsync();
 
-        return Ok(plans.Where(plan =>
-            HostedRunnerPlanVisibility.IsVisibleInCatalog(plan.Capabilities, canAccessHostedRunnerTestPlans)));
+        return Ok(plans
+            .Where(plan => !PlanCapabilitiesSerializer.HasLegacyHostedRunnerEntitlement(plan.CapabilitiesJson))
+            .Select(plan => new
+            {
+                plan.Id,
+                plan.Name,
+                plan.Description,
+                plan.PriceUsd,
+                Capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson),
+                plan.IsDefault,
+                plan.IsActive,
+                plan.SortOrder
+            }));
     }
 }

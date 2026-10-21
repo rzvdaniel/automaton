@@ -54,9 +54,8 @@ public class StripeService
         if (!plan.IsActive)
             throw new InvalidOperationException($"Plan '{plan.Name}' is not active.");
 
-        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson);
-        if (!HostedRunnerPlanVisibility.IsVisibleInCatalog(capabilities, user.CanAccessHostedRunnerTestPlans))
-            throw new InvalidOperationException($"Plan '{plan.Name}' is not available for this user.");
+        if (PlanCapabilitiesSerializer.HasLegacyHostedRunnerEntitlement(plan.CapabilitiesJson))
+            throw new InvalidOperationException($"Plan '{plan.Name}' is no longer available.");
 
         if (string.IsNullOrEmpty(plan.StripePriceId))
             throw new InvalidOperationException($"Plan '{plan.Name}' has no Stripe Price ID configured.");

@@ -112,7 +112,7 @@ public class StorageTelemetryPolicyTests
             DockerFilesystemTotalBytes = 12L * 1024 * 1024 * 1024
         };
 
-        Assert.That(HostedRunnerHostPlacementService.EffectiveDiskCapacityMb(host), Is.EqualTo(12 * 1024));
+        Assert.That(host.DockerFilesystemTotalBytes / (1024 * 1024), Is.EqualTo(12 * 1024));
     }
 
     [Test]

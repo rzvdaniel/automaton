@@ -14,7 +14,6 @@ namespace Automaton.Api.Services;
 public class HostedRunnerManagementService
 {
     private readonly ApplicationDbContext db;
-    private readonly HostedRunnerProvisioningService provisioningService;
     private readonly IEventPublisher eventPublisher;
     private readonly IAuditEventService auditEventService;
     private readonly UserContextService userContextService;
@@ -24,14 +23,12 @@ public class HostedRunnerManagementService
 
     public HostedRunnerManagementService(
         ApplicationDbContext db,
-        HostedRunnerProvisioningService provisioningService,
         IEventPublisher eventPublisher,
         IAuditEventService auditEventService,
         UserContextService userContextService,
         ILogger<HostedRunnerManagementService> logger)
     {
         this.db = db;
-        this.provisioningService = provisioningService;
         this.eventPublisher = eventPublisher;
         this.auditEventService = auditEventService;
         this.userContextService = userContextService;
@@ -42,12 +39,6 @@ public class HostedRunnerManagementService
     {
         var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
         return await RestartCoreAsync(hostedRunner, cancellationToken);
-    }
-
-    public async Task<HostedRunner> ReprovisionAsAdminAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
-    {
-        var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
-        return await ReprovisionCoreAsync(hostedRunner, cancellationToken);
     }
 
     public async Task DeleteAsAdminAsync(
@@ -160,77 +151,6 @@ public class HostedRunnerManagementService
         await PublishRestartActionAsync(hostedRunner, deployment, cancellationToken);
         logger.LogInformation("Hosted runner {HostedRunnerId} restart queued on host {HostId}", hostedRunner.Id, host.Id);
         return hostedRunner;
-    }
-
-    private async Task<HostedRunner> ReprovisionCoreAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
-    {
-        await auditEventService.WriteAsync(
-            new AuditEventWriteRequest
-            {
-                Action = AuditActions.Requested,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = hostedRunner.Id,
-                EventType = AuditEventTypes.RunnerReprovisionRequested,
-                Message = $"Hosted runner '{hostedRunner.Name}' reprovision was requested",
-                TargetUserId = hostedRunner.UserId,
-                Metadata = new
-                {
-                    hostedRunner.Name,
-                    hostedRunner.Status,
-                    hostedRunner.RunnerId,
-                    hostedRunner.RunnerHostId,
-                    hostedRunner.HostedRunnerSpecificationId,
-                    hostedRunner.ContainerName
-                }
-            },
-            cancellationToken);
-
-        var preparation = await provisioningService.PrepareProvisioningAsync(
-            hostedRunner.UserId,
-            Guid.Empty,
-            cancellationToken,
-            forceProvision: true,
-            requiredHostedRunnerId: hostedRunner.Id);
-        if (preparation.ShouldPublishProvisionRequest)
-        {
-            var preparedRunner = preparation.HostedRunner;
-            if (preparedRunner.Runner != null)
-                preparedRunner.Runner.ConnectionId = null;
-
-            preparedRunner.RunnerId = null;
-            preparedRunner.LastError = null;
-            preparedRunner.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        var reprovisioned = await provisioningService.DispatchPreparedProvisioningAsync(preparation, cancellationToken);
-
-        if (reprovisioned == null)
-        {
-            await auditEventService.WriteAsync(
-                new AuditEventWriteRequest
-                {
-                    Action = AuditActions.Failed,
-                    EntityType = AuditEntityTypes.HostedRunner,
-                    EntityId = hostedRunner.Id,
-                    EventType = AuditEventTypes.RunnerReprovisionFailed,
-                    Outcome = AuditOutcomes.Failed,
-                    Message = $"Hosted runner '{hostedRunner.Name}' reprovision could not start",
-                    TargetUserId = hostedRunner.UserId,
-                    Metadata = new
-                    {
-                        hostedRunner.Name,
-                        hostedRunner.RunnerId,
-                        hostedRunner.RunnerHostId,
-                        hostedRunner.HostedRunnerSpecificationId
-                    }
-                },
-                cancellationToken);
-            throw new HostedRunnerProvisioningConflictException(
-                preparation.HostedRunner.LastError ?? "Hosted runner reprovisioning could not start.");
-        }
-
-        return reprovisioned;
     }
 
     private async Task<HostedRunner> LoadHostedRunnerAsync(Guid hostedRunnerId, CancellationToken cancellationToken)

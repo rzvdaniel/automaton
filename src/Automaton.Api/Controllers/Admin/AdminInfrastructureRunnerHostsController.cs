@@ -138,13 +138,6 @@ public sealed class AdminInfrastructureRunnerHostsController(
         }
     }
 
-    [HttpPost("hosts/{id:guid}/disable-scheduling")]
-    public async Task<ActionResult<RunnerHostResponse>> DisableHostScheduling(Guid id, CancellationToken cancellationToken)
-    {
-        var host = await hostApprovalService.DisableSchedulingAsync(id, userContextService.GetUserId(), cancellationToken);
-        return host == null ? NotFound() : Ok(RunnerHostAdminResponseMapper.ToResponse(host));
-    }
-
     [HttpPost("hosts/{id:guid}/revoke-infrastructure-runner")]
     public async Task<ActionResult<RunnerHostResponse>> RevokeInfrastructureRunner(Guid id, CancellationToken cancellationToken)
     {
@@ -163,7 +156,6 @@ public sealed class AdminInfrastructureRunnerHostsController(
     public async Task<ActionResult<RunnerHostResponse>> UpdateHost(Guid id, UpdateRunnerHostRequest request, CancellationToken cancellationToken)
     {
         var host = await db.RunnerHosts
-            .Include(x => x.HostedRunners)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (host == null)
         {
@@ -171,10 +163,7 @@ public sealed class AdminInfrastructureRunnerHostsController(
         }
 
         ApplyHostIdentityAndConnectivity(host, request);
-        var schedulingError = ValidateSchedulingUpdate(host, request.HostedRunnerSchedulingEnabled);
-        if (schedulingError != null) return Conflict(new { message = schedulingError });
-        ApplySchedulingUpdate(host, request.HostedRunnerSchedulingEnabled);
-        ApplyHostCapacityUpdate(host, request);
+        if (request.Status != null) host.Status = request.Status;
         host.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -190,39 +179,6 @@ public sealed class AdminInfrastructureRunnerHostsController(
         if (request.PrivateIp != null) host.PrivateIp = request.PrivateIp == string.Empty ? null : request.PrivateIp;
         if (request.ProvisioningTransport != null) host.ProvisioningTransport = request.ProvisioningTransport;
         if (request.RuntimeConnectivityMode != null) host.RuntimeConnectivityMode = request.RuntimeConnectivityMode;
-    }
-
-    private static string? ValidateSchedulingUpdate(RunnerHost host, bool? schedulingEnabled)
-    {
-        if (schedulingEnabled != true) return null;
-        if (host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort
-            && !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
-            return addressError;
-        if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
-            || !host.ValidatedAtUtc.HasValue
-            || !host.ApprovedAtUtc.HasValue
-            || host.Status != RunnerHostStatuses.Active
-            || host.ProvisioningTransport != RunnerHostProvisioningTransports.InfrastructureRunner
-            || !host.InfrastructureRunnerId.HasValue)
-            return "A host must be Ready, validated, approved, active, and bound to an Infrastructure Runner before scheduling can be enabled.";
-        return null;
-    }
-
-    private static void ApplySchedulingUpdate(RunnerHost host, bool? schedulingEnabled)
-    {
-        if (schedulingEnabled.HasValue)
-            host.HostedRunnerSchedulingEnabled = schedulingEnabled.Value;
-    }
-
-    private static void ApplyHostCapacityUpdate(RunnerHost host, UpdateRunnerHostRequest request)
-    {
-        if (request.Status != null) host.Status = request.Status;
-        if (request.TotalCpuCores.HasValue) host.TotalCpuCores = request.TotalCpuCores.Value;
-        if (request.ReservedCpuCores.HasValue) host.ReservedCpuCores = request.ReservedCpuCores.Value;
-        if (request.TotalMemoryMb.HasValue) host.TotalMemoryMb = request.TotalMemoryMb.Value;
-        if (request.ReservedMemoryMb.HasValue) host.ReservedMemoryMb = request.ReservedMemoryMb.Value;
-        if (request.TotalDiskMb.HasValue) host.TotalDiskMb = request.TotalDiskMb.Value;
-        if (request.ReservedDiskMb.HasValue) host.ReservedDiskMb = request.ReservedDiskMb.Value;
     }
 
 }
