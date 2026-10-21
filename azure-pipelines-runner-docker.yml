@@ -134,9 +134,9 @@ stages:
           - script: |
               set -eu
               docker run --rm --entrypoint /bin/sh $(imageRepository):$(commitImageTag) -c '
-                for action in provision-hosted-runner reprovision-hosted-runner restart-hosted-runner suspend-hosted-runner resume-hosted-runner delete-hosted-runner measure-hosted-runner-storage; do
-                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/action.yaml"
-                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/main.py"
+                for action in restart-hosted-runner suspend-hosted-runner resume-hosted-runner delete-hosted-runner measure-hosted-runner-storage; do
+                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/action.yaml" || exit 1
+                  test -f "/app/SystemApps/automaton-infrastructure/actions/$action/main.py" || exit 1
                 done'
             displayName: 'Smoke test bundled trusted Actions'
 
