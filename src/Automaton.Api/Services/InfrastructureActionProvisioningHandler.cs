@@ -182,19 +182,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
-        if (actionKey == StorageEnforcementActions.SuspendHostedRunner)
-        {
-            ApplySuspensionResult(hostedRunner, deployment);
-            await WriteLifecycleAuditAsync(hostedRunner, actionKey, succeeded: true, null, cancellationToken);
-            return;
-        }
-
-        if (actionKey == StorageEnforcementActions.ResumeHostedRunner)
-        {
-            ApplyResumeResult(hostedRunner, deployment);
-            return;
-        }
-
         if (actionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
             await ApplyStorageVerificationResultAsync(hostedRunner, deployment, result, cancellationToken);
 
@@ -217,29 +204,6 @@ public sealed class InfrastructureActionProvisioningHandler(
         deployment.ReconnectAfterUtc ??= deployment.StartedAt;
         deployment.ReconnectDeadlineUtc = now.AddSeconds(timeoutSeconds);
         deployment.Logs = "Restart command completed; waiting for the hosted Runner to reconnect and heartbeat.";
-    }
-
-    private static void ApplySuspensionResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
-    {
-        hostedRunner.Status = HostedRunnerStatuses.Suspended;
-        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
-        hostedRunner.SuspendedAtUtc = DateTime.UtcNow;
-        hostedRunner.LastEnforcementReason = "Hosted Runner container was stopped after the storage grace period.";
-        deployment.Logs = "Hosted Runner container stopped; persistent volumes were preserved.";
-        deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
-        deployment.FinishedAt = DateTime.UtcNow;
-    }
-
-    private void ApplyResumeResult(HostedRunner hostedRunner, HostedRunnerDeployment deployment)
-    {
-        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
-        deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
-        deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
-        deployment.ReconnectAfterUtc ??= deployment.StartedAt;
-        deployment.ReconnectDeadlineUtc = DateTime.UtcNow.AddSeconds(
-            Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900));
-        deployment.Logs = "Resume command completed; waiting for the hosted Runner to reconnect.";
     }
 
     private async Task ApplyStorageVerificationResultAsync(
@@ -282,10 +246,6 @@ public sealed class InfrastructureActionProvisioningHandler(
         {
             ("restart-hosted-runner", true) => AuditEventTypes.RunnerRestartSucceeded,
             ("restart-hosted-runner", false) => AuditEventTypes.RunnerRestartFailed,
-            (StorageEnforcementActions.SuspendHostedRunner, true) => StorageTelemetryAuditEvents.EnforcementSuspensionSucceeded,
-            (StorageEnforcementActions.SuspendHostedRunner, false) => StorageTelemetryAuditEvents.EnforcementSuspensionFailed,
-            (StorageEnforcementActions.ResumeHostedRunner, true) => StorageTelemetryAuditEvents.EnforcementResumeSucceeded,
-            (StorageEnforcementActions.ResumeHostedRunner, false) => StorageTelemetryAuditEvents.EnforcementResumeFailed,
             ("delete-hosted-runner", true) => AuditEventTypes.HostedRunnerDeleted,
             ("delete-hosted-runner", false) => AuditEventTypes.HostedRunnerDeleteFailed,
             (StorageTelemetryActions.MeasureHostedRunnerStorage, true) => AuditEventTypes.HostedRunnerStorageVerificationSucceeded,

@@ -74,7 +74,6 @@ internal static class WorkerHostApplication
         services.AddScoped<WorkerScheduledActionDispatcher>();
         services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
         services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
-        services.AddScoped<IWorkerScheduledActionHandler, EnforceHostedRunnerStorageScheduledActionHandler>();
         services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
         services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
         services.AddTransient<UserRegisteredCapSubscriber>();

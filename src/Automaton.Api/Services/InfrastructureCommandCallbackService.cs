@@ -108,8 +108,6 @@ public sealed class InfrastructureCommandCallbackService(
     internal static string? TrustedActionKeyForDeployment(string action) => action switch
     {
         HostedRunnerDeploymentActions.Restart => "restart-hosted-runner",
-        HostedRunnerDeploymentActions.Suspend => StorageEnforcementActions.SuspendHostedRunner,
-        HostedRunnerDeploymentActions.Resume => StorageEnforcementActions.ResumeHostedRunner,
         HostedRunnerDeploymentActions.Deprovision => "delete-hosted-runner",
         HostedRunnerDeploymentActions.VerifyStorage => StorageTelemetryActions.MeasureHostedRunnerStorage,
         "measure-hosted-runner-storage" => StorageTelemetryActions.MeasureHostedRunnerStorage,

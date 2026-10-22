@@ -63,6 +63,8 @@ The former per-user Hosted Runner package-deployment queue and callback API have
 - Each app-file download HTTP attempt gets a fresh operation ID, while the requested file session remains in the command. A prior `404`, or a successful operation whose output was later cleaned up, cannot poison a later retry using the same session.
 - Blue/green API slots on the same host share `AppData/deployment-operations`. Availability when slots run on different hosts is **not established**. Do not treat same-host slot acceptance as proof of cross-host storage.
 
+Hosted Runner storage enforcement is retired. The API no longer admits suspend/resume, grace extension or enforcement reset, and the Runner rejects direct execution of retired suspend/resume Actions before preparation or secret resolution. Addressed retired queue deliveries use the existing terminal acknowledgement path, so they cannot create a retry loop or invoke an executor. The Worker seeds only the two storage-reconciliation schedules and disables its former enforcement schedule; a previously published enforcement occurrence fails without a handler. Reconnect and lifecycle recovery do not complete old resume operations. Historical records and the remaining XFS verification path remain; Machine Management capacity telemetry, container limits and disk admission are unaffected.
+
 ## Machine Management Runner Actions — PR #395 draft
 
 The web-deployment baseline from PR #394 is merged into `main`; the isolated Action implementation remains in draft PR #395. Linux Docker Action acceptance is still pending. The complete two-user and duplicate-delivery acceptance run is deferred until milestone 1 is assembled; this draft does not mark milestone 1 complete.

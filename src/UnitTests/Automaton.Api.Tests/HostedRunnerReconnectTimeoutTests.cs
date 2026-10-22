@@ -28,6 +28,33 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class HostedRunnerReconnectTimeoutTests
 {
+    [Test]
+    public async Task RetiredResumeIsNotReinterpretedAsRestartTimeout()
+    {
+        using var db = HostedRunnerAuditTestData.CreateDbContext();
+        var now = DateTime.UtcNow;
+        var runner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "historical-resume",
+            ContainerName = "historical-resume", Status = HostedRunnerStatuses.Running
+        };
+        runner.Deployments.Add(new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = runner.Id, Action = HostedRunnerDeploymentActions.Resume,
+            Status = HostedRunnerDeploymentStatuses.WaitingForReconnect,
+            ReconnectDeadlineUtc = now.AddMinutes(-1)
+        });
+        db.HostedRunners.Add(runner);
+        await db.SaveChangesAsync();
+        var reconciler = new HostedRunnerRestartReconciler(
+            db, new HostedRunnerAuditNoOpAuditEventService(), NullLogger<HostedRunnerRestartReconciler>.Instance);
+
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        db.ChangeTracker.Clear();
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
+        Assert.That((await db.HostedRunners.SingleAsync()).Status, Is.EqualTo(HostedRunnerStatuses.Running));
+    }
 
 
     [Test]

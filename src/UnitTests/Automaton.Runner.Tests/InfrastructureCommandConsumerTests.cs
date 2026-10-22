@@ -90,6 +90,18 @@ public sealed class InfrastructureCommandConsumerTests
         Assert.That(executor.Commands, Is.Empty);
     }
 
+    [TestCase("suspend-hosted-runner")]
+    [TestCase("resume-hosted-runner")]
+    public async Task RetiredStorageDeliveryIsTerminalWithoutInvokingExecutor(string actionKey)
+    {
+        var executor = new RecordingExecutor();
+        var result = await new InfrastructureCommandConsumer(identity, executor)
+            .HandleAsync(JsonSerializer.SerializeToUtf8Bytes(Command() with { ActionKey = actionKey }));
+        Assert.That(result.Terminal, Is.True);
+        Assert.That(result.Execution, Is.Null);
+        Assert.That(executor.Commands, Is.Empty);
+    }
+
     [TestCase("untrusted")]
     [TestCase("../restart-hosted-runner")]
     public void RejectsUnsupportedActionWithoutExecution(string actionKey)

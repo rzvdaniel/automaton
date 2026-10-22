@@ -155,7 +155,6 @@ public sealed class RunnerRegistrationService(
             hostedRunner,
             includeSucceeded: true,
             "Runner connected successfully and is linked to this hosted runner.");
-        CompleteEnforcementResume(hostedRunner);
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
         return deploymentAction;
     }
@@ -182,30 +181,6 @@ public sealed class RunnerRegistrationService(
         if (includeSucceeded)
             deployment.Error = null;
         return deployment.Action;
-    }
-
-    private void CompleteEnforcementResume(HostedRunner hostedRunner)
-    {
-        var enforcementResume = hostedRunner.Deployments
-            .Where(deployment => deployment.Action == HostedRunnerDeploymentActions.Resume &&
-                deployment.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
-            .OrderByDescending(deployment => deployment.StartedAt)
-            .FirstOrDefault();
-        if (enforcementResume is null)
-            return;
-
-        enforcementResume.Status = HostedRunnerDeploymentStatuses.Succeeded;
-        enforcementResume.FinishedAt = DateTime.UtcNow;
-        enforcementResume.Logs = "Hosted Runner reconnected after storage enforcement recovery.";
-        hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
-        hostedRunner.RecoveredAtUtc = DateTime.UtcNow;
-        hostedRunner.LastEnforcementReason = "Runner reconnected after authoritative storage recovery.";
-        dbContext.AuditEvents.Add(new AuditEvent
-        {
-            Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = hostedRunner.Id,
-            TargetUserId = hostedRunner.UserId, Outcome = "Success", EventType = StorageTelemetryAuditEvents.EnforcementRecovered,
-            Message = "Hosted Runner recovered after storage enforcement.", CreatedAtUtc = DateTime.UtcNow
-        });
     }
 
     private bool IsRegistrationAttemptCurrent(Runner runner, HostedRunner hostedRunner)

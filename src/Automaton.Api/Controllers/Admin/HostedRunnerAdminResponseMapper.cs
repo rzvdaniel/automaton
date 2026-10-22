@@ -94,7 +94,6 @@ internal static class HostedRunnerAdminResponseMapper
             };
 }
 public sealed record DeleteHostedRunnerRequest(string DataDisposition);
-public sealed record ExtendStorageGracePeriodRequest(int Hours);
 
 public record RunnerHostResponse
 {

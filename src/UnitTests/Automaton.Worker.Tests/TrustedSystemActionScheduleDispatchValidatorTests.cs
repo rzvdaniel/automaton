@@ -11,7 +11,6 @@ public sealed class TrustedSystemActionScheduleDispatchValidatorTests
 {
     [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner)]
     [TestCase(BuiltInStorageScheduleActionKeys.RunnerHost)]
-    [TestCase(BuiltInStorageScheduleActionKeys.Enforcement)]
     public async Task BuiltInSystemSchedule_ResolvesItsTrustedWorkerActionDefinition(string actionKey)
     {
         var schedule = Schedule();

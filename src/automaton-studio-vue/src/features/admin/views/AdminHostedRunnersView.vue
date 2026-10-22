@@ -15,12 +15,6 @@ import { useRoute } from 'vue-router'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
-import {
-  canResumeHostedRunner,
-  canSuspendHostedRunner,
-  executeHostedRunnerAction,
-  isHostedRunnerActionPending,
-} from '../utils/hostedRunnerActions'
 import type {
   HostedRunner,
   RunnerEnrollment,
@@ -42,8 +36,6 @@ const loadingRunners = ref(false)
 const restartingRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
 const verifyingStorageRunnerId = ref<string | null>(null)
-const suspendingRunnerId = ref<string | null>(null)
-const resumingRunnerId = ref<string | null>(null)
 const deleteConfirmationRunnerId = ref<string | null>(null)
 
 const formatStorage = (bytes?: number) => {
@@ -53,10 +45,10 @@ const formatStorage = (bytes?: number) => {
 }
 
 const verifyStorage = async (runner: HostedRunner) => {
-  if (isHostedRunnerActionPending(runner.id, verifyingStorageRunnerId.value)) return
+  if (runner.id === verifyingStorageRunnerId.value) return
   verifyingStorageRunnerId.value = runner.id
   try {
-    await executeHostedRunnerAction('verifyStorage', runner.id, adminHostedRunnersService)
+    await adminHostedRunnersService.verifyHostedRunnerStorage(runner.id)
     toast.add({ severity: 'info', summary: 'Verification requested', detail: 'Host-side storage verification has been queued.', life: 5000 })
     await loadHostedRunners()
   } catch (error) {
@@ -66,33 +58,6 @@ const verifyStorage = async (runner: HostedRunner) => {
   }
 }
 
-const suspendHostedRunner = async (runner: HostedRunner) => {
-  if (!canSuspendHostedRunner(runner) || !window.confirm(`Suspend ${runner.name}? Existing workloads will be paused.`)) return
-  suspendingRunnerId.value = runner.id
-  try {
-    await executeHostedRunnerAction('suspend', runner.id, adminHostedRunnersService)
-    toast.add({ severity: 'info', summary: 'Suspension requested', detail: `Suspension requested for ${runner.name}.`, life: 3500 })
-    await loadHostedRunners()
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Suspension failed', detail: error instanceof Error ? error.message : 'Unable to suspend hosted runner.', life: 5000 })
-  } finally {
-    suspendingRunnerId.value = null
-  }
-}
-
-const resumeHostedRunner = async (runner: HostedRunner) => {
-  if (!canResumeHostedRunner(runner)) return
-  resumingRunnerId.value = runner.id
-  try {
-    await executeHostedRunnerAction('resume', runner.id, adminHostedRunnersService)
-    toast.add({ severity: 'info', summary: 'Resume requested', detail: `Resume requested for ${runner.name}.`, life: 3500 })
-    await loadHostedRunners()
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Resume failed', detail: error instanceof Error ? error.message : 'Unable to resume hosted runner.', life: 5000 })
-  } finally {
-    resumingRunnerId.value = null
-  }
-}
 const deleteDataConfirmation = ref('')
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
@@ -840,28 +805,6 @@ watch(() => route.path, refreshAll)
                   :loading="restartingRunnerId === data.id"
                   @click="restartHostedRunner(data)"
                 />
-                <Button
-                  v-if="canSuspendHostedRunner(data)"
-                  label="Suspend"
-                  icon="pi pi-pause"
-                  size="small"
-                  severity="warn"
-                  outlined
-                  :loading="suspendingRunnerId === data.id"
-                  :disabled="isHostedRunnerActionPending(data.id, suspendingRunnerId)"
-                  @click="suspendHostedRunner(data)"
-                />
-                <Button
-                  v-if="canResumeHostedRunner(data)"
-                  label="Resume"
-                  icon="pi pi-play"
-                  size="small"
-                  severity="success"
-                  outlined
-                  :loading="resumingRunnerId === data.id"
-                  :disabled="isHostedRunnerActionPending(data.id, resumingRunnerId)"
-                  @click="resumeHostedRunner(data)"
-                />
               </div>
             </template>
           </Column>
@@ -1168,7 +1111,7 @@ watch(() => route.path, refreshAll)
               icon="pi pi-refresh"
               size="small"
               :loading="verifyingStorageRunnerId === selectedRunner.id"
-              :disabled="isHostedRunnerActionPending(selectedRunner.id, verifyingStorageRunnerId)"
+              :disabled="selectedRunner.id === verifyingStorageRunnerId"
               @click="verifyStorage(selectedRunner)"
             />
           </div>
@@ -1181,11 +1124,11 @@ watch(() => route.path, refreshAll)
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Latest self-report</div><div>{{ formatStorage(selectedRunner.storageSelfReportedTotalBytes) }} · {{ formatDateTime(selectedRunner.storageSelfReportedAtUtc) }}</div></div>
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Host available / reserve</div><div>{{ formatStorage(selectedRunner.hostStorageAvailableBytes) }} / {{ formatStorage(selectedRunner.hostStorageReserveRequiredBytes) }}</div></div>
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verification</div><div>{{ selectedRunner.storageVerificationStatus || 'Not requested' }}<span v-if="selectedRunner.storageVerificationReason"> · {{ selectedRunner.storageVerificationReason }}</span></div></div>
-            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Enforcement</div><Tag :value="selectedRunner.enforcementState" :severity="statusSeverity(selectedRunner.enforcementState)" /></div>
-            <div v-if="selectedRunner.gracePeriodEndsAtUtc" class="col-12 md:col-4"><div class="text-color-secondary text-sm">Grace-period deadline</div><div>{{ formatDateTime(selectedRunner.gracePeriodEndsAtUtc) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Historical enforcement</div><Tag :value="selectedRunner.enforcementState" :severity="statusSeverity(selectedRunner.enforcementState)" /></div>
+            <div v-if="selectedRunner.gracePeriodEndsAtUtc" class="col-12 md:col-4"><div class="text-color-secondary text-sm">Historical grace-period deadline</div><div>{{ formatDateTime(selectedRunner.gracePeriodEndsAtUtc) }}</div></div>
             <div v-if="selectedRunner.lastEnforcementReason" class="col-12"><Message severity="warn" :closable="false">{{ selectedRunner.lastEnforcementReason }}</Message></div>
           </div>
-          <Message severity="info" :closable="false">On supported managed Runner Hosts, this is a hard XFS project quota for the Hosted Runner system and user volumes, including application data and build workspaces. Docker images, shared cache, Docker logs, and container writable layers are outside this quota.</Message>
+          <Message severity="info" :closable="false">Storage suspension and resume are retired. Existing enforcement fields are historical. On legacy managed Runner Hosts, this is a hard XFS project quota for the Hosted Runner system and user volumes, including application data and build workspaces. Docker images, shared cache, Docker logs, and container writable layers are outside this quota.</Message>
           <Message v-if="selectedRunner.storageMeasurementError" severity="warn" :closable="false">{{ selectedRunner.storageMeasurementError }}</Message>
           <Message v-if="selectedRunner.storageVerificationError" severity="warn" :closable="false">{{ selectedRunner.storageVerificationError }}</Message>
         </div>

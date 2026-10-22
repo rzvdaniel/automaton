@@ -10,6 +10,32 @@ namespace Automaton.Api.Tests;
 
 internal static class HostedRunnerRegistrationTestScenario
 {
+    public static async Task<(HostedRunnerRegistrationSeed Registration, Guid ResumeId)> SeedRetiredResumeAsync(
+        ApplicationDbContext db, Guid userId)
+    {
+        var seed = Seed(db, userId);
+        var runner = await db.HostedRunners.SingleAsync();
+        runner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
+        var resume = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = runner.Id, Action = HostedRunnerDeploymentActions.Resume,
+            Status = HostedRunnerDeploymentStatuses.WaitingForReconnect, StartedAt = DateTime.UtcNow
+        };
+        db.HostedRunnerDeployments.Add(resume);
+        await db.SaveChangesAsync();
+        return (seed, resume.Id);
+    }
+
+    public static async Task AssertRetiredResumeIsUnchangedAsync(ApplicationDbContext db, Guid resumeId)
+    {
+        db.ChangeTracker.Clear();
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync(item => item.Id == resumeId)).Status,
+            Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
+        var runner = await db.HostedRunners.SingleAsync();
+        Assert.That(runner.EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.ResumePending));
+        Assert.That(runner.RecoveredAtUtc, Is.Null);
+    }
+
     public static HostedRunnerRegistrationSeed Seed(ApplicationDbContext db, Guid userId)
     {
         var planId = HostedRunnerAuditTestData.SeedHostedRunnerPlan(db);

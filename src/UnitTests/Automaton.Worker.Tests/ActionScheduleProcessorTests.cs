@@ -15,6 +15,29 @@ namespace Automaton.Worker.Tests;
 public sealed class ActionScheduleProcessorTests
 {
     [Test]
+    public async Task PreviouslyPublishedEnforcementOccurrenceCannotExecuteAfterRetirement()
+    {
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        schedule.ActionKey = BuiltInStorageScheduleActionKeys.RetiredEnforcement;
+        schedule.Enabled = false;
+        await using var fixture = await ActionScheduleTestDatabase.CreateAsync(schedule);
+        await using var db = fixture.OpenContext();
+        db.ActionScheduleOccurrences.Add(new ActionScheduleOccurrence
+        {
+            Id = Guid.NewGuid(), ScheduleId = schedule.Id, ScheduledForUtc = DateTime.UtcNow.AddMinutes(-1),
+            Status = ActionScheduleOccurrenceStatuses.Published, IdempotencyKey = Guid.NewGuid().ToString()
+        });
+        await db.SaveChangesAsync();
+
+        await Processor(db).ProcessAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var occurrence = await db.ActionScheduleOccurrences.SingleAsync();
+        Assert.That(occurrence.Status, Is.EqualTo(ActionScheduleOccurrenceStatuses.Failed));
+        Assert.That(occurrence.FailureSummary, Does.Contain("No matching trusted Worker handler"));
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+    }
+
+    [Test]
     public async Task CompetingWorkers_OnlyOneClaimsAndCreatesOccurrence()
     {
         await using var fixture = await ActionScheduleTestDatabase.CreateAsync(Schedule(ActionScheduleTypes.Interval));

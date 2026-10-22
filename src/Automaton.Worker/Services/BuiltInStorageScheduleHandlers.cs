@@ -11,7 +11,7 @@ public static class BuiltInStorageScheduleActionKeys
 {
     public const string HostedRunner = "reconcile-hosted-runner-storage";
     public const string RunnerHost = "reconcile-runner-host-storage";
-    public const string Enforcement = StorageEnforcementActions.EnforceHostedRunnerStorage;
+    public const string RetiredEnforcement = "enforce-hosted-runner-storage";
 }
 
 public sealed class ReconcileHostedRunnerStorageScheduledActionHandler(
@@ -32,15 +32,6 @@ public sealed class ReconcileRunnerHostStorageScheduledActionHandler(
         _ = await reconciliation.ReconcileAsync(cancellationToken, includeHostedRunners: false, includeHosts: true);
 }
 
-public sealed class EnforceHostedRunnerStorageScheduledActionHandler(
-    HostedRunnerStorageReconciliationService reconciliation) : IWorkerScheduledActionHandler
-{
-    public string ActionKey => BuiltInStorageScheduleActionKeys.Enforcement;
-
-    public async Task ExecuteAsync(WorkerScheduledActionContext context, CancellationToken cancellationToken) =>
-        _ = await reconciliation.EnforceAsync(cancellationToken);
-}
-
 public sealed class BuiltInStorageScheduleSeeder(
     IServiceScopeFactory scopeFactory,
     ILogger<BuiltInStorageScheduleSeeder> logger) : IHostedService
@@ -48,8 +39,7 @@ public sealed class BuiltInStorageScheduleSeeder(
     private static readonly (string Key, string Name)[] Definitions =
     [
         (BuiltInStorageScheduleActionKeys.HostedRunner, "Hosted Runner storage reconciliation"),
-        (BuiltInStorageScheduleActionKeys.RunnerHost, "Runner Host storage reconciliation"),
-        (BuiltInStorageScheduleActionKeys.Enforcement, "Hosted Runner storage enforcement")
+        (BuiltInStorageScheduleActionKeys.RunnerHost, "Runner Host storage reconciliation")
     ];
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -57,6 +47,7 @@ public sealed class BuiltInStorageScheduleSeeder(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var now = DateTime.UtcNow;
+        await DisableRetiredEnforcementAsync(db, now, cancellationToken);
         foreach (var (key, name) in Definitions)
         {
             var existing = await db.ActionSchedules.SingleOrDefaultAsync(x =>
@@ -91,6 +82,24 @@ public sealed class BuiltInStorageScheduleSeeder(
             await SaveWithDuplicateRecoveryAsync(db, key, name, now, cancellationToken);
             logger.LogInformation("Seeded built-in system storage schedule {ActionKey}", key);
         }
+    }
+
+    private static async Task DisableRetiredEnforcementAsync(
+        ApplicationDbContext db, DateTime now, CancellationToken cancellationToken)
+    {
+        var schedules = await db.ActionSchedules.Where(schedule =>
+            schedule.OwnerType == ActionScheduleOwnerTypes.System &&
+            (schedule.SystemIdentity == BuiltInStorageScheduleActionKeys.RetiredEnforcement ||
+             (schedule.SystemIdentity == null && schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId &&
+              schedule.ActionKey == BuiltInStorageScheduleActionKeys.RetiredEnforcement)))
+            .ToListAsync(cancellationToken);
+        foreach (var schedule in schedules)
+        {
+            schedule.Enabled = false;
+            schedule.NextRunAtUtc = null;
+            schedule.UpdatedAtUtc = now;
+        }
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SaveWithDuplicateRecoveryAsync(ApplicationDbContext db, string key, string name,
