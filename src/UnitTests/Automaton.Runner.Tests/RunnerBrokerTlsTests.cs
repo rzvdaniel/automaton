@@ -69,6 +69,6 @@ public sealed class RunnerBrokerTlsTests
         return factory;
     }
 
-    private static HostedRunnerBrokerConfiguration Configuration(int port)
+    private static RunnerBrokerConfiguration Configuration(int port)
         => new("localhost", port, "/", "test", "test", "test", TlsEnabled: true);
 }

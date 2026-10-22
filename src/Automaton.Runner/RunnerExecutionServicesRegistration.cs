@@ -13,10 +13,6 @@ internal static class RunnerExecutionServicesRegistration
         services.AddScoped<RunnerSettingsService>();
         services.AddTransient<CustomStepExecuteService>();
         services.AddSingleton<InfrastructureCommandService>();
-        services.AddSingleton<HostedRunnerDeploymentPackageDownloader>();
-        services.AddSingleton<HostedRunnerDeploymentCommandProcessor>();
-        services.AddSingleton<HostedRunnerInvalidCommandRecovery>();
-        services.AddSingleton<HostedRunnerDeploymentCommandQueueConsumer>();
         services.AddSingleton<HostContainerExecutionService>();
         services.AddSingleton<MachineStaticSitePublisher>();
         services.AddSingleton<MachineActionDependencyPreparer>();
@@ -32,12 +28,9 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<RunnerExecutionDeliveryHandler>();
         services.AddSingleton<RunnerExecutionQueueConsumer>();
         services.AddHostedService<RunnerExecutionHostedService>();
-        services.AddHostedService<HostedRunnerDeploymentCommandHostedService>();
         services.AddHttpClient<RunnerHostService>();
         services.AddHttpClient<RunnerSettingsService>();
         services.AddHttpClient<ScriptEngineSettingsReporter>();
-        services.AddHttpClient(nameof(HostedRunnerDeploymentPackageDownloader))
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient(nameof(RunnerStorageTelemetryApiClient))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient();

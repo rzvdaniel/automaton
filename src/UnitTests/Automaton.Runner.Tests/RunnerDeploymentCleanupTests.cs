@@ -97,7 +97,7 @@ public sealed class RunnerDeploymentCleanupTests
             Success = true,
             Message = "promoted before Runner interruption"
         };
-        var journal = new HostedRunnerDeploymentResultJournal(workspace);
+        var journal = new RunnerDeploymentResultJournal(workspace);
         await journal.SaveAsync(new DeployAppPackageRequest
         {
             DeploymentOperationId = operationId,

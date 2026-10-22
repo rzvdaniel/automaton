@@ -8,8 +8,8 @@ internal sealed class RunnerExecutionApiClient : IDisposable
     private readonly HttpClient client;
     public RunnerExecutionApiClient(Uri address, string apiKey, Guid runnerId) => client = CreateClient(address, apiKey, runnerId);
     internal RunnerExecutionApiClient(HttpClient client) => this.client = client;
-    public async Task<HostedRunnerBrokerConfiguration> ConfigurationAsync(CancellationToken token)
-        => await GetAsync<HostedRunnerBrokerConfiguration>("api/runner-executions/configuration", token);
+    public async Task<RunnerBrokerConfiguration> ConfigurationAsync(CancellationToken token)
+        => await GetAsync<RunnerBrokerConfiguration>("api/runner-executions/configuration", token);
     public Task<RunnerExecutionAssignment> AssignmentAsync(Guid id, CancellationToken token)
         => GetAsync<RunnerExecutionAssignment>($"api/runner-executions/{id:D}", token);
     public Task<RunnerExecutionAssignment> StatusAsync(Guid id, CancellationToken token)

@@ -6,7 +6,7 @@ namespace Automaton.Runner.Console.Services;
 
 internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandler handler)
 {
-    public async Task ConsumeAsync(HostedRunnerBrokerConfiguration broker, RunnerExecutionApiClient api,
+    public async Task ConsumeAsync(RunnerBrokerConfiguration broker, RunnerExecutionApiClient api,
         Guid runnerId, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(broker.ManagementQueueName))
@@ -16,7 +16,7 @@ internal sealed class RunnerExecutionQueueConsumer(RunnerExecutionDeliveryHandle
         await ConsumeAsync(connection, broker, api, runnerId, token);
     }
 
-    internal async Task ConsumeAsync(IConnection connection, HostedRunnerBrokerConfiguration broker,
+    internal async Task ConsumeAsync(IConnection connection, RunnerBrokerConfiguration broker,
         RunnerExecutionApiClient api, Guid runnerId, CancellationToken token)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token);
