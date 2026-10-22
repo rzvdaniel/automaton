@@ -9,7 +9,6 @@ namespace Automaton.Worker.Tests;
 [TestFixture]
 public sealed class TrustedSystemActionScheduleDispatchValidatorTests
 {
-    [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner)]
     [TestCase(BuiltInStorageScheduleActionKeys.RunnerHost)]
     public async Task BuiltInSystemSchedule_ResolvesItsTrustedWorkerActionDefinition(string actionKey)
     {

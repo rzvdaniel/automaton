@@ -35,18 +35,6 @@ public static class StorageTelemetryPolicy
             requestedStorageBytes: 0);
     }
 
-    public static string EvaluateHostedRunner(long allowanceBytes, long totalBytes, bool success, StorageTelemetryOptions? options = null)
-    {
-        options ??= new StorageTelemetryOptions();
-        if (!success) return HostedRunnerStorageStates.MeasurementFailed;
-        if (allowanceBytes <= 0) return HostedRunnerStorageStates.Unknown;
-        var percent = totalBytes * 100m / allowanceBytes;
-        if (percent > options.OverLimitPercent) return HostedRunnerStorageStates.OverLimit;
-        if (percent >= options.DeploymentBlockPercent) return HostedRunnerStorageStates.DeploymentBlocked;
-        if (percent >= options.WarningPercent) return HostedRunnerStorageStates.Warning;
-        return HostedRunnerStorageStates.Healthy;
-    }
-
     public static long RequiredHostReserve(long totalBytes, StorageTelemetryOptions? options = null)
     {
         options ??= new StorageTelemetryOptions();

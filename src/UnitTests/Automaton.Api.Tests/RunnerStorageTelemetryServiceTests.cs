@@ -1,110 +1,15 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
-using Automaton.Api.Controllers;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace Automaton.Api.Tests;
 
 public class RunnerStorageTelemetryServiceTests
 {
-    [Test]
-    public async Task ReportHostedRunner_AcceptsMatchingIdentityAndRecalculatesTotals()
-    {
-        await using var db = CreateDb();
-        var runner = SeedHostedRunner(db);
-        var service = new RunnerStorageTelemetryService(db);
-
-        await service.ReportHostedRunnerAsync(Authenticated(runner), new(
-            runner.Id, DateTime.UtcNow, 10, 20, 30, 40, 999, 999, 12, true, null, "1.2.3"), default);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(runner.StorageUserBytes, Is.EqualTo(90));
-            Assert.That(runner.StorageTotalBytes, Is.EqualTo(100));
-            Assert.That(runner.StorageState, Is.EqualTo(HostedRunnerStorageStates.Healthy));
-            Assert.That(db.HostedRunnerStorageObservations.Single().TotalBytes, Is.EqualTo(100));
-        });
-    }
-
-    [Test]
-    public void ReportHostedRunner_RejectsAnotherHostedRunnerIdentity()
-    {
-        using var db = CreateDb();
-        var runner = SeedHostedRunner(db);
-        var authenticated = Authenticated(runner);
-        authenticated.HostedRunnerId = Guid.NewGuid();
-        var service = new RunnerStorageTelemetryService(db);
-
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ReportHostedRunnerAsync(authenticated, new(
-            runner.Id, DateTime.UtcNow, 1, 1, 1, 1, 3, 4, 1, true, null, "1"), default));
-    }
-
-    [Test]
-    public async Task ReportHostedRunner_OlderObservationDoesNotReplaceCurrent()
-    {
-        await using var db = CreateDb();
-        var runner = SeedHostedRunner(db);
-        runner.StorageMeasuredAtUtc = DateTime.UtcNow;
-        runner.StorageTotalBytes = 500;
-        await db.SaveChangesAsync();
-
-        await new RunnerStorageTelemetryService(db).ReportHostedRunnerAsync(Authenticated(runner), new(
-            runner.Id, runner.StorageMeasuredAtUtc.Value.AddMinutes(-1), 1, 1, 1, 1, 3, 4, 1, true, null, "1"), default);
-
-        Assert.That(runner.StorageTotalBytes, Is.EqualTo(500));
-        Assert.That(db.HostedRunnerStorageObservations, Is.Empty);
-    }
-
-    [Test]
-    public async Task ReportHostedRunner_FailurePersistsWithoutReplacingUsageWithZero()
-    {
-        await using var db = CreateDb();
-        var runner = SeedHostedRunner(db);
-        runner.StorageTotalBytes = 500;
-        await db.SaveChangesAsync();
-
-        await new RunnerStorageTelemetryService(db).ReportHostedRunnerAsync(Authenticated(runner), new(
-            runner.Id, DateTime.UtcNow, 0, 0, 0, 0, 0, 0, 1, false, "denied", "1"), default);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(runner.StorageTotalBytes, Is.EqualTo(500));
-            Assert.That(runner.StorageState, Is.EqualTo(HostedRunnerStorageStates.MeasurementFailed));
-            Assert.That(db.HostedRunnerStorageObservations.Single().Success, Is.False);
-        });
-    }
-
-    [Test]
-    public async Task RecentAuthoritativeObservation_TakesPrecedenceOverFailedSelfReport()
-    {
-        await using var db = CreateDb();
-        var runner = SeedHostedRunner(db);
-        runner.StorageVerifiedAtUtc = DateTime.UtcNow;
-        runner.StorageVerifiedTotalBytes = 600;
-        runner.StorageTotalBytes = 600;
-        runner.StorageState = HostedRunnerStorageStates.Warning;
-        runner.StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified;
-        await db.SaveChangesAsync();
-
-        await new RunnerStorageTelemetryService(db).ReportHostedRunnerAsync(Authenticated(runner), new(
-            runner.Id, DateTime.UtcNow.AddSeconds(1), 0, 0, 0, 0, 0, 0, 1, false, "denied", "1"), default);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(runner.StorageTotalBytes, Is.EqualTo(600));
-            Assert.That(runner.StorageState, Is.EqualTo(HostedRunnerStorageStates.Warning));
-            Assert.That(runner.StorageMeasurementSource, Is.EqualTo(StorageMeasurementSources.InfrastructureRunnerVerified));
-            Assert.That(runner.StorageSelfReportedStatus, Is.EqualTo(StorageMeasurementStatuses.Failed));
-        });
-    }
-
     [Test]
     public async Task ReportRunnerHost_UsesDockerFilesystemForCapacityState()
     {
@@ -167,29 +72,6 @@ public class RunnerStorageTelemetryServiceTests
     }
 
     [Test]
-    public async Task SubmissionService_ResolvesHostedRunnerIdentityFromApiKey()
-    {
-        await using var db = CreateDb();
-        var apiKey = CreateApiKey();
-        var hosted = SeedHostedRunner(db);
-        var runner = new Runner
-        {
-            Id = hosted.RunnerId!.Value,
-            Name = "hosted-runner",
-            Purpose = RunnerPurposes.Managed,
-            ApiKeyId = apiKey.Id
-        };
-        db.Runners.Add(runner);
-        await db.SaveChangesAsync();
-        var submission = CreateSubmissionService(db);
-
-        await submission.ReportHostedRunnerAsync(apiKey.Id, new(
-            hosted.Id, DateTime.UtcNow, 10, 20, 30, 40, 0, 0, 1, true, null, "1"), CancellationToken.None);
-
-        Assert.That(db.HostedRunnerStorageObservations.Single().HostedRunnerId, Is.EqualTo(hosted.Id));
-    }
-
-    [Test]
     public async Task SubmissionService_ResolvesInfrastructureHostFromApiKey()
     {
         await using var db = CreateDb();
@@ -242,66 +124,8 @@ public class RunnerStorageTelemetryServiceTests
                 true, null, "1", true), CancellationToken.None));
     }
 
-    [Test]
-    public async Task Controller_ReturnsForbiddenWhenApiKeyReportsAnotherHostedRunner()
-    {
-        await using var db = CreateDb();
-        var apiKey = CreateApiKey();
-        var hosted = SeedHostedRunner(db);
-        db.Runners.Add(new Runner
-        {
-            Id = hosted.RunnerId!.Value,
-            Name = "hosted-runner",
-            Purpose = RunnerPurposes.Managed,
-            ApiKeyId = apiKey.Id
-        });
-        await db.SaveChangesAsync();
-        var controller = CreateController(db, apiKey);
-
-        var result = await controller.ReportHostedRunnerStorage(new(
-            Guid.NewGuid(), DateTime.UtcNow, 1, 1, 1, 1, 3, 4, 1, true, null, "1"), CancellationToken.None);
-
-        Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
-    }
-
-    [Test]
-    public async Task Controller_ReturnsBadRequestForMalformedTelemetry()
-    {
-        await using var db = CreateDb();
-        var apiKey = CreateApiKey();
-        var hosted = SeedHostedRunner(db);
-        db.Runners.Add(new Runner
-        {
-            Id = hosted.RunnerId!.Value,
-            Name = "hosted-runner",
-            Purpose = RunnerPurposes.Managed,
-            ApiKeyId = apiKey.Id
-        });
-        await db.SaveChangesAsync();
-        var controller = CreateController(db, apiKey);
-
-        var result = await controller.ReportHostedRunnerStorage(new(
-            hosted.Id, DateTime.UtcNow, -1, 1, 1, 1, 3, 4, 1, true, null, "1"), CancellationToken.None);
-
-        Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
-    }
-
     private static RunnerStorageTelemetrySubmissionService CreateSubmissionService(ApplicationDbContext db)
         => new(db, new RunnerStorageTelemetryService(db));
-
-    private static RunnerStorageTelemetryController CreateController(ApplicationDbContext db, ApiKey apiKey)
-    {
-        var controller = new RunnerStorageTelemetryController(CreateSubmissionService(db));
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                    [new Claim("api_key_id", apiKey.Id.ToString())], "test"))
-            }
-        };
-        return controller;
-    }
 
     private static ApiKey CreateApiKey() => new()
     {
@@ -312,22 +136,4 @@ public class RunnerStorageTelemetryServiceTests
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
 
-    private static HostedRunner SeedHostedRunner(ApplicationDbContext db)
-    {
-        var runnerId = Guid.NewGuid();
-        var hosted = new HostedRunner
-        {
-            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerId = runnerId,
-            Name = "hosted", ContainerName = "hosted", StorageAllowanceBytes = 1000
-        };
-        db.HostedRunners.Add(hosted);
-        db.SaveChanges();
-        return hosted;
-    }
-
-    private static RunnerDetails Authenticated(HostedRunner runner) => new()
-    {
-        Id = runner.RunnerId!.Value, Name = runner.Name, Purpose = RunnerPurposes.Managed,
-        HostedRunnerId = runner.Id
-    };
 }

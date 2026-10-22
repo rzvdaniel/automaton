@@ -24,7 +24,6 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
 
     [TestCase(HostedRunnerDeploymentActions.Restart, "restart-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Deprovision, "delete-hosted-runner")]
-    [TestCase(HostedRunnerDeploymentActions.VerifyStorage, "measure-hosted-runner-storage")]
     public void DeploymentActionMapsOnlyToItsTrustedAction(string deploymentAction, string actionKey)
         => Assert.That(
             InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction),
@@ -34,6 +33,8 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
     [TestCase(HostedRunnerDeploymentActions.Reprovision)]
     [TestCase(HostedRunnerDeploymentActions.Suspend)]
     [TestCase(HostedRunnerDeploymentActions.Resume)]
+    [TestCase(HostedRunnerDeploymentActions.VerifyStorage)]
+    [TestCase("measure-hosted-runner-storage")]
     public void RetiredActionsNoLongerHaveTrustedCallbacks(string deploymentAction)
         => Assert.That(InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction), Is.Null);
 
@@ -50,6 +51,7 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
 
     [TestCase(HostedRunnerDeploymentActions.Suspend, "suspend-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Resume, "resume-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.VerifyStorage, "measure-hosted-runner-storage")]
     public async Task RetiredStorageCommandCannotResolveSecretsOrApplyResults(string action, string key)
     {
         await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(

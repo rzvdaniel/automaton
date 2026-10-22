@@ -9,18 +9,14 @@ namespace Automaton.Runner.Console.Services;
 
 public sealed class StorageTelemetryBackgroundService(RunnerStorageTelemetryApiClient telemetryClient) : BackgroundService
 {
-    private static readonly string[] ManagedRoots =
-    [
-        "/automaton/system",
-        "/automaton/storage/workspace",
-        "/automaton/storage/logs",
-        "/automaton/storage/home"
-    ];
     private readonly SemaphoreSlim measurementLock = new(1, 1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+        if (purpose != RunnerPurposes.Infrastructure &&
+            !string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), RunnerApplicationProfiles.MachineManagement, StringComparison.OrdinalIgnoreCase))
+            return;
         await Task.Delay(GetInitialDelay(purpose, Random.Shared), stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -43,48 +39,13 @@ public sealed class StorageTelemetryBackgroundService(RunnerStorageTelemetryApiC
         if (!await measurementLock.WaitAsync(0, stoppingToken)) return false;
         try
         {
-            return purpose == RunnerPurposes.Infrastructure
-                ? await MeasureHostAsync(stoppingToken)
-                : string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), RunnerApplicationProfiles.MachineManagement, StringComparison.OrdinalIgnoreCase)
-                    ? await MeasureMachineRunnerAsync(stoppingToken)
-                    : await MeasureHostedRunnerAsync(stoppingToken);
-        }
-        finally { measurementLock.Release(); }
-    }
-
-    private async Task<bool> MeasureHostedRunnerAsync(CancellationToken stoppingToken)
-    {
-        if (!Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"), out var hostedRunnerId))
-            return false;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        timeout.CancelAfter(TimeSpan.FromMinutes(5));
-        var stopwatch = Stopwatch.StartNew();
-        try
-        {
-            var values = new long[ManagedRoots.Length];
-            for (var i = 0; i < ManagedRoots.Length; i++)
-                values[i] = await StorageMeasurement.MeasureDirectoryAsync(ManagedRoots[i], timeout.Token);
-            var user = checked(values[1] + values[2] + values[3]);
-            await telemetryClient.ReportHostedRunnerAsync(new(
-                hostedRunnerId, DateTime.UtcNow, values[0], values[1], values[2], values[3],
-                user, checked(values[0] + user), stopwatch.ElapsedMilliseconds, true, null,
-                typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
+            if (purpose == RunnerPurposes.Infrastructure)
+                return await MeasureHostAsync(stoppingToken);
+            if (string.Equals(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"), RunnerApplicationProfiles.MachineManagement, StringComparison.OrdinalIgnoreCase))
+                return await MeasureMachineRunnerAsync(stoppingToken);
             return true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await telemetryClient.ReportHostedRunnerAsync(new(
-                    hostedRunnerId, DateTime.UtcNow, 0, 0, 0, 0, 0, 0, stopwatch.ElapsedMilliseconds,
-                    false, ex.Message, typeof(StorageTelemetryBackgroundService).Assembly.GetName().Version?.ToString()), stoppingToken);
-            }
-            catch (Exception reportError) when (!stoppingToken.IsCancellationRequested)
-            {
-                Log.Warning(reportError, "Could not report hosted Runner storage measurement failure.");
-            }
-            return false;
-        }
+        finally { measurementLock.Release(); }
     }
 
     private async Task<bool> MeasureHostAsync(CancellationToken stoppingToken)

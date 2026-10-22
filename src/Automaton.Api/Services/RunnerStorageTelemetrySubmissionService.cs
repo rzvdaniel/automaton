@@ -10,15 +10,6 @@ public sealed class RunnerStorageTelemetrySubmissionService(
     ApplicationDbContext db,
     RunnerStorageTelemetryService telemetryService)
 {
-    public async Task ReportHostedRunnerAsync(
-        Guid apiKeyId,
-        HostedRunnerStorageTelemetry report,
-        CancellationToken cancellationToken)
-    {
-        var runner = await ResolveHostedRunnerAsync(apiKeyId, cancellationToken);
-        await telemetryService.ReportHostedRunnerAsync(runner, report, cancellationToken);
-    }
-
     public async Task ReportRunnerHostAsync(
         Guid apiKeyId,
         RunnerHostStorageTelemetry report,
@@ -38,20 +29,6 @@ public sealed class RunnerStorageTelemetrySubmissionService(
             string.IsNullOrWhiteSpace(runner.InstallationId))
             throw new UnauthorizedAccessException("The API key is not assigned to a Machine Management Runner.");
         await telemetryService.ReportMachineRunnerAsync(runner, report, cancellationToken);
-    }
-
-    private async Task<RunnerDetails> ResolveHostedRunnerAsync(
-        Guid apiKeyId,
-        CancellationToken cancellationToken)
-    {
-        var runner = await ResolveRunnerAsync(apiKeyId, RunnerPurposes.Managed, cancellationToken);
-        var hostedRunnerId = await db.HostedRunners.AsNoTracking()
-            .Where(item => item.RunnerId == runner.Id)
-            .Select(item => (Guid?)item.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        runner.HostedRunnerId = hostedRunnerId
-            ?? throw new UnauthorizedAccessException("The API key is not assigned to a Hosted Runner.");
-        return runner;
     }
 
     private async Task<RunnerDetails> ResolveInfrastructureRunnerAsync(

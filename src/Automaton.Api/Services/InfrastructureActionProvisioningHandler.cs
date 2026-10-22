@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
@@ -18,7 +17,6 @@ public sealed class InfrastructureActionProvisioningHandler(
     ApplicationDbContext db,
     IAuditEventService auditEventService,
     IOptions<HostedRunnerOptions> hostedRunnerOptions,
-    IOptions<StorageTelemetryOptions> storageTelemetryOptions,
     HostedRunnerBrokerProvisioner brokerProvisioner,
     RunnerExecutionOperationService executions)
 {
@@ -162,7 +160,6 @@ public sealed class InfrastructureActionProvisioningHandler(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,
         string actionKey,
-        JsonElement result,
         CancellationToken cancellationToken)
     {
         if (actionKey == "delete-hosted-runner" && hostedRunner.RunnerId is Guid runnerId)
@@ -171,8 +168,7 @@ public sealed class InfrastructureActionProvisioningHandler(
             await brokerProvisioner.RevokeAsync(runnerId, cancellationToken);
         }
 
-        if (actionKey != StorageTelemetryActions.MeasureHostedRunnerStorage)
-            hostedRunner.LastError = null;
+        hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         deployment.Error = null;
 
@@ -181,9 +177,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             ApplyRestartResult(hostedRunner, deployment);
             return;
         }
-
-        if (actionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
-            await ApplyStorageVerificationResultAsync(hostedRunner, deployment, result, cancellationToken);
 
         deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
         deployment.FinishedAt = DateTime.UtcNow;
@@ -205,14 +198,6 @@ public sealed class InfrastructureActionProvisioningHandler(
         deployment.ReconnectDeadlineUtc = now.AddSeconds(timeoutSeconds);
         deployment.Logs = "Restart command completed; waiting for the hosted Runner to reconnect and heartbeat.";
     }
-
-    private async Task ApplyStorageVerificationResultAsync(
-        HostedRunner hostedRunner,
-        HostedRunnerDeployment deployment,
-        JsonElement result,
-        CancellationToken cancellationToken)
-        => await HostedRunnerStorageVerificationResultApplier.ApplyAsync(
-            db, hostedRunner, deployment, result, storageTelemetryOptions.Value, cancellationToken);
 
     private static void MarkHostedRunnerDeleted(HostedRunner hostedRunner)
     {
@@ -248,8 +233,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             ("restart-hosted-runner", false) => AuditEventTypes.RunnerRestartFailed,
             ("delete-hosted-runner", true) => AuditEventTypes.HostedRunnerDeleted,
             ("delete-hosted-runner", false) => AuditEventTypes.HostedRunnerDeleteFailed,
-            (StorageTelemetryActions.MeasureHostedRunnerStorage, true) => AuditEventTypes.HostedRunnerStorageVerificationSucceeded,
-            (StorageTelemetryActions.MeasureHostedRunnerStorage, false) => AuditEventTypes.HostedRunnerStorageVerificationFailed,
             (_, true) => AuditEventTypes.HostedRunnerProvisioningSucceeded,
             _ => AuditEventTypes.HostedRunnerProvisioningFailed
         };

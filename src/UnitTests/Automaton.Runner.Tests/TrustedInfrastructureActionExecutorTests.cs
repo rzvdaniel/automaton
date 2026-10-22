@@ -11,6 +11,7 @@ public sealed class TrustedInfrastructureActionExecutorTests
 {
     [TestCase("suspend-hosted-runner")]
     [TestCase("resume-hosted-runner")]
+    [TestCase("measure-hosted-runner-storage")]
     public void RetiredStorageCommandIsRejectedBeforePreparationOrSecrets(string actionKey)
     {
         var secrets = new TerminalSecretProvider();

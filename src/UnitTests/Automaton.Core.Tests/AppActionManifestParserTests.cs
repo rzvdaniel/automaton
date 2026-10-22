@@ -171,7 +171,6 @@ public class AppActionManifestParserTests
 
     [TestCase("restart-hosted-runner")]
     [TestCase("delete-hosted-runner")]
-    [TestCase("measure-hosted-runner-storage")]
     public void ParsesTrustedInfrastructureLifecycleAction(string actionKey)
     {
         var repositoryRoot = FindRepositoryRoot();

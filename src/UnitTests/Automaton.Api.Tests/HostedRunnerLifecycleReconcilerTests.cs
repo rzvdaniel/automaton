@@ -17,6 +17,8 @@ public sealed class HostedRunnerLifecycleReconcilerTests
 {
     [TestCase(HostedRunnerDeploymentActions.Suspend)]
     [TestCase(HostedRunnerDeploymentActions.Resume)]
+    [TestCase(HostedRunnerDeploymentActions.VerifyStorage)]
+    [TestCase("measure-hosted-runner-storage")]
     public async Task RetiredStorageOperationIsNotRedispatchedOrApplied(string action)
     {
         await using var db = CreateDb();

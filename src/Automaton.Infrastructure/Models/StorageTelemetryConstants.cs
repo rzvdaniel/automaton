@@ -57,16 +57,7 @@ public static class StorageVerificationStatuses
     public const string TimedOut = "TimedOut";
 }
 
-public static class StorageTelemetryActions
-{
-    public const string MeasureHostedRunnerStorage = "measure-hosted-runner-storage";
-}
-
 public static class StorageTelemetryAuditEvents
 {
-    public const string VerificationRequested = "HostedRunnerStorageVerificationRequested";
-    public const string VerificationSucceeded = "HostedRunnerStorageVerificationSucceeded";
-    public const string VerificationFailed = "HostedRunnerStorageVerificationFailed";
-    public const string HostedRunnerPolicyChanged = "HostedRunnerStoragePolicyChanged";
     public const string RunnerHostPolicyChanged = "RunnerHostStoragePolicyChanged";
 }

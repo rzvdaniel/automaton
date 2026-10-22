@@ -60,8 +60,6 @@ internal static class WorkerHostApplication
     private static void ConfigureServices(HostApplicationBuilder builder)
     {
         var services = builder.Services;
-        services.AddScoped<HostedRunnerStorageLocalityResolver>();
-        services.AddScoped<HostedRunnerStorageLocalityAdoptionService>();
         services.AddAutomatonInfrastructure(builder.Configuration);
         services.AddAutomatonWorkerIdentity();
         services.Configure<StorageTelemetryOptions>(builder.Configuration.GetSection("StorageTelemetry"));
@@ -69,10 +67,9 @@ internal static class WorkerHostApplication
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
         services.AddScoped<HostedRunnerRegistrationReconciler>();
-        services.AddScoped<HostedRunnerStorageReconciliationService>();
+        services.AddScoped<RunnerHostStorageReconciliationService>();
         services.AddScoped<ActionScheduleProcessor>();
         services.AddScoped<WorkerScheduledActionDispatcher>();
-        services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
         services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
         services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
         services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();

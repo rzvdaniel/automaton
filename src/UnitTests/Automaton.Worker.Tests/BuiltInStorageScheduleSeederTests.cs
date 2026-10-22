@@ -1,21 +1,24 @@
 using NUnit.Framework;
+using Automaton.Worker.Services;
 
 namespace Automaton.Worker.Tests;
 
 public sealed class BuiltInStorageScheduleSeederTests
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task StartAsync_DisablesRetiredSystemEnforcementWithoutChangingUserSchedules(bool legacyIdentity)
+    [TestCase(BuiltInStorageScheduleActionKeys.RetiredEnforcement, false)]
+    [TestCase(BuiltInStorageScheduleActionKeys.RetiredEnforcement, true)]
+    [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner, false)]
+    [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner, true)]
+    public async Task StartAsync_DisablesRetiredSystemSchedulesWithoutChangingUserSchedules(string key, bool legacyIdentity)
     {
         await using var fixture = await BuiltInStorageScheduleSeederFixture.CreateAsync();
-        await fixture.SeedRetiredEnforcementAsync(legacyIdentity);
+        await fixture.SeedRetiredScheduleAsync(key, legacyIdentity);
         await fixture.SeedTwiceAsync();
-        await fixture.AssertRetiredEnforcementDisabledAsync();
+        await fixture.AssertRetiredScheduleDisabledAsync(key);
     }
 
     [Test]
-    public async Task StartAsync_IsIdempotentAndSeedsBothWorkerSchedules()
+    public async Task StartAsync_IsIdempotentAndSeedsOnlyHostWorkerSchedule()
     {
         await using var fixture = await BuiltInStorageScheduleSeederFixture.CreateAsync();
         await fixture.SeedTwiceAsync();
@@ -27,8 +30,8 @@ public sealed class BuiltInStorageScheduleSeederTests
     {
         await using var fixture = await BuiltInStorageScheduleSeederFixture.CreateAsync();
         await fixture.SeedOnceAsync();
-        await fixture.TamperHostedRunnerScheduleAsync();
+        await fixture.TamperRunnerHostScheduleAsync();
         await fixture.SeedOnceAsync();
-        await fixture.AssertHostedRunnerScheduleWasReconciledAsync();
+        await fixture.AssertRunnerHostScheduleWasReconciledAsync();
     }
 }

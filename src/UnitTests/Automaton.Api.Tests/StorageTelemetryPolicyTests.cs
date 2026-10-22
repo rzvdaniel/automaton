@@ -6,23 +6,6 @@ namespace Automaton.Api.Tests;
 
 public class StorageTelemetryPolicyTests
 {
-    [TestCase(79, HostedRunnerStorageStates.Healthy)]
-    [TestCase(80, HostedRunnerStorageStates.Warning)]
-    [TestCase(90, HostedRunnerStorageStates.DeploymentBlocked)]
-    [TestCase(100, HostedRunnerStorageStates.DeploymentBlocked)]
-    [TestCase(101, HostedRunnerStorageStates.OverLimit)]
-    public void EvaluateHostedRunner_UsesConfiguredStageFiveBoundaries(int percent, string expected)
-    {
-        Assert.That(StorageTelemetryPolicy.EvaluateHostedRunner(100, percent, true), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void EvaluateHostedRunner_FailureIsNeverHealthyOrZero()
-    {
-        Assert.That(StorageTelemetryPolicy.EvaluateHostedRunner(100, 0, false),
-            Is.EqualTo(HostedRunnerStorageStates.MeasurementFailed));
-    }
-
     [Test]
     public void RequiredHostReserve_UsesGreaterOfFiveGiBAndFifteenPercent()
     {
@@ -51,19 +34,6 @@ public class StorageTelemetryPolicyTests
                 RunnerHostStorageStates.Healthy, reserve + 2L * 1024 * 1024 * 1024,
                 reserve, 2L * 1024 * 1024 * 1024), Is.True);
         });
-    }
-
-    [Test]
-    public void EvaluateHostedRunner_UsesConfiguredThresholds()
-    {
-        var options = new StorageTelemetryOptions
-        {
-            WarningPercent = 70,
-            DeploymentBlockPercent = 85,
-            OverLimitPercent = 95
-        };
-        Assert.That(StorageTelemetryPolicy.EvaluateHostedRunner(100, 86, true, options),
-            Is.EqualTo(HostedRunnerStorageStates.DeploymentBlocked));
     }
 
     [TestCase(RunnerHostStorageStates.Stale)]

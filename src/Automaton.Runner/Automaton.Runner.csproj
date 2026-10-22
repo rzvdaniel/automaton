@@ -76,7 +76,6 @@
                     ..\..\system-apps\automaton-infrastructure\actions\migrate-hosted-runner-storage\action.yaml;
                     ..\..\system-apps\automaton-infrastructure\actions\prepare-hosted-runner-storage\action.yaml;
                     ..\..\system-apps\automaton-infrastructure\actions\prepare-runner-host-storage\action.yaml;
-                    ..\..\system-apps\automaton-infrastructure\actions\reconcile-hosted-runner-storage\action.yaml;
                     ..\..\system-apps\automaton-infrastructure\actions\reconcile-runner-host-storage\action.yaml;
                     ..\..\system-apps\automaton-infrastructure\actions\reset-legacy-hosted-runner\action.yaml" />
   </ItemGroup>
