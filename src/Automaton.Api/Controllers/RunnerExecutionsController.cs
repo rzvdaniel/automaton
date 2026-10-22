@@ -13,7 +13,7 @@ public sealed class RunnerExecutionsController(
     RunnerExecutionOperationService operations, RunnerExecutionArtifactService? artifacts = null) : ControllerBase
 {
     [HttpGet("configuration")]
-    public async Task<ActionResult<HostedRunnerBrokerConfiguration>> Configuration(CancellationToken token)
+    public async Task<ActionResult<RunnerBrokerConfiguration>> Configuration(CancellationToken token)
     {
         var runnerId = RunnerId();
         try { await identity.EnsureAsync(KeyId(), runnerId, ActorId(), token); }

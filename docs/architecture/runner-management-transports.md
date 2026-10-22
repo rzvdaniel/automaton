@@ -49,9 +49,9 @@ RabbitMQ messages contain only operation and Runner identities. The executable r
 | Media upload | `AppMediaStorageService` | Execution | Writes into the app's existing data/media root | API store → Runner HTTPS GET |
 | Media download | `AppMediaStorageService` | Execution | Reads the app media file after metadata lookup | Runner HTTPS POST → API store → API response |
 | Media stats/metadata | `AppMediaStorageService` | Management | Reads current app media usage or file metadata | No artifact |
-| Generic deployment fallback | `DeploymentPackageRunnerService` | Execution | Fetches the package and calls `RunnerDeploymentService` | API store → Runner HTTPS GET |
+| App package deployment | `DeploymentPackageRunnerService` | Execution | Fetches the package and calls `RunnerDeploymentService` | API store → Runner HTTPS GET |
 
-The Hosted Runner's existing package-deployment RabbitMQ/HTTPS path remains separate. Slice 4 migrates the generic Runner fallback and app file/media transfers; it does not alter Hosted Runner command dispatch.
+The former per-user Hosted Runner package-deployment queue and callback API have been removed. All app package deployments now use the assigned Runner's durable typed file-transfer operation described above. The remaining Hosted Runner lifecycle endpoints do not provide a second app-deployment execution route.
 
 ## Authorization, bounds and storage
 

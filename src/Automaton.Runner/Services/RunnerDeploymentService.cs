@@ -6,7 +6,7 @@ namespace Automaton.Runner.Console.Services;
 public class RunnerDeploymentService
 {
     private readonly RunnerWorkspaceService runnerWorkspaceService;
-    private readonly HostedRunnerDeploymentResultJournal resultJournal;
+    private readonly RunnerDeploymentResultJournal resultJournal;
     private readonly IAppRuntimeProcessManager runtimeProcessManager;
     private readonly RunnerApplicationDeploymentExecutor deploymentExecutor;
     private readonly ConcurrentDictionary<(Guid AppId, Guid TargetId), Guid> activeExecutionAttempts = new();
@@ -31,7 +31,7 @@ public class RunnerDeploymentService
         MachineWorkloadDiskAdmission diskAdmission)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
-        resultJournal = new HostedRunnerDeploymentResultJournal(runnerWorkspaceService);
+        resultJournal = new RunnerDeploymentResultJournal(runnerWorkspaceService);
         this.runtimeProcessManager = runtimeProcessManager;
         var resolvedBuildExecutor = buildExecutor ?? new RunnerApplicationBuildExecutor(new DockerContainerRuntime());
         deploymentExecutor = new RunnerApplicationDeploymentExecutor(
@@ -79,14 +79,6 @@ public class RunnerDeploymentService
             }
         }
     }
-
-    public void ForgetHostedRunnerDeploymentResult(Guid operationId)
-        => resultJournal.Delete(operationId);
-
-    public Task<DeployAppPackageResult?> FindHostedRunnerDeploymentResultAsync(
-        Guid operationId,
-        CancellationToken cancellationToken)
-        => resultJournal.TryReadAsync(operationId, cancellationToken);
 
     private async Task<DeployAppPackageResult> DeployPackageCore(
         DeployAppPackageRequest request,

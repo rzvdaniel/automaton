@@ -81,7 +81,7 @@ public sealed class RunnerExecutionQueueCapacityTests
             var handler = new RunnerExecutionDeliveryHandler(processor, new NoopTunnelReconnectRequester());
             consumer = new RunnerExecutionQueueConsumer(handler);
             var api = CreateApi();
-            var configuration = new HostedRunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
+            var configuration = new RunnerBrokerConfiguration("unused", 5671, "/", "test", "unused",
                 "execution", true, "unused", "management");
             consuming = consumer.ConsumeAsync(broker.Connection(), configuration, api, runner, cancellation.Token);
         }

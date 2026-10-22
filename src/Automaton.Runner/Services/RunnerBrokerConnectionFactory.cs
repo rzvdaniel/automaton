@@ -7,7 +7,7 @@ namespace Automaton.Runner.Console.Services;
 
 internal static class RunnerBrokerConnectionFactory
 {
-    public static ConnectionFactory Create(HostedRunnerBrokerConfiguration broker, bool requireTls = false)
+    public static ConnectionFactory Create(RunnerBrokerConfiguration broker, bool requireTls = false)
     {
         if (requireTls && !broker.TlsEnabled)
             throw new InvalidOperationException("Runner execution broker connections require TLS.");

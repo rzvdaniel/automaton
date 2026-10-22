@@ -3,7 +3,7 @@ using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
 
-internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService workspace)
+internal sealed class RunnerDeploymentResultJournal(RunnerWorkspaceService workspace)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -27,7 +27,7 @@ internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService
             return null;
         var json = await File.ReadAllTextAsync(path, cancellationToken);
         return JsonSerializer.Deserialize<DeployAppPackageResult>(json, JsonOptions)
-            ?? throw new InvalidDataException("The persisted Hosted Runner deployment result is invalid.");
+            ?? throw new InvalidDataException("The persisted deployment result is invalid.");
     }
 
     public async Task SaveAsync(
@@ -46,22 +46,6 @@ internal sealed class HostedRunnerDeploymentResultJournal(RunnerWorkspaceService
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    public void Delete(Guid operationId)
-    {
-        if (operationId == Guid.Empty)
-            return;
-        TryDelete(Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}.json"));
-    }
-
     private string GetPath(Guid operationId)
         => Path.Combine(workspace.RunnerRoot, "command-results", $"{operationId:N}.json");
-
-    private static void TryDelete(string path)
-    {
-        try { if (File.Exists(path)) File.Delete(path); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            // Cleanup is best-effort after the API has accepted the durable result.
-        }
-    }
 }

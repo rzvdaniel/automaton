@@ -10,7 +10,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
     IAppRuntimeProcessManager runtimeProcessManager,
     AppActionDeploymentService actionDeploymentService,
     IRunnerApplicationBuildExecutor buildExecutor,
-    HostedRunnerDeploymentResultJournal resultJournal,
+    RunnerDeploymentResultJournal resultJournal,
     MachineWorkloadDiskAdmission diskAdmission)
 {
     private const long MaximumPackageBytes = 100L * 1024 * 1024;

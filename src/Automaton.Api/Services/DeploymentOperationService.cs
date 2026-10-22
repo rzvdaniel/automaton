@@ -22,7 +22,6 @@ public sealed class DeploymentOperationService(
     IEventPublisher eventPublisher,
     DeploymentPackageStore packageStore,
     ApplicationDeploymentService deploymentService,
-    IHostedRunnerDeploymentCommandDispatcher hostedRunnerCommandService,
     ApiInstanceIdentityService apiInstanceIdentityService,
     IServiceScopeFactory scopeFactory,
     ILogger<DeploymentOperationService> logger)
@@ -118,12 +117,6 @@ public sealed class DeploymentOperationService(
 
         try
         {
-            if (await hostedRunnerCommandService.PublishAsync(operation, executionAttemptId, CancellationToken.None))
-            {
-                await WaitForHostedRunnerResultAsync(operationId, executionAttemptId, cancellationToken);
-                return;
-            }
-
             await using var package = packageStore.OpenRead(operation.PackagePath);
             var file = new FormFile(package, 0, package.Length, "file", "deploy-package.zip");
             var result = await deploymentService.DeployPackageAsync(
@@ -155,12 +148,6 @@ public sealed class DeploymentOperationService(
         {
             // Leave the durable lease running until expiry so the current
             // owner can reclaim the operation without a stale completion.
-            throw;
-        }
-        catch (HostedRunnerDeploymentPublishException)
-        {
-            // A confirm failure is ambiguous: retain the operation and let the
-            // durable lease expire before publishing a retry attempt.
             throw;
         }
         catch (Exception exception)
@@ -286,24 +273,6 @@ public sealed class DeploymentOperationService(
                 : target.Slug == operation.TargetSlug) &&
             (target.ExecutionRunnerId != null || operation.TargetSlug == null),
             cancellationToken);
-    }
-
-    private async Task WaitForHostedRunnerResultAsync(
-        Guid operationId,
-        Guid executionAttemptId,
-        CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var state = await dataContext.DeploymentOperations.AsNoTracking()
-                .Where(item => item.Id == operationId)
-                .Select(item => new { item.Status, item.ExecutionAttemptId })
-                .SingleOrDefaultAsync(cancellationToken);
-            if (state is null || state.Status is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed
-                || state.ExecutionAttemptId != executionAttemptId)
-                return;
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-        }
     }
 
     private async Task<DeploymentOperationClaim> ClaimAsync(

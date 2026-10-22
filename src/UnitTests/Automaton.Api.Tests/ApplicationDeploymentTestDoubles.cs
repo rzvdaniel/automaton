@@ -458,7 +458,6 @@ internal static class DeploymentOperationTestScenarios
                 new TestWebHostEnvironment { ContentRootPath = fixture.RootPath },
                 Options.Create(new DeploymentPackageStorageOptions())),
             deploymentService ?? fixture.Service,
-            new NoHostedRunnerCommandDispatcher(),
             fixture.ApiIdentity,
             null!,
             NullLogger<DeploymentOperationService>.Instance);
@@ -645,7 +644,6 @@ internal static class DeploymentAcceptanceServiceFactory
             publisher,
             new DeploymentPackageStore(environment, Options.Create(new DeploymentPackageStorageOptions())),
             null!,
-            new NoHostedRunnerCommandDispatcher(),
             fixture.ApiIdentity,
             null!,
             null!);
@@ -656,12 +654,6 @@ internal static class DeploymentAcceptanceServiceFactory
 internal sealed record DeploymentAcceptanceService(
     DeploymentOperationService Operations,
     RecordingEventPublisher Publisher);
-
-internal sealed class NoHostedRunnerCommandDispatcher : IHostedRunnerDeploymentCommandDispatcher
-{
-    public Task<bool> PublishAsync(DeploymentOperation operation, Guid executionAttemptId, CancellationToken cancellationToken)
-        => Task.FromResult(false);
-}
 
 internal sealed class FixedTargetResolver(AppDeploymentTarget target) : IAppDeploymentTargetResolver
 {

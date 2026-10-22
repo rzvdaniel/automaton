@@ -79,7 +79,7 @@ internal static class HostedRunnerDeleteLifecycleTestSupport
             brokerHandler.Requests.Count == 5
                 && brokerHandler.Requests[4].Method == HttpMethod.Delete
                 && brokerHandler.Requests[4].Path.Contains(
-                    HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), StringComparison.Ordinal),
+                    HostedRunnerBrokerProvisioner.LegacyDeploymentQueueName(runnerId), StringComparison.Ordinal),
             ExecutionBrokerRevoked(brokerHandler.Requests, runnerId));
     }
 

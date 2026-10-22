@@ -12,13 +12,7 @@ public sealed class HostedRunnerBrokerProvisioner(
     IOptions<RabbitMqOptions> rabbitOptions,
     IOptions<HostedRunnerRabbitMqOptions> runnerBrokerOptions)
 {
-    public async Task<HostedRunnerBrokerConfiguration> ProvisionAsync(
-        Guid runnerId,
-        CancellationToken cancellationToken)
-        => await ProvisionQueueAsync($"hosted-runner-{runnerId:N}",
-            HostedRunnerDeploymentCommandPublisher.QueueName(runnerId), cancellationToken);
-
-    public Task<HostedRunnerBrokerConfiguration> ProvisionExecutionAsync(Guid runnerId, CancellationToken cancellationToken)
+    public Task<RunnerBrokerConfiguration> ProvisionExecutionAsync(Guid runnerId, CancellationToken cancellationToken)
     {
         if (!runnerBrokerOptions.Value.TlsEnabled)
             throw new InvalidOperationException("Workflow and custom-step Runner broker connections require TLS.");
@@ -27,7 +21,7 @@ public sealed class HostedRunnerBrokerProvisioner(
             RunnerExecutionCommandPublisher.ManagementQueueName(runnerId));
     }
 
-    private async Task<HostedRunnerBrokerConfiguration> ProvisionQueueAsync(string username,
+    private async Task<RunnerBrokerConfiguration> ProvisionQueueAsync(string username,
         string queueName, CancellationToken cancellationToken, string? managementQueueName = null)
     {
         var rabbit = rabbitOptions.Value;
@@ -53,7 +47,7 @@ public sealed class HostedRunnerBrokerProvisioner(
         await PutAsync(client, $"api/permissions/{encodedVhost}/{Uri.EscapeDataString(username)}",
             new { configure = "", write = "", read = ReadPermission(queueName, managementQueueName) }, cancellationToken);
 
-        return new HostedRunnerBrokerConfiguration(
+        return new RunnerBrokerConfiguration(
             external.Host, external.Port, rabbit.VirtualHost, username, brokerPassword, queueName,
             external.TlsEnabled, external.TlsServerName, managementQueueName);
     }
@@ -80,7 +74,7 @@ public sealed class HostedRunnerBrokerProvisioner(
             $"api/queues/{encodedVhost}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}", cancellationToken);
         await DeleteIfPresentAsync(client, $"api/users/{Uri.EscapeDataString(username)}", cancellationToken);
         await DeleteIfPresentAsync(client,
-            $"api/queues/{encodedVhost}/{Uri.EscapeDataString(HostedRunnerDeploymentCommandPublisher.QueueName(runnerId))}",
+            $"api/queues/{encodedVhost}/{Uri.EscapeDataString(LegacyDeploymentQueueName(runnerId))}",
             cancellationToken);
     }
 
@@ -98,6 +92,9 @@ public sealed class HostedRunnerBrokerProvisioner(
             $"api/queues/{Uri.EscapeDataString(rabbit.VirtualHost)}/{Uri.EscapeDataString(RunnerExecutionCommandPublisher.ManagementQueueName(runnerId))}",
             cancellationToken);
     }
+
+    // Delete queue resources left by older Hosted Runner versions; nothing publishes to this queue now.
+    public static string LegacyDeploymentQueueName(Guid runnerId) => $"automaton.hosted-runner.{runnerId:N}";
 
     private HttpClient CreateManagementClient(RabbitMqOptions rabbit, Uri managementUrl)
     {

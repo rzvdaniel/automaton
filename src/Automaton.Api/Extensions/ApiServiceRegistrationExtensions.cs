@@ -570,11 +570,6 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<DeploymentPackageFinalizationService>();
         services.AddScoped<DeploymentPackageRunnerService>();
         services.AddScoped<DeploymentPackageStore>();
-        services.AddScoped<HostedRunnerDeploymentCommandPublisher>();
-        services.AddScoped<HostedRunnerDeploymentCommandService>();
-        services.AddScoped<IHostedRunnerDeploymentCommandDispatcher>(provider =>
-            provider.GetRequiredService<HostedRunnerDeploymentCommandService>());
-        services.AddScoped<HostedRunnerDeploymentResultService>();
         services.AddScoped<HostContainerExecutionOperationService>();
         services.AddScoped<HostContainerRelayService>();
         services.AddScoped<HostContainerRelayStateResolver>();
@@ -622,7 +617,6 @@ internal static class ApiRunnerRegistration
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
         services.AddScoped<InfrastructureRunnerRegistrationService>();
         services.AddScoped<InfrastructureRunnerRabbitMqConfigurationService>();
-        services.AddScoped<HostedRunnerBrokerConfigurationService>();
         services.AddScoped<HostedRunnerBrokerProvisioner>();
         services.AddScoped<InfrastructureRunnerHostApprovalService>();
         services.AddScoped<AdminRunnersService>();
