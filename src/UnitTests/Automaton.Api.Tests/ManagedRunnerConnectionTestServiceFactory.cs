@@ -1,12 +1,17 @@
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Automaton.Api.Tests;
 
 internal static class ManagedRunnerConnectionTestServiceFactory
 {
+    public static RunnerService Create(ApplicationDbContext db)
+    {
+        var userContext = new UserContextService(new HttpContextAccessor());
+        return Create(db, userContext, new ResourceAuthorizationService(db, userContext));
+    }
+
     public static Task MarkDisconnectedAsync(ApplicationDbContext db, Guid runnerId, string connectionId)
     {
         var service = new RunnerConnectionSessionService(
@@ -16,18 +21,10 @@ internal static class ManagedRunnerConnectionTestServiceFactory
         return service.MarkDisconnectedAsync(runnerId, connectionId, CancellationToken.None);
     }
 
-    public static ManagedRunnerAppAssignmentService CreateWithFailingRoutes(
-        ApplicationDbContext db,
-        ResourceAuthorizationService authorization,
-        BackendRouteConfigService failingRoutes) =>
-        new(db, null!, authorization, failingRoutes,
-            NullLogger<ManagedRunnerAppAssignmentService>.Instance);
-
     public static RunnerService Create(
         ApplicationDbContext db,
         UserContextService userContext,
-        ResourceAuthorizationService authorization,
-        ManagedRunnerAppAssignmentService appAssignment)
+        ResourceAuthorizationService authorization)
     {
         var auditEventService = new AuditEventService(db, userContext, new HttpContextAccessor());
         var applicationEventService = new ApplicationEventService(db);
@@ -48,6 +45,6 @@ internal static class ManagedRunnerConnectionTestServiceFactory
             new RunnerFlowExecutionService(null!),
             new RunnerConnectionLifecycleService(
                 db, authorization, new ApiInstanceIdentityService(), sessionService,
-                registrationService, appAssignment, restartService));
+                registrationService, restartService));
     }
 }

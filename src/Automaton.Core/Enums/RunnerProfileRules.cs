@@ -17,10 +17,6 @@ public static class RunnerProfileRules
         => !IsInfrastructure(purpose)
             && RunnerApplicationProfiles.Normalize(profile) == RunnerApplicationProfiles.PrivilegedHost;
 
-    public static bool CanReceiveAutomaticApplicationAssignment(string? purpose, string? profile)
-        => !IsInfrastructure(purpose) && !IsPrivilegedHost(purpose, profile)
-            && RunnerApplicationProfiles.Normalize(profile) != RunnerApplicationProfiles.MachineManagement;
-
     public static string? NormalizeApplicationProfile(string? purpose, string? profile)
         => IsInfrastructure(purpose) ? null : RunnerApplicationProfiles.Normalize(profile);
 

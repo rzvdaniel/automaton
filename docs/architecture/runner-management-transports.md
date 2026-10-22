@@ -40,6 +40,10 @@ RabbitMQ messages contain only operation and Runner identities. The executable r
 
 `RunnerExecutionOperationService` routes media stats/metadata to the separate management queue. File writes, downloads, uploads and deployment work use the execution queue. The Runner processes them through `RunnerExecutionProcessor` and `RunnerFileTransferExecutor`; completed results are applied through the same authenticated HTTPS result endpoint as other durable Runner operations.
 
+## Runner reconnect and assignment
+
+Runner reconnect records authorized connection/session and installation reports without selecting a Runner for an unassigned app or rebinding deployment targets from Hosted Runner enrollment history. App placement remains owned by the explicit assignment API and its authorization/runtime reassignment guards. The remaining legacy registration and restart bookkeeping does not change app placement. Previously assigned targets continue through the durable operation path; no old-workload migration is provided.
+
 ## File-transfer operations
 
 | Operation | API caller | Queue | Runner behavior | Artifact direction |

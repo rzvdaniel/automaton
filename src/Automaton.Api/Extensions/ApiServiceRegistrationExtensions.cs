@@ -638,7 +638,6 @@ internal static class ApiRunnerRegistration
         services.AddSingleton<RuntimeCookieService>();
         services.AddScoped<BackendRouteConfigService>();
         services.AddScoped<ManagedRunnerBootstrapService>();
-        services.AddScoped<ManagedRunnerAppAssignmentService>();
         return services;
     }
 }

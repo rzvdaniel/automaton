@@ -18,7 +18,6 @@ public sealed class RunnerConnectionLifecycleService(
     ApiInstanceIdentityService apiInstanceIdentityService,
     RunnerConnectionSessionService connectionSessionService,
     RunnerRegistrationService runnerRegistrationService,
-    ManagedRunnerAppAssignmentService managedRunnerAppAssignmentService,
     HostedRunnerRestartCompletionService restartCompletionService)
 {
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<RunnerConnectionLifecycleService>();
@@ -46,7 +45,8 @@ public sealed class RunnerConnectionLifecycleService(
         dbContext.Update(runner);
         await dbContext.SaveChangesAsync(cancellationToken);
         await RecordRunnerConnectionSessionAsync(runner, runnerConnection.ConnectionId!, now, cancellationToken);
-        await CompleteHostedRunnerReconnectAsync(runner, userId, runnerConnection.HostedRunnerId, cancellationToken);
+        await runnerRegistrationService.CompleteReconnectAsync(
+            runner, userId, runnerConnection.HostedRunnerId, cancellationToken);
         await connectionSessionService.WriteApplicationEventsAsync(
             runner.Id,
             ApplicationEventLevels.Info,
@@ -156,18 +156,6 @@ public sealed class RunnerConnectionLifecycleService(
             ApiColor = runner.ApiColor
         });
         await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task CompleteHostedRunnerReconnectAsync(
-        Runner runner,
-        Guid userId,
-        Guid? hostedRunnerId,
-        CancellationToken cancellationToken)
-    {
-        await runnerRegistrationService.CompleteReconnectAsync(runner, userId, hostedRunnerId, cancellationToken);
-        await managedRunnerAppAssignmentService.ReconcileHostedRunnerIdentityAsync(userId, runner.Id, cancellationToken);
-        if (RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(runner.Purpose, runner.ApplicationProfile))
-            await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
     }
 
     private static string? TrimOrNull(string? value, int maximumLength)
