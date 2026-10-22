@@ -26,7 +26,6 @@ internal static class UserAppsTestServices
         var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
-            new HostedRunnerAppCapacityService(dbContext),
             runnerAuthorizationPolicy,
             new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
         var auditEventService = new NoOpAuditEventService();

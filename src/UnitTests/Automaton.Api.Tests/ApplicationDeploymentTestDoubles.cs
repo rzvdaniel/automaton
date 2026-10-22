@@ -266,7 +266,7 @@ internal static class DeploymentFixtureServiceFactory
         => new(
             new DeploymentPackageRunnerService(transferGateway),
             null!,
-            new AppRunnerAssignmentPolicy(state.Db, null!, null!, resolver),
+            new AppRunnerAssignmentPolicy(state.Db, null!, resolver),
             resolver,
             new AppDeploymentTargetStateService(state.Db),
             new DeploymentPackageFinalizationService(

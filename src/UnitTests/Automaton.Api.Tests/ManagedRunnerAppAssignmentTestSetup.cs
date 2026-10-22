@@ -36,7 +36,7 @@ internal static class ManagedRunnerAppAssignmentTestServices
         var userContext = new UserContextService(new HttpContextAccessor());
         var authorization = new ResourceAuthorizationService(db, userContext);
         var runnerAuthorization = new AppRunnerAuthorizationPolicy(db, authorization);
-        var assignment = new AppRunnerAssignmentPolicy(db, new HostedRunnerAppCapacityService(db),
+        var assignment = new AppRunnerAssignmentPolicy(db,
             runnerAuthorization, new AppDeploymentTargetResolver(db, authorization, runnerAuthorization));
         var routes = new BackendRouteConfigService(db,
             Options.Create(new PublishedAppsConfig { TraefikDynamicConfigRoot = routeRoot }),

@@ -22,7 +22,6 @@ internal static class ManagedRunnerBootstrapTestServiceFactory
         var deploymentTargetResolver = new AppDeploymentTargetResolver(db, authorizationService, runnerAuthorizationPolicy);
         return new AppRunnerAssignmentPolicy(
             db,
-            new HostedRunnerAppCapacityService(db),
             runnerAuthorizationPolicy,
             deploymentTargetResolver);
     }

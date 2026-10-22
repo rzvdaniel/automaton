@@ -240,8 +240,10 @@ public sealed class ManagedRunnerAppEligibilityTests : ManagedRunnerAppAssignmen
         await db.SaveChangesAsync();
 
         Assert.That(await service.AssignEligibleAppsAsync(hosted.UserId, hosted.RunnerId!.Value), Is.EqualTo(1));
-        Assert.That(target.ExecutionRunnerId, Is.EqualTo(hosted.RunnerId));
-        Assert.That(target.GenericRuntimeDeployed, Is.False);
+        db.ChangeTracker.Clear();
+        var persistedTarget = await db.AppDeploymentTargets.SingleAsync(item => item.Id == target.Id);
+        Assert.That(persistedTarget.ExecutionRunnerId, Is.EqualTo(hosted.RunnerId));
+        Assert.That(persistedTarget.GenericRuntimeDeployed, Is.False);
     }
 
     [TestCase(true)]

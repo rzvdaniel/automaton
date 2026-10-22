@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
@@ -174,7 +175,6 @@ public class AppDeploymentTargetResolverTests
         var authorizationPolicy = AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId);
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
-            new HostedRunnerAppCapacityService(db),
             authorizationPolicy,
             resolver);
 
@@ -207,7 +207,38 @@ public class AppDeploymentTargetResolverTests
 
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
-            new HostedRunnerAppCapacityService(db),
+            AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
+            AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
+
+        await assignmentPolicy.AssignAsync(app, runner.Id, userId);
+
+        Assert.That(
+            (await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
+            Is.EqualTo(runner.Id));
+    }
+
+    [Test]
+    public async Task AssignAsync_DoesNotApplyRetiredHostedRunnerAppLimit()
+    {
+        await using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var runner = AddRunner(db, userId, online: true);
+        var app = AddApp(db, userId, runnerId: null);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            RunnerId = runner.Id,
+            Name = "legacy hosted record",
+            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                Resources = new HostedRunnerResources { MaximumApps = 0 }
+            }
+        });
+        await db.SaveChangesAsync();
+
+        var assignmentPolicy = new AppRunnerAssignmentPolicy(
+            db,
             AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
             AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
 

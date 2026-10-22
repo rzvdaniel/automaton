@@ -117,6 +117,7 @@ public sealed class ManagedRunnerAppAssignmentService
 
         if (assignedCount > 0)
         {
+            await dbContext.SaveChangesAsync(cancellationToken);
             logger.LogInformation(
                 "Assigned managed runner {RunnerId} to {AssignedCount} eligible app(s) for user {UserId}",
                 runnerId,

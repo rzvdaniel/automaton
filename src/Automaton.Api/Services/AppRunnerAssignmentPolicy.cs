@@ -10,7 +10,6 @@ namespace Automaton.Api.Services;
 /// </summary>
 public sealed class AppRunnerAssignmentPolicy(
     ApplicationDbContext dbContext,
-    HostedRunnerAppCapacityService hostedRunnerAppCapacityService,
     IAppRunnerAuthorizationPolicy runnerAuthorizationPolicy,
     IAppDeploymentTargetResolver targetResolver)
 {
@@ -63,7 +62,9 @@ public sealed class AppRunnerAssignmentPolicy(
             PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
             target.GenericRuntimeDeployed = false;
         }
-        await hostedRunnerAppCapacityService.AssignAsync(target, runnerId.Value, cancellationToken);
+        target.ExecutionRunnerId = runner.Id;
+        target.Status = DeploymentTargetStatus.NotDeployed;
+        target.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     public async Task<Runner> GetAssignedRunnerAsync(
