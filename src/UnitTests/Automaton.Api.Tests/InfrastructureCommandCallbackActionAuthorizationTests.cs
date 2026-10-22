@@ -23,8 +23,6 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
     }
 
     [TestCase(HostedRunnerDeploymentActions.Restart, "restart-hosted-runner")]
-    [TestCase(HostedRunnerDeploymentActions.Suspend, "suspend-hosted-runner")]
-    [TestCase(HostedRunnerDeploymentActions.Resume, "resume-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.Deprovision, "delete-hosted-runner")]
     [TestCase(HostedRunnerDeploymentActions.VerifyStorage, "measure-hosted-runner-storage")]
     public void DeploymentActionMapsOnlyToItsTrustedAction(string deploymentAction, string actionKey)
@@ -34,7 +32,9 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
 
     [TestCase(HostedRunnerDeploymentActions.Provision)]
     [TestCase(HostedRunnerDeploymentActions.Reprovision)]
-    public void RetiredProvisioningActionsNoLongerHaveTrustedCallbacks(string deploymentAction)
+    [TestCase(HostedRunnerDeploymentActions.Suspend)]
+    [TestCase(HostedRunnerDeploymentActions.Resume)]
+    public void RetiredActionsNoLongerHaveTrustedCallbacks(string deploymentAction)
         => Assert.That(InfrastructureCommandCallbackService.TrustedActionKeyForDeployment(deploymentAction), Is.Null);
 
     [Test]
@@ -46,6 +46,15 @@ public sealed class InfrastructureCommandCallbackActionAuthorizationTests
             deploymentStatus: HostedRunnerDeploymentStatuses.Queued);
 
         await InfrastructureCommandCallbackSecurityScenarios.AssertMismatchedCallbacksAreRejectedAsync(fixture);
+    }
+
+    [TestCase(HostedRunnerDeploymentActions.Suspend, "suspend-hosted-runner")]
+    [TestCase(HostedRunnerDeploymentActions.Resume, "resume-hosted-runner")]
+    public async Task RetiredStorageCommandCannotResolveSecretsOrApplyResults(string action, string key)
+    {
+        await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(
+            hostedRunnerStatus: HostedRunnerStatuses.Running, deploymentAction: action);
+        await InfrastructureCommandCallbackSecurityScenarios.AssertCallbacksAreRejectedAsync(fixture, key);
     }
 
     [Test]

@@ -11,22 +11,25 @@ namespace Automaton.Api.Tests;
 internal static class InfrastructureCommandCallbackSecurityScenarios
 {
     public static async Task AssertMismatchedCallbacksAreRejectedAsync(CallbackFixture fixture)
+        => await AssertCallbacksAreRejectedAsync(fixture, "delete-hosted-runner");
+
+    public static async Task AssertCallbacksAreRejectedAsync(CallbackFixture fixture, string actionKey)
     {
-        var requests = CreateMismatchedRequests(fixture);
+        var requests = CreateRequests(fixture, actionKey);
         AssertBothRequestsRejected(fixture, requests);
         await AssertNoCallbackMutationAsync(fixture.Db);
     }
 
     private static (InfrastructureCommandSecretsRequest Secrets, InfrastructureCommandResultRequest Result)
-        CreateMismatchedRequests(CallbackFixture fixture) =>
+        CreateRequests(CallbackFixture fixture, string actionKey) =>
         (
             new InfrastructureCommandSecretsRequest(
-                fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "delete-hosted-runner", []),
+                fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, actionKey, []),
             new InfrastructureCommandResultRequest(
                 fixture.Deployment.Id,
                 fixture.Host.Id,
                 fixture.Runner.Id,
-                "delete-hosted-runner",
+                actionKey,
                 [],
                 new AppActionExecutionResult
                 {
@@ -50,8 +53,10 @@ internal static class InfrastructureCommandCallbackSecurityScenarios
 
     private static async Task AssertNoCallbackMutationAsync(ApplicationDbContext db)
     {
+        db.ChangeTracker.Clear();
         Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status,
             Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+        Assert.That((await db.HostedRunners.SingleAsync()).Status, Is.EqualTo(HostedRunnerStatuses.Running));
     }
 }

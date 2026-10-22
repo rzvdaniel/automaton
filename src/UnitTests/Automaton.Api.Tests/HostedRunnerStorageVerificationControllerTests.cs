@@ -88,7 +88,7 @@ public sealed class HostedRunnerStorageVerificationControllerTests
     private static AdminHostedRunnerStorageController CreateController(
         ApplicationDbContext db,
         RecordingTrustedActionDeploymentService? deployment = null) =>
-        new(db, new NoOpAuditEventService(), null!, null!,
+        new(db, new NoOpAuditEventService(),
             new HostedRunnerStorageActionDeployment(db, deployment ?? new RecordingTrustedActionDeploymentService()));
 
     private static Runner CreateOnlineInfrastructureRunner() => new()

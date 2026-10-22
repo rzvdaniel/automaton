@@ -15,7 +15,8 @@ public sealed class HostedRunnerRestartReconciler(
     public async Task<int> ReconcileAsync(DateTime now, CancellationToken cancellationToken)
     {
         var ids = await db.HostedRunnerDeployments.AsNoTracking()
-            .Where(x => x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
+            .Where(x => x.Action == HostedRunnerDeploymentActions.Restart
+                && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
                 && x.ReconnectDeadlineUtc != null
                 && x.ReconnectDeadlineUtc <= now)
             .OrderBy(x => x.ReconnectDeadlineUtc)
@@ -51,6 +52,7 @@ public sealed class HostedRunnerRestartReconciler(
         {
             return await db.HostedRunnerDeployments
                 .Where(x => x.Id == id
+                    && x.Action == HostedRunnerDeploymentActions.Restart
                     && x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect
                     && x.ReconnectDeadlineUtc <= now)
                 .ExecuteUpdateAsync(setters => setters
@@ -60,7 +62,8 @@ public sealed class HostedRunnerRestartReconciler(
         }
 
         var candidate = await db.HostedRunnerDeployments.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (candidate?.Status != HostedRunnerDeploymentStatuses.WaitingForReconnect
+        if (candidate?.Action != HostedRunnerDeploymentActions.Restart
+            || candidate.Status != HostedRunnerDeploymentStatuses.WaitingForReconnect
             || candidate.ReconnectDeadlineUtc is not DateTime deadline
             || deadline > now)
             return 0;
@@ -76,7 +79,7 @@ public sealed class HostedRunnerRestartReconciler(
         var operation = await db.HostedRunnerDeployments
             .Include(x => x.HostedRunner)
             .SingleAsync(x => x.Id == id, cancellationToken);
-        ApplyRestartTimeout(operation.HostedRunner, operation.Action, now);
+        ApplyRestartTimeout(operation.HostedRunner, now);
         await db.SaveChangesAsync(cancellationToken);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -92,17 +95,10 @@ public sealed class HostedRunnerRestartReconciler(
         }, cancellationToken);
     }
 
-    private static void ApplyRestartTimeout(HostedRunner hostedRunner, string action, DateTime now)
+    private static void ApplyRestartTimeout(HostedRunner hostedRunner, DateTime now)
     {
         hostedRunner.Status = HostedRunnerStatuses.Failed;
         hostedRunner.LastError = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
-        if (action == HostedRunnerDeploymentActions.Resume)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Suspended;
-            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
-            hostedRunner.LastEnforcementReason = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
-        }
-
         hostedRunner.UpdatedAt = now;
     }
 }

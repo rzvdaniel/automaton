@@ -4,6 +4,16 @@ namespace Automaton.Worker.Tests;
 
 public sealed class BuiltInStorageScheduleSeederTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task StartAsync_DisablesRetiredSystemEnforcementWithoutChangingUserSchedules(bool legacyIdentity)
+    {
+        await using var fixture = await BuiltInStorageScheduleSeederFixture.CreateAsync();
+        await fixture.SeedRetiredEnforcementAsync(legacyIdentity);
+        await fixture.SeedTwiceAsync();
+        await fixture.AssertRetiredEnforcementDisabledAsync();
+    }
+
     [Test]
     public async Task StartAsync_IsIdempotentAndSeedsBothWorkerSchedules()
     {

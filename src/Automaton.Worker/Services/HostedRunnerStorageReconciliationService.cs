@@ -12,16 +12,12 @@ namespace Automaton.Worker.Services;
 public sealed class HostedRunnerStorageReconciliationService(
     IServiceScopeFactory scopeFactory,
     IEventPublisher eventPublisher,
-    ITransactionalEventExecutor transactionalEventExecutor,
     IOptions<StorageTelemetryOptions> telemetryOptions)
 {
     private const int MaxVerificationErrorLength = 2000;
 
     internal Task<int> ReconcileAsync(CancellationToken cancellationToken)
         => ReconcileAsync(cancellationToken, includeHostedRunners: true, includeHosts: true);
-
-    internal Task<int> EnforceAsync(CancellationToken cancellationToken)
-        => new HostedRunnerStorageEnforcementService(scopeFactory, eventPublisher, transactionalEventExecutor, telemetryOptions).EnforceAsync(cancellationToken);
 
     internal async Task<int> ReconcileAsync(CancellationToken cancellationToken, bool includeHostedRunners, bool includeHosts)
     {

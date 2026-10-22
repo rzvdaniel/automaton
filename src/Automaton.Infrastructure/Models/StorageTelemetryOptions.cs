@@ -19,7 +19,4 @@ public sealed class StorageTelemetryOptions
     public bool EnableLowFrequencyVerification { get; set; }
     public int LowFrequencyVerificationHours { get; set; } = 24;
     public decimal LowFrequencyVerificationSamplePercent { get; set; } = 1m;
-    public int OverLimitGracePeriodHours { get; set; } = 24;
-    public decimal RecoveryPercent { get; set; } = 95m;
-    public int EnforcementMeasurementValidityMinutes { get; set; } = 240;
 }

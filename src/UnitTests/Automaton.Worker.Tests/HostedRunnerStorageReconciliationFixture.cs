@@ -66,7 +66,7 @@ internal sealed class HostedRunnerStorageReconciliationFixture : IAsyncDisposabl
         ServiceProvider provider,
         StorageTelemetryOptions? telemetryOptions)
         => new(provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(),
-            new NoOpTransactionalEventExecutor(), Options.Create(telemetryOptions ?? new StorageTelemetryOptions()));
+            Options.Create(telemetryOptions ?? new StorageTelemetryOptions()));
 
     public ValueTask DisposeAsync()
     {
@@ -80,9 +80,4 @@ internal sealed class HostedRunnerStorageReconciliationFixture : IAsyncDisposabl
             => Task.CompletedTask;
     }
 
-    private sealed class NoOpTransactionalEventExecutor : ITransactionalEventExecutor
-    {
-        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
-            => operation(cancellationToken);
-    }
 }

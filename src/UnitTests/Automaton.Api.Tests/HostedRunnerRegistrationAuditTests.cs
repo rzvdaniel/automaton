@@ -28,6 +28,21 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class HostedRunnerRegistrationAuditTests
 {
+    [Test]
+    public async Task RegistrationDoesNotCompleteRetiredStorageResume()
+    {
+        using var db = HostedRunnerAuditTestData.CreateDbContext();
+        var userId = Guid.NewGuid();
+        var (seed, resumeId) = await HostedRunnerRegistrationTestScenario.SeedRetiredResumeAsync(db, userId);
+
+        await HostedRunnerProfileTestServiceFactory.CreateWithAudit(db, userId).Add(new RunnerDetails
+        {
+            Id = seed.RunnerId, Name = "new-display-name", Purpose = RunnerPurposes.Managed,
+            HostedRunnerId = seed.HostedRunnerId
+        });
+
+        await HostedRunnerRegistrationTestScenario.AssertRetiredResumeIsUnchangedAsync(db, resumeId);
+    }
 
 
     [Test]

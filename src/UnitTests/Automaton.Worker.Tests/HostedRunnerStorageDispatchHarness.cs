@@ -33,7 +33,7 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         this.databaseName = databaseName;
     }
 
-    internal static Task<HostedRunnerStorageDispatchHarness> CreateAsync(int maxPerHost = 1, int gracePeriodHours = 24)
+    internal static Task<HostedRunnerStorageDispatchHarness> CreateAsync(int maxPerHost = 1)
     {
         var services = new ServiceCollection();
         var databaseName = Guid.NewGuid().ToString("N");
@@ -44,10 +44,9 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         var publisher = new RecordingPublisher();
         var service = new HostedRunnerStorageReconciliationService(
             provider.GetRequiredService<IServiceScopeFactory>(), publisher,
-            new NoOpTransactionalEventExecutor(), Options.Create(new StorageTelemetryOptions
+            Options.Create(new StorageTelemetryOptions
             {
-                MaxVerificationDispatchesPerHost = maxPerHost,
-                OverLimitGracePeriodHours = gracePeriodHours
+                MaxVerificationDispatchesPerHost = maxPerHost
             }));
         return Task.FromResult(new HostedRunnerStorageDispatchHarness(provider, service, publisher, databaseName));
     }
@@ -128,23 +127,6 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         await db.SaveChangesAsync();
     }
 
-    internal async Task SeedOverLimitRunnerAsync()
-    {
-        hostId = Guid.NewGuid();
-        infrastructureRunnerId = Guid.NewGuid();
-        runnerId = Guid.NewGuid();
-        await using var db = await OpenDbAsync();
-        db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test", InfrastructureRunnerId = infrastructureRunnerId });
-        db.HostedRunners.Add(new HostedRunner
-        {
-            Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
-            StorageAllowanceBytes = 100, StorageTotalBytes = 120, StorageState = HostedRunnerStorageStates.OverLimit,
-            StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified,
-            StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageMeasuredAtUtc = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-    }
-
     internal async Task AddDeploymentMirrorsAsync(int count)
     {
         await using var db = await OpenDbAsync();
@@ -175,32 +157,6 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
 
     internal Task ReconcileAsync()
         => service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
-
-    internal Task EnforceAsync() => service.EnforceAsync(default);
-
-    internal async Task EndGracePeriodAsync()
-    {
-        await using var db = await OpenDbAsync();
-        var runner = await db.HostedRunners.SingleAsync(x => x.Id == runnerId);
-        runner.GracePeriodEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
-        await db.SaveChangesAsync();
-    }
-
-    internal async Task<string?> EnforcementStateAsync()
-    {
-        await using var db = await OpenDbAsync();
-        return await db.HostedRunners.Where(x => x.Id == runnerId).Select(x => x.EnforcementState).SingleAsync();
-    }
-
-    internal async Task<int> SuspensionDeploymentCountAsync()
-    {
-        await using var db = await OpenDbAsync();
-        return await db.HostedRunnerDeployments.CountAsync(x => x.HostedRunnerId == runnerId
-            && x.Action == HostedRunnerDeploymentActions.Suspend);
-    }
-
-    internal InfrastructureCommandRequestedEvent SingleEnforcementCommand()
-        => publisher.Messages.OfType<InfrastructureCommandRequestedEvent>().Single();
 
     internal async Task<string> VerificationStatusAsync(Guid id)
     {
@@ -256,9 +212,4 @@ internal sealed class HostedRunnerStorageDispatchHarness : IAsyncDisposable
         }
     }
 
-    private sealed class NoOpTransactionalEventExecutor : ITransactionalEventExecutor
-    {
-        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
-            => operation(cancellationToken);
-    }
 }

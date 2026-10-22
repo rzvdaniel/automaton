@@ -9,6 +9,17 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture, NonParallelizable]
 public sealed class TrustedInfrastructureActionExecutorTests
 {
+    [TestCase("suspend-hosted-runner")]
+    [TestCase("resume-hosted-runner")]
+    public void RetiredStorageCommandIsRejectedBeforePreparationOrSecrets(string actionKey)
+    {
+        var secrets = new TerminalSecretProvider();
+        var executor = new TrustedInfrastructureActionExecutor(null!, null!, secrets);
+        var command = Command(actionKey) with { SecretGrantIds = [Guid.NewGuid()] };
+
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => executor.ExecuteAsync(command, CancellationToken.None));
+        Assert.That(secrets.Calls, Is.Zero);
+    }
     [Test]
     public void AllAllowlistedActionsAreBundledWithTheirExistingEntrypoints()
     {

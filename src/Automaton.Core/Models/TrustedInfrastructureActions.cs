@@ -7,8 +7,6 @@ public static class TrustedInfrastructureActions
     public static IReadOnlySet<string> Keys { get; } = new[]
     {
         "restart-hosted-runner",
-        "suspend-hosted-runner",
-        "resume-hosted-runner",
         "delete-hosted-runner",
         "measure-hosted-runner-storage",
         HostValidationCommand.ActionKey

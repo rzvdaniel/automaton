@@ -15,6 +15,24 @@ namespace Automaton.Api.Tests;
 
 public sealed class HostedRunnerLifecycleReconcilerTests
 {
+    [TestCase(HostedRunnerDeploymentActions.Suspend)]
+    [TestCase(HostedRunnerDeploymentActions.Resume)]
+    public async Task RetiredStorageOperationIsNotRedispatchedOrApplied(string action)
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var (runner, operation) = SeedOperation(db, action, HostedRunnerDeploymentStatuses.Queued, now);
+        runner.Status = HostedRunnerStatuses.Running;
+        await db.SaveChangesAsync();
+        var publisher = new RecordingPublisher();
+
+        Assert.That(await CreateReconciler(db, publisher).ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        db.ChangeTracker.Clear();
+        Assert.That(publisher.Messages, Is.Empty);
+        Assert.That((await db.HostedRunners.SingleAsync()).Status, Is.EqualTo(HostedRunnerStatuses.Running));
+        Assert.That((await db.HostedRunnerDeployments.SingleAsync()).Status, Is.EqualTo(operation.Status));
+    }
+
     [Test]
     public async Task StaleQueuedRestartIsNotRedispatchedWithoutExecutionRecord()
     {

@@ -68,6 +68,10 @@ public sealed class HostedRunnerLifecycleReconciler(
         if (operation == null || !RecoverableStatuses.Contains(operation.Status))
             return false;
 
+        // Retained enforcement records are historical; do not dispatch or reinterpret them.
+        if (operation.Action is HostedRunnerDeploymentActions.Suspend or HostedRunnerDeploymentActions.Resume)
+            return false;
+
         if (IsRetiredProvisioningAction(operation.Action))
             return await FailAsync(operation,
                 "Per-user Hosted Runner provisioning is no longer supported. Assign a Management Runner instead.",
@@ -105,8 +109,6 @@ public sealed class HostedRunnerLifecycleReconciler(
     private static bool IsInfrastructureAction(string action)
         => action is HostedRunnerDeploymentActions.Restart
             or HostedRunnerDeploymentActions.Deprovision
-            or HostedRunnerDeploymentActions.Suspend
-            or HostedRunnerDeploymentActions.Resume
             or HostedRunnerDeploymentActions.VerifyStorage;
 
     private static bool IsRetiredProvisioningAction(string action)
@@ -272,8 +274,6 @@ public sealed class HostedRunnerLifecycleReconciler(
         {
             HostedRunnerDeploymentActions.Restart => "restart-hosted-runner",
             HostedRunnerDeploymentActions.Deprovision => "delete-hosted-runner",
-            HostedRunnerDeploymentActions.Suspend => StorageEnforcementActions.SuspendHostedRunner,
-            HostedRunnerDeploymentActions.Resume => StorageEnforcementActions.ResumeHostedRunner,
             _ => throw new InvalidOperationException($"Unsupported lifecycle recovery action '{operation.Action}'.")
         };
         return new InfrastructureCommandRequestedEvent(

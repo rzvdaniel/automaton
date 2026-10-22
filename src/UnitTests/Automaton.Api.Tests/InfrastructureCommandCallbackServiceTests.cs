@@ -70,11 +70,11 @@ public sealed class InfrastructureCommandCallbackServiceTests
     {
         await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(
             hostedRunnerStatus: HostedRunnerStatuses.Failed,
-            deploymentAction: HostedRunnerDeploymentActions.Reprovision,
+            deploymentAction: HostedRunnerDeploymentActions.Restart,
             deploymentStatus: HostedRunnerDeploymentStatuses.Failed);
         var db = fixture.Db;
         var result = await fixture.Service.ApplyResultAsync(fixture.ApiKeyId, fixture.Deployment.Id,
-            Request(fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "late result") with { ActionKey = "reprovision-hosted-runner" },
+            Request(fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "late result"),
             CancellationToken.None);
 
         Assert.That(result.Outcome, Is.EqualTo(InfrastructureCommandResultOutcomes.TerminalStale));
