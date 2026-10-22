@@ -1,6 +1,6 @@
 # Automaton self-hosted roadmap
 
-Updated: 21 October 2026. Status: M1/M2 implementation and the M3 installation/telemetry slices are merged. Next: demonstrate the single-server CLI deployment flow, then complete M4 legacy cleanup. Broader acceptance remains deferred.
+Updated: 22 October 2026. Status: M1/M2 implementation and the M3 installation/telemetry slices are merged. Next: demonstrate the single-server CLI deployment flow, then complete M4 legacy cleanup. Broader acceptance remains deferred.
 
 ## Product decision
 
@@ -137,6 +137,8 @@ M4 source cleanup is underway while M3's live demonstration remains unverified d
 PRs #407–#410 removed automatic Hosted Runner fallback, per-user provisioning and its Admin/Worker controls, the subscription-spec app-count assignment check, and the separate deployment queue/callback transport. App creation remains independent of machine assignment; deployment uses the assigned Runner's durable typed operation and existing result journal location.
 
 Hosted Runner storage suspension/resume is now retired: automatic enforcement, Admin mutation controls, trusted Actions and resume-on-registration handling are removed. The Worker disables the retired system enforcement schedule; already-published work has no executable handler. Stored workload, enforcement and audit records remain historical; retirement does not resume suspended workloads. No existing database was accessed or migrated during this work. Machine Management filesystem telemetry, container limits and free-disk admission remain in place.
+
+Reconnect-driven automatic app assignment and Hosted enrollment-history target rebinding are removed. App placement uses explicit assignment; reconnect still records authorized presence and retains the remaining legacy registration/restart bookkeeping. Focused reconnect regressions are added; builds and test execution are pending because the implementation workspace has no .NET SDK.
 
 Remaining cleanup is concrete: legacy restart/delete and registration/status consumers; Hosted Runner self-report/verification and account storage locality (Worker `HostedRunnerStorageVerificationDispatcher`, API `HostedRunnerStorageVerificationResultApplier`, Infrastructure `HostedRunnerStorageLocalityResolver`/adoption); and `RunnerHostImageStore`'s mandatory separate XFS/project-quota layout. Hosted container scopes still use account resource mappings and cgroup assumptions. These are legacy consumers to remove, not filesystem or provider requirements to impose on Machine Management. Persisted model/audit fields remain for stored history; no automatic migration is promised.
 

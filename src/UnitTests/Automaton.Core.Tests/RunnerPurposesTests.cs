@@ -70,26 +70,6 @@ public class RunnerPurposesTests
     }
 
     [Test]
-    public void PrivilegedHostIsExcludedOnlyFromAutomaticApplicationAssignment()
-    {
-        Assert.That(
-            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
-                RunnerPurposes.Managed,
-                RunnerApplicationProfiles.Standard),
-            Is.True);
-        Assert.That(
-            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
-                RunnerPurposes.Managed,
-                RunnerApplicationProfiles.PrivilegedHost),
-            Is.False);
-        Assert.That(
-            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
-                RunnerPurposes.Managed,
-                RunnerApplicationProfiles.MachineManagement),
-            Is.False);
-    }
-
-    [Test]
     public void MachineManagementProfileIsAnApplicationRunnerWithoutWorkflowOrInfrastructureCapabilities()
     {
         var capabilities = new[]
