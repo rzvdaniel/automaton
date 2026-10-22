@@ -1,3 +1,4 @@
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -6,7 +7,6 @@ using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
@@ -50,9 +50,7 @@ public sealed class RunnerConnectionAssignmentTests
         AddHistoricalEnrollment(runnerId);
         db.SaveChanges();
 
-        var userContext = new UserContextService(new HttpContextAccessor());
-        var authorization = new ResourceAuthorizationService(db, userContext);
-        runners = ManagedRunnerConnectionTestServiceFactory.Create(db, userContext, authorization);
+        runners = ManagedRunnerConnectionTestServiceFactory.Create(db);
     }
 
     [TearDown]
