@@ -35,7 +35,6 @@ internal static class HostedRunnerProfileTestServiceFactory
                 null!,
                 null!,
                 null!,
-                null!,
                 null!));
     }
 
