@@ -65,7 +65,6 @@ internal static class WorkerHostApplication
         ConfigureDataProtection(builder);
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
-        services.AddScoped<HostedRunnerRegistrationReconciler>();
         services.AddScoped<ActionScheduleProcessor>();
         services.AddScoped<WorkerScheduledActionDispatcher>();
         services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
@@ -73,7 +72,6 @@ internal static class WorkerHostApplication
         services.AddTransient<UserRegisteredCapSubscriber>();
         services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
         services.AddHostedService<CliAuthorizationCleanupService>();
-        services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
         services.AddHostedService<ActionSchedulePollingService>();
         services.AddHostedService<RetiredStorageScheduleCleanup>();
     }

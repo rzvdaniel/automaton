@@ -93,8 +93,6 @@ internal static class HostedRunnerAdminResponseMapper
                 FinishedAt = deployment.FinishedAt
             };
 }
-public sealed record DeleteHostedRunnerRequest(string DataDisposition);
-
 public record RunnerHostResponse
 {
     public Guid Id { get; init; }

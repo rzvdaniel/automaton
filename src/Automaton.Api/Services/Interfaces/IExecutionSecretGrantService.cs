@@ -17,11 +17,6 @@ public interface IExecutionSecretGrantService
         IReadOnlyCollection<Guid> grantIds,
         CancellationToken cancellationToken);
 
-    Task<ExecutionSecretLease> LeaseForInfrastructureCommandAsync(
-        SecretGrantScope scope,
-        IReadOnlyCollection<Guid> grantIds,
-        CancellationToken cancellationToken);
-
     Task MarkConsumedAsync(
         IReadOnlyCollection<Guid> grantIds,
         CancellationToken cancellationToken);

@@ -87,16 +87,7 @@ class AdminHostedRunnersService {
     return response.data
   }
 
-  async restartHostedRunner(id: string): Promise<HostedRunner> {
-    const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/restart`)
-    return response.data
-  }
 
-  async deleteHostedRunner(id: string, dataDisposition: 'preserve' | 'delete'): Promise<void> {
-    await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`, {
-      data: { dataDisposition },
-    })
-  }
 
 }
 

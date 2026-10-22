@@ -6,13 +6,61 @@ namespace Automaton.Runner.Console.Tests;
 
 internal static class HostContainerExecutionScenarios
 {
+    public static async Task<bool> ProductionTypedDockerPathReceivesDockerPrefixedRunBuildAsync()
+    {
+        using var machine = MachineContainerTestEnvironment.Create();
+        using var testWorkspace = RunnerRuntimeContainerTestWorkspace.Create();
+        var calls = new List<IReadOnlyList<string>>();
+        var infrastructure = CreateInfrastructureCommandService(calls);
+        var service = new HostContainerExecutionService(infrastructure);
+        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
+        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
+        try
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.ManagedContainerExecution);
+            await service.ExecuteAsync(new HostContainerExecutionRequest
+            {
+                Scope = MachineContainerTestEnvironment.CurrentScope(),
+                Operation = HostContainerOperationKinds.RunBuild,
+                ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256, RequestedImage = "example/build:1",
+                Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
+                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+                Command = new() { Executable = "build" }
+            });
+
+            return calls.Any(call => call.Count > 1 && call[0] == "docker" && call[1] == "run");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
+        }
+    }
+
+    private static InfrastructureCommandService CreateInfrastructureCommandService(
+        ICollection<IReadOnlyList<string>> calls)
+        => new((arguments, _, _) =>
+        {
+            calls.Add(arguments);
+            var output = arguments.Contains("volume")
+                ? MachineContainerTestEnvironment.CurrentVolumeLabels()
+                : arguments.Contains("image") ? "example/build:1@sha256:abc" : "";
+            var missingContainer = arguments.Contains("container") && arguments.Contains("inspect");
+            return Task.FromResult(new InfrastructureCommandResponse
+            {
+                Success = !missingContainer,
+                Error = missingContainer ? $"Error: No such object: {arguments[^1]}" : string.Empty,
+                Output = output
+            });
+        });
+
     private const string Image = "example/build:1@sha256:abc";
 
-    public static async Task<LabeledHostedVolumeBuildOutcome> RunLabeledHostedVolumeBuildAsync()
+    public static async Task<LabeledMachineVolumeBuildOutcome> RunLabeledMachineVolumeBuildAsync()
     {
-        using var environment = InfrastructureRunnerEnvironment.Create();
-        var hostedRunnerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var session = new HostContainerExecutionSession(hostedRunnerId);
+        using var environment = MachineContainerTestEnvironment.Create();
+        var session = new HostContainerExecutionSession();
         var request = session.CreateRunBuildRequest(new()
         {
             Executable = "build-tool",
@@ -25,9 +73,8 @@ internal static class HostContainerExecutionScenarios
         return new(
             result.Success,
             session.Commands.Any(command =>
-                command.Contains("volume") && command.Contains("automaton-hosted-runner-00000000000000000000000000000001-user")),
+                command.Contains("volume") && command.Contains($"automaton-machine-runner-{environment.InstallationId}-workspace")),
             string.Join(' ', buildCommand),
-            hostedRunnerId,
             scope.AppId,
             scope.DeploymentTargetId,
             scope.DeploymentAttemptId);
@@ -35,7 +82,7 @@ internal static class HostContainerExecutionScenarios
 
     public static async Task<EntrypointVariantsOutcome> RunEntrypointVariantsAsync()
     {
-        using var environment = InfrastructureRunnerEnvironment.Create();
+        using var environment = MachineContainerTestEnvironment.Create();
         var path = await RunCommandAsync(new()
         {
             Executable = "dotnet",
@@ -63,11 +110,10 @@ internal static class HostContainerExecutionScenarios
 
     public static async Task<BuildCleanupOutcome> RunBuildWithHostCommandExceptionAsync()
     {
-        using var environment = InfrastructureRunnerEnvironment.Create();
-        var hostedRunnerId = Guid.NewGuid();
-        var request = CreateInterruptedBuildRequest(hostedRunnerId);
-        var commandState = new InterruptedBuildCommandState(hostedRunnerId, request);
-        var service = new HostContainerExecutionService(commandState.ExecuteAsync);
+        using var environment = MachineContainerTestEnvironment.Create();
+        var request = CreateInterruptedBuildRequest();
+        var commandState = new InterruptedBuildCommandState(request);
+        var service = new HostContainerExecutionService(commandState.ExecuteAsync, new MachineWorkloadDiskAdmission(_ => long.MaxValue));
 
         var cancellationSurfaced = false;
         try
@@ -83,7 +129,7 @@ internal static class HostContainerExecutionScenarios
         return new(cancellationSurfaced, false, retry.Success, commandState.RunCount, commandState.WaitRequested);
     }
 
-    private sealed class InterruptedBuildCommandState(Guid hostedRunnerId, HostContainerExecutionRequest request)
+    private sealed class InterruptedBuildCommandState(HostContainerExecutionRequest request)
     {
         private bool containerExists;
         public int RunCount { get; private set; }
@@ -92,7 +138,7 @@ internal static class HostContainerExecutionScenarios
         public Task<InfrastructureCommandResponse> ExecuteAsync(
             IReadOnlyList<string> arguments, TimeSpan _, CancellationToken __)
         {
-            if (arguments.Contains("volume")) return Task.FromResult(VolumeResponse(hostedRunnerId));
+            if (arguments.Contains("volume")) return Task.FromResult(VolumeResponse());
             if (arguments.Contains("image")) return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = Image });
             if (IsContainerInspection(arguments)) return Task.FromResult(Inspect(arguments));
             if (IsRun(arguments)) return InterruptBuild();
@@ -121,11 +167,11 @@ internal static class HostContainerExecutionScenarios
             return Task.FromResult(new InfrastructureCommandResponse { Success = true, Output = "0" });
         }
 
-        private static InfrastructureCommandResponse VolumeResponse(Guid runnerId)
+        private static InfrastructureCommandResponse VolumeResponse()
             => new()
             {
                 Success = true,
-                Output = $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{runnerId}\",\"automaton.storage-scope\":\"user\"}}"
+                Output = MachineContainerTestEnvironment.CurrentVolumeLabels()
             };
 
         private static bool IsContainerInspection(IReadOnlyList<string> args)
@@ -134,22 +180,23 @@ internal static class HostContainerExecutionScenarios
         private static bool IsWait(IReadOnlyList<string> args) => args.Count > 1 && args[1] == "wait";
     }
 
-    private static HostContainerExecutionRequest CreateInterruptedBuildRequest(Guid hostedRunnerId)
+    private static HostContainerExecutionRequest CreateInterruptedBuildRequest()
         => new()
         {
             OperationId = Guid.NewGuid(),
-            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Scope = MachineContainerTestEnvironment.CurrentScope(),
             Operation = HostContainerOperationKinds.RunBuild,
             RequestedImage = "example/build:1",
             Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
             SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+                ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
             Command = new() { Executable = "build" }
         };
 
     private static string ExistingBuildInspection(HostContainerExecutionRequest request)
         => "{\"Config\":{\"Labels\":{"
             + "\"automaton.operation-id\":\"" + request.OperationId.ToString("N") + "\","
-            + "\"automaton.hosted-runner-id\":\"" + request.Scope.HostedRunnerId.ToString("N") + "\","
+            + "\"automaton.machine-runner-id\":\"" + request.Scope.MachineRunnerId.ToString("N") + "\","
             + "\"automaton.runner-host-id\":\"" + request.Scope.RunnerHostId.ToString("N") + "\","
             + "\"automaton.app-id\":\"" + request.Scope.AppId.ToString("N") + "\","
             + "\"automaton.deployment-target-id\":\"" + request.Scope.DeploymentTargetId.ToString("N") + "\","
@@ -158,7 +205,7 @@ internal static class HostContainerExecutionScenarios
 
     private static async Task<RunBuildOutcome> RunCommandAsync(ApplicationCommandSpec command)
     {
-        var session = new HostContainerExecutionSession(Guid.NewGuid());
+        var session = new HostContainerExecutionSession();
         var result = await session.Service.ExecuteAsync(session.CreateRunBuildRequest(command));
         var runCommand = session.Commands.Single(arguments => arguments.Count > 1 && arguments[1] == "run");
         return new(result.Success, runCommand);
@@ -169,14 +216,13 @@ internal static class HostContainerExecutionScenarios
 
     private sealed class HostContainerExecutionSession
     {
-        public HostContainerExecutionSession(Guid hostedRunnerId)
+        public HostContainerExecutionSession()
         {
-            HostedRunnerId = hostedRunnerId;
             Service = new HostContainerExecutionService((arguments, _, _) =>
             {
                 Commands.Add(arguments);
                 var output = arguments.Contains("volume")
-                    ? $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{HostedRunnerId}\",\"automaton.storage-scope\":\"user\"}}"
+                    ? MachineContainerTestEnvironment.CurrentVolumeLabels()
                     : arguments.Contains("image") ? Image : string.Empty;
                 var missingContainer = arguments.Contains("container") && arguments.Contains("inspect");
                 return Task.FromResult(new InfrastructureCommandResponse
@@ -185,10 +231,9 @@ internal static class HostContainerExecutionScenarios
                     Error = missingContainer ? $"Error: No such object: {arguments[^1]}" : string.Empty,
                     Output = output
                 });
-            });
+            }, new MachineWorkloadDiskAdmission(_ => long.MaxValue));
         }
 
-        public Guid HostedRunnerId { get; }
         public HostContainerExecutionService Service { get; }
         public List<IReadOnlyList<string>> Commands { get; } = [];
 
@@ -197,7 +242,7 @@ internal static class HostContainerExecutionScenarios
             bool includeBuildMode = false)
             => new()
             {
-                Scope = new(HostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Scope = MachineContainerTestEnvironment.CurrentScope(),
                 Operation = HostContainerOperationKinds.RunBuild,
                 RequestedImage = "example/build:1",
                 Resources = new(
@@ -205,6 +250,7 @@ internal static class HostContainerExecutionScenarios
                     HostContainerResourceKinds.Artifact,
                     HostContainerResourceKinds.ApplicationData),
                 SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+                ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
                 Command = command,
                 Environment = includeBuildMode
                     ? new Dictionary<string, string> { ["BUILD_MODE"] = "test" }
@@ -212,36 +258,13 @@ internal static class HostContainerExecutionScenarios
             };
     }
 
-    private sealed class InfrastructureRunnerEnvironment : IDisposable
-    {
-        private readonly string? previousPurpose;
-        private readonly string? previousCapabilities;
-
-        private InfrastructureRunnerEnvironment()
-        {
-            previousPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-            previousCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
-        }
-
-        public static InfrastructureRunnerEnvironment Create() => new();
-
-        public void Dispose()
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", previousPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", previousCapabilities);
-        }
-    }
-
     private sealed record RunBuildOutcome(bool Success, IReadOnlyList<string> Command);
 }
 
-internal sealed record LabeledHostedVolumeBuildOutcome(
+internal sealed record LabeledMachineVolumeBuildOutcome(
     bool Success,
     bool VolumeNameRequested,
     string BuildCommand,
-    Guid HostedRunnerId,
     Guid AppId,
     Guid DeploymentTargetId,
     Guid DeploymentAttemptId);

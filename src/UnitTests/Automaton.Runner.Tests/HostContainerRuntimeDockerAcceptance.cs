@@ -10,7 +10,8 @@ namespace Automaton.Runner.Console.Tests;
 internal sealed class HostContainerRuntimeDockerAcceptance
 {
     private const string SeedCommand = "echo stdout-ok; echo stderr-ok >&2; echo data-ok > /automaton/data/value; if touch /automaton/app/forbidden 2>/dev/null; then echo artifact-writable; else echo artifact-readonly; fi; if touch /root/forbidden 2>/dev/null; then echo root-writable; else echo root-readonly; fi; dd if=/dev/zero of=/tmp/bounded.tmp bs=1M count=40 status=none 2>/dev/null && echo scratch-overflow-success || echo scratch-overflow-blocked; rm -f /tmp/bounded.tmp; echo scratch-ok >/tmp/scratch && echo scratch-writable; sleep 120";
-    private readonly HostContainerScope scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+    private readonly HostContainerScope scope = new(Guid.Empty, Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), MachineRunnerId: Guid.NewGuid());
+    private readonly string installationId = "sh_" + Guid.NewGuid().ToString("N");
     private readonly Guid[] candidates = [Guid.NewGuid(), Guid.NewGuid()];
     private readonly string volume;
     private readonly string[] artifacts;
@@ -22,7 +23,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
 
     private HostContainerRuntimeDockerAcceptance()
     {
-        volume = $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
+        volume = $"automaton-machine-runner-{installationId}-workspace";
         artifacts = candidates.Select(candidate => RunnerWorkspaceService.GetRuntimeCandidateVolumeSubpath(
             scope.AppId, scope.DeploymentTargetId, candidate)).ToArray();
         data = RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, "store,quoted");
@@ -66,10 +67,13 @@ internal sealed class HostContainerRuntimeDockerAcceptance
     {
         foreach (var pair in new Dictionary<string, string>
         {
-            ["AUTOMATON_RUNNER_PURPOSE"] = RunnerPurposes.Infrastructure,
-            ["AUTOMATON_RUNNER_CAPABILITIES"] = RunnerCapabilities.HostContainerExecution,
+            ["AUTOMATON_RUNNER_PURPOSE"] = RunnerPurposes.Managed,
+            ["AUTOMATON_RUNNER_CAPABILITIES"] = RunnerCapabilities.ManagedContainerExecution,
             ["AUTOMATON_RUNTIME_HOST_ADDRESS"] = "127.0.0.1",
-            ["AUTOMATON_LOCAL_DOCKER_TEST"] = "true"
+            ["AUTOMATON_LOCAL_DOCKER_TEST"] = "true",
+            ["AUTOMATON_RUNNER_APPLICATION_PROFILE"] = RunnerApplicationProfiles.MachineManagement,
+            ["AUTOMATON_RUNNER_ID"] = scope.MachineRunnerId.ToString(),
+            ["AUTOMATON_RUNNER_INSTALLATION_ID"] = installationId
         })
         {
             environment[pair.Key] = Environment.GetEnvironmentVariable(pair.Key);
@@ -81,9 +85,9 @@ internal sealed class HostContainerRuntimeDockerAcceptance
     {
         await Docker(
             "volume", "create", "--label", "automaton.managed=true",
-            "--label", "automaton.resource=hosted-runner-volume",
-            "--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:D}",
-            "--label", "automaton.storage-scope=user", volume);
+            "--label", "automaton.resource=machine-workspace-volume",
+            "--label", $"automaton.installation-id={installationId}",
+            "--label", "automaton.storage-scope=workspace", volume);
         volumeCreated = true;
         await Docker(
             "run", "--rm", "--network", "none", "--mount", $"type=volume,source={volume},target=/seed",
@@ -121,6 +125,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             RequestedImage = image,
             Resources = new("source", "artifact", "data"),
             SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+                ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
             ContainerPort = 8080,
             Storage = new() { DataDirectory = "store,quoted" },
             Command = new() { Executable = "sh", Arguments = ["-c", SeedCommand] }
@@ -169,8 +174,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
         var mounts = root.GetProperty("Mounts").EnumerateArray().ToArray();
         Assert.That(mounts.Length, Is.GreaterThanOrEqualTo(2));
         Assert.That(root.GetProperty("HostConfig").GetProperty("ReadonlyRootfs").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("HostConfig").GetProperty("CgroupParent").GetString(),
-            Is.EqualTo(HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId)));
+        Assert.That(root.GetProperty("HostConfig").GetProperty("CgroupParent").GetString(), Is.Null.Or.Empty);
         Assert.That(root.GetProperty("HostConfig").GetProperty("ShmSize").GetInt64(), Is.EqualTo(64L * 1024 * 1024));
         Assert.That(root.GetProperty("HostConfig").GetProperty("Tmpfs").GetProperty("/tmp").GetString(), Does.Contain("size=32m"));
         var logConfig = root.GetProperty("HostConfig").GetProperty("LogConfig");
@@ -209,6 +213,7 @@ internal sealed class HostContainerRuntimeDockerAcceptance
             SharedMemoryMb = 64,
             DockerLogMaxSizeMb = 10,
             DockerLogMaxFiles = 3,
+                ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
             TimeoutSeconds = 60,
             Command = new ApplicationCommandSpec
             {

@@ -1,5 +1,6 @@
 using Automaton.Core.Models;
 using NUnit.Framework;
+using Automaton.Runner.Console.Services;
 
 namespace Automaton.Runner.Console.Tests;
 
@@ -32,7 +33,7 @@ internal static class HostContainerRuntimeCreateAssertions
         Assert.That(args, Does.Contain("no-new-privileges"));
         Assert.That(args[args.ToList().IndexOf("--cap-drop") + 1], Is.EqualTo("ALL"));
         Assert.That(args[args.ToList().IndexOf("--network") + 1], Is.EqualTo("bridge"));
-        Assert.That(args[args.ToList().IndexOf("--cgroup-parent") + 1], Is.EqualTo($"automaton-hosted-runner-{scope.HostedRunnerId:N}.slice"));
+        Assert.That(args, Does.Not.Contain("--cgroup-parent"));
         Assert.That(args[args.ToList().IndexOf("--workdir") + 1], Is.EqualTo("/automaton/app/output"));
         Assert.That(args[args.ToList().IndexOf("--entrypoint") + 1], Is.EqualTo("/automaton/app/scripts/serve"));
         Assert.That(args.TakeLast(3), Is.EqualTo(new[] { digest, "space separated", "--flag" }));
@@ -59,6 +60,6 @@ internal static class HostContainerRuntimeCreateAssertions
         Assert.That(mounts[0], Does.Contain("\"target=/automaton/app\"").And.Contain("\"readonly\""));
         Assert.That(mounts[1], Does.Contain($"volume-subpath=workspace/data/{scope.AppId:D}/database").And.Not.Contain("readonly"));
         Assert.That(mounts[2], Does.Contain($"volume-subpath=workspace/data/{scope.AppId:D}/media/files").And.Not.Contain("readonly"));
-        Assert.That(mounts.All(x => x.Contains($"source=automaton-hosted-runner-{scope.HostedRunnerId:N}-user")), Is.True);
+        Assert.That(mounts.All(x => x.Contains($"source={HostContainerResourcePolicy.VolumeName(scope)}")), Is.True);
     }
 }

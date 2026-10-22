@@ -303,9 +303,9 @@ internal sealed class RabbitMqConsumerTestSession : IAsyncDisposable
             operationId,
             identity.RunnerHostId,
             identity.RunnerId,
-            "restart-hosted-runner",
-            "{\"containerName\":\"test-runner\"}",
-            [Guid.NewGuid()],
+            HostValidationCommand.ActionKey,
+            "{}",
+            [],
             DateTime.UtcNow);
     }
 

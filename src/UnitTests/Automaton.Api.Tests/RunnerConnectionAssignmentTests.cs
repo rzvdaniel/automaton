@@ -24,8 +24,7 @@ public sealed class RunnerConnectionAssignmentTests
     [SetUp]
     public void SetUp()
     {
-        db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        db = ManagedRunnerConnectionTestServiceFactory.CreateDatabase();
         ownerId = Guid.NewGuid();
         runnerId = Guid.NewGuid();
         previousRunnerId = Guid.NewGuid();
@@ -55,6 +54,29 @@ public sealed class RunnerConnectionAssignmentTests
 
     [TearDown]
     public void TearDown() => db.Dispose();
+
+    [TestCase(HostedRunnerDeploymentActions.Reprovision, HostedRunnerDeploymentStatuses.WaitingForRegistration)]
+    [TestCase(HostedRunnerDeploymentActions.Restart, HostedRunnerDeploymentStatuses.WaitingForReconnect)]
+    public async Task Reconnect_PreservesHistoricalHostedLifecycle(string action, string status)
+    {
+        var hosted = await db.HostedRunners.SingleAsync();
+        hosted.Status = HostedRunnerStatuses.Failed;
+        var operationId = Guid.NewGuid();
+        db.HostedRunnerDeployments.Add(new HostedRunnerDeployment
+        {
+            Id = operationId, HostedRunnerId = hosted.Id, Action = action, Status = status,
+            StartedAt = DateTime.UtcNow.AddMinutes(-1)
+        });
+        await db.SaveChangesAsync();
+
+        await ReconnectAsync();
+
+        db.ChangeTracker.Clear();
+        Assert.That((await db.HostedRunners.SingleAsync()).Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+        var operation = await db.HostedRunnerDeployments.SingleAsync(item => item.Id == operationId);
+        Assert.That(operation.Status, Is.EqualTo(status));
+        Assert.That(operation.FinishedAt, Is.Null);
+    }
 
     [TestCase(RunnerApplicationProfiles.Standard)]
     [TestCase(RunnerApplicationProfiles.MachineManagement)]

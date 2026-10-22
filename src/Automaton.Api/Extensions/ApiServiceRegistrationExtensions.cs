@@ -314,11 +314,6 @@ internal static class ApiMessagingRegistration
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
         services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
         services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
-        services.AddScoped<InfrastructureActionProvisioningHandler>();
-        services.AddScoped<InfrastructureCommandCallbackService>();
-        services.AddScoped<InfrastructureCommandResultService>();
-        services.AddScoped<HostedRunnerRestartReconciler>();
-        services.AddScoped<HostedRunnerLifecycleReconciler>();
         services.AddScoped<TrustedInfrastructureActionDeploymentService>();
         services.AddScoped<ITrustedInfrastructureActionDeploymentService>(sp => sp.GetRequiredService<TrustedInfrastructureActionDeploymentService>());
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
@@ -587,8 +582,6 @@ internal static class ApiAppExecutionRegistration
         services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
         services.AddScoped<ScheduledActionExecutionHandler>();
         services.AddHostedService<AppModuleExecutionReconciliationService>();
-        services.AddHostedService<HostedRunnerRestartReconciliationService>();
-        services.AddHostedService<HostedRunnerLifecycleReconciliationService>();
         services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
         services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
         services.AddScoped(typeof(UserImpersonationServiceFactory<>));
@@ -697,7 +690,6 @@ internal static class ApiOperationsRegistration
         services.AddScoped<RunnerDeletionPolicy>();
         services.AddScoped<RunnerConnectionSessionService>();
         services.AddScoped<RunnerQueryService>();
-        services.AddScoped<HostedRunnerRestartCompletionService>();
         services.AddScoped<RunnerFlowExecutionService>();
         services.AddScoped<RunnerExecutionAdmissionService>();
         services.AddScoped<RunnerExecutionIdentityService>();
@@ -711,7 +703,6 @@ internal static class ApiOperationsRegistration
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
-        services.AddScoped<HostedRunnerManagementService>();
         services.AddScoped<InfrastructureWorkflowExecutionService>();
         services.AddScoped<InfrastructureHostValidationResultService>();
         return services;

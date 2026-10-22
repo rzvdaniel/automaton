@@ -38,9 +38,6 @@ const showDeployDialog = ref(false)
 const showSelfHostedInstallDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
-const restartingRunnerId = ref<string | null>(null)
-const hostedRestartPollMaxAttempts = 8
-const hostedRestartPollDelayMs = 1500
 const autoRefreshIntervalMs = 15000
 let autoRefreshTimer: number | null = null
 
@@ -203,25 +200,6 @@ function stopAutoRefresh() {
   }
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
-}
-
-async function pollRunnerUntilOnline(runnerId: string, projectId?: string | null) {
-  for (let attempt = 0; attempt < hostedRestartPollMaxAttempts; attempt += 1) {
-    await delay(hostedRestartPollDelayMs)
-
-    const latestRunners = await runnersService.list(projectId ?? undefined)
-    runners.value = latestRunners
-
-    if (latestRunners.some((candidate) => candidate.id === runnerId && candidate.status === RunnerStatus.Online)) {
-      return true
-    }
-  }
-
-  return false
-}
-
 // Delete runner
 async function deleteRunner(runner: Runner) {
   try {
@@ -241,47 +219,6 @@ async function deleteRunner(runner: Runner) {
       detail: 'Failed to delete runner',
       life: 5000,
     })
-  }
-}
-
-async function restartHostedRunner(runner: Runner) {
-  restartingRunnerId.value = runner.id
-  try {
-    await runnersService.restartHostedRunner(runner.id)
-    toast.add({
-      severity: 'info',
-      summary: 'Restart requested',
-      detail: `Restart requested for ${runner.name}. Waiting for it to reconnect...`,
-      life: 3500,
-    })
-
-    const isOnline = await pollRunnerUntilOnline(runner.id, projectsStore.activeProjectId)
-
-    if (isOnline) {
-      toast.add({
-        severity: 'success',
-        summary: 'Runner online',
-        detail: `${runner.name} is back online.`,
-        life: 3000,
-      })
-    } else {
-      toast.add({
-        severity: 'warn',
-        summary: 'Still reconnecting',
-        detail: `${runner.name} did not come back online yet. It may still be restarting.`,
-        life: 5000,
-      })
-    }
-  } catch (err: unknown) {
-    console.error('Failed to restart hosted runner:', err)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to restart hosted runner',
-      life: 5000,
-    })
-  } finally {
-    restartingRunnerId.value = null
   }
 }
 
@@ -536,17 +473,7 @@ onUnmounted(() => {
             <!-- Actions Menu -->
             <div class="flex gap-1">
               <Button
-                v-if="runner.isHostedRunner"
-                v-tooltip.top="'Restart hosted runner'"
-                icon="pi pi-refresh"
-                text
-                rounded
-                size="small"
-                :loading="restartingRunnerId === runner.id"
-                @click.stop="restartHostedRunner(runner)"
-              />
-              <Button
-                v-else-if="!isRunnerLinkedToProject(runner)"
+                v-if="!runner.isHostedRunner && !isRunnerLinkedToProject(runner)"
                 v-tooltip.top="'Delete runner'"
                 icon="pi pi-trash"
                 text
@@ -770,17 +697,7 @@ onUnmounted(() => {
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button
-                  v-if="data.isHostedRunner"
-                  v-tooltip.top="'Restart hosted runner'"
-                  icon="pi pi-refresh"
-                  text
-                  rounded
-                  size="small"
-                  :loading="restartingRunnerId === data.id"
-                  @click.stop="restartHostedRunner(data)"
-                />
-                <Button
-                  v-else-if="!isRunnerLinkedToProject(data)"
+                  v-if="!data.isHostedRunner && !isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Delete runner'"
                   icon="pi pi-trash"
                   text

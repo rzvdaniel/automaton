@@ -1,11 +1,16 @@
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
 
 internal static class ManagedRunnerConnectionTestServiceFactory
 {
+    public static ApplicationDbContext CreateDatabase() => new(
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
     public static RunnerService Create(ApplicationDbContext db)
     {
         var userContext = new UserContextService(new HttpContextAccessor());
@@ -30,7 +35,6 @@ internal static class ManagedRunnerConnectionTestServiceFactory
         var applicationEventService = new ApplicationEventService(db);
         var sessionService = new RunnerConnectionSessionService(db, applicationEventService, userContext);
         var registrationService = new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService));
-        var restartService = new HostedRunnerRestartCompletionService(db, auditEventService);
         var queryService = new RunnerQueryService(db, authorization, userContext, sessionService);
 
         return new RunnerService(
@@ -41,10 +45,8 @@ internal static class ManagedRunnerConnectionTestServiceFactory
             new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext, RunnerExecutionTestServices.Revocation(db)),
             sessionService,
             queryService,
-            restartService,
             new RunnerFlowExecutionService(null!),
             new RunnerConnectionLifecycleService(
-                db, authorization, new ApiInstanceIdentityService(), sessionService,
-                registrationService, restartService));
+                db, authorization, new ApiInstanceIdentityService(), sessionService));
     }
 }

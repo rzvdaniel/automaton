@@ -1,3 +1,4 @@
+using Automaton.Api.Models;
 using System.Security.Claims;
 using Automaton.Api.Services;
 using Automaton.Core.Models;
@@ -10,20 +11,14 @@ namespace Automaton.Api.Controllers;
 [Authorize(Policy = "AllowApiKey")]
 [Route("api/infrastructure-commands")]
 public sealed class InfrastructureCommandsController(
-    InfrastructureCommandCallbackService commands,
     InfrastructureHostValidationResultService hostValidation) : ControllerBase
 {
-    [HttpPost("{commandId:guid}/secrets")]
-    public async Task<ActionResult<InfrastructureCommandSecretsResponse>> Secrets(Guid commandId,
-        [FromBody] InfrastructureCommandSecretsRequest request, CancellationToken cancellationToken)
-        => Ok(await commands.ResolveSecretsAsync(ApiKeyId(), commandId, request, cancellationToken));
-
     [HttpPost("{commandId:guid}/result")]
     public async Task<ActionResult<InfrastructureCommandResultResponse>> Result(Guid commandId,
         [FromBody] InfrastructureCommandResultRequest request, CancellationToken cancellationToken)
     {
         if (request.ActionKey != HostValidationCommand.ActionKey)
-            return Ok(await commands.ApplyResultAsync(ApiKeyId(), commandId, request, cancellationToken));
+            return Forbid();
         try
         {
             return Ok(await hostValidation.ApplyAsync(ApiKeyId(), commandId, request, cancellationToken));

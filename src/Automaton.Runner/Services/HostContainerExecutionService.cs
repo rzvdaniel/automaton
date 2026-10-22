@@ -6,7 +6,7 @@ using Automaton.Core.Models;
 namespace Automaton.Runner.Console.Services;
 
 /// <summary>
-/// Typed host-container boundary for the trusted Infrastructure Runner.
+/// Typed container boundary for the enrolled Machine Management Runner.
 /// This service deliberately does not accept Docker arguments, host paths, or
 /// network names from a caller.
 /// </summary>
@@ -200,27 +200,8 @@ public sealed partial class HostContainerExecutionService
             && resources.ArtifactKind == HostContainerResourceKinds.Artifact
             && resources.DataKind == HostContainerResourceKinds.ApplicationData;
 
-    internal static bool HasExpectedVolumeLabels(string json, Guid hostedRunnerId)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            RejectDuplicateProperties(document.RootElement);
-            var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(document.RootElement);
-            return labels is not null
-                && labels.Count == 4
-                && labels.TryGetValue("automaton.managed", out var managed) && managed == "true"
-                && labels.TryGetValue("automaton.resource", out var resource) && resource == "hosted-runner-volume"
-                && labels.TryGetValue("automaton.hosted-runner-id", out var runner) && runner == hostedRunnerId.ToString()
-                && labels.TryGetValue("automaton.storage-scope", out var scope) && scope == "user";
-        }
-        catch (JsonException) { return false; }
-    }
-
     internal static bool HasExpectedVolumeLabels(string json, HostContainerScope scope)
-        => scope.MachineRunnerId == Guid.Empty
-            ? HasExpectedVolumeLabels(json, scope.HostedRunnerId)
-            : HostContainerResourcePolicy.HasExpectedVolumeLabels(json, scope);
+        => HostContainerResourcePolicy.HasExpectedVolumeLabels(json, scope);
 
     private static HostContainerExecutionResponse Failure(string code, string error)
         => new() { ErrorCode = code, Error = error };

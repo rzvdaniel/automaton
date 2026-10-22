@@ -11,8 +11,6 @@ public sealed class InfrastructureCommandHostedService(
     IConfiguration configuration,
     AppActionDeploymentService deployment,
     AppActionExecutionService execution,
-    HostContainerExecutionService hostContainer,
-    HostContainerBuildCleanupService buildCleanup,
     ILogger<InfrastructureCommandHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,8 +30,8 @@ public sealed class InfrastructureCommandHostedService(
         var identity = await InfrastructureCommandIdentity.LoadAsync(storage);
         var api = new InfrastructureCommandApiClient(configuration, storage);
         var executor = new TrustedInfrastructureActionExecutor(
-            deployment, execution, api);
-        var consumer = new InfrastructureCommandConsumer(identity, executor, api, hostContainer, api, buildCleanup);
+            deployment, execution);
+        var consumer = new InfrastructureCommandConsumer(identity, executor, api);
         logger.LogInformation("Starting durable infrastructure command consumer for Runner Host {RunnerHostId}", identity.RunnerHostId);
         while (!stoppingToken.IsCancellationRequested)
         {

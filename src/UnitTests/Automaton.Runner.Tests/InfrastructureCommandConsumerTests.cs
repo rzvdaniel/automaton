@@ -33,28 +33,6 @@ public sealed class InfrastructureCommandConsumerTests
         => Assert.That(InfrastructureCommandApiClient.IsAckableResponse(HttpStatusCode.OK, null), Is.False);
 
     [Test]
-    public void SecretResolutionAcceptsOnlyExecutableOrTerminalDisposition()
-    {
-        var executable = InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
-            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Executable,
-                new Dictionary<string, string> { ["TOKEN"] = "value" }));
-        var terminal = InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
-            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Terminal,
-                new Dictionary<string, string>(), "AmbiguousDispatch"));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(executable.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Executable));
-            Assert.That(terminal.Disposition, Is.EqualTo(InfrastructureCommandSecretResolutionDispositions.Terminal));
-        });
-        Assert.Throws<InvalidOperationException>(() => InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
-            new InfrastructureCommandSecretsResponse("unknown", new Dictionary<string, string>())));
-        Assert.Throws<InvalidOperationException>(() => InfrastructureCommandApiClient.ValidateSecretResolutionResponse(
-            new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Terminal,
-                new Dictionary<string, string>())));
-    }
-
-    [Test]
     public async Task CapSerializedCommandPreservesFieldsAndInvokesExecutorOnce()
     {
         var executor = new RecordingExecutor();
@@ -93,6 +71,11 @@ public sealed class InfrastructureCommandConsumerTests
     [TestCase("suspend-hosted-runner")]
     [TestCase("resume-hosted-runner")]
     [TestCase("measure-hosted-runner-storage")]
+    [TestCase("restart-hosted-runner")]
+    [TestCase("delete-hosted-runner")]
+    [TestCase("provision-hosted-runner")]
+    [TestCase("reprovision-hosted-runner")]
+    [TestCase(HostContainerExecutionCommandKinds.InfrastructureActionKey)]
     public async Task RetiredStorageDeliveryIsTerminalWithoutInvokingExecutor(string actionKey)
     {
         var executor = new RecordingExecutor();
@@ -132,7 +115,7 @@ public sealed class InfrastructureCommandConsumerTests
     {
         var operationId = Guid.NewGuid();
         return new(operationId, operationId, identity.RunnerHostId, identity.RunnerId,
-            "restart-hosted-runner", "{\"containerName\":\"test-runner\"}", [Guid.NewGuid()], DateTime.UtcNow);
+            HostValidationCommand.ActionKey, "{}", [], DateTime.UtcNow);
     }
 
     private static async Task<ReadOnlyMemory<byte>> SerializeWithCap(InfrastructureCommandRequestedEvent command)

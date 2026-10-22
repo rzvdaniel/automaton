@@ -23,6 +23,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         previousHostedRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");
         previousMachineRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
         Environment.SetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID", hostedRunnerId.ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", Guid.NewGuid().ToString());
     }
 
     [TearDown]
@@ -151,5 +152,5 @@ public sealed class BrokeredApplicationContainerRuntimeTests
                 requests.Add(request);
                 return Task.FromResult(response(request));
             },
-            () => Task.FromResult<RunnerInstallationProfile?>(new() { RunnerHostId = runnerHostId }));
+            () => Task.FromResult<RunnerInstallationProfile?>(new() { Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.MachineManagement }));
 }

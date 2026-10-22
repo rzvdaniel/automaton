@@ -35,6 +35,20 @@ public sealed class HostContainerRelayServiceTests
     }
 
     [Test]
+    public async Task MachineResultReaderDoesNotExposeOperationsToLegacyOrOtherKeys()
+    {
+        using var fixture = RelayFixture.Create();
+        fixture.AssignMachineRunnerToPersonalWorkspace();
+        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
+        var reader = new HostContainerExecutionOperationService(fixture.Db, fixture.RunnerOperations);
+
+        Assert.That(await reader.GetResultAsync(fixture.MachineApiKeyId, fixture.OperationId, CancellationToken.None), Is.Not.Null);
+        Assert.That(await reader.GetResultAsync(fixture.ApiKeyId, fixture.OperationId, CancellationToken.None), Is.Null);
+        Assert.That(await reader.GetResultAsync(fixture.OtherAccountApiKeyId, fixture.OperationId, CancellationToken.None), Is.Null);
+        Assert.That(await reader.GetResultAsync(Guid.NewGuid(), fixture.OperationId, CancellationToken.None), Is.Null);
+    }
+
+    [Test]
     public async Task Submit_RejectsAnotherAccountsRunnerBeforePublishing()
     {
         using var fixture = RelayFixture.Create();

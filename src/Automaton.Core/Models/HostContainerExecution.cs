@@ -125,10 +125,3 @@ public sealed record HostContainerExecutionOperationResponse(
     Guid OperationId,
     bool Completed,
     HostContainerExecutionResponse? Result);
-
-public sealed record HostContainerCommandDispositionResponse(string Outcome);
-
-public sealed record HostContainerExecutionResultRequest(
-    [property: JsonRequired] Guid RunnerHostId,
-    [property: JsonRequired] Guid InfrastructureRunnerId,
-    [property: JsonRequired] HostContainerExecutionResponse Result);

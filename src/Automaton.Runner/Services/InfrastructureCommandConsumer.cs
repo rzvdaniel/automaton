@@ -10,32 +10,14 @@ public sealed class InfrastructureCommandConsumer
     private readonly InfrastructureCommandIdentity identity;
     private readonly IInfrastructureActionExecutor executor;
     private readonly InfrastructureCommandQueueConsumer queueConsumer;
-    private readonly HostContainerExecutionService? hostContainerExecutor;
-    private readonly HostContainerBuildCleanupService? buildCleanup;
-    private readonly IHostContainerExecutionCommandClient? hostContainerResults;
-
     public InfrastructureCommandConsumer(
         InfrastructureCommandIdentity identity,
         IInfrastructureActionExecutor executor,
         IInfrastructureCommandResultClient results)
-        : this(identity, executor, results, null, null, null)
-    {
-    }
-
-    public InfrastructureCommandConsumer(
-        InfrastructureCommandIdentity identity,
-        IInfrastructureActionExecutor executor,
-        IInfrastructureCommandResultClient results,
-        HostContainerExecutionService? hostContainerExecutor,
-        IHostContainerExecutionCommandClient? hostContainerResults,
-        HostContainerBuildCleanupService? buildCleanup)
     {
         this.identity = identity;
         this.executor = executor;
-        this.hostContainerExecutor = hostContainerExecutor;
-        this.buildCleanup = buildCleanup;
-        this.hostContainerResults = hostContainerResults;
-        queueConsumer = new InfrastructureCommandQueueConsumer(QueueName, HandleAsync, results, SubmitHostContainerResultAsync);
+        queueConsumer = new InfrastructureCommandQueueConsumer(QueueName, HandleAsync, results);
     }
 
     public InfrastructureCommandConsumer(InfrastructureCommandIdentity identity, IInfrastructureActionExecutor executor)
@@ -54,11 +36,11 @@ public sealed class InfrastructureCommandConsumer
             || command.CommandId == Guid.Empty || command.OperationId == Guid.Empty
             || command.RunnerHostId != identity.RunnerHostId || command.InfrastructureRunnerId != identity.RunnerId)
             throw new UnauthorizedAccessException("Infrastructure command identity does not match this Runner and Runner Host.");
-        if (command.ActionKey == HostContainerExecutionCommandKinds.InfrastructureActionKey)
-            return await ExecuteHostContainerAsync(command, cancellationToken);
-
-        if (command.ActionKey is "suspend-hosted-runner" or "resume-hosted-runner" or "measure-hosted-runner-storage")
-            return new(null, null, true, "Hosted Runner storage operations are retired.");
+        if (command.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner"
+            or "restart-hosted-runner" or "delete-hosted-runner"
+            or "suspend-hosted-runner" or "resume-hosted-runner" or "measure-hosted-runner-storage"
+            || command.ActionKey == HostContainerExecutionCommandKinds.InfrastructureActionKey)
+            return new(null, null, true, "Hosted Runner lifecycle and Infrastructure container execution are retired.");
 
         TrustedInfrastructureActions.EnsureAllowed(command.ActionKey);
         ValidateHostValidationCommand(command);
@@ -73,49 +55,6 @@ public sealed class InfrastructureCommandConsumer
         if (command.ActionKey == HostValidationCommand.ActionKey
             && (command.CommandId != command.OperationId || command.SecretGrantIds?.Count != 0))
             throw new InvalidDataException("Host validation requires its operation identity and no secret grants.");
-    }
-
-    private async Task<InfrastructureCommandExecutionResult> ExecuteHostContainerAsync(
-        InfrastructureCommandRequestedEvent command,
-        CancellationToken cancellationToken)
-    {
-        if (hostContainerExecutor is null || hostContainerResults is null || buildCleanup is null)
-            throw new InvalidOperationException("Host-container command processing is not configured on this Infrastructure Runner.");
-        if (command.CommandId != command.OperationId || command.SecretGrantIds.Count != 0
-            || string.IsNullOrWhiteSpace(command.InputJson) || command.CreatedAtUtc == default
-            || command.CreatedAtUtc.Kind != DateTimeKind.Utc)
-            throw new InvalidDataException("The host-container command identity or secret grants are invalid.");
-
-        var request = JsonSerializer.Deserialize<HostContainerExecutionRequest>(command.InputJson, JsonOptions)
-            ?? throw new InvalidDataException("The host-container request is empty.");
-        if (request.OperationId != command.OperationId || request.Scope is null
-            || request.Scope.RunnerHostId != identity.RunnerHostId)
-            throw new UnauthorizedAccessException("The host-container request does not match this Infrastructure Runner Host.");
-
-        var disposition = await hostContainerResults.GetDispositionAsync(command.OperationId, cancellationToken);
-        if (disposition is "already-applied" or "obsolete")
-        {
-            await buildCleanup.CleanupAfterResultAsync(request);
-            return new(null, null, true, disposition);
-        }
-        if (disposition != "execute")
-            throw new InvalidDataException("The API returned an unknown host-container command disposition.");
-
-        return new(null, null, false, null,
-            await hostContainerExecutor.ExecuteAsync(request, cancellationToken));
-    }
-
-    private async Task SubmitHostContainerResultAsync(
-        InfrastructureCommandRequestedEvent command,
-        InfrastructureCommandExecutionResult result,
-        CancellationToken cancellationToken)
-    {
-        if (result.HostContainerResult is null)
-            throw new InvalidOperationException("The host-container command returned no execution result.");
-        await hostContainerResults!.SubmitAsync(command, result.HostContainerResult, cancellationToken);
-        var request = JsonSerializer.Deserialize<HostContainerExecutionRequest>(command.InputJson, JsonOptions);
-        if (request is not null)
-            await buildCleanup!.CleanupAfterResultAsync(request);
     }
 
     public Task<InfrastructureCommandExecutionResult> ConsumeOneAsync(

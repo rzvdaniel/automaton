@@ -12,32 +12,21 @@ public sealed class HostContainerRuntimeTests
 {
     private static readonly string ContainerId = new('a', 64);
     private static readonly string Digest = "example/runtime@sha256:" + new string('b', 64);
-    private readonly HostContainerScope scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-    private readonly Dictionary<string, string?> previousEnvironment = new();
+    private HostContainerScope scope = null!;
+    private MachineContainerTestEnvironment machine = null!;
     private readonly List<IReadOnlyList<string>> calls = [];
 
     [SetUp]
     public void SetUp()
     {
+        machine = MachineContainerTestEnvironment.Create();
+        scope = MachineContainerTestEnvironment.CurrentScope();
         calls.Clear();
-        foreach (var pair in new Dictionary<string, string>
-        {
-            ["AUTOMATON_RUNNER_PURPOSE"] = RunnerPurposes.Infrastructure,
-            ["AUTOMATON_RUNNER_CAPABILITIES"] = RunnerCapabilities.HostContainerExecution,
-            ["AUTOMATON_RUNTIME_HOST_ADDRESS"] = "172.17.0.1"
-        })
-        {
-            previousEnvironment[pair.Key] = Environment.GetEnvironmentVariable(pair.Key);
-            Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-        }
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNTIME_HOST_ADDRESS", "172.17.0.1");
     }
 
     [TearDown]
-    public void TearDown()
-    {
-        foreach (var pair in previousEnvironment)
-            Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-    }
+    public void TearDown() => machine.Dispose();
 
     private HostContainerExecutionRequest CreateRequest() => new()
     {
@@ -45,6 +34,7 @@ public sealed class HostContainerRuntimeTests
         CandidateId = Guid.NewGuid(), RequestedImage = Digest, ContainerPort = 8080,
         Resources = new("source", "artifact", "data"),
         SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+        ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
         Command = new() { Executable = "scripts/serve", WorkingDirectory = "output", Arguments = ["space separated", "--flag"] },
         Storage = new() { DataDirectory = "database", Mounts = [new() { Name = "uploads", RelativePath = "media/files" }] }
     };
@@ -68,13 +58,9 @@ public sealed class HostContainerRuntimeTests
                     : args[1] == "image" ? Digest
                     : args[1] == "create" ? ContainerId : Inspection().ToJsonString()
             });
-        });
+        }, new MachineWorkloadDiskAdmission(_ => long.MaxValue));
 
-    private string VolumeLabels() => JsonSerializer.Serialize(new Dictionary<string, string>
-    {
-        ["automaton.managed"] = "true", ["automaton.resource"] = "hosted-runner-volume",
-        ["automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString(), ["automaton.storage-scope"] = "user"
-    });
+    private static string VolumeLabels() => MachineContainerTestEnvironment.CurrentVolumeLabels();
 
     [Test]
     public async Task ApplicationContainerHasReadOnlyRootBoundedScratchAndConfiguredLogs()
@@ -124,8 +110,7 @@ public sealed class HostContainerRuntimeTests
                 ["com.automaton.managed"] = "true", ["com.automaton.runtime-kind"] = "generic",
                 ["com.automaton.app-id"] = scope.AppId.ToString(),
                 ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString(),
-                ["com.automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString(),
-                ["com.automaton.runner-host-id"] = scope.RunnerHostId.ToString()
+                ["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString()
             }
         },
         ["HostConfig"] = new JsonObject
@@ -169,8 +154,7 @@ public sealed class HostContainerRuntimeTests
 
     [TestCase("app-id")]
     [TestCase("deployment-target-id")]
-    [TestCase("hosted-runner-id")]
-    [TestCase("runner-host-id")]
+    [TestCase("machine-runner-id")]
     [TestCase("managed")]
     [TestCase("runtime-kind")]
     public async Task EveryOperationRejectsWrongOwnershipBeforeMutationOrLogs(string label)
@@ -282,7 +266,7 @@ public sealed class HostContainerRuntimeTests
     public async Task TargetCleanup_DiscoversOrphansAndChecksFullOwnership(string scenario)
     {
         var state = Inspection();
-        if (scenario == "wrong-owner") state["Config"]!["Labels"]!["com.automaton.hosted-runner-id"] = Guid.NewGuid().ToString();
+        if (scenario == "wrong-owner") state["Config"]!["Labels"]!["com.automaton.machine-runner-id"] = Guid.NewGuid().ToString();
         var removed = false;
         var service = Service(args =>
         {
@@ -299,8 +283,7 @@ public sealed class HostContainerRuntimeTests
         Assert.That(result.Success, Is.EqualTo(scenario == "success"));
         if (scenario == "success") Assert.That((await service.ExecuteAsync(request)).Success, Is.True);
         if (scenario is "wrong-owner" or "list-failure") Assert.That(calls.Any(args => args[1] == "rm"), Is.False);
-        Assert.That(calls[0], Does.Contain($"label=com.automaton.hosted-runner-id={scope.HostedRunnerId}"));
-        Assert.That(calls[0], Does.Contain($"label=com.automaton.runner-host-id={scope.RunnerHostId}"));
+        Assert.That(calls[0], Does.Contain($"label=com.automaton.machine-runner-id={scope.MachineRunnerId}"));
         Assert.That(calls[0], Does.Contain($"label=com.automaton.app-id={scope.AppId}"));
         Assert.That(calls[0], Does.Contain($"label=com.automaton.deployment-target-id={scope.DeploymentTargetId}"));
     }
@@ -363,7 +346,7 @@ public sealed class HostContainerRuntimeTests
     [Test]
     public async Task CreateRejectsVolumeWithExtraOrWrongOwnershipLabels()
     {
-        foreach (var json in new[] { VolumeLabels().Replace("\"user\"", "\"shared\""), VolumeLabels().Replace("}", ",\"extra\":\"value\"}") })
+        foreach (var json in new[] { VolumeLabels().Replace("\"workspace\"", "\"shared\""), VolumeLabels().Replace("}", ",\"extra\":\"value\"}") })
         {
             calls.Clear();
             var result = await Service(_ => new() { Success = true, Output = json }).ExecuteAsync(CreateRequest());

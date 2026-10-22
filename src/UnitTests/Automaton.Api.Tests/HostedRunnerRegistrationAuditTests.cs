@@ -46,7 +46,7 @@ public class HostedRunnerRegistrationAuditTests
 
 
     [Test]
-    public async Task RunnerRegistration_CorrelatesByHostedRunnerIdAndCompletesReprovision()
+    public async Task RunnerRegistration_DoesNotApplyHistoricalHostedReprovision()
     {
         using var db = HostedRunnerAuditTestData.CreateDbContext();
         var userId = Guid.NewGuid();
@@ -61,6 +61,6 @@ public class HostedRunnerRegistrationAuditTests
             Purpose = Automaton.Core.Enums.RunnerPurposes.Managed,
             HostedRunnerId = seed.HostedRunnerId
         });
-        await HostedRunnerRegistrationTestScenario.AssertReprovisionCompletedAsync(db, seed);
+        await HostedRunnerRegistrationTestScenario.AssertReprovisionUnchangedAsync(db, seed);
     }
 }

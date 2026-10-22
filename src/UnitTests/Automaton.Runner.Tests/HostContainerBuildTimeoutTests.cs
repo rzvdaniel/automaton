@@ -5,13 +5,14 @@ using NUnit.Framework;
 
 namespace Automaton.Runner.Console.Tests;
 
-[TestFixture]
+[TestFixture, NonParallelizable]
 public sealed class HostContainerBuildTimeoutTests
 {
     [TestCase(false)]
     [TestCase(true)]
     public async Task TimeoutStopsBuildLocallyAndRetainsContainerForResultRecovery(bool recovering)
     {
+        using var machine = MachineContainerTestEnvironment.Create();
         var request = CreateRequest();
         var commands = new List<IReadOnlyList<string>>();
         var stopToken = new CancellationToken(true);
@@ -39,12 +40,13 @@ public sealed class HostContainerBuildTimeoutTests
     private static HostContainerExecutionRequest CreateRequest() => new()
     {
         OperationId = Guid.NewGuid(),
-        Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+        Scope = MachineContainerTestEnvironment.CurrentScope(),
         Operation = HostContainerOperationKinds.RunBuild,
         RequestedImage = "example/build:1",
         Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact,
             HostContainerResourceKinds.ApplicationData),
         SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
+        ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256,
         TimeoutSeconds = 30,
         Command = new() { Executable = "build" }
     };
@@ -55,13 +57,7 @@ public sealed class HostContainerBuildTimeoutTests
         bool recovering)
     {
         if (arguments[1] == "volume")
-            return Success(JsonSerializer.Serialize(new Dictionary<string, string>
-            {
-                ["automaton.managed"] = "true",
-                ["automaton.resource"] = "hosted-runner-volume",
-                ["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString(),
-                ["automaton.storage-scope"] = "user"
-            }));
+            return Success(MachineContainerTestEnvironment.CurrentVolumeLabels());
         if (arguments[1] == "container")
             return recovering ? ExistingContainer(request) : new()
             {
@@ -81,7 +77,7 @@ public sealed class HostContainerBuildTimeoutTests
                 Labels = new Dictionary<string, string>
                 {
                     ["automaton.operation-id"] = request.OperationId.ToString("N"),
-                    ["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString("N"),
+                    ["automaton.machine-runner-id"] = request.Scope.MachineRunnerId.ToString("N"),
                     ["automaton.runner-host-id"] = request.Scope.RunnerHostId.ToString("N"),
                     ["automaton.app-id"] = request.Scope.AppId.ToString("N"),
                     ["automaton.deployment-target-id"] = request.Scope.DeploymentTargetId.ToString("N"),

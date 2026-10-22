@@ -6,8 +6,6 @@ public static class TrustedInfrastructureActions
 {
     public static IReadOnlySet<string> Keys { get; } = new[]
     {
-        "restart-hosted-runner",
-        "delete-hosted-runner",
         HostValidationCommand.ActionKey
     }.ToFrozenSet(StringComparer.Ordinal);
 

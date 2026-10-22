@@ -27,21 +27,6 @@ public sealed class HostContainerExecutionsController(
         return response is null ? NotFound() : Ok(response);
     }
 
-    [HttpGet("{operationId:guid}/disposition")]
-    public async Task<ActionResult<HostContainerCommandDispositionResponse>> Disposition(
-        Guid operationId,
-        CancellationToken cancellationToken)
-        => Ok(new HostContainerCommandDispositionResponse(await operations.GetCommandDispositionAsync(
-            ApiKeyId(), operationId, cancellationToken)));
-
-    [HttpPost("{operationId:guid}/result")]
-    public async Task<ActionResult<HostContainerCommandDispositionResponse>> ApplyResult(
-        Guid operationId,
-        [FromBody] HostContainerExecutionResultRequest request,
-        CancellationToken cancellationToken)
-        => Ok(new HostContainerCommandDispositionResponse(await operations.ApplyResultAsync(
-            ApiKeyId(), operationId, request, cancellationToken)));
-
     private Guid ApiKeyId() => Guid.TryParse(User.FindFirst("api_key_id")?.Value, out var id)
         ? id
         : throw new UnauthorizedAccessException("Host-container operations require API-key authentication.");

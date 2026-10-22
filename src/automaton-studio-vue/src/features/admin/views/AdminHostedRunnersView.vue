@@ -33,9 +33,6 @@ const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
 const loadingHosts = ref(false)
 const loadingRunners = ref(false)
-const restartingRunnerId = ref<string | null>(null)
-const deletingRunnerId = ref<string | null>(null)
-const deleteConfirmationRunnerId = ref<string | null>(null)
 
 const formatStorage = (bytes?: number) => {
   if (bytes === undefined || bytes === null) return 'Unknown'
@@ -43,11 +40,6 @@ const formatStorage = (bytes?: number) => {
   return `${gib.toFixed(gib >= 10 ? 1 : 2)} GB`
 }
 
-const deleteDataConfirmation = ref('')
-const hostedRestartPollMaxAttempts = 8
-const hostedRestartPollDelayMs = 1500
-const hostedDeletePollMaxAttempts = 40
-const hostedDeletePollDelayMs = 1500
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -182,41 +174,6 @@ async function loadHostedRunners() {
   } finally {
     loadingRunners.value = false
   }
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
-}
-
-async function pollHostedRunnerUntilRunning(hostedRunnerId: string) {
-  for (let attempt = 0; attempt < hostedRestartPollMaxAttempts; attempt += 1) {
-    await delay(hostedRestartPollDelayMs)
-
-    const latestHostedRunners = await adminHostedRunnersService.getHostedRunners()
-    hostedRunners.value = latestHostedRunners
-
-    if (latestHostedRunners.some((candidate) => candidate.id === hostedRunnerId && candidate.status === 'running')) {
-      return true
-    }
-  }
-
-  return false
-}
-
-async function pollHostedRunnerDeletion(hostedRunnerId: string): Promise<'succeeded' | 'failed' | 'pending'> {
-  for (let attempt = 0; attempt < hostedDeletePollMaxAttempts; attempt += 1) {
-    await delay(hostedDeletePollDelayMs)
-
-    const latestHostedRunners = await adminHostedRunnersService.getHostedRunners()
-    hostedRunners.value = latestHostedRunners
-    const runner = latestHostedRunners.find((candidate) => candidate.id === hostedRunnerId)
-
-    // Successfully deleted Runners are intentionally omitted from this admin list.
-    if (!runner) return 'succeeded'
-    if (runner.status === 'deleteFailed' || runner.latestDeployment?.status === 'failed') return 'failed'
-  }
-
-  return 'pending'
 }
 
 async function refreshAll() {
@@ -405,107 +362,6 @@ async function revokeInfrastructureRunner(host: RunnerHost) {
     toast.add({ severity: 'error', summary: 'Revocation failed', detail: error instanceof Error ? error.message : 'Could not revoke the Infrastructure Runner.', life: 4000 })
   } finally {
     revokingInfrastructureRunnerHostId.value = null
-  }
-}
-
-async function restartHostedRunner(runner: HostedRunner) {
-  restartingRunnerId.value = runner.id
-  try {
-    await adminHostedRunnersService.restartHostedRunner(runner.id)
-    toast.add({
-      severity: 'info',
-      summary: 'Restart requested',
-      detail: `Restart requested for ${runner.name}. Waiting for it to reconnect...`,
-      life: 3500,
-    })
-
-    const isRunning = await pollHostedRunnerUntilRunning(runner.id)
-    await loadHosts()
-
-    if (isRunning) {
-      toast.add({
-        severity: 'success',
-        summary: 'Runner online',
-        detail: `${runner.name} is running again.`,
-        life: 3000,
-      })
-    } else {
-      toast.add({
-        severity: 'warn',
-        summary: 'Still reconnecting',
-        detail: `${runner.name} did not report running yet. It may still be restarting.`,
-        life: 5000,
-      })
-    }
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to restart hosted runner', life: 3000 })
-  } finally {
-    restartingRunnerId.value = null
-  }
-}
-
-function deleteHostedRunner(runner: HostedRunner) {
-  deleteConfirmationRunnerId.value = runner.id
-  deleteDataConfirmation.value = ''
-}
-
-async function confirmDeleteHostedRunner(runner: HostedRunner, dataDisposition: 'preserve' | 'delete') {
-  if (dataDisposition === 'delete' && deleteDataConfirmation.value !== runner.name) {
-    toast.add({ severity: 'warn', summary: 'Confirmation required', detail: `Type ${runner.name} to permanently delete its data.`, life: 4000 })
-    return
-  }
-  deletingRunnerId.value = runner.id
-  let requestAccepted = false
-  try {
-    await adminHostedRunnersService.deleteHostedRunner(runner.id, dataDisposition)
-    requestAccepted = true
-    const requestedDetail = dataDisposition === 'delete'
-      ? 'Deletion requested. The Runner and its persistent data will be removed after the infrastructure operation completes.'
-      : 'Deletion requested. The Runner container will be removed and its persistent data preserved.'
-    toast.add({ severity: 'info', summary: 'Deletion requested', detail: requestedDetail, life: 5000 })
-
-    const outcome = await pollHostedRunnerDeletion(runner.id)
-    await loadHosts()
-    if (outcome === 'succeeded') {
-      const completedDetail = dataDisposition === 'delete'
-        ? `${runner.name} and its persistent data were deleted.`
-        : `${runner.name} was deleted and its persistent data was preserved.`
-      toast.add({ severity: 'success', summary: 'Deletion completed', detail: completedDetail, life: 4000 })
-    } else if (outcome === 'failed') {
-      const failedRunner = hostedRunners.value.find((candidate) => candidate.id === runner.id)
-      toast.add({
-        severity: 'error',
-        summary: 'Deletion failed',
-        detail: failedRunner?.latestDeployment?.error || failedRunner?.lastError || 'The infrastructure operation failed.',
-        life: 6000,
-      })
-    } else {
-      toast.add({
-        severity: 'info',
-        summary: 'Deletion still in progress',
-        detail: 'The infrastructure operation has not completed yet. Check the deployment status for the final result.',
-        life: 6000,
-      })
-    }
-    selectedRunner.value = hostedRunners.value.find((candidate) => candidate.id === runner.id) ?? null
-  } catch {
-    toast.add(requestAccepted
-      ? {
-          severity: 'warn',
-          summary: 'Unable to monitor deletion',
-          detail: 'Deletion was requested, but Studio could not retrieve the final infrastructure operation status.',
-          life: 6000,
-        }
-      : {
-          severity: 'error',
-          summary: 'Delete request failed',
-          detail: 'Failed to request hosted Runner deletion.',
-          life: 4000,
-        })
-  } finally {
-    deletingRunnerId.value = null
-    deleteConfirmationRunnerId.value = null
-    deleteDataConfirmation.value = ''
   }
 }
 
@@ -781,15 +637,6 @@ watch(() => route.path, refreshAll)
             <template #body="{ data }">
               <div class="flex gap-2">
                 <Button label="Details" text size="small" @click="selectedRunner = data" />
-                <Button
-                  v-if="!isDeletedRunner(data)"
-                  label="Restart"
-                  icon="pi pi-refresh"
-                  size="small"
-                  outlined
-                  :loading="restartingRunnerId === data.id"
-                  @click="restartHostedRunner(data)"
-                />
               </div>
             </template>
           </Column>
@@ -1015,39 +862,6 @@ watch(() => route.path, refreshAll)
 
     <Dialog v-model:visible="runnerDetailsVisible" header="Hosted Runner Details" modal :style="{ width: '48rem' }">
       <div v-if="selectedRunner" class="flex flex-column gap-3">
-        <div v-if="deletingRunnerId === selectedRunner.id" class="flex align-items-center gap-2 border-bottom-1 surface-border pb-3 text-color-secondary">
-          <i class="pi pi-spin pi-spinner" />
-          <span>Deleting hosted runner. Removing managed container and clearing assignments...</span>
-        </div>
-        <div v-else-if="deleteConfirmationRunnerId === selectedRunner.id" class="border-bottom-1 surface-border pb-3">
-          <div class="flex align-items-center gap-2 text-color-danger font-semibold mb-2">
-            <i class="pi pi-exclamation-triangle" />
-            <span>Delete Hosted Runner</span>
-          </div>
-          <p class="mt-0 mb-3 text-color-secondary">Choose what happens to the Runner's persistent system and user volumes.</p>
-          <div class="border-1 surface-border border-round p-3 mb-3">
-            <div class="font-medium mb-1">Preserve persistent data</div>
-            <div class="text-color-secondary text-sm mb-3">Remove the container and unassign applications, but keep both named volumes for recovery.</div>
-            <Button label="Remove container and preserve data" icon="pi pi-box" outlined @click="confirmDeleteHostedRunner(selectedRunner, 'preserve')" />
-          </div>
-          <div class="border-1 border-red-300 border-round p-3 mb-3">
-            <div class="font-medium text-color-danger mb-1">Permanently delete persistent data</div>
-            <div class="text-color-secondary text-sm mb-2">This removes the container and both named volumes. This cannot be undone.</div>
-            <label for="delete-runner-data-confirmation" class="block text-sm mb-1">Type <strong>{{ selectedRunner.name }}</strong> to confirm</label>
-            <InputText id="delete-runner-data-confirmation" v-model="deleteDataConfirmation" class="w-full mb-3" autocomplete="off" />
-            <Button
-              label="Remove container and permanently delete data"
-              icon="pi pi-trash"
-              severity="danger"
-              :disabled="deleteDataConfirmation !== selectedRunner.name"
-              @click="confirmDeleteHostedRunner(selectedRunner, 'delete')"
-            />
-          </div>
-          <div class="flex justify-content-end">
-            <Button label="Cancel" text @click="deleteConfirmationRunnerId = null" />
-          </div>
-        </div>
-        <template v-else>
         <div class="grid">
           <div class="col-12 md:col-6">
             <div class="text-color-secondary text-sm">User</div>
@@ -1117,18 +931,6 @@ watch(() => route.path, refreshAll)
           <div class="text-color-secondary text-sm mb-2">Docker command preview</div>
           <pre class="command-preview">{{ selectedRunner.latestDeployment.commandPreview }}</pre>
         </div>
-        <div v-if="!isDeletedRunner(selectedRunner)" class="flex justify-content-end border-top-1 surface-border pt-3">
-          <Button
-            :label="deletingRunnerId === selectedRunner.id ? 'Deleting...' : 'Delete hosted runner'"
-            icon="pi pi-trash"
-            severity="danger"
-            outlined
-            :loading="deletingRunnerId === selectedRunner.id"
-            :disabled="deletingRunnerId === selectedRunner.id"
-            @click="deleteHostedRunner(selectedRunner)"
-          />
-        </div>
-        </template>
       </div>
     </Dialog>
   </div>
