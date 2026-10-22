@@ -7,6 +7,8 @@ Use this page when adding a new Runner Host or maintaining an existing Infrastru
 
 [![Infrastructure Runner operations](./assets/infrastructure-runner-operations.png)](./assets/infrastructure-runner-operations.png)
 
+Infrastructure host storage telemetry and its separate-XFS image-store check are retired. Existing stored storage fields are historical. Use Machine Management for new workload placement; these legacy installation/repair controls do not upgrade a Machine Management installation.
+
 ## Install on a new server
 
 1. Prepare a Linux server with administrator access and install Docker.

@@ -14,18 +14,20 @@ namespace Automaton.Runner.Console.Tests;
 [NonParallelizable]
 public class StorageMeasurementTests
 {
-    [Test]
-    public async Task HostedProfile_DoesNotMeasureOrSubmitRetiredStorageReports()
+    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.MachineManagement)]
+    public async Task RetiredProfiles_DoNotMeasureOrSubmitStorageReports(string purpose, string profile)
     {
         var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
         var previousHostedId = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", RunnerApplicationProfiles.Standard);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", profile);
         Environment.SetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID", Guid.NewGuid().ToString());
         try
         {
             // A retired profile must not use the telemetry client, even when old enrollment variables remain.
             var service = new StorageTelemetryBackgroundService(null!);
-            Assert.That(await service.MeasureAndReportAsync(RunnerPurposes.Managed, CancellationToken.None), Is.True);
+            Assert.That(await service.MeasureAndReportAsync(purpose, CancellationToken.None), Is.True);
         }
         finally
         {
@@ -96,18 +98,16 @@ public class StorageMeasurementTests
     }
 
     [Test]
-    public void TelemetrySchedule_AppliesPurposeSpecificInitialDelayAndJitter()
+    public void TelemetrySchedule_AppliesMachineInitialDelayAndJitter()
     {
         var random = new Random(42);
         for (var index = 0; index < 100; index++)
         {
-            Assert.That(StorageTelemetryBackgroundService.GetInitialDelay(RunnerPurposes.Managed, random).TotalMinutes,
+            Assert.That(StorageTelemetryBackgroundService.GetInitialDelay(random).TotalMinutes,
                 Is.InRange(2, 10));
-            Assert.That(StorageTelemetryBackgroundService.GetInitialDelay(RunnerPurposes.Infrastructure, random).TotalMinutes,
-                Is.InRange(1, 5));
-            Assert.That(StorageTelemetryBackgroundService.GetNextDelay(RunnerPurposes.Managed, true, random).TotalMinutes,
+            Assert.That(StorageTelemetryBackgroundService.GetNextDelay(true, random).TotalMinutes,
                 Is.InRange(55, 65));
-            Assert.That(StorageTelemetryBackgroundService.GetNextDelay(RunnerPurposes.Managed, false, random).TotalMinutes,
+            Assert.That(StorageTelemetryBackgroundService.GetNextDelay(false, random).TotalMinutes,
                 Is.InRange(10, 15));
         }
     }

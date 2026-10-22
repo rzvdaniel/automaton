@@ -9,22 +9,6 @@ namespace Automaton.Worker.Tests;
 [TestFixture]
 public sealed class TrustedSystemActionScheduleDispatchValidatorTests
 {
-    [TestCase(BuiltInStorageScheduleActionKeys.RunnerHost)]
-    public async Task BuiltInSystemSchedule_ResolvesItsTrustedWorkerActionDefinition(string actionKey)
-    {
-        var schedule = Schedule();
-        schedule.ActionKey = actionKey;
-
-        var manifest = await new TrustedSystemActionScheduleDispatchValidator(
-            new TrustedSystemActionManifestSource()).ValidateAsync(schedule, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(manifest.Metadata.Key, Is.EqualTo(actionKey));
-            Assert.That(manifest.Spec.AllowedExecutionScopes, Does.Contain(ActionExecutionScopes.Worker));
-        });
-    }
-
     [Test]
     public async Task ValidWorkerAction_ReturnsCurrentManifest()
     {

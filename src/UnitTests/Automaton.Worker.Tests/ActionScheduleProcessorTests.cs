@@ -14,8 +14,9 @@ namespace Automaton.Worker.Tests;
 [TestFixture]
 public sealed class ActionScheduleProcessorTests
 {
-    [TestCase(BuiltInStorageScheduleActionKeys.RetiredEnforcement)]
-    [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner)]
+    [TestCase(RetiredStorageScheduleKeys.Enforcement)]
+    [TestCase(RetiredStorageScheduleKeys.HostedRunner)]
+    [TestCase(RetiredStorageScheduleKeys.RunnerHost)]
     public async Task PreviouslyPublishedStorageOccurrenceCannotExecuteAfterRetirement(string key)
     {
         var schedule = Schedule(ActionScheduleTypes.Interval);

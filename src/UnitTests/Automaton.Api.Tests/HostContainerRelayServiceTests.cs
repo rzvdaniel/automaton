@@ -16,33 +16,22 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class HostContainerRelayServiceTests
 {
-    [Test]
-    public async Task Submit_ResolvesStableInfrastructureIdentityAndServerOwnedInputs()
+    [TestCase(RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    public async Task LegacyProfilesCannotQueueHostedContainersEvenWithHistoricalHostBindings(string profile)
     {
         using var fixture = RelayFixture.Create();
-        var result = await fixture.Service.SubmitAsync(fixture.ApiKeyId, fixture.Request(), CancellationToken.None);
-        var forwarded = await fixture.ReadForwardedRequestAsync();
-        AssertQueueDispatch(fixture, result, forwarded);
-    }
+        await fixture.SetCallerProfileAsync(profile);
 
-    private static void AssertQueueDispatch(
-        RelayFixture fixture,
-        HostContainerExecutionOperationResponse result,
-        HostContainerExecutionRequest forwarded)
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Completed, Is.False);
-            Assert.That(result.OperationId, Is.EqualTo(fixture.OperationId));
-            Assert.That(fixture.Events.Events, Has.Count.EqualTo(1));
-            Assert.That(fixture.Events.Events[0].InfrastructureRunnerId, Is.EqualTo(fixture.Infrastructure.Id));
-            Assert.That(fixture.Events.Events[0].RunnerHostId, Is.EqualTo(fixture.Host.Id));
-            Assert.That(fixture.Events.Events[0].ActionKey, Is.EqualTo(HostContainerExecutionCommandKinds.InfrastructureActionKey));
-            Assert.That(forwarded.Scope.HostedRunnerId, Is.EqualTo(fixture.HostedRunner.Id));
-            Assert.That(forwarded.Scope.RunnerHostId, Is.EqualTo(fixture.Host.Id));
-            Assert.That(forwarded.Resources, Is.Null);
-            Assert.That(forwarded.HostPort, Is.Zero);
-        });
+        var result = await fixture.Service.SubmitAsync(fixture.ApiKeyId, fixture.Request(), CancellationToken.None);
+
+        Assert.That(result.Completed, Is.True);
+        Assert.That(result.Result!.ErrorCode, Is.EqualTo("machine_runner_required"));
+        Assert.That(result.Result.Error, Does.Contain("Assign a Management Runner"));
+        Assert.That(fixture.Events.Events, Is.Empty);
+        Assert.That(fixture.Events.RunnerEvents, Is.Empty);
+        Assert.That(await fixture.Db.HostContainerExecutionOperations.CountAsync(), Is.Zero);
+        Assert.That(await fixture.Db.RunnerExecutionOperations.CountAsync(), Is.Zero);
     }
 
     [Test]
@@ -51,20 +40,9 @@ public sealed class HostContainerRelayServiceTests
         using var fixture = RelayFixture.Create();
         var result = await fixture.Service.SubmitAsync(fixture.OtherAccountApiKeyId, fixture.Request(), CancellationToken.None);
 
-        Assert.That(result.Result?.ErrorCode, Is.EqualTo("hosted_runner_binding_mismatch"));
+        Assert.That(result.Result?.ErrorCode, Is.EqualTo("machine_runner_required"));
         Assert.That(fixture.Events.Events, Is.Empty);
         Assert.That(await fixture.Db.HostContainerExecutionOperations.CountAsync(), Is.Zero);
-    }
-
-    [Test]
-    public async Task Submit_PreservesStorageAdmissionBeforeQueueing()
-    {
-        using var fixture = RelayFixture.Create();
-        fixture.Host.StorageState = RunnerHostStorageStates.SchedulingBlocked;
-        var result = await fixture.Service.SubmitAsync(fixture.ApiKeyId, fixture.Request(), CancellationToken.None);
-
-        Assert.That(result.Result?.ErrorCode, Is.EqualTo("host_storage_reserve_unavailable"));
-        Assert.That(fixture.Events.Events, Is.Empty);
     }
 
     [Test]
@@ -335,10 +313,15 @@ public sealed class HostContainerRelayServiceTests
         private HostContainerRelayService CreateService()
         {
             RunnerOperations = RunnerExecutionTestServices.Operations(Db, Events);
-            var operations = new HostContainerExecutionOperationService(Db, Events, RunnerOperations);
             return new HostContainerRelayService(
-                new HostContainerRelayStateResolver(Db), operations, RunnerOperations,
-                Options.Create(new StorageTelemetryOptions()), Options.Create(MachineResources));
+                new HostContainerRelayStateResolver(Db), RunnerOperations, Options.Create(MachineResources));
+        }
+
+        public async Task SetCallerProfileAsync(string profile)
+        {
+            var runner = await Db.Runners.SingleAsync(item => item.ApiKeyId == ApiKeyId);
+            runner.ApplicationProfile = profile;
+            await Db.SaveChangesAsync();
         }
 
         public static RelayFixture Create() => new();
@@ -380,13 +363,6 @@ public sealed class HostContainerRelayServiceTests
                 Db.RunnerUsers.Add(new RunnerUser { RunnerId = MachineRunner.Id, UserId = ownerId });
             Db.SaveChanges();
             return ownerId;
-        }
-
-        public async Task<HostContainerExecutionRequest> ReadForwardedRequestAsync()
-        {
-            var published = Events.Events.Single();
-            return System.Text.Json.JsonSerializer.Deserialize<HostContainerExecutionRequest>(published.InputJson,
-                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
         }
 
         public void Dispose() => Db.Dispose();
