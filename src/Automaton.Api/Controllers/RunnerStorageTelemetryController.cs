@@ -11,18 +11,6 @@ namespace Automaton.Api.Controllers;
 public sealed class RunnerStorageTelemetryController(
     RunnerStorageTelemetrySubmissionService submissionService) : ControllerBase
 {
-    [HttpPost("host")]
-    public async Task<IActionResult> ReportRunnerHostStorage(
-        [FromBody] RunnerHostStorageTelemetry report,
-        CancellationToken cancellationToken)
-    {
-        if (!TryApiKeyId(out var apiKeyId))
-            return Unauthorized();
-
-        return await SubmitAsync(
-            () => submissionService.ReportRunnerHostAsync(apiKeyId, report, cancellationToken));
-    }
-
     [HttpPost("machine")]
     public async Task<IActionResult> ReportMachineRunnerStorage(
         [FromBody] MachineRunnerStorageTelemetry report,

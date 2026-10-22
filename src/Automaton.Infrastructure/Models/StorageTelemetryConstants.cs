@@ -56,8 +56,3 @@ public static class StorageVerificationStatuses
     public const string Failed = "Failed";
     public const string TimedOut = "TimedOut";
 }
-
-public static class StorageTelemetryAuditEvents
-{
-    public const string RunnerHostPolicyChanged = "RunnerHostStoragePolicyChanged";
-}

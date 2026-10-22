@@ -8,11 +8,6 @@ public sealed class RunnerStorageTelemetryApiClient(
     FileStorageService storage,
     IHttpClientFactory httpClientFactory)
 {
-    public Task ReportRunnerHostAsync(
-        RunnerHostStorageTelemetry report,
-        CancellationToken cancellationToken)
-        => PostAsync("api/runner-storage/host", report, cancellationToken);
-
     public Task ReportMachineRunnerAsync(
         MachineRunnerStorageTelemetry report,
         CancellationToken cancellationToken)

@@ -1,51 +1,14 @@
-using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Api.Data;
-using Automaton.Api.Constants;
 using Microsoft.EntityFrameworkCore;
-using Automaton.Api.Logging;
-using System.Text.Json;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
 
-public sealed class RunnerStorageTelemetryService
+public sealed class RunnerStorageTelemetryService(ApplicationDbContext db)
 {
     private static readonly TimeSpan MaximumClockSkew = TimeSpan.FromMinutes(10);
-    private readonly ApplicationDbContext db;
-    private readonly StorageTelemetryOptions options;
-
-    public RunnerStorageTelemetryService(ApplicationDbContext db)
-        : this(db, Options.Create(new StorageTelemetryOptions())) { }
-
-    public RunnerStorageTelemetryService(ApplicationDbContext db, IOptions<StorageTelemetryOptions> options)
-    {
-        this.db = db;
-        this.options = options.Value;
-    }
-
-    public async Task ReportRunnerHostAsync(RunnerDetails authenticatedRunner, RunnerHostStorageTelemetry report, CancellationToken cancellationToken)
-    {
-        ValidateRunnerHostReport(authenticatedRunner, report);
-
-        var host = await db.RunnerHosts.SingleOrDefaultAsync(
-            x => x.Id == report.RunnerHostId && x.InfrastructureRunnerId == authenticatedRunner.Id, cancellationToken)
-            ?? throw new UnauthorizedAccessException("The Runner Host is not linked to the authenticated Infrastructure Runner.");
-        if (host.StorageMeasuredAtUtc >= report.MeasuredAtUtc) return;
-
-        var now = DateTime.UtcNow;
-        UpdateRunnerHostMeasurement(host, report, now);
-        var newState = StorageTelemetryPolicy.EvaluateHost(
-            IsValidImageStoreMeasurement(report) ? report.DockerDataRootTotalBytes!.Value : 0,
-            IsValidImageStoreMeasurement(report) ? report.DockerDataRootAvailableBytes!.Value : 0,
-            IsValidImageStoreMeasurement(report), options);
-        TrackRunnerHostPolicyChange(host, newState, now);
-        host.StorageState = newState;
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task ReportMachineRunnerAsync(
         RunnerDetails authenticatedRunner,
         MachineRunnerStorageTelemetry report,
@@ -89,75 +52,6 @@ public sealed class RunnerStorageTelemetryService
         ValidateText(report.RunnerVersion, 80, nameof(report.RunnerVersion));
         if (report.TotalBytes < 0 || report.AvailableBytes < 0 || report.AvailableBytes > report.TotalBytes)
             throw new ArgumentException("Machine storage values must be non-negative and internally consistent.");
-    }
-
-    private static void ValidateRunnerHostReport(RunnerDetails authenticatedRunner, RunnerHostStorageTelemetry report)
-    {
-        if (authenticatedRunner.Purpose != RunnerPurposes.Infrastructure ||
-            authenticatedRunner.RunnerHostId != report.RunnerHostId)
-            throw new UnauthorizedAccessException("The authenticated Runner cannot report storage for this Runner Host.");
-        ValidateTimestamp(report.MeasuredAtUtc);
-        ValidateText(report.Error, 2000, nameof(report.Error));
-        ValidateText(report.InfrastructureRunnerVersion, 80, nameof(report.InfrastructureRunnerVersion));
-        ValidateText(report.FilesystemPath, 500, nameof(report.FilesystemPath));
-        ValidateText(report.DockerDataRoot, 500, nameof(report.DockerDataRoot));
-        if (report.TotalBytes < 0 || report.UsedBytes < 0 || report.AvailableBytes < 0)
-            throw new ArgumentException("Host storage telemetry values cannot be negative.");
-        if (report.DockerDataRootTotalBytes < 0 || report.DockerDataRootAvailableBytes < 0)
-            throw new ArgumentException("Docker storage telemetry values cannot be negative.");
-        if (report.Success && (report.UsedBytes > report.TotalBytes || report.AvailableBytes > report.TotalBytes))
-            throw new ArgumentException("Host storage telemetry values are internally inconsistent.");
-        if (report.Success && (!report.DockerDataRootTotalBytes.HasValue || !report.DockerDataRootAvailableBytes.HasValue ||
-            report.DockerDataRootAvailableBytes > report.DockerDataRootTotalBytes))
-            throw new ArgumentException("Successful host telemetry must include internally consistent Docker data-root capacity.");
-    }
-
-    private void UpdateRunnerHostMeasurement(RunnerHost host, RunnerHostStorageTelemetry report, DateTime now)
-    {
-        host.StorageMeasuredAtUtc = report.MeasuredAtUtc;
-        host.StorageReceivedAtUtc = now;
-        var imageStoreMeasurementSucceeded = IsValidImageStoreMeasurement(report);
-        host.StorageMeasurementStatus = imageStoreMeasurementSucceeded ? StorageMeasurementStatuses.Succeeded : StorageMeasurementStatuses.Failed;
-        host.StorageMeasurementError = imageStoreMeasurementSucceeded
-            ? null
-            : Truncate(GetImageStoreMeasurementError(report), 2000);
-        if (imageStoreMeasurementSucceeded)
-        {
-            var dockerTotal = report.DockerDataRootTotalBytes!.Value;
-            var dockerAvailable = report.DockerDataRootAvailableBytes!.Value;
-            host.RootFilesystemTotalBytes = report.TotalBytes;
-            host.RootFilesystemAvailableBytes = report.AvailableBytes;
-            host.DockerFilesystemTotalBytes = dockerTotal;
-            host.DockerFilesystemAvailableBytes = dockerAvailable;
-            host.StorageTotalBytes = dockerTotal;
-            host.StorageUsedBytes = dockerTotal - dockerAvailable;
-            host.StorageAvailableBytes = dockerAvailable;
-            host.StorageReserveRequiredBytes = StorageTelemetryPolicy.RequiredHostReserve(dockerTotal, options);
-        }
-    }
-
-    private static bool IsValidImageStoreMeasurement(RunnerHostStorageTelemetry report)
-        => report.Success && report.ImageStoreFilesystemBounded;
-
-    private static string GetImageStoreMeasurementError(RunnerHostStorageTelemetry report)
-        => !report.Success
-            ? report.Error ?? "Host storage measurement failed."
-            : "The Infrastructure Runner did not verify Docker image/cache storage on the bounded XFS filesystem.";
-
-    private void TrackRunnerHostPolicyChange(RunnerHost host, string newState, DateTime now)
-    {
-        if (!string.Equals(host.StorageState, newState, StringComparison.Ordinal))
-        {
-            db.AuditEvents.Add(new AuditEvent
-            {
-                Id = Guid.NewGuid(), Category = LogCategories.Audit, Action = AuditActions.Changed,
-                EntityType = nameof(RunnerHost), EntityId = host.Id, Outcome = AuditOutcomes.Success,
-                EventType = StorageTelemetryAuditEvents.RunnerHostPolicyChanged,
-                Message = $"Runner Host storage policy changed from '{host.StorageState}' to '{newState}'.",
-                MetadataJson = JsonSerializer.Serialize(new { PreviousState = host.StorageState, NewState = newState }),
-                CreatedAtUtc = now
-            });
-        }
     }
 
     private static void ValidateTimestamp(DateTime value)
