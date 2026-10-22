@@ -12,7 +12,7 @@ order: 100
 | Host not validated | Run validation and inspect reported metadata and health details. |
 | Runner reports an API certificate validation error | Verify the API certificate matches its configured hostname and is trusted by the Runner host or container. Install the issuing CA in that environment for development certificates; do not disable certificate validation. |
 
-Per-user Hosted Runner creation and reprovisioning are retired. Existing records are retained; use the available restart, deletion, and storage verification controls only for those records. New customer workloads should use an assigned Machine Management Runner.
+Per-user Hosted Runner creation and reprovisioning are retired. Existing records are retained; use the available restart and deletion controls only for those records. New customer workloads should use an assigned Machine Management Runner.
 
 ## Workflow and custom-step execution
 
@@ -42,4 +42,4 @@ The reviewed automatic recovery follow-up is released. Rapid rollback/rollforwar
 
 Revoked Infrastructure Runner records are retained for history but excluded from cutover and compensation commands once their bound API key is inactive. Eligible disconnected Runners still receive the latest target; do not delete their queues to work around a reconnect delay.
 
-Storage suspension/resume, grace-period extension and enforcement reset are retired. Stored enforcement values are historical. This does not resume previously suspended workloads; retirement or recovery of legacy installations remains a separate operator decision. Machine Management uses configured container limits and free-disk admission instead of account storage allowances.
+Hosted Runner storage reporting/verification, suspension/resume, grace-period extension and enforcement reset are retired. Stored storage and enforcement values are historical; they are no longer refreshed. Account-storage locality is no longer adopted or verified. This does not resume previously suspended workloads; retirement or recovery of legacy installations remains a separate operator decision. Machine Management uses configured container limits and free-disk admission instead of account storage allowances.

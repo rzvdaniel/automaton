@@ -87,9 +87,8 @@ internal static class HostedRunnerRestartLifecycleScenario
             db,
             new HostedRunnerAuditNoOpAuditEventService(),
             hosted: new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 });
-        using var result = System.Text.Json.JsonDocument.Parse("{}");
         await handler.ApplySuccessfulOperationAsync(
-            runner, operation, "restart-hosted-runner", result.RootElement, CancellationToken.None);
+            runner, operation, "restart-hosted-runner", CancellationToken.None);
     }
 }
 

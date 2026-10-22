@@ -32,40 +32,6 @@ public sealed class InfrastructureCommandCallbackServiceTests
     }
 
     [Test]
-    public async Task FailedStorageMeasurementTerminalizesVerificationWithoutFailingRunnerLifecycle()
-    {
-        await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(
-            hostedRunnerStatus: HostedRunnerStatuses.Running,
-            deploymentAction: HostedRunnerDeploymentActions.VerifyStorage,
-            deploymentStatus: HostedRunnerDeploymentStatuses.Dispatching,
-            storageState: HostedRunnerStorageStates.Healthy,
-            addStorageVerification: true);
-        var result = await fixture.Service.ApplyResultAsync(fixture.ApiKeyId, fixture.Deployment.Id,
-            Request(fixture.Deployment.Id, fixture.Host.Id, fixture.Runner.Id, "expected volume is not provisioned") with
-            { ActionKey = StorageTelemetryActions.MeasureHostedRunnerStorage }, CancellationToken.None);
-
-        await InfrastructureCommandCallbackTestScenarios.AssertFailedStorageMeasurementAsync(fixture, result);
-    }
-
-    [Test]
-    public async Task SuccessfulStorageMeasurementCompletesVerification()
-    {
-        await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(
-            hostedRunnerStatus: HostedRunnerStatuses.Running,
-            deploymentAction: HostedRunnerDeploymentActions.VerifyStorage,
-            deploymentStatus: HostedRunnerDeploymentStatuses.Dispatching,
-            storageAllowanceBytes: 1_000,
-            addStorageVerification: true,
-            completeStorageLifecycle: true);
-        var result = await fixture.Service.ApplyResultAsync(
-            fixture.ApiKeyId,
-            fixture.Deployment.Id,
-            InfrastructureCommandCallbackTestScenarios.CreateSuccessfulStorageMeasurementResult(fixture),
-            CancellationToken.None);
-        await InfrastructureCommandCallbackTestScenarios.AssertSuccessfulStorageMeasurementAsync(fixture, result);
-    }
-
-    [Test]
     public async Task TerminalDeploymentWithoutExecutionIsTerminalStaleWithoutMutation()
     {
         await using var fixture = await InfrastructureCommandCallbackTestScenarios.CreateAsync(

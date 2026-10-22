@@ -39,11 +39,11 @@ internal sealed class BuiltInStorageScheduleSeederFixture : IAsyncDisposable
         await SeedOnceAsync();
     }
 
-    internal async Task TamperHostedRunnerScheduleAsync()
+    internal async Task TamperRunnerHostScheduleAsync()
     {
         await using var scope = provider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var schedule = await db.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.HostedRunner);
+        var schedule = await db.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.RunnerHost);
         schedule.Name = "tampered";
         schedule.IntervalSeconds = 3600;
         schedule.ExecutionScope = ActionExecutionScopes.AppRunner;
@@ -65,10 +65,9 @@ internal sealed class BuiltInStorageScheduleSeederFixture : IAsyncDisposable
     {
         Assert.Multiple(() =>
         {
-            Assert.That(schedules, Has.Count.EqualTo(2));
+            Assert.That(schedules, Has.Count.EqualTo(1));
             Assert.That(schedules.Select(x => x.ActionKey), Is.EquivalentTo(new[]
             {
-                BuiltInStorageScheduleActionKeys.HostedRunner,
                 BuiltInStorageScheduleActionKeys.RunnerHost
             }));
         });
@@ -84,24 +83,24 @@ internal sealed class BuiltInStorageScheduleSeederFixture : IAsyncDisposable
         });
     }
 
-    internal async Task AssertHostedRunnerScheduleWasReconciledAsync()
+    internal async Task AssertRunnerHostScheduleWasReconciledAsync()
     {
         await using var scope = provider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var schedule = await db.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.HostedRunner);
+        var schedule = await db.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.RunnerHost);
         Assert.Multiple(() =>
         {
-            Assert.That(db.ActionSchedules.Count(), Is.EqualTo(2));
-            Assert.That(schedule.Name, Is.EqualTo("Hosted Runner storage reconciliation"));
+            Assert.That(db.ActionSchedules.Count(), Is.EqualTo(1));
+            Assert.That(schedule.Name, Is.EqualTo("Runner Host storage reconciliation"));
             Assert.That(schedule.IntervalSeconds, Is.EqualTo(60));
             Assert.That(schedule.ExecutionScope, Is.EqualTo(ActionExecutionScopes.Worker));
             Assert.That(schedule.Enabled, Is.True);
             Assert.That(schedule.NextRunAtUtc, Is.Not.Null);
-            Assert.That(schedule.SystemIdentity, Is.EqualTo(BuiltInStorageScheduleActionKeys.HostedRunner));
+            Assert.That(schedule.SystemIdentity, Is.EqualTo(BuiltInStorageScheduleActionKeys.RunnerHost));
         });
     }
 
-    internal async Task SeedRetiredEnforcementAsync(bool legacyIdentity)
+    internal async Task SeedRetiredScheduleAsync(string key, bool legacyIdentity)
     {
         await using var scope = provider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -111,20 +110,20 @@ internal sealed class BuiltInStorageScheduleSeederFixture : IAsyncDisposable
             {
                 Id = Guid.NewGuid(), OwnerType = owner, ApplicationId = InfrastructureAppTrust.PlatformAppId,
                 SystemIdentity = owner == ActionScheduleOwnerTypes.System && !legacyIdentity
-                    ? BuiltInStorageScheduleActionKeys.RetiredEnforcement : null,
-                ActionKey = BuiltInStorageScheduleActionKeys.RetiredEnforcement,
+                    ? key : null,
+                ActionKey = key,
                 Enabled = true, NextRunAtUtc = DateTime.UtcNow.AddMinutes(1)
             });
         }
         await db.SaveChangesAsync();
     }
 
-    internal async Task AssertRetiredEnforcementDisabledAsync()
+    internal async Task AssertRetiredScheduleDisabledAsync(string key)
     {
         await using var scope = provider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var schedules = await db.ActionSchedules
-            .Where(schedule => schedule.ActionKey == BuiltInStorageScheduleActionKeys.RetiredEnforcement)
+            .Where(schedule => schedule.ActionKey == key)
             .ToListAsync();
         var system = schedules.Single(schedule => schedule.OwnerType == ActionScheduleOwnerTypes.System);
         var user = schedules.Single(schedule => schedule.OwnerType == ActionScheduleOwnerTypes.User);

@@ -57,8 +57,8 @@ public sealed class InfrastructureCommandConsumer
         if (command.ActionKey == HostContainerExecutionCommandKinds.InfrastructureActionKey)
             return await ExecuteHostContainerAsync(command, cancellationToken);
 
-        if (command.ActionKey is "suspend-hosted-runner" or "resume-hosted-runner")
-            return new(null, null, true, "Hosted Runner storage enforcement is retired.");
+        if (command.ActionKey is "suspend-hosted-runner" or "resume-hosted-runner" or "measure-hosted-runner-storage")
+            return new(null, null, true, "Hosted Runner storage operations are retired.");
 
         TrustedInfrastructureActions.EnsureAllowed(command.ActionKey);
         ValidateHostValidationCommand(command);

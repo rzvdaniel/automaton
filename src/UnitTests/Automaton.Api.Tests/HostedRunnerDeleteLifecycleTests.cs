@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Data.Common;
 using System.Net;
-using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
@@ -65,10 +64,9 @@ internal static class HostedRunnerDeleteLifecycleTestSupport
         };
         var handler = RunnerExecutionTestServices.Lifecycle(
             db, new HostedRunnerAuditNoOpAuditEventService(), CreateBrokerProvisioner(brokerHandler));
-        using var document = JsonDocument.Parse("{\"success\":true}");
 
         await handler.ApplySuccessfulOperationAsync(
-            hostedRunner, deployment, "delete-hosted-runner", document.RootElement, CancellationToken.None);
+            hostedRunner, deployment, "delete-hosted-runner", CancellationToken.None);
 
         return new HostedRunnerDeleteLifecycleTestResult(
             hostedRunner.Status == HostedRunnerStatuses.Deleted,

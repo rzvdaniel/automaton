@@ -62,7 +62,7 @@ public sealed class InfrastructureCommandResultService(
             return;
         }
 
-        await ApplyFailedDeploymentResultAsync(deployment, request, execution, cancellationToken);
+        ApplyFailedDeploymentResult(deployment, request, execution);
     }
 
     private async Task ApplySuccessfulDeploymentResultAsync(
@@ -80,46 +80,23 @@ public sealed class InfrastructureCommandResultService(
             deployment.HostedRunner,
             deployment,
             request.ActionKey,
-            document.RootElement,
             cancellationToken);
     }
 
-    private async Task ApplyFailedDeploymentResultAsync(
+    private static void ApplyFailedDeploymentResult(
         HostedRunnerDeployment deployment,
         InfrastructureCommandResultRequest request,
-        AppModuleExecution execution,
-        CancellationToken cancellationToken)
+        AppModuleExecution execution)
     {
         deployment.Status = HostedRunnerDeploymentStatuses.Failed;
         deployment.Error = execution.FailureSummary ?? execution.ErrorCode ?? "Infrastructure Action failed.";
         deployment.FinishedAt = DateTime.UtcNow;
         deployment.HostedRunner.UpdatedAt = deployment.FinishedAt;
 
-        if (request.ActionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
-        {
-            await ApplyFailedStorageMeasurementAsync(deployment, cancellationToken);
-            return;
-        }
-
         deployment.HostedRunner.Status = request.ActionKey == "delete-hosted-runner"
             ? HostedRunnerStatuses.DeleteFailed
             : HostedRunnerStatuses.Failed;
         deployment.HostedRunner.LastError = deployment.Error;
-    }
-
-    private async Task ApplyFailedStorageMeasurementAsync(
-        HostedRunnerDeployment deployment,
-        CancellationToken cancellationToken)
-    {
-        var verification = await db.HostedRunnerStorageVerifications
-            .SingleOrDefaultAsync(request => request.Id == deployment.Id, cancellationToken)
-            ?? throw new InvalidOperationException("Storage verification request was not found.");
-        verification.Status = StorageVerificationStatuses.Failed;
-        verification.CompletedAtUtc = deployment.FinishedAt;
-        verification.Error = Truncate(deployment.Error, 2000);
-        deployment.HostedRunner.StorageMeasurementStatus = StorageMeasurementStatuses.Failed;
-        deployment.HostedRunner.StorageMeasurementError = verification.Error;
-        deployment.HostedRunner.StorageState = HostedRunnerStorageStates.MeasurementFailed;
     }
 
     private static InfrastructureCommandResultResponse? GetTerminalReplayOutcome(
@@ -184,5 +161,4 @@ public sealed class InfrastructureCommandResultService(
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
     }
 
-    private static string Truncate(string value, int maximum) => value.Length <= maximum ? value : value[..maximum];
 }

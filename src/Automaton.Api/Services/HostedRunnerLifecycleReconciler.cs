@@ -68,8 +68,9 @@ public sealed class HostedRunnerLifecycleReconciler(
         if (operation == null || !RecoverableStatuses.Contains(operation.Status))
             return false;
 
-        // Retained enforcement records are historical; do not dispatch or reinterpret them.
-        if (operation.Action is HostedRunnerDeploymentActions.Suspend or HostedRunnerDeploymentActions.Resume)
+        // Retained storage records are historical; do not dispatch or reinterpret them.
+        if (operation.Action is HostedRunnerDeploymentActions.Suspend or HostedRunnerDeploymentActions.Resume
+            or HostedRunnerDeploymentActions.VerifyStorage or "measure-hosted-runner-storage")
             return false;
 
         if (IsRetiredProvisioningAction(operation.Action))
@@ -108,8 +109,7 @@ public sealed class HostedRunnerLifecycleReconciler(
 
     private static bool IsInfrastructureAction(string action)
         => action is HostedRunnerDeploymentActions.Restart
-            or HostedRunnerDeploymentActions.Deprovision
-            or HostedRunnerDeploymentActions.VerifyStorage;
+            or HostedRunnerDeploymentActions.Deprovision;
 
     private static bool IsRetiredProvisioningAction(string action)
         => action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision;

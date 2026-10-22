@@ -92,6 +92,7 @@ public sealed class InfrastructureCommandConsumerTests
 
     [TestCase("suspend-hosted-runner")]
     [TestCase("resume-hosted-runner")]
+    [TestCase("measure-hosted-runner-storage")]
     public async Task RetiredStorageDeliveryIsTerminalWithoutInvokingExecutor(string actionKey)
     {
         var executor = new RecordingExecutor();

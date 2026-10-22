@@ -109,8 +109,6 @@ public sealed class InfrastructureCommandCallbackService(
     {
         HostedRunnerDeploymentActions.Restart => "restart-hosted-runner",
         HostedRunnerDeploymentActions.Deprovision => "delete-hosted-runner",
-        HostedRunnerDeploymentActions.VerifyStorage => StorageTelemetryActions.MeasureHostedRunnerStorage,
-        "measure-hosted-runner-storage" => StorageTelemetryActions.MeasureHostedRunnerStorage,
         _ => null
     };
 

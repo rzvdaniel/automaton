@@ -15,7 +15,7 @@ internal static class RunnerExecutionTestServices
     public static InfrastructureActionProvisioningHandler Lifecycle(ApplicationDbContext db,
         IAuditEventService audit, HostedRunnerBrokerProvisioner? broker = null, HostedRunnerOptions? hosted = null)
         => new(db, audit, Options.Create(hosted ?? new HostedRunnerOptions()),
-            Options.Create(new StorageTelemetryOptions()), broker ?? Broker(), Operations(db));
+            broker ?? Broker(), Operations(db));
     public static RunnerExecutionRevocationService Revocation(ApplicationDbContext db) => new(Operations(db), Broker());
     public static RunnerExecutionOperationService Operations(ApplicationDbContext db, IEventPublisher? events = null,
         IDataProtectionProvider? protection = null, string? artifactRoot = null)

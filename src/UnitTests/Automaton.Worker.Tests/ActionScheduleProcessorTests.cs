@@ -14,11 +14,12 @@ namespace Automaton.Worker.Tests;
 [TestFixture]
 public sealed class ActionScheduleProcessorTests
 {
-    [Test]
-    public async Task PreviouslyPublishedEnforcementOccurrenceCannotExecuteAfterRetirement()
+    [TestCase(BuiltInStorageScheduleActionKeys.RetiredEnforcement)]
+    [TestCase(BuiltInStorageScheduleActionKeys.HostedRunner)]
+    public async Task PreviouslyPublishedStorageOccurrenceCannotExecuteAfterRetirement(string key)
     {
         var schedule = Schedule(ActionScheduleTypes.Interval);
-        schedule.ActionKey = BuiltInStorageScheduleActionKeys.RetiredEnforcement;
+        schedule.ActionKey = key;
         schedule.Enabled = false;
         await using var fixture = await ActionScheduleTestDatabase.CreateAsync(schedule);
         await using var db = fixture.OpenContext();

@@ -321,7 +321,6 @@ internal static class ApiMessagingRegistration
         services.AddScoped<HostedRunnerLifecycleReconciler>();
         services.AddScoped<TrustedInfrastructureActionDeploymentService>();
         services.AddScoped<ITrustedInfrastructureActionDeploymentService>(sp => sp.GetRequiredService<TrustedInfrastructureActionDeploymentService>());
-        services.AddScoped<HostedRunnerStorageActionDeployment>();
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
@@ -747,24 +746,24 @@ internal static class ApiMcpToolRegistration
         services.AddScoped<StepMcpToolProvider>();
         services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
                              Automaton.Mcp.Tools.UiAutomationActionAckService>();
-        // File IO tool group — wired to app-scoped file system
+        // File IO tool group â€” wired to app-scoped file system
         services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                            AppScopedFileSystemFactory>();
         services.AddScoped<Automaton.Mcp.Tools.FileIoTool>();
         services.AddScoped<Automaton.Mcp.Tools.IMcpTool>(sp => sp.GetRequiredService<Automaton.Mcp.Tools.FileIoTool>());
-        // Planning tool group — propose_plan
+        // Planning tool group â€” propose_plan
         services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                            Automaton.Mcp.Tools.PlanningTool>();
-        // Instructions tool group — read_instruction, write_instruction, list_instructions
+        // Instructions tool group â€” read_instruction, write_instruction, list_instructions
         services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                            Automaton.Mcp.Tools.InstructionsTool>();
-        // Embedded Automaton guidance tool group — list_automaton_guidance, get_automaton_guidance
+        // Embedded Automaton guidance tool group â€” list_automaton_guidance, get_automaton_guidance
         services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                            Automaton.Mcp.Tools.AutomatonGuidanceTool>();
-        // UI automation tool group — emits client-action envelopes for preview interactions
+        // UI automation tool group â€” emits client-action envelopes for preview interactions
         services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                            Automaton.Mcp.Tools.UiAutomationTool>();
-        // Instruction injector — injects .instructions/ files into system prompts
+        // Instruction injector â€” injects .instructions/ files into system prompts
         services.AddScoped<AppInstructionInjector>();
         services.AddScoped<AppMemoryService>();
         return services;
@@ -779,7 +778,7 @@ internal static class ApiAiClientRegistration
         services.AddAutomatonAi();
         services.AddAutomatonMcp();
         // Replace the default IAiProviderRegistry with the dynamic decorator that lazy-loads
-        // OpenAI-compatible providers from the database on first use — no restart needed.
+        // OpenAI-compatible providers from the database on first use â€” no restart needed.
         services.AddSingleton<Automaton.Ai.IAiProviderRegistry, DynamicAiProviderRegistry>();
 
         // AI Chat History Service

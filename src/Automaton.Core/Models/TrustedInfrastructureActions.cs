@@ -8,7 +8,6 @@ public static class TrustedInfrastructureActions
     {
         "restart-hosted-runner",
         "delete-hosted-runner",
-        "measure-hosted-runner-storage",
         HostValidationCommand.ActionKey
     }.ToFrozenSet(StringComparer.Ordinal);
 
