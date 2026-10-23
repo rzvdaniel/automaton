@@ -25,6 +25,7 @@ CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
 LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 
 PRODUCTION_REVISION="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+DEPLOYMENT_LOCK_ACQUIRED=false
 
 LIVE_API_COLOR_DEFAULT="blue"
 LIVE_STUDIO_COLOR_DEFAULT="blue"
@@ -870,10 +871,17 @@ switch_all_live_colors() {
     soft_wait_for_public_origin website || true
 }
 
-ensure_infrastructure() {
-    # Serialize maintenance and deployments before any image pulls or container changes.
+acquire_deployment_lock() {
+    # Keep the same open descriptor when infrastructure setup follows an earlier
+    # acquisition; reopening it would briefly release the deployment lock.
+    [[ "$DEPLOYMENT_LOCK_ACQUIRED" != true ]] || return 0
     exec 200>"${AUTOMATON_DEPLOYMENT_LOCK:-/run/lock/automaton-deployment.lock}" || return 1
     flock -x 200 || return 1
+    DEPLOYMENT_LOCK_ACQUIRED=true
+}
+
+ensure_infrastructure() {
+    acquire_deployment_lock || return 1
     storage_check preflight || return 1
     storage_require_local_docker || return 1
     ensure_blue_green_bootstrap

@@ -21,6 +21,7 @@ record() {
 }
 
 validate_recovery_deployment_options() { :; }
+acquire_deployment_lock() { record 'lock'; }
 
 get_live_color() {
     case "$1" in

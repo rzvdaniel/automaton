@@ -105,6 +105,8 @@ validate_color "$WEBSITE_COLOR" "--website-color"
 validate_recovery_deployment_options studio "$STUDIO_RECOVERY_ARTIFACT_REFERENCE" "$EXPLICIT_REVISION"
 validate_recovery_deployment_options website "$WEBSITE_RECOVERY_ARTIFACT_REFERENCE" "$EXPLICIT_REVISION"
 
+acquire_deployment_lock
+
 CURRENT_API_COLOR="$(get_live_color api)"
 CURRENT_STUDIO_COLOR="$(get_live_color studio)"
 CURRENT_WEBSITE_COLOR="$(get_live_color website)"
