@@ -51,6 +51,8 @@ internal static class WorkerHostApplication
                 path: Path.Combine(logDirectory, "worker-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: retainedFileCountLimit,
+                fileSizeLimitBytes: builder.Configuration.GetValue<long?>("Logging:File:FileSizeLimitBytes") ?? 10 * 1024 * 1024,
+                rollOnFileSizeLimit: true,
                 restrictedToMinimumLevel: LogEventLevel.Information,
                 shared: true,
                 outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");

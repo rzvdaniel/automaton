@@ -208,3 +208,4 @@ if [[ "$KEEP_PREVIOUS" != "true" ]]; then
 fi
 
 status_table
+maintain_deployment_images

@@ -5,6 +5,8 @@ set -euo pipefail
 TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$TEST_SCRIPT_DIR/../.." && pwd)"
 source "$REPO_ROOT/scripts/prod-blue-green-common.sh"
+storage_check() { :; } # Capacity decisions are covered by host-storage-test.sh.
+storage_require_local_docker() { :; }
 
 TEST_REPO="$(mktemp -d)"
 trap 'rm -rf -- "$TEST_REPO"' EXIT
@@ -42,6 +44,8 @@ rm -rf -- "$context"
 COMPOSE_FILE="$TEST_REPO/docker-compose.prod.yml"
 BUILD_LOG="$TEST_REPO/build.log"
 docker() {
+    if [[ "$*" == 'buildx version' ]]; then return; fi
+    if [[ "$*" == 'buildx inspect --format {{.Driver}}' ]]; then echo docker; return; fi
     printf '%s|%s\n' "$*" "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}" >> "$BUILD_LOG"
     [[ -f "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}/tracked.txt" ]]
 }
@@ -60,6 +64,8 @@ grep -Fq 'run_source_build_service worker "$PRODUCTION_REVISION" --remove-orphan
 # A failed source build also cleans the temporary context.
 : > "$BUILD_LOG"
 docker() {
+    if [[ "$*" == 'buildx version' ]]; then return; fi
+    if [[ "$*" == 'buildx inspect --format {{.Driver}}' ]]; then echo docker; return; fi
     printf '%s|%s\n' "$*" "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}" >> "$BUILD_LOG"
     return 42
 }

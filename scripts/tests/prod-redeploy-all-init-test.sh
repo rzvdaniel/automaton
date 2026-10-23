@@ -57,6 +57,7 @@ request_api_color_runner_tunnel_reconnect() {
 wait_before_stopping_previous_color() { record "wait:$1"; }
 stop_color() { record "stop:$1:$2"; }
 status_table() { record 'status'; }
+maintain_deployment_images() { :; }
 EOF
 
 write_env() {
