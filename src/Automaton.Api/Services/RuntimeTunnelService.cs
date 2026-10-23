@@ -58,14 +58,14 @@ public sealed class RuntimeTunnelService(
         }
 
         var isHostedRunner = await dbContext.HostedRunners.AnyAsync(hostedRunner =>
-            hostedRunner.DeletedAt == null && hostedRunner.RunnerId == runner.Id,
+            hostedRunner.RunnerId == runner.Id,
             cancellationToken);
         if (isHostedRunner)
         {
             logger.LogWarning(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "hosted-runner");
-            return Failure(StatusCodes.Status404NotFound, "This app target uses the hosted runtime route.");
+            return Failure(StatusCodes.Status404NotFound, "Per-user Hosted runtime is retired. Assign a Management Runner.");
         }
 
         if (!SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(runner.Purpose, runner.ApplicationProfile))

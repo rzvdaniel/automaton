@@ -10,13 +10,15 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using static Automaton.Api.Tests.BackendRouteConfigTestFixture;
+
 namespace Automaton.Api.Tests;
 
 [TestFixture]
 public class BackendRouteConfigServiceTests
 {
     [Test]
-    public async Task RefreshAsync_WritesRoute_ForAppWithRuntimeEndpoint()
+    public async Task RefreshAsync_WritesAuthorizedRoute_ForMachineTarget()
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
@@ -24,16 +26,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
 
-        dbContext.HostedRunners.Add(new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Name = "Hosted Runner",
-            Status = "Running",
-            ContainerName = "runner-a",
-            RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner-a:8080"
-        });
+        AddMachineRunner(dbContext, runnerId);
 
         var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
         defaultTarget.GenericRuntimeDeployed = true;
@@ -63,7 +56,7 @@ public class BackendRouteConfigServiceTests
         {
             Assert.That(CountLines(content, "  routers:"), Is.EqualTo(1));
             Assert.That(CountLines(content, "  middlewares:"), Is.EqualTo(1));
-            Assert.That(CountLines(content, "  services:"), Is.EqualTo(1));
+            Assert.That(content, Does.Not.Contain("  services:"));
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"{Environment.NewLine}      priority: 50"));
             Assert.That(content, Does.Contain("tls: {}"));
             Assert.That(content, Does.Not.Contain("certResolver"));
@@ -71,7 +64,7 @@ public class BackendRouteConfigServiceTests
                 $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
             Assert.That(content, Does.Not.Contain("-api:"));
             Assert.That(content, Does.Not.Contain("-frontend"));
-            Assert.That(content, Does.Contain("http://runner-a:8080"));
+            Assert.That(content, Does.Contain("service: \"api-live-edge\""));
             Assert.That(content, Does.Contain($"private-{appId:N}-auth-headers"));
             Assert.That(content, Does.Contain("forwardAuth:"));
             Assert.That(content, Does.Contain($"private-{appId:N}-auth-strip"));
@@ -97,7 +90,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
         dbContext.WebApps.Local.Single().RequiresAuthentication = false;
         await dbContext.SaveChangesAsync();
@@ -161,7 +154,7 @@ public class BackendRouteConfigServiceTests
             UpdatedAt = DateTimeOffset.UtcNow
         };
         targetB.SynchronizeDefaultConstraint();
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, targetA, GenericRuntimeContractJson());
         var app = dbContext.WebApps.Local.Single();
         app.DeploymentTargets.Add(targetB);
@@ -201,16 +194,7 @@ public class BackendRouteConfigServiceTests
             UpdatedAt = DateTimeOffset.UtcNow
         };
         namedTarget.SynchronizeDefaultConstraint();
-        dbContext.HostedRunners.Add(new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Name = "Hosted Runner",
-            Status = "Running",
-            ContainerName = "runner-a",
-            RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner-a:8080"
-        });
+        AddMachineRunner(dbContext, runnerId);
         dbContext.WebApps.Add(new WebApp
         {
             Id = appId,
@@ -391,12 +375,7 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-        dbContext.HostedRunners.Add(new HostedRunner
-        {
-            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "Hosted Runner",
-            Status = "Running", ContainerName = "runner-a", RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner-a:8080"
-        });
+        AddMachineRunner(dbContext, runnerId);
         dbContext.WebApps.Add(new WebApp
         {
             Id = appId, Name = "Private preview", Summary = string.Empty, Description = string.Empty,
@@ -424,7 +403,7 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target);
         await dbContext.SaveChangesAsync();
 
@@ -441,7 +420,7 @@ public class BackendRouteConfigServiceTests
         var appId = Guid.NewGuid();
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target);
         await dbContext.SaveChangesAsync();
 
@@ -459,7 +438,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
         await dbContext.SaveChangesAsync();
 
@@ -477,7 +456,7 @@ public class BackendRouteConfigServiceTests
         var runnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
         target.GenericRuntimeDeployed = true;
-        AddHostedRunner(dbContext, runnerId);
+        AddMachineRunner(dbContext, runnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
         await dbContext.SaveChangesAsync();
         var service = CreateService(dbContext, rootPath);
@@ -508,8 +487,8 @@ public class BackendRouteConfigServiceTests
         var newRunnerId = Guid.NewGuid();
         var target = AppDeploymentTarget.CreateDefault(appId, oldRunnerId);
         target.GenericRuntimeDeployed = true;
-        AddHostedRunner(dbContext, oldRunnerId);
-        AddHostedRunner(dbContext, newRunnerId);
+        AddMachineRunner(dbContext, oldRunnerId);
+        AddMachineRunner(dbContext, newRunnerId);
         AddApp(dbContext, appId, target, GenericRuntimeContractJson());
         await dbContext.SaveChangesAsync();
         var service = CreateService(dbContext, rootPath);
@@ -535,89 +514,4 @@ public class BackendRouteConfigServiceTests
         Assert.That(target.GenericRuntimeDeployed, Is.False);
     }
 
-    private static void AddHostedRunner(ApplicationDbContext dbContext, Guid runnerId)
-    {
-        dbContext.HostedRunners.Add(new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Name = "Hosted Runner",
-            Status = "Running",
-            ContainerName = "runner-a",
-            RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner-a:8080"
-        });
-    }
-
-    private static void AddApp(
-        ApplicationDbContext dbContext,
-        Guid appId,
-        AppDeploymentTarget target,
-        string? applicationContractJson = null)
-    {
-        applicationContractJson ??= ApplicationContractSerialization.Serialize(new ApplicationContract());
-        dbContext.WebApps.Add(new WebApp
-        {
-            Id = appId,
-            Name = "Generic runtime app",
-            Summary = string.Empty,
-            Description = string.Empty,
-            Definition = "{}",
-            ApplicationContractJson = applicationContractJson,
-            Created = DateTime.UtcNow,
-            Updated = DateTime.UtcNow,
-            DeploymentTargets = { target }
-        });
-    }
-
-    private static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath)
-    {
-        return new BackendRouteConfigService(
-            dbContext,
-            Options.Create(new PublishedAppsConfig
-            {
-                TraefikDynamicConfigRoot = rootPath,
-                ApiBaseUrl = "https://api.test",
-                RuntimeProxyAuthKey = "test-runtime-key"
-            }),
-            new StubWebHostEnvironment(),
-            NullLogger<BackendRouteConfigService>.Instance);
-    }
-
-    private static string GenericRuntimeContractJson() =>
-        ApplicationContractSerialization.Serialize(new ApplicationContract
-        {
-            Runtime = new ApplicationRuntimeSpec
-            {
-                Image = "test/runtime:1",
-                Command = new ApplicationCommandSpec { Executable = "runtime-server" },
-                Port = 8080
-            }
-        });
-
-    private static ApplicationDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        return new ApplicationDbContext(options);
-    }
-
-    private static string CreateTempDirectory()
-    {
-        var path = Path.Combine(Path.GetTempPath(), "automaton-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(path);
-        return path;
-    }
-
-    private sealed class StubWebHostEnvironment : IWebHostEnvironment
-    {
-        public string ApplicationName { get; set; } = "Automaton.Tests";
-        public IFileProvider WebRootFileProvider { get; set; } = null!;
-        public string WebRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = "Production";
-        public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = null!;
-    }
 }

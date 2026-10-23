@@ -43,5 +43,5 @@ $missing = @($requiredServices | Where-Object { $_ -notin $services })
 if ($missing.Count -gt 0) { throw "Required runtime services are not running: $($missing -join ', ')" }
 
 Write-Host '[OK] API, Studio, Website, Traefik, and required runtime services are ready.' -ForegroundColor Green
-Write-Host '[INFO] Hosted Runner provisioning is not validated by this endpoint check.' -ForegroundColor Yellow
-Write-Host '[INFO] Use setup-local-development.ps1 -ProvisionTestRunner to verify the plan, image digest, and eligible Infrastructure Runner host before provisioning.'
+
+Write-Host '[INFO] Endpoint health does not validate Machine Management installation, deployment, routing or persistent-data recovery.' -ForegroundColor Yellow

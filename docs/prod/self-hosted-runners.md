@@ -50,6 +50,8 @@ capacity observation, not a disk quota or a measurement of every Docker volume. 
 Runner's online state, heartbeat and software version provide the current connection
 health signals.
 
+For repository development, `scripts/setup-local-development.ps1` starts the existing local control plane; it no longer provisions a per-user Hosted Runner or changes a subscription. Install Machine Management through the same Studio flow and explicitly assign the app. Endpoint health alone does not establish installation/deployment acceptance. A remote workload machine must resolve and reach the configured development API and broker; a developer-only hostname is insufficient.
+
 ## Profiles
 
 `Standard` uses the normal application Runner container configuration and does not

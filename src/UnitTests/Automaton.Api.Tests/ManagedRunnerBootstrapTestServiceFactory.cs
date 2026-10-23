@@ -7,11 +7,10 @@ namespace Automaton.Api.Tests;
 internal static class ManagedRunnerBootstrapTestServiceFactory
 {
     public static ManagedRunnerBootstrapService CreateService(
-        ApplicationDbContext db,
-        BootstrapRecordingApplicationEventService applicationEvents)
+        ApplicationDbContext db)
     {
         var runnerAssignmentPolicy = CreateRunnerAssignmentPolicy(db);
-        return new ManagedRunnerBootstrapService(db, applicationEvents, runnerAssignmentPolicy);
+        return new ManagedRunnerBootstrapService(db, runnerAssignmentPolicy);
     }
 
     public static AppRunnerAssignmentPolicy CreateRunnerAssignmentPolicy(ApplicationDbContext db)

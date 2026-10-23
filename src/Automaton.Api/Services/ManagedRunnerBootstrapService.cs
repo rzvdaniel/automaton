@@ -1,9 +1,6 @@
-using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
-using Automaton.Core.Constants;
-using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -11,16 +8,13 @@ namespace Automaton.Api.Services;
 public sealed class ManagedRunnerBootstrapService
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly IApplicationEventService applicationEventService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
 
     public ManagedRunnerBootstrapService(
         ApplicationDbContext dbContext,
-        IApplicationEventService applicationEventService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy)
     {
         this.dbContext = dbContext;
-        this.applicationEventService = applicationEventService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
     }
 
@@ -56,27 +50,11 @@ public sealed class ManagedRunnerBootstrapService
     {
         var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId, ownerId, requireOnline: false, cancellationToken: cancellationToken);
-        var hostedRunner = await dbContext.HostedRunners.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.RunnerId == assignedRunner.Id && x.UserId == ownerId, cancellationToken);
-        if (hostedRunner == null)
-            return GetRunnerPresenceResult(assignedRunner);
-
-        if (hostedRunner.DeletedAt != null || hostedRunner.Status is
-            HostedRunnerStatuses.Disabled or HostedRunnerStatuses.Deleted or HostedRunnerStatuses.Deleting)
+        if (await dbContext.HostedRunners.AnyAsync(
+            item => item.RunnerId == assignedRunner.Id, cancellationToken))
             return ManagedRunnerBootstrapResult.Unavailable(
-                "The assigned Hosted Runner is no longer eligible for App execution.");
+                "Per-user Hosted Runner execution is retired. Assign a Management Runner to this app before deploying.");
 
-        if (hostedRunner.Status == HostedRunnerStatuses.Failed)
-            return CreateHostedRunnerFailureResult(hostedRunner, "The assigned Hosted Runner failed to provision.");
-
-        if (hostedRunner.Status is HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Reprovisioning)
-            return await GetInProgressResultAsync(appId, hostedRunner, cancellationToken);
-
-        if (hostedRunner.Status != HostedRunnerStatuses.Running)
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "The assigned Hosted Runner is not available for App execution.");
-
-        RunnerProtocolCompatibilityPolicy.EnsureSupportsContainerApplicationExecution(assignedRunner);
         return GetRunnerPresenceResult(assignedRunner);
     }
 
@@ -85,50 +63,6 @@ public sealed class ManagedRunnerBootstrapService
             ? ManagedRunnerBootstrapResult.Ready(runner.Id)
             : ManagedRunnerBootstrapResult.Unavailable("The assigned Runner is offline.");
 
-    private static ManagedRunnerBootstrapResult CreateHostedRunnerFailureResult(HostedRunner runner, string prefix)
-        => ManagedRunnerBootstrapResult.ProvisionFailed(
-            string.IsNullOrWhiteSpace(runner.LastError) ? prefix : $"{prefix} {runner.LastError}");
-
-    private static bool SupportsContainerApplicationExecution(Runner runner)
-        => int.TryParse(runner.ApiCompatibilityVersion, out var version)
-            && version >= int.Parse(RunnerApiCompatibilityVersions.ContainerApplicationExecution);
-
-    private async Task<ManagedRunnerBootstrapResult> GetInProgressResultAsync(
-        Guid appId,
-        HostedRunner hostedRunner,
-        CancellationToken cancellationToken)
-    {
-        var message = string.IsNullOrWhiteSpace(hostedRunner.ContainerId)
-            ? "Managed runtime is being prepared. Try deploying again in a moment."
-            : "Runner provisioned but did not connect yet. Try deploying again in a moment.";
-        var eventType = string.IsNullOrWhiteSpace(hostedRunner.ContainerId)
-            ? ApplicationEventTypes.ManagedRuntimePreparing
-            : ApplicationEventTypes.ManagedRuntimeWaitingForConnection;
-
-        await WriteManagedRuntimeEventAsync(
-            appId,
-            eventType,
-            message,
-            cancellationToken);
-
-        return string.IsNullOrWhiteSpace(hostedRunner.ContainerId)
-            ? ManagedRunnerBootstrapResult.Preparing(message)
-            : ManagedRunnerBootstrapResult.WaitingForConnection(message);
-    }
-
-    private Task WriteManagedRuntimeEventAsync(
-        Guid appId,
-        string eventType,
-        string message,
-        CancellationToken cancellationToken)
-        => applicationEventService.WriteAsync(new ApplicationEventWriteRequest
-        {
-            AppId = appId,
-            Level = ApplicationEventLevels.Info,
-            Category = ApplicationEventCategories.Deployment,
-            EventType = eventType,
-            Message = message
-        }, cancellationToken);
 }
 
 public sealed class ManagedRunnerBootstrapResult
@@ -144,27 +78,6 @@ public sealed class ManagedRunnerBootstrapResult
         IsReady = true,
         RunnerId = runnerId,
         State = AppDeployStates.Ready
-    };
-
-    public static ManagedRunnerBootstrapResult Preparing(string message) => new()
-    {
-        State = AppDeployStates.PreparingManagedRuntime,
-        Message = message,
-        RequiresRetry = true
-    };
-
-    public static ManagedRunnerBootstrapResult WaitingForConnection(string message) => new()
-    {
-        State = AppDeployStates.ManagedRunnerWaitingForConnection,
-        Message = message,
-        RequiresRetry = true
-    };
-
-    public static ManagedRunnerBootstrapResult ProvisionFailed(string message) => new()
-    {
-        State = AppDeployStates.ManagedRunnerProvisionFailed,
-        Message = message,
-        RequiresRetry = true
     };
 
     public static ManagedRunnerBootstrapResult Unavailable(string message) => new()
