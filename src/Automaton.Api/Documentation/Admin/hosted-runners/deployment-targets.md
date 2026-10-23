@@ -129,7 +129,9 @@ Changing a deployed target's Runner requires confirmation because the selected t
 
 ## Operational rule
 
-New workloads should use an explicitly assigned Machine Management Runner. The legacy **Runner Containers** view may be used for inspection and supported lifecycle operations on existing Hosted Runner records; it cannot create or reprovision per-user Runner containers. Repair an Infrastructure Runner from **Admin → Runners → Runner Hosts**.
+New workloads should use an explicitly assigned Machine Management Runner. The legacy **Runner Containers** view may be used for read-only historical inspection of existing Hosted Runner records; it cannot create or reprovision per-user Runner containers. Repair an Infrastructure Runner from **Admin → Runners → Runner Hosts**.
+
+A failed package/runtime application, or a result accepted by no Runner, is a failed CLI deployment with a nonzero exit code. Inspect the reported failure and target/Runner logs before retrying. A failed replacement can leave the previous healthy runtime serving; that availability does not make the attempted deployment successful. Restore-point warnings remain distinct from runtime failure.
 
 ## Recover an interrupted whole-app deletion
 

@@ -150,8 +150,8 @@ public sealed class DeployService
         if (!runtimeResult.Success || runtimeResult.RunnerCount <= 0)
         {
             AddManagedRuntimeNextSteps(nextSteps, runtimeResult);
-            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, runtimeResult.Message ?? "deploy package did not reach any runner", IsWarning: true));
-            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, runtimeResult.Message ?? "deploy package did not reach any runner"));
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, deployDirectory, uploadResult, runtimeResult, target);
         }
 
         AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, runtimeResult.Message ?? $"deploy package applied to {runtimeResult.RunnerCount} runner(s)"));
@@ -619,8 +619,7 @@ public sealed class DeployService
                 nextSteps.Add("Check the Runner connection and container-execution compatibility in Automaton Studio, then rerun automaton deploy.");
                 return;
             default:
-                nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
-                nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
+                nextSteps.Add("Inspect the deployment failure and Runner logs in Automaton Studio, correct the app or runtime configuration, then rerun automaton deploy.");
                 return;
         }
     }

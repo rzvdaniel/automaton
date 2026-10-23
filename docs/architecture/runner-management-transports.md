@@ -8,6 +8,8 @@ Slice 5 and the isolation corrections are released; automatic cutover recovery f
 
 ## Durable operation path
 
+The repository development edge also defines `api-live-edge`, matching the default tunnel-service name used by generated app routes. A missing service disables those routes even while API and container health checks pass.
+
 ### Account isolation and runtime policy
 
 Action execution, result, and log reads authorize access to the App before loading execution data. The Action controller translates an inaccessible App or missing execution into HTTP 404 and an explicit permission denial into HTTP 403; unexpected exceptions retain the normal error handling. Runner assignment and artifact endpoints continue enforcing their bound Runner credentials separately.

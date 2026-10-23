@@ -52,6 +52,51 @@ health signals.
 
 For repository development, `scripts/setup-local-development.ps1` starts the existing local control plane; it no longer provisions a per-user Hosted Runner or changes a subscription. Install Machine Management through the same Studio flow and explicitly assign the app. Endpoint health alone does not establish installation/deployment acceptance. A remote workload machine must resolve and reach the configured development API and broker; a developer-only hostname is insufficient.
 
+## Verified single-machine development flow
+
+On 23 October 2026, API, Studio, Worker and the CI-produced Runner from `38d994c2`
+ran with a separate development database and broker on one Ubuntu 26.04 test host.
+The Docker/workspace filesystem was XFS; no filesystem migration was needed. The
+Runner artifact came from Azure pipeline run 5192, with digest
+`sha256:b04595d5b8cd4bca9633a8e6d9a5ba9adc2dc8d26ef049c149997a8ab29c4826`.
+
+Use a development API hostname reachable from both the workstation and Runner,
+with trusted TLS. Configure the existing `HostedRunners:ServerUrl` and `DockerImage`
+installer options, plus `RabbitMq:ManagementUrl` and the execution broker's
+`HostedRunnerRabbitMq` host, TLS port and server name. Give the broker a valid TLS
+certificate; do not disable certificate checks. Keep database/broker resources
+separate from existing installations. The repository development edge must expose
+`api-live-edge`, matching `PublishedApps:RuntimeTunnelServiceName`.
+
+Run the generated Machine Management installation command, then use the workstation
+CLI with a project-local development login or its existing credential environment
+variables:
+
+```text
+automaton create --name "Persistence demonstration" --json
+automaton runners --json
+automaton set-runner <management-runner-id> --json
+automaton validate --json
+automaton deploy --json --non-interactive
+automaton publish --slug <development-slug> --public --yes --json --non-interactive
+automaton open --public
+```
+
+The demonstrated app used an explicit runtime image, HTTP health check and data
+directory. It wrote a marker only under `AUTOMATON_APP_DATA_DIR`. Changing its response
+and redeploying preserved that marker. An intentionally failing replacement kept
+the previous healthy app serving; the CLI amendment reports failure/exit 1 instead
+of successful deployment with warnings. Restoring and redeploying the healthy app
+also preserved its data. The development database had zero Hosted Runner records.
+This verifies the single-user web flow, not the deferred combined Actions,
+two-user isolation, cancellation or restart/replay cases.
+
+Before pulling/building images, inspect free space on the actual Docker data and
+workspace filesystems, not just `/`. In this run Docker used a separate mount;
+unused build stages had to be removed before the Runner image would fit. Preserve
+all running/rollback images and app/database volumes during maintenance. No updater,
+backup automation or legacy migration procedure is implied by this demonstration.
+
 ## Profiles
 
 `Standard` uses the normal application Runner container configuration and does not
