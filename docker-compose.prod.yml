@@ -26,7 +26,7 @@ x-api-common: &api-common
     driver: json-file
     options:
       max-size: "10m"
-      max-file: "5"
+      max-file: "3"
   environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
@@ -160,6 +160,13 @@ services:
 
   mysql:
     image: mysql:8.0
+    # Age retention, not a space cap. Coordinate with backups/replicas before changing.
+    command:
+      - --binlog-expire-logs-seconds=${MYSQL_BINLOG_EXPIRE_LOGS_SECONDS:-604800}
+      # The shared development cnf enables an unbounded slow-query file.
+      # Production diagnostics use stderr; opt-in SQL tracing needs separate rotation.
+      - --slow-query-log=OFF
+      - --general-log=OFF
     container_name: automaton-prod-mysql
     restart: unless-stopped
     logging: *default-json-logging

@@ -22,6 +22,10 @@ Do not start a production build with less than 10 GB free. If space is unexpecte
 
 Use `docker system df -v` to distinguish shared image layers, unique image bytes, build cache and volumes. Inspect host directory sizes and `sudo journalctl --disk-usage` when Docker does not explain the footprint. A large MySQL volume may contain binary logs as well as table/index data; compare file sizes with `information_schema.tables` totals without reading private payloads or exposing credentials.
 
+Inspect every filesystem involved, not just Docker's configured root: use `docker info` to locate that root, `findmnt -T <path>` and `df -hT <path>` to identify its backing filesystem, and bounded `du -x` scans to attribute physical storage. Docker may also use an active `/var/lib/containerd` store on a different disk. Check daemon arguments, containerd namespaces and live tasks before classifying an old-looking store as abandoned. Never delete containerd content/snapshots manually. Image sizes, shared layers and build-cache accounting overlap; do not add their reported totals as independent physical usage.
+
+Include system journals, archived logs, stopped containers, build caches and task-owned staging/recovery archives in the inventory. For MySQL, report table/index size separately from binary-log bytes and inspect expiry, replica configuration and backup dependencies. Absence of connected replicas alone does not establish that recovery logs are disposable. Do not print secrets from cron jobs, service configuration or environment files while investigating backups.
+
 ## Permitted cleanup
 
 Before cleanup, confirm that active containers and both the current and immediately previous immutable revision-tagged images are preserved. Cleanup must not remove images tagged with either revision.
@@ -29,11 +33,15 @@ Before cleanup, confirm that active containers and both the current and immediat
 After confirming that active containers and rollback capacity are preserved, the bounded cleanup is:
 
 ```bash
-docker builder prune -af --keep-storage 4GB
+docker builder prune -af --keep-storage 2GB
 docker image prune -f
 ```
 
 Run the inspection commands again afterward and confirm that active services remain healthy. Never prune Docker volumes, use `docker system prune -a`, or use `docker image prune -a` automatically. Preserve blue/green rollback images and all production state. If an item’s safety is unclear, keep it and report it.
+
+The 2 GB cache target is a retention budget, not a minimum required by Docker. Inspect the selected builder first; `docker builder prune` does not maintain an unrelated BuildKit daemon. Prefer its native configured GC for ongoing retention. A prune can reclaim zero bytes; verify actual filesystem free space afterward rather than promising Docker's estimated reclaimable total. Journal vacuuming is a one-time cleanup unless retention configuration is separately changed.
+
+Use the [persisted host policies](../../../docs/prod/production-docker-cheat-sheet.md#disk-cleanup) for ongoing maintenance: per-filesystem alerts/admission, native cache GC, journald limits, container/file-log rotation and explicit image protection. `scripts/host-storage.sh maintain` only removes unused tags in allow-listed repositories, protects container image IDs and deployment revision state, and fails closed on missing protected references. Run it under the same deployment lock; never replace it with a blanket image or volume prune. Source changes do not authorize installing policies or restarting existing hosts.
 
 ## Broader cleanup
 
@@ -43,6 +51,8 @@ For cleanup beyond routine cache/dangling-image pruning, use the user's existing
 - **System journals:** use `journalctl --vacuum-size` or `--vacuum-time` with an agreed bound to remove archived journals. Active journal files remain; do not truncate active container/application logs or delete audit records as disk maintenance.
 - **MySQL binary logs:** inspect `SHOW BINARY LOGS`, expiry settings, replication topology (including disconnected replicas) and backup/point-in-time recovery dependencies. Purge only an authorized cutoff using MySQL's [PURGE BINARY LOGS](https://dev.mysql.com/doc/refman/8.0/en/purge-binary-logs.html); never unlink database files. If discarding all closed history is authorized and dependencies are clear, rotate with `FLUSH BINARY LOGS`, read the new active filename, then purge up to that filename, retaining the active log. Change persistent expiry only within the authorized retention policy and report it; use syntax supported by the deployed MySQL version. Do not reset GTID/binlog state or disable logging for routine cleanup.
 - **Historical backups:** delete only explicitly authorized backup roots/files after checking resolved paths. Do not follow symlinks into live certificates or other state; unlink backup symlinks themselves. Preserve live volumes, current configuration/secrets and unrelated data. Report which restore points were removed.
+
+Before deleting staging or migration archives, inspect their purpose and compare their exact paths with container mounts and active configuration references. An old task directory may still contain mounted TLS files, initialization scripts or authentication keys. Keep those live files even if adjacent archives are obsolete. Never infer that all similarly named directories are disposable from authorization to remove one recovery copy.
 
 After cleanup, report bytes reclaimed and remaining free space, retained rollback artifacts, changed retention settings and any recovery history removed. Run production health verification. Record significant recovery-policy changes in the operational evidence; do not infer milestone acceptance from successful cleanup.
 

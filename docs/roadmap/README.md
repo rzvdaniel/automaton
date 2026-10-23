@@ -161,7 +161,7 @@ Completion: a fresh machine installation, CLI deployment, routed app and redeplo
 These are later improvements, not prerequisites for M3's single-server target or M4 source cleanup:
 
 - Second-machine acceptance and additional multi-machine operating features. Preserve existing enrollment/assignment behavior.
-- Additional monitoring, per-category storage breakdowns, automated retention/cleanup and system-app catalog work.
+- Additional monitoring, per-category storage breakdowns and system-app catalog work. Basic host retention/admission is covered by the [operations policies](../prod/production-docker-cheat-sheet.md#disk-cleanup); applying those policies to existing hosts remains an operator step, not milestone acceptance.
 - Runner self-update/rollback and bootstrap/update helpers.
 - Backup automation, scheduling, destinations and restore tooling. Keep the documented manual backup guidance; it does not imply a legacy migration feature.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.

@@ -99,3 +99,4 @@ if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
 fi
 
 status_table
+maintain_deployment_images

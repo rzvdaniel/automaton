@@ -59,6 +59,12 @@ Put this inside:
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
+  },
+  "builder": {
+    "gc": {
+      "enabled": true,
+      "defaultKeepStorage": "2GB"
+    }
   }
 }
 ```
@@ -83,7 +89,9 @@ docker ps
 
 Important notes:
 
-- this applies to newly created containers
+- merge these keys into the existing daemon config; preserve storage roots, networks and other settings (see [example](../../docker/host-maintenance/daemon.json.example))
+- the GC keys above configure the default Docker-driver builder; run `docker buildx version`, `docker buildx ls` and `docker buildx inspect` first. Source-deployment scripts require the standard Buildx plugin and a local Docker/docker-container driver. If it is absent, the legacy builder's cache is not governed by these BuildKit settings; install the distribution's standard plugin and verify the selected builder before building. For a docker-container builder, configure that builder's BuildKit daemon instead. Do not create another builder as maintenance
+- logging defaults apply to newly created containers
 - existing containers can keep their old logging config until recreated
 - for the blue/green `api`, `studio`, and `website` services, the next recreated containers pick this up automatically during normal deploys
 
@@ -783,53 +791,68 @@ cd /opt/automaton
 
 ## Disk Cleanup
 
-When a Hetzner host starts running low on disk, check Docker usage first:
+### Retention and admission policy
+
+The repository provides opt-in host configuration and bounded maintenance. Installing it and restarting host services are separate operator actions; a source merge does not apply these policies to existing hosts.
+
+- **Images:** preserve every image referenced by a running or stopped container, the current deployment and one explicitly protected rollback per component. Other tagged images are candidates only in repositories named by `/etc/automaton/storage-images.allow`. No volume/container pruning. API/Studio/Website current/previous revisions are additionally protected from blue-green state. Worker rebuilds pin the exact prior container image as `automaton-prod-worker:protected-rollback`. Recovery artifacts with unknown Git provenance and independently installed Runners must be explicitly listed. Do not use `latest` as a rollback reference.
+- **Build cache:** 2 GB GC target on the actual builder, using Docker's native GC (not a scheduled blanket prune). This is a target for reclaimable cache, not a hard limit during builds. For emergency one-time cleanup, use `docker builder prune -af --keep-storage 2GB` only when the default Docker builder owns that cache and no build is active.
+- **Journals:** 512 MiB persistent, 128 MiB runtime, seven-day age retention; active files can temporarily exceed archived-history bounds. Install the supplied journald drop-in.
+- **Container logs:** production Compose and standalone Runner Compose use `json-file`, 10 MiB × three files. Daemon defaults cover other newly created containers. Existing containers need controlled recreation; do not recreate workloads just to adopt logging limits during maintenance.
+- **Application file logs:** API/Worker diagnostic sinks roll daily and at `Logging:File:FileSizeLimitBytes` (default 10 MiB), retaining `Logging:File:RetainedFileCountLimit` files (default 14). Runner's Serilog file sink uses 10 MiB and seven files. These are independent of Docker stdout logs and configurable through the existing logging settings. A single large event can exceed a file threshold. API audit data is separate and retains its existing policy; do not delete audit or workload data as log cleanup.
+- **Temporary/migration artifacts:** retire each completed artifact when its recovery purpose ends, after checking mount/configuration references. Keep required recovery copies off the active host filesystem. Give future disposable tasks an owner and expiry date; use `/var/tmp/automaton-maintenance` only for disposable staging (tmpfiles expires inactive content after 14 days). Never put live secrets, mounted configuration or the sole recovery copy there. Existing build contexts already use EXIT cleanup; interrupted historical directories still require attribution before deletion.
+- **MySQL:** production Compose explicitly defaults to `MYSQL_BINLOG_EXPIRE_LOGS_SECONDS=604800` (seven days). Confirm this against backups and all replicas before deployment; override it if recovery requires longer. Age retention is not a disk cap and does not replace backups. Verify `@@global.binlog_expire_logs_seconds` and auto-purge after rollout; existing persisted MySQL settings can override startup defaults. Changing a template does not alter a running server. For authorized existing-history cleanup, use `SHOW BINARY LOGS` and MySQL `PURGE BINARY LOGS TO '<verified-cutoff>'`; never unlink database files or reset GTID state. Inspect offline replica/backup dependencies before selecting a cutoff. Production disables general/slow-query file logging inherited from the development cnf; error diagnostics continue through Docker's rotated stderr logs. Enable SQL tracing only with a separate rotation policy. No existing SQL trace files are deleted by these scripts.
+
+Capacity checks use the relevant mounted ext4/XFS/Btrfs/ZFS filesystems separately: root, Docker's configured root, the default containerd store, build context/temp storage and container mount sources (including database/workload disks). Small unrelated partitions such as `/boot` do not block deployment. Set newline-separated `AUTOMATON_STORAGE_PATHS` for additional paths, such as a non-default containerd root or a future bind mount not yet referenced by a container. They report **WARNING below 5 GiB or 15% free**, **CRITICAL below 2 GiB or 5%** and return nonzero. Timer output/failures go to the system journal; connect those failures to the operator's existing alerting. This does not install an external notification service.
+
+Production scripts check before infrastructure startup/pulls and again before source builds. They refuse below **10 GiB or 15% free** without creating a build context or changing containers. Set `AUTOMATON_STORAGE_MIN_FREE_GIB` higher for the measured peak replacement/build requirement: running and rollback images stay on disk while a replacement is built/pulled. This simple admission floor is not a reservation or guarantee against concurrent unrelated disk growth. Before manual pulls/builds or independent Runner installation, run `bash scripts/host-storage.sh preflight` on that host too. Existing workload admission still guards app/Action work on workspace storage.
+
+If the required live data, current images and rollback set cannot coexist with that headroom, expand the disk rather than deleting live state or repeatedly reducing retention.
+
+### Install the host policies
+
+Review the files under [docker/host-maintenance](../../docker/host-maintenance) on each host. Merge the daemon example as described above; validate and schedule any Docker restart. Install journald and the capacity/maintenance timers from the repository:
 
 ```bash
-docker system df
-df -h
+sudo install -Dm644 docker/host-maintenance/journald.conf /etc/systemd/journald.conf.d/automaton-storage.conf
+sudo systemctl restart systemd-journald
+sudo install -Dm644 docker/host-maintenance/tmpfiles.conf /etc/tmpfiles.d/automaton-maintenance.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/automaton-maintenance.conf
+sudo install -Dm755 scripts/host-storage.sh /usr/local/sbin/automaton-host-storage
+sudo install -m644 docker/host-maintenance/automaton-*.service docker/host-maintenance/automaton-*.timer /etc/systemd/system/
+sudo install -d -m755 /etc/automaton
+sudo systemctl daemon-reload
+sudo systemctl enable --now automaton-storage.timer
 ```
 
-If build cache is the main culprit, clean that first:
+The supplied tmpfiles policy also creates the shared lock with group `docker` after reboot. The deployment account must belong to that group. Deployment scripts and the image-maintenance timer share this lock. Manual maintenance must use it too.
+
+Create a root-owned `/etc/automaton/storage-images.allow` containing verified local non-`latest` image references, one per line (comments begin with `#`). Include the current and chosen rollback reference for each managed component; for Worker include `automaton-prod-worker:protected-rollback` after verifying/creating that tag from the exact current healthy image before its first replacement. Do not guess Git revisions. Missing references cause image maintenance to fail closed **before deletion**. Blue-green state also requires its protected revisions to exist; if previous cleanup intentionally removed them, reconcile that operational state explicitly rather than inventing replacement provenance.
+
+The image timer defaults to `/opt/automaton/.prod-runtime/nginx/state/blue-green-state.env`. Set `AUTOMATON_STORAGE_DEPLOYMENT_STATE` in `/etc/default/automaton-storage` if installed elsewhere; workload-only hosts can point it to a deliberately absent path. The allow-list alone then governs eligible repositories and protected artifacts. The service file accepts an alternative `AUTOMATON_STORAGE_IMAGE_ALLOWLIST` in the same environment file. Restrict edits to operators. Use the same variables when invoking maintenance from a different checkout.
 
 ```bash
-docker builder prune -a
+sudo flock /run/lock/automaton-deployment.lock /usr/local/sbin/automaton-host-storage maintain
+sudo systemctl enable --now automaton-image-maintenance.timer
+systemctl list-timers 'automaton-*'
+journalctl -u automaton-storage.service -u automaton-image-maintenance.service
 ```
 
-Confirm with `y` when prompted.
+Successful production deploys also run bounded image cleanup; missing/invalid protection configuration emits a warning and leaves images untouched. Cleanup failures do not roll back a healthy deployment. Timers never purge database logs or backups. MySQL expiry, Docker GC and journald each own their retention.
 
-After cleanup, check usage again:
+### Investigate before emergency cleanup
 
 ```bash
-docker system df
-df -h
+df -hT
+docker system df -v
+docker info --format '{{.DockerRootDir}}'
+sudo du -xhd1 /var/lib /var/log /opt
+sudo journalctl --disk-usage
 ```
 
-If Docker accounting and filesystem usage do not match, check Docker's actual root directory:
+Docker can use `/var/lib/containerd` on root even with Docker's root on a separate disk. Inspect active containerd tasks before attributing old-looking stores; never manually delete their snapshots. Shared image/cache accounting overlaps. Never use blanket image/volume pruning. Attribute any remaining growth to its owner and recovery purpose before deleting it, then recheck free space and service health.
 
-```bash
-docker info | grep "Docker Root Dir"
-```
-
-Also inspect `/opt`, because local repo state, build context, or deployment artifacts may be large there:
-
-```bash
-sudo du -h --max-depth=1 /opt | sort -hr
-```
-
-Safe maintenance rules:
-
-- prefer `docker builder prune -a` first because it reclaims old build cache without touching named volumes
-- do not prune volumes as part of routine cleanup because MySQL data is likely stored in a Docker volume
-- `du /var/lib/docker` can look smaller than `docker system df` when Docker uses a different root dir or when accounting includes reclaimable build cache layers
-
-After a successful production deploy, it is reasonable to run:
-
-```bash
-docker builder prune -a -f
-```
-
-Do not run that in the middle of a deploy. Use it after the deployment and verification steps succeed.
+References: [Docker GC](https://docs.docker.com/build/cache/garbage-collection/), [Docker log rotation](https://docs.docker.com/engine/logging/drivers/json-file/), [journald limits](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html), [MySQL binary-log expiry](https://dev.mysql.com/doc/refman/8.0/en/replication-options-binary-log.html).
 
 ## Server Health Checks
 

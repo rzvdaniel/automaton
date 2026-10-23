@@ -1,0 +1,10 @@
+[Unit]
+Description=Automaton filesystem capacity check
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/automaton-storage
+ExecStart=/usr/local/sbin/automaton-host-storage check
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=automaton-storage

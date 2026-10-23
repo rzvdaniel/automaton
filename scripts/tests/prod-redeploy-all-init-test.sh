@@ -21,6 +21,7 @@ record() {
 }
 
 validate_recovery_deployment_options() { :; }
+acquire_deployment_lock() { record 'lock'; }
 
 get_live_color() {
     case "$1" in
@@ -57,6 +58,7 @@ request_api_color_runner_tunnel_reconnect() {
 wait_before_stopping_previous_color() { record "wait:$1"; }
 stop_color() { record "stop:$1:$2"; }
 status_table() { record 'status'; }
+maintain_deployment_images() { :; }
 EOF
 
 write_env() {

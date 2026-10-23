@@ -425,7 +425,8 @@ internal static class ApiLoggingRegistration
                 logConfig,
                 applicationBuilder.Environment.IsDevelopment(),
                 context.Configuration["Logging:File:Path"] ?? "/app/logs",
-                context.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14);
+                context.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14,
+                context.Configuration.GetValue<long?>("Logging:File:FileSizeLimitBytes") ?? 10 * 1024 * 1024);
         });
         return services;
     }
@@ -447,7 +448,7 @@ internal static class ApiLoggerConfiguration
 
 internal static class ApiLoggerSinks
 {
-    internal static void Configure(LoggerConfiguration logConfig, bool isDevelopment, string logDirectory, int retainedFileCountLimit)
+    internal static void Configure(LoggerConfiguration logConfig, bool isDevelopment, string logDirectory, int retainedFileCountLimit, long fileSizeLimitBytes)
     {
         if (isDevelopment)
         {
@@ -466,6 +467,8 @@ internal static class ApiLoggerSinks
             path: Path.Combine(logDirectory, "diagnostic-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: retainedFileCountLimit,
+            fileSizeLimitBytes: fileSizeLimitBytes,
+            rollOnFileSizeLimit: true,
             restrictedToMinimumLevel: LogEventLevel.Information,
             shared: true,
             outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");

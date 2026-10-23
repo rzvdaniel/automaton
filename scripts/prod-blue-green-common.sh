@@ -4,6 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/host-storage.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
 ENV_FILE="$REPO_ROOT/.env"
@@ -23,6 +25,7 @@ CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
 LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 
 PRODUCTION_REVISION="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+DEPLOYMENT_LOCK_ACQUIRED=false
 
 LIVE_API_COLOR_DEFAULT="blue"
 LIVE_STUDIO_COLOR_DEFAULT="blue"
@@ -160,6 +163,27 @@ run_source_build_service() (
     local revision="$2"
     shift 2
     local compose_options=("$@")
+
+    storage_check preflight || return 1
+    storage_require_local_docker || return 1
+    docker buildx version >/dev/null 2>&1 || {
+        echo '[ERROR] Install the standard Docker Buildx plugin and configure its GC before source builds; legacy-builder cache is not covered by the BuildKit policy.' >&2
+        return 1
+    }
+    local builder_driver
+    builder_driver=$(docker buildx inspect --format '{{.Driver}}') || return 1
+    case "$builder_driver" in
+        docker|docker-container) ;;
+        *) echo '[ERROR] Run capacity admission on the selected remote builder host before building; local checks cannot establish its headroom.' >&2; return 1 ;;
+    esac
+
+    if [[ "$compose_service" == worker ]]; then
+        local existing_worker
+        existing_worker=$(docker compose -f "$COMPOSE_FILE" ps -q worker) || return 1
+        if [[ -n "$existing_worker" ]]; then
+            docker tag "$(docker inspect "$existing_worker" --format '{{.Image}}')" automaton-prod-worker:protected-rollback || return 1
+        fi
+    fi
 
     local context
     context="$(create_production_build_context "$revision")" || return 1
@@ -847,7 +871,19 @@ switch_all_live_colors() {
     soft_wait_for_public_origin website || true
 }
 
+acquire_deployment_lock() {
+    # Keep the same open descriptor when infrastructure setup follows an earlier
+    # acquisition; reopening it would briefly release the deployment lock.
+    [[ "$DEPLOYMENT_LOCK_ACQUIRED" != true ]] || return 0
+    exec 200>"${AUTOMATON_DEPLOYMENT_LOCK:-/run/lock/automaton-deployment.lock}" || return 1
+    flock -x 200 || return 1
+    DEPLOYMENT_LOCK_ACQUIRED=true
+}
+
 ensure_infrastructure() {
+    acquire_deployment_lock || return 1
+    storage_check preflight || return 1
+    storage_require_local_docker || return 1
     ensure_blue_green_bootstrap
     echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and traefik are up"
     docker compose -f "$COMPOSE_FILE" up -d mysql rabbitmq worker traefik
@@ -1018,4 +1054,12 @@ status_table() {
     printf -- "studio    %s\n" "$LIVE_STUDIO_COLOR"
     printf -- "website   %s\n" "$LIVE_WEBSITE_COLOR"
     printf -- "\nState file: %s\nUpstreams dir: %s\n" "$STATE_FILE" "$NGINX_UPSTREAMS_DIR"
+}
+
+maintain_deployment_images() {
+    # Only called after successful health checks/cutover. A maintenance failure
+    # must not turn a successful deployment into an apparent application failure.
+    if ! AUTOMATON_STORAGE_DEPLOYMENT_STATE="$STATE_FILE" storage_clean_images; then
+        echo '[WARN] Image maintenance skipped/failed; check the protected allow-list and run host-storage.sh maintain under the deployment lock.' >&2
+    fi
 }

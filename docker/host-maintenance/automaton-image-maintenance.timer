@@ -1,0 +1,9 @@
+[Unit]
+Description=Bound Automaton historical image retention daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

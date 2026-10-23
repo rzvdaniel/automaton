@@ -35,6 +35,7 @@ ensure_infrastructure
 echo "[INFO] Rebuilding and redeploying production worker"
 run_source_build_service worker "$PRODUCTION_REVISION" --remove-orphans
 wait_for_service_healthy worker 120
+maintain_deployment_images
 
 echo "[INFO] Production worker is running"
 docker compose -f "$COMPOSE_FILE" ps worker

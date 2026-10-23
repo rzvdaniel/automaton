@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove verified unused Automaton deployment images
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=AUTOMATON_STORAGE_DEPLOYMENT_STATE=/opt/automaton/.prod-runtime/nginx/state/blue-green-state.env
+EnvironmentFile=-/etc/default/automaton-storage
+ExecStart=/usr/bin/flock /run/lock/automaton-deployment.lock /usr/local/sbin/automaton-host-storage maintain
+StandardOutput=journal
+StandardError=journal
