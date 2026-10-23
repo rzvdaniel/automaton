@@ -11,8 +11,7 @@ namespace Automaton.Runner.Console.Services;
 internal sealed class InfrastructureCommandQueueConsumer(
     string queueName,
     Func<ReadOnlyMemory<byte>, CancellationToken, Task<InfrastructureCommandExecutionResult>> handle,
-    IInfrastructureCommandResultClient results,
-    Func<InfrastructureCommandRequestedEvent, InfrastructureCommandExecutionResult, CancellationToken, Task>? submitHostContainerResult = null)
+    IInfrastructureCommandResultClient results)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -117,12 +116,6 @@ internal sealed class InfrastructureCommandQueueConsumer(
             Serilog.Log.Warning(
                 "Infrastructure command {CommandId} for operation {OperationId} ({ActionKey}) was terminalized before Action execution: {TerminalReason}",
                 command.CommandId, command.OperationId, command.ActionKey, result.TerminalReason);
-        }
-        else if (result.HostContainerResult is not null)
-        {
-            if (submitHostContainerResult is null)
-                throw new InvalidOperationException("Host-container result delivery is not configured.");
-            await submitHostContainerResult(command, result, cancellationToken);
         }
         else
         {

@@ -37,22 +37,4 @@ public sealed class RunnerAuditService(IAuditEventService auditEventService)
             }
         }, cancellationToken);
 
-    public Task WriteHostedRunnerRegistrationCompletedAsync(
-        HostedRunner hostedRunner,
-        Runner runner,
-        string action,
-        CancellationToken cancellationToken)
-        => auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Succeeded,
-            EntityType = AuditEntityTypes.HostedRunner,
-            EntityId = hostedRunner.Id,
-            EventType = action == HostedRunnerDeploymentActions.Reprovision
-                ? AuditEventTypes.RunnerReprovisionSucceeded
-                : AuditEventTypes.HostedRunnerProvisioningSucceeded,
-            Outcome = AuditOutcomes.Success,
-            Message = $"Hosted runner '{hostedRunner.Name}' registered successfully after {action.ToLowerInvariant()}",
-            TargetUserId = hostedRunner.UserId,
-            Metadata = new { hostedRunner.Name, hostedRunner.RunnerHostId, RunnerId = runner.Id, DeploymentAction = action }
-        }, cancellationToken);
 }

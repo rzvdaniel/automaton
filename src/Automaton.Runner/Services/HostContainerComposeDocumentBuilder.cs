@@ -102,13 +102,7 @@ internal static class HostContainerComposeDocumentBuilder
             ["com.automaton.compose-candidate"] = candidateId.ToString("N"),
             ["com.automaton.resolved-image"] = resolvedImage
         };
-        if (scope.MachineRunnerId != Guid.Empty)
-            labels["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString();
-        else
-        {
-            labels["com.automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString();
-            labels["com.automaton.runner-host-id"] = scope.RunnerHostId.ToString();
-        }
+        labels["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString();
         return labels;
     }
 

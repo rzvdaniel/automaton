@@ -9,9 +9,11 @@ internal static class HostContainerResourcePolicy
     private static readonly TimeSpan VolumeOperationTimeout = TimeSpan.FromSeconds(30);
 
     public static string VolumeName(HostContainerScope scope)
-        => scope.MachineRunnerId != Guid.Empty
-            ? $"automaton-machine-runner-{RequireInstallationId()}-workspace"
-            : $"automaton-hosted-runner-{scope.HostedRunnerId:N}-user";
+    {
+        if (scope.MachineRunnerId == Guid.Empty || scope.HostedRunnerId != Guid.Empty || scope.RunnerHostId != Guid.Empty)
+            throw new InvalidOperationException("A Machine Management workspace scope is required.");
+        return $"automaton-machine-runner-{RequireInstallationId()}-workspace";
+    }
 
     public static bool HasExpectedVolumeLabels(string json, HostContainerScope scope)
     {
@@ -20,9 +22,8 @@ internal static class HostContainerResourcePolicy
             using var document = JsonDocument.Parse(json);
             if (HasDuplicateProperties(document.RootElement)) return false;
             var labels = JsonSerializer.Deserialize<Dictionary<string, string>>(document.RootElement);
-            return scope.MachineRunnerId != Guid.Empty
-                ? HasMachineVolumeLabels(labels, RequireInstallationId())
-                : HasHostedVolumeLabels(labels, scope.HostedRunnerId);
+            return scope.MachineRunnerId != Guid.Empty && scope.HostedRunnerId == Guid.Empty && scope.RunnerHostId == Guid.Empty
+                && HasMachineVolumeLabels(labels, RequireInstallationId());
         }
         catch (JsonException)
         {
@@ -44,14 +45,6 @@ internal static class HostContainerResourcePolicy
             && resource == "machine-workspace-volume"
             && labels.TryGetValue("automaton.installation-id", out var installation)
             && installation == installationId;
-
-    private static bool HasHostedVolumeLabels(Dictionary<string, string>? labels, Guid runnerId)
-        => labels is { Count: 4 }
-            && HasManagedWorkspaceLabels(labels, "user")
-            && labels.TryGetValue("automaton.resource", out var resource)
-            && resource == "hosted-runner-volume"
-            && labels.TryGetValue("automaton.hosted-runner-id", out var hosted)
-            && hosted == runnerId.ToString();
 
     private static bool HasManagedWorkspaceLabels(Dictionary<string, string> labels, string expectedScope)
         => labels.TryGetValue("automaton.managed", out var managed)
@@ -84,13 +77,6 @@ internal static class HostContainerResourcePolicy
         if (inspection.Success)
             return HasExpectedVolumeLabels(inspection.Output, scope);
         return false;
-    }
-
-    public static void AddCgroupParent(List<string> arguments, HostContainerScope scope)
-    {
-        if (scope.MachineRunnerId != Guid.Empty || scope.HostedRunnerId == Guid.Empty) return;
-        arguments.Add("--cgroup-parent");
-        arguments.Add(HostedRunnerResourceGroup.GetCgroupParent(scope.HostedRunnerId));
     }
 
     public static void AddContainerLimits(List<string> arguments, HostContainerResourceLimits? limits)

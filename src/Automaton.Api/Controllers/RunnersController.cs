@@ -10,18 +10,15 @@ namespace Automaton.Api.Controllers;
 public class RunnersController : BaseController
 {
     private readonly RunnerService runnersService;
-    private readonly HostedRunnerManagementService hostedRunnerManagementService;
     private readonly UserContextService userContextService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
 
     public RunnersController(
         RunnerService runnersService,
-        HostedRunnerManagementService hostedRunnerManagementService,
         UserContextService userContextService,
         ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.runnersService = runnersService;
-        this.hostedRunnerManagementService = hostedRunnerManagementService;
         this.userContextService = userContextService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
@@ -61,19 +58,6 @@ public class RunnersController : BaseController
     {
         await runnersService.Delete(id, cancellationToken);
 
-        return NoContent();
-    }
-
-    [HttpPost("{id}/restart-hosted")]
-    [Authorize]
-    public async Task<IActionResult> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
-    {
-        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
-        }
-
-        await hostedRunnerManagementService.RestartOwnedHostedRunnerByRunnerIdAsync(id, cancellationToken);
         return NoContent();
     }
 

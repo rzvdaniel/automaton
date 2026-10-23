@@ -200,12 +200,7 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
             return new(Guid.Empty, Guid.Empty, appId, targetId, attemptId, machineRunnerId);
         }
 
-        if (profile.RunnerHostId is not Guid hostId || hostId == Guid.Empty)
-            throw new InvalidOperationException("Runner Host identity is required for brokered runtime operations.");
-        var hosted = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");
-        if (!Guid.TryParse(hosted, out var hostedId))
-            throw new InvalidOperationException("Hosted Runner identity is required for brokered runtime operations.");
-        return new(hostedId, hostId, appId, targetId, attemptId);
+        throw new InvalidOperationException("Hosted container execution is retired. Assign a Management Runner to this app.");
     }
 
     private static void EnsureSuccess(HostContainerExecutionResponse result)

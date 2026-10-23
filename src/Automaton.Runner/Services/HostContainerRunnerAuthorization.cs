@@ -12,14 +12,9 @@ internal static class HostContainerRunnerAuthorization
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             purpose);
-        if (purpose == RunnerPurposes.Infrastructure)
-            return capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase)
-                ? null
-                : Failure("capability", "Host container execution is not enabled for this Infrastructure Runner.");
-
         var profile = RunnerApplicationProfiles.Normalize(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"));
-        return profile == RunnerApplicationProfiles.MachineManagement
+        return purpose == RunnerPurposes.Managed && profile == RunnerApplicationProfiles.MachineManagement
             && capabilities.Contains(RunnerCapabilities.ManagedContainerExecution, StringComparer.OrdinalIgnoreCase)
                 ? null
                 : Failure("authorization", "Typed container execution is not enabled for this Runner profile.");
@@ -33,9 +28,7 @@ internal static class HostContainerRunnerAuthorization
 
         return scope.MachineRunnerId != Guid.Empty
             ? ValidateMachineScope(scope)
-            : scope.HostedRunnerId != Guid.Empty && scope.RunnerHostId != Guid.Empty
-                ? null
-                : Failure("scope", "A complete host-container scope is required.");
+            : Failure("scope", "A Machine Management Runner scope is required.");
     }
 
     private static HostContainerExecutionResponse? ValidateMachineScope(HostContainerScope scope)

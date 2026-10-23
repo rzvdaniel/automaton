@@ -22,7 +22,6 @@ public class RunnerService
     private readonly RunnerDeletionService runnerDeletionService;
     private readonly RunnerConnectionSessionService connectionSessionService;
     private readonly RunnerQueryService runnerQueryService;
-    private readonly HostedRunnerRestartCompletionService restartCompletionService;
     private readonly RunnerFlowExecutionService flowExecutionService;
     private readonly RunnerConnectionLifecycleService connectionLifecycleService;
     private readonly Serilog.ILogger logger;
@@ -37,7 +36,6 @@ public class RunnerService
         RunnerDeletionService runnerDeletionService,
         RunnerConnectionSessionService connectionSessionService,
         RunnerQueryService runnerQueryService,
-        HostedRunnerRestartCompletionService restartCompletionService,
         RunnerFlowExecutionService flowExecutionService,
         RunnerConnectionLifecycleService connectionLifecycleService)
     {
@@ -48,7 +46,6 @@ public class RunnerService
         this.runnerDeletionService = runnerDeletionService;
         this.connectionSessionService = connectionSessionService;
         this.runnerQueryService = runnerQueryService;
-        this.restartCompletionService = restartCompletionService;
         this.flowExecutionService = flowExecutionService;
         this.connectionLifecycleService = connectionLifecycleService;
         logger = Serilog.Log.ForContext<RunnerService>();
@@ -81,9 +78,6 @@ public class RunnerService
 
     internal static void ApplyInstallationReport(Runner runner, RunnerDetails report)
         => RunnerConnectionLifecycleService.ApplyInstallationReport(runner, report);
-    internal Task CompleteHostedRunnerRestartAsync(Runner runner, CancellationToken cancellationToken)
-        => restartCompletionService.CompleteAsync(runner, cancellationToken);
-
     public Task MarkDisconnectedAsync(Guid runnerId, string connectionId, CancellationToken cancellationToken)
         => connectionSessionService.MarkDisconnectedAsync(runnerId, connectionId, cancellationToken);
 

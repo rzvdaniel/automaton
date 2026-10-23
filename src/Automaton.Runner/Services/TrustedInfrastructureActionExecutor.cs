@@ -10,32 +10,22 @@ public interface IInfrastructureActionExecutor
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken);
 }
 
-public interface IInfrastructureSecretProvider
-{
-    Task<InfrastructureCommandSecretsResponse> ResolveAsync(
-        InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken);
-}
-
 public sealed record InfrastructureCommandExecutionResult(
     AppActionExecutionResult? Execution,
     AppModuleExecutionArtifactResponse? Result,
     bool Terminal,
-    string? TerminalReason,
-    HostContainerExecutionResponse? HostContainerResult = null);
+    string? TerminalReason);
 
 public sealed class TrustedInfrastructureActionExecutor(
     AppActionDeploymentService deployment,
-    AppActionExecutionService execution,
-    IInfrastructureSecretProvider secrets) : IInfrastructureActionExecutor
+    AppActionExecutionService execution) : IInfrastructureActionExecutor
 {
-    public TrustedInfrastructureActionExecutor(AppActionDeploymentService deployment, AppActionExecutionService execution)
-        : this(deployment, execution, new MissingInfrastructureSecretProvider())
-    {
-    }
     public async Task<InfrastructureCommandExecutionResult> ExecuteAsync(
         InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken)
     {
         TrustedInfrastructureActions.EnsureAllowed(command.ActionKey);
+        if (command.SecretGrantIds.Count != 0)
+            throw new UnauthorizedAccessException("Host validation does not accept secret grants.");
         var artifactRequest = new ReadAppModuleExecutionArtifactRequest(
             InfrastructureAppTrust.PlatformAppId, command.RunnerHostId, command.ActionKey, command.CommandId);
         var existing = execution.ReadPersistedResult(artifactRequest);
@@ -69,14 +59,6 @@ public sealed class TrustedInfrastructureActionExecutor(
         ReadAppModuleExecutionArtifactRequest artifactRequest,
         CancellationToken cancellationToken)
     {
-        var secretResolution = command.SecretGrantIds.Count == 0
-            ? new InfrastructureCommandSecretsResponse(InfrastructureCommandSecretResolutionDispositions.Executable,
-                new Dictionary<string, string>())
-            : await secrets.ResolveAsync(command, cancellationToken);
-        if (secretResolution.Disposition == InfrastructureCommandSecretResolutionDispositions.Terminal)
-            return new(null, null, true, secretResolution.TerminalReason);
-        if (secretResolution.Disposition != InfrastructureCommandSecretResolutionDispositions.Executable)
-            throw new InvalidOperationException("The Infrastructure API returned an unknown secret resolution disposition.");
         var preparedModule = await deployment.PrepareBundledInfrastructureAsync(command.RunnerHostId, command.ActionKey, cancellationToken);
         using var input = JsonDocument.Parse(command.InputJson);
         var result = await execution.ExecuteAsync(new ExecuteAppActionModuleRequest
@@ -88,15 +70,9 @@ public sealed class TrustedInfrastructureActionExecutor(
             ExpectedDeploymentHash = preparedModule.ContentHash,
             SystemInfrastructure = true,
             Input = input.RootElement.Clone(),
-            Secrets = new Dictionary<string, string>(secretResolution.EnvironmentVariables, StringComparer.Ordinal)
+            Secrets = new Dictionary<string, string>()
         }, cancellationToken);
         return new(result, execution.ReadResult(artifactRequest), false, null);
     }
 
-    private sealed class MissingInfrastructureSecretProvider : IInfrastructureSecretProvider
-    {
-        public Task<InfrastructureCommandSecretsResponse> ResolveAsync(
-            InfrastructureCommandRequestedEvent command, CancellationToken cancellationToken) =>
-            throw new NotSupportedException("Infrastructure command secret delivery requires the Stage 3 API boundary.");
-    }
 }

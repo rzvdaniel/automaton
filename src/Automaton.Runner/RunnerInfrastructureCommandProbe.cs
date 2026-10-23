@@ -46,8 +46,7 @@ internal static class RunnerInfrastructureCommandProbe
         var api = new InfrastructureCommandApiClient(configuration, storage);
         var executor = new TrustedInfrastructureActionExecutor(
             new AppActionDeploymentService(workspace, coordinator),
-            new AppActionExecutionService(workspace, coordinator),
-            api);
+            new AppActionExecutionService(workspace, coordinator));
         var identity = await InfrastructureCommandIdentity.LoadAsync(storage);
         return new InfrastructureCommandConsumer(identity, executor, api);
     }

@@ -38,7 +38,6 @@ public sealed partial class HostContainerExecutionService
                 RunnerWorkspaceService.GetApplicationDataVolumeSubpath(scope.AppId, request.Storage!.DataDirectory),
                 "/automaton/data", readOnly: false)
         };
-        HostContainerResourcePolicy.AddCgroupParent(args, scope);
         HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
         if (request.User is not null)
         {
@@ -209,7 +208,7 @@ public sealed partial class HostContainerExecutionService
         if (labels.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
             throw new JsonException("Invalid labels.");
         if (RuntimeLabels(scope).Any(pair => !labels.TryGetValue(pair.Key, out var value) || value != pair.Value))
-            return (null, false, null, Failure("container_ownership", "The container is not owned by the requested application and Hosted Runner scope."));
+            return (null, false, null, Failure("container_ownership", "The container is not owned by the requested application and machine scope."));
         return (id, running, labels, null);
     }
 
@@ -228,13 +227,7 @@ public sealed partial class HostContainerExecutionService
             ["com.automaton.app-id"] = scope.AppId.ToString(),
             ["com.automaton.deployment-target-id"] = scope.DeploymentTargetId.ToString()
         };
-        if (scope.MachineRunnerId != Guid.Empty)
-            labels["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString();
-        else
-        {
-            labels["com.automaton.hosted-runner-id"] = scope.HostedRunnerId.ToString();
-            labels["com.automaton.runner-host-id"] = scope.RunnerHostId.ToString();
-        }
+        labels["com.automaton.machine-runner-id"] = scope.MachineRunnerId.ToString();
         return labels;
     }
 

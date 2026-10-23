@@ -184,6 +184,18 @@ internal sealed class MachineContainerTestEnvironment : IDisposable
         return new(runnerId, installationId, previous);
     }
 
+    public static HostContainerScope CurrentScope(Guid? appId = null, Guid? targetId = null, Guid? attemptId = null)
+        => new(Guid.Empty, Guid.Empty, appId ?? Guid.NewGuid(), targetId ?? Guid.NewGuid(), attemptId ?? Guid.NewGuid(),
+            Guid.Parse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID")!));
+
+    public static string CurrentVolumeLabels()
+        => System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["automaton.managed"] = "true", ["automaton.resource"] = "machine-workspace-volume",
+            ["automaton.storage-scope"] = "workspace",
+            ["automaton.installation-id"] = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID")!
+        });
+
     public void Dispose()
     {
         for (var index = 0; index < Names.Length; index++)

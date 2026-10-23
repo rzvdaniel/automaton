@@ -82,19 +82,19 @@ internal static class HostedRunnerRegistrationTestScenario
         return new HostedRunnerRegistrationSeed(runnerId, hostedRunner.Id);
     }
 
-    public static async Task AssertReprovisionCompletedAsync(ApplicationDbContext db, HostedRunnerRegistrationSeed seed)
+    public static async Task AssertReprovisionUnchangedAsync(ApplicationDbContext db, HostedRunnerRegistrationSeed seed)
     {
-        var hostedRunner = await db.HostedRunners.SingleAsync(x => x.Id == seed.HostedRunnerId);
-        var deployment = await db.HostedRunnerDeployments.SingleAsync(x => x.HostedRunnerId == seed.HostedRunnerId);
-        Assert.That(hostedRunner.RunnerId, Is.EqualTo(seed.RunnerId));
-        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Running));
-        Assert.That(hostedRunner.PendingSpecificationSnapshot, Is.Null);
-        Assert.That(hostedRunner.SpecificationSnapshot.SourceSpecificationRevision, Is.EqualTo(2));
-        Assert.That(hostedRunner.SpecificationSnapshot.Resources.MemoryLimitMb, Is.EqualTo(2048));
-        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
-        Assert.That(deployment.FinishedAt, Is.Not.Null);
-        Assert.That(await db.AuditEvents.AnyAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionSucceeded), Is.True);
+        db.ChangeTracker.Clear();
+        var hosted = await db.HostedRunners.SingleAsync(item => item.Id == seed.HostedRunnerId);
+        var deployment = await db.HostedRunnerDeployments.SingleAsync(item => item.HostedRunnerId == seed.HostedRunnerId);
+        Assert.That(hosted.RunnerId, Is.EqualTo(seed.RunnerId));
+        Assert.That(hosted.Status, Is.EqualTo(HostedRunnerStatuses.Reprovisioning));
+        Assert.That(hosted.PendingSpecificationSnapshot, Is.Not.Null);
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForRegistration));
+        Assert.That(deployment.FinishedAt, Is.Null);
+        Assert.That(await db.AuditEvents.AnyAsync(item => item.EventType == AuditEventTypes.RunnerReprovisionSucceeded), Is.False);
     }
+
 }
 
 internal sealed record HostedRunnerRegistrationSeed(Guid RunnerId, Guid HostedRunnerId);

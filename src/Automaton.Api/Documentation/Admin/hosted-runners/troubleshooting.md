@@ -12,7 +12,7 @@ order: 100
 | Host not validated | Run validation and inspect reported metadata and health details. |
 | Runner reports an API certificate validation error | Verify the API certificate matches its configured hostname and is trusted by the Runner host or container. Install the issuing CA in that environment for development certificates; do not disable certificate validation. |
 
-Per-user Hosted Runner creation and reprovisioning are retired. Existing records are retained; use the available restart and deletion controls only for those records. New customer workloads should use an assigned Machine Management Runner.
+Per-user Hosted Runner creation and reprovisioning are retired. Existing records are retained; the former restart/delete controls are removed and records are available for inspection only. New customer workloads should use an assigned Machine Management Runner.
 
 ## Workflow and custom-step execution
 
@@ -45,3 +45,5 @@ Revoked Infrastructure Runner records are retained for history but excluded from
 Hosted Runner storage reporting/verification, suspension/resume, grace-period extension and enforcement reset are retired. Stored storage and enforcement values are historical; they are no longer refreshed. Account-storage locality is no longer adopted or verified. This does not resume previously suspended workloads; retirement or recovery of legacy installations remains a separate operator decision. Machine Management uses configured container limits and free-disk admission instead of account storage allowances.
 
 Infrastructure host storage reporting and its XFS image-store validation are retired. Host storage values are historical, not current capacity or placement evidence. New typed container work requires an assigned Machine Management Runner; Standard Hosted Runners no longer relay it through an Infrastructure Runner. Machine workspace telemetry and workload safeguards remain available.
+
+Hosted restart/delete and automatic registration/reconnect/lifecycle mutation are retired. Stored lifecycle and deployment statuses are historical, not current maintenance instructions. No containers, volumes or stored records are deleted by this source cleanup. Machine Management updates remain unsupported; retirement, export and manual moves of existing workloads need a separate operator decision.

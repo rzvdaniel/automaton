@@ -16,9 +16,7 @@ public sealed class RunnerConnectionLifecycleService(
     ApplicationDbContext dbContext,
     ResourceAuthorizationService authorizationService,
     ApiInstanceIdentityService apiInstanceIdentityService,
-    RunnerConnectionSessionService connectionSessionService,
-    RunnerRegistrationService runnerRegistrationService,
-    HostedRunnerRestartCompletionService restartCompletionService)
+    RunnerConnectionSessionService connectionSessionService)
 {
     private readonly Serilog.ILogger logger = Serilog.Log.ForContext<RunnerConnectionLifecycleService>();
 
@@ -45,8 +43,6 @@ public sealed class RunnerConnectionLifecycleService(
         dbContext.Update(runner);
         await dbContext.SaveChangesAsync(cancellationToken);
         await RecordRunnerConnectionSessionAsync(runner, runnerConnection.ConnectionId!, now, cancellationToken);
-        await runnerRegistrationService.CompleteReconnectAsync(
-            runner, userId, runnerConnection.HostedRunnerId, cancellationToken);
         await connectionSessionService.WriteApplicationEventsAsync(
             runner.Id,
             ApplicationEventLevels.Info,
@@ -103,7 +99,6 @@ public sealed class RunnerConnectionLifecycleService(
 
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
-        await restartCompletionService.CompleteAsync(runner, cancellationToken);
     }
 
     public static void ApplyInstallationReport(Runner runner, RunnerDetails report)

@@ -8,25 +8,13 @@ internal static class HostContainerRuntimeUserScenario
 {
     public static async Task<RuntimeUserOutcome> RunAsync()
     {
-        var oldPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var oldCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        var oldHostAddress = Environment.GetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable);
-        var hostedRunnerId = Guid.NewGuid();
+        using var machine = MachineContainerTestEnvironment.Create();
         var commands = new List<IReadOnlyList<string>>();
-        try
-        {
-            SetInfrastructureRunnerEnvironment();
-            var result = await CreateService(hostedRunnerId, commands).ExecuteAsync(CreateRequest(hostedRunnerId));
-            return new(result.Success, result.Error, IsUserApplied(commands));
-        }
-        finally
-        {
-            RestoreEnvironment(oldPurpose, oldCapabilities, oldHostAddress);
-        }
+        var result = await CreateService(commands).ExecuteAsync(CreateRequest());
+        return new(result.Success, result.Error, IsUserApplied(commands));
     }
 
     private static HostContainerExecutionService CreateService(
-        Guid hostedRunnerId,
         ICollection<IReadOnlyList<string>> commands)
         => new((arguments, _, _) =>
         {
@@ -35,17 +23,17 @@ internal static class HostContainerRuntimeUserScenario
             {
                 Success = !IsMissingCandidate(arguments),
                 Error = IsMissingCandidate(arguments) ? $"Error: No such object: {arguments[^1]}" : string.Empty,
-                Output = ResponseOutput(arguments, hostedRunnerId)
+                Output = ResponseOutput(arguments)
             });
-        });
+        }, new MachineWorkloadDiskAdmission(_ => long.MaxValue));
 
     private static bool IsMissingCandidate(IReadOnlyList<string> arguments)
         => arguments.Contains("container") && arguments.Contains("inspect");
 
-    private static HostContainerExecutionRequest CreateRequest(Guid hostedRunnerId)
+    private static HostContainerExecutionRequest CreateRequest()
         => new()
         {
-            Scope = new(hostedRunnerId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Scope = MachineContainerTestEnvironment.CurrentScope(),
             Operation = HostContainerOperationKinds.CreateApplicationContainer,
             RequestedImage = "example/runtime:1",
             CandidateId = Guid.NewGuid(),
@@ -59,13 +47,14 @@ internal static class HostContainerRuntimeUserScenario
                 HostContainerResourceKinds.ApplicationData),
             SharedMemoryMb = 64,
             DockerLogMaxSizeMb = 10,
-            DockerLogMaxFiles = 3
+            DockerLogMaxFiles = 3,
+            ContainerLimits = new(1m, 1024, 256), MinimumFreeDiskMb = 256
         };
 
-    private static string ResponseOutput(IReadOnlyList<string> arguments, Guid hostedRunnerId)
+    private static string ResponseOutput(IReadOnlyList<string> arguments)
     {
         if (arguments.Contains("volume"))
-            return $"{{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"{hostedRunnerId}\",\"automaton.storage-scope\":\"user\"}}";
+            return MachineContainerTestEnvironment.CurrentVolumeLabels();
         if (arguments.Contains("image"))
             return "example/runtime:1@sha256:" + new string('a', 64);
         return arguments.Contains("create") ? new string('b', 64) : string.Empty;
@@ -80,19 +69,6 @@ internal static class HostContainerRuntimeUserScenario
         return userIndex >= 0 && create[userIndex + 1] == "1000:1000";
     }
 
-    private static void SetInfrastructureRunnerEnvironment()
-    {
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
-        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, "172.30.0.1");
-    }
-
-    private static void RestoreEnvironment(string? purpose, string? capabilities, string? hostAddress)
-    {
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", capabilities);
-        Environment.SetEnvironmentVariable(RunnerRuntimeEndpointConfiguration.HostAddressEnvironmentVariable, hostAddress);
-    }
 }
 
 internal sealed record RuntimeUserOutcome(bool Success, string Error, bool UserApplied);

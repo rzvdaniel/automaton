@@ -40,7 +40,7 @@ internal sealed class HostContainerBuildExecutor(
     private static HostContainerExecutionResponse? ValidateRequest(HostContainerExecutionRequest request)
     {
         if (!HasTrustedResources(request.Resources))
-            return Failure("trusted_mapping_unavailable", "The trusted Hosted Runner storage mapping is unavailable.");
+            return Failure("trusted_mapping_unavailable", "The trusted machine workspace mapping is unavailable.");
         if (request.Command is null || request.Environment is null || request.Command.Arguments is null
             || request.Command.Environment is null || string.IsNullOrWhiteSpace(request.Command.Executable))
             return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
@@ -85,14 +85,7 @@ internal sealed class HostContainerBuildExecutor(
             "--label", $"automaton.operation-id={request.OperationId:N}",
             "--label", $"automaton.resolved-image={image}",
             "--mount", $"type=volume,source={volume},target=/automaton/source,volume-subpath={source}" };
-        if (scope.MachineRunnerId != Guid.Empty)
-            args.AddRange(["--label", $"automaton.machine-runner-id={scope.MachineRunnerId:N}"]);
-        else
-        {
-            args.AddRange(["--label", $"automaton.hosted-runner-id={scope.HostedRunnerId:N}",
-                "--label", $"automaton.runner-host-id={scope.RunnerHostId:N}"]);
-        }
-        HostContainerResourcePolicy.AddCgroupParent(args, scope);
+        args.AddRange(["--label", $"automaton.machine-runner-id={scope.MachineRunnerId:N}"]);
         HostContainerResourcePolicy.AddContainerLimits(args, request.ContainerLimits);
         HostContainerWritablePathPolicy.AddTo(
             args, request.SharedMemoryMb!.Value, request.DockerLogMaxSizeMb!.Value, request.DockerLogMaxFiles!.Value);
@@ -179,13 +172,7 @@ internal sealed class HostContainerBuildExecutor(
                 ["automaton.deployment-target-id"] = request.Scope.DeploymentTargetId.ToString("N"),
                 ["automaton.deployment-attempt-id"] = request.Scope.DeploymentAttemptId.ToString("N")
             };
-            if (request.Scope.MachineRunnerId != Guid.Empty)
-                expected["automaton.machine-runner-id"] = request.Scope.MachineRunnerId.ToString("N");
-            else
-            {
-                expected["automaton.hosted-runner-id"] = request.Scope.HostedRunnerId.ToString("N");
-                expected["automaton.runner-host-id"] = request.Scope.RunnerHostId.ToString("N");
-            }
+            expected["automaton.machine-runner-id"] = request.Scope.MachineRunnerId.ToString("N");
             if (expected.Any(pair => !labels.TryGetProperty(pair.Key, out var value) || value.GetString() != pair.Value))
                 return (false, null, Failure("build_ownership", "The existing build container belongs to another operation."));
             var image = labels.GetProperty("automaton.resolved-image").GetString();

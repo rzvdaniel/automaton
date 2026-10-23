@@ -117,7 +117,7 @@ Work:
 4. Inspect the top candidates manually for mixed responsibilities, duplicated decisions, and public contracts.
 5. Confirm existing tests and identify missing characterization cases before selecting the first refactor.
 
-Candidate areas include `AppsService`, `RunnerService`, `RunnerHostService`, and hosted-runner lifecycle reconciliation. They are candidates, not a pre-approved rewrite list. `HostedRunnerLifecycleReconcilerTests` and deployment-target tests provide potential starting coverage, but their existence does not establish completeness.
+Candidate areas include `AppsService`, `RunnerService`, `RunnerHostService`, and hosted-runner lifecycle reconciliation. They are candidates, not a pre-approved rewrite list. Deployment-target and Runner operation tests provide starting coverage; the Hosted lifecycle reconciler and its exclusive tests were removed during M4.
 
 Exit criteria: another developer can reproduce the inventory; actual method scores replace guesses; thresholds, exclusions, and the pilot have a documented rationale. No production behavior changes in this stage.
 
@@ -260,7 +260,7 @@ Existing verification commands that can be used today include:
 
 ```text
 dotnet test src/UnitTests/Automaton.Architecture.Tests/Automaton.Architecture.Tests.csproj -c Release
-dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Release --filter FullyQualifiedName~HostedRunnerLifecycleReconcilerTests
+dotnet test src/UnitTests/Automaton.Api.Tests/Automaton.Api.Tests.csproj -c Release --filter FullyQualifiedName~RunnerConnectionAssignmentTests
 git diff --check
 ```
 

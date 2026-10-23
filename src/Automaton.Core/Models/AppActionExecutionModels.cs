@@ -52,17 +52,6 @@ public static class InfrastructureCommandResultOutcomes
 
 public sealed record InfrastructureCommandResultResponse(string Outcome);
 
-public static class InfrastructureCommandSecretResolutionDispositions
-{
-    public const string Executable = "executable";
-    public const string Terminal = "terminal";
-}
-
-public sealed record InfrastructureCommandSecretsResponse(
-    string Disposition,
-    IReadOnlyDictionary<string, string> EnvironmentVariables,
-    string? TerminalReason = null);
-
 public sealed class ExecuteAppActionModuleRequest
 {
     public Guid ExecutionId { get; set; }

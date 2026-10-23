@@ -32,7 +32,7 @@ public sealed class InfrastructureHostValidationControllerTests
 
     private static InfrastructureCommandsController CreateController(ApplicationDbContext db,
         Guid apiKeyId)
-        => new(null!, new InfrastructureHostValidationResultService(db, new RecordingAuditEventService()))
+        => new(new InfrastructureHostValidationResultService(db, new RecordingAuditEventService()))
         {
             ControllerContext = new ControllerContext
             {

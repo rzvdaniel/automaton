@@ -39,9 +39,6 @@ class RunnersService {
     await apiClient.delete(`/api/runners/${id}`)
   }
 
-  async restartHostedRunner(id: string): Promise<void> {
-    await apiClient.post(`/api/runners/${id}/restart-hosted`)
-  }
 
   async createSelfHostedInstallation(
     request: CreateSelfHostedRunnerInstallationRequest

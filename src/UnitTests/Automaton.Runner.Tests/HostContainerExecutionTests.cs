@@ -8,44 +8,47 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture, NonParallelizable]
 public sealed class HostContainerExecutionTests
 {
-    [Test]
-    public async Task ResolveImageWorksWithDedicatedCapabilityWithoutHostExecution()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LegacyOrMixedAccountScopeIsRejectedBeforeDocker(bool includeMachineIdentity)
     {
-        var commands = new List<string>();
-        var service = new HostContainerExecutionService((arguments, _, _) =>
+        using var machine = MachineContainerTestEnvironment.Create();
+        var invoked = false;
+        var service = new HostContainerExecutionService((_, _, _) =>
         {
-            commands.Add(string.Join(' ', arguments));
-            return Task.FromResult(new InfrastructureCommandResponse
-            {
-                Success = true,
-                Output = commands.Count == 2 ? "python:3.13-slim@sha256:abc" : "pulled"
-            });
+            invoked = true;
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
         });
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
+        var result = await service.ExecuteAsync(new HostContainerExecutionRequest
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
-            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-            {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-                Operation = HostContainerOperationKinds.ResolveImage,
-                RequestedImage = "python:3.13-slim"
-            });
+            Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+                MachineRunnerId: includeMachineIdentity ? machine.RunnerId : Guid.Empty),
+            Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "example/app:1"
+        });
+        Assert.That(result.ErrorCode, Is.EqualTo("scope"));
+        Assert.That(invoked, Is.False);
+    }
 
-            Assert.Multiple(() =>
-            {
-                Assert.That(result.Success, Is.True);
-                Assert.That(result.ResolvedImage, Is.EqualTo("python:3.13-slim@sha256:abc"));
-                Assert.That(commands, Has.Count.EqualTo(2));
-            });
-        }
-        finally
+    [TestCase(RunnerCapabilities.HostContainerExecution)]
+    [TestCase(RunnerCapabilities.ManagedContainerExecution)]
+    public async Task InfrastructureIdentityCannotExecuteMachineOrLegacyContainerWork(string capabilities)
+    {
+        using var machine = MachineContainerTestEnvironment.Create();
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", capabilities);
+        var invoked = false;
+        var service = new HostContainerExecutionService((_, _, _) =>
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
+            invoked = true;
+            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
+        });
+        var result = await service.ExecuteAsync(new HostContainerExecutionRequest
+        {
+            Scope = MachineContainerTestEnvironment.CurrentScope(),
+            Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "example/app:1"
+        });
+        Assert.That(result.ErrorCode, Is.EqualTo("authorization"));
+        Assert.That(invoked, Is.False);
     }
 
     [Test]
@@ -66,7 +69,7 @@ public sealed class HostContainerExecutionTests
                 RequestedImage = "python:3.13-slim"
             });
 
-            Assert.That(result.ErrorCode, Is.EqualTo("capability"));
+            Assert.That(result.ErrorCode, Is.EqualTo("authorization"));
         }
         finally
         {
@@ -103,6 +106,7 @@ public sealed class HostContainerExecutionTests
             });
 
             Assert.That(result.Success, Is.True);
+            Assert.That(result.ResolvedImage, Is.EqualTo("python:3.13-slim@sha256:abc"));
             Assert.That(commands, Has.Count.EqualTo(2));
 
             var mismatch = await service.ExecuteAsync(new HostContainerExecutionRequest
@@ -191,6 +195,8 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task ProductionServicePathUsesDedicatedCapabilityWithoutHostExecution()
     {
+        using var machine = MachineContainerTestEnvironment.Create();
+        using var testWorkspace = RunnerRuntimeContainerTestWorkspace.Create();
         var invoked = false;
         var infrastructureCommands = new InfrastructureCommandService((arguments, _, _) =>
         {
@@ -206,13 +212,13 @@ public sealed class HostContainerExecutionTests
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
         try
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.ManagedContainerExecution);
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
             {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Scope = MachineContainerTestEnvironment.CurrentScope(),
                 Operation = HostContainerOperationKinds.ResolveImage,
-                RequestedImage = "python:3.13-slim"
+                MinimumFreeDiskMb = 256, RequestedImage = "python:3.13-slim"
             });
 
             Assert.Multiple(() =>
@@ -232,19 +238,21 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task StorageDependentOperationFailsWithMappingError()
     {
+        using var machine = MachineContainerTestEnvironment.Create();
+        using var testWorkspace = RunnerRuntimeContainerTestWorkspace.Create();
         var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
         try
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.ManagedContainerExecution);
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
             {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Scope = MachineContainerTestEnvironment.CurrentScope(),
                 Operation = HostContainerOperationKinds.RunBuild,
-                RequestedImage = "python:3.13-slim",
+                MinimumFreeDiskMb = 256, RequestedImage = "python:3.13-slim",
                 Command = new()
             });
 
@@ -258,13 +266,13 @@ public sealed class HostContainerExecutionTests
     }
 
     [Test]
-    public async Task RunBuildUsesLabeledHostedVolumeAndTrustedSubpaths()
+    public async Task RunBuildUsesMachineVolumeAndTrustedSubpaths()
     {
-        var result = await HostContainerExecutionScenarios.RunLabeledHostedVolumeBuildAsync();
+        var result = await HostContainerExecutionScenarios.RunLabeledMachineVolumeBuildAsync();
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.VolumeNameRequested, Is.True);
-        Assert.That(result.BuildCommand, Does.Contain($"--cgroup-parent automaton-hosted-runner-{result.HostedRunnerId:N}.slice"));
+        Assert.That(result.BuildCommand, Does.Not.Contain("--cgroup-parent"));
         Assert.That(result.BuildCommand, Does.Contain("volume-subpath=workspace/runner/deployments/"));
         Assert.That(result.BuildCommand, Does.Contain(
             $"volume-subpath=workspace/runner/deployments/{result.AppId:D}/{result.DeploymentTargetId:D}/{result.DeploymentAttemptId:D}/source"));
@@ -312,51 +320,7 @@ public sealed class HostContainerExecutionTests
 
     [Test]
     public async Task ProductionTypedDockerPathReceivesDockerPrefixedRunBuild()
-    {
-        var calls = new List<IReadOnlyList<string>>();
-        var infrastructure = CreateInfrastructureCommandService(calls);
-        var service = new HostContainerExecutionService(infrastructure);
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
-            await service.ExecuteAsync(new HostContainerExecutionRequest
-            {
-                Scope = new(Guid.Parse("00000000-0000-0000-0000-000000000001"), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-                Operation = HostContainerOperationKinds.RunBuild,
-                RequestedImage = "example/build:1",
-                Resources = new(HostContainerResourceKinds.Source, HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData),
-                SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
-                Command = new() { Executable = "build" }
-            });
-
-            Assert.That(calls.Any(call => call.Count > 1 && call[0] == "docker" && call[1] == "run"), Is.True);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
-    }
-
-    private static InfrastructureCommandService CreateInfrastructureCommandService(
-        ICollection<IReadOnlyList<string>> calls)
-        => new((arguments, _, _) =>
-        {
-            calls.Add(arguments);
-            var output = arguments.Contains("volume")
-                ? "{\"automaton.managed\":\"true\",\"automaton.resource\":\"hosted-runner-volume\",\"automaton.hosted-runner-id\":\"00000000-0000-0000-0000-000000000001\",\"automaton.storage-scope\":\"user\"}"
-                : arguments.Contains("image") ? "example/build:1@sha256:abc" : "";
-            var missingContainer = arguments.Contains("container") && arguments.Contains("inspect");
-            return Task.FromResult(new InfrastructureCommandResponse
-            {
-                Success = !missingContainer,
-                Error = missingContainer ? $"Error: No such object: {arguments[^1]}" : string.Empty,
-                Output = output
-            });
-        });
+        => Assert.That(await HostContainerExecutionScenarios.ProductionTypedDockerPathReceivesDockerPrefixedRunBuildAsync(), Is.True);
 
     [Test]
     public void BrokerStagingSubpathMatchesRunnerWorkspaceStagingSource()
@@ -410,19 +374,21 @@ public sealed class HostContainerExecutionTests
     [Test]
     public async Task SuppliedResourceIdsDoNotEstablishTrustedMapping()
     {
+        using var machine = MachineContainerTestEnvironment.Create();
+        using var testWorkspace = RunnerRuntimeContainerTestWorkspace.Create();
         var service = new HostContainerExecutionService((_, _, _) =>
             Task.FromResult(new InfrastructureCommandResponse { Success = true }));
         var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
         try
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostContainerExecution);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.ManagedContainerExecution);
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
             {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+                Scope = MachineContainerTestEnvironment.CurrentScope(),
                 Operation = HostContainerOperationKinds.CreateApplicationContainer,
-                RequestedImage = "python:3.13-slim",
+                MinimumFreeDiskMb = 256, RequestedImage = "python:3.13-slim",
                 Command = new(),
                 SharedMemoryMb = 64, DockerLogMaxSizeMb = 10, DockerLogMaxFiles = 3,
                 Resources = new("caller-workspace", "caller-artifact", "caller-data")
