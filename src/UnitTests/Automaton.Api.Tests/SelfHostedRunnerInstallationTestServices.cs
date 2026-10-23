@@ -13,7 +13,10 @@ namespace Automaton.Api.Tests;
 
 internal static class SelfHostedRunnerInstallationTestServices
 {
-    public static SelfHostedRunnerInstallationService CreateService(ApplicationDbContext db, Guid userId)
+    public static SelfHostedRunnerInstallationService CreateService(
+        ApplicationDbContext db, Guid userId,
+        string serverUrl = "https://api.example.test",
+        string dockerImage = "automaton/runner:test")
     {
         var context = new DefaultHttpContext();
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "test");
@@ -31,8 +34,8 @@ internal static class SelfHostedRunnerInstallationTestServices
             Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
             Options.Create(new HostedRunnerOptions
             {
-                DockerImage = "automaton/runner:test",
-                ServerUrl = "https://api.example.test"
+                DockerImage = dockerImage,
+                ServerUrl = serverUrl
             }));
     }
 

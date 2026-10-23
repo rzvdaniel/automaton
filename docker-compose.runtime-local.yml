@@ -130,6 +130,9 @@ services:
       PublishedApps__ApiBaseUrl: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       PublishedApps__RuntimeProxyAuthKey: ${LOCAL_RUNTIME_PROXY_AUTH_KEY:-local-runtime-secret}
       PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
+      # These options also supply the Machine Management installation command.
+      HostedRunners__ServerUrl: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
+      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-automaton-runtime-local-runner:latest}
     volumes:
       - runtime-local-api-appdata:/app/AppData
       - runtime-local-published-apps:/app/AppData/published-apps
