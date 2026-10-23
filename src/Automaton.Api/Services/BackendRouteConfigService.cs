@@ -20,9 +20,8 @@ public class BackendRouteConfigService
         Guid AppId,
         Guid DeploymentTargetId,
         bool IsDefault,
-        string RuntimeEndpoint,
+        string RuntimeServiceName,
         string? Slug,
-        bool UsesRuntimeTunnel,
         bool RequiresAuthentication);
 
     public BackendRouteConfigService(
@@ -51,9 +50,7 @@ public class BackendRouteConfigService
         var eligibleTargets = CreateEligibleTargets(
             pendingGenericRuntimeTargetId,
             pendingGenericRuntimeDeployed);
-        var hostedRoutes = await LoadHostedRoutesAsync(eligibleTargets, cancellationToken);
-        var selfHostedRoutes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
-        var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
+        var routes = await LoadSelfHostedRoutesAsync(eligibleTargets, cancellationToken);
 
         await WriteRoutesAsync(routes, cancellationToken);
     }
@@ -81,48 +78,6 @@ public class BackendRouteConfigService
             : target.GenericRuntimeDeployed);
     }
 
-    private async Task<List<RouteTarget>> LoadHostedRoutesAsync(
-        IQueryable<Automaton.Api.Entities.AppDeploymentTarget> eligibleTargets,
-        CancellationToken cancellationToken)
-    {
-        return await eligibleTargets
-            .Where(target =>
-                target.ExecutionRunnerId != null)
-            .Join(
-                dbContext.HostedRunners.AsNoTracking().Where(r =>
-                    r.DeletedAt == null &&
-                    r.RunnerId != null &&
-                    r.RuntimeEndpoint != null &&
-                    r.RuntimeEndpoint != string.Empty),
-                target => target.ExecutionRunnerId,
-                runner => runner.RunnerId,
-                (target, runner) => new
-                {
-                    AppId = target.WebAppId,
-                    DeploymentTargetId = target.Id,
-                    target.IsDefault,
-                    RuntimeEndpoint = runner.RuntimeEndpoint!,
-                    RequiresAuthentication = target.WebApp.RequiresAuthentication,
-                    Slug = target.IsDefault &&
-                        target.WebApp.IsPublished &&
-                        target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                        target.WebApp.AccessStatus == AppAccessStatuses.Active
-                        ? target.WebApp.PublicUrl
-                        : null
-                })
-            .OrderBy(x => x.AppId)
-            .ThenBy(x => x.DeploymentTargetId)
-            .Select(x => new RouteTarget(
-                x.AppId,
-                x.DeploymentTargetId,
-                x.IsDefault,
-                x.RuntimeEndpoint.Trim(),
-                x.Slug,
-                false,
-                x.RequiresAuthentication))
-            .ToListAsync(cancellationToken);
-    }
-
     private async Task<List<RouteTarget>> LoadSelfHostedRoutesAsync(
         IQueryable<Automaton.Api.Entities.AppDeploymentTarget> eligibleTargets,
         CancellationToken cancellationToken)
@@ -131,7 +86,6 @@ public class BackendRouteConfigService
             .Where(target =>
                 target.ExecutionRunnerId != null &&
                 !dbContext.HostedRunners.Any(hostedRunner =>
-                    hostedRunner.DeletedAt == null &&
                     hostedRunner.RunnerId == target.ExecutionRunnerId))
             .Join(
                 dbContext.Runners.AsNoTracking(),
@@ -172,7 +126,6 @@ public class BackendRouteConfigService
                 candidate.IsDefault,
                 publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
                 candidate.Slug,
-                true,
                 candidate.RequiresAuthentication))
             .ToList();
     }
@@ -241,7 +194,6 @@ public class BackendRouteConfigService
 
         AppendRouters(builder, routes);
         AppendMiddlewares(builder, routes);
-        AppendServices(builder, routes);
 
         return builder.ToString();
     }
@@ -314,25 +266,6 @@ public class BackendRouteConfigService
 
     }
 
-    private static void AppendServices(StringBuilder builder, IReadOnlyCollection<RouteTarget> routes)
-    {
-        builder.AppendLine("  services:");
-        foreach (var route in routes.Where(route => !route.UsesRuntimeTunnel && !string.IsNullOrWhiteSpace(route.Slug)))
-        {
-            var key = $"slug-{route.AppId:N}";
-            AppendRuntimeService(builder, route, key);
-        }
-
-        foreach (var route in routes.Where(route => !route.UsesRuntimeTunnel))
-        {
-            var key = route.IsDefault
-                ? $"private-{route.AppId:N}"
-                : $"target-{route.DeploymentTargetId:N}";
-            AppendRuntimeService(builder, route, key);
-        }
-
-    }
-
     private static void AppendRuntimeRouter(
         StringBuilder builder,
         RouteTarget route,
@@ -347,7 +280,7 @@ public class BackendRouteConfigService
         builder.AppendLine("      tls: {}");
         builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{pathPrefix}`)\"");
         builder.AppendLine($"      priority: {priority}");
-        builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
+        builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");
         var middlewares = route.RequiresAuthentication
             ? $"[\"{key}-auth-headers\", \"{key}-auth\", \"{key}-auth-strip\", \"{key}-rewrite\"]"
             : $"[\"{key}-rewrite\"]";
@@ -388,27 +321,11 @@ public class BackendRouteConfigService
         builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "$1")}\"");
     }
 
-    private static void AppendRuntimeService(StringBuilder builder, RouteTarget route, string key)
-    {
-        builder.AppendLine($"    {key}:");
-        builder.AppendLine("      loadBalancer:");
-        builder.AppendLine("        servers:");
-        builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
-    }
-
     private static string BuildTargetRoutePrefix(Guid appId, Guid deploymentTargetId)
         => PublishedAppHostNames.BuildPrivateTargetPath(appId, deploymentTargetId, false).TrimEnd('/');
 
     private static string BuildRuntimePath(RouteTarget route, string path)
-    {
-        var gatewayPath = $"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}";
-        return route.UsesRuntimeTunnel
-            ? $"/runtime-tunnel{gatewayPath}"
-            : gatewayPath;
-    }
-
-    private static string GetServiceName(RouteTarget route, string routeServiceName)
-        => route.UsesRuntimeTunnel ? route.RuntimeEndpoint : routeServiceName;
+        => $"/runtime-tunnel/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}";
 
     private string ResolveRootPath()
     {

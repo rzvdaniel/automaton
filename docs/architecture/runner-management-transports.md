@@ -2,7 +2,7 @@
 
 The [self-hosted roadmap](../roadmap/README.md) selects refactoring the existing Runner. This guide describes the current transport and does not claim that refactoring is complete.
 
-Updated: 18 October 2026.
+Updated: 23 October 2026.
 
 Slice 5 and the isolation corrections are released; automatic cutover recovery from PR #348 is live as `3d890c29`. Both retained Runners use protocol v5 and CI #4978 immutable digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`. Published media, BYO tunnel responses, two-account denial/authentication toggles, and rapid rollback/rollforward with queued earlier targets passed in production. No manual tunnel reconciliation was used in the final round trips; durable validation completed and queues drained. RM is complete for the installed x64 cohort. See the [historical automatic recovery evidence](https://github.com/rzvdaniel/automaton/blob/57941d9971f58409356a74cbcf2529292c2f8a61/docs/roadmap/managed-platform-completion-plan.md#automatic-recovery-acceptance--2026-10-05). Cross-host package/artifact availability remains unverified.
 
@@ -12,9 +12,9 @@ Slice 5 and the isolation corrections are released; automatic cutover recovery f
 
 Action execution, result, and log reads authorize access to the App before loading execution data. The Action controller translates an inaccessible App or missing execution into HTTP 404 and an explicit permission denial into HTTP 403; unexpected exceptions retain the normal error handling. Runner assignment and artifact endpoints continue enforcing their bound Runner credentials separately.
 
-Every authorized App update reconciles the existing runtime route configuration from committed database state, including Hosted and BYO targets. Reconciliation runs immediately after persistence, before app file storage and auditing. If route application fails, retrying the same saved authentication setting attempts reconciliation again; no change detection or process-local pending flag is required. A failed write leaves the previous route file intact; database persistence and route application are not one transaction, so a failed request still requires retry or startup reconciliation. Both enabling and disabling authentication take effect without redeployment.
+Every authorized App update reconciles the existing runtime route configuration from committed database state, for eligible explicitly assigned Runner tunnel targets. Historical Hosted endpoint routes are no longer generated, and retained Hosted assignments are not adopted into tunnel routes. Reconciliation runs immediately after persistence, before app file storage and auditing. If route application fails, retrying the same saved authentication setting attempts reconciliation again; no change detection or process-local pending flag is required. A failed write leaves the previous route file intact; database persistence and route application are not one transaction, so a failed request still requires retry or startup reconciliation. Both enabling and disabling authentication take effect without redeployment.
 
-The follow-up was reviewed, passed CI #4970 and released as `e888fef2`. Two-account Action reads/cancellation and authentication toggles passed on production Hosted and BYO routes without app redeployment; runtime container IDs stayed unchanged. The remaining automatic recovery gate passed after PR #348 release, as recorded above; M1 remains complete.
+The follow-up was reviewed, passed CI #4970 and released as `e888fef2`. Two-account Action reads/cancellation and authentication toggles passed on production Hosted and BYO routes without app redeployment; runtime container IDs stayed unchanged. The remaining automatic recovery gate passed after PR #348 release, as recorded above; that historical transport milestone is distinct from the current self-hosted roadmap and its deferred acceptance.
 
 ```mermaid
 flowchart LR

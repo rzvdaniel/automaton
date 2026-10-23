@@ -68,6 +68,19 @@ public sealed class MachineStaticTunnelTests
         });
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ForwardAsync_DoesNotAdoptRetainedHostedAssignment(bool deleted)
+    {
+        await using var fixture = await StaticSiteFixture.CreateAsync();
+        await fixture.MarkRetiredHostedAsync(deleted);
+
+        var response = await fixture.ForwardAsync();
+
+        Assert.That(response.StatusCode, Is.EqualTo(StatusCodes.Status404NotFound));
+        Assert.That(fixture.LastRequest, Is.Null);
+    }
+
     private sealed class StaticSiteFixture : IAsyncDisposable
     {
         private const string PublicHost = "static-site-one.apps.automaton.monster";
@@ -88,6 +101,18 @@ public sealed class MachineStaticTunnelTests
 
         public CapturingHubContext Hub { get; }
         public TunnelRequest? LastRequest => Hub.LastRequest;
+
+        public async Task MarkRetiredHostedAsync(bool deleted)
+        {
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "Retired Hosted",
+                RunnerId = db.AppDeploymentTargets.Single(target => target.Id == targetId).ExecutionRunnerId,
+                ContainerName = "retired-hosted", Status = "Running",
+                DeletedAt = deleted ? DateTime.UtcNow : null
+            });
+            await db.SaveChangesAsync();
+        }
 
         public static async Task<StaticSiteFixture> CreateAsync(ApplicationContract? contract = null)
         {

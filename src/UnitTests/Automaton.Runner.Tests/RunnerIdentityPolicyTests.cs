@@ -7,7 +7,7 @@ namespace Automaton.Runner.Console.Tests;
 public sealed class RunnerIdentityPolicyTests
 {
     [Test]
-    public void ManagedHostedRunner_UsesAuthoritativeEnrollmentIdentity()
+    public void ManagedHostedRunnerMarker_IsRetired()
     {
         Assert.That(RunnerIdentityPolicy.IsManagedHostedRunner("Managed", Guid.NewGuid().ToString()), Is.True);
     }
@@ -31,13 +31,14 @@ public sealed class RunnerIdentityPolicyTests
         Assert.That(RunnerHostService.ShouldRunGenericIdentityReconciliation("Managed", Guid.NewGuid().ToString()), Is.False);
     }
 
-    [Test]
-    public void ManagedHostedRunnerWithoutPersistedIdentity_FailsClosedAtStartupBoundary()
+    [TestCase("adcb1b5f-cc81-4a5d-9915-af629bf1c6ab")]
+    [TestCase("invalid-retired-marker")]
+    public void RetiredHostedRunnerMarker_FailsClosedAtStartupBoundary(string marker)
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RunnerHostService.EnsureManagedHostedRunnerIdentity("Managed", Guid.NewGuid().ToString()));
+            RunnerHostService.EnsureManagedHostedRunnerIdentity("Managed", marker));
 
-        Assert.That(exception!.Message, Does.Contain("identity is unavailable"));
+        Assert.That(exception!.Message, Does.Contain("execution is retired"));
     }
 
     [Test]
@@ -47,46 +48,10 @@ public sealed class RunnerIdentityPolicyTests
     }
 
     [Test]
-    public void ManagedHostedRunner_ValidPersistedCredentialWinsOverEnrollmentToken()
+    public void MachineManagementWithoutHostedMarker_IsNotBlocked()
     {
-        Assert.That(
-            RunnerHostService.DecideManagedHostedRunnerCredential(true, RunnerCredentialValidationResult.Valid, true),
-            Is.EqualTo(ManagedHostedRunnerCredentialDecision.ReusePersistedCredential));
-    }
-
-    [Test]
-    public void ManagedHostedRunner_RevokedCredentialFallsBackToEnrollment()
-    {
-        Assert.That(
-            RunnerHostService.DecideManagedHostedRunnerCredential(true, RunnerCredentialValidationResult.Rejected, true),
-            Is.EqualTo(ManagedHostedRunnerCredentialDecision.Enroll));
-    }
-
-    [Test]
-    public void ManagedHostedRunner_RevokedCredentialWithoutTokenFailsClosed()
-    {
-        Assert.That(
-            RunnerHostService.DecideManagedHostedRunnerCredential(true, RunnerCredentialValidationResult.Rejected, false),
-            Is.EqualTo(ManagedHostedRunnerCredentialDecision.FailClosed));
-    }
-
-    [Test]
-    public void ManagedHostedRunner_WithoutCredentialUsesEnrollment()
-    {
-        Assert.That(
-            RunnerHostService.DecideManagedHostedRunnerCredential(false, RunnerCredentialValidationResult.Unavailable, true),
-            Is.EqualTo(ManagedHostedRunnerCredentialDecision.Enroll));
-    }
-
-    [TestCase(RunnerCredentialValidationResult.Unavailable, true)]
-    [TestCase(RunnerCredentialValidationResult.Unavailable, false)]
-    public void ManagedHostedRunner_UnavailableCredentialValidationNeverEnrolls(
-        RunnerCredentialValidationResult validationResult,
-        bool hasEnrollmentToken)
-    {
-        Assert.That(
-            RunnerHostService.DecideManagedHostedRunnerCredential(true, validationResult, hasEnrollmentToken),
-            Is.EqualTo(ManagedHostedRunnerCredentialDecision.FailClosed));
+        Assert.DoesNotThrow(() => RunnerHostService.EnsureManagedHostedRunnerIdentity("Managed", null));
+        Assert.That(RunnerHostService.ShouldRunGenericIdentityReconciliation("Managed", null), Is.True);
     }
 
     [TestCase(System.Net.HttpStatusCode.OK, RunnerCredentialValidationResult.Valid)]

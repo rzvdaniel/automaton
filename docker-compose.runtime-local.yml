@@ -130,11 +130,9 @@ services:
       PublishedApps__ApiBaseUrl: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       PublishedApps__RuntimeProxyAuthKey: ${LOCAL_RUNTIME_PROXY_AUTH_KEY:-local-runtime-secret}
       PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
-      HostedRunners__Enabled: "true"
-      HostedRunners__ServerUrl: http://api:8080
-      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-}
-      HostedRunners__DockerNetwork: automaton-runtime-local-runner
-      HostedRunners__RuntimeDockerNetwork: automaton-runtime-local-runner
+      # These options also supply the Machine Management installation command.
+      HostedRunners__ServerUrl: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
+      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-automaton-runtime-local-runner:latest}
     volumes:
       - runtime-local-api-appdata:/app/AppData
       - runtime-local-published-apps:/app/AppData/published-apps
@@ -178,11 +176,6 @@ services:
       EmailConfig__EmailUseSsl: "false"
       EmailConfig__SendEmailsInDevelopment: "true"
       Logging__File__Path: /app/logs
-      HostedRunners__Enabled: "true"
-      HostedRunners__ServerUrl: http://api:8080
-      HostedRunners__DockerImage: ${LOCAL_RUNTIME_HOSTED_RUNNER_IMAGE:-}
-      HostedRunners__DockerNetwork: automaton-runtime-local-runner
-      HostedRunners__RuntimeDockerNetwork: automaton-runtime-local-runner
     volumes:
       - runtime-local-worker-logs:/app/logs
       - runtime-local-worker-dataprotection:/app/data-protection-keys

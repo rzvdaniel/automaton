@@ -19,8 +19,7 @@ public class ManagedRunnerBootstrapServiceTests
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
         var app = SeedBackendApp(db, ownerId);
-        var applicationEvents = new BootstrapRecordingApplicationEventService();
-        var service = CreateService(db, applicationEvents);
+        var service = CreateService(db);
 
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
@@ -46,7 +45,7 @@ public class ManagedRunnerBootstrapServiceTests
         var runner = SeedConnectedRunner(db);
         SeedRunningHostedRunner(db, ownerId, planId, runner);
 
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
 
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
@@ -63,11 +62,37 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         var runnerId = PrepareConnectedHostedRunnerAssignment(db, ownerId, app, deleted: true);
 
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
 
         await AssertUnavailableAndAssignmentAsync(
             db, service, app.Id, ownerId, AppDeployStates.ManagedRuntimeUnavailable,
-            "no longer eligible", runnerId, containsMessage: true);
+            "Assign a Management Runner", runnerId, containsMessage: true);
+    }
+
+    [TestCase("Pending")]
+    [TestCase("Provisioning")]
+    [TestCase("Running")]
+    [TestCase("Failed")]
+    [TestCase("Reprovisioning")]
+    public async Task EnsureRunnerAssignmentAsync_RejectsRetiredHostedAssignmentWithoutRetry(string status)
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var app = SeedBackendApp(db, ownerId);
+        var runnerId = PrepareConnectedHostedRunnerAssignment(db, ownerId, app);
+        db.HostedRunners.Single().Status = status;
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsReady, Is.False);
+            Assert.That(result.RequiresRetry, Is.False);
+            Assert.That(result.Message, Does.Contain("Assign a Management Runner"));
+            Assert.That(app.DeploymentTargets.Single().ExecutionRunnerId, Is.EqualTo(runnerId));
+            Assert.That(db.HostedRunners.Single().Status, Is.EqualTo(status));
+        });
     }
 
     [Test]
@@ -77,7 +102,7 @@ public class ManagedRunnerBootstrapServiceTests
         var ownerId = Guid.NewGuid();
         var app = SeedBackendApp(db, ownerId);
         var runnerId = PrepareSelfHostedRunnerAssignment(db, ownerId, app, RunnerApplicationProfiles.MachineManagement);
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
         await AssertReadyForSelfHostedRunnerAsync(db, service, app.Id, ownerId, runnerId);
     }
 
@@ -89,7 +114,7 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         var runnerId = PrepareSelfHostedRunnerAssignment(
             db, ownerId, app, RunnerApplicationProfiles.PrivilegedHost, privilegedHostApproved: true);
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
         await AssertReadyForSelfHostedRunnerAsync(db, service, app.Id, ownerId, runnerId);
     }
 
@@ -102,7 +127,7 @@ public class ManagedRunnerBootstrapServiceTests
         PrepareSelfHostedRunnerAssignment(db, ownerId, app, RunnerApplicationProfiles.Standard, offline: true);
 
         await AssertUnavailableAsync(
-            CreateService(db, new BootstrapRecordingApplicationEventService()),
+            CreateService(db),
             app.Id, ownerId, AppDeployStates.ManagedRuntimeUnavailable,
             "The assigned Runner is offline.", containsMessage: false);
     }
@@ -117,9 +142,9 @@ public class ManagedRunnerBootstrapServiceTests
 
         await AssertUnavailableAndAssignmentAsync(
             db,
-            CreateService(db, new BootstrapRecordingApplicationEventService()),
+            CreateService(db),
             app.Id, ownerId, AppDeployStates.ManagedRuntimeUnavailable,
-            "no longer eligible", runnerId, containsMessage: true);
+            "Assign a Management Runner", runnerId, containsMessage: true);
     }
 
     [Test]
@@ -130,7 +155,7 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         SeedOnlineInfrastructureRunnerAsHostedRunnerRecord(db, ownerId);
 
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
 
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
         Assert.That(result.Message, Does.Contain("Assign a Management Runner"));
@@ -150,7 +175,7 @@ public class ManagedRunnerBootstrapServiceTests
 
         await AssertLegacyInfrastructureAssignmentUnavailableAsync(
             db,
-            CreateService(db, new BootstrapRecordingApplicationEventService()),
+            CreateService(db),
             app.Id, ownerId, runnerId);
     }
 
@@ -162,7 +187,7 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         SeedMissingPersistedAssignment(db, ownerId, app);
 
-        var service = CreateService(db, new BootstrapRecordingApplicationEventService());
+        var service = CreateService(db);
 
         await AssertMissingAssignmentUnavailableAsync(db, service, app.Id, ownerId);
     }

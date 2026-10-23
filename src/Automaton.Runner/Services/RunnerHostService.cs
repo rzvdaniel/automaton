@@ -68,16 +68,10 @@ public class RunnerHostService
 
             var enrollmentApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
             var runnerPurpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+            EnsureManagedHostedRunnerIdentity(runnerPurpose, Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"));
             await EnsureInfrastructureRunnerRegisteredAsync(runnerPurpose, enrollmentApiKey);
 
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-            if (RunnerIdentityPolicy.IsManagedHostedRunner(
-                    runnerPurpose,
-                    Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID")))
-            {
-                apiKey = await ResolveManagedHostedRunnerCredentialAsync(apiKey);
-            }
-
             if (string.IsNullOrEmpty(apiKey))
             {
                 var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
@@ -98,8 +92,6 @@ public class RunnerHostService
             // Check if runner is registered - if not, use environment variable or default name
             if (!configService.IsRunnerRegistered())
             {
-                EnsureManagedHostedRunnerIdentity(runnerPurpose, Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"));
-
                 logger.Warning("Runner not registered - will register with default name");
                 
                 // Priority: AUTOMATON_RUNNER_NAME env var > Service-{MachineName}
@@ -140,33 +132,6 @@ public class RunnerHostService
         if (await RegisterInfrastructureRunnerAsync(enrollmentApiKey!)) return;
         logger.Error("Infrastructure Runner self-registration failed");
         throw new InvalidOperationException("Infrastructure Runner self-registration failed.");
-    }
-
-    private async Task<string?> ResolveManagedHostedRunnerCredentialAsync(string? persistedApiKey)
-    {
-        var hasPersistedCredential = !string.IsNullOrWhiteSpace(persistedApiKey);
-        var validationResult = hasPersistedCredential
-            ? await apiKeyAuthService.ValidateRunnerCredentialWithServerAsync(persistedApiKey!)
-            : RunnerCredentialValidationResult.Unavailable;
-        var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
-        var decision = DecideManagedHostedRunnerCredential(
-            hasPersistedCredential,
-            validationResult,
-            !string.IsNullOrWhiteSpace(enrollmentToken));
-
-        if (decision == ManagedHostedRunnerCredentialDecision.ReusePersistedCredential)
-        {
-            return persistedApiKey;
-        }
-
-        if (decision == ManagedHostedRunnerCredentialDecision.Enroll
-            && await EnrollAsync())
-        {
-            return await apiKeyAuthService.GetValidApiKeyAsync();
-        }
-
-        throw new InvalidOperationException(
-            "Managed Hosted Runner authentication is unavailable. Re-enroll or reprovision the Hosted Runner.");
     }
 
     /// <summary>
@@ -803,28 +768,12 @@ public class RunnerHostService
     {
         if (RunnerIdentityPolicy.IsManagedHostedRunner(purpose, hostedRunnerId))
         {
-            throw new InvalidOperationException("Managed Hosted Runner identity is unavailable. Re-enroll or reprovision the Hosted Runner.");
+            throw new InvalidOperationException("Per-user Hosted Runner execution is retired. Install a Machine Management Runner and assign apps explicitly.");
         }
     }
 
     internal static bool ShouldRunGenericIdentityReconciliation(string? purpose, string? hostedRunnerId)
         => !RunnerIdentityPolicy.IsManagedHostedRunner(purpose, hostedRunnerId);
-
-    internal static ManagedHostedRunnerCredentialDecision DecideManagedHostedRunnerCredential(
-        bool hasPersistedCredential,
-        RunnerCredentialValidationResult validationResult,
-        bool hasEnrollmentToken)
-    {
-        if (hasPersistedCredential && validationResult == RunnerCredentialValidationResult.Valid)
-        {
-            return ManagedHostedRunnerCredentialDecision.ReusePersistedCredential;
-        }
-
-        return validationResult == RunnerCredentialValidationResult.Rejected && hasEnrollmentToken
-            || !hasPersistedCredential && hasEnrollmentToken
-            ? ManagedHostedRunnerCredentialDecision.Enroll
-            : ManagedHostedRunnerCredentialDecision.FailClosed;
-    }
 
     internal Task<bool> EnrollAsync()
         => enrollmentWorkflow.EnrollAsync();

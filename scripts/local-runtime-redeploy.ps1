@@ -70,5 +70,5 @@ Write-Host "smtp4dev:           http://localhost:3001"
 Write-Host "Traefik ping:       http://localhost:8082/ping"
 Write-Host ""
 Write-Host "[INFO] Runtime-local does not create a schedulable Runner Host." -ForegroundColor Yellow
-Write-Host "       Hosted Runner acceptance requires a non-production eligible Runner Host with an online protocol-4 Infrastructure Runner, HostContainerExecution, and an immutable Hosted Runner image digest."
-Write-Host "       See docs/architecture/local-runtime-hosted-acceptance.md before using -ProvisionTestRunner."
+
+Write-Host "       Install a Machine Management Runner through Studio, assign the app explicitly, and follow docs/prod/self-hosted-runners.md."

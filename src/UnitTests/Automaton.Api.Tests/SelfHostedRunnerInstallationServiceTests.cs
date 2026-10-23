@@ -18,6 +18,31 @@ namespace Automaton.Api.Tests;
 public sealed class SelfHostedRunnerInstallationServiceTests
 {
     [Test]
+    public async Task MachineManagementInstallation_UsesConfiguredDevelopmentApiAndImage()
+    {
+        const string developmentApi = "https://api.automaton.test:8443";
+        const string developmentImage = "dev.example.test/automaton/runner@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(
+            db, Guid.NewGuid(), developmentApi, developmentImage);
+
+        var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "development-machine",
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+            AcknowledgeHostAccess = true
+        }, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.InstallationCommand, Does.Contain($"AUTOMATON_SERVER_URL='{developmentApi}'"));
+            Assert.That(response.InstallationCommand, Does.Contain($"runner_image='{developmentImage}'"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("api.automaton.monster"));
+            Assert.That(response.InstallationCommand, Does.Not.Contain("automaton-runner:latest"));
+        });
+    }
+
+    [Test]
     public async Task Create_StoresOnlyHashAndBuildsIsolatedStandardCommand()
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
