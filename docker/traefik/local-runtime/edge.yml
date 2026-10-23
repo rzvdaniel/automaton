@@ -4,11 +4,11 @@ http:
       entryPoints: [web]
       rule: "HostRegexp(`^.+$`)"
       middlewares: [local-redirect]
-      service: local-api
+      service: api-live-edge
     local-api:
       entryPoints: [websecure]
       rule: "HostRegexp(`^api\\..+$`)"
-      service: local-api
+      service: api-live-edge
       tls: {}
     local-studio:
       entryPoints: [websecure]
@@ -26,7 +26,7 @@ http:
         scheme: https
         permanent: true
   services:
-    local-api:
+    api-live-edge:
       loadBalancer:
         servers:
           - url: "http://api:8080"

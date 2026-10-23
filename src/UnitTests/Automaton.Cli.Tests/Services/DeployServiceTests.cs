@@ -151,6 +151,31 @@ public class DeployServiceTests
         AssertCheck(result, DeployCheckNames.PackageDeploy, true, "deployed");
     }
 
+    [TestCase(false, 0)]
+    [TestCase(false, 1)]
+    [TestCase(true, 0)]
+    public async Task DeployAsync_WhenRuntimeDidNotDeploy_ReturnsFailure(bool runtimeSucceeded, int runnerCount)
+    {
+        var projectRoot = CreateProjectRoot();
+        var fixture = new DeployServiceTestProject(projectRoot);
+        fixture.Configure();
+        const string reason = "Application container failed readiness; previous runtime was retained.";
+        var service = fixture.CreateService(new DeployRuntimeResult(runtimeSucceeded, runnerCount, reason));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.Summary, Is.EqualTo("Deploy failed"));
+            Assert.That(result.RuntimeRunning, Is.False);
+            Assert.That(result.HasWarnings, Is.False);
+            Assert.That(result.Checks.Single(check => check.Name == DeployCheckNames.PackageDeploy).IsWarning, Is.False);
+            Assert.That(result.NextSteps.Any(step => step.Contains("Inspect the deployment failure", StringComparison.Ordinal)), Is.True);
+        });
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, reason);
+    }
+
     [Test]
     public async Task DeployAsync_WhenManagedRuntimeIsPreparing_ReturnsManagedRuntimeNextSteps()
     {
@@ -162,8 +187,8 @@ public class DeployServiceTests
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
-        Assert.That(result.Success, Is.True);
-        Assert.That(result.HasWarnings, Is.True);
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.HasWarnings, Is.False);
         Assert.That(result.NextSteps, Does.Contain("Managed runtime is being prepared. Rerun automaton deploy in a moment."));
         Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
         AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed runtime is being prepared.");
@@ -200,7 +225,7 @@ public class DeployServiceTests
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
-        Assert.That(result.Success, Is.True);
+        Assert.That(result.Success, Is.False);
         Assert.That(result.NextSteps, Does.Contain("The assigned Runner does not support the current container-based application deployment protocol."));
         Assert.That(result.NextSteps, Does.Contain("Ask an administrator to upgrade the Hosted Runner, or assign a compatible Runner, then rerun automaton deploy."));
         Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
@@ -269,7 +294,7 @@ public class DeployServiceTests
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
-        Assert.That(result.Success, Is.True);
+        Assert.That(result.Success, Is.False);
         Assert.That(result.NextSteps, Does.Contain("This app is assigned to a runner, but that runner is not currently connected."));
         Assert.That(result.NextSteps, Does.Contain("Bring the assigned runner online or reassign the app to a healthy runner in Automaton Studio, then rerun automaton deploy."));
         Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
