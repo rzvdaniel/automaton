@@ -74,8 +74,8 @@ internal static class WorkerHostApplication
         services.AddTransient<UserRegisteredCapSubscriber>();
         services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
         services.AddHostedService<CliAuthorizationCleanupService>();
-        services.AddHostedService<ActionSchedulePollingService>();
         services.AddHostedService<RetiredStorageScheduleCleanup>();
+        services.AddHostedService<ActionSchedulePollingService>();
     }
 
     private static void ConfigureDataProtection(HostApplicationBuilder builder)
