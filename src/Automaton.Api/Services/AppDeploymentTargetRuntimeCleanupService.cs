@@ -12,6 +12,17 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
     ApplicationDbContext dbContext,
     IRunnerActionCommands gateway)
 {
+    public async Task<bool> CleanupForDeletionAsync(
+        AppDeploymentTarget target, bool abandonOfflineRuntime, CancellationToken cancellationToken)
+    {
+        if (abandonOfflineRuntime && !RunnerPresenceEvaluator.HasRecentHeartbeat(
+                target.ExecutionRunner?.LastHeartbeatAtUtc, DateTime.UtcNow))
+            return false;
+
+        await CleanupRuntimeAsync(target, cancellationToken);
+        return true;
+    }
+
     public async Task CleanupRuntimeAsync(
         AppDeploymentTarget target,
         CancellationToken cancellationToken,

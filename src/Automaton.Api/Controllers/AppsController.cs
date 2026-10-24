@@ -228,11 +228,19 @@ public class AppsController : BaseController
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = "AllowApiKey")]
     [ServiceFilter(typeof(AppDeploymentTargetExceptionFilter))]
-    public async Task<IActionResult> Delete(Guid id, [FromQuery] bool recoverInterrupted = false)
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromQuery] bool recoverInterrupted = false,
+        [FromQuery] bool abandonOfflineRuntimes = false)
     {
-        if (recoverInterrupted && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
-        await appsService.Remove(id, recoverInterrupted);
+        var apiKeyScope = User.FindFirst("api_key_scope")?.Value;
+        if (apiKeyScope is not null && apiKeyScope is not ("Developer" or "FullAccess")) return Forbid();
+        if ((recoverInterrupted || abandonOfflineRuntimes) && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
+        if (abandonOfflineRuntimes && !recoverInterrupted)
+            return BadRequest(new { message = "Abandoning offline runtimes requires interrupted-deletion recovery." });
+        await appsService.Remove(id, recoverInterrupted, abandonOfflineRuntimes);
 
         return NoContent();
     }
