@@ -171,7 +171,7 @@ run_source_build_service() (
         return 1
     }
     local builder_driver
-    builder_driver=$(docker buildx inspect --format '{{.Driver}}') || return 1
+    builder_driver=$(docker buildx inspect | sed -n 's/^Driver:[[:space:]]*//p') || return 1
     case "$builder_driver" in
         docker|docker-container) ;;
         *) echo '[ERROR] Run capacity admission on the selected remote builder host before building; local checks cannot establish its headroom.' >&2; return 1 ;;

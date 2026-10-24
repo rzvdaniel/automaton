@@ -45,7 +45,11 @@ COMPOSE_FILE="$TEST_REPO/docker-compose.prod.yml"
 BUILD_LOG="$TEST_REPO/build.log"
 docker() {
     if [[ "$*" == 'buildx version' ]]; then return; fi
-    if [[ "$*" == 'buildx inspect --format {{.Driver}}' ]]; then echo docker; return; fi
+    if [[ "$*" == 'buildx inspect' ]]; then
+        [[ "${builder_driver_fixture:-docker}" != inspect-error ]] || return 42
+        printf 'Name: default\nDriver:        %s\n\nNodes:\n' "${builder_driver_fixture:-docker}"
+        return
+    fi
     printf '%s|%s\n' "$*" "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}" >> "$BUILD_LOG"
     [[ -f "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}/tracked.txt" ]]
 }
@@ -53,6 +57,22 @@ run_source_build api blue "$REVISION_A"
 build_context="$(cut -d'|' -f2 "$BUILD_LOG")"
 [[ -n "$build_context" ]]
 ! test -e "$build_context"
+
+# Ubuntu's packaged Buildx has no inspect --format flag. Its standard Driver
+# header accepts both local drivers and must still reject remote/failed inspection.
+builder_driver_fixture=docker-container
+: > "$BUILD_LOG"
+run_source_build api blue "$REVISION_A"
+[[ -s "$BUILD_LOG" ]]
+for builder_driver_fixture in remote unrecognized inspect-error; do
+    : > "$BUILD_LOG"
+    if run_source_build api blue "$REVISION_A"; then
+        echo "Unsupported/failed builder inspection unexpectedly reached deployment." >&2
+        exit 1
+    fi
+    [[ ! -s "$BUILD_LOG" ]]
+done
+unset builder_driver_fixture
 
 # The standalone worker rebuild uses the same tracked snapshot boundary.
 if grep -Fq 'docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans worker' "$TEST_SCRIPT_DIR/../prod-redeploy-worker.sh"; then
@@ -65,7 +85,7 @@ grep -Fq 'run_source_build_service worker "$PRODUCTION_REVISION" --remove-orphan
 : > "$BUILD_LOG"
 docker() {
     if [[ "$*" == 'buildx version' ]]; then return; fi
-    if [[ "$*" == 'buildx inspect --format {{.Driver}}' ]]; then echo docker; return; fi
+    if [[ "$*" == 'buildx inspect' ]]; then printf 'Driver: docker\n'; return; fi
     printf '%s|%s\n' "$*" "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}" >> "$BUILD_LOG"
     return 42
 }
