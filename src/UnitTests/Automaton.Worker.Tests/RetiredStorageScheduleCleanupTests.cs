@@ -11,12 +11,12 @@ public sealed class RetiredStorageScheduleCleanupTests
     [TestCase(RetiredStorageScheduleKeys.HostedRunner, true)]
     [TestCase(RetiredStorageScheduleKeys.RunnerHost, false)]
     [TestCase(RetiredStorageScheduleKeys.RunnerHost, true)]
-    public async Task StartAsync_DisablesRetiredSystemSchedulesWithoutChangingUserSchedules(string key, bool legacyIdentity)
+    public async Task StartAsync_DeletesRetiredSystemSchedulesAndRelatedDataWithoutChangingUserSchedules(string key, bool legacyIdentity)
     {
         await using var fixture = await RetiredStorageScheduleCleanupFixture.CreateAsync();
         await fixture.SeedRetiredScheduleAsync(key, legacyIdentity);
         await fixture.SeedTwiceAsync();
-        await fixture.AssertRetiredScheduleDisabledAsync(key);
+        await fixture.AssertRetiredScheduleDeletedAsync(key);
     }
 
 }

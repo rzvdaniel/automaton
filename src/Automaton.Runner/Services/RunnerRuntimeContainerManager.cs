@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Automaton.Runner.Console.Services;
 
 /// <summary>
-/// Supervises managed application containers. The Runner owns lifecycle and
+/// Manages managed application containers. The Runner owns lifecycle and
 /// readiness; the application image owns the process and its HTTP behavior.
 /// </summary>
 public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
@@ -19,10 +19,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveContainer> active = [];
     private readonly HashSet<string> pendingReconciliation = new(StringComparer.OrdinalIgnoreCase);
-    private readonly CancellationTokenSource supervisionCts = new();
+    private readonly CancellationTokenSource reconciliationCts = new();
     private int disposed;
     private volatile bool acceptingLifecycleWork;
-    private Task? supervisionTask;
+    private Task? reconciliationTask;
 
     public RunnerRuntimeContainerManager(
         RunnerWorkspaceService workspace,
@@ -42,8 +42,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         acceptingLifecycleWork = true;
         // Brokered runtimes depend on the authenticated Hub connection. Defer
-        // their recovery until supervision is running so host startup can
-        // complete and establish that connection first.
+        // their startup recovery until the connection is available.
         var deferReconciliation = containers is IScopedApplicationContainerRuntime;
         foreach (var metadataPath in workspace.EnumerateDeploymentMetadataPaths())
         {
@@ -62,7 +61,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
                 logger.LogWarning(ex, "Could not reconcile managed application container metadata from {MetadataPath}", metadataPath);
             }
         }
-        supervisionTask = Task.Run(() => SuperviseAsync(supervisionCts.Token), CancellationToken.None);
+        if (pendingReconciliation.Count > 0)
+            reconciliationTask = Task.Run(() => RetryPendingReconciliationUntilCompleteAsync(reconciliationCts.Token), CancellationToken.None);
     }
 
     private async Task ReconcileMetadataAsync(string metadataPath, CancellationToken cancellationToken)
@@ -228,9 +228,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         acceptingLifecycleWork = false;
-        supervisionCts.Cancel();
-        if (supervisionTask is not null)
-            await supervisionTask.WaitAsync(cancellationToken);
+        reconciliationCts.Cancel();
+        if (reconciliationTask is not null)
+            await reconciliationTask.WaitAsync(cancellationToken);
         lock (gate)
         {
             foreach (var runtime in active.Values)
@@ -243,8 +243,8 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)
             return;
-        supervisionCts.Cancel();
-        supervisionCts.Dispose();
+        reconciliationCts.Cancel();
+        reconciliationCts.Dispose();
     }
 
     public async Task<RuntimeApplyResult> ApplyAsync(
@@ -734,77 +734,20 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         }
     }
 
-    private async Task SuperviseAsync(CancellationToken cancellationToken)
+    private async Task RetryPendingReconciliationUntilCompleteAsync(CancellationToken cancellationToken)
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (!cancellationToken.IsCancellationRequested)
             {
                 await RetryPendingReconciliationAsync(cancellationToken);
-                ActiveContainer[] runtimes;
-                lock (gate) runtimes = active.Values.ToArray();
-                foreach (var runtime in runtimes)
-                    if (!await SuperviseRuntimeAsync(runtime, cancellationToken)) return;
+                lock (gate)
+                    if (pendingReconciliation.Count == 0) return;
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-        }
-    }
-
-    private async Task<bool> SuperviseRuntimeAsync(ActiveContainer runtime, CancellationToken cancellationToken)
-    {
-        DockerContainerIdentity identity;
-        try
-        {
-            identity = await InspectAsync(runtime.AppId, runtime.TargetId, runtime.ContainerId, cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not inspect managed runtime container {ContainerId}.", runtime.ContainerId);
-            return true;
-        }
-
-        if (identity.Exists && identity.Running) return true;
-        if (!RemoveCurrentRuntime(runtime)) return true;
-        await PersistExitedRuntimeAsync(runtime);
-        return true;
-    }
-
-    private bool RemoveCurrentRuntime(ActiveContainer runtime)
-    {
-        var key = new DeploymentRuntimeKey(runtime.AppId, runtime.TargetId);
-        lock (gate)
-        {
-            if (!active.TryGetValue(key, out var current)
-                || !string.Equals(current.ContainerId, runtime.ContainerId, StringComparison.Ordinal))
-                return false;
-            active.Remove(key);
-        }
-        registry.Remove(runtime.AppId, runtime.TargetId);
-        return true;
-    }
-
-    private async Task PersistExitedRuntimeAsync(ActiveContainer runtime)
-    {
-        try
-        {
-            var path = metadataStore.GetPath(runtime.AppId, runtime.TargetId);
-            var metadata = await metadataStore.ReadAsync(path, CancellationToken.None);
-            if (metadata is null || !string.Equals(metadata.ContainerId, runtime.ContainerId, StringComparison.Ordinal)) return;
-            metadata.State = RuntimeReadinessState.Failed;
-            metadata.EffectivePort = null;
-            metadata.LastError = "The managed runtime container exited unexpectedly.";
-            await metadataStore.WriteAsync(metadata, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not persist failed state for exited runtime {ContainerId}.", runtime.ContainerId);
         }
     }
 

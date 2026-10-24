@@ -99,29 +99,30 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
-    public async Task ExitedCurrentIsRemovedFromRegistryAndMarkedFailed()
+    public async Task ExitedCurrentIsNotContinuouslyInspected()
     {
         var fake = new FakeContainerRuntime();
-        var (manager, workspace, appId, targetId) = CreateManager(fake);
+        var registry = new RunnerRuntimeRegistry();
+        var (manager, workspace, appId, targetId) = CreateManager(fake, registry);
         await manager.StartAsync(CancellationToken.None);
         await manager.ApplyAsync(appId, targetId, Contract(19004));
+        var port = fake.LastRequest!.HostPort;
         fake.Running["container-1"] = false;
 
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            await Task.Delay(250);
-            var current = await ReadMetadataAsync(workspace, appId, targetId);
-            if (current.State == RuntimeReadinessState.Failed)
-                break;
-        }
+        await Task.Delay(2500);
+
         var metadata = await ReadMetadataAsync(workspace, appId, targetId);
-        Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Failed));
-        Assert.That(metadata.EffectivePort, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(metadata.EffectivePort, Is.EqualTo(port));
+            Assert.That(registry.IsPortRegistered(port), Is.True);
+        });
         await manager.StopAsync(CancellationToken.None);
     }
 
     [Test]
-    public async Task TransientInspectFailureKeepsReadyRuntimeRegistered()
+    public async Task RuntimeManagerDoesNotInspectContainersInTheBackground()
     {
         var fake = new FakeContainerRuntime();
         var registry = new RunnerRuntimeRegistry();
