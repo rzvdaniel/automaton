@@ -25,7 +25,7 @@ public sealed class AccountStorageProjectMigrationTests
         await AddHostedRunnerAsync(db, firstAccount, 1_234_567);
         await AddHostedRunnerAsync(db, secondAccount, 1_234_568);
 
-        await db.Database.MigrateAsync();
+        await db.Database.MigrateAsync(StorageIdentityMigration);
 
         var firstProject = await GetProjectAsync(db, firstAccount);
         var secondProject = await GetProjectAsync(db, secondAccount);
@@ -55,7 +55,7 @@ public sealed class AccountStorageProjectMigrationTests
         await AddHostedRunnerAsync(db, accountId, 1_234_567);
         await AddHostedRunnerAsync(db, accountId, 1_234_568);
 
-        var exception = Assert.ThrowsAsync<SqliteException>(() => db.Database.MigrateAsync());
+        var exception = Assert.ThrowsAsync<SqliteException>(() => db.Database.MigrateAsync(StorageIdentityMigration));
 
         Assert.That(exception!.Message, Does.Contain("CHECK constraint failed"));
         Assert.That(await TableExistsAsync(db, "AccountStorageAllocations"), Is.False);

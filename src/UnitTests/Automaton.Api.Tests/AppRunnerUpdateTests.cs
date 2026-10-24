@@ -22,11 +22,9 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AppRunnerUpdateTests
 {
-    [TestCase(true, true)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(false, false)]
-    public async Task Update_AuthenticationChangeRefreshesDeployedRoutes(bool requiresAuthentication, bool hosted)
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Update_AuthenticationChangeRefreshesDeployedRoutes(bool requiresAuthentication)
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -34,7 +32,7 @@ public class AppRunnerUpdateTests
         using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
         await using var db = AppAuthorizationTestData.CreateDbContext();
         var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
-        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, hosted, !requiresAuthentication);
+        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, !requiresAuthentication);
         var model = service.Get(appId);
         model.RequiresAuthentication = requiresAuthentication;
 
@@ -43,22 +41,22 @@ public class AppRunnerUpdateTests
         var content = await File.ReadAllTextAsync(Path.Combine(tempRoot.Path, "AppData", "traefik-dynamic", "managed-runtime-routes.yml"));
         Assert.That(content, Does.Contain($"private-{appId:N}-runtime"));
         Assert.That(content.Contains("forwardAuth:", StringComparison.Ordinal), Is.EqualTo(requiresAuthentication));
-        Assert.That(content, Does.Contain(hosted ? "http://runner-test:8080" : "api-live-edge"));
+        Assert.That(content, Does.Contain("service: \"api-live-edge\""));
     }
 
     private static async Task SeedDeployedAuthenticationAppAsync(
         ApplicationDbContext db, AppsService service, Guid ownerId, Guid appId, Guid runnerId,
-        bool hosted, bool requiresAuthentication)
+        bool requiresAuthentication)
     {
         AppAuthorizationTestData.SeedApp(db, appId, ownerId, "owner-app");
         AppAuthorizationRunnerTestData.SeedManagedRunner(db, runnerId, ownerId);
         _ = service.Get(appId);
         AppAuthorizationDeploymentTestData.SetDefaultDeploymentTarget(db, appId, runnerId, genericRuntimeDeployed: true);
-        await SeedAuthenticationRouteAsync(db, ownerId, runnerId, hosted, requiresAuthentication);
+        await SeedAuthenticationRouteAsync(db, ownerId, requiresAuthentication);
     }
 
     private static async Task SeedAuthenticationRouteAsync(
-        ApplicationDbContext db, Guid ownerId, Guid runnerId, bool hosted, bool requiresAuthentication)
+        ApplicationDbContext db, Guid ownerId, bool requiresAuthentication)
     {
         var entity = await db.WebApps.SingleAsync();
         entity.RequiresAuthentication = requiresAuthentication;
@@ -69,23 +67,12 @@ public class AppRunnerUpdateTests
                 Command = new() { Executable = "custom-server" }, Port = 5000
             }
         });
-        if (hosted)
-        {
-            db.HostedRunners.Add(new HostedRunner
-            {
-                Id = Guid.NewGuid(), UserId = ownerId, RunnerId = runnerId,
-                Name = "hosted", Status = "Running", ContainerName = "runner-test",
-                RuntimeEndpoint = "http://runner-test:8080"
-            });
-        }
         await db.SaveChangesAsync();
     }
 
-    [TestCase(true, true)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(false, false)]
-    public async Task Update_FailedAuthenticationRouteWrite_SameValueRetryRepairsRoute(bool requiresAuthentication, bool hosted)
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Update_FailedAuthenticationRouteWrite_SameValueRetryRepairsRoute(bool requiresAuthentication)
     {
         var ownerId = Guid.NewGuid();
         var appId = Guid.NewGuid();
@@ -93,7 +80,7 @@ public class AppRunnerUpdateTests
         using var tempRoot = new AppAuthorizationTestData.TemporaryDirectory();
         await using var db = AppAuthorizationTestData.CreateDbContext();
         var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
-        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, hosted, requiresAuthentication);
+        await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, requiresAuthentication);
         var model = service.Get(appId);
         model.RequiresAuthentication = !requiresAuthentication;
         await service.Update(appId, model);
