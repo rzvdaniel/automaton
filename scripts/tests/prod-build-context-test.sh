@@ -54,6 +54,7 @@ docker() {
     [[ -f "${AUTOMATON_PRODUCTION_BUILD_CONTEXT:-}/tracked.txt" ]]
 }
 run_source_build api blue "$REVISION_A"
+grep -Fq 'up -d --build --no-deps api-blue' "$BUILD_LOG"
 build_context="$(cut -d'|' -f2 "$BUILD_LOG")"
 [[ -n "$build_context" ]]
 ! test -e "$build_context"

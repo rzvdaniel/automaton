@@ -190,7 +190,7 @@ run_source_build_service() (
     trap 'rm -rf -- "$context"' EXIT HUP INT TERM
     AUTOMATON_PRODUCTION_BUILD_CONTEXT="$context" \
         AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" \
-        docker compose -f "$COMPOSE_FILE" up -d --build "${compose_options[@]}" "$compose_service"
+        docker compose -f "$COMPOSE_FILE" up -d --build --no-deps "${compose_options[@]}" "$compose_service"
 )
 
 validate_recovery_artifact_reference() {
@@ -886,7 +886,7 @@ ensure_infrastructure() {
     storage_require_local_docker || return 1
     ensure_blue_green_bootstrap
     echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and traefik are up"
-    docker compose -f "$COMPOSE_FILE" up -d mysql rabbitmq worker traefik
+    docker compose -f "$COMPOSE_FILE" up -d --no-recreate mysql rabbitmq worker traefik
     wait_for_service_healthy mysql 120
     wait_for_service_healthy rabbitmq 120
     wait_for_service_healthy worker 120
@@ -960,7 +960,7 @@ deploy_color() {
         validate_recovery_artifact_reference "$service" "$recovery_artifact_reference" || return 1
         local recovery_tag="${recovery_artifact_reference#"$image_name:"}"
         echo "[INFO] Reusing verified recovery artifact $recovery_artifact_reference for $compose_service"
-        AUTOMATON_PRODUCTION_IMAGE_TAG="$recovery_tag" docker compose -f "$COMPOSE_FILE" up -d --no-build "$compose_service"
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$recovery_tag" docker compose -f "$COMPOSE_FILE" up -d --no-build --no-deps "$compose_service"
     else
         validate_revision "$revision"
     if ! docker image inspect "$image_name:$revision" >/dev/null 2>&1; then
@@ -973,7 +973,7 @@ deploy_color() {
         docker tag "$image_name:$revision" "$image_name:latest"
     else
         echo "[INFO] Reusing immutable rollback image $image_name:$revision for $compose_service"
-        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --no-build "$compose_service"
+        AUTOMATON_PRODUCTION_IMAGE_TAG="$revision" docker compose -f "$COMPOSE_FILE" up -d --no-build --no-deps "$compose_service"
         docker tag "$image_name:$revision" "$image_name:latest"
     fi
     fi

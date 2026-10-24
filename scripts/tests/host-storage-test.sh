@@ -84,4 +84,12 @@ create_production_build_context() { echo mutation >> "$fixture/mutations"; }
 if ensure_infrastructure; then exit 1; fi
 if run_source_build_service api-blue 1234567; then exit 1; fi
 [[ ! -e "$fixture/mutations" ]]
+# Infrastructure startup may create missing services, but must preserve existing
+# broker/database containers with operational hostname/image overrides.
+storage_check() { :; }
+storage_require_local_docker() { :; }
+ensure_blue_green_bootstrap() { :; }
+wait_for_service_healthy() { :; }
+docker() { [[ "$*" == "compose -f $COMPOSE_FILE up -d --no-recreate mysql rabbitmq worker traefik" ]]; }
+ensure_infrastructure
 echo 'host storage capacity and image retention regressions passed'

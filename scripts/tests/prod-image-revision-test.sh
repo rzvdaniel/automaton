@@ -46,7 +46,7 @@ wait_for_service_healthy() { :; }
 verify_target_from_traefik_network() { :; }
 deploy_color api blue "$PRODUCTION_REVISION"
 
-printf '%s\n' "${compose_calls[@]}" | grep -q -- 'compose.*up -d --no-build api-blue'
+printf '%s\n' "${compose_calls[@]}" | grep -q -- 'compose.*up -d --no-build --no-deps api-blue'
 printf '%s\n' "${compose_calls[@]}" | grep -q -- 'tag automaton-prod-api:0123456789abcdef0123456789abcdef01234567 automaton-prod-api:latest'
 if printf '%s\n' "${compose_calls[@]}" | grep -q -- '--build'; then
     echo "Immutable image deployment must not build from source." >&2
@@ -128,7 +128,7 @@ fi
 # A recovery deployment must reuse the exact artifact without building.
 compose_calls=()
 deploy_color studio blue "$PRODUCTION_REVISION" false automaton-prod-studio:recovery
-printf '%s\n' "${compose_calls[@]}" | grep -q -- 'compose.*up -d --no-build studio-blue.*env=recovery' || {
+printf '%s\n' "${compose_calls[@]}" | grep -q -- 'compose.*up -d --no-build --no-deps studio-blue.*env=recovery' || {
     echo "Recovery deployment must use the dedicated recovery tag without building." >&2
     exit 1
 }
