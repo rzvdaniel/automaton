@@ -708,7 +708,7 @@ Current state:
 
 - `./scripts/prod-redeploy-website.sh` deploys only the website image
 - `./scripts/prod-redeploy-all.sh` deploys only the API, Studio, and website images
-- standalone runner archives are built separately by [`azure-pipelines-runner.yml`](/C:/Work/automaton/azure-pipelines-runner.yml)
+- standalone runner archives are built separately by [`azure-pipelines-runner.yml`](../../azure-pipelines-runner.yml)
 - if public `/downloads/...` assets are needed, publish them from CI artifacts or a dedicated asset-publish job outside the website blue/green deploy path
 
 Reason:
@@ -730,8 +730,6 @@ Current recommended host path:
 Recommended public URL:
 
 - `https://studio.automaton.monster/downloads/runner/latest/...`
-
-See [`docs/runners/runner-download-publishing.md`](/C:/Work/automaton/docs/runners/runner-download-publishing.md) for the current native runner distribution direction and optional archive-hosting notes.
 
 ## Logs
 
@@ -839,6 +837,8 @@ journalctl -u automaton-storage.service -u automaton-image-maintenance.service
 ```
 
 Successful production deploys also run bounded image cleanup; missing/invalid protection configuration emits a warning and leaves images untouched. Cleanup failures do not roll back a healthy deployment. Timers never purge database logs or backups. MySQL expiry, Docker GC and journald each own their retention.
+
+Maintenance evidence, 24 October 2026: host-level policies were installed on both existing servers. Capacity and image-maintenance services passed, both actual Docker builders reported the 2 GiB GC policy, and the daemon restarts preserved all running container IDs/start times using live-restore. Ubuntu's standard Buildx package was installed on the workload host without upgrading Docker. Seven-day MySQL binlog retention was verified; unbounded SQL trace logging was disabled without deleting existing logs or changing table data. The control-plane image-cleanup timer remains disabled because its older production checkout diverges from main and its deployment scripts lack the shared lock; reconcile that checkout separately before enabling automatic image deletion. Its capacity timer and native retention settings are active; workload-host timers are active. No new application binaries were deployed for retention; existing-container logging and the new application file-log limits still need their normal replacement/release. Existing explicit workload logging settings remain bounded and override daemon defaults. No external alert delivery was installed: service failures are available through the system journal.
 
 ### Investigate before emergency cleanup
 
