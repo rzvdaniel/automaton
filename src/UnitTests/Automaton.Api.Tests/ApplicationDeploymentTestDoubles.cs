@@ -190,7 +190,6 @@ internal static class DeploymentFixtureStateFactory
         db.WebApps.Add(CreateApp(appId, target));
         db.Runners.Add(runner);
         db.WebAppUsers.Add(new WebAppUser { WebAppId = appId, UserId = ownerId });
-        db.HostedRunners.Add(CreateHostedRunner(ownerId, runner.Id));
         await db.SaveChangesAsync();
 
         return new DeploymentFixtureState(db, ownerId, appId, apiIdentity, runner, target);
@@ -226,17 +225,6 @@ internal static class DeploymentFixtureStateFactory
             DeploymentTargets = { target }
         };
 
-    private static HostedRunner CreateHostedRunner(Guid ownerId, Guid runnerId)
-        => new()
-        {
-            Id = Guid.NewGuid(),
-            UserId = ownerId,
-            Name = "Package deployment hosted runner",
-            ContainerName = "package-deployment-runner",
-            Status = HostedRunnerStatuses.Running,
-            RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner:8080"
-        };
 }
 
 internal static class DeploymentFixtureServiceFactory

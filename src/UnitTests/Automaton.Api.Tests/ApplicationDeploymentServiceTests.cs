@@ -284,7 +284,7 @@ public sealed class ApplicationDeploymentServiceTests
             Assert.That(result.HasSuccessfulDeploymentTime, Is.True);
             Assert.That(result.ApplicationContractHasServer, Is.True);
             Assert.That(result.RouteExists, Is.True);
-            Assert.That(result.RouteContent, Does.Contain("http://runner:8080"));
+            Assert.That(result.RouteContent, Does.Contain("service: \"api-live-edge\""));
         });
     }
 
@@ -406,7 +406,7 @@ public sealed class ApplicationDeploymentServiceTests
             Assert.That(result.ErrorMessage, Does.Contain("no longer the active operation"));
             Assert.That(result.GenericRuntimeDeployed, Is.True);
             Assert.That(result.RouteExists, Is.True);
-            Assert.That(result.RouteContent, Does.Contain("http://runner:8080"));
+            Assert.That(result.RouteContent, Does.Contain("service: \"api-live-edge\""));
         });
     }
 

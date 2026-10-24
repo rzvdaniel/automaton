@@ -103,7 +103,10 @@ public sealed class RunnerRuntimeContainerManagerTests
     {
         var fake = new FakeContainerRuntime();
         var registry = new RunnerRuntimeRegistry();
-        var (manager, workspace, appId, targetId) = CreateManager(fake, registry);
+        var workspace = new RunnerWorkspaceService();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var manager = CreateManager(fake, registry, workspace);
         await manager.StartAsync(CancellationToken.None);
         await manager.ApplyAsync(appId, targetId, Contract(19004));
         var port = fake.LastRequest!.HostPort;
