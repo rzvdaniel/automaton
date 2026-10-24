@@ -103,7 +103,7 @@ public sealed class AppMutationAuditService(
         }
     }
 
-    public async Task RecordDeletedAsync(WebApp app, Guid ownerId)
+    public async Task RecordDeletedAsync(WebApp app, Guid ownerId, bool abandonedOfflineRuntimes = false)
     {
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, app.Name, app.Id);
         await auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -121,7 +121,8 @@ public sealed class AppMutationAuditService(
                 Name = app.Name,
                 app.PublicUrl,
                 ExecutionRunnerId = GetDefaultRunnerId(app),
-                OwnerUserId = ownerId
+                OwnerUserId = ownerId,
+                AbandonedOfflineRuntimes = abandonedOfflineRuntimes
             }
         });
     }

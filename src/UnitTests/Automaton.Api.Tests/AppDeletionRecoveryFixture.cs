@@ -11,14 +11,15 @@ internal sealed class AppDeletionRecoveryFixture : IAsyncDisposable
     private AppDeletionService? deletion;
     internal required AppDeploymentTargetManagementServiceTests.TestFixtureContext Context { get; init; }
 
-    internal static async Task<AppDeletionRecoveryFixture> CreateAsync()
+    internal static async Task<AppDeletionRecoveryFixture> CreateAsync(bool online = true)
     {
         var context = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
-        var runner = context.AddRunner(online: true);
+        var runner = context.AddRunner(online);
         context.App.DeletionClaimId = Guid.NewGuid();
         var target = await context.Db.AppDeploymentTargets.SingleAsync(t => t.WebAppId == context.App.Id);
         target.ExecutionRunnerId = runner.Id;
         target.Status = DeploymentTargetStatus.Deploying;
+        target.GenericRuntimeDeployed = true;
         target.CleanupPending = true;
         await context.Db.SaveChangesAsync();
         var fixture = new AppDeletionRecoveryFixture { Context = context };
@@ -27,10 +28,10 @@ internal sealed class AppDeletionRecoveryFixture : IAsyncDisposable
         return fixture;
     }
 
-    internal async Task DeleteAsync(bool recover)
+    internal async Task DeleteAsync(bool recover, bool abandonOfflineRuntimes = false)
     {
         var app = await Context.Db.WebApps.SingleAsync(a => a.Id == Context.App.Id);
-        await deletion!.DeleteResourcesAsync(app.Id, app, Context.UserId, recover);
+        await deletion!.DeleteResourcesAsync(app.Id, app, Context.UserId, recover, abandonOfflineRuntimes);
     }
 
     internal void ProbeAdmissionDuringCleanup()

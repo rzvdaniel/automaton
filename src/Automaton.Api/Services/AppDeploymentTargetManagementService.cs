@@ -292,9 +292,12 @@ public sealed partial class AppDeploymentTargetManagementService(
         Guid appId,
         CancellationToken cancellationToken = default,
         bool recoverInterrupted = false,
+        bool abandonOfflineRuntimes = false,
         Func<CancellationToken, Task>? assertDeletionOwner = null,
         Guid? deletionClaimId = null)
     {
+        if (abandonOfflineRuntimes && !recoverInterrupted)
+            throw new ArgumentException("Abandoning offline runtimes requires interrupted-deletion recovery.");
         var targetIds = await dbContext.AppDeploymentTargets
             .AsNoTracking()
             .Where(target => target.WebAppId == appId)
@@ -318,11 +321,10 @@ public sealed partial class AppDeploymentTargetManagementService(
             {
                 if (assertDeletionOwner is not null) await assertDeletionOwner(cancellationToken);
                 var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
-                if (target.ExecutionRunnerId.HasValue)
-                {
-                    await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
+                if (target.ExecutionRunnerId.HasValue &&
+                    await runtimeCleanupService.CleanupForDeletionAsync(
+                        target, abandonOfflineRuntimes, cancellationToken))
                     assignedTargets.Add(target);
-                }
             }
 
             foreach (var runnerTargets in assignedTargets.GroupBy(target => target.ExecutionRunnerId))

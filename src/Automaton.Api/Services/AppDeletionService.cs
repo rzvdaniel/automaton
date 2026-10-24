@@ -10,8 +10,11 @@ public sealed class AppDeletionService(
     AppFileStorageService fileStorageService,
     AppDeploymentTargetManagementService? deploymentTargetManagementService = null)
 {
-    public async Task DeleteResourcesAsync(Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false)
+    public async Task DeleteResourcesAsync(
+        Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
     {
+        if (abandonOfflineRuntimes && !recoverInterrupted)
+            throw new ArgumentException("Abandoning offline runtimes requires interrupted-deletion recovery.");
         await using var executor = await AppDeletionExecutionLock.AcquireAsync(dataContext, appId);
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
         Guid? appClaimId = null;
@@ -20,6 +23,9 @@ public sealed class AppDeletionService(
         try
         {
             await dataContext.Entry(app).ReloadAsync();
+            if (abandonOfflineRuntimes && !app.DeletionClaimId.HasValue)
+                throw new AppDeploymentTargetConflictException(
+                    "Offline runtime abandonment is available only for an interrupted deletion.");
             resuming = recoverInterrupted && app.DeletionClaimId.HasValue;
             appClaimId = resuming
                 ? await appClaims.RecoverAsync(executor)
@@ -29,6 +35,7 @@ public sealed class AppDeletionService(
             {
                 deletionClaims = await deploymentTargetManagementService
                     .ClaimAndCleanupAppRuntimesAsync(appId, recoverInterrupted: resuming,
+                        abandonOfflineRuntimes: abandonOfflineRuntimes,
                         assertDeletionOwner: ct => appClaims.AssertOwnedAsync(executor, appClaimId.Value, ct),
                         deletionClaimId: appClaimId.Value);
             }

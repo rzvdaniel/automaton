@@ -40,6 +40,16 @@ public sealed class AppDeletionCleanupTests
         Assert.That(await fixture.Db.WebApps.AnyAsync(a => a.Id == fixture.App.Id), Is.True);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task InterruptedDeletion_AbandonsOnlyOfflineRunnerAfterOperatorVerification(bool online)
+    {
+        await using var fixture = await AppDeletionRecoveryFixture.CreateAsync(online);
+        await fixture.DeleteAsync(recover: true, abandonOfflineRuntimes: true);
+        Assert.That(await fixture.Context.Db.WebApps.AnyAsync(a => a.Id == fixture.Context.App.Id), Is.False);
+        Assert.That(fixture.Context.Commands.Requests.Count, Is.EqualTo(online ? 2 : 0));
+    }
+
     [Test]
     public async Task DeletionClaim_RejectsNewTargetAndDeploymentFromAnotherApiDuringCleanup()
     {
