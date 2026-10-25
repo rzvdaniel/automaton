@@ -6,7 +6,7 @@ A server release must first be published by the maintainer using the **Publish A
 
 ## Before starting
 
-Have a domain you can configure, a certificate notification email, sudo access, and at least 10 GiB free disk space. An existing Docker installation needs Compose 2.24.4 or newer. Point these DNS records to the server:
+Have a domain you can configure, a certificate notification email, sudo access, and at least 10 GiB free disk space. A missing Docker Compose plugin is installed automatically from Ubuntu's repository when available, or from Docker's Ubuntu repository otherwise, without replacing an existing Docker Engine. Point these DNS records to the server:
 
 - `api.example.com`
 - `studio.example.com`
@@ -28,7 +28,7 @@ less install-automaton.sh
 sudo bash install-automaton.sh --version "$VERSION" --install-docker
 ```
 
-The version above is a placeholder. `--install-docker` authorizes installing Docker Engine and Compose from Docker's official Ubuntu repository if Docker is missing. An existing Docker installation is reused and must already have the Compose plugin. The installer does not replace existing Docker installations or remove conflicting packages automatically.
+The version above is a placeholder. `--install-docker` authorizes installing Docker Engine from Docker's official Ubuntu repository if Docker is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 
@@ -46,9 +46,11 @@ sudo cat /etc/automaton/secrets/setup-token
 
 Paste it into **Server setup token**, select **Check installation**, and create the administrator with your name, email and password. Use at least 12 characters, including uppercase, lowercase, a number and a symbol. Sign in when setup completes.
 
+The setup page and **Admin → Installation** distinguish **verified** live connection checks from **configured** saved settings. Public DNS and inbound ports stay **unverified** in Studio because checks made from inside the server cannot establish external reachability. Check them from another network. The token is read locally on the server and entered into Studio; the page never reveals its stored value.
+
 The setup token stops authorizing access after setup is committed. The initial administrator's email is confirmed through this server-owner setup flow, so SMTP is not required to get started. The durable completion marker prevents setup from reopening if accounts are later removed. Existing installations with a system administrator remain installed even without this marker.
 
-Under **Admin → Installation**, a system administrator can check database and broker connectivity and see whether signing credentials, persistent keys and optional SMTP configuration are present. Configured means presence was checked; it is not proof of delivery, durable storage or a working backup.
+Under **Admin → Installation**, a system administrator can check database and broker connectivity and see whether public URLs, signing credentials, persistent keys and optional SMTP configuration are present. Configured means presence was checked; it is not proof of delivery, durable storage or a working backup.
 
 Install a **Machine Management Runner** through the existing Studio Runner installation flow when you are ready to deploy applications. You may choose the same host or another machine. This installer does not enroll a Runner automatically or assign apps. Follow [Self-hosted Runners](self-hosted-runners.md) for that separate trust/enrollment step.
 

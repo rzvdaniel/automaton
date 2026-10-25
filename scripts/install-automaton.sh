@@ -61,8 +61,7 @@ if [[ "$ID" != ubuntu ]] || ! dpkg --compare-versions "$VERSION_ID" ge 24.04; th
     exit 1
 fi
 [[ "$(uname -m)" == x86_64 ]] || { echo 'The initial server release supports x86_64 servers.' >&2; exit 1; }
-if ! command -v docker >/dev/null; then
-    $install_docker || { echo 'Docker is missing. Re-run with --install-docker to install it from the official repository.' >&2; exit 1; }
+ensure_docker_repository() {
     apt-get update
     apt-get install -y ca-certificates curl
     install -m 0755 -d /etc/apt/keyrings
@@ -70,14 +69,24 @@ if ! command -v docker >/dev/null; then
     chmod a+r /etc/apt/keyrings/docker.asc
     printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' "$(dpkg --print-architecture)" "$VERSION_CODENAME" > /etc/apt/sources.list.d/automaton-docker.list
     apt-get update
+}
+if ! command -v docker >/dev/null; then
+    $install_docker || { echo 'Docker is missing. Re-run with --install-docker to install it from the official repository.' >&2; exit 1; }
+    ensure_docker_repository
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     systemctl enable --now docker
 fi
 docker info >/dev/null
 if ! docker compose version >/dev/null; then
-    $install_docker || { echo 'Docker Compose is missing. Install the Compose plugin or re-run with --install-docker.' >&2; exit 1; }
-    apt-get update
-    apt-get install -y docker-compose-plugin
+    if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+        apt-get install -y docker-compose-v2
+    else
+        if ! apt-cache show docker-compose-plugin >/dev/null 2>&1; then
+            ensure_docker_repository
+        fi
+        apt-get install -y docker-compose-plugin
+    fi
+    docker compose version >/dev/null
 fi
 command -v python3 >/dev/null && python3 -c 'import cryptography' 2>/dev/null || { apt-get update; apt-get install -y python3 python3-cryptography; }
 if [[ -f "$install_dir/release.env" ]] && ! cmp -s "$bundle_dir/release.env" "$install_dir/release.env"; then

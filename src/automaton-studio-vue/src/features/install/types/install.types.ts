@@ -36,6 +36,6 @@ export interface InstallFormErrors {
 
 export interface InstallationCheck {
   name: string
-  status: 'ready' | 'configured' | 'optional' | 'error'
+  status: 'verified' | 'configured' | 'unverified' | 'error'
   detail: string
 }

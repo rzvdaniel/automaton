@@ -78,6 +78,7 @@ async function submit() {
             <small class="text-color-secondary">Use the setup token saved by the installer on your server. It grants access only until administrator setup is complete.</small>
           </div>
           <SetupChecks :setup-token="setupToken" @ready="ready = $event" />
+          <Message severity="info" :closable="false">The installer needs your domain and certificate email before this page opens. If public DNS or firewall access is still unverified, check them from another network. Read the setup token on the server; Studio never displays it.</Message>
           <Message severity="info" :closable="false">Email delivery is optional during setup. Use an address you control; configure SMTP later for invitations and password recovery.</Message>
           <div class="flex flex-column gap-2">
             <label for="admin-name">Your name</label>

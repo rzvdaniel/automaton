@@ -24,7 +24,7 @@ describe('installation checks', () => {
     const wrapper = mount(SetupChecks, { ...options, props: { setupToken: 'old' } })
     await wrapper.get('button').trigger('click')
     await wrapper.setProps({ setupToken: 'new' })
-    resolve([{ name: 'Database', status: 'ready', detail: 'Connected.' }])
+    resolve([{ name: 'Database', status: 'verified', detail: 'Connected.' }])
     await flushPromises()
     expect(wrapper.emitted('ready')?.slice(-1)[0]).toEqual([false])
     expect(wrapper.text()).not.toContain('Connected.')
