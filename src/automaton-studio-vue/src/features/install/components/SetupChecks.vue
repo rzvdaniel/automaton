@@ -37,7 +37,7 @@ async function refresh() {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <div v-for="check in checks" :key="check.name" class="flex align-items-start justify-content-between gap-3">
       <div><strong>{{ check.name }}</strong><p class="text-color-secondary mt-1 mb-0">{{ check.detail }}</p></div>
-      <Tag :value="check.status" :severity="check.status === 'error' ? 'danger' : check.status === 'ready' ? 'success' : 'secondary'" />
+      <Tag :value="check.status" :severity="check.status === 'error' ? 'danger' : check.status === 'verified' ? 'success' : 'secondary'" />
     </div>
   </div>
 </template>

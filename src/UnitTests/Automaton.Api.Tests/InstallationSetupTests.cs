@@ -93,6 +93,35 @@ public sealed class InstallationEndpointTests
 }
 
 [TestFixture]
+public sealed class InstallationReadinessTests
+{
+    [Test]
+    public async Task DistinguishesLiveChecksSavedSettingsAndExternalChecks()
+    {
+        await using var db = Database();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RabbitMq:Host"] = "127.0.0.1", ["RabbitMq:Port"] = "1",
+            ["AuthenticationSettings:HMacSettings:SecretKey"] = "test-key",
+            ["DataProtection:KeysPath"] = Path.GetTempPath(),
+            ["AppConfig:ApiUrl"] = "https://api.example.invalid",
+            ["AppConfig:WebsiteUrl"] = "https://studio.example.invalid"
+        }).Build();
+
+        var checks = await InstallationReadiness.CheckAsync(db, configuration, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(checks.Single(check => check.Name == "Database").Status, Is.EqualTo("verified"));
+            Assert.That(checks.Single(check => check.Name == "Message broker").Status, Is.EqualTo("error"));
+            Assert.That(checks.Single(check => check.Name == "Public URLs").Status, Is.EqualTo("configured"));
+            Assert.That(checks.Single(check => check.Name == "Public DNS and ports").Status, Is.EqualTo("unverified"));
+            Assert.That(checks.Single(check => check.Name == "SMTP").Status, Is.EqualTo("unverified"));
+        });
+    }
+}
+
+[TestFixture]
 public sealed class OptionalGitHubAuthenticationTests
 {
     [Test]
