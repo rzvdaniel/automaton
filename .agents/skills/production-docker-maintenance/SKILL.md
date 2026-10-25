@@ -26,6 +26,15 @@ Inspect every filesystem involved, not just Docker's configured root: use `docke
 
 Include system journals, archived logs, stopped containers, build caches and task-owned staging/recovery archives in the inventory. For MySQL, report table/index size separately from binary-log bytes and inspect expiry, replica configuration and backup dependencies. Absence of connected replicas alone does not establish that recovery logs are disposable. Do not print secrets from cron jobs, service configuration or environment files while investigating backups.
 
+## Known storage locations on this host
+
+These are inventory hints from the production host, not fixed cleanup targets; recheck current mounts and files each time.
+
+- **MySQL volume:** inspect the volume mounted at `/var/lib/mysql` with `docker inspect automaton-prod-mysql` and `du`, then compare its contents with table/index totals. The volume can be dominated by `binlog.*`, `undo_*`, and redo files even when the `automaton` tables are small. This host uses row-based binlogging; large row deletes can themselves produce large binlogs, so table cleanup may not immediately free the same amount on the host. Check `binlog_expire_logs_seconds` and `binlog_expire_logs_auto_purge`; auto-expiry is age-based, and MySQL removes expired logs at startup or when the binary log is flushed, not exactly at the expiry second. Keep the active log. See [MySQL log-file maintenance](https://dev.mysql.com/doc/refman/8.0/en/log-file-maintenance.html).
+- **Worker file logs:** inspect the named volume mounted at `/app/logs` in `automaton-prod-worker`, including largest dated files, not only Docker's container log sizes. The Worker config defaults to 14 retained files and 10 MiB size-based rolling, but this host had dated files of hundreds of MiB. Verify actual rotation behavior and keep the current file; remove only closed, dated logs when authorized.
+- **Temporary test artifacts:** inspect large files in `/tmp` and correlate runner test archives/images with `docker ps -a` and image IDs before removal. This host had a 452 MiB dated runner test image archive plus two unused `m1-test` images. An archive and its Docker image are separate storage; removing one does not remove the other.
+- **Containerd image store:** `/var/lib/containerd` can be much larger than `docker system df` alone suggests because it holds content blobs and unpacked snapshots. Use Docker/containerd tools to identify unused images; never remove files from this directory manually.
+
 ## Permitted cleanup
 
 Before cleanup, confirm that active containers and both the current and immediately previous immutable revision-tagged images are preserved. Cleanup must not remove images tagged with either revision.

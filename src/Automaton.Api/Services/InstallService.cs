@@ -1,4 +1,4 @@
-﻿using Automaton.Api.Application.Commands;
+using Automaton.Api.Application.Commands;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -9,42 +9,43 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-public class InstallService
-(
+public class InstallService(
     UserManager<ApplicationUser> userManager,
     IEmailService emailService,
     ConfigurationService configurationService,
     ApplicationDbContext dbContext,
     ILogger<InstallService> logger,
-    UsersService usersService
-)
-{    
-    public async Task Install(InstallCommand systemAdminConfig, CancellationToken cancellationToken)
+    UsersService usersService)
+{
+    private const string CompletionKey = "Installation.Complete";
+
+    public async Task Install(InstallCommand command, CancellationToken cancellationToken)
     {
-        try
+        await using (var claim = await InstallationClaim.AcquireAsync(dbContext, cancellationToken))
         {
+            await using var transaction = dbContext.Database.IsRelational()
+                ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
+                : null;
+            if (await InstallationComplete())
+                throw new InstallationSetupException("Installation has already been completed.");
             await AddRoles(cancellationToken);
-
-            await AddSystemAdministrator(systemAdminConfig);
-
-            await SendRegistrationEmail(systemAdminConfig, cancellationToken);
+            await AddSystemAdministrator(command);
+            dbContext.Settings.Add(new Setting { Key = CompletionKey, Value = "true" });
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occured during installation, rolling back.");
-
-            await RollBackSystemAdministrator(systemAdminConfig);
-
-            throw;
-        }   
+        // SMTP is optional. Delivery must never undo a committed administrator account.
+        if (string.IsNullOrWhiteSpace(configurationService.EmailConfig.EmailHost)) return;
+        try { await SendRegistrationEmail(command, cancellationToken); }
+        catch (Exception ex) { logger.LogWarning(ex, "Administrator created; the welcome email could not be delivered."); }
     }
 
     public async Task<bool> InstallationComplete()
-    {
-        return await dbContext.Users.AnyAsync(); 
-    }
+        => await dbContext.Settings.AnyAsync(setting => setting.Key == CompletionKey)
+            || await dbContext.UserRoles.AnyAsync(membership => dbContext.Roles.Any(role =>
+            role.Id == membership.RoleId && role.Name == UserRole.SystemAdministrator));
 
-    private async Task SendRegistrationEmail(InstallCommand installCommand, CancellationToken cancellationToken)
+    private Task SendRegistrationEmail(InstallCommand command, CancellationToken cancellationToken)
     {
         var userDetails = new EmailData
         {
@@ -52,115 +53,49 @@ public class InstallService
             From = new EmailAccount
             {
                 Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
-                    ? configurationService.EmailConfig.EmailAccount
-                    : configurationService.EmailConfig.FromEmail
+                    ? configurationService.EmailConfig.EmailAccount : configurationService.EmailConfig.FromEmail
             },
-            To = [new EmailAccount { Email = installCommand.Email, Name = installCommand.Name }],
+            To = [new EmailAccount { Email = command.Email!, Name = command.Name! }],
             Variables =
             {
-                { "Name", installCommand.Name },
+                { "Name", command.Name! },
                 { "LoginUrl", $"{configurationService.WebsiteUrl}/login" },
                 { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             }
         };
-
-        await emailService.Send(userDetails, cancellationToken);
+        return emailService.Send(userDetails, cancellationToken);
     }
 
-    public async Task AddSystemAdministrator(InstallCommand systemAdminConfig)
+    private async Task AddSystemAdministrator(InstallCommand command)
     {
-        var result = await CreateUser(systemAdminConfig);
-
-        if (!result.Succeeded)
-            throw new Exception("Could not create system administrator");
-
-        var admin = await GetUserByEmailOrUserName(systemAdminConfig.Email) ??
-            throw new Exception("Could not find system administrator");
-
-        await AddUserToRolesAsync(admin.Id, [UserRole.SystemAdministrator, UserRole.Administrator, UserRole.User]);
-    }
-
-    private async Task RollBackSystemAdministrator(InstallCommand systemAdminConfig)
-    {
-        var admin = await GetUserByEmailOrUserName(systemAdminConfig.Email) ??
-            throw new Exception("Could not find system administrator"); ;
-
-        var result = await userManager.DeleteAsync(admin);
-
-        if (!result.Succeeded)
-            throw new Exception("Could not delete system administrator");
-    }
-
-    private async Task<IdentityResult> CreateUser(InstallCommand systemAdminConfig)
-    {
-        if (userManager.Users.Any(u => u.Email == systemAdminConfig.Email))
+        var user = new ApplicationUser
         {
-            throw new Exception($"User with email address {systemAdminConfig.Email} already registered");
-        }
-
-        var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(systemAdminConfig.Name);
-        var newUser = new ApplicationUser
-        {
-            UserName = systemAdminConfig.Email,
-            Email = systemAdminConfig.Email,
-            Name = systemAdminConfig.Name,
-            PublicUsername = publicUsername
+            UserName = command.Email, Email = command.Email!, Name = command.Name!,
+            PublicUsername = await usersService.GenerateUniquePublicUsernameAsync(command.Name!),
+            // Possession of the server setup token authorizes this initial account.
+            EmailConfirmed = true
         };
-
-        var result = await userManager.CreateAsync(newUser, systemAdminConfig.Password);
-
-        return result;
+        var result = await userManager.CreateAsync(user, command.Password!);
+        EnsureSucceeded(result);
+        result = await userManager.AddToRolesAsync(user,
+            [UserRole.SystemAdministrator, UserRole.Administrator, UserRole.User]);
+        EnsureSucceeded(result);
     }
 
-    private async Task<ApplicationUser?> GetUserByEmailOrUserName(string emailOrUserName)
+    private static void EnsureSucceeded(IdentityResult result)
     {
-        var user = await userManager.FindByEmailAsync(emailOrUserName) ??
-            await userManager.FindByNameAsync(emailOrUserName);
-
-        return user;
-    }
-
-    private async Task<ApplicationUser?> GetUserById(string userId)
-    {
-        var result = await userManager.FindByIdAsync(userId);
-
-        return result;
-    }
-
-    private async Task AddUserToRolesAsync(Guid userId, IEnumerable<string> roles)
-    {
-        var user = await GetUserById(userId) ??
-            throw new Exception($"User with id {userId} not found");
-
-        var result = await userManager.AddToRolesAsync(user, roles);
         if (!result.Succeeded)
-        {
-            throw new Exception("Error in adding user to roles!");
-        }
-    }
-
-    private async Task<ApplicationUser?> GetUserById(Guid userId)
-    {
-        var result = await GetUserById(userId.ToString());
-
-        return result;
+            throw new InstallationSetupException(string.Join(" ", result.Errors.Select(error => error.Description)));
     }
 
     private async Task AddRoles(CancellationToken cancellationToken)
     {
-        var roles = new string[] { UserRole.SystemAdministrator, UserRole.Administrator, UserRole.User };
-
-        foreach (string role in roles)
+        string[] roles = [UserRole.SystemAdministrator, UserRole.Administrator, UserRole.User];
+        foreach (var role in roles)
         {
-            if (!dbContext.Roles.Any(r => r.Name == role))
-            {
-                dbContext.Roles.Add(new ApplicationRole { Name = role, NormalizedName = role.ToUpper() });
-            }
+            if (!await dbContext.Roles.AnyAsync(item => item.Name == role, cancellationToken))
+                dbContext.Roles.Add(new ApplicationRole { Name = role, NormalizedName = role.ToUpperInvariant() });
         }
-
-        if (dbContext.ChangeTracker.HasChanges())
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

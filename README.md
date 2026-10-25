@@ -15,6 +15,25 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 - **Runner model** — run the declared application process on your own infrastructure or managed runner infrastructure.
 - **AI-agent harness** — repository instructions, skills, and verification guidance for tools like Claude Code, Codex, Cursor, and Copilot.
 
+## Install on your server
+
+The versioned installer targets Ubuntu 24.04 x86_64. Before you begin, choose a published `server-vX.Y.Z` release, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
+
+1. Download and run the installer, replacing the version with a release that exists on the [Releases page](https://github.com/rzvdaniel/automaton/releases):
+
+   ```bash
+   VERSION=server-vX.Y.Z
+   curl -fL "https://github.com/rzvdaniel/automaton/releases/download/$VERSION/install-automaton.sh" -o install-automaton.sh
+   sudo bash install-automaton.sh --version "$VERSION" --install-docker
+   ```
+
+   It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. `--install-docker` installs Docker only when it is missing.
+
+2. Open `https://studio.example.com/install`. On the server, run `sudo cat /etc/automaton/secrets/setup-token`, paste the token into Studio, check the installation, and create your first administrator.
+3. Sign in and install a Machine Management Runner from **Runners** before deploying apps. You can install it on this server or another machine.
+
+See the [server installation guide](docs/prod/install-automaton.md) for Cloudflare certificates, custom paths, configuration, recovery and backup details.
+
 ## Core architecture
 
 - **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)

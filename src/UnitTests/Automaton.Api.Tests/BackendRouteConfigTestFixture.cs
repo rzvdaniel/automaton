@@ -44,7 +44,7 @@ internal static class BackendRouteConfigTestFixture
         });
     }
 
-    internal static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath)
+    internal static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath, string? certificateResolver = null)
     {
         return new BackendRouteConfigService(
             dbContext,
@@ -52,7 +52,8 @@ internal static class BackendRouteConfigTestFixture
             {
                 TraefikDynamicConfigRoot = rootPath,
                 ApiBaseUrl = "https://api.test",
-                RuntimeProxyAuthKey = "test-runtime-key"
+                RuntimeProxyAuthKey = "test-runtime-key",
+                CertificateResolver = certificateResolver
             }),
             new StubWebHostEnvironment(),
             NullLogger<BackendRouteConfigService>.Instance);

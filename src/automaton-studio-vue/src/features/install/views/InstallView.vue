@@ -1,273 +1,109 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import SetupChecks from '../components/SetupChecks.vue'
 import { installService } from '../services/install.service'
-import type { InstallFormErrors } from '../types/install.types'
 
 const router = useRouter()
-
-// State
-const isLoading = ref(false)
-const isCheckingStatus = ref(true)
-const installationComplete = ref(false)
+const checking = ref(true)
+const statusError = ref('')
+const complete = ref(false)
+const tokenRequired = ref(true)
+const setupToken = ref('')
+const ready = ref(false)
+const saving = ref(false)
 const error = ref('')
-const submitted = ref(false)
-
-// Form state
 const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const formErrors = ref<InstallFormErrors>({})
-
-// Check installation status on mount
-onMounted(async () => {
+async function loadStatus() {
+  checking.value = true
+  statusError.value = ''
   try {
-    installationComplete.value = await installService.isInstallationComplete()
-  } catch {
-    // If we can't check status, assume installation is not complete
-    installationComplete.value = false
-  } finally {
-    isCheckingStatus.value = false
-  }
-})
-
-// Form validation
-function validateForm(): boolean {
-  formErrors.value = {}
-  let isValid = true
-
-  // Name validation
-  if (!name.value) {
-    formErrors.value.name = 'Name is required'
-    isValid = false
-  } else if (name.value.length > 256) {
-    formErrors.value.name = 'Name must be 256 characters or less'
-    isValid = false
-  }
-
-  // Email validation
-  if (!email.value) {
-    formErrors.value.email = 'Email is required'
-    isValid = false
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    formErrors.value.email = 'Please enter a valid email address'
-    isValid = false
-  }
-
-  // Password validation
-  if (!password.value) {
-    formErrors.value.password = 'Password is required'
-    isValid = false
-  } else if (password.value.length < 6) {
-    formErrors.value.password = 'Password must be at least 6 characters'
-    isValid = false
-  } else if (password.value.length > 100) {
-    formErrors.value.password = 'Password must be 100 characters or less'
-    isValid = false
-  }
-
-  // Confirm password validation
-  if (!confirmPassword.value) {
-    formErrors.value.confirmPassword = 'Please confirm your password'
-    isValid = false
-  } else if (confirmPassword.value !== password.value) {
-    formErrors.value.confirmPassword = 'Passwords do not match'
-    isValid = false
-  }
-
-  return isValid
+    const status = await installService.getStatus()
+    complete.value = status.installationComplete
+    tokenRequired.value = status.setupTokenRequired
+  } catch { statusError.value = 'Studio cannot reach the API. Check the server and retry.' }
+  finally { checking.value = false }
 }
-
-// Handle form submission
-async function handleSubmit() {
-  submitted.value = true
+onMounted(loadStatus)
+async function submit() {
   error.value = ''
-
-  if (!validateForm()) {
+  if (!ready.value) { error.value = 'Check the installation before continuing.'; return }
+  if (password.value !== confirmPassword.value) { error.value = 'Passwords do not match.'; return }
+  if (password.value.length < 12 || !/[a-z]/.test(password.value) || !/[A-Z]/.test(password.value)
+    || !/[0-9]/.test(password.value) || !/[^a-zA-Z0-9]/.test(password.value)) {
+    error.value = 'Use at least 12 characters, including uppercase, lowercase, a number and a symbol.'
     return
   }
-
-  isLoading.value = true
-
+  saving.value = true
   try {
-    await installService.install({
-      name: name.value,
-      email: email.value,
-      password: password.value,
-    })
-
-    // Success - redirect to dashboard
-    router.push('/')
-  } catch {
-    error.value = 'Installation failed. Please try again.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// Navigate to dashboard
-function goToDashboard() {
-  router.push('/')
-}
-
-// Check if field has error
-function hasError(field: keyof InstallFormErrors): boolean {
-  return submitted.value && !!formErrors.value[field]
-}
-
-// Clear error on input
-function clearError() {
-  error.value = ''
+    await installService.install({ name: name.value.trim(), email: email.value.trim(), password: password.value }, setupToken.value)
+    setupToken.value = ''
+    password.value = ''
+    confirmPassword.value = ''
+    await router.replace('/login?setup=complete')
+  } catch (cause) {
+    error.value = axios.isAxiosError(cause) && typeof cause.response?.data?.message === 'string'
+      ? cause.response.data.message : 'Setup could not be completed. Check your entries and retry.'
+  } finally { saving.value = false }
 }
 </script>
-
 <template>
-  <div class="install-view flex align-items-center justify-content-center min-h-screen">
-    <!-- Loading state while checking status -->
-    <div v-if="isCheckingStatus" class="text-center">
-      <i class="pi pi-spin pi-spinner text-4xl text-primary"></i>
-    </div>
-
-    <!-- Installation Complete State -->
-    <Card v-else-if="installationComplete" class="install-card w-full" style="max-width: 400px">
+  <main class="install-view min-h-screen flex align-items-center justify-content-center p-3">
+    <Card class="install-card w-full">
+      <template #title>Welcome to Automaton</template>
+      <template #subtitle>Create the first system administrator for your server.</template>
       <template #content>
-        <div class="text-center py-4">
-          <i class="pi pi-check-circle text-6xl mb-4" style="color: var(--p-green-500)"></i>
-          <h1 class="text-2xl font-bold mb-3">Installation Complete</h1>
-          <p class="text-color-secondary mb-4">
-            Automaton has already been installed and configured.
-          </p>
-          <Button label="Go to Dashboard" class="w-full" @click="goToDashboard" />
+        <div v-if="checking" class="text-center p-4" role="status">Checking installation…</div>
+        <div v-else-if="statusError" class="flex flex-column gap-3">
+          <Message severity="error" :closable="false">{{ statusError }}</Message>
+          <Button label="Retry connection" outlined @click="loadStatus" />
         </div>
-      </template>
-    </Card>
-
-    <!-- Installation Form -->
-    <Card v-else class="install-card w-full" style="max-width: 400px">
-      <template #header>
-        <div class="text-center pt-4">
-          <i class="pi pi-bolt text-4xl mb-3" style="color: var(--p-primary-500)"></i>
-          <h1 class="text-2xl font-bold m-0">Welcome to Automaton Studio</h1>
-          <p class="text-color-secondary mt-2">
-            Let's set up your administrator account to get started
-          </p>
+        <div v-else-if="complete" class="flex flex-column gap-3">
+          <Message severity="success" :closable="false">Your administrator account is already configured.</Message>
+          <Button label="Sign in" @click="router.push('/login')" />
         </div>
-      </template>
-
-      <template #content>
-        <!-- Error message -->
-        <Message v-if="error" severity="error" :closable="false" class="mb-4">
-          {{ error }}
-        </Message>
-
-        <form class="flex flex-column gap-4" @submit.prevent="handleSubmit">
-          <!-- Name field -->
-          <div class="flex flex-column gap-2">
-            <label for="name" class="font-medium">Name</label>
-            <InputText
-              id="name"
-              v-model="name"
-              placeholder="Enter your name"
-              class="w-full"
-              :invalid="hasError('name')"
-              :disabled="isLoading"
-              @input="clearError"
-            />
-            <small v-if="hasError('name')" class="text-red-500">
-              {{ formErrors.name }}
-            </small>
+        <form v-else class="flex flex-column gap-4" @submit.prevent="submit">
+          <div v-if="tokenRequired" class="flex flex-column gap-2">
+            <label for="setup-token">Server setup token</label>
+            <Password input-id="setup-token" v-model="setupToken" :feedback="false" toggle-mask fluid :disabled="saving" autocomplete="off" />
+            <small class="text-color-secondary">Use the setup token saved by the installer on your server. It grants access only until administrator setup is complete.</small>
           </div>
-
-          <!-- Email field -->
+          <SetupChecks :setup-token="setupToken" @ready="ready = $event" />
+          <Message severity="info" :closable="false">Email delivery is optional during setup. Use an address you control; configure SMTP later for invitations and password recovery.</Message>
           <div class="flex flex-column gap-2">
-            <label for="email" class="font-medium">Email</label>
-            <InputText
-              id="email"
-              v-model="email"
-              type="email"
-              placeholder="Enter your email"
-              class="w-full"
-              :invalid="hasError('email')"
-              :disabled="isLoading"
-              @input="clearError"
-            />
-            <small v-if="hasError('email')" class="text-red-500">
-              {{ formErrors.email }}
-            </small>
+            <label for="admin-name">Your name</label>
+            <InputText id="admin-name" v-model="name" required maxlength="256" autocomplete="name" :disabled="saving" />
           </div>
-
-          <!-- Password field -->
           <div class="flex flex-column gap-2">
-            <label for="password" class="font-medium">Password</label>
-            <Password
-              id="password"
-              v-model="password"
-              placeholder="Enter your password"
-              toggle-mask
-              class="w-full"
-              input-class="w-full"
-              :invalid="hasError('password')"
-              :disabled="isLoading"
-              @input="clearError"
-            />
-            <small v-if="hasError('password')" class="text-red-500">
-              {{ formErrors.password }}
-            </small>
-            <small v-else class="text-color-secondary">
-              Must be at least 6 characters long
-            </small>
+            <label for="admin-email">Administrator email</label>
+            <InputText id="admin-email" v-model="email" type="email" required autocomplete="email" :disabled="saving" />
           </div>
-
-          <!-- Confirm Password field -->
           <div class="flex flex-column gap-2">
-            <label for="confirmPassword" class="font-medium">Confirm Password</label>
-            <Password
-              id="confirmPassword"
-              v-model="confirmPassword"
-              placeholder="Confirm your password"
-              :feedback="false"
-              toggle-mask
-              class="w-full"
-              input-class="w-full"
-              :invalid="hasError('confirmPassword')"
-              :disabled="isLoading"
-              @input="clearError"
-            />
-            <small v-if="hasError('confirmPassword')" class="text-red-500">
-              {{ formErrors.confirmPassword }}
-            </small>
+            <label for="admin-password">Password</label>
+            <Password input-id="admin-password" v-model="password" required toggle-mask fluid autocomplete="new-password" :disabled="saving" />
+            <small class="text-color-secondary">At least 12 characters with uppercase, lowercase, a number and a symbol.</small>
           </div>
-
-          <!-- Submit button -->
-          <Button
-            type="submit"
-            label="Complete Setup"
-            class="w-full mt-2"
-            :loading="isLoading"
-            :disabled="isLoading"
-          />
+          <div class="flex flex-column gap-2">
+            <label for="admin-confirm">Confirm password</label>
+            <Password input-id="admin-confirm" v-model="confirmPassword" required :feedback="false" toggle-mask fluid autocomplete="new-password" :disabled="saving" />
+          </div>
+          <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+          <Button type="submit" label="Create administrator" :loading="saving" :disabled="!ready || saving" />
         </form>
       </template>
     </Card>
-  </div>
+  </main>
 </template>
-
 <style scoped>
-.install-view {
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .install-view {
-  background-color: var(--p-surface-950);
-}
-
-.install-card {
-  margin: 1rem;
-}
+.install-view { background: var(--p-content-background); }
+.install-card { max-width: 36rem; }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { installService } from '@/features/install/services/install.service'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -13,6 +14,9 @@ import type { LoginFormErrors } from '../types/auth.types'
 
 const { login, isLoading, error, clearError } = useAuth()
 const route = useRoute()
+const router = useRouter()
+const gitHubEnabled = ref(false)
+const userSignUp = ref(false)
 
 // Form state
 const email = ref('')
@@ -31,9 +35,19 @@ const redirectTo = computed(() => {
   return typeof redirect === 'string' ? redirect : '/'
 })
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const status = await installService.getStatus()
+    if (!status.installationComplete) { await router.replace('/install'); return }
+    gitHubEnabled.value = status.gitHubEnabled
+    userSignUp.value = status.userSignUp
+  } catch {
+    // Keep password login available if the optional installation-status check fails.
+  }
   // Check for success message from registration
-  if (route.query.registered === 'true') {
+  if (route.query.setup === 'complete') {
+    successMessage.value = 'Administrator created. Sign in to continue.'
+  } else if (route.query.registered === 'true') {
     successMessage.value = 'Registration successful! Please sign in with your credentials.'
   } else if (route.query.emailConfirmation === 'success') {
     successMessage.value = 'Email confirmed. Sign in to continue to Studio with your account fully activated.'
@@ -181,6 +195,7 @@ function continueWithGitHub() {
 
           <Button
             type="button"
+            v-if="gitHubEnabled"
             label="Continue with GitHub"
             icon="pi pi-github"
             severity="secondary"
@@ -190,7 +205,7 @@ function continueWithGitHub() {
             @click="continueWithGitHub"
           />
 
-          <div class="text-center">
+          <div v-if="userSignUp" class="text-center">
             <span class="text-color-secondary text-sm">Don't have an account? </span>
             <router-link to="/register" class="text-primary no-underline hover:underline text-sm">
               Sign up

@@ -5,6 +5,8 @@ order: 20
 
 # Runner Administration
 
+- [Server installation and setup](./server-installation.md)
+
 New workloads should use a customer-installed Machine Management Runner assigned to an app or environment. Per-user Hosted Runner creation and provisioning have been retired; plan assignment, billing, or signup no longer creates a Runner container.
 
 - [Environments, deployment targets, and Runner assignments](./deployment-targets.md)

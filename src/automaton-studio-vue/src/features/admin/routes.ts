@@ -36,6 +36,12 @@ export const adminRoutes: RouteRecordRaw[] = [
     },
     children: [
       {
+        path: 'installation',
+        name: 'admin-installation',
+        component: () => import('@/features/install/views/InstallationStatusView.vue'),
+        meta: { title: 'Installation', requiresRole: ['SysAdmin'] },
+      },
+      {
         path: '',
         redirect: '/admin/dashboard',
       },

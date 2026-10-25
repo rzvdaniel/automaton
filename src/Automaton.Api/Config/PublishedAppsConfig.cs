@@ -52,6 +52,9 @@ public class PublishedAppsConfig
     /// Traefik service name for the currently live API edge. Self-hosted App routes use it
     /// to enter the API-to-Runner runtime tunnel instead of targeting a Runner directly.
     /// </summary>
+    /// <summary>Optional Traefik ACME resolver for per-host certificates on standalone installations.</summary>
+    public string? CertificateResolver { get; set; }
+
     public string RuntimeTunnelServiceName { get; set; } = "api-live-edge";
 
 }

@@ -13,6 +13,7 @@ namespace Automaton.Api.Application.Commands
         public string? Email { get; set; }
 
         [Required(ErrorMessage = "Password is mandatory")]
+        [StringLength(100, MinimumLength = 12)]
         public string? Password { get; set; }
     }
 }

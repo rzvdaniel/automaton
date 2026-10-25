@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -14,6 +17,12 @@ interface AdminNavItem {
 }
 
 const navItems: AdminNavItem[] = [
+  {
+    label: 'Installation',
+    icon: 'pi pi-check-circle',
+    to: '/admin/installation',
+    routePrefix: '/admin/installation',
+  },
   {  
     label: 'Dashboard',
     icon: 'pi pi-chart-bar',
@@ -88,6 +97,8 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
+const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || authStore.user?.roles?.includes('SysAdmin')))
+
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)
 }
@@ -107,7 +118,7 @@ const navigate = (to: string) => {
           <div class="flex flex-column gap-1">
             <div class="text-color-secondary text-sm font-semibold mb-2 px-3">Administration</div>
             <Button
-              v-for="item in navItems"
+              v-for="item in visibleNavItems"
               :key="item.to"
               :label="item.label"
               :icon="item.icon"

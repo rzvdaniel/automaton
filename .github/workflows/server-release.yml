@@ -1,0 +1,128 @@
+name: Publish Automaton Server
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Server version, e.g. 0.1.0 (creates server-v0.1.0)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      contents: read
+    strategy:
+      matrix:
+        component: [server, worker, studio]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: matrix.component == 'studio'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/automaton-studio-vue/package-lock.json
+      - name: Check Studio
+        if: matrix.component == 'studio'
+        working-directory: src/automaton-studio-vue
+        run: |
+          npm ci --ignore-scripts
+          npm run test -- src/features/install
+          VITE_RUNTIME_CONFIG=true VITE_BASE_PATH=/ npm run build
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set repository name
+        id: repository
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.component }}
+          push: true
+          # Initial installer release supports x86_64 Ubuntu servers.
+          platforms: linux/amd64
+          tags: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}:${{ github.sha }}
+          build-args: |
+            VITE_RUNTIME_CONFIG=true
+            VITE_API_BASE_URL=
+            VITE_PUBLIC_APPS_BASE_URL=
+            VITE_GITHUB_AUTH_API_BASE_URL=
+            VITE_SUBSCRIPTIONS_ENABLED=false
+            VITE_APP_TITLE=Automaton Studio
+      - name: Export image reference
+        env:
+          IMAGE: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}@${{ steps.image.outputs.digest }}
+          COMPONENT: ${{ matrix.component }}
+        run: printf '%s\n' "$IMAGE" > "$COMPONENT.image"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.component }}
+          path: '*.image'
+  bundle:
+    needs: images
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-*
+          merge-multiple: true
+      - name: Build release bundle
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
+          mkdir automaton-server
+          cp docker/install/{compose.yaml,configure.py} automaton-server/
+          cp scripts/install-automaton.sh automaton-server/install.sh
+          cp docs/prod/install-automaton.md automaton-server/README.md
+          {
+            echo "API_IMAGE=$(cat server.image)"
+            echo "WORKER_IMAGE=$(cat worker.image)"
+            echo "STUDIO_IMAGE=$(cat studio.image)"
+            for pair in MYSQL_IMAGE=mysql:8.4 RABBITMQ_IMAGE=rabbitmq:4-management TRAEFIK_IMAGE=traefik:v3 RUNNER_IMAGE=rzvdaniel/automaton-runner:latest; do
+              image="${pair#*=}"
+              docker pull "$image" >&2
+              printf '%s=%s\n' "${pair%%=*}" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+            done
+          } > automaton-server/release.env
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify anonymous image distribution
+        run: |
+          public_config=$(mktemp -d)
+          trap 'rm -rf "$public_config"' EXIT
+          while IFS= read -r reference; do
+            docker --config "$public_config" pull "$reference"
+          done < <(cat server.image worker.image studio.image)
+      - name: Smoke test isolated installation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-cryptography
+          sudo python3 scripts/tests/server-installer-config-test.py
+          sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
+      - name: Package release
+        run: |
+          tar -czf automaton-server.tar.gz automaton-server
+          sha256sum automaton-server.tar.gz > automaton-server.tar.gz.sha256
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh
