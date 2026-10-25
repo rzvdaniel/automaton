@@ -9,7 +9,7 @@ public sealed record InstallationCheck(string Name, string Status, string Detail
 public static class InstallationReadiness
 {
     public static async Task<IReadOnlyList<InstallationCheck>> CheckAsync(
-        ApplicationDbContext db, IConfiguration configuration, CancellationToken token)
+        ApplicationDbContext db, IConfiguration configuration, SmtpSettingsService smtpSettings, CancellationToken token)
     {
         var checks = new List<InstallationCheck>();
         var databaseReady = await db.Database.CanConnectAsync(token);
@@ -30,10 +30,27 @@ public static class InstallationReadiness
                 : "Configure the API and Studio addresses on the server."));
         checks.Add(new("Public DNS and ports", "unverified",
             "Check api, studio, apps and *.apps DNS records from outside this server, and allow inbound TCP 80, 443 and 5671."));
-        var emailConfigured = !string.IsNullOrWhiteSpace(configuration["EmailConfig:EmailHost"]);
-        checks.Add(new("SMTP", emailConfigured ? "configured" : "unverified",
-            emailConfigured ? "SMTP settings are present; delivery has not been tested." : "Configure SMTP later for invitations and password recovery."));
+        checks.Add(await CheckSmtpAsync(smtpSettings, token));
         return checks;
+    }
+
+    private static async Task<InstallationCheck> CheckSmtpAsync(SmtpSettingsService smtpSettings, CancellationToken token)
+    {
+        try
+        {
+            var smtp = await smtpSettings.GetSummaryAsync(token);
+            var configured = smtp.PasswordSet && !string.IsNullOrWhiteSpace(smtp.EmailHost)
+                && smtp.EmailPort > 0 && !string.IsNullOrWhiteSpace(smtp.EmailAccount);
+            if (smtp.VerifiedAt.HasValue)
+                return new("SMTP", "verified", "SMTP authentication succeeded for these saved settings; delivery has not been tested.");
+            if (!configured)
+                return new("SMTP", "unverified", "Configure SMTP later for invitations and password recovery.");
+            return new("SMTP", "configured", "SMTP settings are present; authentication and delivery have not been tested.");
+        }
+        catch (SmtpSettingsUnreadableException error)
+        {
+            return new("SMTP", "error", error.Message);
+        }
     }
 
     private static async Task<InstallationCheck> CheckBrokerAsync(IConfiguration configuration, CancellationToken token)

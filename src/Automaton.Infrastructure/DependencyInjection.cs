@@ -24,6 +24,7 @@ public static class DependencyInjection
                 mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(DependencyInjection).Assembly.GetName().Name)));
 
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<SmtpSettingsService>();
         services.AddScoped<EmailConfirmationLinkBuilder>();
         services.AddScoped<RunnerEnrollmentMaterialService>();
 

@@ -2,40 +2,41 @@ using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Fluid;
 using MailKit.Net.Smtp;
-using MailKit.Security;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MimeKit;
 using System.Resources;
 
 namespace Automaton.Api.Services;
 
-public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfigOptions, ILogger<EmailService> logger) : IEmailService
+public class EmailService(SmtpSettingsService smtpSettings, ILogger<EmailService> logger) : IEmailService
 {
     private static readonly ResourceManager TemplateResourceManager = new("Automaton.Infrastructure.Resources.EmailTemplates", typeof(EmailService).Assembly);
     private static readonly FluidParser TemplateParser = new();
-    private readonly Automaton.Api.Config.EmailConfig _emailConfig = emailConfigOptions.Value;
 
     public async Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
     {
         try
         {
+            var effective = await smtpSettings.GetEffectiveAsync(cancellationToken);
+            var config = effective.Config;
+            if (effective.Managed)
+                emailDetails.Variables["SupportEmail"] = config.SupportEmail;
             var (subject, bodyHtml) = await RenderEmailAsync(emailDetails, cancellationToken);
-            var message = BuildMessage(emailDetails, subject, bodyHtml);
+            var message = BuildMessage(emailDetails, subject, bodyHtml, config, effective.Managed);
 
             using var client = new SmtpClient();
 
-            var socketOptions = ResolveSocketOptions(_emailConfig.EmailPort, _emailConfig.EmailUseSsl);
+            var socketOptions = SmtpSettingsService.SocketOptions(config.EmailPort, config.EmailUseSsl);
 
             await client.ConnectAsync(
-                _emailConfig.EmailHost,
-                _emailConfig.EmailPort,
+                config.EmailHost,
+                config.EmailPort,
                 socketOptions,
                 cancellationToken);
 
             await client.AuthenticateAsync(
-                _emailConfig.EmailAccount,
-                _emailConfig.EmailPassword,
+                config.EmailAccount,
+                config.EmailPassword,
                 cancellationToken);
 
             await client.SendAsync(message, cancellationToken);
@@ -49,21 +50,6 @@ public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfig
             logger.LogError(ex, "Failed to send email: {ExceptionMessage}", ex.Message);
             throw;
         }
-    }
-
-    private static SecureSocketOptions ResolveSocketOptions(int port, bool useSsl)
-    {
-        if (port == 587)
-        {
-            return SecureSocketOptions.StartTls;
-        }
-
-        if (port == 465)
-        {
-            return SecureSocketOptions.SslOnConnect;
-        }
-
-        return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None;
     }
 
     private async Task<(string subject, string bodyHtml)> RenderEmailAsync(EmailData emailDetails, CancellationToken cancellationToken)
@@ -109,13 +95,14 @@ public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfig
         return await fluidTemplate.RenderAsync(context);
     }
 
-    private MimeMessage BuildMessage(EmailData emailDetails, string subject, string bodyHtml)
+    private static MimeMessage BuildMessage(EmailData emailDetails, string subject, string bodyHtml,
+        Automaton.Api.Config.EmailConfig config, bool managed)
     {
         var message = new MimeMessage();
 
-        var fromAddress = emailDetails.From?.Email
-            ?? _emailConfig.FromEmail
-            ?? _emailConfig.EmailAccount;
+        var fromAddress = managed
+            ? config.FromEmail ?? config.EmailAccount
+            : emailDetails.From?.Email ?? config.FromEmail ?? config.EmailAccount;
         var fromName = emailDetails.From?.Name ?? "Automaton";
 
         if (string.IsNullOrWhiteSpace(fromAddress))

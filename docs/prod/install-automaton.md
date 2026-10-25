@@ -69,14 +69,16 @@ The defaults are `/opt/automaton-server` for the release manifest and Compose fi
 | SMTP, GitHub OAuth, Stripe | `appsettings.Production.json` | Operator, optional |
 | Runner credentials | Studio enrollment flow | Automaton, per Runner |
 
-Public signup, GitHub OAuth, billing credentials and legacy Hosted Runner provisioning start unconfigured/disabled. Add external integrations only when needed. SMTP settings use the existing `EmailConfig` fields: `EmailHost`, `EmailPort`, `EmailUseSsl`, `EmailAccount`, `EmailPassword`, `FromEmail` and `SupportEmail`. For GitHub, configure `GitHub.ClientId`/`ClientSecret`; the generated API/frontend URLs are already set. Integration credentials are not editable in the new status page. After editing settings securely on the host, recreate API and Worker to apply changes:
+Public signup, GitHub OAuth, billing credentials and legacy Hosted Runner provisioning start unconfigured/disabled. After creating the first administrator, **Admin → Installation → Outgoing email** can save SMTP host, port, TLS mode, account, password, sender address and support address. Studio stores the settings in the database with the SMTP document encrypted by the API Data Protection key ring. Its password is never returned to Studio. A successful **Check connection** verifies TLS and authentication, not inbox delivery; saving changes clears that verification. **Send test email** sends only to the recipient explicitly entered by the administrator; SMTP acceptance is not proof of inbox delivery. Database settings take effect for subsequent messages without a restart and override the file-based `EmailConfig`. If they cannot be decrypted, sending fails and Studio reports the key-ring problem rather than using the file configuration.
+
+The protected `appsettings.Production.json` remains the fallback until SMTP is saved through Studio. For GitHub, configure `GitHub.ClientId`/`ClientSecret`; the generated API/frontend URLs are already set. OAuth and billing credentials are not editable in the installation page. After editing those file settings securely on the host, recreate API and Worker to apply changes:
 
 ```bash
 cd /opt/automaton-server
 sudo docker compose --env-file release.env --env-file .env -f compose.yaml up -d --force-recreate api worker
 ```
 
-Preserve generated encryption/signing keys and Data Protection volumes. Replacing them can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; it is not an upgrade tool. Existing blue/green production deployments continue using their existing scripts and are not migrated by this installer.
+Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; it is not an upgrade tool. Existing blue/green production deployments continue using their existing scripts and are not migrated by this installer.
 
 ## Back up before relying on the installation
 

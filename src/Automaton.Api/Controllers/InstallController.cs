@@ -9,7 +9,7 @@ namespace Automaton.Api.Controllers;
 
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class InstallController(InstallService installService, IConfiguration configuration,
-    IWebHostEnvironment environment, ApplicationDbContext db) : BaseController
+    IWebHostEnvironment environment, ApplicationDbContext db, SmtpSettingsService smtpSettings) : BaseController
 {
     [HttpGet("status")]
     [AllowAnonymous]
@@ -32,7 +32,7 @@ public class InstallController(InstallService installService, IConfiguration con
             if (!User.IsInRole(UserRole.SystemAdministrator)) return Forbid();
         }
         else if (!HasSetupAccess()) return StatusCode(403, new { message = "Enter the setup token from your server." });
-        return Ok(await InstallationReadiness.CheckAsync(db, configuration, token));
+        return Ok(await InstallationReadiness.CheckAsync(db, configuration, smtpSettings, token));
     }
 
     [HttpPost]
