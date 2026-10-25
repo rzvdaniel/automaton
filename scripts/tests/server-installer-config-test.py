@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Validate the installer entrypoint against disposable paths without starting services."""
+import hashlib
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+@unittest.skipUnless(os.geteuid() == 0, 'Requires root and existing Docker/Compose on Ubuntu 24.04; never installs Docker.')
+class InstallerEntrypointTests(unittest.TestCase):
+    def test_fresh_install_checks_existing_filesystem_before_port_preflight(self):
+        with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
+            root = Path(temporary)
+            bundle = root / 'bundle'; bundle.mkdir()
+            (bundle / 'release.env').write_text('')
+            shutil.copy2(REPO / 'docker/install/configure.py', bundle / 'configure.py')
+            tools = root / 'bin'; tools.mkdir()
+            # Match df's failure for missing paths, with enough disk on existing ancestors.
+            (tools / 'df').write_text('#!/bin/bash\n[[ -d "${@: -1}" ]] || exit 1\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
+            (tools / 'ss').write_text('#!/bin/sh\necho "LISTEN 0 128 0.0.0.0:80 0.0.0.0:*"\n')
+            for tool in tools.iterdir(): tool.chmod(0o755)
+            command = ['bash', str(REPO / 'scripts/install-automaton.sh'),
+                       '--install-dir', str(root / 'missing/nested/install'), '--config-dir', str(root / 'config'),
+                       '--email', 'owner@example.invalid', '--domain', 'example.invalid']
+            environment = os.environ | {'AUTOMATON_RELEASE_DIR': str(bundle), 'PATH': str(tools) + ':' + os.environ['PATH']}
+            result = subprocess.run(command, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Ports 80, 443 and 5671 must be available.', result.stderr)
+            self.assertFalse((root / 'missing').exists())
+
+    def test_resume_and_configuration_identity(self):
+        with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
+            root = Path(temporary)
+            bundle = root / 'bundle'; bundle.mkdir()
+            for name in ('configure.py', 'compose.yaml'):
+                shutil.copy2(REPO / 'docker/install' / name, bundle / name)
+            images = ('API', 'STUDIO', 'WORKER', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
+            (bundle / 'release.env').write_text(''.join(f'{name}_IMAGE=example.invalid/test@sha256:{"0" * 64}\n' for name in images))
+            command = ['bash', str(REPO / 'scripts/install-automaton.sh'), '--configure-only',
+                       '--install-dir', str(root / 'install'), '--config-dir', str(root / 'config'),
+                       '--email', 'owner@example.invalid', '--domain', 'example.invalid']
+            environment = os.environ | {'AUTOMATON_RELEASE_DIR': str(bundle)}
+            first = subprocess.run(command, env=environment, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            def snapshot():
+                return {p.relative_to(root): hashlib.sha256(p.read_bytes()).hexdigest()
+                        for p in root.rglob('*') if p.is_file()}
+            before = snapshot()
+            second = subprocess.run(command, env=environment, capture_output=True, text=True)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(before, snapshot())
+            changed = subprocess.run(command + ['--domain', 'different.invalid'], env=environment, capture_output=True, text=True)
+            self.assertNotEqual(changed.returncode, 0)
+            self.assertEqual(before, snapshot())
+            self.assertIn('CONFIG_DIR=' + str(root / 'config'), (root / 'install/.env').read_text())
+            # A retained release manifest proves this is recovery, even if the
+            # entire private configuration directory was accidentally deleted.
+            shutil.rmtree(root / 'config')
+            recovered = subprocess.run(command, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(recovered.returncode, 0)
+            self.assertIn('Restore the configuration backup', recovered.stderr)
+            self.assertFalse((root / 'config').exists())
+
+
+if __name__ == '__main__': unittest.main()

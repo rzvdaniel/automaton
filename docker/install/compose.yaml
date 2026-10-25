@@ -1,0 +1,109 @@
+name: automaton-server
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 10m, max-file: '3'}
+x-app: &app
+  restart: unless-stopped
+  logging: *logging
+  environment:
+    DOTNET_ENVIRONMENT: Production
+    ASPNETCORE_ENVIRONMENT: Production
+  volumes:
+    - ${CONFIG_DIR:?}/appsettings.Production.json:/app/appsettings.Production.json:ro
+  depends_on:
+    mysql: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:?}
+    restart: unless-stopped
+    logging: *logging
+    command: [--binlog-expire-logs-seconds=604800, --slow-query-log=OFF, --general-log=OFF]
+    environment:
+      MYSQL_DATABASE: automaton
+      MYSQL_USER: automaton
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets: [mysql_password, mysql_root_password]
+    volumes: [mysql-data:/var/lib/mysql]
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD=$$(cat /run/secrets/mysql_root_password) mysqladmin ping -h localhost -u root --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 60
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:?}
+    user: '0:0'
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - 'cp /run/secrets/bootstrap.conf /etc/rabbitmq/rabbitmq.conf; chown rabbitmq:rabbitmq /etc/rabbitmq/rabbitmq.conf; exec docker-entrypoint.sh rabbitmq-server'
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ${CONFIG_DIR:?}/rabbitmq.conf:/run/secrets/bootstrap.conf:ro
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+  api:
+    <<: *app
+    image: ${API_IMAGE:?}
+    volumes:
+      - ${CONFIG_DIR:?}/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - api-data:/app/AppData
+      - api-keys:/app/data-protection-keys
+      - ${CONFIG_DIR:?}/dynamic:/app/AppData/traefik-dynamic
+    healthcheck:
+      test: [CMD, curl, -fsS, http://127.0.0.1:8080/healthz]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+  worker:
+    <<: *app
+    image: ${WORKER_IMAGE:?}
+    volumes:
+      - ${CONFIG_DIR:?}/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - worker-keys:/app/data-protection-keys
+    depends_on:
+      api: {condition: service_healthy}
+  studio:
+    image: ${STUDIO_IMAGE:?}
+    volumes:
+      - ${CONFIG_DIR:?}/studio-runtime-config.js:/usr/share/nginx/html/runtime-config.js:ro
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      api: {condition: service_healthy}
+  traefik:
+    image: ${TRAEFIK_IMAGE:?}
+    restart: unless-stopped
+    logging: *logging
+    ports: ['80:80', '443:443', '5671:5671']
+    environment:
+      CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_token
+    secrets: [cloudflare_token]
+    volumes:
+      - ${CONFIG_DIR:?}/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ${CONFIG_DIR:?}/dynamic:/etc/traefik/dynamic:ro
+      - certificates:/certificates
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, traefik, healthcheck, --ping]
+      interval: 10s
+      retries: 30
+secrets:
+  mysql_password: {file: '${CONFIG_DIR:?}/secrets/mysql-password'}
+  mysql_root_password: {file: '${CONFIG_DIR:?}/secrets/mysql-root-password'}
+  cloudflare_token: {file: '${CONFIG_DIR:?}/secrets/cloudflare-token'}
+volumes:
+  mysql-data:
+  rabbitmq-data:
+  api-data:
+  api-keys:
+  worker-keys:
+  certificates:

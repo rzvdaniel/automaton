@@ -17,8 +17,9 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class BackendRouteConfigServiceTests
 {
-    [Test]
-    public async Task RefreshAsync_WritesAuthorizedRoute_ForMachineTarget()
+    [TestCase(null)]
+    [TestCase("letsencrypt")]
+    public async Task RefreshAsync_WritesAuthorizedRoute_ForMachineTarget(string? certificateResolver)
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
@@ -46,7 +47,7 @@ public class BackendRouteConfigServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, rootPath);
+        var service = CreateService(dbContext, rootPath, certificateResolver);
         await service.RefreshAsync();
 
         var outputPath = Path.Combine(rootPath, "managed-runtime-routes.yml");
@@ -58,8 +59,10 @@ public class BackendRouteConfigServiceTests
             Assert.That(CountLines(content, "  middlewares:"), Is.EqualTo(1));
             Assert.That(content, Does.Not.Contain("  services:"));
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"{Environment.NewLine}      priority: 50"));
-            Assert.That(content, Does.Contain("tls: {}"));
-            Assert.That(content, Does.Not.Contain("certResolver"));
+            if (certificateResolver is null)
+                Assert.That(content, Does.Contain("tls: {}"));
+            else
+                Assert.That(content, Does.Contain($"certResolver: \"{certificateResolver}\""));
             Assert.That(content, Does.Contain(
                 $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
             Assert.That(content, Does.Not.Contain("-api:"));

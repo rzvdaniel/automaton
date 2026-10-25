@@ -8,6 +8,10 @@ license: Apache-2.0
 
 Use this skill when preparing or reviewing a fresh Automaton production installation or documenting the settings an operator must provide. For deployment and cutover operations, also follow [production-deployment](../production-deployment/SKILL.md).
 
+## Fresh server installer
+
+For a new standalone server, use [the public installation guide](../../../docs/prod/install-automaton.md), `scripts/install-automaton.sh`, and the release bundle under `docker/install/`. The initial supported target is Ubuntu 24.04 x86_64 with public DNS. The release workflow publishes prebuilt, digest-pinned server images and a checksum-verified bundle. A fresh install stores protected settings outside the checkout in `/etc/automaton`; Studio `/install` requires its generated setup token. Re-running preserves credentials. This is separate from the existing production blue/green workflow and does not migrate it.
+
 ## Find the authoritative settings
 
 Do not use a live server's untracked settings file as the setup template. Read the tracked examples and current consumers:

@@ -1,32 +1,23 @@
-/**
- * Install service for API calls
- * Connects to ASP.NET backend endpoints for installation
- */
 import apiClient from '@/shared/services/api/axios-instance'
-import type { InstallCommand, InstallationStatusResponse } from '../types/install.types'
+import type { InstallCommand, InstallationStatusResponse, InstallationCheck } from '../types/install.types'
 
 class InstallService {
-  /**
-   * Check if installation is complete
-   * GET /api/install/status
-   */
-  async isInstallationComplete(): Promise<boolean> {
-    try {
-      const { data } = await apiClient.get<InstallationStatusResponse>('/api/install/status')
-      return data.installationComplete ?? false
-    } catch {
-      // If we can't check status, assume installation is not complete
-      return false
-    }
+  async getStatus(): Promise<InstallationStatusResponse> {
+    const { data } = await apiClient.get<InstallationStatusResponse>('/api/install/status')
+    return data
   }
 
-  /**
-   * Install Automaton with admin account
-   * POST /api/install
-   */
-  async install(command: InstallCommand): Promise<void> {
-    await apiClient.post('/api/install', command)
+  async check(setupToken = ''): Promise<InstallationCheck[]> {
+    const { data } = await apiClient.post<InstallationCheck[]>('/api/install/checks', null, {
+      headers: { 'X-Automaton-Setup-Token': setupToken },
+    })
+    return data
+  }
+
+  async install(command: InstallCommand, setupToken: string): Promise<void> {
+    await apiClient.post('/api/install', command, {
+      headers: { 'X-Automaton-Setup-Token': setupToken },
+    })
   }
 }
-
 export const installService = new InstallService()

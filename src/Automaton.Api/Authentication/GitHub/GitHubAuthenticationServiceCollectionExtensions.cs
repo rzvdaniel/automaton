@@ -11,6 +11,9 @@ public static class GitHubAuthenticationServiceCollectionExtensions
 {
     public static AuthenticationBuilder AddGitHubOAuth(this AuthenticationBuilder authenticationBuilder, IConfiguration configuration)
     {
+        var configured = configuration.GetSection("GitHub").Get<GitHubOAuthOptions>();
+        if (string.IsNullOrWhiteSpace(configured?.ClientId) || string.IsNullOrWhiteSpace(configured.ClientSecret))
+            return authenticationBuilder;
         return authenticationBuilder.AddOAuth(GitHubAuthenticationDefaults.Scheme, options =>
         {
             var githubOptions = configuration.GetSection("GitHub").Get<GitHubOAuthOptions>() ?? new GitHubOAuthOptions();

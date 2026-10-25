@@ -50,6 +50,8 @@ public class GitHubAuthController : ControllerBase
     [AllowAnonymous]
     public IActionResult Login([FromQuery] string? returnUrl = null)
     {
+        if (string.IsNullOrWhiteSpace(_gitHubOptions.ClientId) || string.IsNullOrWhiteSpace(_gitHubOptions.ClientSecret))
+            return StatusCode(503, new { message = "GitHub sign-in is not configured." });
         var sanitizedReturnUrl = NormalizeReturnUrl(returnUrl);
         var properties = new AuthenticationProperties
         {

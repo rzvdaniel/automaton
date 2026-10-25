@@ -11,6 +11,7 @@ azure-pipelines*.yml
 *.md
 docs/
 screenshots/
+!src/Automaton.Api/Documentation/Admin/**/*.md
 !shared/ai-guidance/**/*.md
 !shared/ai-guidance/llms.txt
 
@@ -52,6 +53,7 @@ Logs/
 
 # Node modules
 node_modules/
+**/node_modules/
 
 # Environment files
 .env
@@ -59,6 +61,12 @@ node_modules/
 !.env.example
 
 # Protected production state and credentials
+/config
+/config/**
+**/appsettings.Development.json
+**/appsettings.Production.json
+/.prod-runtime
+/.prod-runtime/**
 /backups
 /backups/**
 /secrets

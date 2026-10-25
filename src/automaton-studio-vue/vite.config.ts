@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     plugins: [vue()],
+    define: process.env.VITE_RUNTIME_CONFIG === 'true' ? {
+      'import.meta.env.VITE_API_BASE_URL': 'globalThis.__AUTOMATON_CONFIG__.apiBaseUrl',
+      'import.meta.env.VITE_GITHUB_AUTH_API_BASE_URL': 'globalThis.__AUTOMATON_CONFIG__.apiBaseUrl',
+      'import.meta.env.VITE_PUBLIC_APPS_BASE_URL': 'globalThis.__AUTOMATON_CONFIG__.publicAppsBaseUrl',
+    } : {},
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

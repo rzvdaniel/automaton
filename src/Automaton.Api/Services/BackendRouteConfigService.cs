@@ -266,7 +266,7 @@ public class BackendRouteConfigService
 
     }
 
-    private static void AppendRuntimeRouter(
+    private void AppendRuntimeRouter(
         StringBuilder builder,
         RouteTarget route,
         string key,
@@ -277,7 +277,9 @@ public class BackendRouteConfigService
         builder.AppendLine($"    {key}-runtime:");
         builder.AppendLine("      entryPoints:");
         builder.AppendLine("        - websecure");
-        builder.AppendLine("      tls: {}");
+        builder.AppendLine(string.IsNullOrWhiteSpace(publishedAppsConfig.CertificateResolver)
+            ? "      tls: {}"
+            : $"      tls: {{ certResolver: {System.Text.Json.JsonSerializer.Serialize(publishedAppsConfig.CertificateResolver)} }}");
         builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{pathPrefix}`)\"");
         builder.AppendLine($"      priority: {priority}");
         builder.AppendLine($"      service: \"{route.RuntimeServiceName}\"");

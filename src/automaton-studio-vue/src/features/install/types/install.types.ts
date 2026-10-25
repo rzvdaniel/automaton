@@ -19,6 +19,9 @@ export interface InstallCommand {
  */
 export interface InstallationStatusResponse {
   installationComplete: boolean
+  setupTokenRequired: boolean
+  gitHubEnabled: boolean
+  userSignUp: boolean
 }
 
 /**
@@ -29,4 +32,10 @@ export interface InstallFormErrors {
   email?: string
   password?: string
   confirmPassword?: string
+}
+
+export interface InstallationCheck {
+  name: string
+  status: 'ready' | 'configured' | 'optional' | 'error'
+  detail: string
 }
