@@ -17,7 +17,7 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 
 ## Install on your server
 
-The versioned installer targets Ubuntu 24.04 x86_64. Before you begin, choose a published `server-vX.Y.Z` release, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
+The versioned installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, choose a published `server-vX.Y.Z` release, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
 
 1. Download and run the installer, replacing the version with a release that exists on the [Releases page](https://github.com/rzvdaniel/automaton/releases):
 

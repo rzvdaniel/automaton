@@ -48,7 +48,7 @@ jobs:
           context: .
           file: docker/Dockerfile.${{ matrix.component }}
           push: true
-          # Initial installer release supports x86_64 Ubuntu servers.
+          # Installer supports x86_64 Ubuntu 24.04 and newer; this builds on a pinned LTS runner.
           platforms: linux/amd64
           tags: ghcr.io/${{ steps.repository.outputs.name }}-${{ matrix.component }}:${{ github.sha }}
           build-args: |

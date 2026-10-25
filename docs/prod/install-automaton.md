@@ -1,8 +1,8 @@
 # Install Automaton on your server
 
-The server release installs API, Studio, Worker, MySQL, RabbitMQ and Traefik together with Docker Compose. The initial installer supports **Ubuntu 24.04 LTS on x86_64** with public DNS. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
+The server release installs API, Studio, Worker, MySQL, RabbitMQ and Traefik together with Docker Compose. The installer supports **Ubuntu 24.04 or newer on x86_64** with public DNS. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. When installing Docker, the installer uses Docker's Ubuntu apt repository, which must publish packages for the host's Ubuntu codename. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
 
-A server release must first be published by the maintainer using the **Publish Automaton Server** GitHub workflow. The commands below require an existing `server-vX.Y.Z` release; source changes alone do not publish an installer release or upgrade any running instance.
+A server release must first be published by the maintainer using the **Publish Automaton Server** GitHub Actions workflow. Run it from the repository's Actions tab on `main`, choose **Run workflow**, and enter a new version such as `0.1.0` (without the `server-v` prefix). It builds and publishes the API, Worker and Studio images, resolves infrastructure image digests, runs an isolated installation smoke test, then creates a GitHub release tagged `server-v0.1.0` with the installer, bundle and checksum. The commands below require that release; source changes alone do not publish an installer release or upgrade any running instance.
 
 ## Before starting
 
