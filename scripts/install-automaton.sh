@@ -25,7 +25,7 @@ while (($#)); do
         --install-docker) install_docker=true; shift ;;
         --configure-only) configure_only=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh --version server-vVERSION [--domain example.com] [--email admin@example.com] [--install-docker]' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh --version server-vVERSION [--domain example.com] [--email admin@example.com] [--install-docker]' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -54,9 +54,12 @@ if [[ ! -f "$bundle_dir/release.env" ]]; then
     tar -xzf "$download_dir/automaton-server.tar.gz" -C "$download_dir"
     bundle_dir="$download_dir/automaton-server"
 fi
-# Only the initial supported OS is accepted; do not replace an existing Docker engine.
+# Require Ubuntu 24.04 or newer; do not replace an existing Docker engine.
 source /etc/os-release
-[[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]] || { echo 'This installer supports Ubuntu 24.04 LTS.' >&2; exit 1; }
+if [[ "$ID" != ubuntu ]] || ! dpkg --compare-versions "$VERSION_ID" ge 24.04; then
+    echo 'This installer supports Ubuntu 24.04 or newer.' >&2
+    exit 1
+fi
 [[ "$(uname -m)" == x86_64 ]] || { echo 'The initial server release supports x86_64 servers.' >&2; exit 1; }
 if ! command -v docker >/dev/null; then
     $install_docker || { echo 'Docker is missing. Re-run with --install-docker to install it from the official repository.' >&2; exit 1; }
