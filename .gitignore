@@ -85,6 +85,9 @@ appsettings*.json
 !appsettings.Development.example.json
 !appsettings.Production.example.json
 
+# Production-local runtime config and timestamped copies/backups
+/config/
+
 .vscode/
 
 # Ignore files created by Claude AI
