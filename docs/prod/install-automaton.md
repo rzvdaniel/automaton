@@ -19,7 +19,7 @@ The default HTTPS mode issues certificates through HTTP validation, including in
 
 ## Install
 
-Choose a published release version from the private repository's Releases page. With `gh` authenticated to that repository, download and verify the bundle, inspect its installer, then run it:
+Choose a published server release from the private repository's Releases page. With `gh` authenticated to that repository, download and verify the bundle, inspect its installer, then run it. The extracted installer uses the version in its bundle, so no `--version` is needed:
 
 ```bash
 VERSION=server-vX.Y.Z
@@ -32,6 +32,8 @@ sudo bash automaton-server/install.sh --install-docker
 ```
 
 The version above is a placeholder. The source repository is private, so anonymous `curl` requests to its release assets do not work. `--install-docker` authorizes installing Docker Engine from Docker's official Ubuntu repository if Docker is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
+
+If you download only `install-automaton.sh`, run `sudo bash install-automaton.sh --install-docker` to select the newest stable `server-vX.Y.Z` release. This standalone path requires GitHub CLI (`gh`) authenticated to the private repository for the root account running the installer. Add `--version server-vX.Y.Z` to select a specific release. The installer verifies the downloaded bundle's checksum in either case.
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 
@@ -85,11 +87,13 @@ Preserve generated encryption/signing keys and Data Protection volumes. Back up 
 
 ## Update an installed server
 
-Choose a published `server-vX.Y.Z` release and run the updater that the installer placed beside the Compose file:
+Run the updater that the installer placed beside the Compose file. Without a version, it selects the newest stable server distribution available publicly on GHCR:
 
 ```bash
-sudo bash /opt/automaton-server/update.sh --version server-vX.Y.Z
+sudo bash /opt/automaton-server/update.sh
 ```
+
+To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
 For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it with the same `--version` argument. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
 

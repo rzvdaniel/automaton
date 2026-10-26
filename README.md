@@ -17,9 +17,9 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 
 ## Install on your server
 
-The versioned installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, choose a published `server-vX.Y.Z` release, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
+The installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
 
-1. With access to the private source repository, download and run the installer, replacing the version with a release that exists on the [Releases page](https://github.com/rzvdaniel/automaton/releases):
+1. With access to the private source repository, download the bundle from a server release on the [Releases page](https://github.com/rzvdaniel/automaton/releases) and run its installer. The version selects the download; the extracted installer already knows its release:
 
    ```bash
    VERSION=server-vX.Y.Z
@@ -37,7 +37,7 @@ The versioned installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu rele
 
 See the [server installation guide](docs/prod/install-automaton.md) for Cloudflare certificates, custom paths, configuration, recovery and backup details.
 
-For installed servers, `sudo bash /opt/automaton-server/update.sh --version server-vX.Y.Z` updates compatible API, Worker and Studio images from the public GHCR distribution package after making a recovery backup. The initial installer download still requires repository access; see the guide for the offline bundle path and update limits.
+For installed servers, `sudo bash /opt/automaton-server/update.sh` selects the newest stable server release from the public GHCR distribution package and updates compatible API, Worker and Studio images after making a recovery backup. Add `--version server-vX.Y.Z` to choose a specific release. The initial installer download still requires repository access; see the guide for the offline bundle path and update limits.
 
 ## Core architecture
 

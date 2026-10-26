@@ -25,7 +25,7 @@ while (($#)); do
         --install-docker) install_docker=true; shift ;;
         --configure-only) configure_only=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh --version server-vVERSION [--domain example.com] [--email admin@example.com] [--install-docker]' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com] [--install-docker]' 'Without --version, a standalone installer selects the latest stable server release using authenticated gh; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -43,13 +43,24 @@ if $status_only; then
 fi
 # Download the complete release when this script was downloaded by itself.
 if [[ ! -f "$bundle_dir/release.env" ]]; then
+    if [[ -z "$version" ]]; then
+        command -v gh >/dev/null || { echo 'Install and authenticate GitHub CLI (gh) to select the latest server release, or run an extracted release bundle.' >&2; exit 1; }
+        version=$(gh api --paginate repos/rzvdaniel/automaton/releases --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
+            { grep -E '^server-v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -n 1)
+        [[ -n "$version" ]] || { echo 'No published stable Automaton server release was found.' >&2; exit 1; }
+        printf 'Installing latest stable Automaton server release: %s\n' "$version"
+    fi
     [[ "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify a published --version server-vX.Y.Z, or use a complete release bundle.' >&2; exit 1; }
-    command -v curl >/dev/null || { echo 'Install curl first (sudo apt-get install curl).' >&2; exit 1; }
     download_dir=$(mktemp -d)
     trap 'rm -rf -- "$download_dir"' EXIT
-    release_url="https://github.com/rzvdaniel/automaton/releases/download/$version"
-    curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz" -o "$download_dir/automaton-server.tar.gz"
-    curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz.sha256" -o "$download_dir/automaton-server.tar.gz.sha256"
+    if command -v gh >/dev/null; then
+        gh release download "$version" --repo rzvdaniel/automaton --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256 --dir "$download_dir"
+    else
+        command -v curl >/dev/null || { echo 'Install curl first (sudo apt-get install curl).' >&2; exit 1; }
+        release_url="https://github.com/rzvdaniel/automaton/releases/download/$version"
+        curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz" -o "$download_dir/automaton-server.tar.gz"
+        curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz.sha256" -o "$download_dir/automaton-server.tar.gz.sha256"
+    fi
     (cd "$download_dir" && sha256sum -c automaton-server.tar.gz.sha256)
     tar -xzf "$download_dir/automaton-server.tar.gz" -C "$download_dir"
     bundle_dir="$download_dir/automaton-server"

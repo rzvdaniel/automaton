@@ -13,6 +13,26 @@ REPO = Path(__file__).resolve().parents[2]
 
 @unittest.skipUnless(os.geteuid() == 0, 'Requires root and existing Docker/Compose on Ubuntu 24.04; never installs Docker.')
 class InstallerEntrypointTests(unittest.TestCase):
+    def test_no_version_selects_latest_stable_server_release(self):
+        with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
+            root = Path(temporary)
+            tools = root / 'bin'; tools.mkdir()
+            (tools / 'gh').write_text('''#!/bin/sh
+if [ "$1" = api ]; then
+  printf 'server-v0.1.2\\nserver-v0.1.10\\nother-v9.0.0\\n'
+else
+  printf 'selected:%s\\n' "$3" >&2
+  exit 1
+fi
+''')
+            (tools / 'gh').chmod(0o755)
+            result = subprocess.run(['bash', str(REPO / 'scripts/install-automaton.sh')],
+                                    env=os.environ | {'PATH': str(tools) + ':' + os.environ['PATH']},
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Installing latest stable Automaton server release: server-v0.1.10', result.stdout)
+            self.assertIn('selected:server-v0.1.10', result.stderr)
+
     def test_fresh_install_checks_existing_filesystem_before_port_preflight(self):
         with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
             root = Path(temporary)
