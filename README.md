@@ -19,12 +19,15 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 
 The versioned installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, choose a published `server-vX.Y.Z` release, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
 
-1. Download and run the installer, replacing the version with a release that exists on the [Releases page](https://github.com/rzvdaniel/automaton/releases):
+1. With access to the private source repository, download and run the installer, replacing the version with a release that exists on the [Releases page](https://github.com/rzvdaniel/automaton/releases):
 
    ```bash
    VERSION=server-vX.Y.Z
-   curl -fL "https://github.com/rzvdaniel/automaton/releases/download/$VERSION/install-automaton.sh" -o install-automaton.sh
-   sudo bash install-automaton.sh --version "$VERSION" --install-docker
+   gh release download "$VERSION" --repo rzvdaniel/automaton \
+     --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256
+   sha256sum -c automaton-server.tar.gz.sha256
+   tar -xzf automaton-server.tar.gz
+   sudo bash automaton-server/install.sh --install-docker
    ```
 
    It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. A missing Docker Compose plugin is installed automatically. `--install-docker` installs Docker Engine only when it is missing.
@@ -33,6 +36,8 @@ The versioned installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu rele
 3. Sign in and install a Machine Management Runner from **Runners** before deploying apps. You can install it on this server or another machine.
 
 See the [server installation guide](docs/prod/install-automaton.md) for Cloudflare certificates, custom paths, configuration, recovery and backup details.
+
+For installed servers, `sudo bash /opt/automaton-server/update.sh --version server-vX.Y.Z` updates compatible API, Worker and Studio images from the public GHCR distribution package after making a recovery backup. The initial installer download still requires repository access; see the guide for the offline bundle path and update limits.
 
 ## Core architecture
 

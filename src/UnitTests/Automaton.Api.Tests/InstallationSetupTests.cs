@@ -108,7 +108,8 @@ public sealed class InstallationReadinessTests
             ["AppConfig:WebsiteUrl"] = "https://studio.example.invalid"
         }).Build();
 
-        var checks = await InstallationReadiness.CheckAsync(db, configuration, CancellationToken.None);
+        var smtp = SmtpTestFixture.Service(db, file: new Automaton.Api.Config.EmailConfig());
+        var checks = await InstallationReadiness.CheckAsync(db, configuration, smtp, CancellationToken.None);
 
         Assert.Multiple(() =>
         {
@@ -147,7 +148,7 @@ internal static class InstallationTestFixture
     internal static IConfiguration Configuration(string? token) => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?> { ["Bootstrap:Token"] = token }).Build();
 
-    internal static InstallController Controller(ApplicationDbContext db) => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db)
+    internal static InstallController Controller(ApplicationDbContext db) => new(Service(db), Configuration("server-token"), new SetupEnvironment(), db, null!)
     {
         ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
     };

@@ -1,0 +1,4 @@
+FROM scratch
+COPY automaton-server.tar.gz /automaton-server.tar.gz
+COPY automaton-server.tar.gz.sha256 /automaton-server.tar.gz.sha256
+CMD ["/automaton-server.tar.gz"]

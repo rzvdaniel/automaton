@@ -19,16 +19,19 @@ The default HTTPS mode issues certificates through HTTP validation, including in
 
 ## Install
 
-Choose a published release version from the repository's Releases page, download its installer, inspect it, and run it:
+Choose a published release version from the private repository's Releases page. With `gh` authenticated to that repository, download and verify the bundle, inspect its installer, then run it:
 
 ```bash
 VERSION=server-vX.Y.Z
-curl -fL "https://github.com/rzvdaniel/automaton/releases/download/$VERSION/install-automaton.sh" -o install-automaton.sh
-less install-automaton.sh
-sudo bash install-automaton.sh --version "$VERSION" --install-docker
+gh release download "$VERSION" --repo rzvdaniel/automaton \
+  --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256
+sha256sum -c automaton-server.tar.gz.sha256
+tar -xzf automaton-server.tar.gz
+less automaton-server/install.sh
+sudo bash automaton-server/install.sh --install-docker
 ```
 
-The version above is a placeholder. `--install-docker` authorizes installing Docker Engine from Docker's official Ubuntu repository if Docker is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
+The version above is a placeholder. The source repository is private, so anonymous `curl` requests to its release assets do not work. `--install-docker` authorizes installing Docker Engine from Docker's official Ubuntu repository if Docker is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 
@@ -69,14 +72,30 @@ The defaults are `/opt/automaton-server` for the release manifest and Compose fi
 | SMTP, GitHub OAuth, Stripe | `appsettings.Production.json` | Operator, optional |
 | Runner credentials | Studio enrollment flow | Automaton, per Runner |
 
-Public signup, GitHub OAuth, billing credentials and legacy Hosted Runner provisioning start unconfigured/disabled. Add external integrations only when needed. SMTP settings use the existing `EmailConfig` fields: `EmailHost`, `EmailPort`, `EmailUseSsl`, `EmailAccount`, `EmailPassword`, `FromEmail` and `SupportEmail`. For GitHub, configure `GitHub.ClientId`/`ClientSecret`; the generated API/frontend URLs are already set. Integration credentials are not editable in the new status page. After editing settings securely on the host, recreate API and Worker to apply changes:
+Public signup, GitHub OAuth, billing credentials and legacy Hosted Runner provisioning start unconfigured/disabled. After creating the first administrator, **Admin → Installation → Outgoing email** can save SMTP host, port, TLS mode, account, password, sender address and support address. Studio stores the settings in the database with the SMTP document encrypted by the API Data Protection key ring. Its password is never returned to Studio. A successful **Check connection** verifies TLS and authentication, not inbox delivery; saving changes clears that verification. **Send test email** sends only to the recipient explicitly entered by the administrator; SMTP acceptance is not proof of inbox delivery. Database settings take effect for subsequent messages without a restart and override the file-based `EmailConfig`. If they cannot be decrypted, sending fails and Studio reports the key-ring problem rather than using the file configuration.
+
+The protected `appsettings.Production.json` remains the fallback until SMTP is saved through Studio. For GitHub, configure `GitHub.ClientId`/`ClientSecret`; the generated API/frontend URLs are already set. OAuth and billing credentials are not editable in the installation page. After editing those file settings securely on the host, recreate API and Worker to apply changes:
 
 ```bash
 cd /opt/automaton-server
 sudo docker compose --env-file release.env --env-file .env -f compose.yaml up -d --force-recreate api worker
 ```
 
-Preserve generated encryption/signing keys and Data Protection volumes. Replacing them can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; it is not an upgrade tool. Existing blue/green production deployments continue using their existing scripts and are not migrated by this installer.
+Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; use the updater below for a new release. Existing blue/green production deployments continue using their existing scripts and are not migrated by this installer.
+
+## Update an installed server
+
+Choose a published `server-vX.Y.Z` release and run the updater that the installer placed beside the Compose file:
+
+```bash
+sudo bash /opt/automaton-server/update.sh --version server-vX.Y.Z
+```
+
+For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it with the same `--version` argument. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
+
+Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
+
+The distribution package must be publicly readable for anonymous updates. The source repository's GitHub release assets are private; use authenticated transfer for the initial installer until a public installer download is provided. Existing blue/green source deployments use their separate deployment scripts.
 
 ## Back up before relying on the installation
 
@@ -85,7 +104,7 @@ Ignored files and filesystem permissions do not prevent accidental deletion. Bac
 ## Status and recovery
 
 ```bash
-sudo bash install-automaton.sh --status
+sudo bash /opt/automaton-server/install.sh --status
 cd /opt/automaton-server
 sudo docker compose --env-file release.env --env-file .env -f compose.yaml logs --tail 100 api worker traefik
 ```
@@ -94,6 +113,6 @@ Logs can contain operational details; redact them before sharing. If DNS/TLS ver
 
 ## Publishing a server release (maintainers)
 
-Run `.github/workflows/server-release.yml` on the intended reviewed revision with a version such as `0.1.0`. It builds/pushes API, Worker and a domain-independent Studio image to GHCR, resolves image digests, tests an isolated first-administrator claim against MySQL/RabbitMQ, and publishes the bundle/checksum/installer under `server-v0.1.0`. The three GHCR packages must be publicly readable; the workflow verifies anonymous pulls before publishing the release. On first publication, a repository owner may need to change package visibility to Public, then rerun the workflow. Runner images remain under their existing Azure DevOps release authority.
+Run `.github/workflows/server-release.yml` on the intended reviewed revision with a version such as `0.1.0`. It builds/pushes API, Worker and a domain-independent Studio image to GHCR, preserves the prior release's infrastructure image digests, tests an isolated first-administrator claim against MySQL/RabbitMQ, and publishes the bundle/checksum/installer/updater under `server-v0.1.0`. It also publishes a distribution image containing the bundle and checksum for anonymous updates. All four GHCR packages must be publicly readable; the workflow verifies anonymous pulls before publishing the release. On first publication of the distribution package, a repository owner may need to change its visibility to Public, then rerun the workflow. Runner images remain under their existing Azure DevOps release authority.
 
 The local configuration tests and the isolated Docker smoke test are development validation. Public DNS/certificates and a clean Ubuntu/Docker installation require acceptance on a disposable server before declaring a release generally supported.

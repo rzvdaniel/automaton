@@ -4,7 +4,6 @@ using Automaton.Api.Services;
 using Automaton.UnitTests.Shared;
 using MailKit.Security;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
 namespace Automaton.Api.Tests;
@@ -16,15 +15,16 @@ public sealed class EmailCertificateValidationTests
     public async Task Send_RejectsUntrustedSmtpServerCertificate()
     {
         await using var server = new LoopbackTlsServer();
+        await using var db = InstallationTestFixture.Database();
         var service = new EmailService(
-            Options.Create(new EmailConfig
-            {
-                EmailHost = "localhost",
-                EmailPort = server.Port,
-                EmailUseSsl = true,
-                EmailAccount = "sender@example.test",
-                EmailPassword = "test-only"
-            }),
+            SmtpTestFixture.Service(db, file: new EmailConfig
+                {
+                    EmailHost = "localhost",
+                    EmailPort = server.Port,
+                    EmailUseSsl = true,
+                    EmailAccount = "sender@example.test",
+                    EmailPassword = "test-only"
+                }),
             NullLogger<EmailService>.Instance);
         var message = new EmailData
         {

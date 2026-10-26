@@ -142,6 +142,9 @@ python3 "$bundle_dir/configure.py" --config-dir "$config_dir" --domain "$domain"
 install -d -m 0755 "$install_dir"
 install -m 0600 "$bundle_dir/release.env" "$install_dir/release.env"
 install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
+if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
+if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
+if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
 printf 'CONFIG_DIR=%s\n' "$config_dir" > "$install_dir/.env"

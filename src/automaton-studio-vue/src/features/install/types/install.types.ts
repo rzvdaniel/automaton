@@ -39,3 +39,25 @@ export interface InstallationCheck {
   status: 'verified' | 'configured' | 'unverified' | 'error'
   detail: string
 }
+
+export interface SmtpSettingsSummary {
+  source: 'none' | 'file' | 'studio'
+  emailHost: string
+  emailPort: number
+  emailUseSsl: boolean
+  emailAccount: string
+  fromEmail: string
+  supportEmail: string
+  passwordSet: boolean
+  verifiedAt: string | null
+}
+
+export interface SmtpSettingsUpdate {
+  emailHost: string
+  emailPort: number
+  emailUseSsl: boolean
+  emailAccount: string
+  emailPassword: string
+  fromEmail: string
+  supportEmail: string
+}
