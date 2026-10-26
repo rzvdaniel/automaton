@@ -17,21 +17,26 @@ class InstallerEntrypointTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
             root = Path(temporary)
             tools = root / 'bin'; tools.mkdir()
-            (tools / 'gh').write_text('''#!/bin/sh
-if [ "$1" = api ]; then
-  printf 'server-v0.1.2\\nserver-v0.1.10\\nother-v9.0.0\\n'
-else
-  printf 'selected:%s\\n' "$3" >&2
-  exit 1
-fi
+            (root / 'sitecustomize.py').write_text('''import io, json, urllib.request, urllib.parse
+def release_page(request, timeout):
+    page = json.dumps([
+        {'tag_name': 'server-v0.1.2', 'draft': False, 'prerelease': False},
+        {'tag_name': 'server-v0.1.10', 'draft': False, 'prerelease': False},
+        {'tag_name': 'server-v0.2.0', 'draft': True, 'prerelease': False},
+        {'tag_name': 'other-v9.0.0', 'draft': False, 'prerelease': False},
+    ] if urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query).get('page') == ['1'] else [])
+    return io.BytesIO(page.encode())
+urllib.request.urlopen = release_page
 ''')
-            (tools / 'gh').chmod(0o755)
+            (tools / 'curl').write_text('#!/bin/sh\nprintf "selected:%s\\n" "$*" >&2\nexit 1\n')
+            (tools / 'curl').chmod(0o755)
             result = subprocess.run(['bash', str(REPO / 'scripts/install-automaton.sh')],
-                                    env=os.environ | {'PATH': str(tools) + ':' + os.environ['PATH']},
+                                    env=os.environ | {'PATH': str(tools) + ':' + os.environ['PATH'],
+                                                      'PYTHONPATH': str(root)},
                                     capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn('Installing latest stable Automaton server release: server-v0.1.10', result.stdout)
-            self.assertIn('selected:server-v0.1.10', result.stderr)
+            self.assertIn('Installing latest stable Automaton server release: server-v0.1.10', result.stdout, result.stderr)
+            self.assertIn('/server-v0.1.10/automaton-server.tar.gz', result.stderr)
 
     def test_fresh_install_checks_existing_filesystem_before_port_preflight(self):
         with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:

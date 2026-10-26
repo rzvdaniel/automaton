@@ -21,27 +21,24 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 
 The installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
 
-1. With access to the private source repository, download the bundle from a server release on the [Releases page](https://github.com/rzvdaniel/automaton/releases) and run its installer. The version selects the download; the extracted installer already knows its release:
+1. Download the public installer, review it, and run it. It selects the latest stable server release and verifies the release bundle before installing:
 
    ```bash
-   VERSION=server-vX.Y.Z
-   gh release download "$VERSION" --repo rzvdaniel/automaton \
-     --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256
-   sha256sum -c automaton-server.tar.gz.sha256
-   tar -xzf automaton-server.tar.gz
-   sudo bash automaton-server/install.sh
+   curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
+   less install-automaton.sh
+   sudo bash install-automaton.sh
    ```
 
    It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. Missing Docker Engine and Compose are installed automatically; an existing Docker Engine is preserved.
 
-   If you have only the standalone `install-automaton.sh` asset, `sudo bash install-automaton.sh` selects the latest stable server release; add `--version server-vX.Y.Z` to pin one. That path requires GitHub CLI authenticated to the private repository for the account running the installer.
+   Add `--version server-vX.Y.Z` to pin a published release. The [server installation guide](docs/prod/install-automaton.md) also shows how to download and verify a specific bundle before running it.
 
 2. Open `https://studio.example.com/install`. On the server, run `sudo cat /etc/automaton/secrets/setup-token`, paste the token into Studio, check the installation, and create your first administrator.
 3. Sign in and install a Machine Management Runner from **Runners** before deploying apps. You can install it on this server or another machine.
 
 See the [server installation guide](docs/prod/install-automaton.md) for Cloudflare certificates, custom paths, configuration, recovery and backup details.
 
-For installed servers, `sudo bash /opt/automaton-server/update.sh` selects the newest stable server release from the public GHCR distribution package and updates compatible API, Worker and Studio images after making a recovery backup. Add `--version server-vX.Y.Z` to choose a specific release. The initial installer download still requires repository access; see the guide for the offline bundle path and update limits.
+For installed servers, `sudo bash /opt/automaton-server/update.sh` selects the newest stable server release from the public GHCR distribution package and updates compatible API, Worker and Studio images after making a recovery backup. Add `--version server-vX.Y.Z` to choose a specific release. The release assets are also publicly downloadable; see the guide for the offline bundle path and update limits.
 
 ## Core architecture
 

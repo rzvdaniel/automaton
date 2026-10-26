@@ -24,7 +24,7 @@ while (($#)); do
         --install-docker) shift ;; # Accepted for commands written before Docker installation became automatic.
         --configure-only) configure_only=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically if missing. Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable server release using authenticated gh; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically if missing. Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable public server release; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -40,37 +40,53 @@ if $status_only; then
     docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml" ps
     exit
 fi
-# Download the complete release when this script was downloaded by itself.
-if [[ ! -f "$bundle_dir/release.env" ]]; then
-    if [[ -z "$version" ]]; then
-        command -v gh >/dev/null || { echo 'Install and authenticate GitHub CLI (gh) to select the latest server release, or run an extracted release bundle.' >&2; exit 1; }
-        version=$(gh api --paginate repos/rzvdaniel/automaton/releases --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
-            { grep -E '^server-v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -n 1)
-        [[ -n "$version" ]] || { echo 'No published stable Automaton server release was found.' >&2; exit 1; }
-        printf 'Installing latest stable Automaton server release: %s\n' "$version"
-    fi
-    [[ "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify a published --version server-vX.Y.Z, or use a complete release bundle.' >&2; exit 1; }
-    download_dir=$(mktemp -d)
-    trap 'rm -rf -- "$download_dir"' EXIT
-    if command -v gh >/dev/null; then
-        gh release download "$version" --repo rzvdaniel/automaton --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256 --dir "$download_dir"
-    else
-        command -v curl >/dev/null || { echo 'Install curl first (sudo apt-get install curl).' >&2; exit 1; }
-        release_url="https://github.com/rzvdaniel/automaton/releases/download/$version"
-        curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz" -o "$download_dir/automaton-server.tar.gz"
-        curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz.sha256" -o "$download_dir/automaton-server.tar.gz.sha256"
-    fi
-    (cd "$download_dir" && sha256sum -c automaton-server.tar.gz.sha256)
-    tar -xzf "$download_dir/automaton-server.tar.gz" -C "$download_dir"
-    bundle_dir="$download_dir/automaton-server"
-fi
-# Require Ubuntu 24.04 or newer; do not replace an existing Docker engine.
+# Check the host before installing bootstrap dependencies or downloading a release.
 source /etc/os-release
 if [[ "$ID" != ubuntu ]] || ! dpkg --compare-versions "$VERSION_ID" ge 24.04; then
     echo 'This installer supports Ubuntu 24.04 or newer.' >&2
     exit 1
 fi
 [[ "$(uname -m)" == x86_64 ]] || { echo 'The initial server release supports x86_64 servers.' >&2; exit 1; }
+# Download the complete release when this script was downloaded by itself.
+if [[ ! -f "$bundle_dir/release.env" ]]; then
+    if ! command -v python3 >/dev/null || ! command -v curl >/dev/null; then
+        apt-get update
+        apt-get install -y ca-certificates curl python3
+    fi
+    if [[ -z "$version" ]]; then
+        version=$(python3 - <<'PY'
+import json, re, urllib.request
+versions = []
+for page in range(1, 100):
+    url = f'https://api.github.com/repos/rzvdaniel/automaton/releases?per_page=100&page={page}'
+    request = urllib.request.Request(url, headers={'User-Agent': 'automaton-server-installer'})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        releases = json.load(response)
+    if not releases:
+        break
+    versions.extend(release['tag_name'] for release in releases
+                    if not release['draft'] and not release['prerelease']
+                    and re.fullmatch(r'server-v[0-9]+\.[0-9]+\.[0-9]+', release['tag_name']))
+else:
+    raise SystemExit('Too many releases to select the latest server version.')
+if versions:
+    print(max(versions, key=lambda version: tuple(map(int, version.removeprefix('server-v').split('.')))))
+PY
+)
+        [[ -n "$version" ]] || { echo 'No published stable Automaton server release was found.' >&2; exit 1; }
+        printf 'Installing latest stable Automaton server release: %s\n' "$version"
+    fi
+    [[ "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify a published --version server-vX.Y.Z, or use a complete release bundle.' >&2; exit 1; }
+    download_dir=$(mktemp -d)
+    trap 'rm -rf -- "$download_dir"' EXIT
+    release_url="https://github.com/rzvdaniel/automaton/releases/download/$version"
+    curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz" -o "$download_dir/automaton-server.tar.gz"
+    curl --fail --location --proto '=https' --tlsv1.2 "$release_url/automaton-server.tar.gz.sha256" -o "$download_dir/automaton-server.tar.gz.sha256"
+    (cd "$download_dir" && sha256sum -c automaton-server.tar.gz.sha256)
+    tar -xzf "$download_dir/automaton-server.tar.gz" -C "$download_dir"
+    bundle_dir="$download_dir/automaton-server"
+fi
+# Do not replace an existing Docker engine.
 ensure_docker_repository() {
     apt-get update
     apt-get install -y ca-certificates curl

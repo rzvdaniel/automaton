@@ -19,21 +19,30 @@ The default HTTPS mode issues certificates through HTTP validation, including in
 
 ## Install
 
-Choose a published server release from the private repository's Releases page. With `gh` authenticated to that repository, download and verify the bundle, inspect its installer, then run it. The extracted installer uses the version in its bundle, so no `--version` is needed:
+For the latest stable server release, download the public installer, review it, then run it. It selects the release from GitHub, downloads the bundle, and verifies its checksum:
+
+```bash
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
+less install-automaton.sh
+sudo bash install-automaton.sh
+```
+
+To pin a release, add `--version server-vX.Y.Z`. Alternatively, download and verify the bundle yourself from the [public Releases page](https://github.com/rzvdaniel/automaton/releases). The extracted installer uses the version in its bundle, so it needs no `--version` argument:
 
 ```bash
 VERSION=server-vX.Y.Z
-gh release download "$VERSION" --repo rzvdaniel/automaton \
-  --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256
+BASE="https://github.com/rzvdaniel/automaton/releases/download/$VERSION"
+curl -fLO "$BASE/automaton-server.tar.gz"
+curl -fLO "$BASE/automaton-server.tar.gz.sha256"
 sha256sum -c automaton-server.tar.gz.sha256
 tar -xzf automaton-server.tar.gz
 less automaton-server/install.sh
 sudo bash automaton-server/install.sh
 ```
 
-The version above is a placeholder. The source repository is private, so anonymous `curl` requests to its release assets do not work. The installer installs Docker Engine from Docker's official Ubuntu repository if it is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
+The version above is a placeholder. The installer installs Docker Engine from Docker's official Ubuntu repository if it is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
 
-If you download only `install-automaton.sh`, run `sudo bash install-automaton.sh` to select the newest stable `server-vX.Y.Z` release. This standalone path requires GitHub CLI (`gh`) authenticated to the private repository for the root account running the installer. Add `--version server-vX.Y.Z` to select a specific release. The installer verifies the downloaded bundle's checksum in either case.
+The standalone installer works without a GitHub account. It selects the newest stable `server-vX.Y.Z` release by default and verifies the downloaded bundle's checksum. The updater is included in the installation and is also available as a public release asset if it must be transferred separately.
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 
@@ -99,7 +108,7 @@ For installations before the updater was bundled, transfer the reviewed `update-
 
 Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
 
-The distribution package must be publicly readable for anonymous updates. The source repository's GitHub release assets are private; use authenticated transfer for the initial installer until a public installer download is provided. Existing blue/green source deployments use their separate deployment scripts.
+The distribution package and GitHub release assets are publicly readable, so installation and updates need no GitHub account. Existing blue/green source deployments use their separate deployment scripts.
 
 ## Back up before relying on the installation
 
