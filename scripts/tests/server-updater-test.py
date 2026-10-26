@@ -107,6 +107,22 @@ elif args[0]=='compose':
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.sql').is_file())
 
+    def test_no_version_selects_latest_stable_distribution(self):
+        (self.bin / 'curl').write_text('''#!/bin/sh
+case "$*" in
+  *'/token?'*) echo '{"token":"test-token"}' ;;
+  *'/tags/list'*) echo '{"tags":["server-v0.1.2","server-v0.2.0-beta.1","server-v0.1.10","other-v9.0.0"]}' ;;
+  *) echo '{"installationComplete":true}' ;;
+esac
+''')
+        (self.bin / 'docker').write_text('#!/bin/sh\nif [ "$1" = pull ]; then echo "selected:$2" >&2; exit 1; fi\n')
+        command = ['bash', str(REPO / 'scripts/update-automaton.sh'),
+                   '--install-dir', str(self.install), '--config-dir', str(self.config)]
+        result = subprocess.run(command, env=self.environment, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('selected:ghcr.io/rzvdaniel/automaton-server-distribution:server-v0.1.10', result.stderr)
+        self.assertFalse((self.install / 'backups').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

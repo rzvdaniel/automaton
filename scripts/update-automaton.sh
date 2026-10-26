@@ -17,12 +17,13 @@ while (($#)); do
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --backup-dir) backup_root="${2:?Missing backup directory}"; shift 2 ;;
-        --help) echo 'Usage: sudo bash update-automaton.sh --version server-vX.Y.Z [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH]'; exit 0 ;;
+        --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 [[ $EUID == 0 ]] || { echo 'Run the updater with sudo.' >&2; exit 1; }
-[[ "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify --version server-vX.Y.Z.' >&2; exit 1; }
+[[ -n "$version" || -z "$bundle_archive" ]] || { echo 'Specify --version when using an offline bundle.' >&2; exit 1; }
+[[ -z "$version" || "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify --version server-vX.Y.Z.' >&2; exit 1; }
 for dir in "$install_dir" "$config_dir"; do
     [[ "$dir" =~ ^/[a-zA-Z0-9_./-]+$ && "$dir" != / && ! -L "$dir" ]] || { echo 'Use absolute, non-symlink installation and configuration directories.' >&2; exit 1; }
 done
@@ -40,6 +41,17 @@ done
 grep -Fxq "CONFIG_DIR=$config_dir" "$install_dir/.env" || { echo 'The installation uses another configuration directory.' >&2; exit 1; }
 command -v docker >/dev/null && docker compose version >/dev/null && docker info >/dev/null
 command -v python3 >/dev/null && command -v curl >/dev/null && command -v sha256sum >/dev/null
+if [[ -z "$version" ]]; then
+    registry='rzvdaniel/automaton-server-distribution'
+    token=$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 "https://ghcr.io/token?scope=repository:$registry:pull" |
+        python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+    version=$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+        --header "Authorization: Bearer $token" "https://ghcr.io/v2/$registry/tags/list?n=10000" |
+        python3 -c 'import json,re,sys; print("\n".join(tag for tag in json.load(sys.stdin).get("tags", []) if re.fullmatch(r"server-v[0-9]+\.[0-9]+\.[0-9]+", tag)))' |
+        sort -V | tail -n 1)
+    [[ -n "$version" ]] || { echo 'No stable server release was found in the public distribution package.' >&2; exit 1; }
+    printf 'Updating to latest stable Automaton server release: %s\n' "$version"
+fi
 
 working=$(mktemp -d)
 trap 'rm -rf -- "$working"' EXIT
