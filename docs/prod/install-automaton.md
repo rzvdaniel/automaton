@@ -6,7 +6,7 @@ A server release must first be published by the maintainer using the **Publish A
 
 ## Before starting
 
-Have a domain you can configure, a certificate notification email, sudo access, and at least 10 GiB free disk space. A missing Docker Compose plugin is installed automatically from Ubuntu's repository when available, or from Docker's Ubuntu repository otherwise, without replacing an existing Docker Engine. Point these DNS records to the server:
+Have a domain you can configure, a certificate notification email, sudo access, and at least 10 GiB free disk space. Docker does not need to be preinstalled: the installer adds Docker Engine and Compose when missing, without replacing an existing Docker Engine. Point these DNS records to the server:
 
 - `api.example.com`
 - `studio.example.com`
@@ -37,9 +37,9 @@ If you download only `install-automaton.sh`, run `sudo bash install-automaton.sh
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 
-The installer downloads the versioned bundle, verifies its SHA-256 checksum, creates configuration, pulls digest-pinned application images, runs API startup migrations, and starts the stack. It checks the public Studio/API HTTPS route before printing the setup address. It refuses to take over occupied ports or a different existing installation.
+The standalone installer downloads the versioned bundle and verifies its SHA-256 checksum; verify an extracted bundle before running its installer as shown above. The installer creates configuration, pulls digest-pinned application images, runs API startup migrations, and starts the stack. It checks the public Studio/API HTTPS route before printing the setup address. It refuses to take over occupied ports or a different existing installation.
 
-For offline preparation with an already downloaded bundle, extract `automaton-server.tar.gz`, verify its checksum, and run `sudo bash automaton-server/install.sh --domain example.com --email owner@example.com`. `--configure-only` prepares configuration and validates Compose without pulling or starting containers; Docker and Python prerequisites must still be available.
+For offline preparation with an already downloaded bundle, extract `automaton-server.tar.gz`, verify its checksum, and run `sudo bash automaton-server/install.sh --domain example.com --email owner@example.com`. `--configure-only` prepares configuration and validates Compose without pulling or starting containers; it can still install missing Docker, Compose, and Python packages, so package repository access is needed if they are absent.
 
 ## Create your administrator in Studio
 
@@ -95,7 +95,7 @@ sudo bash /opt/automaton-server/update.sh
 
 To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
-For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it with the same `--version` argument. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
+For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it as shown above, with or without an explicit version. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
 
 Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
 
