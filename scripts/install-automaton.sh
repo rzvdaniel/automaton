@@ -9,7 +9,6 @@ domain=''
 email=''
 version=''
 tls_mode=http
-install_docker=false
 configure_only=false
 status_only=false
 bundle_dir="${AUTOMATON_RELEASE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
@@ -22,10 +21,10 @@ while (($#)); do
         --version) version="${2:?Missing release tag}"; shift 2 ;;
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
-        --install-docker) install_docker=true; shift ;;
+        --install-docker) shift ;; # Accepted for commands written before Docker installation became automatic.
         --configure-only) configure_only=true; shift ;;
         --status) status_only=true; shift ;;
-        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com] [--install-docker]' 'Without --version, a standalone installer selects the latest stable server release using authenticated gh; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: sudo bash install-automaton.sh [--version server-vVERSION] [--domain example.com] [--email admin@example.com]' 'Installs Docker Engine and Compose automatically if missing. Existing Docker installations are preserved.' 'Without --version, a standalone installer selects the latest stable server release using authenticated gh; an extracted bundle installs its own version.' 'Optional: --install-dir PATH --config-dir PATH --configure-only --status' 'Requires Ubuntu 24.04 or newer, public DNS and ports 80/443/5671. Optional --tls-mode cloudflare enables wildcard certificates.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
@@ -82,7 +81,6 @@ ensure_docker_repository() {
     apt-get update
 }
 if ! command -v docker >/dev/null; then
-    $install_docker || { echo 'Docker is missing. Re-run with --install-docker to install it from the official repository.' >&2; exit 1; }
     ensure_docker_repository
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     systemctl enable --now docker
