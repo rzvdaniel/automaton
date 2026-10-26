@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      packages: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -82,21 +82,35 @@ jobs:
       - name: Build release bundle
         env:
           VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
           mkdir automaton-server
           cp docker/install/{compose.yaml,configure.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
+          cp scripts/update-automaton.sh automaton-server/update.sh
           cp docs/prod/install-automaton.md automaton-server/README.md
+          printf 'server-v%s\n' "$VERSION" > automaton-server/version
+          previous=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty')
+          if [[ -n "$previous" ]]; then
+            mkdir previous-release
+            gh release download "$previous" --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256 --dir previous-release
+            (cd previous-release && sha256sum -c automaton-server.tar.gz.sha256)
+            tar -xzf previous-release/automaton-server.tar.gz -C previous-release automaton-server/release.env
+          fi
           {
             echo "API_IMAGE=$(cat server.image)"
             echo "WORKER_IMAGE=$(cat worker.image)"
             echo "STUDIO_IMAGE=$(cat studio.image)"
-            for pair in MYSQL_IMAGE=mysql:8.4 RABBITMQ_IMAGE=rabbitmq:4-management TRAEFIK_IMAGE=traefik:v3 RUNNER_IMAGE=rzvdaniel/automaton-runner:latest; do
-              image="${pair#*=}"
-              docker pull "$image" >&2
-              printf '%s=%s\n' "${pair%%=*}" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
-            done
+            if [[ -n "$previous" ]]; then
+              grep -E '^(MYSQL|RABBITMQ|TRAEFIK|RUNNER)_IMAGE=' previous-release/automaton-server/release.env
+            else
+              for pair in MYSQL_IMAGE=mysql:8.4 RABBITMQ_IMAGE=rabbitmq:4-management TRAEFIK_IMAGE=traefik:v3 RUNNER_IMAGE=rzvdaniel/automaton-runner:latest; do
+                image="${pair#*=}"
+                docker pull "$image" >&2
+                printf '%s=%s\n' "${pair%%=*}" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+              done
+            fi
           } > automaton-server/release.env
       - uses: docker/login-action@v3
         with:
@@ -115,14 +129,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-installer-config-test.py
+          sudo python3 scripts/tests/server-updater-test.py
           sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
       - name: Package release
         run: |
           tar -czf automaton-server.tar.gz automaton-server
           sha256sum automaton-server.tar.gz > automaton-server.tar.gz.sha256
+      - uses: docker/setup-buildx-action@v3
+      - name: Publish public distribution image
+        env:
+          VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}-server-distribution:server-v$VERSION"
+          docker buildx build --platform linux/amd64 -f docker/Dockerfile.server-distribution -t "$image" --push .
+          public_config=$(mktemp -d)
+          trap 'rm -rf "$public_config"' EXIT
+          docker --config "$public_config" pull "$image"
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh
+          gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh scripts/update-automaton.sh

@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Exercise the standalone updater with disposable manifests and mocked service commands."""
+import hashlib
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import unittest
+
+REPO = Path(__file__).resolve().parents[2]
+IMAGES = ('API', 'WORKER', 'STUDIO', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
+
+
+def manifest(app_digit, infrastructure_digit='0'):
+    return ''.join(f'{name}_IMAGE=example.invalid/{name.lower()}@sha256:{(app_digit if name in ("API", "WORKER", "STUDIO") else infrastructure_digit) * 64}\n'
+                   for name in IMAGES)
+
+
+@unittest.skipUnless(hasattr(os, 'geteuid') and os.geteuid() == 0, 'Requires root on Ubuntu; does not touch a live installation.')
+class ServerUpdaterTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='automaton-updater-test-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.install = self.root / 'install'
+        self.config = self.root / 'config'
+        self.install.mkdir()
+        self.config.mkdir()
+        (self.install / 'release.env').write_text(manifest('1'))
+        (self.install / 'compose.yaml').write_text('services: {}\n')
+        (self.install / '.env').write_text(f'CONFIG_DIR={self.config}\n')
+        (self.install / 'version').write_text('server-v0.1.1\n')
+        (self.config / 'installation.json').write_text('{"domain":"example.invalid"}\n')
+        (self.config / 'appsettings.Production.json').write_text('{}\n')
+        self.bin = self.root / 'bin'
+        self.bin.mkdir()
+        docker = self.bin / 'docker'
+        docker.write_text('''#!/usr/bin/env python3
+import io, os, sys, tarfile
+args=sys.argv[1:]
+if args[0]=='inspect': print('true')
+elif args[0]=='cp':
+    with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
+        data=b'key-or-data'
+        item=tarfile.TarInfo('entry'); item.size=len(data)
+        archive.addfile(item, io.BytesIO(data))
+elif args[0]=='compose':
+    if 'ps' in args: print('container-'+args[-1])
+    elif 'exec' in args: print('-- Dump completed on 2026-01-01')
+    elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
+''')
+        (self.bin / 'curl').write_text('#!/bin/sh\necho \'{"installationComplete":true}\'\n')
+        (self.bin / 'df').write_text('#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
+        for tool in self.bin.iterdir():
+            tool.chmod(0o755)
+        self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH']}
+
+    def bundle(self, target=None):
+        source = self.root / 'bundle-source' / 'automaton-server'
+        source.mkdir(parents=True, exist_ok=True)
+        (source / 'release.env').write_text(target or manifest('2'))
+        (source / 'compose.yaml').write_text('services: {}\n')
+        (source / 'version').write_text('server-v0.1.2\n')
+        shutil.copy2(REPO / 'scripts/update-automaton.sh', source / 'update.sh')
+        shutil.copy2(REPO / 'scripts/install-automaton.sh', source / 'install.sh')
+        archive = self.root / 'automaton-server.tar.gz'
+        with tarfile.open(archive, 'w:gz') as tar:
+            tar.add(source, arcname='automaton-server')
+        checksum = self.root / 'automaton-server.tar.gz.sha256'
+        checksum.write_text(f'{hashlib.sha256(archive.read_bytes()).hexdigest()}  automaton-server.tar.gz\n')
+        return archive, checksum
+
+    def update(self, archive, checksum, extra=None):
+        return subprocess.run(['bash', str(REPO / 'scripts/update-automaton.sh'), '--version', 'server-v0.1.2',
+                               '--install-dir', str(self.install), '--config-dir', str(self.config),
+                               '--bundle', str(archive), '--checksum', str(checksum)],
+                              env=self.environment | (extra or {}), capture_output=True, text=True)
+
+    def test_upgrades_after_verified_backup(self):
+        result = self.update(*self.bundle())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('2'))
+        backup, = (self.install / 'backups').iterdir()
+        for name in ('database.sql', 'config.tar.gz', 'api-keys.tar.gz', 'worker-keys.tar.gz', 'api-data.tar.gz', 'release.env', 'SHA256SUMS'):
+            self.assertTrue((backup / name).is_file(), name)
+        self.assertEqual((backup / 'release.env').read_text(), manifest('1'))
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
+
+    def test_bad_checksum_and_infrastructure_change_preserve_installation(self):
+        archive, checksum = self.bundle()
+        checksum.write_text('0' * 64 + '  automaton-server.tar.gz\n')
+        self.assertNotEqual(self.update(archive, checksum).returncode, 0)
+        archive, checksum = self.bundle(manifest('2', '3'))
+        result = self.update(archive, checksum)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('reviewed infrastructure migration', result.stderr)
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1'))
+        self.assertFalse((self.install / 'backups').exists())
+
+    def test_failed_service_update_keeps_previous_manifest_and_backup(self):
+        result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1'))
+        backup, = (self.install / 'backups').iterdir()
+        self.assertTrue((backup / 'database.sql').is_file())
+
+
+if __name__ == '__main__':
+    unittest.main()
