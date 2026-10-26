@@ -2,6 +2,8 @@
 
 Automaton is an AI-first platform for building, deploying, publishing, and running web apps.
 
+> **Pre-alpha:** Automaton is under active development. Interfaces, installation steps, and data formats may change without a migration path. Do not use it for sensitive production workloads yet.
+
 Build apps locally with your preferred AI coding agent, describe their build/runtime contract explicitly, deploy them with the Automaton CLI, and publish them through Automaton Studio. Applications may use any technology available in the selected Runner workspace.
 
 > AI can code. Automaton helps it ship.
