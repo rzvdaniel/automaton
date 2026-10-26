@@ -28,12 +28,12 @@ gh release download "$VERSION" --repo rzvdaniel/automaton \
 sha256sum -c automaton-server.tar.gz.sha256
 tar -xzf automaton-server.tar.gz
 less automaton-server/install.sh
-sudo bash automaton-server/install.sh --install-docker
+sudo bash automaton-server/install.sh
 ```
 
-The version above is a placeholder. The source repository is private, so anonymous `curl` requests to its release assets do not work. `--install-docker` authorizes installing Docker Engine from Docker's official Ubuntu repository if Docker is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
+The version above is a placeholder. The source repository is private, so anonymous `curl` requests to its release assets do not work. The installer installs Docker Engine from Docker's official Ubuntu repository if it is missing. A missing Compose plugin is installed automatically, including on a server with an existing Docker Engine. The installer first tries Ubuntu's `docker-compose-v2` package and falls back to Docker's `docker-compose-plugin` package. It does not replace existing Docker installations or remove conflicting packages automatically.
 
-If you download only `install-automaton.sh`, run `sudo bash install-automaton.sh --install-docker` to select the newest stable `server-vX.Y.Z` release. This standalone path requires GitHub CLI (`gh`) authenticated to the private repository for the root account running the installer. Add `--version server-vX.Y.Z` to select a specific release. The installer verifies the downloaded bundle's checksum in either case.
+If you download only `install-automaton.sh`, run `sudo bash install-automaton.sh` to select the newest stable `server-vX.Y.Z` release. This standalone path requires GitHub CLI (`gh`) authenticated to the private repository for the root account running the installer. Add `--version server-vX.Y.Z` to select a specific release. The installer verifies the downloaded bundle's checksum in either case.
 
 You can supply `--domain example.com --email owner@example.com` to avoid those two prompts. The optional Cloudflare DNS token prompt is hidden. Do not put secret values in command arguments or terminal transcripts.
 

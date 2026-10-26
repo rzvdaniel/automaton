@@ -27,10 +27,10 @@ The installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release suppor
      --pattern automaton-server.tar.gz --pattern automaton-server.tar.gz.sha256
    sha256sum -c automaton-server.tar.gz.sha256
    tar -xzf automaton-server.tar.gz
-   sudo bash automaton-server/install.sh --install-docker
+   sudo bash automaton-server/install.sh
    ```
 
-   It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. A missing Docker Compose plugin is installed automatically. `--install-docker` installs Docker Engine only when it is missing.
+   It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. Missing Docker Engine and Compose are installed automatically; an existing Docker Engine is preserved.
 
 2. Open `https://studio.example.com/install`. On the server, run `sudo cat /etc/automaton/secrets/setup-token`, paste the token into Studio, check the installation, and create your first administrator.
 3. Sign in and install a Machine Management Runner from **Runners** before deploying apps. You can install it on this server or another machine.
