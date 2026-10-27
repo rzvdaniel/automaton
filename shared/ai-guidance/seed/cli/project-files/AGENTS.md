@@ -25,7 +25,9 @@ If `automaton.json` is missing and the user wants a new remote app, run
 
 After implementing the app, run `automaton validate` and fix every error. Run
 `automaton deploy` and wait for the asynchronous operation to reach
-`Succeeded` before claiming completion. Verify the deployed URL.
+`Succeeded` before claiming completion. Verify the app's main behavior through
+its real entry point, then report the observed result as proof. A successful
+deployment status or reachable URL alone is not proof that the app works.
 
 If deployment fails, inspect the reported operation and correct the source or
 contract before retrying. Do not claim a successful deploy from a local build.

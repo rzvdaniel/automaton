@@ -20,14 +20,22 @@ the existing files before choosing commands, paths, or dependencies.
 9. Run `automaton validate` and fix its errors.
 10. Run `automaton deploy`.
 11. Wait for the asynchronous operation to reach a terminal result.
-12. If it reaches `Succeeded`, verify the deployed URL.
+12. If it reaches `Succeeded`, verify the app's main behavior through its real
+    entry point and record the observed result.
 13. If it fails, inspect the exact failure and fix it.
 14. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
-For a published web app, exercise its main user interaction in a browser before
-reporting success. If the site calls a separate API, check browser requests as
-well as direct API calls; cross-origin preflight can fail even when the API
-responds to command-line requests. After a fix, verify the browser flow again.
+Every completed app needs proof that its requested behavior works. For a web
+app, exercise the main user interaction in a browser, including writes and
+reads when the app supports them. For an API, call its deployed endpoints and
+check the response and any intended state change. For an Action, run it with a
+representative input and check its terminal status, result, and logs. If a site
+calls a separate API, check browser requests as well as direct API calls;
+cross-origin preflight can fail even when the API responds to command-line
+requests. After a fix or redeploy, repeat the affected check. In the final
+report, state what was tested and observed, link the published app or execution
+when available, and name any requested behavior that could not be verified.
+Deployment status, a reachable URL, or a local build alone is not proof.
 
 Use an assigned Machine Management Runner for new self-hosted applications. Do not use a
 Privileged Host Runner as an automatic fallback. Privileged Host approval is
