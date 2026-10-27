@@ -122,6 +122,11 @@ Actions-only deployments have no HTTP route. After upgrading from a release that
 omitted static or Compose routing state, redeploy affected environments to restore
 their routes; publishing alone does not repair that deployment state.
 
+For a browser site calling an API on another app hostname, configure CORS in the
+API app for the website origin, allowed methods, and headers. The runtime tunnel
+forwards preflight `OPTIONS` requests and the app's response; Automaton's control
+API CORS policy does not authorize cross-origin requests for user apps.
+
 Saving a change to the App's `RequiresAuthentication` setting refreshes routes for its deployed targets, including Hosted and BYO Runner routes. A redeployment is not required to apply or remove runtime authentication. If saving fails after database persistence, resolve the reported failure and retry the same setting: every authorized save retries route application. Until route application succeeds, the previous route may remain active. Runtime visibility and authentication are separate settings; a private URL alone does not require sign-in.
 
 Private app links use `app-{appId:N}.{configured apps domain}`, with no hyphens in the app ID. The primary target opens at `/` on that host. Named targets open at `/a/{appId}/t/{targetId}/` on the same host. The API's `RoutePath` is relative to the app host, not the shared apps domain. Use Studio's Open or Copy URL action instead of constructing a `/private/{appId}` link. No legacy path redirect is provided.

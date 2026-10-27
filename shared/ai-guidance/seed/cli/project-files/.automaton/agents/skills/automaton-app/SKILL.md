@@ -24,6 +24,11 @@ the existing files before choosing commands, paths, or dependencies.
 13. If it fails, inspect the exact failure and fix it.
 14. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
+For a published web app, exercise its main user interaction in a browser before
+reporting success. If the site calls a separate API, check browser requests as
+well as direct API calls; cross-origin preflight can fail even when the API
+responds to command-line requests. After a fix, verify the browser flow again.
+
 Use an assigned Machine Management Runner for new self-hosted applications. Do not use a
 Privileged Host Runner as an automatic fallback. Privileged Host approval is
 persisted per app environment: after explicit user approval, run

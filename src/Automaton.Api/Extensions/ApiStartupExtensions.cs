@@ -59,10 +59,7 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         ApiEnvironmentMiddleware.Configure(app);
         ApiStaticFileMiddleware.Configure(app);
-        if (corsOrigins is { Length: > 0 })
-        {
-            app.UseCors("CorsPolicy");
-        }
+        ApiCorsMiddleware.Configure(app, corsOrigins);
 
         app.UseAuthentication();
         app.UseAuthorization();
@@ -72,6 +69,19 @@ internal static class ApiApplicationPipelineExtensions
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");
         app.MapFallbackToPage("/_Host");
+    }
+}
+
+internal static class ApiCorsMiddleware
+{
+    internal static void Configure(WebApplication app, string[]? corsOrigins)
+    {
+        if (corsOrigins is not { Length: > 0 })
+            return;
+
+        app.UseWhen(
+            context => !context.Request.Path.StartsWithSegments("/runtime-tunnel/apps", StringComparison.OrdinalIgnoreCase),
+            branch => branch.UseCors("CorsPolicy"));
     }
 }
 

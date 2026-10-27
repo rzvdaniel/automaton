@@ -98,6 +98,8 @@ The M2 static publishing path uses the existing `AppPublicationService` and dura
 
 Publishing stages a candidate version separately and switches the shared server configuration only after the candidate is ready. If activation fails, the prior site configuration and version remain live. Successful replacement retains a previous version for restore and cleans only older versions for that app; unpublishing removes that app's route and files without touching other sites. This path serves declared static output, not source, secrets, logs or private app data. It does not claim a production deployment or close the deferred combined milestone 1 acceptance.
 
+The API excludes runtime-tunnel paths from its control-plane CORS middleware. Browser preflight requests reach the deployed app through the tunnel, and the app's CORS headers return to the browser. Each app owns its allowed origins, methods, and headers.
+
 ## SignalR after Slice 4
 
 The file chunk registries, chunk DTOs, API chunk callbacks, `HubFileTransferService`, and `DeployAppPackage` Runner hub handler are removed. Workflow/custom-step execution, App Actions, managed-artifact synchronization, trusted host-container operations, host validation and storage telemetry use their migrated durable/API paths.
