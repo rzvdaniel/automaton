@@ -1,0 +1,101 @@
+name: Runner image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*', 'runner-v*']
+    paths:
+      - '.github/workflows/runner-image.yml'
+      - 'src/Automaton.Runner/**'
+      - 'src/Automaton.Core/**'
+      - 'src/Automaton.Core.Scripting/**'
+      - 'src/Automaton.Steps/**'
+      - 'src/Automaton.Ai/**'
+      - 'src/Automaton.AiGuidance/**'
+      - 'src/Automaton.Mcp/**'
+      - 'src/Automaton.Messaging/**'
+      - 'shared/ai-guidance/**'
+      - 'system-apps/automaton-infrastructure/actions/**'
+      - 'Directory.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: runner-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve image and source
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${REPOSITORY,,}-runner"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "immutable=$image:sha-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          tags="$image:sha-$GITHUB_SHA"
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            tags="$tags,$image:latest"
+          elif [[ "$REF_TYPE" == tag && "$REF_NAME" =~ ^(runner-)?v[0-9][A-Za-z0-9_.-]*$ ]]; then
+            tags="$tags,$image:${REF_NAME#runner-}"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the exact source revision
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Automaton.Runner/Dockerfile
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: ${{ steps.image.outputs.immutable }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Smoke test the built image
+        env:
+          IMAGE: ${{ steps.image.outputs.immutable }}
+        run: |
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
+            test "$(id -u)" = 1000
+            command -v docker
+            docker --version
+            test -f /app/SystemApps/automaton-infrastructure/actions/validate-runner-host/action.yaml
+            test -f /app/SystemApps/automaton-infrastructure/actions/validate-runner-host/main.sh
+          '
+      - name: Push the tested image and record its digest
+        env:
+          IMAGE: ${{ steps.image.outputs.immutable }}
+          TAGS: ${{ steps.image.outputs.tags }}
+        run: |
+          set -euo pipefail
+          IFS=, read -ra tags <<< "$TAGS"
+          for tag in "${tags[@]}"; do
+            docker tag "$IMAGE" "$tag"
+            docker push "$tag"
+          done
+          digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")
+          [[ "$digest" == *@sha256:* ]]
+          printf '%s\n' "$digest" > runner.image
+          printf 'Source: `%s`\n\nImage: `%s`\n' "$GITHUB_SHA" "$digest" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runner-image
+          path: runner.image

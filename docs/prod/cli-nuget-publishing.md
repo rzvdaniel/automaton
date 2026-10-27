@@ -1,106 +1,23 @@
 # Automaton CLI NuGet Publishing and Installation
 
-This document explains:
+## 1. Build and publish packages with GitHub Actions
 
-- how to publish the Automaton CLI to NuGet.org using Azure Pipelines
-- how to install the locally packed CLI globally for development testing
-- how end users should install the CLI globally after it is published
+[Pack CLI and Runner](../../.github/workflows/nuget.yml) replaces the retired
+Azure CLI and Runner package pipelines. Run it from GitHub **Actions**, enter an
+explicit NuGet version such as `1.0.20261027.1`, and leave **publish** off for a
+dry run. It builds both projects in Release and uploads packages, checksums and
+the exact source revision as GitHub Actions artifacts. It does not run tests.
 
-## Relevant Files
+To publish, run it on `main` with **publish** enabled. Configure the repository's
+`NUGET_ORG_API_KEY` Actions secret with a NuGet.org key scoped to the intended
+packages. Azure pipeline secrets are not transferred automatically. The workflow
+rejects publishing from another branch and reports a missing key explicitly;
+package builds and artifact downloads do not need this secret.
 
-- Pipeline: `azure-pipelines-cli.yml`
-- CLI project: `src/Automaton.Cli/Automaton.Cli.csproj`
-
-## 1. Publish the CLI to NuGet.org
-
-The repository already contains an Azure DevOps pipeline for the CLI.
-
-Pipeline file:
-
-```yaml
-azure-pipelines-cli.yml
-```
-
-### What the pipeline does
-
-On changes to the CLI project or pipeline file, it:
-
-1. restores the CLI project
-2. builds it in `Release`
-3. packs it as a .NET global tool NuGet package
-4. publishes the package artifact in Azure DevOps
-5. on `main` only, pushes the `.nupkg` to NuGet.org
-
-### Requirements
-
-Before the first real publish, make sure all of these are in place:
-
-1. A NuGet.org account
-2. Access to create an API key on NuGet.org
-3. An Azure DevOps pipeline created from `azure-pipelines-cli.yml`
-4. A secret Azure DevOps pipeline variable named `NUGET_ORG_API_KEY`
-
-### Create the NuGet API key
-
-1. Sign in to NuGet.org
-2. Go to your account settings
-3. Create an API key with package push permissions
-4. Copy the API key once and store it safely
-
-### Add the API key to Azure DevOps
-
-In the pipeline settings or variables UI:
-
-1. Create a variable named `NUGET_ORG_API_KEY`
-2. Mark it as secret
-
-The pipeline already expects that exact name.
-
-### Safe dry run
-
-Run the pipeline on `develop` first.
-
-With the current pipeline logic:
-
-- `BuildAndPackage` runs on `develop`
-- `Release` is skipped on `develop`
-- no package is pushed to NuGet.org
-
-This is the recommended first validation step.
-
-### Real publish
-
-To publish for real:
-
-1. merge the CLI changes into `main`
-2. run the pipeline on `main`
-3. confirm the package is packed successfully
-4. let the `Release` stage push it to NuGet.org
-
-### Versioning in Azure Pipelines
-
-The pipeline uses the Azure DevOps build number as the NuGet version.
-
-Current pipeline naming pattern:
-
-```yaml
-name: 1.0.$(Date:yyyyMMdd)$(Rev:.r)
-```
-
-And the pack step uses:
-
-```yaml
-versioningScheme: 'byBuildNumber'
-```
-
-That means pipeline-produced versions look like this:
-
-```text
-1.0.20260505.1
-1.0.20260505.2
-```
-
-This avoids manually editing the version before each publish.
+Standalone Runner archives are built separately by
+[Build native Runner archives](../../.github/workflows/release.yml), using the
+current Runner project and .NET 9. Production server and Runner container images
+have their own build workflows; see [deploying the Runner](deploying-runner.md).
 
 ## 2. Install the Locally Packed CLI Globally for Development
 

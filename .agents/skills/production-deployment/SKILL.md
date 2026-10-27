@@ -24,14 +24,14 @@ Read the current scripts and [the production cheat sheet](../../../docs/prod/pro
 ## Runner image release authority
 
 Production Runner Docker images are built and published by the repository's
-Azure DevOps pipeline, `azure-pipelines-runner-docker.yml`.
+GitHub Actions workflow, `.github/workflows/runner-image.yml`, publishing to GHCR.
 
 Do not create a parallel production Runner build or publishing path on a
 production host or developer machine. For changes under `src/Automaton.Runner/`:
 
 1. Validate the change locally as appropriate.
 2. Merge it to the intended release revision.
-3. Let the Azure DevOps Runner pipeline build and publish the production image.
+3. Let the GitHub Actions Runner image workflow build and publish the production image.
 4. Verify the exact published image digest and image-level smoke checks.
 5. Deploy or install Runners from that CI-produced artifact.
 

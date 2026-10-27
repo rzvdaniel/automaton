@@ -1,0 +1,85 @@
+name: Build production images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'docker/**'
+      - 'src/**'
+      - 'shared/ai-guidance/**'
+      - 'Directory.*'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'docker/**'
+      - 'src/**'
+      - 'shared/ai-guidance/**'
+      - 'Directory.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-images-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  images:
+    name: Build ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [server, worker, studio, website]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          COMPONENT: ${{ matrix.component }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}-$COMPONENT" >> "$GITHUB_OUTPUT"
+      - name: Build the production image
+        uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.component }}
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          build-args: |
+            VITE_RUNTIME_CONFIG=true
+            VITE_API_BASE_URL=
+            VITE_PUBLIC_APPS_BASE_URL=
+            VITE_GITHUB_AUTH_API_BASE_URL=
+            VITE_SUBSCRIPTIONS_ENABLED=false
+            VITE_APP_TITLE=Automaton Studio
+      - name: Record the image reference
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          printf '%s\n' "$IMAGE" > "$COMPONENT.image"
+          printf 'Source: `%s`\n\nImage: `%s`\n' "$GITHUB_SHA" "$IMAGE" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: image-${{ matrix.component }}
+          path: '*.image'

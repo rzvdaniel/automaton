@@ -1,47 +1,33 @@
 # Deploying the Automaton Runner
 
-This guide covers deploying an Automaton Runner on any Linux server (Hetzner, DigitalOcean, AWS EC2, etc.) using the pre-built Docker image published to Docker Hub.
+This guide covers deploying an Automaton Runner on any Linux server (Hetzner, DigitalOcean, AWS EC2, etc.) using the pre-built Docker image published to GHCR.
 
 ## How the Release Pipeline Works
 
-The Runner is built and published by `azure-pipelines-runner-docker.yml`.
+The production Runner artifact authority is GitHub Actions
+[Runner image](../../.github/workflows/runner-image.yml). It builds
+`src/Automaton.Runner/Dockerfile` with the repository root as its context, checks
+the non-root user, Docker CLI and bundled trusted Actions, then pushes that same
+image to `ghcr.io/rzvdaniel/automaton-runner`.
 
-The pipeline runs for relevant Runner or shared-code changes merged to `main`,
-and also for `v*` or `runner-v*` release tags. Pull-request builds remain
-manual (`pr: none`) so registry credentials are not exposed to arbitrary fork
-code. It is the production Runner artifact authority. Do not manually build or
-push a production Runner image from a developer machine or production host.
+Relevant changes merged to `main` publish `sha-<full-commit-sha>` and `latest`.
+`v*` and `runner-v*` tags publish the immutable SHA tag and a version alias.
+Manual **Run workflow** builds use the selected repository branch or tag and
+publish its exact checked-out SHA; non-main branch builds do not move `latest`.
+There is no pull-request image publication or production-host image build.
 
-```bash
-git tag runner-v1.2.0
-git push origin runner-v1.2.0
-```
+Use the workflow summary and its `runner-image` artifact to obtain the published
+`repository@sha256:<digest>` reference. Verify its OCI source-revision label
+before updating a machine. Do not substitute `latest` for acceptance evidence.
+Existing pinned Docker Hub images remain usable as rollback artifacts; their
+registry is no longer the active build/publish authority.
 
-This triggers a build from `src/Automaton.Runner/Dockerfile` (build context `src/`) and pushes a source-revision tag plus the release aliases to Docker Hub:
+GHCR publishing uses the workflow's `GITHUB_TOKEN`; no Docker Hub secret is
+required. A newly created GHCR package is private by default. Make the Runner
+package Public in GitHub package settings before expecting anonymous installation,
+or supply authorized registry authentication. Existing installations keep their
+configured image reference until an operator updates it.
 
-| Tag | Description |
-|----|-------------|
-| `rzvdaniel/automaton-runner:sha-<full-commit-sha>` | Immutable source-revision tag published for every build |
-| `rzvdaniel/automaton-runner:latest` | Always points to the most recent release |
-| `rzvdaniel/automaton-runner:v1.2.0` | Pinned version tag |
-
-Manual non-main branch builds publish only the `sha-<full-commit-sha>` tag. They
-do not move `latest`, which keeps pre-merge acceptance artifacts separate from
-the production alias. Docker build metadata also records the source revision;
-acceptance must record both the full SHA tag and the resolved `sha256` digest.
-
-### Publishing an exact pre-merge Runner artifact
-
-For a trusted repository branch, use Azure DevOps **Run pipeline** for
-`azure-pipelines-runner-docker.yml` from `main`, set `Source ref` to the
-fully-qualified branch or tag containing the desired commit, and enter that
-full SHA in `Expected source revision`. The pipeline fetches and checks out the
-source ref, then fails before registry login if it does not resolve to the
-requested revision. Source-ref override builds publish only the immutable
-`sha-<full-commit-sha>` tag and leave `latest` and release aliases unchanged.
-The pipeline prints the immutable image tag and resolved published digest. Use
-that exact `repository@sha256:<digest>` reference for real-host acceptance; do
-not substitute `latest`.
 
 ---
 
@@ -78,7 +64,7 @@ EOF
 ```yaml
 services:
   runner:
-    image: rzvdaniel/automaton-runner:latest
+    image: ghcr.io/rzvdaniel/automaton-runner:latest
     container_name: automaton-runner
     restart: unless-stopped
     env_file: .env
@@ -143,7 +129,7 @@ To upgrade to a specific version instead of `latest`:
 
 ```bash
 # In docker-compose.yml, change image to:
-#   image: rzvdaniel/automaton-runner:v1.2.0
+#   image: ghcr.io/rzvdaniel/automaton-runner:v1.2.0
 docker compose up -d
 ```
 

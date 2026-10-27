@@ -17,6 +17,17 @@ Build apps locally with your preferred AI coding agent, describe their build/run
 - **Runner model** — run the declared application process on your own infrastructure or managed runner infrastructure.
 - **AI-agent harness** — repository instructions, skills, and verification guidance for tools like Claude Code, Codex, Cursor, and Copilot.
 
+## Build and release automation
+
+GitHub Actions builds [production images](.github/workflows/build.yml), publishes
+[Runner images](.github/workflows/runner-image.yml) to GHCR, and provides manual
+[CLI/Runner NuGet packages](.github/workflows/nuget.yml) and
+[native Runner archives](.github/workflows/release.yml). The existing
+[server release workflow](.github/workflows/server-release.yml) assembles installer
+releases. Container publication uses `GITHUB_TOKEN`; NuGet publication additionally
+requires the `NUGET_ORG_API_KEY` repository secret. The Azure
+[test pipeline](azure-pipelines-studio-server.yml) remains unchanged.
+
 ## Install on your server
 
 The installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
