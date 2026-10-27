@@ -1,6 +1,6 @@
 # Automaton self-hosted roadmap
 
-Updated: 24 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; broader Action and multi-user acceptance remains deferred before team use.
+Updated: 27 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; a single-account CLI/static/API/Action flow is now demonstrated. Multi-user and combined restart/replay acceptance remain deferred before team use.
 
 ## Product decision
 
@@ -98,7 +98,7 @@ The implementation PRs are merged on the reconciled source baseline from PR #391
 
 Acceptance: on a disposable Linux machine, two users deploy apps and run jobs through one management Runner. Cross-user files, secrets, logs and operations are denied. There is no placeholder Hosted Runner record or per-user management container required for new workloads. Restart/lost-response checks demonstrate safe result recovery and no automatic replay of uncertain Actions. Source/artifacts and persistent data survive the applicable restart/update scenarios.
 
-M1 implementation PRs are merged. Combined integration acceptance remains deferred; the single-user M3 demonstration does not verify real Action execution, two-user isolation, cancellation or combined restart/replay behavior.
+M1 implementation PRs are merged. Combined integration acceptance remains deferred. The 27 October normal-user exercise below adds real Action execution and cancellation evidence; two-user isolation and combined restart/replay behavior remain unverified.
 
 ### 2. Make personal and shared apps useful with low overhead
 
@@ -128,17 +128,37 @@ The previous workstation-to-workload networking blocker was avoided by placing t
 Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
 
 A normal-user CLI exercise on 27 October created two static sites, an HTTP API
-and a separate reporting Action app through the existing account and explicit
-Machine Management assignment flow. The API's published endpoint and replacement
-from release 1 to release 2 passed with persistent data retained; an intentionally
-unhealthy replacement failed while release 2 kept serving with the same marker.
-Both static sites built and published into one shared serving container, but
-their public URLs exposed missing static routing state in the installed API.
-Python Action preparation also failed because its container user did not match
-the Runner-owned workspace. Local fixes cover those failures, CLI static-package
-admission, HTTP 429 recovery during device authorization, and stale generated
-guidance. API/Runner rollout and final static URL, Action execution and cancellation
-checks remain pending; this is partial evidence, not broader M1/M2 acceptance.
+and a reporting Action app through one authorized account and an explicitly
+assigned remote Machine Management Runner. The API's published endpoint and
+release 1 → release 2 replacement passed with persistent data retained. An
+intentionally unhealthy replacement failed while release 2 kept serving with the
+same marker; a final healthy replacement and platform rollout also retained it.
+
+The exercise found and corrected CLI device-login HTTP 429 handling, static
+package admission, static/Compose routing state and Python Action container file
+ownership. [PR #434](https://github.com/rzvdaniel/automaton/pull/434) merged the
+fixes and moved build/publishing automation to GitHub Actions; Azure tests were
+left unchanged. [PR #435](https://github.com/rzvdaniel/automaton/pull/435) corrected
+package-build assembly versions. All production image builds and both tool
+package builds passed in GitHub Actions.
+
+The API and Runner run the verified images built from `cd64dc22`; the installed
+CLI package `1.0.20261027.1` was built from `cd3d54bf`. The
+[Runner image run](https://github.com/rzvdaniel/automaton/actions/runs/40500261674)
+published `ghcr.io/rzvdaniel/automaton-runner@sha256:cf86b20267fc2d91703da1c3c7f4bfb8b6defd08ee94748360a37ae76e3a78e0`.
+API blue/green health checks and all three tunnel reconnect requests passed;
+the prior API image and stopped Runner container remain available for rollback.
+
+Both static URLs returned their expected pages. Host inspection confirmed one
+shared static serving container, with about 12 KiB and 16 KiB of site files, and
+a separate API container. Browser-origin API/CORS requests passed; source,
+configuration and environment-file probes returned only the static HTML fallback.
+The Python Action returned the expected JSON report; CLI result/log reads passed.
+Cancellation of a running Action reached `Cancelled` and removed its container;
+a subsequent Action succeeded. This is single-account acceptance, not evidence
+of two-user isolation, multi-Runner placement or combined restart/replay behavior.
+The production image cleanup step failed closed on a pre-existing missing protected
+image reference; no recovery history or application data was deleted.
 
 ### 4. Remove superseded execution and hosting paths
 
@@ -184,4 +204,4 @@ Update the milestone status here only with its evidence and remaining limitation
 
 Public multi-tenant hosting, automatic cloud capacity purchasing, managed VM/microVM creation, Kubernetes, cross-region failover, distributed storage, a replacement message bus, a new workflow engine and a custom agent orchestrator are outside this roadmap. Optional provider integrations can be considered after the self-hosted path is useful and simple to operate.
 
-**Next action:** use the completed flow for our own apps and fix concrete problems encountered through normal use. #418's host retention settings were installed on 24 October; the control-plane image-cleanup timer remains paused pending reconciliation of its older deployment checkout, and existing-container/application-binary log changes await normal replacement. See the operations guide for maintenance evidence. Before broader team use, complete the outstanding real Action execution, two-user isolation, cancellation and combined restart/replay acceptance. Keep backup automation, Runner self-update and the other deferred features postponed. No new feature or preparation milestone is needed. Existing-installation retirement, production deployment and data decisions remain separate.
+**Next action:** use the completed flow for our own apps and fix concrete problems encountered through normal use. #418's host retention settings were installed on 24 October; the control-plane image-cleanup timer remains paused pending reconciliation of its older deployment checkout, and existing-container/application-binary log changes await normal replacement. See the operations guide for maintenance evidence. Before broader team use, complete two-user isolation and the combined restart/replay and integrated small-team acceptance. Single-account real Action execution and cancellation are demonstrated above. Keep backup automation, Runner self-update and the other deferred features postponed. No new feature or preparation milestone is needed. Existing-installation retirement, production deployment and data decisions remain separate.
