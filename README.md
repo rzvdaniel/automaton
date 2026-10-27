@@ -25,8 +25,8 @@ GitHub Actions builds [production images](.github/workflows/build.yml), publishe
 [native Runner archives](.github/workflows/release.yml). The existing
 [server release workflow](.github/workflows/server-release.yml) assembles installer
 releases. Container publication uses `GITHUB_TOKEN`; NuGet publication additionally
-requires the `NUGET_ORG_API_KEY` repository secret. The Azure
-[test pipeline](azure-pipelines-studio-server.yml) remains unchanged.
+requires the `NUGET_ORG_API_KEY` repository secret. Azure pipeline definitions
+have been retired; there is no replacement automated all-project C# test pipeline.
 
 ## Install on your server
 

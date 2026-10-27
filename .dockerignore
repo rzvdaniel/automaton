@@ -5,7 +5,6 @@
 
 # CI/CD
 .github
-azure-pipelines*.yml
 
 # Documentation
 *.md

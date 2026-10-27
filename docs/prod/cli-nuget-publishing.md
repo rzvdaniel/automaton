@@ -200,10 +200,10 @@ Use this sequence for reliable releases:
 1. test locally with `dotnet pack`
 2. install the local package globally with `--add-source .\.tmp\cli-pack`
 3. verify key commands locally
-4. run the Azure pipeline on `develop`
-5. confirm artifact generation succeeded
+4. run **Pack CLI and Runner** with the intended version and **publish** disabled
+5. download and verify the generated package artifacts
 6. merge to `main`
-7. let Azure Pipelines publish to NuGet.org
+7. run **Pack CLI and Runner** on `main` with the release version and **publish** enabled
 8. verify public install with `dotnet tool install --global Automaton.Cli`
 
 ## 5. Quick Command Reference
