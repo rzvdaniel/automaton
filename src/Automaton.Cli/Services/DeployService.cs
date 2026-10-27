@@ -288,14 +288,15 @@ public sealed class DeployService
             directory,
             ApplicationBuildArtifactSelector.GetRelativeDirectory(deploymentApplication),
             actionCount > 0,
-            deploymentApplication.Runtime.Command is not null || deploymentApplication.Compose is not null,
+            deploymentApplication.Runtime.Command is not null || deploymentApplication.Compose is not null
+                || deploymentApplication.IsStaticSite,
             deploymentApplication.Build.Command is not null,
             nextSteps,
             out var deployDirectory);
         if (!applicationCheck.Success && deploymentApplication.Runtime.Command is null
             && deploymentApplication.Compose is null && actionCount == 0)
         {
-            nextSteps.Add("Add application.runtime.command.executable to automaton.json, or define at least one Action for an Actions-only app");
+            nextSteps.Add("Declare a runtime command, a static-site build command and output directory, or at least one Action for an Actions-only app");
         }
         checks.Add(applicationCheck);
         if (!applicationCheck.Success)

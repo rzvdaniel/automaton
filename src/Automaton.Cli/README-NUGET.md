@@ -30,7 +30,17 @@ credential. If a browser cannot be opened, copy the displayed URL and code to an
 device. For CI/CD and other unattended flows, set `AUTOMATON_API_KEY` and run the
 required command directly; environment credentials are never persisted.
 
+During device authorization, the CLI waits through HTTP 429 responses using the
+server's `Retry-After` header (60 seconds when absent), within the request's
+authorization lifetime. A temporary rate limit does not require another approval.
+
 ## Pull modes
+
+Static sites declare `application.build.command`, an explicit build image and
+`application.build.outputDirectory`, with no runtime command or Compose contract.
+The assigned Machine Management Runner builds and publishes the output through
+its shared static server. Dynamic HTTP applications declare their own runtime
+image and command; Actions-only applications may omit an HTTP runtime.
 
 ```bash
 # Refresh the current linked local project from Studio source files

@@ -184,6 +184,8 @@ internal sealed class HostContainerActionExecutor(
         var args = new List<string>
         {
             "docker", "run", "--rm", "--interactive", "--name", name,
+            // Match the Runner-owned workspace and owner-only execution input files.
+            "--user", "1000:1000",
             "--network", "bridge", "--read-only", "--security-opt", "no-new-privileges",
             "--cap-drop", "ALL", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m,mode=1777",
             "--shm-size", $"{request.SharedMemoryMb}m", "--log-driver", "local",

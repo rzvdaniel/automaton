@@ -24,20 +24,19 @@ the existing files before choosing commands, paths, or dependencies.
 13. If it fails, inspect the exact failure and fix it.
 14. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
 
-Prefer a Standard or Hosted Runner for ordinary applications. Do not use a
+Use an assigned Machine Management Runner for new self-hosted applications. Do not use a
 Privileged Host Runner as an automatic fallback. Privileged Host approval is
 persisted per app environment: after explicit user approval, run
 `automaton target approve <environment>` and use
 `automaton target revoke <environment>` to remove it. If only a Privileged
 Host Runner appears usable, stop and ask the user for explicit approval.
 
-Any app that exposes an HTTP/public URL must declare `application.runtime.command`.
-This includes frontend-only and static web apps. Their runtime artifact must
-contain or depend on an HTTP server described by the same generic contract.
-A null runtime command is reserved for Actions-only or other finite-work apps
-with no HTTP endpoint. Make the process, port, health path, and data directory
-explicit whenever the app has a runtime. Automaton has no static-file serving
-fallback.
+Dynamic HTTP apps must declare `application.runtime.command` and an explicit
+runtime image. Static sites use a build command and `build.outputDirectory`,
+with no runtime command or Compose contract; the Machine Management Runner
+publishes the declared output through its shared static server. Actions-only
+or other finite-work apps with no HTTP endpoint may also omit the runtime command. Make the process,
+port, health path, and data directory explicit whenever the app has a runtime.
 Keep generated output and dependencies out of durable source unless the user
 specifically asks for them.
 

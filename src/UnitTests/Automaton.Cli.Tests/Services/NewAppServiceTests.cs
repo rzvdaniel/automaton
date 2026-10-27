@@ -207,7 +207,7 @@ public class NewAppServiceTests
         var skillPath = Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md");
         Assert.That(File.Exists(skillPath), Is.True);
         var skill = File.ReadAllText(skillPath);
-        Assert.That(skill, Does.Contain("Prefer a Standard or Hosted Runner for ordinary applications"));
+        Assert.That(skill, Does.Contain("Use an assigned Machine Management Runner"));
         Assert.That(skill, Does.Contain("automaton target approve <environment>"));
         Assert.That(skill, Does.Contain("automaton target revoke <environment>"));
         Assert.That(skill, Does.Not.Contain("--acknowledge-privileged-host-access"));

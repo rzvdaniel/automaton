@@ -44,7 +44,8 @@ public sealed class DeploymentPackageFinalizationService(
         await backendRouteConfigService.RefreshAsync(
             cancellationToken,
             deploymentTargetId,
-            packageApplication.Runtime.Command is not null);
+            packageApplication.Runtime.Command is not null
+                || packageApplication.Compose is not null || packageApplication.IsStaticSite);
     }
 
     public Task RestoreRoutesAsync() => backendRouteConfigService.RefreshAsync(CancellationToken.None);

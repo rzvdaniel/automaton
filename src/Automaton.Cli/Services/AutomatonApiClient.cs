@@ -283,9 +283,21 @@ public class AutomatonApiClient : IDisposable
     public async Task<JsonElement> PollCliAuthorizationAsync(Guid requestId, string verifier, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { verifier }, JsonOptions);
-        using var resp = await PostJsonAsync($"api/cli-auth/requests/{requestId}/poll", payload, ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
+        while (true)
+        {
+            using var resp = await PostJsonAsync($"api/cli-auth/requests/{requestId}/poll", payload, ct);
+            if (resp.StatusCode != System.Net.HttpStatusCode.TooManyRequests)
+            {
+                await EnsureSuccessAsync(resp);
+                return await ReadJsonAsync(resp, ct);
+            }
+
+            var retryAfter = resp.Headers.RetryAfter;
+            var delay = retryAfter?.Delta
+                ?? (retryAfter?.Date - DateTimeOffset.UtcNow)
+                ?? TimeSpan.FromSeconds(60);
+            await Task.Delay(delay < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : delay, ct);
+        }
     }
 
     public async Task CompleteCliAuthorizationAsync(Guid requestId, string verifier, CancellationToken ct = default)

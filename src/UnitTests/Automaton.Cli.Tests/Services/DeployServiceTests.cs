@@ -70,7 +70,7 @@ public class DeployServiceTests
         {
             Assert.That(result.Success, Is.False);
             AssertCheck(result, DeployCheckNames.ApplicationPackage, false, "runtime command is required");
-            Assert.That(result.NextSteps, Has.Some.Contains("application.runtime.command.executable"));
+            Assert.That(result.NextSteps, Has.Some.Contains("runtime command"));
             Assert.That(fixture.SnapshotCalls, Is.Zero);
             Assert.That(fixture.DeployCalls, Is.Zero);
         });
