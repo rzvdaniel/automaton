@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           version="${REQUESTED_VERSION:-${GITHUB_REF_NAME#v}}"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$ ]]
-          dotnet publish src/Automaton.Runner/Automaton.Runner.csproj -c Release --runtime "$RUNTIME" --self-contained "$SELF_CONTAINED" -p:Version="$version" -o publish
+          dotnet publish src/Automaton.Runner/Automaton.Runner.csproj -c Release --runtime "$RUNTIME" --self-contained "$SELF_CONTAINED" -p:Version="$version" -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.0 -o publish
           printf '%s\n' "$GITHUB_SHA" > publish/source-revision.txt
           platform="$RUNTIME"
           case "$RUNTIME" in win-*) platform="windows-${RUNTIME#win-}" ;; osx-*) platform="macos-${RUNTIME#osx-}" ;; esac
