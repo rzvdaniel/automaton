@@ -86,3 +86,38 @@ files. For illustration only, a project may use `node:22-bookworm-slim` with
 `node server.js`, `python:3.13-slim` with `python app.py`, or an ASP.NET runtime
 image with its published application command. Choose the image and command for
 the application; Automaton does not detect or select a stack.
+
+## Efficient image selection
+
+Preserve the user's chosen technology. Prefer the smallest maintained image
+from an official or trusted publisher that supports the app's actual dependencies
+and the Runner architecture. Image size is a preference, not a reason to remove
+required libraries, security updates, health checks, or durable storage.
+
+- For static output, use the static-site contract in this skill so the Runner shares its
+  static serving container across sites. Do not add a dedicated nginx, Node, or
+  Python HTTP container for each static app. Server-rendered apps and APIs still
+  need their declared runtime process.
+- Separate `build.image` from `runtime.image` when build tools are required only
+  during compilation or packaging. Keep SDKs, compilers, development dependencies,
+  and build caches out of the deployed runtime artifact. For a custom Dockerfile,
+  use a multi-stage build when appropriate.
+- For Python, consider an official `python:<supported-version>-slim` image when
+  its libraries suffice. For Node, consider a supported slim variant and retain
+  only production dependencies. For .NET, build with an SDK image and run with
+  the matching ASP.NET or .NET runtime image; use runtime-deps only when the
+  published app includes its runtime. These are examples, not required stacks.
+- Use Alpine or other minimal variants only after checking native-library,
+  certificate, globalization, and executable compatibility. Do not assume every
+  app can run on Alpine or in an image without a shell.
+- Reuse compatible image versions across apps where practical so Docker can
+  share cached layers. Declare explicit supported version tags or digests rather
+  than `latest`, and plan updates for security fixes.
+- Use a supported database image when a database is needed, and keep its durable
+  data in configured persistent storage. Do not replace a required database just
+  to shrink the image; its growing data, backups, and memory also need capacity.
+
+Validate and deploy the chosen image through the normal CLI flow and verify
+health and application behavior. When reporting resource use, distinguish shared
+image layers, container writable layers, app files and retained deployments,
+persistent data, logs, and RAM; image size alone is not per-app capacity.

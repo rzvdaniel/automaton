@@ -10,6 +10,11 @@ Use the CLI's documented commands and preserve the user's chosen technology.
 `automaton.json` is the deployment contract. Automaton does not prescribe a
 language, framework, package manager, source layout, or application architecture.
 
+Prefer small, maintained images compatible with the app. Separate build tools
+from production runtimes, and use the shared static-site contract for static
+output. Follow the image-selection guidance in the generated skill; preserve the
+user's chosen technology and verify dependencies before choosing a minimal image.
+
 Keep the contract accurate when build, runtime, health, storage, or execution
 behavior changes. Keep durable data in the configured data directory and keep
 secrets out of source-controlled files.
