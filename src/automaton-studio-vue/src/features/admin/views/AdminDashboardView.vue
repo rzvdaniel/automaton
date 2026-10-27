@@ -35,7 +35,6 @@ const quickLinks = [
   { label: 'Marketplace Apps', icon: 'pi pi-shop', to: '/admin/marketplace-apps' },
   { label: 'App Activity', icon: 'pi pi-chart-line', to: '/admin/app-activity' },
   { label: 'Server Logs', icon: 'pi pi-list', to: '/admin/logs' },
-  { label: 'Hosted Runners', icon: 'pi pi-server', to: '/admin/hosted-runners' },
   { label: 'Subscription Plans', icon: 'pi pi-credit-card', to: '/admin/subscription-plans' },
 ] satisfies DashboardLink[]
 
@@ -85,10 +84,10 @@ const overviewCards = computed<OverviewCard[]>(() => {
     {
       label: 'Active runners',
       value: current.activeRunners,
-      helper: 'Running hosted runners',
+      helper: 'Connected Machine Management Runners',
       icon: 'pi pi-server',
-      to: '/admin/hosted-runners',
-      actionLabel: 'Open hosted runners',
+      to: '/runners',
+      actionLabel: 'Open runners',
       tone: current.activeRunners === 0 ? 'danger' : 'success',
     },
     {

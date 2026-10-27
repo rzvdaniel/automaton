@@ -5,13 +5,11 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '../services/runners.service'
 import {
   RunnerApplicationProfiles,
   SelfHostedRunnerInstallationStatuses,
-  type RunnerApplicationProfile,
   type SelfHostedRunnerInstallation,
   type SelfHostedRunnerInstallationStatus,
 } from '../types/runners.types'
@@ -28,7 +26,6 @@ const emit = defineEmits<{ created: [] }>()
 const toast = useToast()
 
 const runnerName = ref('')
-const profile = ref<RunnerApplicationProfile>(RunnerApplicationProfiles.Standard)
 const acknowledgedHostAccess = ref(false)
 const submitting = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -37,52 +34,20 @@ const installationStatus = ref<SelfHostedRunnerInstallationStatus | null>(null)
 const refreshingStatus = ref(false)
 let statusPollTimer: ReturnType<typeof setTimeout> | null = null
 
-const profileOptions = [
-  {
-    label: 'Standard',
-    value: RunnerApplicationProfiles.Standard,
-    description:
-      'Runs Automaton apps with normal container isolation. Recommended for ordinary application workloads.',
-  },
-  {
-    label: 'Machine Management',
-    value: RunnerApplicationProfiles.MachineManagement,
-    description:
-      'Runs one trusted management Runner on this machine. Requires Ubuntu and Docker Engine; ext4 is the tested storage baseline, and other working Docker filesystems are accepted. Actions run in isolated containers; raw workflows and management-process custom steps remain disabled.',
-  },
-  {
-    label: 'Privileged Host',
-    value: RunnerApplicationProfiles.PrivilegedHost,
-    description:
-      'Runs trusted infrastructure-aware apps with administrator-level access to this machine.',
-  },
-]
-
-const isPrivileged = computed(() => profile.value === RunnerApplicationProfiles.PrivilegedHost)
-const requiresHostAccess = computed(() =>
-  profile.value === RunnerApplicationProfiles.PrivilegedHost ||
-  profile.value === RunnerApplicationProfiles.MachineManagement
+const warning = computed(() =>
+  installation.value?.hostAccessWarning ??
+  'This trusted Runner can manage Docker containers on this machine. User app code must remain isolated in containers.'
 )
+
 const isValidName = computed(() => isValidSelfHostedRunnerName(runnerName.value))
 const canCreate = computed(
   () =>
     canCreateSelfHostedInstallation(
       runnerName.value,
-      profile.value,
+      RunnerApplicationProfiles.MachineManagement,
       acknowledgedHostAccess.value
     ) && !submitting.value
 )
-const warning = computed(
-  () =>
-    installation.value?.hostAccessWarning ??
-    (isPrivileged.value
-      ? 'Apps deployed to this Runner may read and modify host files, inspect host processes, control Docker containers, affect services and system state, and access secrets stored on this machine.'
-      : 'Automaton exposes typed app-container operations and disables Actions and workflows, but the Runner itself is trusted infrastructure: a compromise could control host Docker. Ordinary app and build code must remain isolated in containers.')
-)
-
-watch(profile, () => {
-  acknowledgedHostAccess.value = false
-})
 watch(visible, (isVisible) => {
   if (!isVisible) {
     stopStatusPolling()
@@ -92,7 +57,6 @@ watch(visible, (isVisible) => {
 
 function reset() {
   runnerName.value = ''
-  profile.value = RunnerApplicationProfiles.Standard
   acknowledgedHostAccess.value = false
   errorMessage.value = null
   installation.value = null
@@ -108,7 +72,7 @@ async function createInstallation() {
     installation.value = await runnersService.createSelfHostedInstallation(
       createSelfHostedInstallationRequest(
         runnerName.value,
-        profile.value,
+        RunnerApplicationProfiles.MachineManagement,
         acknowledgedHostAccess.value
       )
     )
@@ -191,7 +155,7 @@ function close() {
 <template>
   <Dialog
     v-model:visible="visible"
-    header="Install Self-Hosted Runner"
+    header="Install Machine Management Runner"
     modal
     :style="{ width: 'min(680px, calc(100vw - 2rem))' }"
   >
@@ -200,7 +164,6 @@ function close() {
         Create a one-time Docker installation command for a machine you own.
       </p>
       <Message
-        v-if="profile === RunnerApplicationProfiles.MachineManagement"
         severity="info"
         :closable="false"
         class="mb-4"
@@ -220,21 +183,8 @@ function close() {
           >Enter a Runner name between 1 and 120 characters.</small
         >
       </div>
-      <div class="field mt-4">
-        <label class="font-semibold block mb-2">Installation profile</label>
-        <SelectButton
-          v-model="profile"
-          :options="profileOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-        />
-        <p class="text-color-secondary text-sm mb-0 mt-2">
-          {{ profileOptions.find((option) => option.value === profile)?.description }}
-        </p>
-      </div>
-      <Message v-if="requiresHostAccess" severity="warn" :closable="false" class="mt-4">
-        <strong>{{ isPrivileged ? 'Privileged Host access' : 'Machine management access' }}</strong><br />{{ warning }}
+      <Message severity="warn" :closable="false" class="mt-4">
+        <strong>Machine management access</strong><br />{{ warning }}
         <div class="flex align-items-start gap-2 mt-3">
           <Checkbox
             v-model="acknowledgedHostAccess"
@@ -242,11 +192,7 @@ function close() {
             binary
           />
           <label for="host-access-acknowledgement"
-            >{{
-              isPrivileged
-                ? 'I understand that apps on this Runner will have administrator-level access to this machine.'
-                : 'I understand that this trusted Runner can manage Docker containers on this machine, and user app code must remain isolated in containers.'
-            }}</label
+            >I understand that this trusted Runner can manage Docker containers on this machine, and user app code must remain isolated in containers.</label
           >
         </div>
       </Message>
@@ -265,20 +211,11 @@ function close() {
         :closable="false"
         class="mb-4"
       >
-        <strong>{{ installation.applicationProfile === RunnerApplicationProfiles.MachineManagement ? 'Machine management access' : 'Privileged Host access' }}</strong><br />{{ installation.hostAccessWarning ?? warning }}
+        <strong>Machine management access</strong><br />{{ installation.hostAccessWarning ?? warning }}
       </Message>
       <div class="installation-summary">
         <span><strong>Runner:</strong> {{ installation.runnerName }}</span>
-        <span
-          ><strong>Profile:</strong>
-          {{
-            installation.applicationProfile === RunnerApplicationProfiles.PrivilegedHost
-              ? 'Privileged Host'
-              : installation.applicationProfile === RunnerApplicationProfiles.MachineManagement
-                ? 'Machine Management'
-                : 'Standard'
-          }}</span
-        >
+        <span><strong>Profile:</strong> Machine Management</span>
         <span
           ><strong>Expires:</strong>
           {{ new Date(installation.expiresAtUtc).toLocaleString() }}</span

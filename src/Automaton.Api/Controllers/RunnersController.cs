@@ -10,17 +10,9 @@ namespace Automaton.Api.Controllers;
 public class RunnersController : BaseController
 {
     private readonly RunnerService runnersService;
-    private readonly UserContextService userContextService;
-    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
-
-    public RunnersController(
-        RunnerService runnersService,
-        UserContextService userContextService,
-        ConfirmedEmailGuardService confirmedEmailGuardService)
+    public RunnersController(RunnerService runnersService)
     {
         this.runnersService = runnersService;
-        this.userContextService = userContextService;
-        this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     [HttpGet]
@@ -32,15 +24,9 @@ public class RunnersController : BaseController
 
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult> Post(RunnerDetails runner, CancellationToken cancellationToken)
+    public ActionResult Post()
     {
-        var userId = userContextService.GetUserId();
-        if (!await confirmedEmailGuardService.IsConfirmedAsync(userId))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
-        }
-
-        return Ok(await runnersService.Add(runner, cancellationToken));
+        return StatusCode(StatusCodes.Status410Gone, new { message = "Install a Machine Management Runner through the one-time installation flow." });
     }
 
     [HttpPut("{id}")]

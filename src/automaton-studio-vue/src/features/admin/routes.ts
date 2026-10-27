@@ -15,8 +15,6 @@ import AdminDashboardView from './views/AdminDashboardView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
-import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
-import AdminInfrastructureRunnersView from './views/AdminInfrastructureRunnersView.vue'
 import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUsersView from './views/AdminUsersView.vue'
@@ -162,26 +160,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'Subscription Plans',
         },
-      },
-      {
-        path: 'hosted-runners',
-        name: 'admin-hosted-runners',
-        component: AdminHostedRunnersView,
-        meta: {
-          title: 'Runners',
-        },
-      },
-      {
-        path: 'hosted-runners/infrastructure',
-        name: 'admin-infrastructure-runners',
-        component: AdminInfrastructureRunnersView,
-        meta: { title: 'Infrastructure Runners' },
-      },
-      {
-        path: 'hosted-runners/containers',
-        name: 'admin-hosted-runner-containers',
-        component: AdminHostedRunnersView,
-        meta: { title: 'Hosted Runners' },
       },
       {
         path: 'marketplace-apps',

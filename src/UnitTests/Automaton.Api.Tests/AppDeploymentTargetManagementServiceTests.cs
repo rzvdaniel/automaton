@@ -228,169 +228,25 @@ public class AppDeploymentTargetManagementServiceTests
             Is.EqualTo(DeploymentTargetStatus.Unassigned));
     }
 
-    [Test]
-    public async Task Create_InfrastructureRunnerForOrdinaryAppIsRejected()
+    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.MachineManagement)]
+    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost)]
+    public async Task Create_RejectsRetiredRunnerProfiles(string purpose, string profile)
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
-        var runner = fixture.AddRunner(online: true, purpose: RunnerPurposes.Infrastructure);
-        await fixture.Db.SaveChangesAsync();
-
-        Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await fixture.Service.CreateAsync(
-                fixture.App.Id,
-                new CreateAppDeploymentTargetRequest
-                {
-                    Name = "Infrastructure",
-                    Slug = "infrastructure",
-                    RunnerId = runner.Id
-                },
-                fixture.UserId));
-    }
-
-    [Test]
-    public async Task Create_PrivilegedHostRequiresPersistedApproval()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var runner = fixture.AddRunner(
-            online: true,
-            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
-        await fixture.Db.SaveChangesAsync();
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await fixture.Service.CreateAsync(
-                fixture.App.Id,
-                new CreateAppDeploymentTargetRequest
-                {
-                    Name = "Privileged",
-                    Slug = "privileged",
-                    RunnerId = runner.Id
-                },
-                fixture.UserId));
-        var created = await fixture.Service.CreateAsync(
-            fixture.App.Id,
-            new CreateAppDeploymentTargetRequest
-            {
-                Name = "Confirmed privileged",
-                Slug = "confirmed-privileged"
-            },
-            fixture.UserId);
-        await fixture.Service.SetPrivilegedHostApprovalAsync(fixture.App.Id, created.Id, fixture.UserId, true);
-        created = await fixture.Service.AssignRunnerAsync(
-            fixture.App.Id,
-            created.Id,
-            new AssignAppDeploymentTargetRunnerRequest { RunnerId = runner.Id },
-            fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(exception!.Message, Does.Contain("persisted Privileged Host access approval"));
-            Assert.That(created.Runner?.Id, Is.EqualTo(runner.Id));
-        });
-    }
-
-    [Test]
-    public async Task PrivilegedHostApproval_IsIdempotentAndCanBeRevoked()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var target = await fixture.Db.AppDeploymentTargets
-            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
-
-        var approved = await fixture.Service.SetPrivilegedHostApprovalAsync(
-            fixture.App.Id, target.Id, fixture.UserId, true);
-        var approvedAgain = await fixture.Service.SetPrivilegedHostApprovalAsync(
-            fixture.App.Id, target.Id, fixture.UserId, true);
-        var revoked = await fixture.Service.SetPrivilegedHostApprovalAsync(
-            fixture.App.Id, target.Id, fixture.UserId, false);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(approved.PrivilegedHostAccessApproved, Is.True);
-            Assert.That(approved.PrivilegedHostAccessApprovedAtUtc, Is.Not.Null);
-            Assert.That(approved.PrivilegedHostAccessApprovedByUserId, Is.EqualTo(fixture.UserId));
-            Assert.That(approvedAgain.PrivilegedHostAccessApprovedAtUtc, Is.EqualTo(approved.PrivilegedHostAccessApprovedAtUtc));
-            Assert.That(revoked.PrivilegedHostAccessApproved, Is.False);
-            Assert.That(revoked.PrivilegedHostAccessApprovedAtUtc, Is.Null);
-            Assert.That(revoked.PrivilegedHostAccessApprovedByUserId, Is.Null);
-        });
-    }
-
-    [Test]
-    public async Task AssignRunner_PrivilegedHostRequiresPersistedApprovalOnlyWhenRunnerChanges()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var privilegedRunner = fixture.AddRunner(
-            online: true,
-            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
-        var target = await fixture.Db.AppDeploymentTargets
-            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+        var runner = fixture.AddRunner(online: true, purpose: purpose, applicationProfile: profile);
         await fixture.Db.SaveChangesAsync();
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await fixture.Service.AssignRunnerAsync(
+            async () => await fixture.Service.CreateAsync(
                 fixture.App.Id,
-                target.Id,
-                new AssignAppDeploymentTargetRunnerRequest { RunnerId = privilegedRunner.Id },
+                new CreateAppDeploymentTargetRequest
+                {
+                    Name = "Retired",
+                    Slug = "retired",
+                    RunnerId = runner.Id
+                },
                 fixture.UserId));
-
-        await fixture.Service.SetPrivilegedHostApprovalAsync(fixture.App.Id, target.Id, fixture.UserId, true);
-        var assigned = await fixture.Service.AssignRunnerAsync(
-            fixture.App.Id,
-            target.Id,
-            new AssignAppDeploymentTargetRunnerRequest
-            {
-                RunnerId = privilegedRunner.Id
-            },
-            fixture.UserId);
-        var unchanged = await fixture.Service.AssignRunnerAsync(
-            fixture.App.Id,
-            target.Id,
-            new AssignAppDeploymentTargetRunnerRequest { RunnerId = privilegedRunner.Id },
-            fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(assigned.Runner?.Id, Is.EqualTo(privilegedRunner.Id));
-            Assert.That(unchanged.Runner?.Id, Is.EqualTo(privilegedRunner.Id));
-        });
-    }
-
-    [Test]
-    public async Task List_IdentifiesOnlyActiveHostedRunnerRelationshipsAsAutomatonHosted()
-    {
-        await using var fixture = await TestFixtureContext.CreateAsync();
-        var activeRunner = fixture.AddRunner(online: true);
-        var deletedRunner = fixture.AddRunner(online: true);
-        fixture.Db.HostedRunners.AddRange(
-            fixture.AddHostedRunner(activeRunner.Id),
-            fixture.AddHostedRunner(deletedRunner.Id, DateTime.UtcNow));
-        await fixture.Db.SaveChangesAsync();
-
-        await fixture.Service.CreateAsync(
-            fixture.App.Id,
-            new CreateAppDeploymentTargetRequest
-            {
-                Name = "Active hosted",
-                Slug = "active-hosted",
-                RunnerId = activeRunner.Id
-            },
-            fixture.UserId);
-        await fixture.Service.CreateAsync(
-            fixture.App.Id,
-            new CreateAppDeploymentTargetRequest
-            {
-                Name = "Deleted hosted",
-                Slug = "deleted-hosted",
-                RunnerId = deletedRunner.Id
-            },
-            fixture.UserId);
-
-        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(targets.Single(target => target.Runner?.Id == activeRunner.Id).Runner!.IsHostedRunner, Is.True);
-            Assert.That(targets.Single(target => target.Runner?.Id == deletedRunner.Id).Runner!.IsHostedRunner, Is.False);
-        });
     }
 
     [Test]
@@ -512,7 +368,7 @@ public class AppDeploymentTargetManagementServiceTests
         public Runner AddRunner(
             bool online,
             string purpose = RunnerPurposes.Managed,
-            string? applicationProfile = null)
+            string? applicationProfile = RunnerApplicationProfiles.MachineManagement)
         {
             var runner = new Runner
             {

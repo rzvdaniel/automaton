@@ -132,13 +132,7 @@ public sealed class DeploymentTargetService(ConfigService config)
     }
 
     public static string FormatDestination(DeploymentTargetRunnerInfo? runner) =>
-        runner?.IsHostedRunner == true
-            ? "Automaton Hosted"
-            : runner is null
-                ? "No runtime assigned"
-                : runner.ApplicationProfile == "PrivilegedHost"
-                    ? "Self-hosted · Privileged Host"
-                    : "Self-hosted · Standard";
+        runner is null ? "No runtime assigned" : "Machine Management Runner";
 
     public async Task<DeploymentTargetInfo> AddAsync(
         string directory,

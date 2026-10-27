@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,9 +39,12 @@ public class AdminDashboardController : ControllerBase
             .AsNoTracking()
             .CountAsync(app => app.IsPublished, cancellationToken);
 
-        var activeRunners = await _dbContext.HostedRunners
+        var activeRunners = await _dbContext.Runners
             .AsNoTracking()
-            .CountAsync(runner => runner.DeletedAt == null && runner.Status == HostedRunnerStatuses.Running, cancellationToken);
+            .CountAsync(runner => runner.Purpose == RunnerPurposes.Managed &&
+                runner.ApplicationProfile == RunnerApplicationProfiles.MachineManagement &&
+                runner.ConnectionId != null && runner.LastHeartbeatAtUtc != null &&
+                runner.LastHeartbeatAtUtc >= now - RunnerPresenceEvaluator.OfflineThreshold, cancellationToken);
 
         var executionsToday = await _dbContext.FlowExecutions
             .AsNoTracking()

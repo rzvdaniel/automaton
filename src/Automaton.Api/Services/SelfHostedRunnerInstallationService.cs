@@ -41,6 +41,8 @@ public sealed class SelfHostedRunnerInstallationService(
             throw new ArgumentException("RunnerName must be between 1 and 120 characters.");
 
         var profile = RunnerApplicationProfiles.Normalize(request.ApplicationProfile);
+        if (profile != RunnerApplicationProfiles.MachineManagement)
+            throw new ArgumentException("Only Machine Management Runners can be installed.");
         if (profile == RunnerApplicationProfiles.MachineManagement && !request.AcknowledgeHostAccess)
             throw new UnauthorizedAccessException("Host access must be explicitly acknowledged for this Runner profile.");
         var now = DateTime.UtcNow;

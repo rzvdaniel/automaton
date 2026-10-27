@@ -25,6 +25,8 @@ public sealed class RunnerQueryService(
     public async Task<IEnumerable<RunnerDetails>> List(Guid? projectId, CancellationToken cancellationToken)
     {
         var runnerEntities = await authorizationService.GetRunnersQueryByContext(projectId, UserId)
+            .Where(runner => runner.Purpose == RunnerPurposes.Managed &&
+                runner.ApplicationProfile == RunnerApplicationProfiles.MachineManagement)
             .ToListAsync(cancellationToken);
         var deletedHostedRunners = await dbContext.HostedRunners
             .AsNoTracking()

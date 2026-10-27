@@ -89,12 +89,6 @@ const navItems: AdminNavItem[] = [
     to: '/admin/subscription-plans',
     routePrefix: '/admin/subscription-plans',
   },
-  {
-    label: 'Runners',
-    icon: 'pi pi-server',
-    to: '/admin/hosted-runners',
-    routePrefix: '/admin/hosted-runners',
-  },
 ]
 
 const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || authStore.user?.roles?.includes('SysAdmin')))
