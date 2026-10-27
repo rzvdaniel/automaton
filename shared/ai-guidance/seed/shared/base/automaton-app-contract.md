@@ -47,15 +47,18 @@ its arguments, working directory, environment, shell setting, and timeout.
 When `build.image` is omitted, `runtime.image` is used.
 `build.outputDirectory` is optional and identifies the build artifact to use.
 
-`runtime.command` names the process to start. It is required when the application
-exposes an HTTP or public endpoint, including frontend-only and static web apps.
+`runtime.command` names the process to start. It is required for a dynamic HTTP
+application.
 For a new container deployment it requires an explicit `runtime.image`; the image
 owns the application process. Historical stored contracts without an image remain
 readable, but must declare one before they can be deployed again.
 Those apps must provide or depend on an HTTP server in the runtime artifact and
-declare it through this contract. Automaton has no static-file serving fallback.
-A null `runtime.command` is valid only for Actions-only or other finite-work
-applications with no HTTP endpoint.
+declare it through this contract. A static site instead declares a build command
+and `build.outputDirectory`, with no runtime command or Compose contract. Its
+build requires an explicit build image; the Machine Management Runner publishes
+only the declared output through a shared static serving container. Actions-only
+or other finite-work applications with no HTTP endpoint may also omit the runtime
+command.
 
 Automaton supplies the container listening port in `AUTOMATON_PORT`, regardless
 of the requested `runtime.port`. The process must listen on that port and bind
@@ -76,4 +79,4 @@ are required. Keep every managed path inside the application workspace.
 
 Run `automaton validate`, then `automaton deploy`. Deployment is asynchronous.
 Success means the deployment operation reaches `Succeeded`. Publishing is a
-separate action and requires explicit user approval.
+separate action; publish when authorized by the user's requested delivery.

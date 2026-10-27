@@ -88,10 +88,10 @@ public sealed class AiGuidanceSeedExportTests
         var normalizedExportedText = exportedText.ReplaceLineEndings(" ");
         Assert.Multiple(() =>
         {
-            Assert.That(exportedText, Does.Contain("HTTP/public URL"));
-            Assert.That(exportedText, Does.Contain("frontend-only and static web apps"));
-            Assert.That(normalizedExportedText, Does.Contain("no static-file serving fallback"));
-            Assert.That(exportedText, Does.Contain("Actions-only or other finite-work"));
+            Assert.That(exportedText, Does.Contain("Dynamic HTTP apps must declare"));
+            Assert.That(exportedText, Does.Contain("Static sites use a build command"));
+            Assert.That(normalizedExportedText, Does.Contain("shared static server"));
+            Assert.That(normalizedExportedText, Does.Contain("Actions-only or other finite-work"));
             Assert.That(exportedText, Does.Contain("no HTTP endpoint"));
             Assert.That(exportedText, Does.Contain("automaton create"));
             Assert.That(exportedText, Does.Contain("not linked in the current environment"));

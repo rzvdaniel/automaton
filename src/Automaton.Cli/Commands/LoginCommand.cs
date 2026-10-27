@@ -203,20 +203,26 @@ public static class LoginCommand
         AnsiConsole.MarkupLine($"Enter this code: [bold]{userCode}[/]");
     }
 
-    private static async Task<string> PollForApiKeyAsync(
+    internal static async Task<string> PollForApiKeyAsync(
         AutomatonApiClient client, CliAuthorizationResponse authorization)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(authorization.ExpiresIn);
-        while (DateTime.UtcNow < deadline)
+        using var expiry = new CancellationTokenSource(TimeSpan.FromSeconds(authorization.ExpiresIn));
+        try
         {
-            var status = await client.PollCliAuthorizationAsync(
-                authorization.RequestId, authorization.Verifier);
-            var state = status.TryGetProperty("status", out var property) ? property.GetString() : null;
-            var apiKey = ReadAuthorizedApiKey(status, state);
-            if (apiKey != null) return apiKey;
-            await HandleAuthorizationStateAsync(state, authorization.PollInterval);
+            while (true)
+            {
+                var status = await client.PollCliAuthorizationAsync(
+                    authorization.RequestId, authorization.Verifier, expiry.Token);
+                var state = status.TryGetProperty("status", out var property) ? property.GetString() : null;
+                var apiKey = ReadAuthorizedApiKey(status, state);
+                if (apiKey != null) return apiKey;
+                await HandleAuthorizationStateAsync(state, authorization.PollInterval, expiry.Token);
+            }
         }
-        throw new TimeoutException("The CLI authorization request expired before it was approved.");
+        catch (OperationCanceledException) when (expiry.IsCancellationRequested)
+        {
+            throw new TimeoutException("The CLI authorization request expired before it was approved.");
+        }
     }
 
     private static string? ReadAuthorizedApiKey(System.Text.Json.JsonElement status, string? state)
@@ -225,7 +231,7 @@ public static class LoginCommand
         return status.GetProperty("apiKey").GetString();
     }
 
-    private static Task HandleAuthorizationStateAsync(string? state, int pollInterval)
+    private static Task HandleAuthorizationStateAsync(string? state, int pollInterval, CancellationToken cancellationToken)
     {
         if (state is "expired" or "invalid" or "completed")
         {
@@ -235,7 +241,7 @@ public static class LoginCommand
         {
             throw new InvalidOperationException("Authorization was cancelled in Studio.");
         }
-        return Task.Delay(TimeSpan.FromSeconds(pollInterval));
+        return Task.Delay(TimeSpan.FromSeconds(pollInterval), cancellationToken);
     }
 
     private static async Task CompleteAuthorizationAsync(

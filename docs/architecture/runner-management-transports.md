@@ -81,7 +81,18 @@ Python dependency preparation is also isolated: `AppActionDeploymentService` del
 
 The M2 Compose path uses the same protected host-container relay and machine/app assignment checks. `ApplyComposeProject` carries the typed, CLI-parsed Compose contract and server-derived per-container bounds; the management Runner resolves image digests, creates only labeled app-scoped named volumes, then starts the generated internal project network. Only the declared public service receives a private-address HTTP binding, which is returned to the existing runtime route registry. Compose inspection and cleanup use app/target/candidate labels; project cleanup preserves managed data volumes. The accepted fields and limits are listed in the [supported Compose subset](../implementation/compose-supported-subset.md). Compose builds and credential delivery remain deferred; manifest environment values are non-sensitive literals.
 
+Action preparation and execution containers run as UID/GID `1000:1000`, matching
+the Runner-owned workspace and owner-only execution input files. This preserves
+capability dropping and a read-only root filesystem while allowing bounded
+dependency preparation and scoped input reads.
+
 ## Shared static publishing
+
+Deployment finalization treats static build output and the supported Compose HTTP
+service as routable workloads alongside an explicit runtime command. Both the
+pending route refresh and committed target state use that decision; Actions-only
+deployment removes the HTTP route. The CLI accepts static build/output contracts
+without requiring a separate runtime process or a locally built output directory.
 
 The M2 static publishing path uses the existing `AppPublicationService` and durable Runner file-transfer operation. `MachineStaticAppPublicationService` selects the app's assigned Machine Management Runner only when the app contract declares static build output, then dispatches publish or unpublish commands through `RunnerFileTransferGateway`; it creates no per-user Hosted Runner record. Dynamic and Compose apps retain their runtime gateway path. The Runner's `MachineStaticSitePublisher` accepts only files allowed by `PublishedStaticOutputFilePolicy`, stores versioned output under the app's own workspace directory, and writes its generated Nginx site index and configuration under Runner-owned metadata. `MachineStaticServingContainer` manages one bounded, read-only static server per machine. It binds its dynamically selected port to the configured private runtime host address reachable from the Runner container, while the API runtime tunnel selects the app's release prefix. The existing API runtime tunnel and route configuration retain hostname, public/authenticated access, and revocation decisions.
 

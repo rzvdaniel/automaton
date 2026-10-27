@@ -127,6 +127,19 @@ The previous workstation-to-workload networking blocker was avoided by placing t
 
 Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
 
+A normal-user CLI exercise on 27 October created two static sites, an HTTP API
+and a separate reporting Action app through the existing account and explicit
+Machine Management assignment flow. The API's published endpoint and replacement
+from release 1 to release 2 passed with persistent data retained; an intentionally
+unhealthy replacement failed while release 2 kept serving with the same marker.
+Both static sites built and published into one shared serving container, but
+their public URLs exposed missing static routing state in the installed API.
+Python Action preparation also failed because its container user did not match
+the Runner-owned workspace. Local fixes cover those failures, CLI static-package
+admission, HTTP 429 recovery during device authorization, and stale generated
+guidance. API/Runner rollout and final static URL, Action execution and cancellation
+checks remain pending; this is partial evidence, not broader M1/M2 acceptance.
+
 ### 4. Remove superseded execution and hosting paths
 
 **Complete.** Source cleanup and the final audit merged through #416 (`38d994c2`); the fresh single-machine flow is demonstrated and its routing/CLI corrections merged in #417. No automatic workload migration, old/new dual execution, legacy-ID/URL preservation or generic compatibility framework is required.

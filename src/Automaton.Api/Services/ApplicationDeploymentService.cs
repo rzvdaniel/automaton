@@ -128,7 +128,8 @@ public sealed class ApplicationDeploymentService
                     target.Id,
                     success: true,
                     cancellationToken: CancellationToken.None,
-                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null,
+                    genericRuntimeDeployed: packageApplication.Runtime.Command is not null
+                        || packageApplication.Compose is not null || packageApplication.IsStaticSite,
                     deploymentOperationId: deploymentOperationId,
                     executionAttemptId: executionAttemptId);
                 targetStateFinalized = true;

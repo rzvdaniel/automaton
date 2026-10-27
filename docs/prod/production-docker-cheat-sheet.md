@@ -708,7 +708,7 @@ Current state:
 
 - `./scripts/prod-redeploy-website.sh` deploys only the website image
 - `./scripts/prod-redeploy-all.sh` deploys only the API, Studio, and website images
-- standalone runner archives are built separately by [`azure-pipelines-runner.yml`](../../azure-pipelines-runner.yml)
+- standalone runner archives are built separately by [the native Runner archive workflow](../../.github/workflows/release.yml)
 - if public `/downloads/...` assets are needed, publish them from CI artifacts or a dedicated asset-publish job outside the website blue/green deploy path
 
 Reason:

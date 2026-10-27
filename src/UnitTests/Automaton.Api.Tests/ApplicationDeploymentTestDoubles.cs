@@ -63,9 +63,10 @@ internal static class DeploymentPackageArchiveFactory
         Guid appId,
         string packagePath,
         bool hasRuntime,
-        IReadOnlyDictionary<string, string>? sourceFiles = null)
+        IReadOnlyDictionary<string, string>? sourceFiles = null,
+        ApplicationContract? application = null)
     {
-        var contract = new ApplicationContract();
+        var contract = application ?? new ApplicationContract();
         if (hasRuntime)
         {
             contract.Runtime.Image = "test/runtime:1";

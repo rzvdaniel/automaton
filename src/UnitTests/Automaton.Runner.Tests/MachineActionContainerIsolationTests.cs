@@ -129,6 +129,7 @@ internal sealed class MachineActionContainerFixture : IAsyncDisposable
             Assert.That(dockerRun, Does.Contain("--memory"));
             Assert.That(dockerRun, Does.Contain("--pids-limit"));
             Assert.That(dockerRun, Does.Contain("--workdir"));
+            Assert.That(string.Join(' ', dockerRun), Does.Contain("--user 1000:1000"));
             Assert.That(dockerRun, Does.Contain("/automaton/action"));
             Assert.That(dockerRun, Does.Contain("--cap-drop"));
             Assert.That(dockerRun, Does.Contain("ALL"));
