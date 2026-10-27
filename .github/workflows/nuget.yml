@@ -40,7 +40,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           PROJECT: ${{ matrix.project }}
-        run: dotnet pack "src/$PROJECT/$PROJECT.csproj" -c Release -p:Version="$VERSION" -o packages
+        run: dotnet pack "src/$PROJECT/$PROJECT.csproj" -c Release -p:Version="$VERSION" -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.0 -o packages
       - name: Record checksums and source
         run: |
           sha256sum packages/*.nupkg > packages/checksums.txt
