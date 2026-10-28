@@ -16,6 +16,8 @@ public class Runner
     public DateTime? LastHeartbeatAtUtc { get; set; }
     public DateTime? LastConnectedAtUtc { get; set; }
     public DateTime? LastDisconnectedAtUtc { get; set; }
+    [ConcurrencyCheck]
+    public DateTime? DeletionRequestedAtUtc { get; set; }
     public string Status { get; set; }
     public string? Version { get; set; }
     public string? MachineName { get; set; }

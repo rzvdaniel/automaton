@@ -67,14 +67,20 @@ Every assigned Runner must be online, including assignments without a currently
 running web runtime. Cleanup discovers older owned containers as well as the
 current runtime. The shared account volume and other apps are preserved.
 
+For a published static site, deletion also removes its entry from the shared Nginx configuration and deletes its published releases. Other sites keep running. The shared static-server container remains available even after its last site is deleted; the Runner uninstall command removes that empty server. A failed configuration reload fails deletion and retains the app's workspace and data for retry. Deleting an additional environment does not unpublish the Live static site.
+
 Deleting an additional environment still preserves the app's shared persistent
 data. Whole-app deletion waits for all target cleanups before deleting that data.
+Whole-app deletion also discovers and removes verified app-owned Compose data volumes on each assigned Runner. A busy or unverified volume fails deletion and is preserved. Deleting an individual environment preserves those volumes.
 A persisted app deletion claim blocks creation of new environments and deployment
 admission throughout Runner cleanup, source cleanup, and app-record deletion.
 The claim has no automatic expiry: an API interruption leaves admission blocked.
+Traefik route generation and runtime requests exclude apps with a pending deletion claim. Edge configuration cleanup must succeed before the app's files and database record are deleted. A stale edge rule cannot forward a deleting app through the runtime gateway.
 If cleanup fails, the app record is retained: resolve Runner availability or the
 reported cleanup problem, then retry **Delete App**. Already removed runtimes and
 data are not restored.
+
+When a fresh deletion fails and its claim is released, Traefik routes are regenerated from the current database state so untouched runtimes remain reachable. Interrupted-deletion recovery keeps its deletion claim and routes revoked until recovery completes. If route restoration also fails, the error reports both failures for operator repair.
 
 Apply the app deletion-claim migration and update every API replica. Drain old API
 slots before exercising deletion; older API versions do not honor this claim.

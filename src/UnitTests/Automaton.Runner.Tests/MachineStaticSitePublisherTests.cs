@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
 
@@ -244,6 +245,71 @@ public sealed class MachineStaticSitePublisherTests
         Assert.ThrowsAsync<InvalidOperationException>(() => publisher.PublishAsync(
             Guid.NewGuid(), appId, target, "dist", CancellationToken.None));
         Assert.That(containerStarted, Is.False);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task AppCleanup_RemovesOnlyDeletedSiteAndPreservesFilesWhenReloadFails(bool reloadSucceeds)
+    {
+        var workspace = new RunnerWorkspaceService();
+        var deletedApp = Guid.NewGuid();
+        var siblingApp = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var reloadAllowed = true;
+        var publisher = new MachineStaticSitePublisher(workspace, new MachineStaticServingOptions(),
+            (_, _) => Task.FromResult<MachineStaticServerEndpoint?>(new("127.0.0.1", 32123)),
+            (_, _) => Task.FromResult(reloadAllowed));
+        WriteOutput(deletedApp, targetId, "dist", "deleted site");
+        WriteOutput(siblingApp, targetId, "dist", "sibling site");
+        await publisher.PublishAsync(Guid.NewGuid(), deletedApp, targetId, "dist", CancellationToken.None);
+        await publisher.PublishAsync(Guid.NewGuid(), siblingApp, targetId, "dist", CancellationToken.None);
+        var data = workspace.GetAppDataDirectory(deletedApp);
+        Directory.CreateDirectory(data);
+        await File.WriteAllTextAsync(Path.Combine(data, "tasks.json"), "persistent tasks");
+        var command = CreateCleanupExecutor(workspace, publisher);
+        reloadAllowed = reloadSucceeds;
+
+        if (reloadSucceeds)
+        {
+            await DeleteAppAsync(command, deletedApp, targetId);
+            // Repeated cleanup must succeed even after the app's files have gone.
+            await DeleteAppAsync(command, deletedApp, targetId);
+        }
+        else
+        {
+            Assert.ThrowsAsync<InvalidOperationException>(() => DeleteAppAsync(command, deletedApp, targetId));
+        }
+
+        var sites = await ReadPublishedSitesAsync(workspace);
+        Assert.That(sites.ContainsKey(siblingApp), Is.True);
+        Assert.That(sites.ContainsKey(deletedApp), Is.EqualTo(!reloadSucceeds));
+        var config = await File.ReadAllTextAsync(Path.Combine(workspace.GetPublishedStaticMetadataRoot(), "nginx", "default.conf"));
+        Assert.That(config.Contains(deletedApp.ToString("D")), Is.EqualTo(!reloadSucceeds));
+        Assert.That(config, Does.Contain(siblingApp.ToString("D")));
+        Assert.That(Directory.Exists(workspace.GetPublishedStaticSiteVersionsRoot(siblingApp)), Is.True);
+        Assert.That(Directory.Exists(data), Is.EqualTo(!reloadSucceeds));
+    }
+
+    private static AppActionCommandExecutor CreateCleanupExecutor(RunnerWorkspaceService workspace, MachineStaticSitePublisher publisher)
+        => new(null!, null!, new RunnerDeploymentService(workspace, new CleanupRuntime(), new AppActionDeploymentService(workspace)),
+            publisher, new MachineApplicationStorageCleanup((_, _) => Task.FromResult(
+                new InfrastructureCommandResponse { Success = true })));
+
+    private static async Task DeleteAppAsync(AppActionCommandExecutor command, Guid appId, Guid targetId)
+        => await command.ExecuteAsync(AppActionCommand.Create("cleanup-app-resources",
+            new CleanupAppDeploymentTargetRequest(appId, targetId, true)), CancellationToken.None);
+
+    private static async Task<Dictionary<Guid, Guid>> ReadPublishedSitesAsync(RunnerWorkspaceService workspace)
+        => JsonSerializer.Deserialize<Dictionary<Guid, Guid>>(await File.ReadAllTextAsync(
+            Path.Combine(workspace.GetPublishedStaticMetadataRoot(), "sites.json")))!;
+
+    private sealed class CleanupRuntime : IAppRuntimeProcessManager
+    {
+        public Task StopAsync(Guid appId, Guid deploymentTargetId) => Task.CompletedTask;
+        public Task<RuntimeApplyResult> ApplyAsync(Guid appId, Guid deploymentTargetId, ApplicationContract contract,
+            CancellationToken cancellationToken = default, string? artifactRoot = null,
+            Guid? candidateId = null, Guid? deploymentAttemptId = null)
+            => throw new NotSupportedException();
     }
 
     private static string WriteOutput(Guid appId, Guid targetId, string outputDirectory, string indexContents)

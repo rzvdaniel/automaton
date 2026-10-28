@@ -110,7 +110,7 @@ internal static class AppAuthorizationTestServiceFactory
             new AppMutationAuditService(dependencies.UserContext, dependencies.RecentActivity, dependencies.Audit),
             dependencies.Routes,
             dependencies.Assignment,
-            new AppDeletionService(dependencies.Db, dependencies.Storage));
+            new AppDeletionService(dependencies.Db, dependencies.Storage, routeConfigService: dependencies.Routes));
 
     private static AppPublicationService CreatePublicationService(AppsServiceDependencies dependencies) =>
         new(

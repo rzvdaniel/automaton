@@ -15,6 +15,8 @@ internal static class RunnerExecutionServicesRegistration
         services.AddSingleton<InfrastructureCommandService>();
         services.AddSingleton<HostContainerExecutionService>();
         services.AddSingleton<MachineStaticSitePublisher>();
+        services.AddSingleton<MachineApplicationStorageCleanup>();
+        services.AddSingleton<AppActionCommandExecutor>();
         services.AddSingleton<MachineActionDependencyPreparer>();
         services.AddSingleton<MachineActionExecutionHandler>();
         services.AddSingleton<HostContainerBuildCleanupService>();

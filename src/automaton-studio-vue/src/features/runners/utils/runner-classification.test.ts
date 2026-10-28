@@ -23,7 +23,7 @@ describe('runner classification', () => {
   it('marks a non-hosted Machine Management runner distinctly', () => {
     expect(
       classifyRunner(runner({ applicationProfile: RunnerApplicationProfiles.MachineManagement }))
-    ).toBe('self-hosted-machine-management')
+    ).toBe('machine-management')
   })
 
   it('hides all unsupported and retired runners from the normal Runners page', () => {

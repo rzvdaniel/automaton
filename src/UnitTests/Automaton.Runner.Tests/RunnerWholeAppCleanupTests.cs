@@ -18,14 +18,17 @@ public sealed class RunnerWholeAppCleanupTests
         Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", previous);
         if (Directory.Exists(root)) Directory.Delete(root, true);
     }
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task WholeAppCleanup_RemovesOnlyOwnedStorageAndPreservesItOnRuntimeFailure(bool fail)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task WholeAppCleanup_RemovesOnlyOwnedStorageAndPreservesItOnCleanupFailure(bool failRuntime, bool failVolume)
     {
+        var fail = failRuntime || failVolume;
         var workspace = new RunnerWorkspaceService();
         var process = new CleanupProcessManager
-        { StopFailure = fail ? new InvalidOperationException("cleanup failed") : null };
+        { StopFailure = failRuntime ? new InvalidOperationException("cleanup failed") : null };
         var service = new RunnerDeploymentService(workspace, process, new AppActionDeploymentService(workspace));
+        var storageCleanup = CreateStorageCleanup(failVolume);
         var appId = Guid.NewGuid();
         var siblingId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
@@ -36,15 +39,18 @@ public sealed class RunnerWholeAppCleanupTests
         var marker = Path.Combine(workspace.GetAppDataDirectory(siblingId), "marker");
         await File.WriteAllTextAsync(marker, "preserve");
         if (fail)
-            Assert.ThrowsAsync<InvalidOperationException>(() => service.CleanupTargetAsync(appId, targetId, true));
+            Assert.ThrowsAsync<InvalidOperationException>(() => service.CleanupApplicationAsync(appId, targetId, storageCleanup));
         else
         {
-            await service.CleanupTargetAsync(appId, targetId, true);
-            await service.CleanupTargetAsync(appId, targetId, true);
+            await service.CleanupApplicationAsync(appId, targetId, storageCleanup);
+            await service.CleanupApplicationAsync(appId, targetId, storageCleanup);
         }
         Assert.That(owned.All(path => Directory.Exists(path) == fail), Is.True);
         Assert.That(await File.ReadAllTextAsync(marker), Is.EqualTo("preserve"));
     }
+
+    private static MachineApplicationStorageCleanup CreateStorageCleanup(bool fail)
+        => new((_, _) => Task.FromResult(new InfrastructureCommandResponse { Success = !fail }));
 
     [Test]
     public void WholeAppStorageCleanup_RemovesLegacyDataAndRejectsEmptyIdentity()

@@ -32,7 +32,9 @@ public class RunnerDetails
     public string? ApplicationProfile { get; set; }
     public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
     public string? InstallationId { get; set; }
-    public bool CanExecuteApplications => RunnerProfileRules.CanExecuteApplications(Purpose, ApplicationProfile, Capabilities);
+    public DateTime? DeletionRequestedAtUtc { get; set; }
+    public bool CanExecuteApplications => DeletionRequestedAtUtc is null
+        && RunnerProfileRules.CanExecuteApplications(Purpose, ApplicationProfile, Capabilities);
 
     // Project context
     public AccessScope Scope { get; set; }

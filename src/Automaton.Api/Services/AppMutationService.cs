@@ -226,8 +226,6 @@ public sealed class AppMutationService(
         await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted, abandonOfflineRuntimes);
 
         await mutationAuditService.RecordDeletedAsync(app, ownerId, abandonOfflineRuntimes);
-
-        await backendRouteConfigService.RefreshAsync();
     }
 
     private Guid? ResolveAppOwnerId(Entities.WebApp appEntity)

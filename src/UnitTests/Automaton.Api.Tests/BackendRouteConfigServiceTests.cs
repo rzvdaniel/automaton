@@ -126,7 +126,7 @@ public class BackendRouteConfigServiceTests
             Definition = "{}",
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, Guid.NewGuid()) }
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, null) }
         });
 
         await dbContext.SaveChangesAsync();
@@ -301,10 +301,10 @@ public class BackendRouteConfigServiceTests
         dbContext.Runners.Add(new Runner
             {
                 Id = runnerId,
-                Name = "Privileged host",
+                Name = "Machine Management",
                 Status = "connected",
                 Purpose = "Managed",
-                ApplicationProfile = "PrivilegedHost"
+                ApplicationProfile = "MachineManagement"
             });
         dbContext.WebApps.Add(new WebApp
             {
@@ -335,7 +335,7 @@ public class BackendRouteConfigServiceTests
     }
 
     [Test]
-    public async Task RefreshAsync_DoesNotRouteInfrastructureRunnerThroughRuntimeTunnel()
+    public async Task RefreshAsync_RejectsUnsupportedRunnerPurpose()
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
@@ -364,9 +364,7 @@ public class BackendRouteConfigServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        await CreateService(dbContext, rootPath).RefreshAsync();
-
-        Assert.That(File.Exists(Path.Combine(rootPath, "managed-runtime-routes.yml")), Is.False);
+        Assert.ThrowsAsync<ArgumentException>(() => CreateService(dbContext, rootPath).RefreshAsync());
     }
 
     [Test]

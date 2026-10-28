@@ -14,6 +14,20 @@ public sealed class RunnerExecutionOperationTests
 {
     private static IDataProtectionProvider Protection() => new EphemeralDataProtectionProvider();
 
+    [TestCase("cleanup-app-resources")]
+    [TestCase("cleanup-target-resources")]
+    [TestCase("cleanup-app")]
+    [TestCase("cleanup-target")]
+    public async Task CleanupLeavesManagementConsumerFreeForNestedDockerOperations(string kind)
+    {
+        await using var db = Db();
+        var publisher = new Publisher();
+        var service = RunnerExecutionTestServices.Operations(db, publisher);
+        await service.QueueAsync(Guid.NewGuid(), Guid.NewGuid(), new(null, null,
+            AppActionCommand.Create(kind, new { })), CancellationToken.None);
+        Assert.That(publisher.Command!.Management, Is.False);
+    }
+
     [Test]
     public async Task ActionManagementAndCancellationUseSeparateQueueFromExecution()
     {

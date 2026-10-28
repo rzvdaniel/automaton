@@ -25,8 +25,10 @@ public class RunnerDeploymentTargetIsolationTests
             Path.GetTempPath(),
             "automaton-target-deployment-tests",
             Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
         Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", root);
         Environment.SetEnvironmentVariable("RUNNER_SCRIPTS_DIR", null);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", "MachineManagement");
     }
 
     [TearDown]
@@ -51,20 +53,8 @@ public class RunnerDeploymentTargetIsolationTests
         var firstPackage = CreatePackage(appId, "first target");
         var secondPackage = CreatePackage(appId, "second target");
 
-        var first = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = firstTargetId,
-            PackagePath = firstPackage,
-            Clean = true
-        });
-        var second = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = secondTargetId,
-            PackagePath = secondPackage,
-            Clean = true
-        });
+        var first = await service.DeployPackage(RunnerDeploymentFixtureBuildExecutor.Request(appId, firstTargetId, firstPackage));
+        var second = await service.DeployPackage(RunnerDeploymentFixtureBuildExecutor.Request(appId, secondTargetId, secondPackage));
 
         var firstContent = await File.ReadAllTextAsync(Path.Combine(
             workspace.GetAppRuntimeApplicationDirectory(appId, firstTargetId),
@@ -197,30 +187,18 @@ public class RunnerDeploymentTargetIsolationTests
     {
         var workspace = new RunnerWorkspaceService();
         var processManager = new StubBackendProcessManager();
-        var service = new RunnerDeploymentService(
-            workspace,
-            processManager,
-            new AppActionDeploymentService(workspace));
+        var service = CreateDeploymentService(workspace, processManager);
         var appId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var package = CreatePackage(appId, "runtime target", hasRuntime: true);
 
-        var result = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = targetId,
-            PackagePath = package,
-            Clean = true
-        });
+        var result = await service.DeployPackage(RunnerDeploymentFixtureBuildExecutor.Request(appId, targetId, package));
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Success, Is.True);
-            Assert.That(processManager.StartedTargets, Does.Contain(targetId));
-            Assert.That(processManager.StartedContracts[targetId].Runtime.Command!.Executable, Is.EqualTo("dotnet"));
-            Assert.That(processManager.CandidateIds[targetId], Is.Not.EqualTo(Guid.Empty));
-            Assert.That(processManager.ArtifactRoots[targetId], Does.Contain(processManager.CandidateIds[targetId].ToString()));
-        });
+        Assert.That(result.Success, Is.True, result.Message);
+        Assert.That(processManager.StartedTargets, Does.Contain(targetId));
+        Assert.That(processManager.StartedContracts[targetId].Runtime.Command!.Executable, Is.EqualTo("dotnet"));
+        Assert.That(processManager.CandidateIds[targetId], Is.Not.EqualTo(Guid.Empty));
+        Assert.That(processManager.ArtifactRoots[targetId], Does.Contain(processManager.CandidateIds[targetId].ToString()));
     }
 
     [Test]
@@ -242,28 +220,14 @@ public class RunnerDeploymentTargetIsolationTests
                 Command = new ApplicationCommandSpec
                 {
                     Executable = "dotnet",
-                    Arguments = [FixturePath(), "--delay", "1500"]
+                    Arguments = [RunnerDeploymentFixtureBuildExecutor.FixturePath(), "--delay", "1500"]
                 }
             });
         var secondPackage = CreatePackage(appId, "second", hasRuntime: true);
 
-        var firstTask = service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = targetId,
-            PackagePath = firstPackage,
-            Clean = true,
-            ExecutionAttemptId = firstAttemptId
-        });
+        var firstTask = service.DeployPackage(RunnerDeploymentFixtureBuildExecutor.Request(appId, targetId, firstPackage, firstAttemptId));
         await Task.Delay(150);
-        var secondTask = service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = targetId,
-            PackagePath = secondPackage,
-            Clean = true,
-            ExecutionAttemptId = secondAttemptId
-        });
+        var secondTask = service.DeployPackage(RunnerDeploymentFixtureBuildExecutor.Request(appId, targetId, secondPackage, secondAttemptId));
 
         var results = await Task.WhenAll(firstTask, secondTask);
 
@@ -327,7 +291,7 @@ public class RunnerDeploymentTargetIsolationTests
     private static RunnerDeploymentService CreateDeploymentService(
         RunnerWorkspaceService workspace,
         StubBackendProcessManager processManager)
-        => new(workspace, processManager, new AppActionDeploymentService(workspace));
+        => new(workspace, processManager, new AppActionDeploymentService(workspace), new RunnerDeploymentFixtureBuildExecutor());
 
     private static void WriteEntry(ZipArchive archive, string path, string content)
     {
@@ -335,12 +299,6 @@ public class RunnerDeploymentTargetIsolationTests
         using var writer = new StreamWriter(entry.Open());
         writer.Write(content);
     }
-
-    private static string FixturePath()
-        => Path.GetFullPath(Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", "..",
-            "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
 
     private sealed class StubBackendProcessManager : IAppRuntimeProcessManager
     {

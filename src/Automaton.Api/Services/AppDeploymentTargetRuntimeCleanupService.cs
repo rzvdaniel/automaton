@@ -46,7 +46,9 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         try
         {
             var result = await gateway.SendAsync<CleanupAppDeploymentTargetResult>(runner!.Id,
-                deleteApplicationStorage ? "cleanup-app" : "cleanup-target", new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id, deleteApplicationStorage), cancellationToken);
+                deleteApplicationStorage ? "cleanup-app-resources" : "cleanup-target-resources",
+                new CleanupAppDeploymentTargetRequest(target.WebAppId, target.Id, deleteApplicationStorage,
+                    UnpublishStaticSite: target.IsDefault || deleteApplicationStorage), cancellationToken);
             if (!result.Success || result.AppId != target.WebAppId || result.DeploymentTargetId != target.Id)
             {
                 await RecordCleanupFailureAsync(

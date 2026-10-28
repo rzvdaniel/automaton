@@ -848,17 +848,6 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
-                    b.Property<bool>("PrivilegedHostAccessApproved")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTimeOffset?>("PrivilegedHostAccessApprovedAtUtc")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid?>("PrivilegedHostAccessApprovedByUserId")
-                        .HasColumnType("char(36)");
-
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -3095,6 +3084,10 @@ namespace Automaton.Api.Migrations
 
                     b.Property<int?>("ContainerSpecificationVersion")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletionRequestedAtUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("ImageDigest")
                         .HasMaxLength(256)

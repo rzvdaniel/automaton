@@ -37,10 +37,8 @@ internal sealed class RunnerExecutionExecutor(IServiceProvider services) : IRunn
             throw new InvalidOperationException("File transfers require an authenticated Runner execution client.");
         if (request.Action is not null)
         {
-            return await new AppActionCommandExecutor(
-                scope.ServiceProvider.GetRequiredService<AppActionExecutionService>(),
-                scope.ServiceProvider.GetRequiredService<AppActionDeploymentService>(),
-                scope.ServiceProvider.GetRequiredService<RunnerDeploymentService>()).ExecuteAsync(request.Action, token);
+            return await scope.ServiceProvider.GetRequiredService<AppActionCommandExecutor>()
+                .ExecuteAsync(request.Action, token);
         }
         EnsureRawExecutionAllowed(request);
         await workflowGate.WaitAsync(token);

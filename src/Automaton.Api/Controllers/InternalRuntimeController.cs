@@ -69,7 +69,8 @@ public class InternalRuntimeController : ControllerBase
         }
 
         var appExists = await dbContext.WebApps
-            .AnyAsync(a => a.Id == appId && a.AccessStatus == AppAccessStatuses.Active, cancellationToken);
+            .AnyAsync(a => a.Id == appId && a.AccessStatus == AppAccessStatuses.Active
+                && a.DeletionClaimId == null, cancellationToken);
         if (!appExists)
         {
             logger.LogDebug("Runtime auth failed for app {AppId}: app unavailable.", appId);

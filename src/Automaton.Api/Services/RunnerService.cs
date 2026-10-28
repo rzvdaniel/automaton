@@ -94,6 +94,9 @@ public class RunnerService
             throw new InvalidOperationException($"Runner {id} not found");
         }
 
+        if (runner.InstallationId is not null && runner.InstallationId != entity.InstallationId)
+            throw new ArgumentException("Runner installation identity cannot be changed through the update API.", nameof(runner));
+
         var capabilities = RunnerCapabilities.Normalize(runner.Capabilities, entity.Purpose);
 
         entity.Name = runner.Name;
@@ -101,7 +104,6 @@ public class RunnerService
         entity.MachineName = runner.MachineName;
         entity.IpAddress = runner.IpAddress;
         entity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, entity.Purpose);
-        entity.InstallationId = runner.InstallationId ?? entity.InstallationId;
 
         // Mark entity as modified
         dbContext.Entry(entity).State = EntityState.Modified;
@@ -131,8 +133,8 @@ public class RunnerService
         return exists;
     }
 
-    public Task Delete(Guid id, CancellationToken cancellationToken)
-        => runnerDeletionService.DeleteAsync(id, cancellationToken);
+    public Task Delete(Guid id, CancellationToken cancellationToken, bool hostCleanupConfirmed = false)
+        => runnerDeletionService.DeleteAsync(id, cancellationToken, hostCleanupConfirmed);
 
     public Task<IEnumerable<RunnerFlowResult>> ExecuteFlow(
         Guid flowId,

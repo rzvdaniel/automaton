@@ -38,6 +38,7 @@ public sealed class RuntimeTunnelService(
                 target.Id == deploymentTargetId &&
                 target.WebAppId == appId &&
                 target.ExecutionRunnerId != null &&
+                target.WebApp.DeletionClaimId == null &&
                 target.GenericRuntimeDeployed,
                 cancellationToken);
 

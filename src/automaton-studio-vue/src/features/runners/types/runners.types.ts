@@ -30,6 +30,7 @@ export type AccessScope = (typeof AccessScope)[keyof typeof AccessScope]
  */
 export interface Runner {
   id: string
+  deletionRequestedAtUtc?: string | null
   name: string
   connectionId?: string
   status: RunnerStatus
@@ -67,6 +68,11 @@ export interface Runner {
   machineStorageMeasuredAtUtc?: string | null
   machineStorageMeasurementStatus?: string | null
   machineStorageMeasurementError?: string | null
+}
+
+export interface RunnerRemovalInstructions {
+  runnerId: string
+  uninstallCommand: string
 }
 
 export const RunnerApplicationProfiles = {

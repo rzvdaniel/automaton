@@ -5,7 +5,9 @@ namespace Automaton.Runner.Console.Services;
 
 /// <summary>Runs the existing Action owners behind journaled, authenticated commands.</summary>
 internal sealed class AppActionCommandExecutor(AppActionExecutionService execution, AppActionDeploymentService deployment,
-    RunnerDeploymentService runtime)
+    RunnerDeploymentService runtime,
+    MachineStaticSitePublisher? staticSites = null,
+    MachineApplicationStorageCleanup? storageCleanup = null)
 {
     public async Task<RunnerExecutionResult> ExecuteAsync(AppActionCommand command, CancellationToken token)
     {
@@ -21,8 +23,8 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
             "read-logs" => execution.ReadLogs(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "read-result" => execution.ReadResult(command.Read<ReadAppModuleExecutionArtifactRequest>()),
             "prepare-module" => await deployment.PrepareModuleAsync(command.Read<PrepareAppActionModuleRequest>(), token),
-            "cleanup-target" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
-            "cleanup-app" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
+            "cleanup-target" or "cleanup-target-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = false }),
+            "cleanup-app" or "cleanup-app-resources" => await CleanupAsync(command.Read<CleanupAppDeploymentTargetRequest>() with { DeleteApplicationStorage = true }),
             _ => throw new InvalidDataException("Unknown App Action command.")
         };
         return new() { Outcome = "Succeeded", Started = started, Finished = DateTime.UtcNow,
@@ -38,7 +40,18 @@ internal sealed class AppActionCommandExecutor(AppActionExecutionService executi
         => deployment.DeleteVersion(request.AppId, request.DeploymentTargetId, request.ActionKey, request.Version);
     private async Task<CleanupAppDeploymentTargetResult> CleanupAsync(CleanupAppDeploymentTargetRequest request)
     {
-        await runtime.CleanupTargetAsync(request.AppId, request.DeploymentTargetId, request.DeleteApplicationStorage);
+        if (request.DeleteApplicationStorage && storageCleanup is null)
+            throw new InvalidOperationException("App data cleanup is unavailable. App storage was preserved for retry.");
+        if (request.UnpublishStaticSite || request.DeleteApplicationStorage)
+        {
+            if (staticSites is null || !await staticSites.UnpublishAsync(
+                    request.AppId, request.DeploymentTargetId, CancellationToken.None))
+                throw new InvalidOperationException("Static-site cleanup failed. App files were preserved for retry.");
+        }
+        if (request.DeleteApplicationStorage)
+            await runtime.CleanupApplicationAsync(request.AppId, request.DeploymentTargetId, storageCleanup!);
+        else
+            await runtime.CleanupTargetAsync(request.AppId, request.DeploymentTargetId);
         return new(request.AppId, request.DeploymentTargetId, true);
     }
 }

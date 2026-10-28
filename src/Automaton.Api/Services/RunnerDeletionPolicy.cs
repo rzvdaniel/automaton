@@ -24,9 +24,15 @@ public sealed class RunnerDeletionPolicy(
             throw new UnauthorizedAccessException($"You do not have permission to delete runner {runnerId}");
         }
 
-        var isHostedRunner = await dbContext.HostedRunners
-            .AnyAsync(x => x.RunnerId == runnerId && x.DeletedAt == null, cancellationToken);
-        if (isHostedRunner)
-            throw new InvalidOperationException("Hosted runners cannot be deleted from the generic runners page. Restart the hosted runner instead.");
+        var assignments = await dbContext.AppDeploymentTargets
+            .Where(target => target.ExecutionRunnerId == runnerId)
+            .Select(target => target.WebApp.Name + " / " + target.Name)
+            .ToListAsync(cancellationToken);
+        if (assignments.Count > 0)
+            throw new InvalidOperationException(
+                $"Move or delete all assigned app environments before deleting this Runner: {string.Join(", ", assignments)}.");
+        if (await dbContext.RunnerExecutionOperations.AnyAsync(
+                operation => operation.RunnerId == runnerId && operation.CompletedAtUtc == null, cancellationToken))
+            throw new InvalidOperationException("Wait for the Runner's pending operations to finish before preparing removal.");
     }
 }
