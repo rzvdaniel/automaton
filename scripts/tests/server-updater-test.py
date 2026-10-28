@@ -38,8 +38,10 @@ class ServerUpdaterTests(unittest.TestCase):
         self.bin.mkdir()
         docker = self.bin / 'docker'
         docker.write_text('''#!/usr/bin/env python3
-import io, os, sys, tarfile
+import io, json, os, sys, tarfile
 args=sys.argv[1:]
+if os.environ.get('FAKE_DOCKER_LOG'):
+    with open(os.environ['FAKE_DOCKER_LOG'], 'a') as log: print(json.dumps(args), file=log)
 if args[0]=='inspect': print('true')
 elif args[0]=='cp':
     with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
@@ -106,6 +108,32 @@ elif args[0]=='compose':
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1'))
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.sql').is_file())
+
+    def test_preserves_and_uses_reviewed_override_for_both_manifests(self):
+        import json
+        override = self.install / 'compose.override.yaml'
+        content = 'services:\n  mysql:\n    image: example.invalid/retained-mysql@sha256:' + '9' * 64 + '\n'
+        override.write_text(content)
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        compose = [args for args in calls if args[0] == 'compose' and '-f' in args]
+        self.assertTrue(compose)
+        for args in compose:
+            self.assertIn(str(override), args)
+        backup, = (self.install / 'backups').iterdir()
+        self.assertEqual((backup / 'compose.override.yaml').read_text(), content)
+        self.assertIn('compose.override.yaml', (backup / 'SHA256SUMS').read_text())
+        self.assertEqual(override.read_text(), content)
+
+    def test_rejects_symlink_override_before_services_change(self):
+        override = self.install / 'compose.override.yaml'
+        override.symlink_to(self.install / 'compose.yaml')
+        result = self.update(*self.bundle())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('non-symlink', result.stderr)
+        self.assertFalse((self.install / 'backups').exists())
 
     def test_no_version_selects_latest_stable_distribution(self):
         (self.bin / 'curl').write_text('''#!/bin/sh

@@ -110,6 +110,14 @@ Copy the recovery directory to encrypted off-host storage, and retain the matchi
 
 The distribution package and GitHub release assets are publicly readable, so installation and updates need no GitHub account. Existing blue/green source deployments use their separate deployment scripts.
 
+### Adopted production installations
+
+A reviewed migration can adopt an existing production server into this layout. The fresh installer does not perform that migration. Preserve the original database and broker versions, credentials, broker node identity, application and Data Protection volumes, certificate store, networks and public routes before cutting over. Never attach an existing database volume to a newer database image as part of layout adoption.
+
+An adopted installation may keep a root-owned `compose.override.yaml` beside `compose.yaml`. The updater applies this same override to the installed and candidate release, backs it up with checksums, and preserves it across updates. This allows external existing volumes/networks and exact infrastructure image digests to remain pinned while API, Worker and Studio follow normal releases. Infrastructure pins in the override take precedence over the release manifest and require their own reviewed upgrade. Keep application image references driven by the release manifest so application updates still take effect. Review the effective configuration locally with `docker compose --env-file release.env --env-file .env -f compose.yaml -f compose.override.yaml config`; its output can contain secrets and must not be shared.
+
+Use `update.sh` for subsequent releases. `install.sh --status` supports the override; rerunning the fresh installer against an override installation is refused to protect its imported settings. Manual Compose commands on an adopted server must also include `-f compose.override.yaml`. Retain the stopped original containers and verified configuration/data backups until public routes, database records, broker connectivity and an actual subsequent updater run have been checked. The public marketing website is outside the standalone server bundle and needs its own retained service and route when migrating a server that hosts it.
+
 ## Back up before relying on the installation
 
 Ignored files and filesystem permissions do not prevent accidental deletion. Back up `/etc/automaton`, `/opt/automaton-server`, the MySQL volume and the API data/API key/Worker key volumes to encrypted off-host storage. Keep the backup decryption key separately. Use an application-consistent database backup or quiesced volume snapshot and verify a restore on another host. Certificate and broker volumes also contain persistent operational state. No remote backup destination or automatic backup scheduler is configured by this installer.
