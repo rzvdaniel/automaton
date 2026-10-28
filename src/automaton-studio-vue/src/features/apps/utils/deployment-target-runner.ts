@@ -1,4 +1,4 @@
-import { RunnerApplicationProfiles, RunnerStatus, type Runner } from '@/features/runners/types/runners.types'
+import { RunnerStatus, type Runner } from '@/features/runners/types/runners.types'
 import { classifyRunner, isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
 
 export function getDeploymentTargetRunnerProjectId(projectId?: string | null): string | undefined {
