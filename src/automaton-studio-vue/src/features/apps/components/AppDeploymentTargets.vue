@@ -54,7 +54,6 @@ const advancedTargetIds = ref<string[]>([])
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const actionMenuTarget = ref<AppDeploymentTarget | null>(null)
 
-const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
 const hasMachineManagementTarget = computed(() => targets.value.some(isMachineManagementTarget))
 const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
@@ -279,10 +278,6 @@ function destinationLabel(target: AppDeploymentTarget): string {
     : 'Retired self-hosted destination'
 }
 
-function runtimeTransport(target: AppDeploymentTarget): string {
-  return 'API ↔ Runner tunnel'
-}
-
 function canOpenPreview(target: AppDeploymentTarget): boolean {
   return (
     !!target.runner &&
@@ -452,7 +447,7 @@ watch(() => props.refreshRevision, load)
               ><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span
               ><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span
               ><span>Target ID: {{ liveTarget.id }}</span
-              ><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span
+              ><span>Runtime transport: API ↔ Runner tunnel</span
               ><span>Runtime route: {{ targetRoute(liveTarget) }}</span
               ><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span>
             </div>
@@ -545,7 +540,7 @@ watch(() => props.refreshRevision, load)
                 ><span>Runner: {{ target.runner?.name ?? 'None' }}</span
                 ><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span
                 ><span>Target ID: {{ target.id }}</span
-                ><span>Runtime transport: {{ runtimeTransport(target) }}</span
+                ><span>Runtime transport: API ↔ Runner tunnel</span
                 ><span>Runtime route: {{ targetRoute(target) }}</span
                 ><span>Internal preview URL: {{ targetRoute(target) }}</span>
               </div>

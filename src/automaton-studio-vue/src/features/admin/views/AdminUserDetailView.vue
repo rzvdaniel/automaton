@@ -149,30 +149,6 @@ function verificationSeverity(confirmed: boolean) {
   return confirmed ? 'success' : 'warn'
 }
 
-function formatLastHeartbeat(value?: string) {
-  const date = parseUtcDate(value)
-  if (!date) {
-    return 'Not tracked yet'
-  }
-
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
-  if (diffSeconds < 60) {
-    return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`
-  }
-
-  const diffMinutes = Math.floor(diffSeconds / 60)
-  if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
-  }
-
-  return formatDate(value)
-}
-
 function triggerAction(actionLabel: string) {
   const userName = user.value?.name || 'this user'
   toast.add({
