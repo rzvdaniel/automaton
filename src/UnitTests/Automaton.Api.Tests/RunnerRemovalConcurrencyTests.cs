@@ -11,6 +11,7 @@ public sealed class RunnerRemovalConcurrencyTests
     {
         await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync();
         var runner = fixture.AddRunner(online: true);
+        runner.InstallationId = "sh_0123456789abcdef0123456789abcdef";
         await fixture.Db.SaveChangesAsync();
         await using var replica = new Automaton.Api.Data.ApplicationDbContext(fixture.ContextOptions);
         var stale = await replica.Runners.SingleAsync(item => item.Id == runner.Id);
