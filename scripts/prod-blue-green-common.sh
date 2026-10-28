@@ -881,6 +881,10 @@ acquire_deployment_lock() {
 }
 
 ensure_infrastructure() {
+    if [[ -f "$RUNTIME_ROOT/installer-managed" ]]; then
+        echo "[ERROR] This stack was adopted into the installer-managed layout. Use its installed update.sh; the retired source stack must remain stopped." >&2
+        return 1
+    fi
     acquire_deployment_lock || return 1
     storage_check preflight || return 1
     storage_require_local_docker || return 1
