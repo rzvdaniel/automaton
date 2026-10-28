@@ -3086,6 +3086,7 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletionRequestedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("ImageDigest")
