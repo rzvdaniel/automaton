@@ -73,11 +73,11 @@ jobs:
         env:
           IMAGE: ${{ steps.image.outputs.immutable }}
         run: |
-          docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -exc '
             test "$(id -u)" = 1000
             command -v docker
             docker --version
-            test -f /app/Automaton.Runner.dll
+            test -f /app/automaton-runner.dll
             test -x /app/docker-entrypoint.sh
             test -x /usr/local/bin/automaton-host-exec
             dotnet --list-runtimes | grep -q Microsoft.AspNetCore.App
