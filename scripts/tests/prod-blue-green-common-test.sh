@@ -6,6 +6,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../prod-blue-green-common.sh"
 
+(
+    RUNTIME_ROOT="$(mktemp -d)"
+    trap 'rm -rf "$RUNTIME_ROOT"' EXIT
+    touch "$RUNTIME_ROOT/installer-managed"
+    acquire_deployment_lock() { echo 'Unexpected deployment lock attempt' >&2; exit 99; }
+    if ensure_infrastructure; then
+        echo 'An adopted source stack must not restart shared infrastructure.' >&2
+        exit 1
+    fi
+)
+
 template="$REPO_ROOT/docker/traefik/prod/api-edge.yml"
 grep -q 'api-live-edge:' "$template"
 grep -q 'url: "http://api-__API_COLOR__:8080"' "$template"

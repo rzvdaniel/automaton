@@ -1,6 +1,10 @@
 # Production Docker Cheat Sheet
 
-This is the source of truth for the current Traefik-based production stack.
+This guide describes the source-based Traefik blue/green stack. For installer-managed servers, use [the installation and update guide](install-automaton.md).
+
+On 28 October 2026, the existing control-plane server was adopted into `/opt/automaton-server` with protected configuration in `/etc/automaton` and successfully updated through the normal updater to `server-v0.1.6`. Its original database, broker, app/key/certificate volumes, credentials, broker node identity, networks and private broker bindings were retained through a reviewed Compose override. Public and origin API/Studio/app/website routes, existing installation status, unchanged app/Runner record counts, and certificate-validated broker TLS/AMQP were verified after the update. Original containers remain stopped for rollback; the marketing website remains a separate running service.
+
+On that adopted server, future application releases use `sudo bash /opt/automaton-server/update.sh`. The old checkout's runtime `installer-managed` marker blocks source redeploy scripts from starting a second copy of shared infrastructure. Do not start the retired MySQL, RabbitMQ, API, Worker, Studio or Traefik containers while the adopted stack is running. Retained source blue/green state is historical, not the active control-plane state. The website remains outside the server release: manage only its selected service with `--no-deps` when using the old Compose file, so it cannot restart the retired dependencies. Do not run the old full-stack or website redeploy scripts on the adopted host.
 
 Use it for both:
 
