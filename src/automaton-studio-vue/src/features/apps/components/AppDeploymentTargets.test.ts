@@ -33,7 +33,6 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     status: DeploymentTargetStatus.Running,
     genericRuntimeDeployed: true,
     cleanupPending: false,
-    privilegedHostAccessApproved: false,
     lastSuccessfulDeploymentAt: '2026-08-04T18:42:00Z',
     routePath: '/',
     runner: {
@@ -70,7 +69,7 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
 describe('AppDeploymentTargets', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('separates the Live deployment from additional targets and hides hosted Runner names', async () => {
+  it('separates the Live deployment from additional targets and marks retired hosted destinations', async () => {
     const wrapper = await mountTargets([
       target(),
       target({ id: 'canary-id', name: 'Canary', slug: 'canary', isDefault: false }),
@@ -78,7 +77,7 @@ describe('AppDeploymentTargets', () => {
 
     expect(wrapper.text()).toContain('Live environment')
     expect(wrapper.text()).toContain('Additional environments')
-    expect(wrapper.text()).toContain('Automaton Hosted')
+    expect(wrapper.text()).toContain('Retired hosted destination')
     expect(wrapper.text()).not.toContain('hidden-hosted-runner')
     expect(wrapper.text()).toContain('Canary')
     expect(wrapper.findAll('.p-tag').filter((tag) => tag.text() === 'LIVE')).toHaveLength(1)
@@ -129,7 +128,7 @@ describe('AppDeploymentTargets', () => {
     expect(disclosure.attributes('aria-expanded')).toBe('true')
     expect(wrapper.text()).toContain('Target ID: live-id')
     expect(wrapper.text()).toContain('Environment slug: live')
-    expect(wrapper.text()).toContain('Runtime transport: Direct edge routing')
+    expect(wrapper.text()).toContain('Runtime transport: API ↔ Runner tunnel')
     expect(wrapper.text()).toContain('Runtime route: /')
     expect(wrapper.text()).toContain('Internal preview URL:')
   })
@@ -152,7 +151,7 @@ describe('AppDeploymentTargets', () => {
     expect(wrapper.text()).not.toContain('No destination assigned')
   })
 
-  it('shows privileged access and its self-hosted destination', async () => {
+  it('marks legacy self-hosted destinations as retired', async () => {
     const privileged = target({
       id: 'privileged-id',
       name: 'Privileged',
@@ -183,12 +182,9 @@ describe('AppDeploymentTargets', () => {
     })
     const wrapper = await mountTargets([target(), privileged, standard])
 
-    expect(wrapper.text()).toContain('Self-hosted')
-    expect(wrapper.text()).toContain('Privileged access')
-    expect(wrapper.text()).toContain('Self-hosted · Privileged Host')
-    expect(
-      wrapper.findAll('.p-tag').filter((tag) => tag.text() === 'Privileged access')
-    ).toHaveLength(1)
+    expect(wrapper.text()).toContain('Retired self-hosted destination')
+    expect(wrapper.text()).not.toContain('Privileged access')
+    expect(wrapper.text()).not.toContain('Self-hosted · Machine Management')
   })
 
   it('keeps hosted metadata for hosted additional environments', async () => {
@@ -203,11 +199,11 @@ describe('AppDeploymentTargets', () => {
       .findAll('.target-card')
       .find((candidate) => candidate.text().includes('Hosted Canary'))
 
-    expect(card?.text()).toContain('Automaton Hosted')
+    expect(card?.text()).toContain('Retired hosted destination')
     expect(card?.text()).not.toContain('Self-hosted')
   })
 
-  it('shows standard self-hosted metadata when a self-hosted environment is Live', async () => {
+  it('marks a legacy self-hosted Live environment as retired', async () => {
     const liveSelfHosted = target({
       runner: {
         id: 'self-hosted-live-runner',
@@ -221,8 +217,7 @@ describe('AppDeploymentTargets', () => {
     const wrapper = await mountTargets([liveSelfHosted])
     const card = wrapper.find('.target-card--live')
 
-    expect(card.text()).toContain('Self-hosted')
-    expect(card.text()).not.toContain('Automaton Hosted')
+    expect(card.text()).toContain('Retired self-hosted destination')
     expect(card.text()).not.toContain('Privileged access')
   })
 
@@ -245,7 +240,7 @@ describe('AppDeploymentTargets', () => {
     expect(wrapper.text()).toContain('automaton deploy live')
   })
 
-  it('retains privileged access metadata when a privileged environment is Live', async () => {
+  it('does not show retired privileged access as an active permission', async () => {
     const livePrivileged = target({
       runner: {
         id: 'privileged-live-runner',
@@ -259,9 +254,8 @@ describe('AppDeploymentTargets', () => {
     const wrapper = await mountTargets([livePrivileged])
     const card = wrapper.find('.target-card--live')
 
-    expect(card.text()).toContain('Self-hosted')
-    expect(card.text()).toContain('Privileged access')
-    expect(card.text()).not.toContain('Automaton Hosted')
+    expect(card.text()).toContain('Retired self-hosted destination')
+    expect(card.text()).not.toContain('Privileged access')
   })
 
   it('only enables promotion when canPromote permits it', async () => {

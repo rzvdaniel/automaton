@@ -16,7 +16,6 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     status: DeploymentTargetStatus.Running,
     genericRuntimeDeployed: true,
     cleanupPending: false,
-    privilegedHostAccessApproved: false,
     routePath: '/',
     runner: {
       id: 'runner-id',

@@ -266,13 +266,17 @@ function openRoute(target: AppDeploymentTarget) {
 }
 
 function isMachineManagementTarget(target: AppDeploymentTarget): boolean {
-  return target.runner?.applicationProfile === 'MachineManagement'
+  return target.runner?.purpose === 'Managed' &&
+    target.runner.applicationProfile === 'MachineManagement' &&
+    !target.runner.isHostedRunner
 }
 
 function destinationLabel(target: AppDeploymentTarget): string {
   if (!target.runner) return 'No runtime assigned'
   if (target.runner.isHostedRunner) return 'Retired hosted destination'
-  return 'Self-hosted · Machine Management'
+  return isMachineManagementTarget(target)
+    ? 'Self-hosted · Machine Management'
+    : 'Retired self-hosted destination'
 }
 
 function runtimeTransport(target: AppDeploymentTarget): string {
@@ -418,7 +422,7 @@ watch(() => props.refreshRevision, load)
               >
             </div>
             <div class="target-destination">
-              <i class="pi pi-server"></i><span>{{ destinationLabel(liveTarget) }}</span
+              <i class="pi pi-server"></i><span>{{ destinationLabel(liveTarget) }}</span>
             </div>
             <div class="target-meta" :title="deploymentTimeTitle(liveTarget)">
               <span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span
@@ -511,7 +515,7 @@ watch(() => props.refreshRevision, load)
                 >
               </div>
               <div class="target-destination">
-                <i class="pi pi-server"></i><span>{{ destinationLabel(target) }}</span
+                <i class="pi pi-server"></i><span>{{ destinationLabel(target) }}</span>
               </div>
               <div class="target-meta" :title="deploymentTimeTitle(target)">
                 <span v-if="deploymentState(target)">{{ deploymentState(target) }}</span

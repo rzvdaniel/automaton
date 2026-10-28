@@ -3,7 +3,9 @@ import type { AppDeploymentTarget } from '../types/apps.types'
 export function getDeployTargetOptionLabel(target: AppDeploymentTarget, viewingTargetId?: string): string {
   const destination = target.runner?.isHostedRunner
     ? 'Retired hosted destination'
-    : 'Self-hosted · Machine Management'
+    : target.runner?.purpose === 'Managed' && target.runner.applicationProfile === 'MachineManagement'
+      ? 'Self-hosted · Machine Management'
+      : 'Retired self-hosted destination'
   const viewing = target.id === viewingTargetId ? ' · Viewing' : ''
   return `${target.name} · ${target.isDefault ? 'Live' : 'Additional'} · ${destination} · ${target.status}${viewing}`
 }

@@ -131,6 +131,9 @@ public class ResourceAuthorizationService
     /// </summary>
     public async Task<bool> CanDeleteAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
+        if (Automaton.Core.Models.InfrastructureAppTrust.IsTrustedApp(appId))
+            return false;
+
         // Check personal ownership
         var hasPersonalAccess = await dbContext.WebAppUsers
             .AnyAsync(u => u.WebAppId == appId && u.UserId == userId, cancellationToken);

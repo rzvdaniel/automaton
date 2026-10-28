@@ -56,7 +56,6 @@ function liveTarget(overrides: Partial<AppDeploymentTarget> = {}): AppDeployment
     lastDeploymentAt: '2026-09-15T10:00:00Z',
     lastSuccessfulDeploymentAt: '2026-09-15T10:00:00Z',
     cleanupPending: false,
-    privilegedHostAccessApproved: false,
     routePath: '/a/app-id/',
     runner: {
       id: 'runner-id',
