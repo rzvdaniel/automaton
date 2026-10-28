@@ -43,7 +43,10 @@ namespace Automaton.Api.Data
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
             PrepareDeploymentTargets();
-            return base.SaveChanges(acceptAllChangesOnSuccess);
+            using var admission = OpenRunnerAssignmentAdmission();
+            var result = base.SaveChanges(acceptAllChangesOnSuccess);
+            admission?.Commit();
+            return result;
         }
 
         public override async Task<int> SaveChangesAsync(
@@ -51,7 +54,10 @@ namespace Automaton.Api.Data
             CancellationToken cancellationToken = default)
         {
             await PrepareDeploymentTargetsAsync(cancellationToken);
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await using var admission = await OpenRunnerAssignmentAdmissionAsync(cancellationToken);
+            var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            if (admission is not null) await admission.CommitAsync(cancellationToken);
+            return result;
         }
 
         private void PrepareDeploymentTargets()

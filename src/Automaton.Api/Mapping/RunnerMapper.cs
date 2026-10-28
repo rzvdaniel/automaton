@@ -49,6 +49,8 @@ public static class RunnerMapper
          MachineStorageMeasurementStatus = runner.MachineStorageMeasurementStatus,
          MachineStorageMeasurementError = runner.MachineStorageMeasurementError,
          Purpose = RunnerPurposes.Normalize(runner.Purpose),
+         InstallationId = runner.InstallationId,
+         DeletionRequestedAtUtc = runner.DeletionRequestedAtUtc,
          ApplicationProfile = RunnerProfileRules.NormalizeApplicationProfile(runner.Purpose, runner.ApplicationProfile),
          Capabilities = RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
 		 Scope = scope,

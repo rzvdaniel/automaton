@@ -113,4 +113,13 @@ public class RunnerDeploymentService
         runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
         if (deleteApplicationStorage) runnerWorkspaceService.DeleteApplicationStorage(appId);
     }
+
+    public async Task CleanupApplicationAsync(Guid appId, Guid deploymentTargetId,
+        MachineApplicationStorageCleanup storageCleanup)
+    {
+        await runtimeProcessManager.StopAsync(appId, deploymentTargetId);
+        await storageCleanup.DeleteComposeVolumesAsync(appId);
+        runnerWorkspaceService.DeleteApplicationTarget(appId, deploymentTargetId);
+        runnerWorkspaceService.DeleteApplicationStorage(appId);
+    }
 }

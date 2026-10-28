@@ -66,7 +66,8 @@ public class BackendRouteConfigService
                 nameof(pendingGenericRuntimeTargetId));
         }
 
-        var targets = dbContext.AppDeploymentTargets.AsNoTracking();
+        var targets = dbContext.AppDeploymentTargets.AsNoTracking()
+            .Where(target => target.WebApp.DeletionClaimId == null);
         if (pendingGenericRuntimeTargetId is not { } targetId)
         {
             return targets.Where(target => target.GenericRuntimeDeployed);
@@ -144,7 +145,7 @@ public class BackendRouteConfigService
             if (File.Exists(targetPath))
             {
                 File.Copy(targetPath, backupPath, overwrite: true);
-                TryDelete(targetPath);
+                File.Delete(targetPath);
             }
 
             logger.LogInformation(

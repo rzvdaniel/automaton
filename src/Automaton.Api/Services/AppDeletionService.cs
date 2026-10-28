@@ -8,7 +8,8 @@ namespace Automaton.Api.Services;
 public sealed class AppDeletionService(
     ApplicationDbContext dataContext,
     AppFileStorageService fileStorageService,
-    AppDeploymentTargetManagementService? deploymentTargetManagementService = null)
+    AppDeploymentTargetManagementService? deploymentTargetManagementService = null,
+    BackendRouteConfigService? routeConfigService = null)
 {
     public async Task DeleteResourcesAsync(
         Guid appId, WebApp app, Guid ownerId, bool recoverInterrupted = false, bool abandonOfflineRuntimes = false)
@@ -31,6 +32,10 @@ public sealed class AppDeletionService(
                 ? await appClaims.RecoverAsync(executor)
                 : await appClaims.AcquireAsync(appId);
             await dataContext.Entry(app).ReloadAsync();
+            await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
+            // Revoke edge routing before dispatching destructive runtime or storage cleanup.
+            if (routeConfigService is not null) await routeConfigService.RefreshAsync();
+            await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             if (deploymentTargetManagementService is not null)
             {
                 deletionClaims = await deploymentTargetManagementService

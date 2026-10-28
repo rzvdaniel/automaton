@@ -40,11 +40,28 @@ public class RunnersController : BaseController
 
     [HttpDelete("{id}")]
     [Authorize]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken,
+        [FromQuery] bool hostCleanupConfirmed = false)
     {
-        await runnersService.Delete(id, cancellationToken);
+        try
+        {
+            await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(new { message = exception.Message });
+        }
 
         return NoContent();
+    }
+
+    [HttpPost("{id}/removal")]
+    [Authorize]
+    public async Task<IActionResult> PrepareRemoval(Guid id, [FromServices] RunnerRemovalService removal,
+        CancellationToken cancellationToken)
+    {
+        try { return Ok(await removal.PrepareAsync(id, cancellationToken)); }
+        catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
     }
 
     [HttpGet("status")]

@@ -505,6 +505,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<AppQueryService>();
         services.AddScoped<AppPublicationService>();
         services.AddScoped<MachineStaticAppPublicationService>();
+        services.AddScoped<RunnerRemovalService>();
         services.AddScoped<AppsService>();
         services.AddScoped<AppImageManagementService>();
         services.AddScoped<AppRuntimeArchiveUploadService>();

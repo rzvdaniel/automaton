@@ -282,6 +282,7 @@ internal sealed class HostContainerComposeProjectExecutor(
         => ["docker", "volume", "create", "--label", "com.automaton.managed=true",
             "--label", "com.automaton.resource=compose-app-volume",
             "--label", $"com.automaton.app-id={scope.AppId}",
+            "--label", $"com.automaton.machine-runner-id={scope.MachineRunnerId}",
             "--label", $"com.automaton.deployment-target-id={scope.DeploymentTargetId}",
             "--label", $"com.automaton.compose-volume={volume}", name];
 

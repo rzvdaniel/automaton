@@ -9,6 +9,29 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class AppDeletionCleanupTests
 {
+    [Test]
+    public async Task FailedEdgeCleanup_DoesNotDispatchDestructiveRunnerCommands()
+    {
+        await using var fixture = await AppDeploymentTargetManagementServiceTests.TestFixtureContext.CreateAsync(successfulCleanup: true);
+        await ConfigureTargetsAsync(fixture);
+        using var directory = new AppAuthorizationTestData.TemporaryDirectory();
+        var deletion = await CreateDeletionWithBlockedRoutesAsync(fixture, directory.Path);
+
+        Assert.ThrowsAsync<IOException>(() => deletion.DeleteResourcesAsync(fixture.App.Id, fixture.App, fixture.UserId));
+        Assert.That(fixture.Commands.Requests, Is.Empty);
+        Assert.That(await fixture.Db.WebApps.AnyAsync(app => app.Id == fixture.App.Id), Is.True);
+    }
+
+    private static async Task<AppDeletionService> CreateDeletionWithBlockedRoutesAsync(
+        AppDeploymentTargetManagementServiceTests.TestFixtureContext fixture, string root)
+    {
+        var blockedRoot = Path.Combine(root, "routes");
+        await File.WriteAllTextAsync(blockedRoot, "not a directory");
+        AppAuthorizationTestServiceFactory.CreateAppsService(fixture.Db, fixture.UserId, root, out var storage);
+        return new AppDeletionService(fixture.Db, storage, fixture.Service,
+            BackendRouteConfigTestFixture.CreateService(fixture.Db, blockedRoot));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task AppDeletion_CleansAllAssignedTargetsBeforeStorageAndReleasesClaimsOnFailure(bool failStorage)

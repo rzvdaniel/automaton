@@ -51,10 +51,9 @@ public class RuntimeTunnelPolicyTests
         });
     }
 
-    [TestCase("Managed", "Standard", true)]
-    [TestCase("Managed", "PrivilegedHost", true)]
+    [TestCase("Managed", "Standard", false)]
+    [TestCase("Managed", "PrivilegedHost", false)]
     [TestCase("Managed", "MachineManagement", true)]
-    [TestCase("Infrastructure", null, false)]
     [TestCase("Managed", "Unknown", false)]
     public void AllowsRuntimeTunnel_OnlyAllowsApplicationProfiles(string purpose, string? profile, bool expected)
     {

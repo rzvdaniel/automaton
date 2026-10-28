@@ -83,6 +83,8 @@ After a database restore or a machine identity conflict, stop new effects until 
 
 An optional system-app catalog for monitoring, backup and selected maintenance is later work. Do not build it before the core flow and legacy cleanup. Any future host-privileged maintenance needs explicit administrator authorization and a narrow trusted capability.
 
+Routing scale remains unvalidated for thousands of apps. The current Traefik and shared Nginx configurations contain per-app rules and are regenerated on changes. After the deletion safeguards, evaluate fixed edge routing with authoritative runtime lookup and active static-release lookup, preserving authentication, deletion denial and release isolation. See [routing lifecycle and scaling constraints](../architecture/runner-management-transports.md#runner-reconnect-and-assignment); benchmark concurrent publish/delete work before claiming large-team scale.
+
 ## Delivery milestones
 
 M1/M2 implementation is merged; their broader integration acceptance remains deferred. M3/M4 are complete: the fresh single-server demonstration passed, its corrections are merged, and legacy removal and its final audit are merged. No legacy migration product is required. Further changes should fix concrete problems found through normal use, without another tree of speculative briefs or supporting abstractions without a current consumer.

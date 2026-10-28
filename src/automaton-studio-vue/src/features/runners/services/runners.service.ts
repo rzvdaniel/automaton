@@ -6,6 +6,7 @@ import apiClient from '@/shared/services/api/axios-instance'
 import type {
   CreateSelfHostedRunnerInstallationRequest,
   Runner,
+  RunnerRemovalInstructions,
   RunnerStatusResponse,
   SelfHostedRunnerInstallation,
   SelfHostedRunnerInstallationStatusResponse,
@@ -36,7 +37,12 @@ class RunnersService {
    * DELETE /api/runners/{id}
    */
   async delete(id: string): Promise<void> {
-    await apiClient.delete(`/api/runners/${id}`)
+    await apiClient.delete(`/api/runners/${id}`, { params: { hostCleanupConfirmed: true } })
+  }
+
+  async prepareRemoval(id: string): Promise<RunnerRemovalInstructions> {
+    const { data } = await apiClient.post<RunnerRemovalInstructions>(`/api/runners/${id}/removal`)
+    return data
   }
 
 

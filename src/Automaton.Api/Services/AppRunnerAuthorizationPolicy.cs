@@ -65,6 +65,8 @@ public sealed class AppRunnerAuthorizationPolicy(
             .SingleOrDefaultAsync(item => item.Id == runnerId, cancellationToken)
             ?? throw new InvalidOperationException("Execution Runner not found.");
 
+        if (runner.DeletionRequestedAtUtc.HasValue)
+            throw new InvalidOperationException("This Runner is being removed and cannot accept app assignments.");
         if (RunnerPurposes.Normalize(runner.Purpose) != RunnerPurposes.Managed ||
             RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement)
             throw new InvalidOperationException("Only Machine Management Runners can run applications.");

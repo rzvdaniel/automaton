@@ -139,6 +139,7 @@ public sealed class RunnerExecutionOperationService(
         };
         await transactions.ExecuteAsync(async ct =>
         {
+            await db.EnsureRunnerOperationAdmissionAsync(runnerId, ct);
             db.RunnerExecutionOperations.Add(operation);
             await db.SaveChangesAsync(ct);
             await events.PublishAsync(new RunnerExecutionRequestedEvent(operation.Id, runnerId,

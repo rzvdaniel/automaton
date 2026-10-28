@@ -131,8 +131,8 @@ public class RunnerService
         return exists;
     }
 
-    public Task Delete(Guid id, CancellationToken cancellationToken)
-        => runnerDeletionService.DeleteAsync(id, cancellationToken);
+    public Task Delete(Guid id, CancellationToken cancellationToken, bool hostCleanupConfirmed = false)
+        => runnerDeletionService.DeleteAsync(id, cancellationToken, hostCleanupConfirmed);
 
     public Task<IEnumerable<RunnerFlowResult>> ExecuteFlow(
         Guid flowId,

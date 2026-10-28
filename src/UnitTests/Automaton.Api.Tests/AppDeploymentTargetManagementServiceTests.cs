@@ -234,10 +234,12 @@ public class AppDeploymentTargetManagementServiceTests
     public async Task Create_RejectsRetiredRunnerProfiles(string purpose, string profile)
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
-        var runner = fixture.AddRunner(online: true, purpose: purpose, applicationProfile: profile);
+        var runner = fixture.AddRunner(online: true);
+        runner.Purpose = purpose;
+        runner.ApplicationProfile = profile;
         await fixture.Db.SaveChangesAsync();
 
-        Assert.ThrowsAsync<InvalidOperationException>(
+        Assert.ThrowsAsync<ArgumentException>(
             async () => await fixture.Service.CreateAsync(
                 fixture.App.Id,
                 new CreateAppDeploymentTargetRequest

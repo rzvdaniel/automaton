@@ -9,6 +9,8 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import SelfHostedRunnerInstallDialog from '../components/SelfHostedRunnerInstallDialog.vue'
+import RunnerRemovalDialog from '../components/RunnerRemovalDialog.vue'
+import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -19,6 +21,7 @@ import {
   getStatusDisplayName,
   getStatusSeverity,
   type Runner,
+  type RunnerRemovalInstructions,
   isRunnerLinkedToProject,
 } from '../types/runners.types'
 import { classifyRunner, isVisibleApplicationRunner } from '../utils/runner-classification'
@@ -32,6 +35,9 @@ const authStore = useAuthStore()
 const loading = ref(true)
 const runners = ref<Runner[]>([])
 const showSelfHostedInstallDialog = ref(false)
+const removalInstructions = ref<RunnerRemovalInstructions | null>(null)
+const removalRunnerName = ref('')
+const showRemovalDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
 const autoRefreshIntervalMs = 15000
@@ -192,32 +198,28 @@ function stopAutoRefresh() {
 // Delete runner
 async function deleteRunner(runner: Runner) {
   try {
-    await runnersService.delete(runner.id)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Runner deleted successfully',
-      life: 3000,
-    })
+    removalInstructions.value = await runnersService.prepareRemoval(runner.id)
+    removalRunnerName.value = runner.name
+    showRemovalDialog.value = true
     await loadRunners()
   } catch (err: unknown) {
     console.error('Failed to delete runner:', err)
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'Failed to delete runner',
-      life: 5000,
+      detail: isAxiosError(err) ? err.response?.data?.message ?? 'Failed to prepare Runner removal' : 'Failed to prepare Runner removal',
+      life: 10000,
     })
   }
 }
 
 function confirmDelete(runner: Runner) {
   confirm.require({
-    message: `Are you sure you want to delete the runner "${runner.name}"?`,
+    message: `Prepare removal of "${runner.name}"? All app environments must be moved or deleted first. New assignments will be blocked, and you will receive a command to uninstall it on its server.`,
     header: 'Delete Runner',
     icon: 'pi pi-exclamation-triangle',
     rejectLabel: 'Cancel',
-    acceptLabel: 'Delete',
+    acceptLabel: 'Prepare removal',
     acceptClass: 'p-button-danger',
     accept: () => {
       deleteRunner(runner)
@@ -647,6 +649,10 @@ onUnmounted(() => {
       v-model:visible="showSelfHostedInstallDialog"
       @created="handleSelfHostedInstallationCreated"
     />
+
+    <RunnerRemovalDialog v-if="removalInstructions" :key="removalInstructions.runnerId"
+      v-model:visible="showRemovalDialog" :instructions="removalInstructions"
+      :runner-name="removalRunnerName" @removed="loadRunners" />
 
 
   </div>

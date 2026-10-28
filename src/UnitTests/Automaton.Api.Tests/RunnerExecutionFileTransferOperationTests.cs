@@ -85,7 +85,7 @@ public sealed class RunnerExecutionFileTransferOperationTests
         {
             var root = Path.Combine(Path.GetTempPath(), "automaton-download-result-" + Guid.NewGuid().ToString("N"));
             var db = CreateDb();
-            var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "transfer-test", RunnerUsers = [] };
+            var runner = new Runner { Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "transfer-test", RunnerUsers = [], ApplicationProfile = "MachineManagement" };
             db.Runners.Add(runner);
             await db.SaveChangesAsync();
             var operations = RunnerExecutionTestServices.Operations(db, artifactRoot: root);
