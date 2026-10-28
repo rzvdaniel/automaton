@@ -77,8 +77,13 @@ jobs:
             test "$(id -u)" = 1000
             command -v docker
             docker --version
-            test -f /app/SystemApps/automaton-infrastructure/actions/validate-runner-host/action.yaml
-            test -f /app/SystemApps/automaton-infrastructure/actions/validate-runner-host/main.sh
+            test -f /app/Automaton.Runner.dll
+            test -x /app/docker-entrypoint.sh
+            test -x /usr/local/bin/automaton-host-exec
+            dotnet --list-runtimes | grep -q Microsoft.AspNetCore.App
+            test -w /app/config
+            test -w /automaton/storage/workspace/runner
+            test -w /automaton/system
           '
       - name: Push the tested image and record its digest
         env:
