@@ -22,7 +22,6 @@ import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
 import AdminUserRunnersView from './views/AdminUserRunnersView.vue'
 import AdminAppDetailView from './views/AdminAppDetailView.vue'
-import AdminSystemApplicationView from './views/AdminSystemApplicationView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -50,12 +49,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'Dashboard',
         },
-      },
-      {
-        path: 'system',
-        name: 'admin-system-application',
-        component: AdminSystemApplicationView,
-        meta: { title: 'System Application' },
       },
       {
         path: 'ai-providers',

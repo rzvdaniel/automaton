@@ -1,30 +1,23 @@
 ---
 title: Deploy a Runner
-description: Set up a self-hosted Automaton Runner for configured runtimes and Actions.
+description: Install a Machine Management Runner to deploy Automaton apps and Actions.
 ---
 
 # Deploy a Runner
 
-A Runner executes configured long-running runtimes and finite Actions. Choose a
-Standard Runner for ordinary workloads. Use a Privileged Host Runner only for
-trusted apps that need approved host capabilities.
+A Machine Management Runner hosts app runtimes and isolated Actions on a server you control. The server needs Ubuntu and a running Docker Engine. The Runner itself has access to the machine's Docker socket, so install it only on a trusted server.
 
 ## Install
 
-In Automaton Studio, open **Runners**, select **Install Self-Hosted Runner**,
-choose a profile, and copy the generated one-time command to the target host.
-Do not share the enrollment credential. Return to **Runners** and confirm the
-Runner connects.
+In Automaton Studio, open **Runners** and select **Install Machine Management Runner**. Enter a name, acknowledge the machine access warning, and copy the generated one-time command to the server. Do not share the enrollment credential. Return to **Runners** and confirm that the Runner connects.
 
-The CLI also supports:
+You can list connected Runners from the CLI:
 
 ```bash
-automaton runner install
 automaton runners
 ```
 
-The host needs Docker and access to the Automaton account. Keep privileged apps
-private and follow the least-capability rule.
+Assign the Runner to the app environment before deployment. A Runner can host multiple app environments on the same machine.
 
 ## Deploy an app
 
@@ -33,5 +26,4 @@ automaton validate
 automaton deploy
 ```
 
-The Runner performs the configured build and starts the configured runtime. Wait
-for the deployment to reach `Succeeded` before publishing or reporting success.
+Wait for deployment to reach `Succeeded` before publishing or reporting success.

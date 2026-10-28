@@ -83,7 +83,9 @@ public sealed class RunnerQueryService(
     public async Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
         var runner = await authorizationService.GetAccessibleRunnersQuery()
-            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower(), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Purpose == RunnerPurposes.Managed &&
+                x.ApplicationProfile == RunnerApplicationProfiles.MachineManagement &&
+                x.Name.ToLower() == name.ToLower(), cancellationToken);
         if (runner == null)
             return null;
 

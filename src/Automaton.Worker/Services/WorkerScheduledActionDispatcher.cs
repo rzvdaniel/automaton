@@ -26,6 +26,7 @@ public sealed class WorkerScheduledActionDispatcher(
                     || x.Status == ActionScheduleOccurrenceStatuses.Dispatching
                         && x.UpdatedAtUtc < nowUtc.AddMinutes(-2))
                 && x.Schedule.OwnerType == ActionScheduleOwnerTypes.System
+                && x.Schedule.ApplicationId != ActionScheduleProcessor.RetiredPlatformAppId
                 && x.Schedule.ExecutionScope == ActionExecutionScopes.Worker)
             .OrderBy(x => x.ScheduledForUtc).Select(x => x.Id).Take(50).ToListAsync(cancellationToken);
 
