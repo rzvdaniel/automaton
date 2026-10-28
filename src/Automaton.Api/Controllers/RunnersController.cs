@@ -33,7 +33,8 @@ public class RunnersController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Put(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
     {
-        await runnersService.Update(id, runner, cancellationToken);
+        try { await runnersService.Update(id, runner, cancellationToken); }
+        catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
 
         return NoContent();
     }

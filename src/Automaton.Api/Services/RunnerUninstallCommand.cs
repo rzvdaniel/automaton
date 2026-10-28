@@ -23,15 +23,23 @@ internal static class RunnerUninstallCommand
               echo 'App or Action containers still exist. Clean up those workloads before uninstalling.' >&2
               exit 1
             fi
-            app_data=$(docker volume ls --quiet --filter 'label=com.automaton.machine-runner-id={{{runnerId:D}}}' --filter 'label=com.automaton.resource=compose-app-volume')
-            if [ -n "$app_data" ]; then
-              echo 'App data volumes still exist. Delete their owning apps or explicitly clean up retained app data before uninstalling.' >&2
-              exit 1
-            fi
+            app_data=$(docker volume ls --quiet --filter 'label=com.automaton.managed=true' --filter 'label=com.automaton.resource=compose-app-volume')
+            for app_volume in $app_data; do
+              owner=$(docker volume inspect --format '{{index .Labels "com.automaton.machine-runner-id"}}' "$app_volume")
+              if ! printf '%s\n' "$owner" | grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' || printf '%s\n' "$owner" | grep -Fxiq '{{{runnerId:D}}}'; then
+                echo 'App data volumes belong to this Runner or lack a verified machine identity. Inspect and clean up retained app data before uninstalling.' >&2
+                exit 1
+              fi
+            done
             containers=$(docker ps -a --format '{{.Names}}')
             if printf '%s\n' "$containers" | grep -Fxq '{{{runnerContainer}}}'; then
               identity=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' '{{{runnerContainer}}}')
               printf '%s\n' "$identity" | grep -Fxq 'AUTOMATON_RUNNER_INSTALLATION_ID={{{installationId}}}'
+              if ! identity=$(docker cp '{{{runnerContainer}}}:/app/config/runner.json' - | tar -xOf -); then
+                echo 'Cannot verify the management container Runner identity; it was preserved.' >&2
+                exit 1
+              fi
+              printf '%s\n' "$identity" | grep -Eiq '"RunnerId"[[:space:]]*:[[:space:]]*"{{{runnerId:D}}}"'
             fi
             if printf '%s\n' "$containers" | grep -Fxq '{{{staticContainer}}}'; then
               owner=$(docker inspect --format '{{index .Config.Labels "automaton.machine-runner-id"}}' '{{{staticContainer}}}')
@@ -57,6 +65,7 @@ internal static class RunnerUninstallCommand
               docker network rm '{{{network}}}'
             fi
             echo 'Runner host cleanup completed. Confirm removal in Studio to revoke its credentials.'
+            echo 'The host installation/configuration directory was retained. Remove it manually after confirming credential revocation in Studio.'
             AUTOMATON_RUNNER_UNINSTALL
             """;
     }

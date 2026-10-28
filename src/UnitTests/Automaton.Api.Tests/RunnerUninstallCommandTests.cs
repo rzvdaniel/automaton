@@ -16,6 +16,13 @@ public sealed class RunnerUninstallCommandTests
     [TestCase("orphan", 1)]
     [TestCase("foreign", 1)]
     [TestCase("data", 1)]
+    [TestCase("legacy-data", 1)]
+    [TestCase("malformed-data", 1)]
+    [TestCase("foreign-data", 0)]
+    [TestCase("foreign-runner", 1)]
+    [TestCase("foreign-installation", 1)]
+    [TestCase("missing-config", 1)]
+    [TestCase("stopped", 0)]
     public async Task HostCommandChecksOwnershipAndRefusesRemainingWorkloads(string mode, int expectedExitCode)
     {
         if (OperatingSystem.IsWindows()) Assert.Ignore("The Machine Management host command requires a Unix shell.");
@@ -36,7 +43,8 @@ public sealed class RunnerUninstallCommandTests
         var calls = await File.ReadAllTextAsync(log);
 
         Assert.That(process.ExitCode, Is.EqualTo(expectedExitCode), await output + await error);
-        if (mode == "owned")
+        Assert.That(calls, Does.Not.Contain("volume rm retained-app-data"));
+        if (mode is "owned" or "stopped" or "foreign-data")
         {
             Assert.That(calls, Does.Contain($"rm --force automaton-self-hosted-{installation[3..15]}"));
             Assert.That(calls, Does.Contain($"rm --force automaton-static-{installation[3..]}"));
@@ -58,6 +66,9 @@ public sealed class RunnerUninstallCommandTests
         start.Environment["MODE"] = mode;
         start.Environment["INSTALLATION"] = installation;
         start.Environment["RUNNER_ID"] = runnerId.ToString("D");
+        start.Environment["FAKE_CONFIG"] = path;
+        var persistedId = mode == "foreign-runner" ? Guid.NewGuid() : runnerId;
+        File.WriteAllText(Path.Combine(path, "runner.json"), "{\"RunnerId\":\"" + persistedId + "\"}");
         return Process.Start(start)!;
     }
 
@@ -78,12 +89,28 @@ public sealed class RunnerUninstallCommandTests
               *machine-runner-id*)
                 if [ "$MODE" = foreign ]; then echo foreign-runner; else echo "$RUNNER_ID"; fi ;;
               *automaton.resource*) echo machine-static-server ;;
-              *) echo "AUTOMATON_RUNNER_INSTALLATION_ID=$INSTALLATION" ;;
+              *)
+                if [ "$MODE" = foreign-installation ]; then echo 'AUTOMATON_RUNNER_INSTALLATION_ID=wrong-installation'; else echo "AUTOMATON_RUNNER_INSTALLATION_ID=$INSTALLATION"; fi ;;
             esac ;;
+          cp*)
+            if [ "$MODE" = missing-config ]; then exit 1; fi
+            tar -cf - -C "$FAKE_CONFIG" runner.json ;;
           'volume ls')
             if [ "$MODE" != missing ] && [ "$3" = --format ]; then echo "automaton-machine-runner-$INSTALLATION-workspace"; fi
-            if [ "$MODE" = data ] && [ "$3" = --quiet ]; then echo retained-app-data; fi ;;
-          'volume inspect') echo "$INSTALLATION" ;;
+            case "$MODE" in data|legacy-data|malformed-data|foreign-data)
+              if [ "$3" = --quiet ]; then echo retained-app-data; fi ;;
+            esac ;;
+          'volume inspect')
+            case "$4" in
+              *machine-runner-id*)
+                case "$MODE" in
+                  legacy-data) echo '<no value>' ;;
+                  malformed-data) echo invalid ;;
+                  foreign-data) echo '11111111-1111-1111-1111-111111111111' ;;
+                  *) echo "$RUNNER_ID" ;;
+                esac ;;
+              *) echo "$INSTALLATION" ;;
+            esac ;;
           'network ls')
             if [ "$MODE" != missing ]; then echo "automaton-self-hosted-$INSTALLATION-runtime"; fi ;;
         esac

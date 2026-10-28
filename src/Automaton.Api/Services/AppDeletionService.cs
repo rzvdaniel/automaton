@@ -20,6 +20,7 @@ public sealed class AppDeletionService(
         IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
         Guid? appClaimId = null;
         var resuming = false;
+        var routesRevoked = false;
         var appClaims = new AppDeletionClaimService(dataContext);
         try
         {
@@ -34,7 +35,11 @@ public sealed class AppDeletionService(
             await dataContext.Entry(app).ReloadAsync();
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             // Revoke edge routing before dispatching destructive runtime or storage cleanup.
-            if (routeConfigService is not null) await routeConfigService.RefreshAsync();
+            if (routeConfigService is not null)
+            {
+                await routeConfigService.RefreshAsync();
+                routesRevoked = true;
+            }
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             if (deploymentTargetManagementService is not null)
             {
@@ -51,20 +56,33 @@ public sealed class AppDeletionService(
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }
-        catch
+        catch (Exception deletionError)
         {
-            if (deploymentTargetManagementService is not null && deletionClaims is not null)
-            {
-                dataContext.ChangeTracker.Clear();
-                await deploymentTargetManagementService.ReleaseAppDeletionClaimsAsync(
-                    appId, deletionClaims, CancellationToken.None, appClaimId);
-            }
-
-            // Recovery remains a pending deletion intent on failure; admission must
-            // not reopen while older idempotent cleanup commands can still finish.
-            if (appClaimId.HasValue && !resuming)
-                await appClaims.ReleaseAsync(appId, appClaimId.Value, CancellationToken.None);
+            await CompensateFailureAsync(appId, deletionClaims, appClaimId, resuming, routesRevoked, deletionError);
             throw;
+        }
+    }
+
+    private async Task CompensateFailureAsync(Guid appId,
+        IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims, Guid? appClaimId,
+        bool resuming, bool routesRevoked, Exception deletionError)
+    {
+        if (deploymentTargetManagementService is not null && deletionClaims is not null)
+        {
+            dataContext.ChangeTracker.Clear();
+            await deploymentTargetManagementService.ReleaseAppDeletionClaimsAsync(
+                appId, deletionClaims, CancellationToken.None, appClaimId);
+        }
+
+        // Interrupted recovery keeps its intent closed to new work and traffic.
+        if (!appClaimId.HasValue || resuming) return;
+        await new AppDeletionClaimService(dataContext).ReleaseAsync(appId, appClaimId.Value, CancellationToken.None);
+        if (!routesRevoked || routeConfigService is null) return;
+        try { await routeConfigService.RefreshAsync(); }
+        catch (Exception restorationError)
+        {
+            throw new AggregateException("App deletion failed and its routes could not be restored. Resolve the routing error before retrying.",
+                deletionError, restorationError);
         }
     }
 }

@@ -58,6 +58,8 @@ Runner reconnect records authorized connection/session and installation reports 
 
 ## File-transfer operations
 
+Fresh app deletion failure releases its claim and regenerates routes from durable state; interrupted-deletion recovery keeps its claim and routes revoked. Installation identity is immutable through Runner updates, and host uninstall verifies the management container's persisted Runner ID as well as its installation environment. The volume preflight inspects all managed Compose app data volumes and refuses current-machine or unattributed volumes, including volumes created before machine ownership labels existed. Clearly foreign volumes remain untouched. No legacy execution flow or automatic storage adoption is introduced.
+
 Whole-app cleanup also discovers Docker Compose data volumes by app identity and verifies managed/resource labels, target identity and the deterministic volume name before removing them. Volumes are removed without force, after runtime cleanup and before app workspace/data deletion; a busy or unverified volume fails deletion and preserves remaining storage. Individual-environment cleanup retains persistent volumes. Newly created Compose data volumes carry the machine Runner identity so the host uninstall command can refuse retained app data rather than silently orphan it.
 
 App/target cleanup commands use the execution queue, because container teardown can await typed Docker operations on the management queue. Routing cleanup itself to the single-consumer management queue would block those nested operations. Metadata reads and typed host-container operations keep their existing management routing.

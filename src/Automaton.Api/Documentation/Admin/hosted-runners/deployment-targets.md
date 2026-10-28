@@ -80,6 +80,8 @@ If cleanup fails, the app record is retained: resolve Runner availability or the
 reported cleanup problem, then retry **Delete App**. Already removed runtimes and
 data are not restored.
 
+When a fresh deletion fails and its claim is released, Traefik routes are regenerated from the current database state so untouched runtimes remain reachable. Interrupted-deletion recovery keeps its deletion claim and routes revoked until recovery completes. If route restoration also fails, the error reports both failures for operator repair.
+
 Apply the app deletion-claim migration and update every API replica. Drain old API
 slots before exercising deletion; older API versions do not honor this claim.
 
