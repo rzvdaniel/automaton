@@ -2,11 +2,24 @@ using Automaton.Core.Models;
 using Automaton.Runner.Console.Services;
 using NUnit.Framework;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Runner.Console.Tests;
 
 public sealed class AppActionCommandExecutorTests
 {
+    [Test]
+    public async Task ExecutionDispatcherUsesTheRegisteredCommandHandler()
+    {
+        var handler = new AppActionCommandExecutor(new AppActionExecutionService(new RunnerWorkspaceService()), null!, null!);
+        using var services = new ServiceCollection().AddSingleton(handler).BuildServiceProvider();
+        using var dispatcher = new RunnerExecutionExecutor(services);
+        var result = await dispatcher.ExecuteAsync(new(null, null,
+            AppActionCommand.Create("read-logs", new ReadAppModuleExecutionArtifactRequest(
+                Guid.NewGuid(), Guid.NewGuid(), "missing", Guid.NewGuid()))), CancellationToken.None);
+        Assert.That(result.Outcome, Is.EqualTo("Succeeded"));
+    }
+
     [Test]
     public void UnknownCommandIsPermanentlyInvalid()
         => Assert.ThrowsAsync<InvalidDataException>(() => new AppActionCommandExecutor(null!, null!, null!)
