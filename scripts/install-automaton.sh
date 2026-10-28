@@ -37,8 +37,17 @@ exec 9>/run/lock/automaton-install.lock
 flock -n 9 || { echo 'Another installer is running.' >&2; exit 1; }
 unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE MYSQL_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
 if $status_only; then
-    docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml" ps
+    compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
+    if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
+        [[ -f "$install_dir/compose.override.yaml" && ! -L "$install_dir/compose.override.yaml" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
+        compose+=(-f "$install_dir/compose.override.yaml")
+    fi
+    "${compose[@]}" ps
     exit
+fi
+if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
+    echo 'This installation has reviewed Compose overrides. Use update.sh for releases; the fresh installer cannot reconfigure it.' >&2
+    exit 1
 fi
 # Check the host before installing bootstrap dependencies or downloading a release.
 source /etc/os-release

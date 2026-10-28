@@ -113,6 +113,12 @@ PY
 
 old_compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml")
+override="$install_dir/compose.override.yaml"
+if [[ -e "$override" || -L "$override" ]]; then
+    [[ -f "$override" && ! -L "$override" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
+    old_compose+=(-f "$override")
+    new_compose+=(-f "$override")
+fi
 "${old_compose[@]}" config --quiet
 "${new_compose[@]}" config --quiet
 for service in mysql rabbitmq api worker studio traefik; do
@@ -135,6 +141,7 @@ install -d -m 0700 "$backup_root"
 backup=$(mktemp -d "$backup_root/$version-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 echo "Creating protected recovery backup at $backup"
 cp -p "$install_dir/release.env" "$install_dir/compose.yaml" "$install_dir/.env" "$backup/"
+[[ ! -f "$override" ]] || cp -p "$override" "$backup/compose.override.yaml"
 [[ ! -f "$install_dir/version" ]] || cp -p "$install_dir/version" "$backup/previous-version"
 [[ ! -f "$install_dir/update.sh" ]] || cp -p "$install_dir/update.sh" "$backup/previous-update.sh"
 [[ ! -f "$install_dir/install.sh" ]] || cp -p "$install_dir/install.sh" "$backup/previous-install.sh"
@@ -148,6 +155,9 @@ docker cp "$api_container:/app/AppData/." - | gzip > "$backup/api-data.tar.gz"
 [[ -s "$backup/database.sql" ]] && tail -n 1 "$backup/database.sql" | grep -q 'Dump completed' || { echo 'Database backup did not complete.' >&2; exit 1; }
 for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archive.tar.gz" >/dev/null; done
 (cd "$backup" && sha256sum release.env compose.yaml .env config.tar.gz api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz database.sql > SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
+if [[ -f "$override" ]]; then
+    (cd "$backup" && sha256sum compose.override.yaml >> SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
+fi
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull api worker studio
 echo 'Updating API, Worker and Studio.'
