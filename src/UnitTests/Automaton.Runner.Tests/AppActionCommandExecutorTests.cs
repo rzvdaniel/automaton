@@ -11,13 +11,18 @@ public sealed class AppActionCommandExecutorTests
     [Test]
     public async Task ExecutionDispatcherUsesTheRegisteredCommandHandler()
     {
-        var handler = new AppActionCommandExecutor(new AppActionExecutionService(new RunnerWorkspaceService()), null!, null!);
-        using var services = new ServiceCollection().AddSingleton(handler).BuildServiceProvider();
+        using var services = RegisteredHandlerServices();
         using var dispatcher = new RunnerExecutionExecutor(services);
         var result = await dispatcher.ExecuteAsync(new(null, null,
             AppActionCommand.Create("read-logs", new ReadAppModuleExecutionArtifactRequest(
                 Guid.NewGuid(), Guid.NewGuid(), "missing", Guid.NewGuid()))), CancellationToken.None);
         Assert.That(result.Outcome, Is.EqualTo("Succeeded"));
+    }
+
+    private static ServiceProvider RegisteredHandlerServices()
+    {
+        var handler = new AppActionCommandExecutor(new AppActionExecutionService(new RunnerWorkspaceService()), null!, null!);
+        return new ServiceCollection().AddSingleton(handler).BuildServiceProvider();
     }
 
     [Test]

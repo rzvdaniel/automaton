@@ -60,6 +60,8 @@ Runner reconnect records authorized connection/session and installation reports 
 
 Whole-app cleanup also discovers Docker Compose data volumes by app identity and verifies managed/resource labels, target identity and the deterministic volume name before removing them. Volumes are removed without force, after runtime cleanup and before app workspace/data deletion; a busy or unverified volume fails deletion and preserves remaining storage. Individual-environment cleanup retains persistent volumes. Newly created Compose data volumes carry the machine Runner identity so the host uninstall command can refuse retained app data rather than silently orphan it.
 
+App/target cleanup commands use the execution queue, because container teardown can await typed Docker operations on the management queue. Routing cleanup itself to the single-consumer management queue would block those nested operations. Metadata reads and typed host-container operations keep their existing management routing.
+
 | Operation | API caller | Queue | Runner behavior | Artifact direction |
 | --- | --- | --- | --- | --- |
 | App file upload | `AppFileUploadService` | Execution | Fetches bytes into the existing `Path.GetTempPath()/uploads/{session}` area | API store → Runner HTTPS GET |
