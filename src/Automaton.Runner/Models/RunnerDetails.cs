@@ -24,6 +24,5 @@ public class RunnerDetails
     public string? ContainerHealth { get; set; }
     public string Purpose { get; set; } = RunnerPurposes.Managed;
     public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
-    public Guid? RunnerHostId { get; set; }
     public string? InstallationId { get; set; }
 }

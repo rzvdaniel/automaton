@@ -111,7 +111,7 @@ public class AppDeploymentTargetResolverTests
             db,
             userId,
             online: true,
-            purpose: RunnerPurposes.Infrastructure);
+            purpose: "Infrastructure");
         var app = AddApp(db, userId, runner.Id);
         app.Tags = "infrastructure,admin";
         await db.SaveChangesAsync();
@@ -120,11 +120,11 @@ public class AppDeploymentTargetResolverTests
             async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
                 .ResolveAsync(app.Id, null, userId));
 
-        Assert.That(exception!.Message, Does.Contain("trusted infrastructure App"));
+        Assert.That(exception!.Message, Does.Contain("Management Runner"));
     }
 
     [Test]
-    public async Task ResolveAsync_WhenTrustedAppAndAdministratorUseInfrastructureRunner_ReturnsTarget()
+    public async Task ResolveAsync_RejectsInfrastructureRunnerEvenForAdministrator()
     {
         await using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -133,7 +133,7 @@ public class AppDeploymentTargetResolverTests
             db,
             userId,
             online: true,
-            purpose: RunnerPurposes.Infrastructure);
+            purpose: "Infrastructure");
         var app = AddApp(
             db,
             userId,
@@ -141,10 +141,10 @@ public class AppDeploymentTargetResolverTests
             InfrastructureAppTrust.PlatformAppId);
         await db.SaveChangesAsync();
 
-        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId, isAdministrator: true)
-            .ResolveAsync(app.Id, null, userId);
-
-        Assert.That(target.ExecutionRunner?.Id, Is.EqualTo(runner.Id));
+        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
+            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId, isAdministrator: true)
+                .ResolveAsync(app.Id, null, userId));
+        Assert.That(exception!.Message, Does.Contain("Management Runner"));
     }
 
     [Test]
@@ -188,7 +188,7 @@ public class AppDeploymentTargetResolverTests
     }
 
     [Test]
-    public async Task AssignAsync_AllowsExplicitPrivilegedHostAssignment()
+    public async Task AssignAsync_RejectsRetiredPrivilegedHostProfile()
     {
         await using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -196,13 +196,8 @@ public class AppDeploymentTargetResolverTests
             db,
             userId,
             online: true,
-            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
+            applicationProfile: "PrivilegedHost");
         var app = AddApp(db, userId, runnerId: null);
-        await db.SaveChangesAsync();
-
-        var target = await db.AppDeploymentTargets
-            .SingleAsync(x => x.WebAppId == app.Id && x.IsDefault);
-        target.PrivilegedHostAccessApproved = true;
         await db.SaveChangesAsync();
 
         var assignmentPolicy = new AppRunnerAssignmentPolicy(
@@ -210,11 +205,8 @@ public class AppDeploymentTargetResolverTests
             AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
             AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
 
-        await assignmentPolicy.AssignAsync(app, runner.Id, userId);
-
-        Assert.That(
-            (await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
-            Is.EqualTo(runner.Id));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(
+            async () => await assignmentPolicy.AssignAsync(app, runner.Id, userId));
     }
 
     [Test]

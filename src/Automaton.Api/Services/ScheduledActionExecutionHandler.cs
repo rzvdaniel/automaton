@@ -1,7 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
-using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Messaging.Events;
 using Automaton.Core.Models;
@@ -14,7 +13,6 @@ public sealed class ScheduledActionExecutionHandler(
     ApplicationDbContext db,
     ActionScheduleService schedules,
     AppActionExecutionService executions,
-    ITrustedInfrastructureActionDeploymentService infrastructureActions,
     ILogger<ScheduledActionExecutionHandler> logger)
 {
     public async Task HandleAsync(ScheduledActionExecutionRequestedEvent message, CancellationToken cancellationToken)
@@ -147,10 +145,7 @@ public sealed class ScheduledActionExecutionHandler(
                 input.Clone(),
                 occurrenceId,
                 cancellationToken),
-            ActionExecutionScopes.InfrastructureRunner => DispatchInfrastructureAsync(
-                schedule, occurrenceId, input, cancellationToken),
-            ActionExecutionScopes.Worker => throw new InvalidOperationException(
-                "No trusted Worker scheduled Action handler is registered for this Action."),
+            ActionExecutionScopes.Worker => throw new InvalidOperationException("Worker scheduled Actions are not dispatched by the Runner handler."),
             _ => throw new InvalidOperationException("Scheduled Action execution scope is invalid.")
         };
 
@@ -165,49 +160,6 @@ public sealed class ScheduledActionExecutionHandler(
                 .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Failed)
                 .SetProperty(x => x.FailureSummary, Limit(exception.Message, 2000))
                 .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
-    }
-
-    private static bool HasFreshHeartbeat(Runner runner)
-        => runner.LastHeartbeatAtUtc.HasValue && runner.LastHeartbeatAtUtc >= DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-
-    private async Task<AppModuleExecution> DispatchInfrastructureAsync(
-        ActionSchedule schedule,
-        Guid occurrenceId,
-        JsonElement input,
-        CancellationToken cancellationToken)
-    {
-        if (!input.TryGetProperty("runnerHostId", out var hostIdElement)
-            || !Guid.TryParse(hostIdElement.GetString(), out var hostId))
-            throw new InvalidOperationException("InfrastructureRunner schedules require a server-managed runnerHostId.");
-        var host = await db.RunnerHosts.Include(x => x.InfrastructureRunner)
-            .SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken)
-            ?? throw new KeyNotFoundException("Runner Host not found.");
-        var runner = host.InfrastructureRunner
-            ?? throw new InvalidOperationException("Runner Host has no Infrastructure Runner.");
-        if (host.Status != RunnerHostStatuses.Active
-            || host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
-            || !host.ValidatedAtUtc.HasValue
-            || !host.ApprovedAtUtc.HasValue
-            || !string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
-            || !HasFreshHeartbeat(runner))
-            throw new InvalidOperationException("Infrastructure Runner is not active, approved, ready, and online.");
-        var module = await infrastructureActions.EnsureDeployedAsync(
-            runner.Id, schedule.ActionKey, cancellationToken);
-        var deploymentTargetId = await db.AppDeploymentTargets
-            .Where(target =>
-                target.WebAppId == schedule.ApplicationId &&
-                target.IsDefault)
-            .Select(target => target.Id)
-            .SingleAsync(cancellationToken);
-        return await executions.ExecuteScheduledOnRunnerAsync(
-            schedule.ApplicationId,
-            deploymentTargetId,
-            schedule.ActionKey,
-            input.Clone(),
-            occurrenceId,
-            runner,
-            module,
-            cancellationToken);
     }
 
     private static string Limit(string value, int length) => value.Length <= length ? value : value[..length];

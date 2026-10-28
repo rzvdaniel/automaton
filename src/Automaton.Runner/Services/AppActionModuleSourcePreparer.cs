@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -30,9 +29,6 @@ internal static class AppActionModuleSourcePreparer
         AppActionManifestParser.ValidateKey(request.ActionKey);
         if (request.SourceZip.Length == 0 || request.SourceZip.Length > 20 * 1024 * 1024)
             throw new InvalidOperationException("Action source package must be between 1 byte and 20 MB.");
-        var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
-        if (request.SystemInfrastructure && purpose != RunnerPurposes.Infrastructure)
-            throw new UnauthorizedAccessException("System infrastructure Actions may only be prepared on Infrastructure Runners.");
     }
 
     private static string CreateTemporaryRoot()
@@ -78,7 +74,7 @@ internal static class AppActionModuleSourcePreparer
     {
         var manifestPath = Path.Combine(root, "action.yaml");
         if (!File.Exists(manifestPath)) throw new InvalidOperationException("Action source package is missing action.yaml.");
-        var manifest = AppActionManifestParser.ParseFile(manifestPath, request.ActionKey, request.SystemInfrastructure);
+        var manifest = AppActionManifestParser.ParseFile(manifestPath, request.ActionKey);
         var hash = AppActionSourceFiles.ComputeContentHash(root);
         if (!string.Equals(hash, request.ExpectedContentHash, StringComparison.Ordinal))
             throw new InvalidOperationException("Action source package hash did not match the expected hash.");

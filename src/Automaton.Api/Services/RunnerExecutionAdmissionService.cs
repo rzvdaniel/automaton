@@ -1,5 +1,4 @@
 using Automaton.Api.Data;
-using Automaton.Api.Enums;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,23 +15,8 @@ public sealed class RunnerExecutionAdmissionService(
             : authorization.GetAccessibleRunnersQuery();
         var runner = await query.AsNoTracking().SingleOrDefaultAsync(r => r.Id == runnerId, token)
             ?? throw new UnauthorizedAccessException("Runner is not accessible.");
-        if (RunnerPurposes.Normalize(runner.Purpose) != RunnerPurposes.Managed ||
-            RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement)
+        if (!RunnerProfileRules.IsValid(runner.Purpose, runner.ApplicationProfile))
             throw new UnauthorizedAccessException("Only Machine Management Runners are supported.");
-        if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
-            throw new UnauthorizedAccessException("Raw workflow and custom-step execution is disabled on Machine Management Runners.");
-        if (RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose)
-            && !await IsAdministratorAsync(db, actor, token))
-            throw new UnauthorizedAccessException("Only administrators may execute on Infrastructure Runners.");
-        if (!RunnerCapabilities.Includes(runner.CapabilitiesJson, RunnerCapabilities.WorkflowExecution, runner.Purpose))
-            throw new InvalidOperationException("Runner does not support workflow execution.");
-        if (!runner.LastHeartbeatAtUtc.HasValue
-            || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)
-            throw new InvalidOperationException("Runner is offline.");
-        return actor;
+        throw new UnauthorizedAccessException("Raw workflow and custom-step execution is disabled on Machine Management Runners.");
     }
-
-    internal static Task<bool> IsAdministratorAsync(ApplicationDbContext db, Guid actor, CancellationToken token)
-        => db.UserRoles.Join(db.Roles, u => u.RoleId, r => r.Id, (u, r) => new { u.UserId, r.Name })
-            .AnyAsync(r => r.UserId == actor && (r.Name == UserRole.Administrator || r.Name == UserRole.SystemAdministrator), token);
 }

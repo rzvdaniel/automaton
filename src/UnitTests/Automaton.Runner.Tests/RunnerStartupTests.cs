@@ -102,7 +102,6 @@ public sealed class RunnerStartupTests
                 Content = JsonContent.Create(new RunnerEnrollmentExchangeResponse
                 {
                     RunnerId = Guid.NewGuid(),
-                    RunnerHostId = Guid.NewGuid(),
                     RunnerName = "managed-test-runner",
                     ApiKey = "ak_test-enrolled-credential",
                     Purpose = "Managed",

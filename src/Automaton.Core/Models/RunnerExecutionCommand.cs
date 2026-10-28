@@ -80,7 +80,6 @@ public sealed record RunnerFileTransferCommand(
     bool Clean = false,
     Guid? DeploymentOperationId = null,
     Guid? ExecutionAttemptId = null,
-    bool SystemInfrastructure = false,
     ActionContainerPolicy? ActionContainerPolicy = null,
     int? MinimumFreeDiskMb = null);
 

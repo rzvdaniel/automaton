@@ -119,7 +119,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         Directory.CreateDirectory(attempt.StagingRoot);
         RunnerDeploymentWorkspace.ExtractPackageSafely(request.PackagePath, attempt.StagingRoot);
         var manifest = RunnerDeploymentWorkspace.LoadManifest(attempt.StagingRoot, attempt.AppId);
-        RunnerDeploymentWorkspace.ValidateIncomingActions(attempt.StagingRoot, request.SystemInfrastructure);
+        RunnerDeploymentWorkspace.ValidateIncomingActions(attempt.StagingRoot);
         return manifest;
     }
 
@@ -215,7 +215,7 @@ internal sealed class RunnerApplicationDeploymentExecutor(
         CancellationToken cancellationToken)
     {
         var actions = await actionDeploymentService.PrepareAllAsync(
-            attempt.AppId, attempt.TargetId, request.SystemInfrastructure, cancellationToken,
+            attempt.AppId, attempt.TargetId, cancellationToken,
             request.ActionContainerPolicy);
         attempt.Logs.AddRange(actions.Select(result => $"Action {result.ActionKey}: {result.Status}."));
         return actions;

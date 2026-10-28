@@ -39,36 +39,6 @@ public sealed class AiGuidanceSeedExportTests
     }
 
     [Test]
-    public async Task SeedMissingDefaultsAsync_SeedsPrivilegedHostGuidance_WithExpectedMetadataAndContent()
-    {
-        await using var dbContext = CreateDbContext();
-        var service = CreateRuntimeService(dbContext);
-
-        await service.SeedMissingDefaultsAsync();
-
-        var document = await dbContext.AiGuidanceDocuments
-            .SingleAsync(item => item.Key == "automaton-privileged-host-apps");
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(document.Title, Is.EqualTo("Automaton Privileged Host Apps"));
-            Assert.That(document.Surface, Is.EqualTo("shared"));
-            Assert.That(document.DocumentKind, Is.EqualTo(AiGuidanceDocumentKinds.Guidance));
-            Assert.That(document.RequiredByDefault, Is.False);
-            Assert.That(document.IsModelLoadable, Is.True);
-            Assert.That(document.OutputPath, Is.Null);
-            Assert.That(document.ContentMarkdown, Does.Contain("/host"));
-            Assert.That(document.ContentMarkdown, Does.Contain("/var/run/docker.sock"));
-            Assert.That(document.ContentMarkdown, Does.Contain("shell=False"));
-            Assert.That(document.ContentMarkdown, Does.Contain("Standard Runner"));
-            Assert.That(document.ContentMarkdown, Does.Contain("automatic fallback"));
-            Assert.That(document.ContentMarkdown, Does.Contain("automaton target approve <environment>"));
-            Assert.That(document.ContentMarkdown, Does.Contain("automaton target revoke <environment>"));
-            Assert.That(document.ContentMarkdown, Does.Contain("explicit user approval"));
-        });
-    }
-
-    [Test]
     public async Task BuildExportPackAsync_ExportsExactlyTheTwoCliProjectFiles()
     {
         await using var dbContext = CreateDbContext();

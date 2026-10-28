@@ -10,8 +10,8 @@ public sealed class MachineManagementRunnerIdentityTests
 {
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, true)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard, true)]
-    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.MachineManagement, true)]
+    [TestCase(RunnerPurposes.Managed, "Standard", true)]
+    [TestCase("Infrastructure", RunnerApplicationProfiles.MachineManagement, true)]
     public async Task ExecutionIdentity_RequiresEnrolledMachineManagementKey(
         string purpose, string profile, bool useEnrolledKey)
     {

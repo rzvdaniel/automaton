@@ -7,7 +7,5 @@ public enum ApiKeySource
 {
     Manual = 1,
     CliAuthorization = 2,
-    RunnerProvisioning = 3,
-    InfrastructureRunnerEnrollment = 4,
-    InfrastructureRunnerRegistration = 5
+    RunnerProvisioning = 3
 }

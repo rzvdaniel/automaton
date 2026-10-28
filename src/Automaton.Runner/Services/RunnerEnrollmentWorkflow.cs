@@ -37,10 +37,7 @@ internal sealed class RunnerEnrollmentWorkflow
         }
 
         var runnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
-        if (string.IsNullOrWhiteSpace(runnerName))
-        {
-            runnerName = $"infrastructure-{Environment.MachineName}";
-        }
+        if (string.IsNullOrWhiteSpace(runnerName)) runnerName = $"machine-{Environment.MachineName}";
 
         var request = new RunnerEnrollmentExchangeRequest
         {
@@ -79,18 +76,16 @@ internal sealed class RunnerEnrollmentWorkflow
                 Purpose = enrollment.Purpose,
                 ApplicationProfile = enrollment.ApplicationProfile,
                 Capabilities = enrollment.Capabilities,
-                RunnerHostId = enrollment.RunnerHostId,
                 InstallationId = enrollment.InstallationId
             });
 
-            ApplyInstallationProfile(enrollment.Purpose, enrollment.Capabilities, enrollment.RunnerHostId);
+            ApplyInstallationProfile(enrollment.Purpose, enrollment.Capabilities);
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", enrollment.RunnerId.ToString());
             Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", enrollment.RunnerName);
             Environment.SetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN", null);
 
             logger.Information(
-                "Runner enrollment completed for host {RunnerHostId} as runner {RunnerId}",
-                enrollment.RunnerHostId,
+                "Runner enrollment completed as runner {RunnerId}",
                 enrollment.RunnerId);
             WriteLine($"✅ Runner enrolled successfully: {enrollment.RunnerName}");
             return true;
@@ -102,50 +97,6 @@ internal sealed class RunnerEnrollmentWorkflow
         }
     }
 
-    public async Task<bool> RegisterInfrastructureRunnerAsync(string enrollmentApiKey)
-    {
-        var request = await InfrastructureRunnerRegistrationRequestFactory.CreateAsync(storageService);
-
-        using var httpRequest = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{configService.BaseUrl}/api/infrastructure-runners/register")
-        {
-            Content = JsonContent.Create(request)
-        };
-        httpRequest.Headers.Add("X-API-Key", enrollmentApiKey);
-
-        using var response = await httpClient.SendAsync(httpRequest);
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.Warning("Infrastructure Runner self-registration failed with status {StatusCode}", response.StatusCode);
-            return false;
-        }
-
-        var registration = await response.Content.ReadFromJsonAsync<InfrastructureRunnerRegistrationResponse>();
-        if (registration == null || string.IsNullOrWhiteSpace(registration.ApiKey))
-        {
-            logger.Warning("Infrastructure Runner self-registration response did not include a permanent credential");
-            return false;
-        }
-
-        await apiKeyAuthService.SetEnrolledApiKeyAsync(registration.ApiKey);
-        await storageService.SaveRunnerConfigAsync(registration.RunnerId.ToString(), registration.RunnerName);
-        await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
-        {
-            Purpose = registration.Purpose,
-            Capabilities = registration.Capabilities,
-            RunnerHostId = registration.RunnerHostId,
-            InstallationId = registration.InstallationId
-        });
-
-        ApplyInstallationProfile(registration.Purpose, registration.Capabilities, registration.RunnerHostId);
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", registration.RunnerId.ToString());
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", registration.RunnerName);
-        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", null);
-        WriteLine($"✅ Infrastructure Runner self-registration completed: {registration.RunnerName}");
-        return true;
-    }
-
     public async Task ApplyInstallationProfileAsync()
     {
         var profile = await storageService.LoadInstallationProfileAsync();
@@ -154,7 +105,7 @@ internal sealed class RunnerEnrollmentWorkflow
             return;
         }
 
-        var capabilities = RunnerCapabilities.ForInstallationProfile(profile.Capabilities, profile.Purpose);
+        var capabilities = RunnerCapabilities.Normalize(profile.Capabilities, profile.Purpose);
         if (!(profile.Capabilities ?? Array.Empty<string>())
             .SequenceEqual(capabilities, StringComparer.OrdinalIgnoreCase))
         {
@@ -162,7 +113,7 @@ internal sealed class RunnerEnrollmentWorkflow
             await storageService.SaveInstallationProfileAsync(profile);
         }
 
-        ApplyInstallationProfile(profile.Purpose, capabilities, profile.RunnerHostId);
+        ApplyInstallationProfile(profile.Purpose, capabilities);
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE", profile.ApplicationProfile);
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_INSTALLATION_ID", profile.InstallationId);
 
@@ -174,18 +125,12 @@ internal sealed class RunnerEnrollmentWorkflow
                 : null);
     }
 
-    private static void ApplyInstallationProfile(
-        string purpose,
-        IReadOnlyList<string> capabilities,
-        Guid? runnerHostId)
+    private static void ApplyInstallationProfile(string purpose, IReadOnlyList<string> capabilities)
     {
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
         Environment.SetEnvironmentVariable(
             "AUTOMATON_RUNNER_CAPABILITIES",
-            string.Join(',', RunnerCapabilities.ForInstallationProfile(
-                capabilities,
-                purpose)));
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
+            string.Join(',', RunnerCapabilities.Normalize(capabilities, purpose)));
     }
 
 }

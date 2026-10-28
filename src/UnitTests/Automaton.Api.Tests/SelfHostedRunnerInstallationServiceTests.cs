@@ -44,8 +44,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         });
     }
 
-    [TestCase(RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    [TestCase("Standard")]
+    [TestCase("PrivilegedHost")]
     public async Task Create_RejectsRetiredRunnerProfiles(string profile)
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
@@ -205,8 +205,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         AssertEnrollmentResult(result);
     }
 
-    [TestCase(RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    [TestCase("Standard")]
+    [TestCase("PrivilegedHost")]
     public async Task Exchange_RejectsPendingLegacyEnrollment(string profile)
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();

@@ -12,8 +12,7 @@ export function isValidSelfHostedRunnerName(runnerName: string): boolean {
 }
 
 export function requiresHostAccessAcknowledgement(profile: RunnerApplicationProfile): boolean {
-  return profile === RunnerApplicationProfiles.PrivilegedHost ||
-    profile === RunnerApplicationProfiles.MachineManagement
+  return profile === RunnerApplicationProfiles.MachineManagement
 }
 
 export function canCreateSelfHostedInstallation(

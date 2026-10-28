@@ -29,12 +29,12 @@ public sealed class HostContainerExecutionTests
         Assert.That(invoked, Is.False);
     }
 
-    [TestCase(RunnerCapabilities.HostContainerExecution)]
+    [TestCase("HostContainerExecution")]
     [TestCase(RunnerCapabilities.ManagedContainerExecution)]
     public async Task InfrastructureIdentityCannotExecuteMachineOrLegacyContainerWork(string capabilities)
     {
         using var machine = MachineContainerTestEnvironment.Create();
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
         Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", capabilities);
         var invoked = false;
         var service = new HostContainerExecutionService((_, _, _) =>
@@ -60,8 +60,8 @@ public sealed class HostContainerExecutionTests
         var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
         try
         {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Infrastructure);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", RunnerCapabilities.HostExecution);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", "HostExecution");
             var result = await service.ExecuteAsync(new HostContainerExecutionRequest
             {
                 Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),

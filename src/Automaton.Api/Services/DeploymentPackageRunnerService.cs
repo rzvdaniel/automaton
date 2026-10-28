@@ -49,8 +49,6 @@ public sealed class DeploymentPackageRunnerService(
             Clean: clean,
             DeploymentOperationId: deploymentOperationId,
             ExecutionAttemptId: executionAttemptId,
-            SystemInfrastructure: InfrastructureAppTrust.IsTrustedApp(appId)
-                && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal),
             ActionContainerPolicy: actionResources?.ToActionContainerPolicy());
 
         var (_, result) = await transfers.ExecuteAsync(operationId, runner.Id, ownerId,

@@ -218,10 +218,10 @@ namespace Automaton.Api.Services
 
         internal static (int Total, int Online) GetAppOwnerRunnerMetrics(IEnumerable<RunnerDetails> runners)
         {
-            // Keep Dashboard counts aligned with the app-owner Runners surface, which hides
-            // Infrastructure Runners because they are platform provisioning infrastructure.
             var appOwnerRunners = runners
-                .Where(runner => !RunnerProfileRules.IsInfrastructure(runner.Purpose))
+                .Where(runner => runner.Purpose == RunnerPurposes.Managed &&
+                    runner.ApplicationProfile == RunnerApplicationProfiles.MachineManagement &&
+                    !runner.IsHostedRunner)
                 .ToList();
 
             return (

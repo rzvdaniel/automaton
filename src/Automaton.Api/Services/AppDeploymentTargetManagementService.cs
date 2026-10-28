@@ -80,10 +80,6 @@ public sealed partial class AppDeploymentTargetManagementService(
             CreatedAt = now,
             UpdatedAt = now
         };
-        if (runner != null)
-        {
-            PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
-        }
         target.SynchronizeDefaultConstraint();
         dbContext.AppDeploymentTargets.Add(target);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -148,39 +144,6 @@ public sealed partial class AppDeploymentTargetManagementService(
         return await GetAsync(appId, targetId, userId, cancellationToken);
     }
 
-    public async Task<AppDeploymentTargetSummary> SetPrivilegedHostApprovalAsync(
-        Guid appId,
-        Guid targetId,
-        Guid approverUserId,
-        bool approved,
-        CancellationToken cancellationToken = default)
-    {
-        var target = await GetTrackedTargetAsync(appId, targetId, cancellationToken);
-        if (approved)
-        {
-            if (!target.PrivilegedHostAccessApproved)
-            {
-                target.PrivilegedHostAccessApproved = true;
-                target.PrivilegedHostAccessApprovedAtUtc = DateTimeOffset.UtcNow;
-                target.PrivilegedHostAccessApprovedByUserId = approverUserId;
-                target.UpdatedAt = DateTimeOffset.UtcNow;
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-        }
-        else if (target.PrivilegedHostAccessApproved ||
-                 target.PrivilegedHostAccessApprovedAtUtc.HasValue ||
-                 target.PrivilegedHostAccessApprovedByUserId.HasValue)
-        {
-            target.PrivilegedHostAccessApproved = false;
-            target.PrivilegedHostAccessApprovedAtUtc = null;
-            target.PrivilegedHostAccessApprovedByUserId = null;
-            target.UpdatedAt = DateTimeOffset.UtcNow;
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        return await ToSummaryAsync(target, cancellationToken);
-    }
-
     public async Task<AppDeploymentTargetSummary> AssignRunnerAsync(
         Guid appId,
         Guid targetId,
@@ -205,7 +168,6 @@ public sealed partial class AppDeploymentTargetManagementService(
                     app, request.RunnerId.Value, userId, cancellationToken);
                 if (target.ExecutionRunnerId != runner.Id)
                 {
-                    PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
                 }
             }
             if (target.ExecutionRunnerId == runner?.Id)
@@ -515,9 +477,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                         StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrWhiteSpace(target.ExecutionRunner.ConnectionId)),
             PublishedAppHostNames.BuildPrivateTargetPath(target.WebAppId, target.Id, target.IsDefault),
-            target.PrivilegedHostAccessApproved,
-            target.PrivilegedHostAccessApprovedAtUtc,
-            target.PrivilegedHostAccessApprovedByUserId);
+            LastDeploymentError: null);
 
     private static bool IsLegacyDefaultTarget(AppDeploymentTarget target) =>
         string.Equals(target.Name, "default", StringComparison.OrdinalIgnoreCase) ||

@@ -1,14 +1,9 @@
 import type { AppDeploymentTarget } from '../types/apps.types'
-import { RunnerApplicationProfiles } from '@/features/runners/types/runners.types'
 
 export function getDeployTargetOptionLabel(target: AppDeploymentTarget, viewingTargetId?: string): string {
   const destination = target.runner?.isHostedRunner
-    ? 'Automaton Hosted'
-    : target.runner?.applicationProfile === RunnerApplicationProfiles.PrivilegedHost
-      ? 'Self-hosted · Privileged Host'
-      : target.runner?.applicationProfile === RunnerApplicationProfiles.MachineManagement
-        ? 'Self-hosted · Machine Management'
-      : 'Self-hosted · Standard'
+    ? 'Retired hosted destination'
+    : 'Self-hosted · Machine Management'
   const viewing = target.id === viewingTargetId ? ' · Viewing' : ''
   return `${target.name} · ${target.isDefault ? 'Live' : 'Additional'} · ${destination} · ${target.status}${viewing}`
 }

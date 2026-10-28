@@ -39,27 +39,6 @@ public sealed class ApiKeyAuditTests
         Assert.That(auditEvent.MetadataJson, Does.Contain("[REDACTED]"));
     }
 
-    [Test]
-    public async Task RevokeInfrastructureRunnerEnrollmentKey_DeactivatesKeyWithoutDeletingHistory()
-    {
-        using var dbContext = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var service = CreateAuditedService(dbContext, userId);
-
-        var (_, entity) = await service.CreateApiKeyAsync(
-            userId,
-            "Infrastructure enrollment",
-            ApiKeyScope.InfrastructureRunnerEnroll,
-            maximumUses: 1);
-
-        Assert.That(await service.RevokeInfrastructureRunnerEnrollmentKeyAsync(entity.Id, userId), Is.True);
-
-        var stored = await dbContext.ApiKeys.SingleAsync(x => x.Id == entity.Id);
-        Assert.That(stored.IsActive, Is.False);
-        Assert.That(await dbContext.ApiKeys.CountAsync(), Is.EqualTo(1));
-        Assert.That(await dbContext.AuditEvents.AnyAsync(x => x.EntityId == entity.Id && x.Action == "Disabled"), Is.True);
-    }
-
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

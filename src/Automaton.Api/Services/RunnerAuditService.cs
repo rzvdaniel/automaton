@@ -13,7 +13,6 @@ public sealed class RunnerAuditService(IAuditEventService auditEventService)
     public Task WriteCreatedAsync(
         Runner runner,
         Guid actorUserId,
-        Guid? runnerHostId,
         int changes,
         CancellationToken cancellationToken)
         => auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -32,7 +31,6 @@ public sealed class RunnerAuditService(IAuditEventService auditEventService)
                 runner.MachineName,
                 runner.IpAddress,
                 runner.Purpose,
-                RunnerHostId = runnerHostId,
                 Changes = changes
             }
         }, cancellationToken);

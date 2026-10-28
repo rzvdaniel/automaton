@@ -132,10 +132,6 @@ internal static class SchedulingModelConfiguration
                 entity.Property(e => e.LastCleanupError).HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
-                entity.Property(e => e.PrivilegedHostAccessApproved).IsRequired().HasDefaultValue(false);
-                entity.Property(e => e.PrivilegedHostAccessApprovedAtUtc);
-                entity.Property(e => e.PrivilegedHostAccessApprovedByUserId);
-
                 entity.HasIndex(e => new { e.WebAppId, e.Slug }).IsUnique();
                 entity.HasIndex(e => new { e.WebAppId, e.DefaultConstraintKey }).IsUnique();
                 entity.HasIndex(e => e.ExecutionRunnerId);

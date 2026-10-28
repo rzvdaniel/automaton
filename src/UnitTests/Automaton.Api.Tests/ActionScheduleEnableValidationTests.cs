@@ -260,7 +260,7 @@ public sealed class ActionScheduleEnableValidationTests
                 User = user,
                 Schedule = schedule,
                 Resolver = resolver,
-                Service = new ActionScheduleService(db, resolver, new StubTrustedValidator(), new StubAudit())
+                Service = new ActionScheduleService(db, resolver, new StubAudit())
             };
         }
 
@@ -284,17 +284,11 @@ public sealed class ActionScheduleEnableValidationTests
             }
         };
 
-        public Task<AppActionManifest> ResolveAsync(Guid appId, string actionKey, Guid userId, bool system, CancellationToken cancellationToken)
+        public Task<AppActionManifest> ResolveAsync(Guid appId, string actionKey, Guid userId, CancellationToken cancellationToken)
         {
             Calls++;
             return Error == null ? Task.FromResult(Manifest) : Task.FromException<AppActionManifest>(Error);
         }
-    }
-
-    private sealed class StubTrustedValidator : ITrustedSystemActionScheduleDispatchValidator
-    {
-        public Task<AppActionManifest> ValidateAsync(ActionSchedule schedule, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("System validation is not expected in these user-schedule tests.");
     }
 
     private sealed class StubAudit : IAuditEventService

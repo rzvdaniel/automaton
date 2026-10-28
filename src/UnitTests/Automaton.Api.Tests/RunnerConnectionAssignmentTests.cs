@@ -33,7 +33,7 @@ public sealed class RunnerConnectionAssignmentTests
             new Runner
             {
                 Id = runnerId, Name = "current", Purpose = RunnerPurposes.Managed,
-                ApplicationProfile = RunnerApplicationProfiles.Standard,
+                ApplicationProfile = "Standard",
                 CapabilitiesJson = RunnerCapabilities.Serialize(
                     [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.ManagedContainerExecution],
                     RunnerPurposes.Managed)
@@ -78,7 +78,7 @@ public sealed class RunnerConnectionAssignmentTests
         Assert.That(operation.FinishedAt, Is.Null);
     }
 
-    [TestCase(RunnerApplicationProfiles.Standard)]
+    [TestCase("Standard")]
     [TestCase(RunnerApplicationProfiles.MachineManagement)]
     public async Task Reconnect_DoesNotAssignUnassignedApp(string profile)
     {
@@ -112,7 +112,7 @@ public sealed class RunnerConnectionAssignmentTests
         Assert.That(persisted.GenericRuntimeDeployed, Is.True);
     }
 
-    [TestCase(RunnerApplicationProfiles.Standard)]
+    [TestCase("Standard")]
     [TestCase(RunnerApplicationProfiles.MachineManagement)]
     public async Task Reconnect_PreservesAssignedRuntimeAndUpdatesPresence(string profile)
     {

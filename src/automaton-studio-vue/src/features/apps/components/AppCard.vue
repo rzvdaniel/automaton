@@ -85,12 +85,8 @@ const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveSta
 const liveDestinationLabel = computed(() => {
   const environment = liveEnvironment.value
   if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
-  if (environment.isHostedRunner) return 'Automaton Hosted'
-  return environment.applicationProfile === 'PrivilegedHost'
-    ? 'Self-hosted · Privileged Host'
-    : environment.applicationProfile === 'MachineManagement'
-      ? 'Self-hosted · Machine Management'
-    : 'Self-hosted · Standard'
+  if (environment.isHostedRunner) return 'Retired hosted destination'
+  return 'Self-hosted · Machine Management'
 })
 
 const canOpenPrivateApp = computed(() => props.app.runtime.genericRuntimeDeployed)

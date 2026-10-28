@@ -8,13 +8,13 @@ namespace Automaton.Api.Tests;
 public class DashboardStatsServiceTests
 {
     [Test]
-    public void GetAppOwnerRunnerMetrics_ExcludesInfrastructureFromBothCounts()
+    public void GetAppOwnerRunnerMetrics_ExcludesUnsupportedProfilesFromBothCounts()
     {
         var metrics = DashboardStatsService.GetAppOwnerRunnerMetrics(
         [
-            CreateRunner(RunnerPurposes.Infrastructure, RunnerStatus.Online),
-            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Online),
-            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Offline)
+            CreateRunner("Infrastructure", RunnerStatus.Online),
+            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Online, RunnerApplicationProfiles.MachineManagement),
+            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Offline, RunnerApplicationProfiles.MachineManagement)
         ]);
 
         Assert.Multiple(() =>
@@ -25,25 +25,30 @@ public class DashboardStatsServiceTests
     }
 
     [Test]
-    public void GetAppOwnerRunnerMetrics_IncludesHostedAndSelfHostedRunners()
+    public void GetAppOwnerRunnerMetrics_ExcludesRetiredHostedRunners()
     {
         var metrics = DashboardStatsService.GetAppOwnerRunnerMetrics(
         [
-            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Online, isHostedRunner: true),
-            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Offline, isHostedRunner: false)
+            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Online, RunnerApplicationProfiles.MachineManagement, isHostedRunner: true),
+            CreateRunner(RunnerPurposes.Managed, RunnerStatus.Offline, RunnerApplicationProfiles.MachineManagement)
         ]);
 
         Assert.Multiple(() =>
         {
-            Assert.That(metrics.Total, Is.EqualTo(2));
-            Assert.That(metrics.Online, Is.EqualTo(1));
+            Assert.That(metrics.Total, Is.EqualTo(1));
+            Assert.That(metrics.Online, Is.EqualTo(0));
         });
     }
 
-    private static RunnerDetails CreateRunner(string purpose, RunnerStatus status, bool isHostedRunner = false)
+    private static RunnerDetails CreateRunner(
+        string purpose,
+        RunnerStatus status,
+        string? profile = null,
+        bool isHostedRunner = false)
         => new()
         {
             Purpose = purpose,
+            ApplicationProfile = profile,
             Status = status,
             IsHostedRunner = isHostedRunner
         };

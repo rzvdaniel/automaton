@@ -31,10 +31,7 @@ public class RunnerDetails
     public string Purpose { get; set; } = RunnerPurposes.Managed;
     public string? ApplicationProfile { get; set; }
     public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
-    public Guid? RunnerHostId { get; set; }
     public string? InstallationId { get; set; }
-    public bool IsInfrastructureRunner => string.Equals(Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase);
-    public bool IsPrivilegedHostRunner => RunnerProfileRules.IsPrivilegedHost(Purpose, ApplicationProfile);
     public bool CanExecuteApplications => RunnerProfileRules.CanExecuteApplications(Purpose, ApplicationProfile, Capabilities);
 
     // Project context

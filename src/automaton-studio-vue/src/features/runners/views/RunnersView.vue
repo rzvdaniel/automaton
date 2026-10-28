@@ -118,23 +118,16 @@ function getStatusColor(status: RunnerStatus): string {
 
 function getRunnerSourceLabel(runner: Runner): string {
   switch (classifyRunner(runner)) {
-    case 'automaton-hosted':
-      return 'Automaton-hosted'
-    case 'self-hosted-privileged':
-      return 'Self-hosted · Privileged Host'
-    case 'self-hosted-machine-management':
+    case 'machine-management':
       return 'Self-hosted · Machine Management'
     default:
-      return 'Self-hosted · Standard'
+      return 'Unsupported Runner profile'
   }
 }
 
 function getRunnerSourceSeverity(runner: Runner): 'contrast' | 'warn' | 'info' {
   switch (classifyRunner(runner)) {
-    case 'automaton-hosted':
-      return 'contrast'
-    case 'self-hosted-privileged':
-    case 'self-hosted-machine-management':
+    case 'machine-management':
       return 'warn'
     default:
       return 'info'
@@ -264,11 +257,6 @@ onUnmounted(() => {
         />
       </div>
     </div>
-
-    <Message severity="warn" :closable="false" class="mb-4">
-      <strong>Experimental Infrastructure:</strong> hosted runners and backend deployments are
-      still evolving. Unexpected disconnects or reconnect delays may occur during redeployments.
-    </Message>
 
     <!-- Stats Cards -->
     <div class="grid mb-5">

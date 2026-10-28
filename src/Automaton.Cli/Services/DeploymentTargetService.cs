@@ -175,38 +175,6 @@ public sealed class DeploymentTargetService(ConfigService config)
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
     }
 
-    public async Task<DeploymentTargetInfo> ApprovePrivilegedHostAccessAsync(
-        string directory,
-        string slug,
-        string? environmentName = null,
-        CancellationToken cancellationToken = default)
-    {
-        var target = await ResolveAsync(directory, slug, environmentName, cancellationToken);
-        var (client, appId, _) = CreateClient(directory, environmentName);
-        using (client)
-        {
-            await client.ApproveDeploymentTargetPrivilegedHostAccessAsync(appId, target.Id, cancellationToken);
-        }
-
-        return await ResolveAsync(directory, slug, environmentName, cancellationToken);
-    }
-
-    public async Task<DeploymentTargetInfo> RevokePrivilegedHostAccessAsync(
-        string directory,
-        string slug,
-        string? environmentName = null,
-        CancellationToken cancellationToken = default)
-    {
-        var target = await ResolveAsync(directory, slug, environmentName, cancellationToken);
-        var (client, appId, _) = CreateClient(directory, environmentName);
-        using (client)
-        {
-            await client.RevokeDeploymentTargetPrivilegedHostAccessAsync(appId, target.Id, cancellationToken);
-        }
-
-        return await ResolveAsync(directory, slug, environmentName, cancellationToken);
-    }
-
     public async Task<DeploymentTargetInfo> ClearRunnerAsync(
         string directory,
         DeploymentTargetInfo target,

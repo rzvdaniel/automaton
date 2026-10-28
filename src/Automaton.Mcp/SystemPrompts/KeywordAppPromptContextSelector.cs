@@ -23,18 +23,8 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
             AddReference(references, "automaton-actions");
         }
 
-        if (ContainsAnyWord(normalized,
-                "privileged", "docker", "host", "system", "metrics") ||
-            ContainsAnyPhrase(normalized, "host information", "host monitoring", "host runner"))
-        {
-            AddReference(references, "automaton-privileged-host-apps");
-        }
-
         return references;
     }
-
-    private static bool ContainsAnyPhrase(string text, params string[] phrases) =>
-        phrases.Any(text.Contains);
 
     private static bool ContainsAnyWord(string text, params string[] words) =>
         words.Any(word => ContainsWord(text, word));

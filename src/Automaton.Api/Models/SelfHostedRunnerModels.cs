@@ -5,7 +5,7 @@ namespace Automaton.Api.Models;
 public sealed record CreateSelfHostedRunnerInstallationRequest
 {
     public string RunnerName { get; init; } = string.Empty;
-    public string ApplicationProfile { get; init; } = RunnerApplicationProfiles.Standard;
+    public string ApplicationProfile { get; init; } = RunnerApplicationProfiles.MachineManagement;
     public bool AcknowledgeHostAccess { get; init; }
 }
 

@@ -316,22 +316,6 @@ onMounted(() => {
           </Card>
         </div>
 
-        <div class="col-12 lg:col-6">
-          <Card class="detail-card detail-card--interactive h-full" @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })">
-            <template #title>Runners</template>
-            <template #content>
-              <div class="summary-card summary-card--compact">
-                <div class="summary-stat-row">
-                  <span class="summary-stat">{{ user.onlineRunnerCount.toLocaleString() }}</span>
-                  <span class="summary-stat-label">online</span>
-                </div>
-                <div class="summary-meta">{{ user.runnerCount.toLocaleString() }} total runners</div>
-                <div class="summary-detail">Heartbeat: {{ formatLastHeartbeat(user.lastRunnerHeartbeatAtUtc) }}</div>
-              </div>
-            </template>
-          </Card>
-        </div>
-
         <div v-if="hasAccountActions" class="col-12 lg:col-6">
           <Card class="detail-card h-full">
             <template #title>Actions</template>

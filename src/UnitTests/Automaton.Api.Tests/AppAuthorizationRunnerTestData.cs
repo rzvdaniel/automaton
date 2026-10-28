@@ -18,7 +18,7 @@ internal static class AppAuthorizationRunnerTestData
         Guid userId,
         string? appTags = null)
     {
-        SeedRunner(dbContext, runnerId, userId, "infrastructure-runner", RunnerPurposes.Infrastructure, isOnline: true);
+        SeedRunner(dbContext, runnerId, userId, "infrastructure-runner", "Infrastructure", isOnline: true);
         SetAppTags(dbContext, appTags);
     }
 

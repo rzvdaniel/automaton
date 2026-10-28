@@ -8,7 +8,6 @@ namespace Automaton.Api.Controllers;
 [ApiController]
 [Route("api/runner-enrollments")]
 public sealed class RunnerEnrollmentsController(
-    RunnerEnrollmentService runnerEnrollmentService,
     SelfHostedRunnerInstallationService selfHostedRunnerInstallationService) : ControllerBase
 {
     [HttpPost("exchange")]
@@ -19,8 +18,7 @@ public sealed class RunnerEnrollmentsController(
     {
         try
         {
-            var response = await runnerEnrollmentService.ExchangeAsync(request, cancellationToken);
-            response ??= await selfHostedRunnerInstallationService.ExchangeAsync(request, cancellationToken);
+            var response = await selfHostedRunnerInstallationService.ExchangeAsync(request, cancellationToken);
             return response == null
                 ? Unauthorized(new { message = "The enrollment token is invalid, expired, or already used." })
                 : Ok(response);

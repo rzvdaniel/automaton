@@ -128,7 +128,6 @@ internal static class ApiCoreOptionRegistration
         services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
         services.Configure<RunnerEnrollmentOptions>(applicationBuilder.Configuration.GetSection(RunnerEnrollmentOptions.SectionName));
         services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
-        services.Configure<InfrastructureRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(InfrastructureRunnerRabbitMqOptions.SectionName));
         services.Configure<HostedRunnerRabbitMqOptions>(applicationBuilder.Configuration.GetSection(HostedRunnerRabbitMqOptions.SectionName));
         services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
         services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
@@ -225,13 +224,6 @@ internal static class ApiAuthenticationRegistration
                     options.HeaderName = "X-API-Key";
                     options.QueryParameterName = "api_key";
                 })
-            .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
-                ApiKeyAuthenticationSchemeOptions.InfrastructureRunnerEnrollmentScheme,
-                options =>
-                {
-                    options.HeaderName = "X-API-Key";
-                    options.QueryParameterName = string.Empty;
-                })
             .AddGitHubOAuth(applicationBuilder.Configuration);
 
         // Define specific authorization policies for different access levels
@@ -259,8 +251,7 @@ internal static class ApiAuthorizationRegistration
               .RequireAssertion(context =>
               {
                   var scopeClaim = context.User.FindFirst("api_key_scope")?.Value;
-                  return !Enum.TryParse<Automaton.Core.Enums.ApiKeyScope>(scopeClaim, out var scope)
-                      || scope != Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll;
+                  return true;
               }));
 
             options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
@@ -271,11 +262,6 @@ internal static class ApiAuthorizationRegistration
             // Policy for anonymous endpoints (validation, etc.)
             options.AddPolicy("AllowAnonymous", policy =>
                 policy.RequireAssertion(_ => true));
-
-            options.AddPolicy("InfrastructureRunnerEnrollment", policy =>
-                policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.InfrastructureRunnerEnrollmentScheme)
-                    .RequireAuthenticatedUser()
-                    .RequireClaim("api_key_scope", Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll.ToString()));
 
             // Admin policy for users with Admin or SysAdmin roles
             options.AddPolicy("Administrators", policy =>
@@ -314,8 +300,6 @@ internal static class ApiMessagingRegistration
         services.AddSingleton<IEventPublisher, CapEventPublisher>();
         services.AddTransient<ScheduledActionExecutionRequestedCapSubscriber>();
         services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
-        services.AddScoped<TrustedInfrastructureActionDeploymentService>();
-        services.AddScoped<ITrustedInfrastructureActionDeploymentService>(sp => sp.GetRequiredService<TrustedInfrastructureActionDeploymentService>());
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
@@ -581,8 +565,6 @@ internal static class ApiAppExecutionRegistration
         services.AddScoped<IRunnerActionCommands>(sp => sp.GetRequiredService<AppActionRunnerGateway>());
         services.AddScoped<ActionScheduleService>();
         services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
-        services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
-        services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
         services.AddScoped<ScheduledActionExecutionHandler>();
         services.AddHostedService<AppModuleExecutionReconciliationService>();
         services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
@@ -604,16 +586,9 @@ internal static class ApiRunnerRegistration
         services.AddScoped<RunnerStorageTelemetryService>();
         services.AddScoped<RunnerStorageTelemetrySubmissionService>();
         services.Configure<MachineContainerResourceOptions>(applicationBuilder.Configuration.GetSection(MachineContainerResourceOptions.SectionName));
-        services.AddScoped<RunnerEnrollmentService>();
-        services.AddScoped<RunnerEnrollmentAdministrationService>();
-        services.AddScoped<InfrastructureRunnerEnrollmentExchangeService>();
         services.AddScoped<SelfHostedRunnerInstallationService>();
         services.AddScoped<SelfHostedRunnerEnrollmentExchangeService>();
-        services.AddScoped<InfrastructureRunnerRegistrationService>();
-        services.AddScoped<InfrastructureRunnerRabbitMqConfigurationService>();
         services.AddScoped<HostedRunnerBrokerProvisioner>();
-        services.AddScoped<InfrastructureRunnerHostApprovalService>();
-        services.AddScoped<AdminRunnersService>();
         services.AddScoped<FlowExecutionHistoryService>();
         services.AddScoped<FlowExecutionLogService>();
         services.AddScoped<RecentActivityService>();
@@ -706,8 +681,6 @@ internal static class ApiOperationsRegistration
         services.AddTransient<RunnerExecutionRequestedCapSubscriber>();
         services.AddScoped<RunnerConnectionLifecycleService>();
         services.AddScoped<AdminSubscriptionPlanOperationsService>();
-        services.AddScoped<InfrastructureWorkflowExecutionService>();
-        services.AddScoped<InfrastructureHostValidationResultService>();
         return services;
     }
 }

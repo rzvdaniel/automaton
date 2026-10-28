@@ -13,7 +13,7 @@ internal static class HostedRunnerMySqlSeedData
         db.Runners.Add(new Runner
         {
             Id = infrastructureRunnerId, Name = "test-infrastructure-runner", Status = "online",
-            Purpose = RunnerPurposes.Infrastructure
+            Purpose = "Infrastructure"
         });
         var host = new RunnerHost
         {

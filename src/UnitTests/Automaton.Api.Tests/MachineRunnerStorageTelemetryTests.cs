@@ -79,7 +79,7 @@ public sealed class MachineRunnerStorageTelemetryTests
         db.Runners.Add(new Runner
         {
             Id = Guid.NewGuid(), Name = "standard", Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.Standard, ApiKeyId = apiKey.Id
+            ApplicationProfile = "Standard", ApiKeyId = apiKey.Id
         });
         await db.SaveChangesAsync();
 

@@ -26,15 +26,10 @@ public sealed class AppActionDeploymentService
     public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(
         Guid appId,
         Guid deploymentTargetId,
-        bool allowPrivilegedCapabilities = false,
         CancellationToken cancellationToken = default,
         ActionContainerPolicy? containerPolicy = null)
     {
-        if (allowPrivilegedCapabilities && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")) != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
-            throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
-        var actions = AppActionManifestParser.Discover(
-            workspace.GetAppSourceRoot(appId, deploymentTargetId),
-            allowPrivilegedCapabilities);
+        var actions = AppActionManifestParser.Discover(workspace.GetAppSourceRoot(appId, deploymentTargetId));
         if (actions.Count > 0) EnsureMachineActionPreparationAvailable(
             workspace.GetAppSourceRoot(appId, deploymentTargetId), containerPolicy);
 
@@ -53,7 +48,7 @@ public sealed class AppActionDeploymentService
         if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
             != RunnerApplicationProfiles.MachineManagement)
             return;
-        if (AppActionManifestParser.Discover(sourceRoot, allowPrivilegedCapabilities: false).Count == 0) return;
+        if (AppActionManifestParser.Discover(sourceRoot).Count == 0) return;
         if (machineDependencyPreparer is null)
             throw new InvalidOperationException("Bounded Action dependency preparation is unavailable on this Machine Management Runner.");
         MachineActionDependencyPreparer.EnsurePolicy(policy);
@@ -73,7 +68,7 @@ public sealed class AppActionDeploymentService
                 var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, key);
                 var manifestPath = Path.Combine(current, "action.yaml");
                 if (!File.Exists(manifestPath)) continue;
-                var manifest = AppActionManifestParser.ParseFile(manifestPath, key, allowPrivilegedCapabilities: true);
+                var manifest = AppActionManifestParser.ParseFile(manifestPath, key);
                 actions.Add(new(key, manifest.Metadata.Name, manifest.Metadata.Description, manifest.Spec.Runtime,
                     manifest.Spec.Entrypoint, manifest.Spec.TimeoutSeconds, AppActionVersionStore.ReadCurrentHash(current),
                     manifest.Spec.Schedulable, manifest.Spec.AllowedExecutionScopes,
@@ -126,22 +121,6 @@ public sealed class AppActionDeploymentService
         string actionKey,
         string version)
         => versionStore.DeleteVersion(appId, deploymentTargetId, actionKey, version);
-
-    public Task<AppActionDeploymentResult> PrepareBundledInfrastructureAsync(
-        Guid runnerHostId,
-        string actionKey,
-        CancellationToken cancellationToken)
-    {
-        TrustedInfrastructureActions.EnsureAllowed(actionKey);
-        if (Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
-            != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
-            throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
-        var actionRoot = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure", "actions", actionKey);
-        var manifestPath = Path.Combine(actionRoot, "action.yaml");
-        var manifest = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
-        return PrepareAsync(InfrastructureAppTrust.PlatformAppId, runnerHostId,
-            new DiscoveredAppAction(actionKey, actionRoot, manifestPath, manifest), cancellationToken);
-    }
 
     private async Task<AppActionDeploymentResult> PrepareAsync(
         Guid appId,

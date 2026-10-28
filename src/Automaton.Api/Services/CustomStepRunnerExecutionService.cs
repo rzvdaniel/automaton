@@ -1,9 +1,7 @@
 using Automaton.Core.Models;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
-using Automaton.Api.Enums;
 using Automaton.Api.Models;
-using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using CustomStep = Automaton.Api.Models.CustomStep;
@@ -21,7 +19,7 @@ public sealed class CustomStepRunnerExecutionService(
         Guid userId,
         CancellationToken cancellationToken)
     {
-        return EnsureInfrastructureRunnerAccessAsync(selectedRunnerIds, userId, cancellationToken);
+        return EnsureNoRunnerExecutionAsync(selectedRunnerIds, userId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RunnerCustomStepResult>> ExecuteOnRunnersAsync(
@@ -39,31 +37,16 @@ public sealed class CustomStepRunnerExecutionService(
         return results;
     }
 
-    private async Task EnsureInfrastructureRunnerAccessAsync(
+    private static Task EnsureNoRunnerExecutionAsync(
         IReadOnlyCollection<Guid> selectedRunnerIds,
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var selectedRunners = await dataContext.Runners
-            .Where(runner => selectedRunnerIds.Contains(runner.Id))
-            .Select(runner => new { runner.CapabilitiesJson, runner.Purpose })
-            .ToListAsync(cancellationToken);
-        var infrastructureRunnerSelected = selectedRunners.Any(runner =>
-            RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose));
-
-        if (infrastructureRunnerSelected && !await IsAdministratorAsync(userId, cancellationToken))
-        {
-            throw new UnauthorizedAccessException("Only administrators may execute custom steps on Infrastructure Runners.");
-        }
-    }
-
-    private Task<bool> IsAdministratorAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        return dataContext.UserRoles
-            .Join(dataContext.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { userRole.UserId, role.Name })
-            .AnyAsync(candidate => candidate.UserId == userId &&
-                                   (candidate.Name == UserRole.Administrator || candidate.Name == UserRole.SystemAdministrator),
-                cancellationToken);
+        _ = userId;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (selectedRunnerIds.Count > 0)
+            throw new UnauthorizedAccessException("Custom-step execution is disabled on Machine Management Runners.");
+        return Task.CompletedTask;
     }
 
     private async Task<RunnerCustomStepResult> ExecuteOnRunnerAsync(

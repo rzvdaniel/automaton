@@ -33,7 +33,6 @@ public sealed class ManagedApplicationArtifactGateway(ApplicationDbContext db, R
             || !await db.WebAppUsers.AnyAsync(u => u.WebAppId == request.AppId && u.UserId == ownerId, token))
             throw new UnauthorizedAccessException("Managed artifacts do not belong to this owner and assigned Runner.");
         var runner = target.ExecutionRunner!;
-        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
         RunnerProtocolCompatibilityPolicy.EnsureSupportsManagedApplicationArtifacts(runner);
         if (!runner.LastHeartbeatAtUtc.HasValue
             || runner.LastHeartbeatAtUtc < DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold)

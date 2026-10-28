@@ -109,13 +109,10 @@ internal sealed class RunnerRegistrationWorkflow
             Version = Environment.Version.ToString(),
             MachineName = Environment.MachineName,
             Purpose = purpose,
-            Capabilities = RunnerCapabilities.ForInstallationProfile(
+            Capabilities = RunnerCapabilities.Normalize(
                 Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                 purpose),
-            RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
-                ? (Guid?)runnerHostId
-                : null,
             HostedRunnerId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"), out var hostedRunnerId)
                 ? (Guid?)hostedRunnerId
                 : null,

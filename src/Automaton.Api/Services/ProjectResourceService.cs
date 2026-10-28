@@ -340,10 +340,8 @@ public class ProjectResourceService
             throw new InvalidOperationException("Runner not found or access denied");
         }
 
-        if (RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose))
-        {
-            throw new InvalidOperationException("Infrastructure runners cannot be added to projects.");
-        }
+        if (!RunnerProfileRules.IsValid(runner.Purpose, runner.ApplicationProfile))
+            throw new InvalidOperationException("Only Machine Management Runners can be added to projects.");
 
         var existingLink = await dbContext.ProjectRunners
             .FirstOrDefaultAsync(pr => pr.ProjectId == projectId && pr.RunnerId == runnerId, cancellationToken);

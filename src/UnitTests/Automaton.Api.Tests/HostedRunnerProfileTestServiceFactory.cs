@@ -19,7 +19,6 @@ internal static class HostedRunnerProfileTestServiceFactory
             db,
             userContext,
             authorizationService: null!,
-            runnerRegistrationService: new RunnerRegistrationService(db, userContext, new RunnerAuditService(audit)),
             runnerDeletionService: new RunnerDeletionService(
                 db,
                 new RunnerDeletionPolicy(db, null!),

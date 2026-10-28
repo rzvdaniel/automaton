@@ -246,10 +246,7 @@ export interface AdminUser {
   privateAppCount: number
   lastAppName?: string
   runnerCount: number
-  onlineRunnerCount: number
-  lastRunnerHeartbeatAtUtc?: string
   apps: AdminUserApp[]
-  runners: AdminUserRunner[]
   roles: string[]
   accessFailedCount?: number
 }
@@ -258,15 +255,6 @@ export interface AdminUserApp {
   id: string
   name: string
   isPublished: boolean
-}
-
-export interface AdminUserRunner {
-  id: string
-  name: string
-  status: string
-  lastHeartbeatAtUtc?: string
-  lastConnectedAtUtc?: string
-  version?: string
 }
 
 export interface AdminUserSummary {
@@ -491,42 +479,6 @@ export interface RunnerEnrollment {
   expectedPurpose: string
   expectedCapabilities: string[]
   dockerImage: string
-}
-
-export interface InfrastructureRunnerEnrollmentKey {
-  id: string
-  apiKey?: string
-  keyPrefix: string
-  expiresAtUtc: string
-  createdAtUtc: string
-  usedAtUtc?: string | null
-  useCount: number
-  maximumUses: number
-  isActive: boolean
-  status: 'Pending' | 'Consumed' | 'Expired' | 'Revoked' | string
-}
-
-export interface InfrastructureWorkflowExecution {
-  id: string
-  workflowVersionId: string
-  requestedByUserId: string
-  targetRunnerId: string
-  targetRunnerHostId: string
-  status: string
-  createdAtUtc: string
-  startedAtUtc?: string
-  completedAtUtc?: string
-  exitCode?: number
-  error?: string
-  idempotencyKey: string
-  resultJson?: string
-}
-
-export interface InfrastructureWorkflowExecutionLog {
-  sequence: number
-  timestampUtc: string
-  stream: string
-  message: string
 }
 
 export interface HostedRunnerDeployment {

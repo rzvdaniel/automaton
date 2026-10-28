@@ -70,8 +70,6 @@ export interface Runner {
 }
 
 export const RunnerApplicationProfiles = {
-  Standard: 'Standard',
-  PrivilegedHost: 'PrivilegedHost',
   MachineManagement: 'MachineManagement',
 } as const
 

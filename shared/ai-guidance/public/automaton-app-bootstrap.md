@@ -15,12 +15,9 @@ If you are in an empty directory and the user asks you to build an Automaton app
    requirements and available runtime environment. Do not assume that tools
    installed locally are available on the assigned Runner.
 
-Prefer a Standard or Hosted Runner for ordinary applications. Do not assign a
-Privileged Host Runner as an automatic fallback. Privileged Host approval is
-persisted per app environment: after explicit user approval, run
-`automaton target approve <environment>` and use
-`automaton target revoke <environment>` to remove it. If only a Privileged
-Host Runner appears usable, stop and ask the user for that approval.
+Assign a Machine Management Runner to the app's deployment target in Studio or
+with `automaton target add`. Do not assume an unassigned or unsupported Runner
+can host the app.
 
 For an existing remote app, use `automaton link <app-id>` instead of creating
 another app, then read the generated local guidance before making changes.

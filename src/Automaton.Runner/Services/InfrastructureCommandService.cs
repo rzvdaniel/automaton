@@ -41,10 +41,9 @@ public sealed class InfrastructureCommandService
             purpose);
         var profile = RunnerApplicationProfiles.Normalize(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"));
-        var authorized = purpose == RunnerPurposes.Infrastructure
-            ? capabilities.Contains(RunnerCapabilities.HostContainerExecution, StringComparer.OrdinalIgnoreCase)
-            : profile == RunnerApplicationProfiles.MachineManagement
-                && capabilities.Contains(RunnerCapabilities.ManagedContainerExecution, StringComparer.OrdinalIgnoreCase);
+        var authorized = purpose == RunnerPurposes.Managed
+            && profile == RunnerApplicationProfiles.MachineManagement
+            && capabilities.Contains(RunnerCapabilities.ManagedContainerExecution, StringComparer.OrdinalIgnoreCase);
         if (!authorized)
             return Task.FromResult(Failure("Typed container execution is not enabled for this Runner profile."));
 

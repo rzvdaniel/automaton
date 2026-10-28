@@ -21,7 +21,7 @@ public sealed class SelfHostedRunnerInstallationAuthorizationTests
     [TestCase(ApiKeyScope.WorkflowExecution)]
     [TestCase(ApiKeyScope.Runner)]
     [TestCase(ApiKeyScope.WebApp)]
-    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    [TestCase((ApiKeyScope)6)]
     [TestCase(ApiKeyScope.FullAccess)]
     public void NonDeveloperApiKeysCannotCreateInstallations(ApiKeyScope scope)
     {

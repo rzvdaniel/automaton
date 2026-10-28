@@ -107,24 +107,12 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_ReturnsReady_ForConnectedPrivilegedHostSelfHostedRunner()
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var app = SeedBackendApp(db, ownerId);
-        var runnerId = PrepareSelfHostedRunnerAssignment(
-            db, ownerId, app, RunnerApplicationProfiles.PrivilegedHost, privilegedHostApproved: true);
-        var service = CreateService(db);
-        await AssertReadyForSelfHostedRunnerAsync(db, service, app.Id, ownerId, runnerId);
-    }
-
-    [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsActionableUnavailable_ForOfflineSelfHostedRunner()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
         var app = SeedBackendApp(db, ownerId);
-        PrepareSelfHostedRunnerAssignment(db, ownerId, app, RunnerApplicationProfiles.Standard, offline: true);
+        PrepareSelfHostedRunnerAssignment(db, ownerId, app, RunnerApplicationProfiles.MachineManagement, offline: true);
 
         await AssertUnavailableAsync(
             CreateService(db),

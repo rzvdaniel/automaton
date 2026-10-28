@@ -18,8 +18,6 @@ import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.
 import {
   getDeploymentTargetRunnerOptions,
   getDeploymentTargetRunnerProjectId,
-  isPrivilegedSelfHostedRunner,
-  resolveAutomatonHostedRunnerId,
 } from '../utils/deployment-target-runner'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getEnvironmentDisplayName } from '../utils/environment-display'
@@ -57,44 +55,11 @@ const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const actionMenuTarget = ref<AppDeploymentTarget | null>(null)
 
 const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
-const selectedRunnerIsPrivileged = computed(() =>
-  isPrivilegedSelfHostedRunner(selectedRunner.value)
-)
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
 const hasMachineManagementTarget = computed(() => targets.value.some(isMachineManagementTarget))
 const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
 const additionalTargets = computed(() => targets.value.filter((target) => !target.isDefault))
-const hostedRunners = computed(() => runners.value.filter((runner) => runner.isHostedRunner))
-const selfHostedRunnerOptions = computed(() =>
-  runnerOptions.value.filter((option) => {
-    const runner = runners.value.find((candidate) => candidate.id === option.value)
-    return !runner?.isHostedRunner
-  })
-)
-const hostedDestinationOption = computed(() => {
-  const existingRunnerId = editingTarget.value?.runner?.isHostedRunner
-    ? editingTarget.value.runner.id
-    : null
-  const runner =
-    runners.value.find(
-      (candidate) =>
-        candidate.id === resolveAutomatonHostedRunnerId(runners.value, existingRunnerId)
-    ) ?? null
-  if (runner)
-    return { label: 'Automaton Hosted', value: runner.id, disabled: runner.status !== 'Online' }
-  return {
-    label:
-      hostedRunners.value.length > 1
-        ? 'Automaton Hosted (multiple managed Runners; unavailable here)'
-        : 'Automaton Hosted (unavailable)',
-    value: '__automaton-hosted-unavailable__',
-    disabled: true,
-  }
-})
-const destinationRunnerOptions = computed(() => [
-  hostedDestinationOption.value,
-  ...selfHostedRunnerOptions.value,
-])
+const destinationRunnerOptions = computed(() => runnerOptions.value)
 
 const normalizedSlug = computed(() =>
   slug.value
@@ -300,28 +265,18 @@ function openRoute(target: AppDeploymentTarget) {
   if (route) window.open(route, '_blank', 'noopener,noreferrer')
 }
 
-function isPrivilegedTarget(target: AppDeploymentTarget): boolean {
-  return (
-    !!target.runner &&
-    !target.runner.isHostedRunner &&
-    target.runner.applicationProfile === 'PrivilegedHost'
-  )
-}
-
 function isMachineManagementTarget(target: AppDeploymentTarget): boolean {
   return target.runner?.applicationProfile === 'MachineManagement'
 }
 
 function destinationLabel(target: AppDeploymentTarget): string {
   if (!target.runner) return 'No runtime assigned'
-  if (target.runner.isHostedRunner) return 'Automaton Hosted'
-  if (isMachineManagementTarget(target)) return 'Self-hosted · Machine Management'
-  if (target.runner.applicationProfile === 'PrivilegedHost') return 'Self-hosted · Privileged Host'
-  return 'Self-hosted · Standard'
+  if (target.runner.isHostedRunner) return 'Retired hosted destination'
+  return 'Self-hosted · Machine Management'
 }
 
 function runtimeTransport(target: AppDeploymentTarget): string {
-  return target.runner?.isHostedRunner ? 'Direct edge routing' : 'API ↔ Runner tunnel'
+  return 'API ↔ Runner tunnel'
 }
 
 function canOpenPreview(target: AppDeploymentTarget): boolean {
@@ -347,58 +302,7 @@ function canPromote(target: AppDeploymentTarget): boolean {
 }
 
 function canSaveTarget(): boolean {
-  if (!name.value.trim() || !normalizedSlug.value) return false
-  if (!selectedRunnerIsPrivileged.value) return true
-  if (editingTarget.value?.runner?.id === runnerId.value) return true
-  return !!editingTarget.value?.privilegedHostAccessApproved
-}
-
-function approvePrivilegedHostAccess(target: AppDeploymentTarget) {
-  confirm.require({
-    header: 'Approve Privileged Host access?',
-    message:
-      'This grants the target permission to run on a Privileged Host. The App may read and modify host files, inspect host processes and Docker containers, affect services and system state, and access host secrets.',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Approve access',
-    accept: () => void setPrivilegedHostAccessApproval(target, true),
-  })
-}
-
-function revokePrivilegedHostAccess(target: AppDeploymentTarget) {
-  confirm.require({
-    header: 'Revoke Privileged Host access?',
-    message:
-      'This removes the target approval and prevents it from being assigned to a Privileged Host until an administrator approves it again.',
-    icon: 'pi pi-exclamation-triangle',
-    acceptClass: 'p-button-danger',
-    acceptLabel: 'Revoke access',
-    accept: () => void setPrivilegedHostAccessApproval(target, false),
-  })
-}
-
-async function setPrivilegedHostAccessApproval(target: AppDeploymentTarget, approved: boolean) {
-  busyTargetId.value = target.id
-  try {
-    await (approved
-      ? appsService.approvePrivilegedHostAccess(props.appId, target.id)
-      : appsService.revokePrivilegedHostAccess(props.appId, target.id))
-    toast.add({
-      severity: 'success',
-      summary: approved ? 'Privileged Host access approved' : 'Privileged Host access revoked',
-      detail: approved
-        ? `${target.name} can now be assigned to a Privileged Host.`
-        : `${target.name} can no longer be assigned to a Privileged Host.`,
-      life: 3000,
-    })
-    await load()
-    if (editingTarget.value?.id === target.id) {
-      editingTarget.value = targets.value.find((item) => item.id === target.id) ?? null
-    }
-  } catch (error) {
-    showError(error, approved ? 'Failed to approve Privileged Host access' : 'Failed to revoke Privileged Host access')
-  } finally {
-    busyTargetId.value = null
-  }
+  return !!name.value.trim() && !!normalizedSlug.value
 }
 
 function formatDeploymentTime(target: AppDeploymentTarget): string {
@@ -515,12 +419,6 @@ watch(() => props.refreshRevision, load)
             </div>
             <div class="target-destination">
               <i class="pi pi-server"></i><span>{{ destinationLabel(liveTarget) }}</span
-              ><Tag
-                v-if="isPrivilegedTarget(liveTarget)"
-                value="Privileged access"
-                icon="pi pi-shield"
-                severity="warn"
-              />
             </div>
             <div class="target-meta" :title="deploymentTimeTitle(liveTarget)">
               <span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span
@@ -614,12 +512,6 @@ watch(() => props.refreshRevision, load)
               </div>
               <div class="target-destination">
                 <i class="pi pi-server"></i><span>{{ destinationLabel(target) }}</span
-                ><Tag
-                  v-if="isPrivilegedTarget(target)"
-                  value="Privileged access"
-                  icon="pi pi-shield"
-                  severity="warn"
-                />
               </div>
               <div class="target-meta" :title="deploymentTimeTitle(target)">
                 <span v-if="deploymentState(target)">{{ deploymentState(target) }}</span
@@ -747,51 +639,8 @@ watch(() => props.refreshRevision, load)
           show-clear
           placeholder="Assign later"
         />
-        <small
-          >Automaton Hosted does not expose the managed Runner identity. Self-hosted destinations
-          are eligible application Runners only.</small
-        >
+        <small>Only connected Machine Management Runners can host app environments.</small>
       </div>
-      <Message v-if="selectedRunnerIsPrivileged && !editingTarget" severity="warn" :closable="false">
-        <strong>Privileged Host access</strong><br />
-        This App may read and modify host files, inspect host processes and Docker containers,
-        affect services and system state, and access host secrets.
-        <small class="block mt-3"
-          >Create this target without a destination, save it, then approve Privileged Host access
-          before assigning the destination.</small
-        >
-      </Message>
-      <Message v-if="editingTarget" severity="warn" :closable="false">
-        <strong>Privileged Host approval</strong><br />
-        Approval is persisted on this target and is required before it can be assigned to a
-        Privileged Host. Approved access permits the App to read and modify host files, inspect
-        host processes and Docker containers, affect services and system state, and access host
-        secrets.
-        <div class="flex align-items-center gap-2 mt-3">
-          <Tag
-            :value="editingTarget.privilegedHostAccessApproved ? 'Approved' : 'Not approved'"
-            :severity="editingTarget.privilegedHostAccessApproved ? 'success' : 'secondary'"
-          />
-          <Button
-            v-if="!editingTarget.privilegedHostAccessApproved"
-            label="Approve access"
-            icon="pi pi-shield"
-            size="small"
-            :loading="busyTargetId === editingTarget.id"
-            @click="approvePrivilegedHostAccess(editingTarget)"
-          />
-          <Button
-            v-else
-            label="Revoke access"
-            icon="pi pi-ban"
-            severity="danger"
-            outlined
-            size="small"
-            :loading="busyTargetId === editingTarget.id"
-            @click="revokePrivilegedHostAccess(editingTarget)"
-          />
-        </div>
-      </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
         <Button

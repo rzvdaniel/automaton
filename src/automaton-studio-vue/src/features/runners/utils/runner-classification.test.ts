@@ -20,37 +20,15 @@ function runner(overrides: Partial<Runner> = {}): Runner {
 }
 
 describe('runner classification', () => {
-  it('uses the hosted-runner relationship as the authoritative managed classification', () => {
-    expect(
-      classifyRunner(
-        runner({
-          isHostedRunner: true,
-          applicationProfile: RunnerApplicationProfiles.PrivilegedHost,
-        })
-      )
-    ).toBe('automaton-hosted')
-  })
-
-  it('classifies legacy null-profile application runners as self-hosted standard', () => {
-    expect(classifyRunner(runner({ applicationProfile: null }))).toBe('self-hosted-standard')
-  })
-
-  it('marks a non-hosted Privileged Host runner with its warning classification', () => {
-    expect(
-      classifyRunner(runner({ applicationProfile: RunnerApplicationProfiles.PrivilegedHost }))
-    ).toBe('self-hosted-privileged')
-  })
-
   it('marks a non-hosted Machine Management runner distinctly', () => {
     expect(
       classifyRunner(runner({ applicationProfile: RunnerApplicationProfiles.MachineManagement }))
     ).toBe('self-hosted-machine-management')
   })
 
-  it('hides infrastructure runners from the normal Runners page', () => {
-    const infrastructureRunner = runner({ purpose: 'Infrastructure' })
-
-    expect(classifyRunner(infrastructureRunner)).toBe('hidden-infrastructure')
-    expect(isVisibleApplicationRunner(infrastructureRunner)).toBe(false)
+  it('hides all unsupported and retired runners from the normal Runners page', () => {
+    expect(classifyRunner(runner({ applicationProfile: null }))).toBe('unsupported')
+    expect(classifyRunner(runner({ isHostedRunner: true, applicationProfile: RunnerApplicationProfiles.MachineManagement }))).toBe('unsupported')
+    expect(isVisibleApplicationRunner(runner({ applicationProfile: null }))).toBe(false)
   })
 })
