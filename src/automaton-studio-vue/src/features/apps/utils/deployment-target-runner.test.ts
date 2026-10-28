@@ -6,7 +6,7 @@ import {
 } from './deployment-target-runner'
 
 function runner(overrides: Partial<Runner> = {}): Runner {
-  return { id: 'runner', name: 'Runner', status: RunnerStatus.Online, connectionSessionCount: 0, scope: AccessScope.Personal, isHostedRunner: false, ...overrides }
+  return { id: 'runner', name: 'Runner', status: RunnerStatus.Online, connectionSessionCount: 0, scope: AccessScope.Personal, isHostedRunner: false, applicationProfile: RunnerApplicationProfiles.MachineManagement, ...overrides }
 }
 
 describe('deployment target Runner options', () => {
