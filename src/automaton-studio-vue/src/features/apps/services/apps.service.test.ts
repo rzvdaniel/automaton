@@ -10,33 +10,6 @@ const apiClient = vi.hoisted(() => ({
 
 vi.mock('@/shared/services/api/axios-instance', () => ({ default: apiClient }))
 
-describe('AppsService privileged Host approval', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('approves privileged Host access on a deployment target', async () => {
-    const target = { id: 'target-id', privilegedHostAccessApproved: true }
-    apiClient.post.mockResolvedValue({ data: target })
-
-    await expect(appsService.approvePrivilegedHostAccess('app-id', 'target-id')).resolves.toBe(target)
-
-    expect(apiClient.post).toHaveBeenCalledWith(
-      '/api/apps/app-id/targets/target-id/privileged-host-access',
-      {},
-    )
-  })
-
-  it('revokes privileged Host access on a deployment target', async () => {
-    const target = { id: 'target-id', privilegedHostAccessApproved: false }
-    apiClient.delete.mockResolvedValue({ data: target })
-
-    await expect(appsService.revokePrivilegedHostAccess('app-id', 'target-id')).resolves.toBe(target)
-
-    expect(apiClient.delete).toHaveBeenCalledWith(
-      '/api/apps/app-id/targets/target-id/privileged-host-access',
-    )
-  })
-})
-
 describe('AppsService metadata settings', () => {
   beforeEach(() => vi.clearAllMocks())
 

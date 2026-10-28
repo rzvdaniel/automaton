@@ -1,10 +1,7 @@
 using Automaton.Api.Data;
-using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Logging;
 using Automaton.Api.Middleware;
-using Automaton.Core.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Events;
@@ -16,35 +13,6 @@ internal static class ApiApplicationInitializationExtensions
     internal static async Task InitializeAutomatonApiAsync(this WebApplication app)
     {
         await app.ApplyMigrationsAsync();
-        await InfrastructurePlatformAppInitializer.EnsureExistsAsync(app.Services);
-    }
-}
-
-internal static class InfrastructurePlatformAppInitializer
-{
-    internal static async Task EnsureExistsAsync(IServiceProvider services)
-    {
-        await using var scope = services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        if (await dbContext.WebApps.AnyAsync(app => app.Id == InfrastructureAppTrust.PlatformAppId))
-        {
-            return;
-        }
-
-        dbContext.WebApps.Add(new WebApp
-        {
-            Id = InfrastructureAppTrust.PlatformAppId,
-            Name = InfrastructureAppTrust.PlatformAppName,
-            Summary = "Platform-owned infrastructure Action modules.",
-            Description = "Internal Automaton infrastructure operations.",
-            Definition = "{}",
-            IsPublished = false,
-            IsForkable = false,
-            RequiresAuthentication = true,
-            Created = DateTime.UtcNow,
-            Updated = DateTime.UtcNow
-        });
-        await dbContext.SaveChangesAsync();
     }
 }
 

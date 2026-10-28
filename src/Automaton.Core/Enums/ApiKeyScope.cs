@@ -38,11 +38,6 @@ public enum ApiKeyScope
     WebApp = 5,
 
     /// <summary>
-    /// Single-use, short-lived credential for Infrastructure Runner host registration.
-    /// </summary>
-    InfrastructureRunnerEnroll = 6,
-
-    /// <summary>
     /// Developer credential for the Automaton CLI and normal app lifecycle operations.
     /// It does not grant API-key management, administration, billing, or infrastructure enrollment access.
     /// </summary>

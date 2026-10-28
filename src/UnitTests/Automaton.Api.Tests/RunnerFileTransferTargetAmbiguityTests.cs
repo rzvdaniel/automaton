@@ -46,7 +46,7 @@ internal static class RunnerFileTransferTargetAmbiguityScenario
             ApiKeyId = Guid.NewGuid(),
             Name = "shared-runner",
             Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.Standard
+            ApplicationProfile = "Standard"
         };
         var live = AppDeploymentTarget.CreateLive(appId, runnerId);
         var preview = new AppDeploymentTarget

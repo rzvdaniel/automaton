@@ -26,20 +26,17 @@ public class AdminUsersController : BaseController
     }
 
     private readonly AdminAppsService adminAppsService;
-    private readonly AdminRunnersService adminRunnersService;
     private readonly UsersService usersService;
     private readonly ConfigurationService configurationService;
     private readonly IEmailService emailService;
 
     public AdminUsersController(
         AdminAppsService adminAppsService,
-        AdminRunnersService adminRunnersService,
         UsersService usersService,
         ConfigurationService configurationService,
         IEmailService emailService)
     {
         this.adminAppsService = adminAppsService;
-        this.adminRunnersService = adminRunnersService;
         this.usersService = usersService;
         this.configurationService = configurationService;
         this.emailService = emailService;
@@ -61,15 +58,6 @@ public class AdminUsersController : BaseController
     public ActionResult<IEnumerable<AppModel>> GetUserApps([FromRoute, NotEmptyGuid] Guid userId, [FromQuery] Guid? projectId = null)
     {
         return Ok(adminAppsService.ListOwnedByUserForAdmin(userId, projectId));
-    }
-
-    [HttpGet("{userId:guid}/runners")]
-    public async Task<ActionResult<IEnumerable<RunnerDetails>>> GetUserRunners(
-        [FromRoute, NotEmptyGuid] Guid userId,
-        [FromQuery] Guid? projectId,
-        CancellationToken cancellationToken)
-    {
-        return Ok(await adminRunnersService.ListOwnedByUserForAdmin(userId, projectId, cancellationToken));
     }
 
     [HttpPut("{userId:guid}")]

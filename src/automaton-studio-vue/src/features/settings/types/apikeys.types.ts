@@ -21,8 +21,6 @@ export const ApiKeySource = {
   Manual: 1,
   CliAuthorization: 2,
   RunnerProvisioning: 3,
-  InfrastructureRunnerEnrollment: 4,
-  InfrastructureRunnerRegistration: 5,
 } as const
 
 export type ApiKeySource = (typeof ApiKeySource)[keyof typeof ApiKeySource]
@@ -100,10 +98,6 @@ export function getSourceDisplayName(source: ApiKeySource): string {
       return 'Automaton CLI authorization'
     case ApiKeySource.RunnerProvisioning:
       return 'Runner provisioning'
-    case ApiKeySource.InfrastructureRunnerEnrollment:
-      return 'Infrastructure Runner enrollment'
-    case ApiKeySource.InfrastructureRunnerRegistration:
-      return 'Infrastructure Runner registration'
     default:
       return 'Unknown'
   }

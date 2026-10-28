@@ -53,7 +53,6 @@ public class Program
                 CreateServerCommand(),
                 CreateServiceCommand(),
                 CreateCleanupCommand(),
-                RunnerInfrastructureCommandProbe.Create(),
                 CreateExecuteAppFlowCommand()
             };
 

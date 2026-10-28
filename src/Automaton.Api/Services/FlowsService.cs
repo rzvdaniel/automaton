@@ -1,11 +1,11 @@
-﻿using Automaton.Core.Enums;
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
 using Automaton.Api.Models;
-using Automaton.Api.Enums;
 using Automaton.Api.Data;
+using Automaton.Api.Enums;
+using Automaton.Core.Enums;
 
 namespace Automaton.Api.Services;
 
@@ -221,16 +221,8 @@ public class FlowsService
         }
 
         var selectedRunnerIds = runnerIds.Distinct().ToList();
-        var selectedRunners = await dbContext.Runners
-            .Where(r => selectedRunnerIds.Contains(r.Id))
-            .Select(r => new { r.CapabilitiesJson, r.Purpose })
-            .ToListAsync(cancellationToken);
-        var infrastructureRunnerSelected = selectedRunners.Any(r =>
-            RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
-        if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
-        {
-            throw new UnauthorizedAccessException("Only administrators may execute flows on Infrastructure Runners.");
-        }
+        if (selectedRunnerIds.Count > 0)
+            throw new UnauthorizedAccessException("Raw workflow execution is disabled on Machine Management Runners.");
         
         // Note: Flow decryption happens when Runner loads flow via API
         // The Get(Guid id) method returns flow with decrypted values
@@ -241,12 +233,6 @@ public class FlowsService
 
         return result;
     }
-
-    private Task<bool> IsAdministratorAsync(CancellationToken cancellationToken)
-        => dbContext.UserRoles
-            .Join(dbContext.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { userRole.UserId, role.Name })
-            .AnyAsync(x => x.UserId == userId &&
-                           (x.Name == UserRole.Administrator || x.Name == UserRole.SystemAdministrator), cancellationToken);
 
     public FlowSettings GetSettings(Guid id)
     {

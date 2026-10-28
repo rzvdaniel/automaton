@@ -36,7 +36,7 @@ public class ApiKeyServiceTests
 
     [TestCase(ApiKeyScope.Runner)]
     [TestCase(ApiKeyScope.FullAccess)]
-    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    [TestCase((ApiKeyScope)6)]
     public void UserCreatableScopes_RejectSystemAndLegacyBroadKeyTypes(ApiKeyScope scope)
     {
         Assert.That(ApiKeysController.UserCreatableScopes, Does.Not.Contain(scope));
@@ -53,7 +53,7 @@ public class ApiKeyServiceTests
 
     [TestCase(ApiKeyScope.Runner)]
     [TestCase(ApiKeyScope.FullAccess)]
-    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    [TestCase((ApiKeyScope)6)]
     public void UserVisibleScopes_ExcludeSystemManagedKeyTypes(ApiKeyScope scope)
     {
         Assert.That(ApiKeyService.UserVisibleScopes, Does.Not.Contain(scope));
@@ -61,7 +61,7 @@ public class ApiKeyServiceTests
 
     [TestCase(ApiKeyScope.Runner)]
     [TestCase(ApiKeyScope.FullAccess)]
-    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    [TestCase((ApiKeyScope)6)]
     public async Task CreateApiKey_RejectsNonUserCreatableScopes(ApiKeyScope scope)
     {
         var controller = new ApiKeysController(null!, null!, null!, null!);
@@ -86,7 +86,7 @@ public class ApiKeyServiceTests
     [TestCase(ApiKeyScope.ReadOnly)]
     [TestCase(ApiKeyScope.WorkflowExecution)]
     [TestCase(ApiKeyScope.WebApp)]
-    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    [TestCase((ApiKeyScope)6)]
     public void RunnerValidationScopes_RejectNonRunnerCredentials(ApiKeyScope scope)
     {
         Assert.That(ApiKeysController.RunnerUsableScopes, Does.Not.Contain(scope));

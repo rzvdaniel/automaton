@@ -259,7 +259,7 @@ internal sealed class HostContainerActionExecutor(
         if (!File.Exists(path)) return (null, Failure("action_missing", $"Action '{key}' is not deployed."));
         try
         {
-            var manifest = AppActionManifestParser.ParseFile(path, key, allowPrivilegedCapabilities: false);
+            var manifest = AppActionManifestParser.ParseFile(path, key);
             if (manifest.Spec.Runtime is not (AppActionRuntimes.Python or AppActionRuntimes.Bash))
                 return (null, Failure("action_runtime", "The Action runtime is not supported by the bounded job container."));
             return (manifest, null);

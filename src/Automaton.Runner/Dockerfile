@@ -37,7 +37,6 @@ COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
 COPY src/Automaton.Messaging/ ./Automaton.Messaging/
 COPY src/Automaton.Runner/ ./Automaton.Runner/
-COPY system-apps/automaton-infrastructure/actions/ /system-apps/automaton-infrastructure/actions/
 
 # Build and publish
 RUN dotnet publish Automaton.Runner/Automaton.Runner.csproj \

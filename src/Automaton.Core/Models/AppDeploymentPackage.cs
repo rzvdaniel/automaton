@@ -13,7 +13,6 @@ public sealed class DeployAppPackageRequest
     public Guid DeploymentTargetId { get; set; }
     public string PackagePath { get; set; } = string.Empty;
     public bool Clean { get; set; }
-    public bool SystemInfrastructure { get; set; }
     public Guid? DeploymentOperationId { get; set; }
     public Guid? ExecutionAttemptId { get; set; }
     public ActionContainerPolicy? ActionContainerPolicy { get; set; }

@@ -55,25 +55,6 @@ public sealed class RunnerTunnelReconnectServiceTests
         Assert.That(fixture.Publisher.RunnerIds, Does.Contain(fixture.DisconnectedRunnerId));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task CutoverAndCompensation_SkipRetainedRevokedRunnerWithRemovedQueues(bool reconcile)
-    {
-        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
-        var revokedId = await fixture.AddInfrastructureRunnerAsync(isActive: false);
-        var eligibleId = await fixture.AddInfrastructureRunnerAsync(isActive: true);
-        fixture.Publisher.RemovedQueueRunnerIds.Add(revokedId);
-
-        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
-
-        Assert.That(result.FailedCount, Is.Zero);
-        Assert.That(result.CandidateRunnerCount, Is.EqualTo(6));
-        Assert.That(result.RequestedCount, Is.EqualTo(5));
-        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(revokedId));
-        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(eligibleId));
-        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(fixture.DisconnectedRunnerId));
-    }
-
     [Test]
     public async Task RequestForApiColor_QueuesLatestTargetForAllRegisteredCompatibleRunners()
     {
@@ -186,26 +167,18 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
     public Guid CurrentReplicaRunnerId { get; }
     public Guid DisconnectedRunnerId { get; }
 
-    public async Task<Guid> AddInfrastructureRunnerAsync(bool isActive)
+    public async Task<Guid> AddBoundLegacyRunnerAsync()
     {
-        var key = new ApiKey { Id = Guid.NewGuid(), IsActive = isActive };
+        var id = Guid.NewGuid();
+        var key = new ApiKey { Id = Guid.NewGuid(), IsActive = true, Source = ApiKeySource.RunnerProvisioning };
         var runner = new Runner
         {
-            Id = Guid.NewGuid(), Name = isActive ? "eligible-offline" : "retained-revoked",
-            Purpose = RunnerPurposes.Infrastructure, ConnectionId = null!,
+            Id = id, Name = "enrolled-byo", Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement, ConnectionId = null!,
             ApiCompatibilityVersion = RunnerApiCompatibilityVersions.Current,
             ApiKeyId = key.Id, ApiKey = key
         };
         db.Runners.Add(runner);
-        await db.SaveChangesAsync();
-        return runner.Id;
-    }
-
-    public async Task<Guid> AddBoundLegacyRunnerAsync()
-    {
-        var id = await AddInfrastructureRunnerAsync(isActive: true);
-        var runner = await db.Runners.SingleAsync(candidate => candidate.Id == id);
-        runner.Purpose = RunnerPurposes.Managed;
         await db.SaveChangesAsync();
         return id;
     }
@@ -255,7 +228,7 @@ internal sealed class RunnerTunnelReconnectFixture : IAsyncDisposable
         var installationService = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
         var installation = await installationService.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
-            RunnerName = "enrolled-byo", ApplicationProfile = RunnerApplicationProfiles.Standard
+            RunnerName = "enrolled-byo", ApplicationProfile = RunnerApplicationProfiles.MachineManagement
         }, CancellationToken.None);
         var token = Regex.Match(installation.InstallationCommand,
             "AUTOMATON_ENROLLMENT_TOKEN='([^']+)'", RegexOptions.None, TimeSpan.FromSeconds(1)).Groups[1].Value;

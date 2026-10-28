@@ -39,7 +39,6 @@ Examples:
 
 - Studio Editor
 - Actions
-- Privileged Host Apps
 - MCP
 
 Guidance may be:

@@ -20,14 +20,14 @@ public sealed class TrustedSystemActionManifestSource : ITrustedSystemActionMani
     public AppActionManifest? Find(string actionKey)
     {
         var root = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure");
-        return AppActionManifestParser.Discover(root, allowPrivilegedCapabilities: true)
+        return AppActionManifestParser.Discover(root)
             .SingleOrDefault(x => x.Key == actionKey)?.Manifest;
     }
 
     public IReadOnlyList<AppActionManifest> List()
     {
         var root = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure");
-        return AppActionManifestParser.Discover(root, allowPrivilegedCapabilities: true)
+        return AppActionManifestParser.Discover(root)
             .Select(x => x.Manifest).ToList();
     }
 }

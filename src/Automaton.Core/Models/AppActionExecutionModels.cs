@@ -41,17 +41,6 @@ public static class AppModuleExecutionErrorCodes
     public const string AmbiguousDispatch = "AmbiguousDispatch";
 }
 
-public static class InfrastructureCommandResultOutcomes
-{
-    public const string Accepted = "accepted";
-    public const string AlreadyApplied = "already-applied";
-    public const string TerminalStale = "terminal-stale";
-
-    public static bool IsAckable(string? outcome) => outcome is Accepted or AlreadyApplied or TerminalStale;
-}
-
-public sealed record InfrastructureCommandResultResponse(string Outcome);
-
 public sealed class ExecuteAppActionModuleRequest
 {
     public Guid ExecutionId { get; set; }
@@ -60,7 +49,6 @@ public sealed class ExecuteAppActionModuleRequest
     public string ActionKey { get; set; } = string.Empty;
     public string? ExpectedDeploymentHash { get; set; }
     public int? TimeoutSeconds { get; set; }
-    public bool SystemInfrastructure { get; set; }
     public JsonElement Input { get; set; }
     public Dictionary<string, string> Secrets { get; set; } = [];
     public ActionContainerPolicy? ContainerPolicy { get; set; }
@@ -113,8 +101,7 @@ public sealed record PrepareAppActionModuleRequest(
     Guid DeploymentTargetId,
     string ActionKey,
     byte[] SourceZip,
-    string ExpectedContentHash,
-    bool SystemInfrastructure);
+    string ExpectedContentHash);
 public sealed record SynchronizeAppActionModulesRequest(
     Guid AppId,
     Guid DeploymentTargetId,

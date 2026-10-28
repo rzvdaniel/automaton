@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
 namespace Automaton.Runner.Console.Services;
@@ -22,13 +21,7 @@ internal static class AppActionExecutionPreparer
         if (!File.Exists(manifestPath))
             throw new InvalidOperationException($"Action '{request.ActionKey}' is not deployed.");
 
-        var allowPrivileged = request.SystemInfrastructure
-            && RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
-                == RunnerPurposes.Infrastructure;
-        var manifest = AppActionManifestParser.ParseFile(
-            manifestPath,
-            request.ActionKey,
-            allowPrivilegedCapabilities: allowPrivileged);
+        var manifest = AppActionManifestParser.ParseFile(manifestPath, request.ActionKey);
         var deploymentHash = ReadDeploymentHash(Path.Combine(currentDirectory, ".automaton-action-deployment.json"));
         if (!string.IsNullOrWhiteSpace(request.ExpectedDeploymentHash)
             && !string.Equals(request.ExpectedDeploymentHash, deploymentHash, StringComparison.Ordinal))

@@ -191,9 +191,6 @@ export interface AppDeploymentTarget {
   cleanupPending: boolean
   lastCleanupError?: string | null
   lastCleanupAttemptAt?: string | null
-  privilegedHostAccessApproved: boolean
-  privilegedHostAccessApprovedAtUtc?: string | null
-  privilegedHostAccessApprovedByUserId?: string | null
   runner?: {
     id: string
     name: string

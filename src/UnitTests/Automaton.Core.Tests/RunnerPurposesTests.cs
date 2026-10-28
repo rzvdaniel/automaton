@@ -5,72 +5,25 @@ namespace Automaton.Core.Tests;
 public class RunnerPurposesTests
 {
     [Test]
-    public void Normalize_DefaultsUnknownAndEmptyValuesToManaged()
+    public void NormalizeAcceptsOnlyManagedPurpose()
     {
-        Assert.That(RunnerPurposes.Normalize(null), Is.EqualTo(RunnerPurposes.Managed));
-        Assert.That(RunnerPurposes.Normalize(string.Empty), Is.EqualTo(RunnerPurposes.Managed));
-        Assert.That(RunnerPurposes.Normalize("unknown"), Is.EqualTo(RunnerPurposes.Managed));
+        Assert.That(RunnerPurposes.Normalize("managed"), Is.EqualTo(RunnerPurposes.Managed));
+        Assert.That(() => RunnerPurposes.Normalize("Infrastructure"), Throws.ArgumentException);
+        Assert.That(() => RunnerPurposes.Normalize(null), Throws.ArgumentException);
     }
 
     [Test]
-    public void Normalize_PreservesInfrastructurePurposeCaseInsensitively()
+    public void MachineManagementIsTheOnlyApplicationProfile()
     {
-        Assert.That(RunnerPurposes.Normalize("infrastructure"), Is.EqualTo(RunnerPurposes.Infrastructure));
+        Assert.That(RunnerProfileRules.IsValid(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement), Is.True);
+        Assert.That(RunnerProfileRules.IsValid(RunnerPurposes.Managed, "Standard"), Is.False);
+        Assert.That(RunnerProfileRules.IsValid(RunnerPurposes.Managed, "PrivilegedHost"), Is.False);
+        Assert.That(RunnerProfileRules.IsValid("Infrastructure", RunnerApplicationProfiles.MachineManagement), Is.False);
+        Assert.That(() => RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Managed, "Standard"), Throws.ArgumentException);
     }
 
     [Test]
-    public void ApplicationProfile_DefaultsLegacyManagedRunnersToStandard()
-    {
-        Assert.That(
-            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Managed, null),
-            Is.EqualTo(RunnerApplicationProfiles.Standard));
-        Assert.That(
-            RunnerProfileRules.IsPrivilegedHost(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost),
-            Is.True);
-    }
-
-    [Test]
-    public void ApplicationProfile_RejectsUnknownValuesInsteadOfDefaulting()
-    {
-        Assert.That(RunnerApplicationProfiles.IsValidForPurpose("mystery", RunnerPurposes.Managed), Is.False);
-        Assert.That(
-            () => RunnerApplicationProfiles.Normalize("mystery"),
-            Throws.ArgumentException);
-        Assert.That(
-            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Managed, "standard"),
-            Is.EqualTo(RunnerApplicationProfiles.Standard));
-    }
-
-    [Test]
-    public void InfrastructureRunnersCannotHaveAnApplicationProfile()
-    {
-        Assert.That(
-            RunnerProfileRules.IsValid(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.PrivilegedHost),
-            Is.False);
-        Assert.That(
-            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Infrastructure, null),
-            Is.Null);
-    }
-
-    [Test]
-    public void PrivilegedHostProfileDoesNotGrantInfrastructureCapabilities()
-    {
-        var capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
-
-        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.HostedRunnerProvisioning));
-        Assert.That(
-            RunnerProfileRules.IsPrivilegedHost(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost),
-            Is.True);
-        Assert.That(
-            RunnerCapabilities.RequiresAdministrator(capabilities, RunnerPurposes.Managed),
-            Is.False);
-        Assert.That(
-            RunnerProfileRules.CanExecuteApplications(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, capabilities),
-            Is.True);
-    }
-
-    [Test]
-    public void MachineManagementProfileIsAnApplicationRunnerWithoutWorkflowOrInfrastructureCapabilities()
+    public void MachineManagementCanRunApplicationsWithSupportedCapabilities()
     {
         var capabilities = new[]
         {
@@ -78,10 +31,9 @@ public class RunnerPurposesTests
             RunnerCapabilities.ManagedContainerExecution
         };
 
-        Assert.That(RunnerProfileRules.IsValid(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement), Is.True);
-        Assert.That(RunnerProfileRules.CanExecuteApplications(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, capabilities), Is.True);
-        Assert.That(RunnerCapabilities.RequiresAdministrator(capabilities, RunnerPurposes.Managed), Is.False);
-        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.WorkflowExecution));
-        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
+        Assert.That(RunnerProfileRules.CanExecuteApplications(
+            RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, capabilities), Is.True);
+        Assert.That(RunnerProfileRules.CanExecuteApplications(
+            RunnerPurposes.Managed, "Standard", capabilities), Is.False);
     }
 }

@@ -66,10 +66,8 @@ public class RunnerHostService
                 throw new InvalidOperationException("Server URL not configured. Set AUTOMATON_SERVER_URL environment variable.");
             }
 
-            var enrollmentApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
             var runnerPurpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
             EnsureManagedHostedRunnerIdentity(runnerPurpose, Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"));
-            await EnsureInfrastructureRunnerRegisteredAsync(runnerPurpose, enrollmentApiKey);
 
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
@@ -121,17 +119,6 @@ public class RunnerHostService
             logger.Fatal(ex, "Fatal error in service mode startup");
             throw;
         }
-    }
-
-    private async Task EnsureInfrastructureRunnerRegisteredAsync(string runnerPurpose, string? enrollmentApiKey)
-    {
-        var shouldRegister = string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
-            && !configService.IsRunnerRegistered()
-            && !string.IsNullOrWhiteSpace(enrollmentApiKey);
-        if (!shouldRegister) return;
-        if (await RegisterInfrastructureRunnerAsync(enrollmentApiKey!)) return;
-        logger.Error("Infrastructure Runner self-registration failed");
-        throw new InvalidOperationException("Infrastructure Runner self-registration failed.");
     }
 
     /// <summary>
@@ -777,9 +764,6 @@ public class RunnerHostService
 
     internal Task<bool> EnrollAsync()
         => enrollmentWorkflow.EnrollAsync();
-
-    private Task<bool> RegisterInfrastructureRunnerAsync(string enrollmentApiKey)
-        => enrollmentWorkflow.RegisterInfrastructureRunnerAsync(enrollmentApiKey);
 
     private Task ApplyInstallationProfileAsync()
         => enrollmentWorkflow.ApplyInstallationProfileAsync();

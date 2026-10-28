@@ -18,7 +18,6 @@ public class RunnerService
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
     private readonly ResourceAuthorizationService authorizationService;
-    private readonly RunnerRegistrationService runnerRegistrationService;
     private readonly RunnerDeletionService runnerDeletionService;
     private readonly RunnerConnectionSessionService connectionSessionService;
     private readonly RunnerQueryService runnerQueryService;
@@ -32,7 +31,6 @@ public class RunnerService
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
         ResourceAuthorizationService authorizationService,
-        RunnerRegistrationService runnerRegistrationService,
         RunnerDeletionService runnerDeletionService,
         RunnerConnectionSessionService connectionSessionService,
         RunnerQueryService runnerQueryService,
@@ -42,7 +40,6 @@ public class RunnerService
         this.dbContext = dbContext;
         this.userContextService = userContextService;  // ✅ Store service reference
         this.authorizationService = authorizationService;
-        this.runnerRegistrationService = runnerRegistrationService;
         this.runnerDeletionService = runnerDeletionService;
         this.connectionSessionService = connectionSessionService;
         this.runnerQueryService = runnerQueryService;
@@ -59,9 +56,6 @@ public class RunnerService
 
     public Runner Get(Guid id)
         => runnerQueryService.Get(id);
-    public Task<int> Add(RunnerDetails runnerModel, CancellationToken cancellationToken = default)
-        => runnerRegistrationService.Add(runnerModel, cancellationToken);
-
     public Task UpdateConnection(
         Guid runnerId,
         Guid userId,
@@ -101,10 +95,6 @@ public class RunnerService
         }
 
         var capabilities = RunnerCapabilities.Normalize(runner.Capabilities, entity.Purpose);
-        if (RunnerCapabilities.RequiresAdministrator(capabilities) && !await runnerRegistrationService.IsAdministratorAsync(UserId, cancellationToken))
-        {
-            throw new UnauthorizedAccessException("Only an administrator may register a Runner with privileged capabilities.");
-        }
 
         entity.Name = runner.Name;
         entity.Version = runner.Version;

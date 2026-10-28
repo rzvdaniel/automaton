@@ -89,14 +89,6 @@ public sealed class RunnerConnectionLifecycleService(
         runner.ApiColor = runnerHeartbeat.ApiColor ?? apiInstanceIdentityService.ApiColor;
         ApplyInstallationReport(runner, runnerHeartbeat);
 
-        if (string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
-        {
-            var host = await dbContext.RunnerHosts
-                .SingleOrDefaultAsync(x => x.InfrastructureRunnerId == runner.Id, cancellationToken);
-            if (host != null)
-                host.LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc;
-        }
-
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -114,11 +106,6 @@ public sealed class RunnerConnectionLifecycleService(
         runner.Architecture = TrimOrNull(report.Architecture, 40);
         runner.ContainerHealth = TrimOrNull(report.ContainerHealth, 40);
 
-        if (RunnerPurposes.Normalize(runner.Purpose) == RunnerPurposes.Infrastructure
-            && RunnerPurposes.Normalize(report.Purpose) == RunnerPurposes.Infrastructure)
-        {
-            runner.CapabilitiesJson = RunnerCapabilities.Serialize(report.Capabilities, RunnerPurposes.Infrastructure);
-        }
     }
 
     private void ApplyConnectionDetails(Runner runner, RunnerDetails connection, DateTime now)

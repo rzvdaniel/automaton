@@ -18,7 +18,6 @@ public class AutomatonHub : Hub
     private const string RunnerMachineNameHeader = "RunnerMachineName";
     private const string RunnerPurposeHeader = "RunnerPurpose";
     private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
-    private const string RunnerHostIdHeader = "RunnerHostId";
     private const string HostedRunnerIdHeader = "HostedRunnerId";
     private const string RunnerImageDigestHeader = "RunnerImageDigest";
     private const string RunnerSpecificationVersionHeader = "RunnerSpecificationVersion";
@@ -227,7 +226,6 @@ public class AutomatonHub : Hub
                     .ToString()
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                 httpContext.Request.Headers[RunnerPurposeHeader].ToString()),
-            RunnerHostId = Guid.TryParse(httpContext.Request.Headers[RunnerHostIdHeader].ToString(), out var hostId) ? hostId : null,
             HostedRunnerId = Guid.TryParse(httpContext.Request.Headers[HostedRunnerIdHeader].ToString(), out var hostedRunnerId)
                 ? hostedRunnerId
                 : null,

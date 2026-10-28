@@ -5,8 +5,8 @@ using Automaton.Api.Services;
 using Automaton.Core.Constants;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
+using Automaton.Messaging.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
@@ -16,8 +16,8 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class HostContainerRelayServiceTests
 {
-    [TestCase(RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    [TestCase("Standard")]
+    [TestCase("PrivilegedHost")]
     public async Task LegacyProfilesCannotQueueHostedContainersEvenWithHistoricalHostBindings(string profile)
     {
         using var fixture = RelayFixture.Create();
@@ -28,7 +28,6 @@ public sealed class HostContainerRelayServiceTests
         Assert.That(result.Completed, Is.True);
         Assert.That(result.Result!.ErrorCode, Is.EqualTo("machine_runner_required"));
         Assert.That(result.Result.Error, Does.Contain("Assign a Management Runner"));
-        Assert.That(fixture.Events.Events, Is.Empty);
         Assert.That(fixture.Events.RunnerEvents, Is.Empty);
         Assert.That(await fixture.Db.HostContainerExecutionOperations.CountAsync(), Is.Zero);
         Assert.That(await fixture.Db.RunnerExecutionOperations.CountAsync(), Is.Zero);
@@ -55,7 +54,6 @@ public sealed class HostContainerRelayServiceTests
         var result = await fixture.Service.SubmitAsync(fixture.OtherAccountApiKeyId, fixture.Request(), CancellationToken.None);
 
         Assert.That(result.Result?.ErrorCode, Is.EqualTo("machine_runner_required"));
-        Assert.That(fixture.Events.Events, Is.Empty);
         Assert.That(await fixture.Db.HostContainerExecutionOperations.CountAsync(), Is.Zero);
     }
 
@@ -286,7 +284,7 @@ public sealed class HostContainerRelayServiceTests
             var hostedRunnerIdentity = new Runner
             {
                 Id = Guid.NewGuid(), Name = "hosted", ApiKeyId = ApiKeyId, Purpose = RunnerPurposes.Managed,
-                ApplicationProfile = RunnerApplicationProfiles.Standard, ConnectionId = "hosted-online"
+                ApplicationProfile = "Standard", ConnectionId = "hosted-online"
             };
             Host = new RunnerHost
             {
@@ -298,7 +296,7 @@ public sealed class HostContainerRelayServiceTests
             };
             Infrastructure = new Runner
             {
-                Id = Host.InfrastructureRunnerId!.Value, Name = "infra", Purpose = RunnerPurposes.Infrastructure,
+                Id = Host.InfrastructureRunnerId!.Value, Name = "infra", Purpose = "Infrastructure",
                 ConnectionId = "infra-online", LastHeartbeatAtUtc = DateTime.UtcNow,
                 ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
                 CapabilitiesJson = "[\"HostContainerExecution\"]", ApiInstanceId = "different-api-slot"
@@ -316,7 +314,7 @@ public sealed class HostContainerRelayServiceTests
             Db.Runners.AddRange(hostedRunnerIdentity, Infrastructure, new Runner
             {
                 Id = Guid.NewGuid(), Name = "other-account-hosted", ApiKeyId = OtherAccountApiKeyId,
-                Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.Standard
+                Purpose = RunnerPurposes.Managed, ApplicationProfile = "Standard"
             });
             Db.HostedRunners.Add(HostedRunner);
             Db.WebApps.Add(App);
@@ -384,12 +382,10 @@ public sealed class HostContainerRelayServiceTests
 
     private sealed class RecordingPublisher : IEventPublisher
     {
-        public List<InfrastructureCommandRequestedEvent> Events { get; } = [];
         public List<RunnerExecutionRequestedEvent> RunnerEvents { get; } = [];
 
         public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
         {
-            if (message is InfrastructureCommandRequestedEvent command) Events.Add(command);
             if (message is RunnerExecutionRequestedEvent runnerOperation) RunnerEvents.Add(runnerOperation);
             return Task.CompletedTask;
         }

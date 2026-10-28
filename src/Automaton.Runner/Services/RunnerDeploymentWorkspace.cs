@@ -84,10 +84,10 @@ internal sealed class RunnerDeploymentWorkspace(RunnerWorkspaceService workspace
         if (Directory.Exists(source)) CopyDirectory(source, destination);
     }
 
-    public static void ValidateIncomingActions(string extractRoot, bool allowPrivilegedCapabilities)
+    public static void ValidateIncomingActions(string extractRoot)
     {
         var sourceRoot = Path.Combine(extractRoot, "source");
-        foreach (var action in AppActionManifestParser.Discover(sourceRoot, allowPrivilegedCapabilities))
+        foreach (var action in AppActionManifestParser.Discover(sourceRoot))
         {
             var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
             var actionRoot = Path.GetFullPath(action.DirectoryPath);

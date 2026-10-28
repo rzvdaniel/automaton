@@ -14,9 +14,9 @@ namespace Automaton.Runner.Console.Tests;
 [NonParallelizable]
 public class StorageMeasurementTests
 {
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.MachineManagement)]
+    [TestCase(RunnerPurposes.Managed, "Standard")]
+    [TestCase("Infrastructure", "Standard")]
+    [TestCase("Infrastructure", RunnerApplicationProfiles.MachineManagement)]
     public async Task RetiredProfiles_DoNotMeasureOrSubmitStorageReports(string purpose, string profile)
     {
         var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");

@@ -119,8 +119,8 @@ public sealed class RunnerExecutionOperationTests
         Assert.That((await service.WaitAsync(id, CancellationToken.None)).Outcome, Is.EqualTo("Lost"));
     }
 
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost)]
+    [TestCase(RunnerPurposes.Managed, "Standard")]
+    [TestCase(RunnerPurposes.Managed, "PrivilegedHost")]
     public async Task RetiredApplicationProfilesAreRejected(string purpose, string profile)
     {
         await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner();
@@ -135,7 +135,7 @@ public sealed class RunnerExecutionOperationTests
     [Test]
     public async Task InfrastructureProfileRequiresAdministrator()
     {
-        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner(); runner.Purpose = RunnerPurposes.Infrastructure;
+        await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner(); runner.Purpose = "Infrastructure";
         runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }]; db.Runners.Add(runner); await db.SaveChangesAsync();
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => new RunnerExecutionAdmissionService(db, null!, null!)
             .AuthorizeAsync(runner.Id, actor, CancellationToken.None));

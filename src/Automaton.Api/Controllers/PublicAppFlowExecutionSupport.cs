@@ -130,7 +130,7 @@ internal static class PublicAppFlowExecutionSupport
     {
         var onlineRunners = (await runnerService.List(cancellationToken))
             .Where(runner => runner.Status == RunnerStatus.Online
-                && !RunnerCapabilities.RequiresAdministrator(runner.Capabilities))
+                && RunnerProfileRules.IsValid(runner.Purpose, runner.ApplicationProfile))
             .ToList();
         if (onlineRunners.Count == 0)
         {

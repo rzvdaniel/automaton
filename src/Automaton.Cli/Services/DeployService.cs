@@ -590,7 +590,6 @@ public sealed class DeployService
                 "Normal hosted Runner provisioning requires an Infrastructure Runner transport"))
         {
             nextSteps.Add("No eligible Runner Host is available for managed Hosted Runner provisioning.");
-            nextSteps.Add("An administrator should check that a non-production Runner Host is online, validated, approved, has capacity, and has an online protocol-4 Infrastructure Runner with HostContainerExecution.");
             return;
         }
 

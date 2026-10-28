@@ -27,9 +27,9 @@ public sealed class RunnerProtocolCompatibilityTests
             Assert.That(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands, Is.EqualTo("5"));
             Assert.That(RunnerApiCompatibilityVersions.Current, Is.EqualTo("5"));
             Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
-                Does.Not.Contain(RunnerCapabilities.HostContainerExecution));
-            Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
-                Does.Contain(RunnerCapabilities.HostContainerExecution));
+                Does.Not.Contain("HostContainerExecution"));
+            Assert.That(RunnerCapabilities.DefaultsForPurpose("Infrastructure"),
+                Does.Contain("HostContainerExecution"));
         });
     }
 

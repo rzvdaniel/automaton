@@ -120,7 +120,7 @@ public sealed class OrganizationAssignedAppAuthorizationTests
     public async Task ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned()
     {
         await using var fixture = await AppFixture.CreateAsync(assignApp: true, projectRole: ProjectRole.Developer);
-        var runnerId = await fixture.AssignMachineRunnerAsync(RunnerApplicationProfiles.Standard);
+        var runnerId = await fixture.AssignMachineRunnerAsync("Standard");
         var gateway = new RecordingActionGateway();
         var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
         using var input = JsonDocument.Parse("{}");
@@ -135,7 +135,7 @@ public sealed class OrganizationAssignedAppAuthorizationTests
     {
         await using var fixture = await AppFixture.CreateAsync(
             assignApp: true, projectRole: ProjectRole.Developer);
-        await fixture.AssignMachineRunnerAsync(RunnerApplicationProfiles.PrivilegedHost);
+        await fixture.AssignMachineRunnerAsync("PrivilegedHost");
         var gateway = new RecordingActionGateway();
         var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
         using var input = JsonDocument.Parse("{}");

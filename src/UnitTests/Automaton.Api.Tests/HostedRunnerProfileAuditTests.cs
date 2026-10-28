@@ -28,29 +28,6 @@ namespace Automaton.Api.Tests;
 public class HostedRunnerProfileAuditTests
 {
     [Test]
-    public async Task RegistrationDoesNotPersistSelfReportedApplicationProfile()
-    {
-        using var db = HostedRunnerAuditTestData.CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runnerId = Guid.NewGuid();
-        var accessor = HostedRunnerAuditTestHttpContext.Create(userId, "runner-owner@automaton.test");
-        var userContext = new UserContextService(accessor);
-        var runnerService = HostedRunnerProfileTestServiceFactory.Create(db, userContext);
-
-        await runnerService.Add(new RunnerDetails
-        {
-            Id = runnerId,
-            Name = "profile-self-report",
-            Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
-        });
-
-        var persisted = await db.Runners.SingleAsync(x => x.Id == runnerId);
-        Assert.That(persisted.ApplicationProfile, Is.Null);
-    }
-
-
-    [Test]
     public void ReconnectAndHeartbeatInstallationReportsCannotChangePersistedProfile()
     {
         var runner = new Runner
@@ -58,45 +35,20 @@ public class HostedRunnerProfileAuditTests
             Id = Guid.NewGuid(),
             Name = "profile-authoritative",
             Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost,
+            ApplicationProfile = "PrivilegedHost",
             ImageDigest = "old"
         };
 
         RunnerService.ApplyInstallationReport(runner, new RunnerDetails
         {
-            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ApplicationProfile = "Standard",
             ImageDigest = "new"
         });
 
-        Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(runner.ApplicationProfile, Is.EqualTo("PrivilegedHost"));
         Assert.That(runner.ImageDigest, Is.EqualTo("new"));
     }
 
-
-    [Test]
-    public void InfrastructureReconnectRefreshesAdvertisedCapabilities()
-    {
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infrastructure-capability-refresh",
-            Purpose = RunnerPurposes.Infrastructure,
-            CapabilitiesJson = RunnerCapabilities.Serialize(
-                [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
-                RunnerPurposes.Infrastructure)
-        };
-
-        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
-        {
-            Purpose = RunnerPurposes.Infrastructure,
-            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
-            Capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)
-        });
-
-        Assert.That(
-            RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
-            Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure)));
-    }
 
 
     [Test]
@@ -115,8 +67,7 @@ public class HostedRunnerProfileAuditTests
         RunnerService.ApplyInstallationReport(runner, new RunnerDetails
         {
             Purpose = RunnerPurposes.Managed,
-            Capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
-            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution
+            Capabilities = ["HostExecution", "HostContainerExecution"]
         });
 
         Assert.That(
@@ -124,31 +75,6 @@ public class HostedRunnerProfileAuditTests
             Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed)));
     }
 
-
-    [Test]
-    public void InfrastructureReconnectDoesNotInferCapabilitiesFromProtocol()
-    {
-        var runner = new Runner
-        {
-            Id = Guid.NewGuid(),
-            Name = "infrastructure-restricted-report",
-            Purpose = RunnerPurposes.Infrastructure,
-            CapabilitiesJson = RunnerCapabilities.Serialize(
-                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
-                RunnerPurposes.Infrastructure)
-        };
-
-        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
-        {
-            Purpose = RunnerPurposes.Infrastructure,
-            ApiCompatibilityVersion = RunnerApiCompatibilityVersions.HostContainerExecution,
-            Capabilities = [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution]
-        });
-
-        Assert.That(
-            RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
-            Is.EquivalentTo(new[] { RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution }));
-    }
 
 
     [Test]

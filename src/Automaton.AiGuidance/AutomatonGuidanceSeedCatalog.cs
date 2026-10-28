@@ -32,18 +32,6 @@ public static class AutomatonGuidanceSeedCatalog
             SortOrder: 100,
             OutputPath: null),
         new(
-            "shared/guidance/automaton-privileged-host-apps.md",
-            "automaton-privileged-host-apps",
-            "Automaton Privileged Host Apps",
-            "shared",
-            "Guidance",
-            "Security and capability rules for Privileged Host Apps.",
-            "[\"privileged-host\",\"security\"]",
-            RequiredByDefault: false,
-            IsModelLoadable: true,
-            SortOrder: 110,
-            OutputPath: null),
-        new(
             "studio/guidance/automaton-studio-editor.md",
             "automaton-studio-editor",
             "Automaton Studio Editor",

@@ -144,8 +144,6 @@ public sealed class AppActionExecutionService
             ExecutionId = execution.Id, AppId = appId, DeploymentTargetId = deploymentTargetId,
             ActionKey = actionKey, ExpectedDeploymentHash = deployedAction.ContentHash,
             Input = input.ValueKind == JsonValueKind.Undefined ? JsonSerializer.SerializeToElement<object?>(null) : input.Clone(),
-            SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
-                && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
         };
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {

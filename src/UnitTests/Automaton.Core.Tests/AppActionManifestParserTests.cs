@@ -90,11 +90,11 @@ public class AppActionManifestParserTests
     }
 
     [Test]
-    public void RejectsUnknownCapabilitiesEvenForSystemActions()
+    public void RejectsUnknownCapabilities()
     {
         var yaml = ValidManifest + "\n  capabilities:\n    - unrestricted-network\n";
 
-        var error = Assert.Throws<InvalidOperationException>(() => AppActionManifestParser.Parse(yaml, "hello", allowPrivilegedCapabilities: true))!;
+        var error = Assert.Throws<InvalidOperationException>(() => AppActionManifestParser.Parse(yaml, "hello"))!;
 
         Assert.That(error.Message, Does.Contain("not supported"));
     }

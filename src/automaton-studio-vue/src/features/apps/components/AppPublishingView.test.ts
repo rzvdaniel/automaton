@@ -55,7 +55,6 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     lastDeploymentAt: '2026-09-15T10:00:00Z',
     lastSuccessfulDeploymentAt: '2026-09-15T10:00:00Z',
     cleanupPending: false,
-    privilegedHostAccessApproved: false,
     routePath: '/a/app-id/',
     runner: { id: 'runner-id', name: 'Runner', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,

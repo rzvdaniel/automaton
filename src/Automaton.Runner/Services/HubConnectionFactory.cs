@@ -56,7 +56,7 @@ internal static class HubConnectionFactory
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         options.Headers.Add(
             RunnerCapabilitiesHeader,
-            string.Join(',', RunnerCapabilities.ForInstallationProfile(configuredCapabilities, purpose)));
+            string.Join(',', RunnerCapabilities.Normalize(configuredCapabilities, purpose)));
     }
 
     private static void AddOptionalHeader(HttpConnectionOptions options, string headerName, string environmentVariable)

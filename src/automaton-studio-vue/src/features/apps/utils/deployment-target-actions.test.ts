@@ -6,7 +6,7 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
   return {
     id: 'live-id', appId: 'app-id', name: 'Live', slug: 'hosted-control', isDefault: true,
     status: DeploymentTargetStatus.Running, genericRuntimeDeployed: true,
-    cleanupPending: false, privilegedHostAccessApproved: false, routePath: '/',
+    cleanupPending: false, routePath: '/',
     runner: { id: 'runner-id', name: 'Runner', purpose: 'Application', isHostedRunner: true, isOnline: true },
     ...overrides,
   }
@@ -33,7 +33,7 @@ describe('deployment target actions', () => {
 
   it('identifies the viewed target without selecting it', () => {
     const canary = target({ id: 'canary-id', name: 'Canary', slug: 'privileged-canary', isDefault: false, runner: { ...target().runner!, isHostedRunner: false, applicationProfile: 'PrivilegedHost' } })
-    expect(getDeployTargetOptionLabel(canary, 'canary-id')).toBe('Canary · Additional · Self-hosted · Privileged Host · Running · Viewing')
+    expect(getDeployTargetOptionLabel(canary, 'canary-id')).toBe('Canary · Additional · Retired self-hosted destination · Running · Viewing')
   })
 
   it('always uses CLI guidance when Studio deployment is disabled', () => {

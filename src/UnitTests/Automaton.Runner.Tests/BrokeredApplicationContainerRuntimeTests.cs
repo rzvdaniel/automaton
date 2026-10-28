@@ -107,11 +107,11 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         });
     }
 
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard, true, true)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, true, false)]
+    [TestCase(RunnerPurposes.Managed, "Standard", true, true)]
+    [TestCase(RunnerPurposes.Managed, "PrivilegedHost", true, false)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false, true)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard, false, false)]
-    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.Standard, true, false)]
+    [TestCase(RunnerPurposes.Managed, "Standard", false, false)]
+    [TestCase("Infrastructure", "Standard", true, false)]
     public void RuntimeSelectionRequiresSupportedManagedBrokerShape(string purpose, string profile, bool hasHostedId, bool expected)
         => Assert.That(RunnerApplicationContainerRuntimeSelection.UsesBroker(
             purpose, profile, hasHostedId ? Guid.NewGuid().ToString() : null), Is.EqualTo(expected));

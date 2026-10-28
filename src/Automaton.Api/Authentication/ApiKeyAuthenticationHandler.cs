@@ -13,7 +13,6 @@ namespace Automaton.Api.Authentication;
 public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 {
     public const string DefaultScheme = "ApiKey";
-    public const string InfrastructureRunnerEnrollmentScheme = "InfrastructureRunnerEnrollment";
     public string Scheme => DefaultScheme;
     public string HeaderName { get; set; } = "X-API-Key";
     public string QueryParameterName { get; set; } = "api_key";

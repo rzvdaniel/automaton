@@ -213,7 +213,7 @@ public class AppsStepExecutionService
         }
 
         var runners = await query.ToListAsync();
-        return runners.Where(r => !RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
+        return runners.Where(r => RunnerProfileRules.IsValid(r.Purpose, r.ApplicationProfile));
     }
 
     /// <summary>

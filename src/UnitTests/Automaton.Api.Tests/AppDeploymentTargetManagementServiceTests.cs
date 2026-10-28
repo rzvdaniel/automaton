@@ -228,9 +228,9 @@ public class AppDeploymentTargetManagementServiceTests
             Is.EqualTo(DeploymentTargetStatus.Unassigned));
     }
 
-    [TestCase(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.MachineManagement)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost)]
+    [TestCase("Infrastructure", RunnerApplicationProfiles.MachineManagement)]
+    [TestCase(RunnerPurposes.Managed, "Standard")]
+    [TestCase(RunnerPurposes.Managed, "PrivilegedHost")]
     public async Task Create_RejectsRetiredRunnerProfiles(string purpose, string profile)
     {
         await using var fixture = await TestFixtureContext.CreateAsync();

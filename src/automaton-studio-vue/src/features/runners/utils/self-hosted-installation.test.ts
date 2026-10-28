@@ -12,25 +12,6 @@ import {
 } from './self-hosted-installation'
 
 describe('self-hosted Runner installation form', () => {
-  it('accepts a Standard Runner without a host-access acknowledgement', () => {
-    expect(
-      canCreateSelfHostedInstallation('my-runner', RunnerApplicationProfiles.Standard, false)
-    ).toBe(true)
-  })
-
-  it('requires acknowledgement before creating a Privileged Host installation', () => {
-    expect(
-      canCreateSelfHostedInstallation(
-        'host-runner',
-        RunnerApplicationProfiles.PrivilegedHost,
-        false
-      )
-    ).toBe(false)
-    expect(
-      canCreateSelfHostedInstallation('host-runner', RunnerApplicationProfiles.PrivilegedHost, true)
-    ).toBe(true)
-  })
-
   it('requires acknowledgement before creating a Machine Management installation', () => {
     expect(
       canCreateSelfHostedInstallation(
@@ -56,11 +37,11 @@ describe('self-hosted Runner installation form', () => {
 
   it('sends only the name and selected application profile to the installation endpoint', () => {
     expect(
-      createSelfHostedInstallationRequest('  my-runner  ', RunnerApplicationProfiles.Standard)
+      createSelfHostedInstallationRequest('  my-runner  ', RunnerApplicationProfiles.MachineManagement, true)
     ).toEqual({
       runnerName: 'my-runner',
-      applicationProfile: 'Standard',
-      acknowledgeHostAccess: false,
+      applicationProfile: 'MachineManagement',
+      acknowledgeHostAccess: true,
     })
   })
 

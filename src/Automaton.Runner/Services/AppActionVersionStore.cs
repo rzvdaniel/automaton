@@ -163,7 +163,7 @@ internal sealed class AppActionVersionStore(RunnerWorkspaceService workspace)
         AppActionDeploymentOutputGuard.EnsureSafeTree(directory);
         var manifestPath = Path.Combine(directory, "action.yaml");
         if (!File.Exists(manifestPath)) throw new InvalidOperationException("Action version is missing action.yaml.");
-        var manifest = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
+        var manifest = AppActionManifestParser.ParseFile(manifestPath, actionKey);
         var entrypoint = Path.GetFullPath(Path.Combine(directory, manifest.Spec.Entrypoint));
         EnsureInside(directory, entrypoint);
         if (AppActionDeploymentOutputGuard.IsLink(entrypoint) || !File.Exists(entrypoint))

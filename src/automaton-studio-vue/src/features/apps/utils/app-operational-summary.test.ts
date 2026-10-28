@@ -13,7 +13,6 @@ function target(overrides: Partial<AppDeploymentTarget> = {}): AppDeploymentTarg
     genericRuntimeDeployed: false,
     lastSuccessfulDeploymentAt: null,
     cleanupPending: false,
-    privilegedHostAccessApproved: false,
     routePath: '/',
     runner: {
       id: 'runner-id',

@@ -153,26 +153,6 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
-    public async Task ApproveDeploymentTargetPrivilegedHostAccessAsync(
-        string appId,
-        string targetId,
-        CancellationToken ct = default)
-    {
-        using var resp = await PostJsonAsync(
-            $"api/apps/{appId}/targets/{targetId}/privileged-host-access", "{}", ct);
-        await EnsureSuccessAsync(resp);
-    }
-
-    public async Task RevokeDeploymentTargetPrivilegedHostAccessAsync(
-        string appId,
-        string targetId,
-        CancellationToken ct = default)
-    {
-        using var resp = await _http.DeleteAsync(
-            $"api/apps/{appId}/targets/{targetId}/privileged-host-access", ct);
-        await EnsureSuccessAsync(resp);
-    }
-
     public async Task DeleteDeploymentTargetAsync(
         string appId,
         string targetId,

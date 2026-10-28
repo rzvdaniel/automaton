@@ -25,15 +25,15 @@ public class TargetCommandStructureTests
     }
 
     [Test]
-    public void PrivilegedHostApproval_IsExplicitAndOldAcknowledgementFlagIsNotExposed()
+    public void DeploymentTargetCommands_DoNotExposeRetiredPrivilegedHostApproval()
     {
         var target = TargetCommand.Build(new ConfigService());
         var deploy = DeployCommand.Build(new ConfigService());
 
         Assert.Multiple(() =>
         {
-            Assert.That(target.Subcommands.Single(item => item.Name == "approve").Description, Does.Contain("Persist approval"));
-            Assert.That(target.Subcommands.Single(item => item.Name == "revoke").Description, Does.Contain("Revoke persisted"));
+            Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("approve-privileged-host"));
+            Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("revoke-privileged-host"));
             Assert.That(
                 target.Subcommands.SelectMany(item => item.Options).Any(option => option.Name == "acknowledge-privileged-host-access"),
                 Is.False);

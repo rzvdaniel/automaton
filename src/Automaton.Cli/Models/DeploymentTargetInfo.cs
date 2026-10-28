@@ -14,7 +14,4 @@ public sealed record DeploymentTargetInfo(
     bool IsDefault,
     string Status,
     DateTimeOffset? LastDeploymentAt,
-    DeploymentTargetRunnerInfo? Runner,
-    bool PrivilegedHostAccessApproved = false,
-    DateTimeOffset? PrivilegedHostAccessApprovedAtUtc = null,
-    string? PrivilegedHostAccessApprovedByUserId = null);
+    DeploymentTargetRunnerInfo? Runner);

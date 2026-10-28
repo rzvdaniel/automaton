@@ -40,7 +40,6 @@ public sealed class AppDeploymentTargetResolver(
 
         target.ExecutionRunner = await runnerAuthorizationPolicy.AuthorizeActionExecutionAsync(
             app, target.ExecutionRunnerId.Value, userId, cancellationToken);
-        PrivilegedHostAssignmentGuard.EnsureApproved(target, target.ExecutionRunner);
         return target;
     }
 

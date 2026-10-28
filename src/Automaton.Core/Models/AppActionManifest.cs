@@ -13,26 +13,16 @@ public static class AppActionRuntimes
 
 public static class AppActionCapabilities
 {
-    public const string Docker = "docker";
-    public const string Host = "host";
-
-    public static readonly IReadOnlySet<string> Privileged = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        Docker,
-        Host
-    };
-
-    public static readonly IReadOnlySet<string> Supported = Privileged;
+    public static readonly IReadOnlySet<string> Supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
 public static class AppActionExecutionScopes
 {
     public const string Worker = "Worker";
     public const string AppRunner = "AppRunner";
-    public const string InfrastructureRunner = "InfrastructureRunner";
     public static readonly IReadOnlySet<string> Supported = new HashSet<string>(StringComparer.Ordinal)
     {
-        Worker, AppRunner, InfrastructureRunner
+        Worker, AppRunner
     };
 }
 
@@ -92,7 +82,7 @@ public static class AppActionManifestParser
         .IgnoreUnmatchedProperties()
         .Build();
 
-    public static AppActionManifest Parse(string yaml, string actionKey, bool allowPrivilegedCapabilities = false)
+    public static AppActionManifest Parse(string yaml, string actionKey)
     {
         AppActionManifest manifest;
         try
@@ -105,15 +95,15 @@ public static class AppActionManifestParser
             throw new InvalidOperationException($"Action manifest YAML is invalid: {ex.Message}", ex);
         }
 
-        Validate(manifest, actionKey, allowPrivilegedCapabilities);
+        Validate(manifest, actionKey);
         manifest.Metadata.Key ??= actionKey;
         return manifest;
     }
 
-    public static AppActionManifest ParseFile(string manifestPath, string actionKey, bool allowPrivilegedCapabilities = false)
-        => Parse(File.ReadAllText(manifestPath), actionKey, allowPrivilegedCapabilities);
+    public static AppActionManifest ParseFile(string manifestPath, string actionKey)
+        => Parse(File.ReadAllText(manifestPath), actionKey);
 
-    public static IReadOnlyList<DiscoveredAppAction> Discover(string appSourceRoot, bool allowPrivilegedCapabilities = false)
+    public static IReadOnlyList<DiscoveredAppAction> Discover(string appSourceRoot)
     {
         var actionsRoot = Path.Combine(appSourceRoot, "actions");
         if (!Directory.Exists(actionsRoot))
@@ -136,18 +126,18 @@ public static class AppActionManifestParser
                 key,
                 directory,
                 manifestPath,
-                ParseFile(manifestPath, key, allowPrivilegedCapabilities)));
+                ParseFile(manifestPath, key)));
         }
 
         return actions;
     }
 
-    private static void Validate(AppActionManifest manifest, string actionKey, bool allowPrivilegedCapabilities)
+    private static void Validate(AppActionManifest manifest, string actionKey)
     {
         ValidateKey(actionKey);
         ValidateIdentity(manifest, actionKey);
         ValidateExecutionSettings(manifest.Spec);
-        ValidateCapabilities(manifest.Spec, allowPrivilegedCapabilities);
+        ValidateCapabilities(manifest.Spec);
         ValidateScheduling(manifest.Spec);
     }
 
@@ -172,13 +162,11 @@ public static class AppActionManifestParser
         ValidateRelativePath(spec.Entrypoint, "entrypoint");
     }
 
-    private static void ValidateCapabilities(AppActionSpec spec, bool allowPrivilegedCapabilities)
+    private static void ValidateCapabilities(AppActionSpec spec)
     {
         var unsupportedCapability = spec.Capabilities.FirstOrDefault(capability => !AppActionCapabilities.Supported.Contains(capability));
         if (unsupportedCapability != null)
             throw new InvalidOperationException($"Action capability '{unsupportedCapability}' is not supported.");
-        if (!allowPrivilegedCapabilities && spec.Capabilities.Any(AppActionCapabilities.Privileged.Contains))
-            throw new InvalidOperationException("Normal App Actions cannot request privileged host or Docker capabilities.");
     }
 
     private static void ValidateScheduling(AppActionSpec spec)

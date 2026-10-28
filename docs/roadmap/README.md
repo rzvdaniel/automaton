@@ -125,7 +125,7 @@ Demonstrated on 23 October 2026 using a separate development API, Studio, Worker
 
 The previous workstation-to-workload networking blocker was avoided by placing the isolated development control plane and Runner on the same test host. Existing databases and app volumes were preserved; only the separate development database was initialized/migrated. This does not close the deferred M1/M2 multi-user, Action, cancellation or restart/replay evidence. Second-machine acceptance remains deferred.
 
-Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment and legacy Infrastructure Runner commands are not upgrade instructions. Backup automation and Runner self-update are deferred.
+Manual backup requirements remain documented. Machine Management installations have no supported update/rollback procedure; re-enrollment creates a separate installation and is not an upgrade path. Backup automation and Runner self-update are deferred.
 
 A normal-user CLI exercise on 27 October created two static sites, an HTTP API
 and a reporting Action app through one authorized account and an explicitly

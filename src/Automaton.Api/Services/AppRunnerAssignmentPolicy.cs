@@ -59,7 +59,6 @@ public sealed class AppRunnerAssignmentPolicy(
             cancellationToken);
         if (target.ExecutionRunnerId != runner.Id)
         {
-            PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
             target.GenericRuntimeDeployed = false;
         }
         target.ExecutionRunnerId = runner.Id;
@@ -81,7 +80,6 @@ public sealed class AppRunnerAssignmentPolicy(
             cancellationToken);
         var runner = target.ExecutionRunner!;
 
-        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
 
         if (requireOnline &&
             !RunnerPresenceEvaluator.IsOnline(
@@ -100,7 +98,6 @@ public sealed class AppRunnerAssignmentPolicy(
     {
         var target = await targetResolver.ResolveAsync(appId, targetSlug, userId, cancellationToken);
         var runner = target.ExecutionRunner!;
-        PrivilegedHostAssignmentGuard.EnsureApproved(target, runner);
         if (!RunnerPresenceEvaluator.HasRecentHeartbeat(runner.LastHeartbeatAtUtc, DateTime.UtcNow))
             throw new InvalidOperationException("The assigned Runner is unavailable.");
         return runner;

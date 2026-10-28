@@ -15,7 +15,7 @@ An authenticated user creates an installation with:
 POST /api/self-hosted-runners/installations
 Content-Type: application/json
 
-{"runnerName":"my-runner","applicationProfile":"Standard"}
+{"runnerName":"my-runner","applicationProfile":"MachineManagement"}
 ```
 
 The response contains a one-time Docker command, an expiry time, the enrollment and
@@ -97,27 +97,11 @@ unused build stages had to be removed before the Runner image would fit. Preserv
 all running/rollback images and app/database volumes during maintenance. No updater,
 backup automation or legacy migration procedure is implied by this demonstration.
 
-## Profiles
+## Supported profile
 
-`Standard` uses the normal application Runner container configuration and does not
-mount the Docker socket, host PID namespace, or host root filesystem.
-
-`PrivilegedHost` preserves the approved application host-access arguments:
-`--privileged`, `--user 0`, `--pid host`, the Docker socket mount, and `/` mounted at
-`/host`. Unlike the Infrastructure Runner, it uses Docker bridge isolation rather than
-`--network host`, so its internal FastAPI (`8001`) and runtime gateway (`8080`) listeners
-do not collide with other Runner containers and are not published on the host. It still registers as a normal
-application Runner with the `PrivilegedHost` application profile; it is not an
-Infrastructure Runner and receives no Infrastructure capabilities or authorization.
-
-Privileged Host applications may read and modify host files, inspect host processes,
-inspect and control Docker containers, affect services and system state, and access
-secrets available on the host. Docker privilege is separate from Automaton API
-authorization.
-
-Self-hosted installations use their own container name, installation identity, and
-configuration directory, so they can coexist with Infrastructure and Automaton-hosted
-Runners on the same physical machine without sharing credentials.
+Machine Management is the only supported Runner profile. It has access to the Docker
+socket to manage bounded application and Action containers. User app code runs inside
+those containers; raw workflows and custom steps in the Runner process remain disabled.
 
 The generated command verifies Docker and the daemon, pulls the configured image,
 creates the container, checks that it remains running after startup, and prints a
@@ -152,14 +136,12 @@ a separate operator decision.
 
 Machine Management installations do not yet have a supported Runner update or
 rollback procedure. The generated Studio command is for enrolling a new installation;
-do not rerun it as an upgrade. Existing Infrastructure Runner repair/update commands
-and Compose-managed Runner instructions do not apply to Machine Management
-installations. Runner self-update and rollback remain deferred work.
+do not rerun it as an upgrade. Runner self-update and rollback remain deferred work.
 
 ## Manual testing
 
 Use an authenticated API key with the installation endpoint, save the returned
 `installationCommand`, and run it on a test Docker host. Then verify that the Runner
 appears under the requesting user's Runners and that its purpose is the normal
-application purpose. For a Privileged Host installation, verify the profile is
-`PrivilegedHost` and inspect the warning before running applications on a real host.
+application purpose and `MachineManagement` profile. Confirm the Runner is connected
+before assigning an app environment.

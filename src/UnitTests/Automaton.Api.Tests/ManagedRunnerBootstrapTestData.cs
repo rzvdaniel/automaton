@@ -129,7 +129,7 @@ internal static class ManagedRunnerBootstrapTestData
             Id = Guid.NewGuid(),
             Name = "managed-runner",
             Purpose = RunnerPurposes.Managed,
-            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ApplicationProfile = "Standard",
             CapabilitiesJson = RunnerCapabilities.Serialize(
                 RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
                 RunnerPurposes.Managed),
@@ -222,7 +222,6 @@ internal static class ManagedRunnerBootstrapTestData
         Guid ownerId,
         WebApp app,
         string profile,
-        bool privilegedHostApproved = false,
         bool offline = false)
     {
         SeedUser(db, ownerId, planId: null);
@@ -234,12 +233,6 @@ internal static class ManagedRunnerBootstrapTestData
         }
         var target = app.DeploymentTargets.Single(candidate => candidate.IsDefault);
         target.ExecutionRunnerId = runner.Id;
-        if (privilegedHostApproved)
-        {
-            target.PrivilegedHostAccessApproved = true;
-            target.PrivilegedHostAccessApprovedAtUtc = DateTime.UtcNow;
-            target.PrivilegedHostAccessApprovedByUserId = ownerId;
-        }
         db.SaveChanges();
         return runner.Id;
     }
@@ -286,10 +279,8 @@ internal static class ManagedRunnerBootstrapTestData
     {
         Id = Guid.NewGuid(),
         Name = "infrastructure-runner",
-        Purpose = RunnerPurposes.Infrastructure,
-        CapabilitiesJson = RunnerCapabilities.Serialize(
-            RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
-            RunnerPurposes.Infrastructure),
+        Purpose = "Infrastructure",
+        CapabilitiesJson = "[\"HostExecution\"]",
         ConnectionId = "infrastructure-connection",
         LastHeartbeatAtUtc = DateTime.UtcNow,
         LastConnectedAtUtc = DateTime.UtcNow,

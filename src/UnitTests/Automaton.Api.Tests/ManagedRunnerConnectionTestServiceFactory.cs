@@ -34,14 +34,12 @@ internal static class ManagedRunnerConnectionTestServiceFactory
         var auditEventService = new AuditEventService(db, userContext, new HttpContextAccessor());
         var applicationEventService = new ApplicationEventService(db);
         var sessionService = new RunnerConnectionSessionService(db, applicationEventService, userContext);
-        var registrationService = new RunnerRegistrationService(db, userContext, new RunnerAuditService(auditEventService));
         var queryService = new RunnerQueryService(db, authorization, userContext, sessionService);
 
         return new RunnerService(
             db,
             userContext,
             authorization,
-            registrationService,
             new RunnerDeletionService(db, new RunnerDeletionPolicy(db, authorization), auditEventService, userContext, RunnerExecutionTestServices.Revocation(db)),
             sessionService,
             queryService,
