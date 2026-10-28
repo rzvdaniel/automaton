@@ -54,24 +54,6 @@ public sealed class AppDeploymentTargetsController(
         Ok(await targetService.MakeDefaultAsync(
             appId, targetId, userContextService.GetUserId(), cancellationToken));
 
-    [HttpPost("{targetId:guid}/privileged-host-access")]
-    [Authorize(Policy = "Administrators")]
-    public async Task<ActionResult<AppDeploymentTargetSummary>> ApprovePrivilegedHostAccess(
-        Guid appId,
-        Guid targetId,
-        CancellationToken cancellationToken) =>
-        Ok(await targetService.SetPrivilegedHostApprovalAsync(
-            appId, targetId, userContextService.GetUserId(), true, cancellationToken));
-
-    [HttpDelete("{targetId:guid}/privileged-host-access")]
-    [Authorize(Policy = "Administrators")]
-    public async Task<ActionResult<AppDeploymentTargetSummary>> RevokePrivilegedHostAccess(
-        Guid appId,
-        Guid targetId,
-        CancellationToken cancellationToken) =>
-        Ok(await targetService.SetPrivilegedHostApprovalAsync(
-            appId, targetId, userContextService.GetUserId(), false, cancellationToken));
-
     [HttpPost("{targetId:guid}/assign-runner")]
     public async Task<ActionResult<AppDeploymentTargetSummary>> AssignRunner(
         Guid appId,

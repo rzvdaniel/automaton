@@ -18,6 +18,8 @@ public sealed class ActionScheduleProcessor(
     WorkerScheduledActionDispatcher workerDispatcher,
     ILogger<ActionScheduleProcessor> logger)
 {
+    // Historical InfrastructureAppTrust.PlatformAppId; retained rows must not dispatch.
+    internal static readonly Guid RetiredPlatformAppId = new("7a33f453-f04a-4d17-b767-8c94d9593d30");
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan MisfireTolerance = TimeSpan.FromSeconds(45);
     private readonly string leaseOwner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
@@ -28,7 +30,8 @@ public sealed class ActionScheduleProcessor(
         await workerDispatcher.DispatchAsync(now, cancellationToken);
         await DispatchQueuedAsync(now, cancellationToken);
         var ids = await db.ActionSchedules.AsNoTracking()
-            .Where(x => x.Enabled && x.NextRunAtUtc <= now
+            .Where(x => x.ApplicationId != RetiredPlatformAppId
+                && x.Enabled && x.NextRunAtUtc <= now
                 && (x.LeaseExpiresAtUtc == null || x.LeaseExpiresAtUtc < now))
             .OrderBy(x => x.NextRunAtUtc).Select(x => x.Id).Take(50).ToListAsync(cancellationToken);
         foreach (var id in ids)
@@ -63,7 +66,8 @@ public sealed class ActionScheduleProcessor(
 
     internal async Task<bool> TryClaimAsync(Guid scheduleId, DateTime nowUtc, CancellationToken cancellationToken)
         => await db.ActionSchedules
-            .Where(x => x.Id == scheduleId && x.Enabled && x.NextRunAtUtc <= nowUtc
+            .Where(x => x.Id == scheduleId && x.ApplicationId != RetiredPlatformAppId
+                && x.Enabled && x.NextRunAtUtc <= nowUtc
                 && (x.LeaseExpiresAtUtc == null || x.LeaseExpiresAtUtc < nowUtc))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.LeaseOwner, leaseOwner)
@@ -235,7 +239,8 @@ public sealed class ActionScheduleProcessor(
     private async Task DispatchQueuedAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
         var queued = await db.ActionScheduleOccurrences.AsNoTracking()
-            .Where(x => x.Status == ActionScheduleOccurrenceStatuses.Queued)
+            .Where(x => x.Status == ActionScheduleOccurrenceStatuses.Queued
+                && x.Schedule.ApplicationId != RetiredPlatformAppId)
             .OrderBy(x => x.ScheduledForUtc).Select(x => new { x.Id, x.ScheduleId }).Take(50).ToListAsync(cancellationToken);
         foreach (var item in queued)
         {

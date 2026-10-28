@@ -96,6 +96,8 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
             .FirstOrDefaultAsync(x => x.EnrollmentTokenHash == tokenHash, cancellationToken);
         if (enrollment is null || enrollment.Status != RunnerEnrollmentStatuses.Pending)
             return null;
+        if (RunnerApplicationProfiles.Normalize(enrollment.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement)
+            return null;
 
         var now = DateTime.UtcNow;
         if (enrollment.ExpiresAtUtc <= now)

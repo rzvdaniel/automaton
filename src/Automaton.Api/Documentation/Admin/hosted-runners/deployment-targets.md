@@ -45,9 +45,9 @@ The Live target receives the app's normal private URL and, when published, its p
 
 Users manage environments from **Apps → open an app → Settings → Environments**. The page separates **Live** from **Additional environments**. They can deploy an environment, open its preview, view logs, edit its name or slug and runtime destination, promote an additional environment to Live, and delete an additional environment.
 
-The normal destination label is **Automaton Hosted**, **Self-hosted · Standard**, **Self-hosted · Machine Management**, or **Self-hosted · Privileged Host**. Machine Management uses the machine's Docker socket through Automaton's typed app-container operations; web apps and isolated Actions run in bounded containers. Raw workflows and custom-step code remain disabled on this profile because those legacy handlers execute in the management process. Its installation creates a private Docker bridge and passes that bridge's validated gateway address to the Runner so it can reach published app-container ports; routed HTTP continues through the existing API runtime tunnel. Treat the management Runner as trusted infrastructure because a compromise could control host Docker. Its workspace and app data share an installation-scoped Docker volume; this profile does not enforce per-app disk quotas. Studio does not expose the identity of an Automaton-managed Hosted Runner in the normal destination selector. An **Advanced** section shows runner and target IDs, runtime transport, and the internal preview URL for troubleshooting.
+The supported destination is **Self-hosted · Machine Management**. Machine Management uses the machine's Docker socket through Automaton's typed app-container operations; web apps and isolated Actions run in bounded containers. Raw workflows and custom-step code remain disabled on this profile because those legacy handlers execute in the management process. Its installation creates a private Docker bridge and passes that bridge's validated gateway address to the Runner so it can reach published app-container ports; routed HTTP continues through the existing API runtime tunnel. Treat the management Runner as trusted infrastructure because a compromise could control host Docker. Its workspace and app data share an installation-scoped Docker volume; this profile does not enforce per-app disk quotas. An **Advanced** section shows runner and target IDs, runtime transport, and the internal preview URL for troubleshooting.
 
-To install a Machine Management Runner, open **Runners → Install Self-Hosted Runner** in Studio and prepare an Ubuntu host with Docker Engine installed and running. The generated command checks Ubuntu and Docker availability before pulling the Runner image. ext4 is the tested storage baseline, but working Docker storage on XFS or another supported filesystem is accepted. The command does not install Docker, move existing Docker data, or configure the filesystem.
+To install a Machine Management Runner, open **Runners → Install Machine Management Runner** in Studio and prepare an Ubuntu host with Docker Engine installed and running. The generated command checks Ubuntu and Docker availability before pulling the Runner image. ext4 is the tested storage baseline, but working Docker storage on XFS or another supported filesystem is accepted. The command does not install Docker, move existing Docker data, or configure the filesystem.
 
 After assigning a target to a Machine Management Runner, deploy it with the CLI (`automaton deploy` for Live or `automaton deploy <environment>` for a named target). The Runner builds source packages in a bounded container or pulls the declared runtime image, starts a candidate container, and waits for its configured HTTP readiness check before the target is marked deployed and its route is activated. A failed build or unhealthy replacement leaves the previous healthy runtime serving. App data is stored separately from replaceable source/runtime artifacts and survives updates and Runner restarts. Python Action dependencies are prepared in a bounded container, and Actions execute in bounded containers; dependency installation does not run on the management host.
 
@@ -79,9 +79,7 @@ data are not restored.
 Apply the app deletion-claim migration and update every API replica. Drain old API
 slots before exercising deletion; older API versions do not honor this claim.
 
-Release matching API, Hosted Runner, and Infrastructure Runner versions for this
-cleanup contract. Older Runners cannot perform the new container-discovery
-operation; do not rely on them to complete deletion.
+Release matching API and Machine Management Runner versions for this cleanup contract. Older Runners cannot perform the container-discovery operation; do not rely on them to complete deletion.
 
 ## Environment rollout and migration checklist
 
@@ -100,17 +98,15 @@ referenced target. Never delete target rows manually.
 For a release that changes target-aware SignalR methods, deploy API and Studio
 together and ask users to refresh existing Studio tabs. Verify one-environment
 deploy/publish, multi-environment preview and logs, Live promotion without
-redeployment, and Privileged Host approval state. Administrators grant or revoke
-approval on the target's Privileged Host access action; assignment remains
-blocked while approval is absent. If rollback is required,
+redeployment, and Machine Management Runner assignment. If rollback is required,
 restore the previous API and Studio revision without changing the database or
 deployed environment rows, then repeat the route, log, and publish smoke checks.
 
 ## Where administrators manage Runner infrastructure
 
-Use **Admin → Runners → Runner Hosts** for Infrastructure Runners and the servers they control.
+Manage Machine Management Runners from **Runners**. The old Admin Runner pages have been removed.
 
-Use **Admin → Hosted Runners → Runner Containers** for managed tenant Runner containers. A Hosted Runner container is not a Deployment Target: the container may execute several targets from different apps, while each target remains isolated by app and target identity.
+Each Machine Management Runner can host several app deployment targets; each target keeps its own app and environment identity.
 
 ## Target statuses
 
@@ -142,7 +138,7 @@ Changing a deployed target's Runner requires confirmation because the selected t
 
 ## Operational rule
 
-New workloads should use an explicitly assigned Machine Management Runner. The legacy **Runner Containers** view may be used for read-only historical inspection of existing Hosted Runner records; it cannot create or reprovision per-user Runner containers. Repair an Infrastructure Runner from **Admin → Runners → Runner Hosts**.
+Assign a Machine Management Runner explicitly for every new workload. Existing Hosted Runner records remain historical and cannot be managed through Studio.
 
 A failed package/runtime application, or a result accepted by no Runner, is a failed CLI deployment with a nonzero exit code. Inspect the reported failure and target/Runner logs before retrying. A failed replacement can leave the previous healthy runtime serving; that availability does not make the attempted deployment successful. Restore-point warnings remain distinct from runtime failure.
 

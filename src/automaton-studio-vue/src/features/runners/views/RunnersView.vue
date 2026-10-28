@@ -5,10 +5,7 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
-import TabView from 'primevue/tabview'
-import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import SelfHostedRunnerInstallDialog from '../components/SelfHostedRunnerInstallDialog.vue'
@@ -34,7 +31,6 @@ const authStore = useAuthStore()
 // State
 const loading = ref(true)
 const runners = ref<Runner[]>([])
-const showDeployDialog = ref(false)
 const showSelfHostedInstallDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
@@ -236,58 +232,6 @@ function confirmDelete(runner: Runner) {
   })
 }
 
-const cliCommand = `dotnet tool install --global Automaton.Cli
-automaton login
-automaton runner install`
-
-const dockerCommand = `docker run -d \\
-  --name automaton-runner \\
-  --restart unless-stopped \\
-  -e AUTOMATON_API_KEY=ak_your_key_here \\
-  -e AUTOMATON_RUNNER_NAME=My-Runner \\
-  rzvdaniel/automaton-runner:latest`
-
-const composeCommand = `services:
-  automaton-runner:
-    image: rzvdaniel/automaton-runner:latest
-    container_name: automaton-runner
-    restart: unless-stopped
-    environment:
-      AUTOMATON_API_KEY: ak_your_key_here
-      AUTOMATON_RUNNER_NAME: My-Runner`
-
-async function copyText(text: string, detail: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    toast.add({
-      severity: 'success',
-      summary: 'Copied',
-      detail,
-      life: 2000,
-    })
-  } catch (err) {
-    console.error('Failed to copy:', err)
-    toast.add({
-      severity: 'warn',
-      summary: 'Copy Failed',
-      detail: 'Could not copy to clipboard',
-      life: 3000,
-    })
-  }
-}
-
-function copyCliCommand() {
-  void copyText(cliCommand, 'CLI commands copied to clipboard')
-}
-
-function copyDockerCommand() {
-  void copyText(dockerCommand.replace(/\\\n/g, ''), 'Docker command copied to clipboard')
-}
-
-function copyComposeCommand() {
-  void copyText(composeCommand, 'Docker Compose file copied to clipboard')
-}
-
 // React to active project changes (including initial load)
 watch(
   () => projectsStore.activeProjectId,
@@ -313,9 +257,8 @@ onUnmounted(() => {
         <p class="text-color-secondary mt-1 mb-0">Remote execution agents for your workflows</p>
       </div>
       <div class="runners-page-header__actions">
-        <Button label="Other runner options" text @click="showDeployDialog = true" />
         <Button
-          label="Install Self-Hosted Runner"
+          label="Install Machine Management Runner"
           icon="pi pi-plus"
           @click="showSelfHostedInstallDialog = true"
         />
@@ -411,17 +354,16 @@ onUnmounted(() => {
 
           <p class="text-color-secondary text-sm mt-3 mb-0">
             <strong>Recommended:</strong> create a one-time Docker command for a self-hosted Runner
-            on a machine you own. API-key and CLI installation options remain available separately.
+            on a machine you own. The generated command enrolls this server securely.
           </p>
 
           <div class="flex gap-2 mt-4 justify-content-center">
             <Button
-              label="Install Self-Hosted Runner"
+              label="Install Machine Management Runner"
               icon="pi pi-plus"
               @click="showSelfHostedInstallDialog = true"
             />
-            <Button label="Other runner options" text @click="showDeployDialog = true" />
-          </div>
+              </div>
         </div>
       </template>
     </Card>
@@ -718,157 +660,7 @@ onUnmounted(() => {
       @created="handleSelfHostedInstallationCreated"
     />
 
-    <!-- Legacy Runner installation options -->
-    <Dialog
-      v-model:visible="showDeployDialog"
-      header="Deploy a runner"
-      :modal="true"
-      :style="{ width: '760px' }"
-    >
-      <p class="text-color-secondary mt-0 mb-4">
-        A runner connects your machine or server to Automaton and executes backend code for your apps.
-        Use the CLI for the easiest setup, or Docker if you prefer to manage the container yourself.
-      </p>
 
-      <Message severity="info" :closable="false" class="mb-4">
-        You'll need an <strong>API Key</strong> with Runner scope.
-        <router-link to="/apikeys" class="ml-1">Go to API Keys</router-link> to create one.
-      </Message>
-
-      <TabView>
-        <TabPanel header="CLI install" value="cli-install">
-          <div class="py-3">
-            <Message severity="success" :closable="false" class="mb-3">
-              <strong>Recommended.</strong> The Automaton CLI installs and configures the Docker runner container for you.
-            </Message>
-
-            <p class="mt-0 mb-3"><strong>Run these commands in your terminal:</strong></p>
-
-            <div class="code-block">
-              <pre class="code-content"><span class="cmd">dotnet tool install</span> --global Automaton.Cli
-<span class="cmd">automaton login</span>
-<span class="cmd">automaton runner install</span></pre>
-              <Button
-                icon="pi pi-copy"
-                size="small"
-                class="copy-btn"
-                @click="copyCliCommand"
-              />
-            </div>
-
-            <h4 class="mb-2">Requirements</h4>
-            <div class="config-table">
-              <div class="config-row">
-                <code class="config-key">.NET SDK</code>
-                <span class="config-desc">Required to install the Automaton CLI global tool</span>
-              </div>
-              <div class="config-row">
-                <code class="config-key">Docker</code>
-                <span class="config-desc">Required and must be running before installing the runner</span>
-              </div>
-              <div class="config-row">
-                <code class="config-key">API Key</code>
-                <span class="config-desc">Create a Runner-scoped key from API Keys</span>
-              </div>
-            </div>
-          </div>
-        </TabPanel>
-
-        <TabPanel header="Docker install" value="docker-install">
-          <div class="py-3">
-            <p class="mt-0 mb-3"><strong>Run the runner container directly:</strong></p>
-
-            <div class="code-block">
-              <pre class="code-content"><span class="cmd">docker run</span> -d \
-  --name automaton-runner \
-  --restart unless-stopped \
-  -e <span class="env">AUTOMATON_API_KEY</span>=<span class="val">ak_your_key_here</span> \
-  -e <span class="env">AUTOMATON_RUNNER_NAME</span>=<span class="val">My-Runner</span> \
-  rzvdaniel/automaton-runner:latest</pre>
-              <Button
-                icon="pi pi-copy"
-                size="small"
-                class="copy-btn"
-                @click="copyDockerCommand"
-              />
-            </div>
-
-            <h4 class="mb-2">Configuration</h4>
-            <div class="config-table">
-              <div class="config-row">
-                <code class="config-key">AUTOMATON_API_KEY</code>
-                <span class="config-desc">Required. Get this from API Keys</span>
-              </div>
-              <div class="config-row">
-                <code class="config-key">AUTOMATON_RUNNER_NAME</code>
-                <span class="config-desc">Optional display name shown in Studio</span>
-              </div>
-            </div>
-
-            <Message severity="info" :closable="false" class="mt-4">
-              By default, the runner connects to <code>https://api.automaton.monster</code>.
-              Set <code>AUTOMATON_API_URL</code> only if you use a custom or self-hosted Automaton API.
-            </Message>
-          </div>
-        </TabPanel>
-
-        <TabPanel header="Docker Compose" value="docker-compose">
-          <div class="py-3">
-            <p class="mt-0 mb-3"><strong>Create a docker-compose.yml file:</strong></p>
-
-            <div class="code-block">
-              <pre class="code-content"><span class="env">services</span>:
-  automaton-runner:
-    image: rzvdaniel/automaton-runner:latest
-    container_name: automaton-runner
-    restart: unless-stopped
-    environment:
-      <span class="env">AUTOMATON_API_KEY</span>: <span class="val">ak_your_key_here</span>
-      <span class="env">AUTOMATON_RUNNER_NAME</span>: <span class="val">My-Runner</span></pre>
-              <Button
-                icon="pi pi-copy"
-                size="small"
-                class="copy-btn"
-                @click="copyComposeCommand"
-              />
-            </div>
-
-            <p class="mt-0 mb-3"><strong>Start the runner:</strong></p>
-            <div class="code-block compact-code-block">
-              <pre class="code-content"><span class="cmd">docker compose up</span> -d</pre>
-            </div>
-
-            <Message severity="info" :closable="false" class="mt-4">
-              Docker Compose is a good option for VPS or server installations because the runner restarts automatically after reboot.
-            </Message>
-          </div>
-        </TabPanel>
-
-        <TabPanel header="Troubleshooting" value="troubleshooting">
-          <div class="py-3">
-            <p class="mt-0 mb-3"><strong>Useful commands:</strong></p>
-
-            <div class="code-block compact-code-block">
-              <pre class="code-content"><span class="cmd">docker ps</span>
-<span class="cmd">docker logs</span> -f automaton-runner
-<span class="cmd">automaton --version</span></pre>
-            </div>
-
-            <h4 class="mb-2">Runner does not appear online?</h4>
-            <ul class="env-list">
-              <li>Make sure Docker is installed and running.</li>
-              <li>Make sure the API key is valid and has Runner scope.</li>
-              <li>Make sure the machine can reach <code>https://api.automaton.monster</code>.</li>
-              <li>Check the runner logs for connection or authentication errors.</li>
-            </ul>
-          </div>
-        </TabPanel>
-      </TabView>
-
-      <template #footer>
-        <Button label="Close" text @click="showDeployDialog = false" />
-      </template>
-    </Dialog>
   </div>
 </template>
 

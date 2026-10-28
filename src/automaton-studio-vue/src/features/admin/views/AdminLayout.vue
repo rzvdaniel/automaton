@@ -30,12 +30,6 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/dashboard',
   },
   {
-    label: 'System',
-    icon: 'pi pi-shield',
-    to: '/admin/system',
-    routePrefix: '/admin/system',
-  },
-  {
     label: 'Users',
     icon: 'pi pi-users',
     to: '/admin/users',
@@ -88,12 +82,6 @@ const navItems: AdminNavItem[] = [
     icon: 'pi pi-credit-card',
     to: '/admin/subscription-plans',
     routePrefix: '/admin/subscription-plans',
-  },
-  {
-    label: 'Runners',
-    icon: 'pi pi-server',
-    to: '/admin/hosted-runners',
-    routePrefix: '/admin/hosted-runners',
   },
 ]
 

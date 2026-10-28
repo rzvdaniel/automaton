@@ -29,7 +29,6 @@ COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
 COPY system-apps/ /system-apps/
 COPY shared/ai-guidance/ /shared/ai-guidance/
-COPY scripts/install-infrastructure-runner.sh /scripts/install-infrastructure-runner.sh
 
 RUN dotnet publish Automaton.Api/Automaton.Api.csproj \
     -c Release \

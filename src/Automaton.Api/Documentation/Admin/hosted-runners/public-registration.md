@@ -31,9 +31,9 @@ To reopen, set the same property to `true` and apply it through the normal API d
 
 Signup is not an execution safeguard. Review each account in Administration > Users for roles and assigned/effective plan, then inspect its runners, apps and pending execution operations. Unassigned accounts may inherit the default active plan. Plan assignment does not create a Hosted Runner or determine Machine Management Runner access.
 
-Machine Management Runner assignment and execution depend on the existing app, workspace, and Runner authorization checks. Administrators manage Infrastructure Runner hosts separately. Existing Hosted Runner records may remain available for legacy lifecycle operations, but the platform no longer creates or provisions per-user containers.
+Machine Management Runner assignment and execution depend on the existing app, workspace, and Runner authorization checks. The former Infrastructure and Hosted Runner administration screens are retired. Existing records remain in the database as history.
 
-Before wider access, independently validate live image provenance, tenant authorization on execution and secret grants, privileged Infrastructure Runner separation, CPU/memory/PID limits, capability dropping/no-new-privileges, filesystem and Docker-socket isolation, writable-layer/durable-storage limits, outbound network restrictions, cancellation/timeouts and retry behavior. Source inspection and unit tests do not establish live enforcement. Do not revoke permissions, change subscriptions or stop workloads as part of this review.
+Before wider access, independently validate live image provenance, tenant authorization on execution and secret grants, CPU/memory/PID limits, capability dropping/no-new-privileges, filesystem and Docker-socket isolation, writable-layer/durable-storage limits, outbound network restrictions, cancellation/timeouts and retry behavior. Source inspection and unit tests do not establish live enforcement. Do not revoke permissions, change subscriptions or stop workloads as part of this review.
 
 ## GitHub login build configuration
 

@@ -44,6 +44,7 @@ public sealed class ActionScheduleService
     public async Task<ActionSchedule> CreateAsync(SaveActionScheduleRequest request, Guid userId, bool administrator, CancellationToken ct)
     {
         var system = InfrastructureAppTrust.IsTrustedApp(request.ApplicationId);
+        if (system) throw new InvalidOperationException("Legacy System Application schedules are retired. Create an administrator-owned App instead.");
         var capability = await GetCapabilityAsync(userId, administrator && system, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
         if (!system && await db.ActionSchedules.CountAsync(x => x.OwnerType == ActionScheduleOwnerTypes.User && x.OwnerUserId == userId, ct) >= capability.MaximumSchedules)
@@ -67,6 +68,8 @@ public sealed class ActionScheduleService
     {
         var schedule = await FindAuthorizedAsync(id, userId, administrator, ct);
         var requestedSystem = InfrastructureAppTrust.IsTrustedApp(request.ApplicationId);
+        if (InfrastructureAppTrust.IsTrustedApp(schedule.ApplicationId) || requestedSystem)
+            throw new InvalidOperationException("Legacy System Application schedules are retired. Create an administrator-owned App instead.");
         if ((schedule.OwnerType == ActionScheduleOwnerTypes.System) != requestedSystem)
             throw new InvalidOperationException("A schedule cannot change between user and system ownership.");
         var validationUserId = schedule.OwnerUserId ?? userId;
@@ -121,6 +124,8 @@ public sealed class ActionScheduleService
     public async Task ValidateForDispatchAsync(ActionSchedule schedule, CancellationToken ct)
     {
         var system = schedule.OwnerType == ActionScheduleOwnerTypes.System;
+        if (InfrastructureAppTrust.IsTrustedApp(schedule.ApplicationId))
+            throw new InvalidOperationException("Legacy System Application schedules are retired.");
         var userId = schedule.OwnerUserId ?? Guid.Empty;
         var capability = await GetCapabilityAsync(userId, administrator: system, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
@@ -161,6 +166,8 @@ public sealed class ActionScheduleService
     private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, bool administrator, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
     {
         var system = schedule.OwnerType == ActionScheduleOwnerTypes.System;
+        if (InfrastructureAppTrust.IsTrustedApp(schedule.ApplicationId))
+            throw new InvalidOperationException("Legacy System Application schedules are retired.");
         if (system != InfrastructureAppTrust.IsTrustedApp(schedule.ApplicationId))
             throw new InvalidOperationException("Schedule ownership does not match its application.");
         if (system && !administrator) throw new UnauthorizedAccessException("Only administrators may manage system schedules.");

@@ -10,7 +10,6 @@ internal static class CliCommandCatalog
     {
         var root = new RootCommand("Automaton CLI — create, deploy, and publish Automaton apps");
         AddCommands(root, config);
-        AddInstallAlias(root, config);
         root.Name = "automaton";
         return root;
     }
@@ -34,17 +33,10 @@ internal static class CliCommandCatalog
         root.AddCommand(LogsCommand.Build(config));
         root.AddCommand(PullCommand.Build(config));
         root.AddCommand(PublishCommand.Build(config));
-        root.AddCommand(RunnerCommand.Build(config));
         root.AddCommand(RunnersCommand.Build(config));
         root.AddCommand(SetRunnerCommand.Build(config));
         root.AddCommand(ConfigCommand.Build(config));
         root.AddCommand(TargetCommand.Build(config));
     }
 
-    private static void AddInstallAlias(RootCommand root, ConfigService config)
-    {
-        var install = new Command("install", "Install local Automaton components");
-        install.AddCommand(RunnerCommand.Build(config));
-        root.AddCommand(install);
-    }
 }

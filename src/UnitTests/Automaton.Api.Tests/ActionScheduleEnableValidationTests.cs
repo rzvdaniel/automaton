@@ -154,6 +154,34 @@ public sealed class ActionScheduleEnableValidationTests
     }
 
     [Test]
+    public async Task Create_RejectsRetiredSystemApplicationSchedule()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var request = new SaveActionScheduleRequest
+        {
+            ApplicationId = InfrastructureAppTrust.PlatformAppId,
+            ActionKey = "platform-action",
+            Name = "Retired platform schedule"
+        };
+
+        Assert.That(async () => await fixture.Service.CreateAsync(request, fixture.User.Id, administrator: true, CancellationToken.None),
+            Throws.InvalidOperationException.With.Message.Contains("retired"));
+        Assert.That(await fixture.Db.ActionSchedules.CountAsync(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Dispatch_RejectsHistoricalSystemApplicationSchedule()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Schedule.OwnerType = ActionScheduleOwnerTypes.System;
+        fixture.Schedule.OwnerUserId = null;
+        fixture.Schedule.ApplicationId = InfrastructureAppTrust.PlatformAppId;
+
+        Assert.That(async () => await fixture.Service.ValidateForDispatchAsync(fixture.Schedule, CancellationToken.None),
+            Throws.InvalidOperationException.With.Message.Contains("retired"));
+    }
+
+    [Test]
     public async Task Model_RepresentsSystemOwnershipWithoutAdministratorForeignKey()
     {
         await using var fixture = await Fixture.CreateAsync();

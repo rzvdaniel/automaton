@@ -33,6 +33,7 @@ public class AutomatonHub : Hub
     private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly ILogger<AutomatonHub> logger;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
+    private readonly RunnerExecutionIdentityService runnerIdentity;
 
     public AutomatonHub(
         RunnerService runnerService,
@@ -40,7 +41,8 @@ public class AutomatonHub : Hub
         ApiInstanceIdentityService apiInstanceIdentityService,
         TunnelRequestRegistry tunnelRegistry,
         ILogger<AutomatonHub> logger,
-        IAppDeploymentTargetResolver deploymentTargetResolver)
+        IAppDeploymentTargetResolver deploymentTargetResolver,
+        RunnerExecutionIdentityService runnerIdentity)
     {
         this.runnerService = runnerService;
         this.appsService = appsService;
@@ -48,6 +50,7 @@ public class AutomatonHub : Hub
         this.tunnelRegistry = tunnelRegistry;
         this.logger = logger;
         this.deploymentTargetResolver = deploymentTargetResolver;
+        this.runnerIdentity = runnerIdentity;
     }
 
     public override async Task OnConnectedAsync()
@@ -61,6 +64,7 @@ public class AutomatonHub : Hub
 
         try
         {
+            await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, GetUserId(), Context.ConnectionAborted);
             await UpdateRunnerConnection();
         }
         catch (UnauthorizedAccessException ex)
@@ -172,6 +176,7 @@ public class AutomatonHub : Hub
 
         try
         {
+            await runnerIdentity.EnsureAsync(GetApiKeyId(), runner.Id, userId, Context.ConnectionAborted);
             await runnerService.RecordHeartbeatAsync(runner.Id, userId, runner, CancellationToken.None);
         }
         catch (UnauthorizedAccessException ex)
@@ -252,6 +257,11 @@ public class AutomatonHub : Hub
 
         return userId;
     }
+
+    private Guid GetApiKeyId()
+        => Guid.TryParse(Context.User?.FindFirst("api_key_id")?.Value, out var apiKeyId)
+            ? apiKeyId
+            : Guid.Empty;
 
     private async Task UpdateRunnerConnection()
     {

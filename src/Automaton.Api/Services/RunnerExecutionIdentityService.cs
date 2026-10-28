@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-/// <summary>Preserves enrolled-key binding and existing owner-key BYO registration authorization.</summary>
+/// <summary>Requires an enrolled Machine Management Runner key for execution.</summary>
 public sealed class RunnerExecutionIdentityService(ApplicationDbContext db, ResourceAuthorizationService authorization)
 {
     public async Task<HostContainerExecutionResponse?> RevalidateHostContainerAssignmentAsync(
@@ -43,16 +43,9 @@ public sealed class RunnerExecutionIdentityService(ApplicationDbContext db, Reso
             throw new UnauthorizedAccessException("Runner API-key authentication and identity are required.");
         var runner = await db.Runners.AsNoTracking().SingleOrDefaultAsync(r => r.Id == runnerId, token)
             ?? throw new UnauthorizedAccessException("Runner was not found.");
-        if (runner.ApiKeyId.HasValue)
-        {
-            if (runner.ApiKeyId == keyId) return;
-            throw new UnauthorizedAccessException("The API key belongs to a different Runner.");
-        }
-        if (authenticatedUserId == Guid.Empty
-            || !await authorization.CanUpdateRunnerAsync(runnerId, authenticatedUserId, token))
-            throw new UnauthorizedAccessException("The owner API key cannot manage this BYO Runner.");
-        if (RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose)
-            && !await RunnerExecutionAdmissionService.IsAdministratorAsync(db, authenticatedUserId, token))
-            throw new UnauthorizedAccessException("Privileged Runner execution requires an administrator.");
+        if (RunnerPurposes.Normalize(runner.Purpose) != RunnerPurposes.Managed ||
+            RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) != RunnerApplicationProfiles.MachineManagement ||
+            runner.ApiKeyId != keyId)
+            throw new UnauthorizedAccessException("Only enrolled Machine Management Runners may execute operations.");
     }
 }

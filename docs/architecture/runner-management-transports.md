@@ -2,7 +2,9 @@
 
 The [self-hosted roadmap](../roadmap/README.md) selects refactoring the existing Runner. This guide describes the current transport and does not claim that refactoring is complete.
 
-Updated: 23 October 2026.
+Updated: 28 October 2026.
+
+The supported Runner is an enrolled Machine Management Runner. Its SignalR connection and HTTPS operations require the same persisted Runner API key; owner keys cannot impersonate a Runner. The former Admin Hosted/Infrastructure Runner screens, installers, and registration endpoints are retired. Bundled Infrastructure System Application Actions are no longer offered through Admin; new legacy system schedules are rejected, and the Worker skips retained platform schedules without deleting their history. A replacement system capability should be built as an ordinary administrator-owned App.
 
 Slice 5 and the isolation corrections are released; automatic cutover recovery from PR #348 is live as `3d890c29`. Both retained Runners use protocol v5 and CI #4978 immutable digest `sha256:3a535215a024c31f5169ae4a83dde57ada072ee3f1c1401bd81a6cf7e12a5da8`. Published media, BYO tunnel responses, two-account denial/authentication toggles, and rapid rollback/rollforward with queued earlier targets passed in production. No manual tunnel reconciliation was used in the final round trips; durable validation completed and queues drained. RM is complete for the installed x64 cohort. See the [historical automatic recovery evidence](https://github.com/rzvdaniel/automaton/blob/57941d9971f58409356a74cbcf2529292c2f8a61/docs/roadmap/managed-platform-completion-plan.md#automatic-recovery-acceptance--2026-10-05). Cross-host package/artifact availability remains unverified.
 

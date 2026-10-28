@@ -15,8 +15,6 @@ import AdminDashboardView from './views/AdminDashboardView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
-import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
-import AdminInfrastructureRunnersView from './views/AdminInfrastructureRunnersView.vue'
 import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUsersView from './views/AdminUsersView.vue'
@@ -24,7 +22,6 @@ import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
 import AdminUserRunnersView from './views/AdminUserRunnersView.vue'
 import AdminAppDetailView from './views/AdminAppDetailView.vue'
-import AdminSystemApplicationView from './views/AdminSystemApplicationView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -52,12 +49,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'Dashboard',
         },
-      },
-      {
-        path: 'system',
-        name: 'admin-system-application',
-        component: AdminSystemApplicationView,
-        meta: { title: 'System Application' },
       },
       {
         path: 'ai-providers',
@@ -162,26 +153,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'Subscription Plans',
         },
-      },
-      {
-        path: 'hosted-runners',
-        name: 'admin-hosted-runners',
-        component: AdminHostedRunnersView,
-        meta: {
-          title: 'Runners',
-        },
-      },
-      {
-        path: 'hosted-runners/infrastructure',
-        name: 'admin-infrastructure-runners',
-        component: AdminInfrastructureRunnersView,
-        meta: { title: 'Infrastructure Runners' },
-      },
-      {
-        path: 'hosted-runners/containers',
-        name: 'admin-hosted-runner-containers',
-        component: AdminHostedRunnersView,
-        meta: { title: 'Hosted Runners' },
       },
       {
         path: 'marketplace-apps',

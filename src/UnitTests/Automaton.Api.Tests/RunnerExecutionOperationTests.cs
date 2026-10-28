@@ -96,7 +96,7 @@ public sealed class RunnerExecutionOperationTests
     }
 
     [Test]
-    public async Task OwnerKeyCanExecuteUnboundByoRunnerButCannotBypassEnrolledKeyBinding()
+    public async Task OwnerKeyCannotExecuteUnboundRunner()
     {
         await using var db = Db();
         var actor = Guid.NewGuid(); var key = Guid.NewGuid(); var runner = Runner();
@@ -105,13 +105,6 @@ public sealed class RunnerExecutionOperationTests
         db.Runners.Add(runner); await db.SaveChangesAsync();
         var service = RunnerExecutionTestServices.Operations(db);
         var id = await service.QueueAsync(runner.Id, actor, new(Guid.NewGuid(), null), CancellationToken.None);
-        Assert.That((await service.AssignmentAsync(key, id, CancellationToken.None,
-            authenticatedUserId: actor, runnerId: runner.Id)).Disposition, Is.EqualTo("execute"));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.AssignmentAsync(key, id, CancellationToken.None,
-            authenticatedUserId: Guid.NewGuid(), runnerId: runner.Id));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.AssignmentAsync(key, id, CancellationToken.None,
-            authenticatedUserId: actor, runnerId: Guid.NewGuid()));
-        runner.ApiKeyId = Guid.NewGuid(); await db.SaveChangesAsync();
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.AssignmentAsync(key, id, CancellationToken.None,
             authenticatedUserId: actor, runnerId: runner.Id));
     }
@@ -128,14 +121,14 @@ public sealed class RunnerExecutionOperationTests
 
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.Standard)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost)]
-    public async Task SupportedApplicationProfilesNeedNoConnectionId(string purpose, string profile)
+    public async Task RetiredApplicationProfilesAreRejected(string purpose, string profile)
     {
         await using var db = Db(); var actor = Guid.NewGuid(); var runner = Runner();
         runner.Purpose = purpose; runner.ApplicationProfile = profile;
         runner.RunnerUsers = [new() { RunnerId = runner.Id, UserId = actor }];
         db.Runners.Add(runner); await db.SaveChangesAsync();
         var admission = new RunnerExecutionAdmissionService(db, null!, null!);
-        Assert.That(await admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None), Is.EqualTo(actor));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, actor, CancellationToken.None));
         Assert.ThrowsAsync<UnauthorizedAccessException>(() => admission.AuthorizeAsync(runner.Id, Guid.NewGuid(), CancellationToken.None));
     }
 
@@ -186,7 +179,7 @@ public sealed class RunnerExecutionOperationTests
             Is.EqualTo("cancel"));
     private static async Task AssertNotCompletedAsync(ApplicationDbContext db)
         => Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).CompletedAtUtc, Is.Null);
-    private static Runner Runner() => new() { Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "test", LastHeartbeatAtUtc = DateTime.UtcNow, RunnerUsers = [] };
+    private static Runner Runner() => new() { Id = Guid.NewGuid(), ApiKeyId = Guid.NewGuid(), Name = "test", Purpose = RunnerPurposes.Managed, ApplicationProfile = RunnerApplicationProfiles.MachineManagement, LastHeartbeatAtUtc = DateTime.UtcNow, RunnerUsers = [] };
     private sealed class Publisher : IEventPublisher
     {
         public RunnerExecutionRequestedEvent? Command { get; private set; }

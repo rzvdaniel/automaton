@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
@@ -42,83 +44,20 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         });
     }
 
-    [Test]
-    public async Task Create_StoresOnlyHashAndBuildsIsolatedStandardCommand()
-    {
-        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
-        var userId = Guid.NewGuid();
-        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, userId);
-
-        var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
-        {
-            RunnerName = "standard-self-hosted",
-            ApplicationProfile = "standard"
-        }, CancellationToken.None);
-
-        var enrollment = await db.SelfHostedRunnerEnrollments.SingleAsync();
-        Assert.That(response.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.Standard));
-        Assert.That(response.InstallationCommand, Does.Contain("automaton/runner"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("--privileged"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("/var/run/docker.sock"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("AUTOMATON_HOST_WORKSPACE_ROOT"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("/automaton/workspace"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("findmnt"));
-        Assert.That(enrollment.EnrollmentTokenHash, Does.Not.Contain("AUTOMATON_ENROLLMENT_TOKEN"));
-        Assert.That(enrollment.EnrollmentTokenHash, Is.Not.EqualTo(string.Empty));
-        Assert.That(enrollment.UserId, Is.EqualTo(userId));
-    }
-
-    [Test]
-    public async Task PrivilegedInstallation_UsesHostArgumentsButRemainsApplicationRunner()
+    [TestCase(RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    public async Task Create_RejectsRetiredRunnerProfiles(string profile)
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
         var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
 
-        var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        Assert.That(async () => await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
-            RunnerName = "privileged-self-hosted",
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
-        }, CancellationToken.None);
-
-        Assert.That(response.RequiresHostAccessAcknowledgement, Is.True);
-        Assert.That(response.HostAccessWarning, Does.Contain("host files"));
-        Assert.That(response.InstallationCommand, Does.Contain("--privileged"));
-        Assert.That(response.InstallationCommand, Does.Contain("--pid host"));
-        Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
-        Assert.That(response.InstallationCommand, Does.Contain("-v /:/host"));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            $"runtime_network='automaton-self-hosted-{response.InstallationId}-runtime'"));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            "docker network create \"$runtime_network\""));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            "docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' \"$runtime_network\""));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            "--network \"$runtime_network\""));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            "AUTOMATON_RUNTIME_HOST_ADDRESS=\"$runtime_host_address\""));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("AUTOMATON_RUNTIME_PUBLISH_ADDRESS"));
-        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_WORKSPACE_ROOT='/automaton/workspace'"));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            $"AUTOMATON_HOST_WORKSPACE_ROOT='/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            $"-v '/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace:/automaton/workspace'"));
-        Assert.That(response.InstallationCommand, Does.Contain(
-            $"mkdir -p '/opt/automaton/self-hosted-runners/{response.InstallationId}' '/opt/automaton/self-hosted-runners/{response.InstallationId}/workspace'"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
-        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_PURPOSE='Managed'"));
-        Assert.That(response.InstallationCommand, Does.Contain("docker image inspect --format '{{index .RepoDigests 0}}' \"$runner_image\""));
-        Assert.That(response.InstallationCommand, Does.Contain("case \"$resolved_image\" in"));
-        Assert.That(response.InstallationCommand, Does.Contain("@sha256:"));
-        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_IMAGE=$resolved_image"));
-        Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_IMAGE_DIGEST=$resolved_image"));
-        Assert.That(response.InstallationCommand, Does.Contain("\"$resolved_image\""));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("RUNNER_HOST_ID"));
-        Assert.That(response.InstallationCommand, Does.Not.Contain("HOSTED_RUNNER_ID"));
+            RunnerName = "retired-runner",
+            ApplicationProfile = profile,
+            AcknowledgeHostAccess = true
+        }, CancellationToken.None), Throws.TypeOf<ArgumentException>());
+        Assert.That(await db.SelfHostedRunnerEnrollments.CountAsync(), Is.Zero);
     }
 
     [Test]
@@ -180,35 +119,6 @@ public sealed class SelfHostedRunnerInstallationServiceTests
     }
 
     [Test]
-    public async Task MultiplePrivilegedInstallations_UseDistinctIdentityAndNoHostPorts()
-    {
-        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
-        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
-
-        var first = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
-        {
-            RunnerName = "privileged-one",
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
-        }, CancellationToken.None);
-        var second = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
-        {
-            RunnerName = "privileged-two",
-            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
-        }, CancellationToken.None);
-
-        Assert.That(second.InstallationId, Is.Not.EqualTo(first.InstallationId));
-        Assert.That(second.InstallationCommand, Is.Not.EqualTo(first.InstallationCommand));
-        Assert.That(first.InstallationCommand, Does.Not.Contain("--network host"));
-        Assert.That(second.InstallationCommand, Does.Not.Contain("--network host"));
-        Assert.That(first.InstallationCommand, Does.Not.Contain("-p 8001"));
-        Assert.That(first.InstallationCommand, Does.Not.Contain("-p 8080"));
-        Assert.That(first.InstallationCommand, Does.Not.Contain("--publish"));
-        Assert.That(second.InstallationCommand, Does.Not.Contain("-p 8001"));
-        Assert.That(second.InstallationCommand, Does.Not.Contain("-p 8080"));
-        Assert.That(second.InstallationCommand, Does.Not.Contain("--publish"));
-    }
-
-    [Test]
     public async Task Installer_VerifiesStartupAndReportsBoundedFailureWithoutTracingSecrets()
     {
         await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
@@ -217,7 +127,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
             RunnerName = "installer-feedback",
-            ApplicationProfile = RunnerApplicationProfiles.Standard
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+            AcknowledgeHostAccess = true
         }, CancellationToken.None);
 
         Assert.That(response.InstallationCommand, Does.Contain("command -v docker"));
@@ -260,7 +171,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         var installation = await ownerService.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
         {
             RunnerName = "private-status",
-            ApplicationProfile = RunnerApplicationProfiles.Standard
+            ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+            AcknowledgeHostAccess = true
         }, CancellationToken.None);
 
         var otherUserService = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
@@ -293,14 +205,41 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         AssertEnrollmentResult(result);
     }
 
+    [TestCase(RunnerApplicationProfiles.Standard)]
+    [TestCase(RunnerApplicationProfiles.PrivilegedHost)]
+    public async Task Exchange_RejectsPendingLegacyEnrollment(string profile)
+    {
+        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
+        const string token = "legacy-enrollment-token";
+        db.SelfHostedRunnerEnrollments.Add(new SelfHostedRunnerEnrollment
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerName = "legacy-runner",
+            ApplicationProfile = profile,
+            InstallationId = $"sh_{Guid.NewGuid():N}",
+            EnrollmentTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant(),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
+        });
+        await db.SaveChangesAsync();
+        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
+
+        var result = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
+        {
+            EnrollmentToken = token,
+            RunnerName = "legacy-runner"
+        }, CancellationToken.None);
+
+        Assert.That(result, Is.Null);
+        Assert.That(await db.Runners.CountAsync(), Is.Zero);
+    }
+
     private static void AssertEnrollmentResult(EnrollmentExchangeResult result)
     {
         Assert.That(result.Purpose, Is.EqualTo(RunnerPurposes.Managed));
-        Assert.That(result.Profile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
-        Assert.That(result.ResponseProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(result.Profile, Is.EqualTo(RunnerApplicationProfiles.MachineManagement));
+        Assert.That(result.ResponseProfile, Is.EqualTo(RunnerApplicationProfiles.MachineManagement));
         Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.ApplicationHosting));
         Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.WorkflowExecution));
-        Assert.That(result.Capabilities, Does.Not.Contain(RunnerCapabilities.DockerManagement));
+        Assert.That(result.Capabilities, Does.Contain(RunnerCapabilities.ManagedContainerExecution));
         Assert.That(result.HostedRunners, Is.Zero);
         Assert.That(result.RunnerHosts, Is.Zero);
         Assert.That(result.UserLinked, Is.True);
@@ -334,7 +273,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
             var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
             {
                 RunnerName = "status-runner",
-                ApplicationProfile = RunnerApplicationProfiles.Standard
+                ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+                AcknowledgeHostAccess = true
             }, CancellationToken.None);
             var enrollment = await db.SelfHostedRunnerEnrollments.SingleAsync();
             return new StatusScenario(db, service, installation.InstallationId, enrollment);
@@ -364,7 +304,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
                 Id = Guid.NewGuid(),
                 Name = enrollment.RunnerName,
                 Purpose = RunnerPurposes.Managed,
-                ApplicationProfile = RunnerApplicationProfiles.Standard,
+                ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
                 InstallationId = installationId,
                 Status = RunnerConnectivityStatuses.Unknown
             };
@@ -425,7 +365,8 @@ public sealed class SelfHostedRunnerInstallationServiceTests
             var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
             {
                 RunnerName = "registered-self-hosted",
-                ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
+                ApplicationProfile = RunnerApplicationProfiles.MachineManagement,
+                AcknowledgeHostAccess = true
             }, CancellationToken.None);
             var token = Regex.Match(
                 installation.InstallationCommand,

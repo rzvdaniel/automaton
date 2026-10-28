@@ -40,6 +40,29 @@ public sealed class ActionScheduleProcessorTests
     }
 
     [Test]
+    public async Task RetiredSystemApplicationSchedule_IsNotClaimedRepeatedly()
+    {
+        Assert.That(ActionScheduleProcessor.RetiredPlatformAppId, Is.EqualTo(InfrastructureAppTrust.PlatformAppId));
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        schedule.ApplicationId = InfrastructureAppTrust.PlatformAppId;
+        var dueAt = schedule.NextRunAtUtc;
+        await using var fixture = await ActionScheduleTestDatabase.CreateAsync(schedule);
+        await using var db = fixture.OpenContext();
+        var processor = Processor(db);
+
+        await processor.ProcessAsync(CancellationToken.None);
+        await processor.ProcessAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var retained = await db.ActionSchedules.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(retained.NextRunAtUtc, Is.EqualTo(dueAt));
+            Assert.That(retained.LeaseOwner, Is.Null);
+            Assert.That(db.ActionScheduleOccurrences.Count(), Is.Zero);
+        });
+    }
+
+    [Test]
     public async Task CompetingWorkers_OnlyOneClaimsAndCreatesOccurrence()
     {
         await using var fixture = await ActionScheduleTestDatabase.CreateAsync(Schedule(ActionScheduleTypes.Interval));
