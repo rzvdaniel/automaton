@@ -1,25 +1,24 @@
 ---
 name: production-deployment
-description: Use when changing or operating Automaton production deployment, Runner image release/publishing, production scripts, Compose, Traefik routes, certificates, health checks, blue-green cutovers, or rollback.
+description: Operate installer-managed Automaton releases, Runner publishing, routing, verification and recovery.
 license: Apache-2.0
 ---
 
 # Production deployment
 
-Use this skill for production operations and changes to production deployment machinery. A live deployment requires an explicit user request.
+A live deployment requires an explicit user request. Use the versioned installer and updater described in [the installation guide](../../../docs/prod/install-automaton.md). Source blue/green deploy scripts have been retired.
 
-## Current model
+## Server release and update
 
-API, Studio, and Website use blue-green services. The Worker is updated in place. Traefik serves public traffic and reads generated dynamic configuration. Hosted app traffic goes directly from the runtime edge to Runner endpoints.
+1. Check the Git working tree and preserve unrelated changes. Keep Git network operations under the deployment user; never copy Git credentials to root.
+2. Validate affected code and scripts, merge the reviewed change, and publish a versioned bundle through `.github/workflows/server-release.yml`.
+3. Inspect migrations and existing data before applying a release. Preserve configured signing/encryption keys, credentials, Data Protection keys and persistent volumes.
+4. Run the installation's `update.sh` (default `/opt/automaton-server/update.sh`). It verifies the release checksum, backs up configuration/database/key material and updates the application images. Never use the fresh installer to overwrite an existing configuration.
+5. Adopted installations can retain a reviewed `compose.override.yaml`; the updater must apply and back up the same override for the installed and candidate release. Do not silently upgrade their pinned database/broker versions.
+6. Verify container state, origin and public API/Studio/app routes, installation status and the certificate-validated Runner broker connection. Verify requested application behavior separately from deployment health.
+7. Report the installed release, updated services, verification results and any unavailable check. The marketing website remains separate from the standalone server bundle.
 
-Read the current scripts and [the production cheat sheet](../../../docs/prod/production-docker-cheat-sheet.md) before changing the workflow:
-
-- `scripts/prod-redeploy-api.sh`
-- `scripts/prod-redeploy-studio.sh`
-- `scripts/prod-redeploy-website.sh`
-- `scripts/prod-redeploy-worker.sh`
-- `scripts/prod-adopt-image-revisions.sh`
-- `scripts/prod-verify.sh`
+The updater's protected recovery directory is the rollback record. Image rollback after a migration may be unsafe; assess the database before restoring an earlier manifest. Retain backups unless the user explicitly authorizes their removal. Never delete live volumes as deployment cleanup.
 
 ## Runner image release authority
 
@@ -39,68 +38,10 @@ A local Docker build is development validation only. It is not a production
 release artifact. Do not infer that `latest` is in use because its tag changed.
 Record and verify the immutable RepoDigest used by each deployed Runner.
 
-## Docker maintenance
+## Storage and routing
 
-For on-host Docker builds, also apply [.agents/skills/production-docker-maintenance/SKILL.md](../production-docker-maintenance/SKILL.md).
+Apply [production Docker maintenance](../production-docker-maintenance/SKILL.md) for disk preflight and cleanup. Preserve active images, configured Runner artifacts and retained rollback images. No blanket image or volume pruning.
 
-Use it during preflight before starting a Docker build, whenever free disk is below its maintenance thresholds, and after a successful deployment to bound accumulated build cache. Do not bypass its volume, rollback-image, or destructive-prune safeguards. A production Docker build must not begin with less than 10 GB of free disk space.
+Apply routing configuration atomically. Verify actual routing after the file-provider update; a Traefik ping is insufficient. Only registered app routes should claim published app hostnames; wildcard TLS certificates do not require a wildcard API fallback. Deleted or unknown app hostnames must return 404.
 
-When space is unexpectedly low, that skill also covers host storage attribution and authorized cleanup of obsolete tagged images, archived journals, MySQL binary-log history and historical backups. Inspect these separately from live application data; deployment authorization alone does not authorize removing recovery history.
-
-## Rollback image retention
-
-Before replacing a production revision, retain the currently deployed API, Studio,
-and Website images under immutable Git revision tags such as
-`automaton-prod-api:<git-sha>`. Deploy scripts record the current and immediately
-previous revision in blue-green state and accept `--revision` to select an
-existing immutable image explicitly for rollback. Never rely on `latest`, dangling
-images, or build cache as the rollback artifact.
-
-If blue-green state predates revision metadata, run
-`scripts/prod-adopt-image-revisions.sh` once with an explicit known revision for
-each live service being adopted, for example `--api <sha> --studio <sha>
---website <sha>`. The command only verifies the live containers, tags their exact
-images, and records current revision metadata; it does not build, deploy, restart,
-switch colors, or change the database. Stop if any live image cannot be verified.
-
-If a live Studio or Website image cannot be attributed to a known Git revision,
-do not guess one. First preserve and verify an immutable recovery tag for the
-exact running image, then pass that tag to the corresponding redeploy command:
-`--current-artifact-ref <image-ref>`. The script compares the reference's image
-ID with the live container before it builds or changes traffic. This one-time
-path leaves historical Git revision metadata blank; after the new revision is
-accepted, the normal immutable revision metadata becomes authoritative.
-
-For a recovery rollback after the old color has stopped, use the separate
-`--recovery-artifact-ref <image-ref>` option. The complete one-time sequence is:
-
-```text
-live unknown image
-  -> capture its exact image ID
-  -> create a dedicated non-latest recovery tag
-  -> verify tag and live image IDs match
-  -> deploy the new known Git revision
-  -> retain the recovery tag through Stage 4 acceptance
-```
-
-If rollback is required, deploy the verified recovery tag without a build,
-complete the normal health and reachability checks, and then cut traffic back.
-The service's current Git revision becomes blank/unknown; the Docker artifact
-reference and Git revision are separate kinds of provenance. Never infer a Git
-SHA from a Docker tag or use `latest` as the recovery artifact.
-
-## Safety rules
-
-1. Run read-only preflight checks on the production checkout, live colors, services, and protected state.
-2. Keep Git network operations under the production `automaton` user. Keep network Git operations separate from privileged filesystem operations. Never copy credentials to root.
-3. Inspect tracked changes before advancing production. Never reset, clean, stash, overwrite, or delete production state without explicit approval. Treat private keys, `.env`, `secrets/`, `venv/`, backups, databases, generated runtime files, and test data as protected.
-4. Fetch `origin/main` and advance the checkout with a fast-forward only.
-5. Select services from the merged diff. Do not rebuild unchanged services.
-6. Render Traefik dynamic configuration atomically. Observe and validate the file-provider update before cutover. A Traefik ping alone does not validate the update.
-7. Build and warm the inactive color before cutover. Keep the previous color until health, warmup, routing, and rollback checks pass.
-8. For API cutovers, after switching traffic the redeploy script calls the active API to publish durable reconnect commands on the existing Runner management queues for all eligible registered protocol-compatible Runners, including disconnected Runners and those still recorded on the target color with earlier cutover commands queued. Bound-key registrations must retain an active API key; revoked Infrastructure Runner rows with removed queues are excluded. Legacy BYO registrations using owner credentials remain eligible. Connection presence is not an eligibility requirement. All connected eligible Runners must support protocol version 5; otherwise restore the prior API route and update those Runners before retrying. This bounded tunnel reconnect is not a management drain or registration-completion gate: do not poll drain status or require Runners to register before deployment completes. The Runner completes active tunnel requests when possible, then reconnects; an in-flight tunnel may be interrupted after its 20-second grace. If forward command publication fails, restore the prior route first, then use the still-running new API image to publish compensation commands targeting the restored color to all eligible registered protocol-v5 Runners, including disconnected Runners. The Runner retains the latest requested color until its API handshake confirms that target. This catches commands already delivered or still queued, and does not call the older API endpoint. If compensation publication fails, keep both API colors running and retry reconciliation. Full-stack rollback restores API, Studio, and Website selectors together before tunnel reconciliation.
-9. Run `scripts/prod-verify.sh` and report the deployed revision, services, live colors, tunnel reconnect signal result, and skipped services.
-
-Do not hardcode a service color, public domain, port, or secret. Do not delete production data in a deployment change. Inspect any migration and affected rows first.
-
-For shell changes, run `bash -n` on every changed production script. For production image or Dockerfile changes, validate the actual Docker build context in addition to a local solution build.
+For shell changes, run `bash -n` on every changed script. Validate production image changes with their actual Docker build context and CI artifact. Never log secrets or raw configuration values.

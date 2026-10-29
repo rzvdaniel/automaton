@@ -120,4 +120,4 @@ git diff --check
 
 For production shell changes, run `bash -n` on every touched script. For Studio UI, follow the studio-design visual checklist in addition to type-check.
 
-For production operations, follow the preflight, fast-forward, affected-service, blue-green, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request.
+For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request.

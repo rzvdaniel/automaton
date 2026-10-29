@@ -63,6 +63,6 @@ For cleanup beyond routine cache/dangling-image pruning, use the user's existing
 
 Before deleting staging or migration archives, inspect their purpose and compare their exact paths with container mounts and active configuration references. An old task directory may still contain mounted TLS files, initialization scripts or authentication keys. Keep those live files even if adjacent archives are obsolete. Never infer that all similarly named directories are disposable from authorization to remove one recovery copy.
 
-After cleanup, report bytes reclaimed and remaining free space, retained rollback artifacts, changed retention settings and any recovery history removed. Run production health verification. Record significant recovery-policy changes in the operational evidence; do not infer milestone acceptance from successful cleanup.
+After cleanup, report bytes reclaimed and remaining free space, retained rollback artifacts, changed retention settings and any recovery history removed. Verify the installer-managed services and their public/origin routes. Record significant recovery-policy changes in the operational evidence; do not infer milestone acceptance from successful cleanup.
 
 For the broader production workflow, read the [production cheat sheet](../../../docs/prod/production-docker-cheat-sheet.md).

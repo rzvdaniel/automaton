@@ -137,12 +137,11 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
     for name, rule, service in [('api', f'Host(`api.{domain}`)', 'api'),
                                 ('studio', f'Host(`studio.{domain}`)', 'studio'),
                                 ('studio-api', f'Host(`studio.{domain}`) && (PathPrefix(`/api`) || Path(`/auth/github/login`) || PathPrefix(`/signin-github`))', 'api'),
-                                ('apps', f'Host(`apps.{domain}`) || HostRegexp(`^.+\\.apps\\.{re.escape(domain)}$`)', 'api')]:
+                                ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
                                              tls={'certResolver': resolver}, priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
     if tls_mode == 'http':
         edge.pop('tls')
-        edge['http']['routers']['apps']['rule'] = f'Host(`apps.{domain}`)'
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))
 
 

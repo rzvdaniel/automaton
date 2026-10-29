@@ -92,7 +92,7 @@ cd /opt/automaton-server
 sudo docker compose --env-file release.env --env-file .env -f compose.yaml up -d --force-recreate api worker
 ```
 
-Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; use the updater below for a new release. Existing blue/green production deployments continue using their existing scripts and are not migrated by this installer.
+Preserve generated encryption/signing keys and Data Protection volumes. Back up the API Data Protection key ring together with the database; restored Studio-managed SMTP settings cannot be decrypted without the matching keys. Replacing keys can invalidate sessions or make existing encrypted records unreadable. Re-running the same installer preserves credentials and operator edits; missing keys fail with a restore instruction instead of silently replacing them. A different domain, TLS mode, configuration directory or release manifest is refused. This command resumes first installation; use the updater below for a new release. The retired source deployment scripts have been removed. Existing servers require a reviewed adoption before using the installer-managed updater.
 
 ## Update an installed server
 
@@ -108,9 +108,11 @@ For installations before the updater was bundled, transfer the reviewed `update-
 
 Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
 
-The distribution package and GitHub release assets are publicly readable, so installation and updates need no GitHub account. Existing blue/green source deployments use their separate deployment scripts.
+The distribution package and GitHub release assets are publicly readable, so installation and updates need no GitHub account. Legacy servers require a reviewed adoption before using this updater.
 
 ### Adopted production installations
+
+Registered app routes alone claim published app hostnames; wildcard TLS certificates do not route unknown or deleted hosts to the platform API.
 
 A reviewed migration can adopt an existing production server into this layout. The fresh installer does not perform that migration. Preserve the original database and broker versions, credentials, broker node identity, application and Data Protection volumes, certificate store, networks and public routes before cutting over. Never attach an existing database volume to a newer database image as part of layout adoption.
 

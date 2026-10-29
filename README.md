@@ -224,13 +224,7 @@ npm run build
 ### Production scripts
 
 ```bash
-bash -n scripts/prod-redeploy-all.sh
-bash -n scripts/prod-redeploy-api.sh
-bash -n scripts/prod-redeploy-worker.sh
-bash -n scripts/prod-redeploy-studio.sh
-bash -n scripts/prod-redeploy-website.sh
-bash -n scripts/prod-verify.sh
-bash -n scripts/prod-reset-blue-green.sh
+bash -n scripts/install-automaton.sh scripts/update-automaton.sh scripts/host-storage.sh
 ```
 
 Run only the commands relevant to the files you changed.

@@ -56,63 +56,21 @@ sudo ./setup-service.sh
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
 | `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
-| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for Traefik-based blue/green production deploys |
-| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color Traefik serves for API, Studio, and website |
-| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with a blue/green cutover |
-| `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with a blue/green cutover |
-| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with a blue/green cutover |
-| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
-| `prod-reset-blue-green.sh` | Linux/macOS | Reset live routing state to all-blue after blue containers are confirmed running |
-| `prod-verify.sh` | Linux/macOS | Verify Traefik configuration and routing, live colors, origin URLs, and public Cloudflare URLs |
 
 ---
 
-## 🚢 Production Docker Redeploy Helpers
+## Production installation and updates
 
-These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. Traefik reads the generated dynamic configuration and blue/green selectors under `.prod-runtime/traefik/`, and the scripts update those files before reloading Traefik to point each hostname at the freshly deployed color.
-
-```bash
-cd /opt/automaton
-./scripts/prod-switch-blue-green.sh status
-./scripts/prod-reset-blue-green.sh
-./scripts/prod-redeploy-api.sh
-./scripts/prod-redeploy-studio.sh
-./scripts/prod-redeploy-website.sh
-./scripts/prod-redeploy-all.sh
-./scripts/prod-verify.sh
-```
-
-CLI releases are independent of website deployment. When `src/Automaton.Cli` changes,
-run [Pack CLI and Runner](../.github/workflows/nuget.yml) on `main` with an explicit
-version and **publish** enabled to publish to NuGet.org; see
-[CLI NuGet publishing](../docs/prod/cli-nuget-publishing.md).
-Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window. Each API, Studio, and website build is also tagged with the full Git revision, and the current and immediately previous revision are recorded in blue-green state. Use `--revision <git-sha>` to explicitly deploy a retained image for rollback; do not rely on `latest` or dangling images.
-If blue-green state predates revision metadata, first adopt the known live image revisions without deploying:
+Use `install-automaton.sh` for a fresh standalone server and the installed `update.sh` for subsequent releases. See [the installation guide](../docs/prod/install-automaton.md).
 
 ```bash
-./scripts/prod-adopt-image-revisions.sh --api <sha> --studio <sha> --website <sha>
+sudo bash /opt/automaton-server/update.sh
+sudo bash /opt/automaton-server/install.sh --status
 ```
 
-The adoption command verifies the current live containers, tags their exact images, and records current revisions. It performs no build, restart, cutover, or database change.
-These production shell scripts are committed with the executable bit set, so a normal `git pull` on Linux should not show them as locally modified just because you ran `chmod +x` once.
+`host-storage.sh` provides storage inspection and bounded image maintenance. The retired source blue/green deployment helpers have been removed. The separately hosted marketing website is outside the server updater.
 
-Examples:
-
-```bash
-# First deployment on a fresh server, or a normal full-stack redeploy
-cd /opt/automaton
-./scripts/prod-redeploy-all.sh
-
-# Deploy website + Studio, but keep the previous color around for quick rollback
-./scripts/prod-redeploy-website.sh --keep-previous
-./scripts/prod-redeploy-studio.sh --keep-previous
-
-# Force just the API to the green color
-./scripts/prod-redeploy-api.sh --color green
-
-# See which color is currently live for each hostname
-./scripts/prod-switch-blue-green.sh status
-```
+CLI releases remain independent: run [Pack CLI and Runner](../.github/workflows/nuget.yml) with an explicit version and publish enabled. See [CLI NuGet publishing](../docs/prod/cli-nuget-publishing.md).
 
 ---
 
