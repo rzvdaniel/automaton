@@ -18,6 +18,13 @@ the process the effective port through `AUTOMATON_PORT`.
 Add an optional `application.health.path` when the process exposes an HTTP
 readiness endpoint. Store durable files below `AUTOMATON_APP_DATA_DIR`.
 
+## Live updates
+
+Automaton forwards each request to your app and returns the complete response
+when the app has finished it. WebSockets and streamed responses, such as
+Server-Sent Events, are not supported. For multiplayer games, dashboards, or
+other live views, poll a small JSON endpoint, for example once a second.
+
 ## Deploy
 
 ```bash

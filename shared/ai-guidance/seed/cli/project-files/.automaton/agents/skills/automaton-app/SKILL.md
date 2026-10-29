@@ -37,12 +37,9 @@ report, state what was tested and observed, link the published app or execution
 when available, and name any requested behavior that could not be verified.
 Deployment status, a reachable URL, or a local build alone is not proof.
 
-Use an assigned Machine Management Runner for new self-hosted applications. Do not use a
-Privileged Host Runner as an automatic fallback. Privileged Host approval is
-persisted per app environment: after explicit user approval, run
-`automaton target approve <environment>` and use
-`automaton target revoke <environment>` to remove it. If only a Privileged
-Host Runner appears usable, stop and ask the user for explicit approval.
+Use an assigned Machine Management Runner for new self-hosted applications. When the
+Live environment has none, `automaton deploy` assigns the only online Machine
+Management Runner available to the app; with several, use the Runner the user names.
 
 Dynamic HTTP apps must declare `application.runtime.command` and an explicit
 runtime image. Static sites use a build command and `build.outputDirectory`,

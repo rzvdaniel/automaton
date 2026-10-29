@@ -209,6 +209,7 @@ const isActive = (to: string) => {
         <Button
           v-if="isExpanded && !isMobile"
           v-tooltip.left="isPinned ? 'Unpin sidebar' : 'Pin sidebar'"
+          :aria-label="isPinned ? 'Unpin sidebar' : 'Pin sidebar'"
           :icon="isPinned ? 'pi pi-lock' : 'pi pi-thumbtack'"
           text
           rounded
@@ -227,6 +228,7 @@ const isActive = (to: string) => {
             <div v-for="item in section.items" :key="item.to" class="nav-item-wrapper">
               <Button
                 v-tooltip.right="tooltipOptions(item.label)"
+                :aria-label="item.label"
                 :class="[
                   'nav-item',
                   {
@@ -282,6 +284,7 @@ const isActive = (to: string) => {
         <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
             v-tooltip.right="tooltipOptions(item.label)"
+            :aria-label="item.label"
             :class="[
               'nav-item',
               {
@@ -318,6 +321,7 @@ const isActive = (to: string) => {
         <div v-for="item in visibleAdminNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
             v-tooltip.right="tooltipOptions(item.label)"
+            :aria-label="item.label"
             :class="[
               'nav-item',
               {

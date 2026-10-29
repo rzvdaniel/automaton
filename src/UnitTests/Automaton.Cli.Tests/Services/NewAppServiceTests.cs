@@ -208,8 +208,8 @@ public class NewAppServiceTests
         Assert.That(File.Exists(skillPath), Is.True);
         var skill = File.ReadAllText(skillPath);
         Assert.That(skill, Does.Contain("Use an assigned Machine Management Runner"));
-        Assert.That(skill, Does.Contain("automaton target approve <environment>"));
-        Assert.That(skill, Does.Contain("automaton target revoke <environment>"));
+        Assert.That(skill, Does.Contain("`automaton deploy` assigns the only online Machine"));
+        Assert.That(skill, Does.Not.Contain("automaton target approve"));
         Assert.That(skill, Does.Not.Contain("--acknowledge-privileged-host-access"));
     }
 

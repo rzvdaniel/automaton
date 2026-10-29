@@ -493,9 +493,16 @@ public class AutomatonApiClient : IDisposable
 
     // ── Runners ───────────────────────────────────────────────────────────────
 
-    public async Task<JsonElement> ListRunnersAsync(CancellationToken ct = default)
+    public Task<JsonElement> ListRunnersAsync(CancellationToken ct = default)
+        => ListRunnersAsync(projectId: null, ct);
+
+    // Without a project ID the server lists personal Runners; with one, the project's Runners.
+    public async Task<JsonElement> ListRunnersAsync(string? projectId, CancellationToken ct = default)
     {
-        using var resp = await _http.GetAsync("api/runners", ct);
+        var path = string.IsNullOrWhiteSpace(projectId)
+            ? "api/runners"
+            : $"api/runners?projectId={Uri.EscapeDataString(projectId)}";
+        using var resp = await _http.GetAsync(path, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }

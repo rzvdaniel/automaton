@@ -34,8 +34,7 @@ public static class LogsCommand
                 var (_, targets) = await targetService.ListAsync(cwd, environmentName, context.GetCancellationToken());
                 var target = DeploymentTargetService.SelectEnvironment(targets, targetSlug, nonInteractive);
                 var resolved = config.ResolveContext(config.TryLoadProjectConfig(cwd), cwd, environmentName);
-                var url = CliAppUrlBuilder.BuildStudioApplicationUrl(resolved.Server, resolved.AppId)
-                    + $"?target={Uri.EscapeDataString(target.Slug)}";
+                var url = CliAppUrlBuilder.BuildStudioLogsUrl(resolved.Server, resolved.AppId, target.Slug);
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, environment = target.Slug, url });

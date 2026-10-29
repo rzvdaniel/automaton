@@ -35,7 +35,7 @@ mkdir my-app && cd my-app
 automaton new "My App"
 ```
 
-The CLI currently requires the .NET 9 SDK for NuGet installation. The server installer uses containers and does not require a separate .NET installation. See the [CLI guide](https://automaton.monster/cli).
+The CLI requires the .NET 9 SDK or later for NuGet installation. The server installer uses containers and does not require a separate .NET installation. See the [CLI guide](https://automaton.monster/cli).
 
 Ask your coding agent to build the app. It should read the generated `AGENTS.md` and `automaton.json`, then validate, deploy and verify the real app behavior:
 

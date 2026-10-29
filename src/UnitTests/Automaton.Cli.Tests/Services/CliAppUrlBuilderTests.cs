@@ -67,4 +67,12 @@ public class CliAppUrlBuilderTests
 
         Assert.That(url, Is.EqualTo("https://studio.automaton.monster/apps/app-123"));
     }
+
+    [Test]
+    public void BuildStudioLogsUrl_OpensLogsViewForTheEnvironment()
+    {
+        var url = CliAppUrlBuilder.BuildStudioLogsUrl("https://api.automaton.monster", "app-123", "live");
+
+        Assert.That(url, Is.EqualTo("https://studio.automaton.monster/apps/app-123?view=logs&target=live"));
+    }
 }

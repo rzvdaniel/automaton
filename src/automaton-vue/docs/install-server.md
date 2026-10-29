@@ -46,7 +46,7 @@ dotnet tool install -g Automaton.Cli
 automaton login --server https://api.your-domain.com
 ```
 
-The NuGet tool currently requires the .NET 9 SDK. Approve login in your own Studio. Keep credentials out of AI chat. Continue with [your first app](./getting-started).
+The NuGet tool requires the .NET 9 SDK or later. Approve login in your own Studio. Keep credentials out of AI chat. Continue with [your first app](./getting-started).
 
 ## Update
 

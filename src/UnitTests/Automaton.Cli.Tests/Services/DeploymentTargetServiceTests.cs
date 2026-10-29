@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using NUnit.Framework;
@@ -143,4 +144,78 @@ public class DeploymentTargetServiceTests
         Assert.That(exception!.Message, Does.Contain("default, server-eu"));
         Assert.That(exception.Message, Does.Not.Contain("automaton logs"));
     }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_ReturnsTheOnlyOnlineMachineManagementRunner()
+    {
+        var runners = Runners(
+            Runner("runner-1", online: true),
+            Runner("runner-2", online: false));
+
+        Assert.That(DeploymentTargetService.SelectOnlyAvailableRunnerId(runners), Is.EqualTo("runner-1"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_IgnoresRunnersThatCannotRunApplications()
+    {
+        var runners = Runners(
+            Runner("runner-1", online: true),
+            Runner("runner-2", online: true, canExecuteApplications: false),
+            Runner("runner-3", online: true, profile: "Unknown"),
+            Runner("runner-4", online: true, hosted: true));
+
+        Assert.That(DeploymentTargetService.SelectOnlyAvailableRunnerId(runners), Is.EqualTo("runner-1"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_IgnoresStaleRunnerThatKeptItsConnection()
+    {
+        // A crashed Runner keeps its connection ID; the server reports it Offline once its heartbeat is stale.
+        var runners = Runners(Runner("runner-1", online: true), Runner("runner-2", online: false));
+
+        Assert.That(DeploymentTargetService.SelectOnlyAvailableRunnerId(runners), Is.EqualTo("runner-1"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_RequiresAChoiceWhenSeveralRunnersAreOnline()
+    {
+        var runners = Runners(Runner("runner-1", online: true), Runner("runner-2", online: true));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            DeploymentTargetService.SelectOnlyAvailableRunnerId(runners));
+
+        Assert.That(exception!.Message, Does.Contain("automaton set-runner"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_ExplainsWhenNoRunnerIsOnline()
+    {
+        var runners = Runners(Runner("runner-1", online: false));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            DeploymentTargetService.SelectOnlyAvailableRunnerId(runners));
+
+        Assert.That(exception!.Message, Does.Contain("no online Machine Management Runner"));
+    }
+
+    private static JsonElement Runners(params object[] runners)
+        => JsonSerializer.SerializeToElement(runners, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    // Mirrors the API's RunnerDetails JSON: status is a string enum and the connection ID survives a crash.
+    private static object Runner(
+        string id,
+        bool online,
+        bool canExecuteApplications = true,
+        string profile = "MachineManagement",
+        bool hosted = false)
+        => new
+        {
+            Id = id,
+            Name = id,
+            ConnectionId = $"connection-{id}",
+            Status = online ? "Online" : "Offline",
+            IsHostedRunner = hosted,
+            ApplicationProfile = profile,
+            CanExecuteApplications = canExecuteApplications
+        };
 }

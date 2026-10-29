@@ -6,7 +6,6 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import { useAuth } from '../composables/useAuth'
 import { authService } from '../services/auth.service'
@@ -21,7 +20,6 @@ const userSignUp = ref(false)
 // Form state
 const email = ref('')
 const password = ref('')
-const rememberMe = ref(false)
 const formErrors = ref<LoginFormErrors>({})
 const submitted = ref(false)
 
@@ -175,11 +173,7 @@ function continueWithGitHub() {
             </small>
           </div>
 
-          <div class="flex align-items-center justify-content-between">
-            <div class="flex align-items-center gap-2">
-              <Checkbox v-model="rememberMe" input-id="remember" binary :disabled="isLoading" />
-              <label for="remember" class="text-sm">Remember me</label>
-            </div>
+          <div class="flex align-items-center justify-content-end">
             <router-link to="/forgot-password" class="text-sm text-primary no-underline hover:underline">
               Forgot password?
             </router-link>

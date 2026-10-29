@@ -49,6 +49,10 @@ automaton deploy --publish --non-interactive
 automaton deploy --runner my-runner
 ```
 
+If the Live environment has no Runner yet, `automaton deploy` assigns the only
+online Machine Management Runner and reports it. With several online Runners,
+choose one with `--runner`.
+
 Use `automaton deploy <target-slug>` to select a remote deployment target. The
 `--env <name>` option selects the local project profile that contains the app
 link and credentials; it is not a remote target selector. Use
