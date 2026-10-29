@@ -15,10 +15,10 @@ type NavLink = {
 }
 
 const navLinks: NavLink[] = [
-  { label: 'Apps', href: '/apps' },
+  { label: 'Install', href: '/docs/install-server', external: true },
   { label: 'How it works', href: '/#architecture', hash: true },
   { label: 'Docs', href: '/docs/', external: true },
-  { label: 'Pricing', href: '/pricing' },
+  { label: 'Open source', href: '/pricing' },
 ]
 
 function isActiveLink(href: string, hash?: boolean, external?: boolean) {
@@ -41,7 +41,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       <RouterLink class="brand" to="/">
         <img :src="logoUrl" alt="" class="mark" aria-hidden="true" />
         <span class="brand-text">Automaton Monster</span>
-        <span class="preview-badge">Beta</span>
+        <span class="preview-badge">Early access</span>
       </RouterLink>
 
       <nav class="nav-links desktop-only" aria-label="Primary navigation">
@@ -61,10 +61,14 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       </nav>
 
       <div class="nav-actions desktop-only">
-        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Get Started</a>
+        <a :href="publicAppConfig.installUrl" class="button primary">Install Automaton</a>
       </div>
 
-      <button class="mobile-menu-btn mobile-only" type="button" @click="mobileMenuOpen = !mobileMenuOpen">
+      <button
+        class="mobile-menu-btn mobile-only"
+        type="button"
+        @click="mobileMenuOpen = !mobileMenuOpen"
+      >
         <i :class="mobileMenuOpen ? 'pi pi-times' : 'pi pi-bars'" />
       </button>
     </div>
@@ -85,7 +89,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       </component>
 
       <div class="mobile-menu-actions">
-        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Get Started</a>
+        <a :href="publicAppConfig.installUrl" class="button primary">Install Automaton</a>
       </div>
     </div>
   </header>

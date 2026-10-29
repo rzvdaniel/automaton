@@ -5,8 +5,8 @@ import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
 const installCommand = 'dotnet tool install -g Automaton.Cli'
-const loginCommand = 'automaton login'
-const setupCommand = 'automaton sync-ai'
+const loginCommand = 'automaton login --server https://api.your-domain.com'
+const setupCommand = 'automaton new "My App"'
 const deployCommand = 'automaton deploy'
 const publishCommand = 'automaton publish'
 const setupFlow = [
@@ -15,6 +15,7 @@ const setupFlow = [
   '',
   'mkdir iss-tracker',
   'cd iss-tracker',
+  setupCommand,
   '',
   '# Then ask your AI:',
   '# "Build a live ISS tracker with realtime orbital data."',
@@ -52,18 +53,30 @@ async function copyCode(key: string, code: string) {
             <span class="eyebrow">AI-native deployment workflow</span>
             <h1>Your AI already writes code. Automaton ships it.</h1>
             <p class="hero-copy">
-              Install the Automaton CLI, connect your AI coding workflow, and deploy real applications
-              without manually wiring infrastructure.
+              Install the Automaton CLI, connect your AI coding workflow, and deploy real
+              applications to your self-hosted Automaton server. Install the server first, or use
+              the API URL supplied by your administrator.
             </p>
 
             <div class="hero-actions">
-              <button class="button primary" type="button" @click="copyCode('install-command', installCommand)">
-                {{ copiedKey === 'install-command' ? 'Copied install command' : 'Copy install command' }}
+              <button
+                class="button primary"
+                type="button"
+                @click="copyCode('install-command', installCommand)"
+              >
+                {{
+                  copiedKey === 'install-command'
+                    ? 'Copied install command'
+                    : 'Copy install command'
+                }}
               </button>
-              <a class="button" href="/docs/cli-ai-tools">Open documentation</a>
+              <a class="button" :href="publicAppConfig.installUrl">Install the server first</a>
             </div>
 
-            <p class="secondary-note">Use your own AI tools. Host your own runners. Keep your own code.</p>
+            <p class="secondary-note">
+              The NuGet CLI requires the .NET 9 SDK. The server installer does not require a
+              separate .NET installation.
+            </p>
           </div>
 
           <article class="terminal">
@@ -78,13 +91,26 @@ async function copyCode(key: string, code: string) {
               <div class="cmd">$ {{ setupCommand }}</div>
 
               <div class="setup-card">
-                <div class="check"><span class="tick">✓</span><span><strong>Authenticated</strong> with Automaton Studio</span></div>
-                <div class="check"><span class="tick">✓</span><span><strong>Generated AI guidance</strong> for coding agents</span></div>
-                <div class="check"><span class="tick">✓</span><span><strong>Prepared deployment workflow</strong> for publish and runners</span></div>
+                <div class="check">
+                  <span class="tick">✓</span
+                  ><span><strong>Authenticated</strong> with Automaton Studio</span>
+                </div>
+                <div class="check">
+                  <span class="tick">✓</span
+                  ><span><strong>Generated AI guidance</strong> for coding agents</span>
+                </div>
+                <div class="check">
+                  <span class="tick">✓</span
+                  ><span
+                    ><strong>Prepared deployment workflow</strong> for publish and runners</span
+                  >
+                </div>
               </div>
 
-              <div class="cmd"><span class="muted"># Then ask your AI:</span>
-Build a live ISS tracker with Earth visualization and realtime orbital data.</div>
+              <div class="cmd">
+                <span class="muted"># Then ask your AI:</span> Build a live ISS tracker with Earth
+                visualization and realtime orbital data.
+              </div>
 
               <div class="cmd">$ {{ deployCommand }}</div>
             </div>
@@ -97,7 +123,8 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           <div class="section-head">
             <h2>Install once. Then just describe the app.</h2>
             <p>
-              Setup teaches your AI how Automaton apps work. After that, you describe the product — the agent handles structure, deployment, and publishing.
+              Setup teaches your AI how Automaton apps work. After that, you describe the product —
+              the agent handles structure, deployment, and publishing.
             </p>
           </div>
 
@@ -110,15 +137,20 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
             </article>
             <article class="step">
               <div class="step-number">2</div>
-              <h3>Run setup once</h3>
-              <p>Connect your workspace and give your AI agent local guidance for building Automaton apps.</p>
+              <h3>Connect to your instance</h3>
+              <p>
+                Connect your workspace and give your AI agent local guidance for building Automaton
+                apps.
+              </p>
               <div class="step-snippet">{{ setupCommand }}</div>
             </article>
             <article class="step">
               <div class="step-number">3</div>
               <h3>Ask for the app</h3>
               <p>Now the prompt becomes the product idea — not deployment instructions.</p>
-              <div class="prompt-bubble">"Build a live ISS tracker with Earth visualization and realtime orbital data."</div>
+              <div class="prompt-bubble">
+                "Build a live ISS tracker with Earth visualization and realtime orbital data."
+              </div>
             </article>
           </div>
         </div>
@@ -128,15 +160,31 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
         <div class="container">
           <div class="section-head">
             <h2>The workflow layer between AI-generated code and deployed software.</h2>
-            <p>Automaton CLI connects local AI tools, Automaton Studio, publishing, and optional server execution.</p>
+            <p>
+              Automaton CLI connects local AI tools, Automaton Studio, publishing, and optional
+              server execution.
+            </p>
           </div>
 
           <div class="flow">
-            <div class="flow-item"><strong>AI Agent</strong><span>Generates and edits the app locally.</span></div>
-            <div class="flow-item"><strong>Automaton CLI</strong><span>Applies structure, metadata, and deployment commands.</span></div>
-            <div class="flow-item"><strong>Automaton Studio</strong><span>Manages apps, deployments, publishing, and visibility.</span></div>
-            <div class="flow-item"><strong>Published App</strong><span>Goes live as public or private.</span></div>
-            <div class="flow-item"><strong>Runner</strong><span>Executes configured server logic locally or in Docker.</span></div>
+            <div class="flow-item">
+              <strong>AI Agent</strong><span>Generates and edits the app locally.</span>
+            </div>
+            <div class="flow-item">
+              <strong>Automaton CLI</strong
+              ><span>Applies structure, metadata, and deployment commands.</span>
+            </div>
+            <div class="flow-item">
+              <strong>Automaton Studio</strong
+              ><span>Manages apps, deployments, publishing, and visibility.</span>
+            </div>
+            <div class="flow-item">
+              <strong>Published App</strong><span>Goes live as public or private.</span>
+            </div>
+            <div class="flow-item">
+              <strong>Runner</strong
+              ><span>Executes configured server logic locally or in Docker.</span>
+            </div>
           </div>
         </div>
       </section>
@@ -157,20 +205,26 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           <div>
             <div class="section-head">
               <h2>Project structure</h2>
-              <p>Automaton apps stay simple. Editable source and optional server execution are described by the app contract.</p>
+              <p>
+                Automaton apps stay simple. Editable source and optional server execution are
+                described by the app contract.
+              </p>
             </div>
 
             <div class="code-panel">
-              <pre>iss-tracker/
+              <pre>
+iss-tracker/
 ├─ AGENTS.md
 ├─ .automaton/
 │  └─ app.json
 ├─ app-source/
-└─ automaton.json</pre>
+└─ automaton.json</pre
+              >
             </div>
 
             <p class="secondary-note">
-              AGENTS.md gives coding agents local guidance. Server-side execution is optional and follows the app contract.
+              AGENTS.md gives coding agents local guidance. Server-side execution is optional and
+              follows the app contract.
             </p>
           </div>
         </div>
@@ -211,11 +265,14 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
       <section>
         <div class="container split">
           <article class="runner-card">
-            <h2>Server runtimes need a Runner.</h2>
+            <h2>Every app needs a Runner.</h2>
             <p>
-              Static apps can deploy instantly. Apps with server logic execute through Automaton Runners.
+              All apps use a Machine Management Runner. Static sites share its static server; APIs
+              and Actions run in bounded containers.
             </p>
-            <p class="secondary-note">Run them locally, on your own server, in Docker, or later using managed runners.</p>
+            <p class="secondary-note">
+              Install a Runner from your Studio on the server or a separate supported machine.
+            </p>
 
             <div class="hero-actions">
               <a class="button" href="/docs/troubleshooting">Learn about runners</a>
@@ -223,10 +280,12 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
           </article>
 
           <div class="requirements">
-            <div class="requirement"><span>Static apps</span><span>Requires HTTP runtime</span></div>
+            <div class="requirement"><span>Static apps</span><span>Shared static server</span></div>
             <div class="requirement"><span>Server runtimes</span><span>Requires Runner</span></div>
-            <div class="requirement"><span>Self-hosted Runner</span><span>Available today</span></div>
-            <div class="requirement"><span>Managed Runner</span><span>Coming later</span></div>
+            <div class="requirement">
+              <span>Self-hosted Runner</span><span>Available today</span>
+            </div>
+            <div class="requirement"><span>Hosting</span><span>Your infrastructure</span></div>
           </div>
         </div>
       </section>
@@ -235,10 +294,16 @@ Build a live ISS tracker with Earth visualization and realtime orbital data.</di
         <div class="container cta-box">
           <div>
             <h2>Build and publish your first app in minutes.</h2>
-            <p>Install the setup flow, tell your AI what to build, then deploy directly to Automaton Monster.</p>
+            <p>
+              Install the server, connect the CLI to your API URL, then tell your AI what to build.
+            </p>
           </div>
 
-          <button class="button primary" type="button" @click="copyCode('setup-flow-bottom', setupFlow)">
+          <button
+            class="button primary"
+            type="button"
+            @click="copyCode('setup-flow-bottom', setupFlow)"
+          >
             {{ copiedKey === 'setup-flow-bottom' ? 'Copied setup flow' : 'Copy setup flow' }}
           </button>
         </div>
@@ -323,7 +388,11 @@ h1 {
   font-weight: 850;
   font-size: 0.92rem;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .button:hover {
@@ -409,7 +478,13 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
 }
 
 .check {
@@ -580,7 +655,9 @@ section {
   padding: 26px;
   border: 1px solid rgba(69, 230, 138, 0.25);
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(69, 230, 138, 0.08), rgba(80, 215, 255, 0.04)), rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(135deg, rgba(69, 230, 138, 0.08), rgba(80, 215, 255, 0.04)),
+    rgba(255, 255, 255, 0.04);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
@@ -630,7 +707,9 @@ section {
   padding: 30px;
   border: 1px solid rgba(69, 230, 138, 0.28);
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(69, 230, 138, 0.1), rgba(80, 215, 255, 0.05)), rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(135deg, rgba(69, 230, 138, 0.1), rgba(80, 215, 255, 0.05)),
+    rgba(255, 255, 255, 0.04);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 

@@ -11,17 +11,16 @@ import logoUrl from '@/assets/logo.svg'
           <img :src="logoUrl" alt="" class="footer-logo-icon" aria-hidden="true" />
           <span>Automaton</span>
         </div>
-        <p class="footer-tagline">The fastest way to turn your code into a live app.</p>
-        <p class="footer-preview-note">Automaton is currently available in Beta.</p>
+        <p class="footer-tagline">Build with AI. Deploy on your own server.</p>
+        <p class="footer-preview-note">Open source under Apache 2.0. Early access.</p>
         <div class="footer-social">
-          <a href="https://github.com" target="_blank" class="social-link" aria-label="GitHub">
+          <a
+            href="https://github.com/rzvdaniel/automaton"
+            target="_blank"
+            class="social-link"
+            aria-label="GitHub"
+          >
             <i class="pi pi-github" />
-          </a>
-          <a href="https://twitter.com" target="_blank" class="social-link" aria-label="Twitter">
-            <i class="pi pi-twitter" />
-          </a>
-          <a href="https://discord.com" target="_blank" class="social-link" aria-label="Discord">
-            <i class="pi pi-discord" />
           </a>
         </div>
       </div>
@@ -30,29 +29,35 @@ import logoUrl from '@/assets/logo.svg'
         <h4 class="footer-col-title">Product</h4>
         <a href="/apps" class="footer-link">Apps</a>
         <a href="/cli" class="footer-link">CLI</a>
-        <a href="/pricing" class="footer-link">Pricing</a>
-        <a href="#" class="footer-link">Changelog</a>
+        <a href="/pricing" class="footer-link">Open source &amp; hosting</a>
+        <a href="https://github.com/rzvdaniel/automaton/releases" class="footer-link">Releases</a>
       </div>
 
       <div class="footer-col">
         <h4 class="footer-col-title">Resources</h4>
         <a href="/docs/" class="footer-link">Docs</a>
         <a href="/cli" class="footer-link">CLI Install</a>
-        <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="footer-link">llms.txt</a>
+        <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="footer-link"
+          >llms.txt</a
+        >
         <a href="/docs/cli-ai-tools" class="footer-link">Build with AI</a>
       </div>
 
       <div class="footer-col">
-        <h4 class="footer-col-title">Company</h4>
-        <a href="#" class="footer-link">About</a>
-        <a href="mailto:hello@automaton.app" class="footer-link">Contact</a>
-        <a href="#" class="footer-link">Terms</a>
-        <a href="#" class="footer-link">Privacy</a>
+        <h4 class="footer-col-title">Project</h4>
+        <a :href="publicAppConfig.githubUrl" class="footer-link">Source code</a>
+        <a href="https://github.com/rzvdaniel/automaton/issues" class="footer-link">Contact</a>
+        <a href="https://github.com/rzvdaniel/automaton/blob/main/LICENSE" class="footer-link"
+          >Apache 2.0 license</a
+        >
+        <a :href="publicAppConfig.installUrl" class="footer-link">Install on your server</a>
       </div>
 
       <div class="footer-side">
         <p class="footer-side-copy">Built by a solo developer.</p>
-        <a href="mailto:hello@automaton.app" class="footer-cta">Get in touch <i class="pi pi-arrow-right" /></a>
+        <a href="https://github.com/rzvdaniel/automaton/issues" class="footer-cta"
+          >Project issues <i class="pi pi-arrow-right"
+        /></a>
         <div class="footer-copyright">© 2026 Automaton</div>
       </div>
     </div>
@@ -120,7 +125,9 @@ import logoUrl from '@/assets/logo.svg'
   border: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--color-text-muted);
-  transition: color 0.2s, border-color 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
 }
 
 .social-link:hover {

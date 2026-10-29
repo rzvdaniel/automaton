@@ -53,10 +53,10 @@ router.afterEach((to) => {
   const seo = to.meta?.seo as Partial<SeoMeta> | undefined
 
   applySeo({
-    title: seo?.title ?? 'Build and Deploy AI-Generated Apps',
+    title: seo?.title ?? 'Open-source App Deployment on Your Server',
     description:
       seo?.description ??
-      'Automaton Monster helps you build apps with AI. Frontend hosting is included, and your backend runs where you choose.',
+      'Automaton is an open-source platform for deploying web apps, APIs and Actions on your own server. Install your Studio, connect a Runner, and deploy with your AI tools.',
     path: to.path,
     noindex: seo?.noindex,
   })

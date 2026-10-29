@@ -24,9 +24,9 @@ export default defineConfig({
       { text: 'Apps', link: `${siteOrigin}/apps` },
       { text: 'Docs', link: '/' },
       { text: 'CLI', link: `${siteOrigin}/cli` },
-      { text: 'Pricing', link: `${siteOrigin}/pricing` },
+      { text: 'Open source', link: `${siteOrigin}/pricing` },
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/rzvdaniel/automaton' }],
     search: {
       provider: 'local',
     },
@@ -34,6 +34,7 @@ export default defineConfig({
       {
         text: 'Start Here',
         items: [
+          { text: 'Install Your Server', link: '/install-server' },
           { text: 'Build an Automaton App', link: '/build-an-automaton-app' },
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Build with AI Tools', link: '/cli-ai-tools' },

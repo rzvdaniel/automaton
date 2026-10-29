@@ -39,9 +39,13 @@ const defaultPublicAppsBaseUrl = import.meta.env.DEV
   ? defaultApiBaseUrl
   : 'https://apps.automaton.monster/'
 
-const publicSiteUrl = ensureTrailingSlash(import.meta.env.VITE_PUBLIC_SITE_URL || defaultPublicSiteUrl)
+const publicSiteUrl = ensureTrailingSlash(
+  import.meta.env.VITE_PUBLIC_SITE_URL || defaultPublicSiteUrl,
+)
 const studioUrl = ensureTrailingSlash(import.meta.env.VITE_STUDIO_URL || defaultStudioUrl)
-const publicAppsBaseUrl = trimTrailingSlash(import.meta.env.VITE_PUBLIC_APPS_BASE_URL || defaultPublicAppsBaseUrl)
+const publicAppsBaseUrl = trimTrailingSlash(
+  import.meta.env.VITE_PUBLIC_APPS_BASE_URL || defaultPublicAppsBaseUrl,
+)
 const apiBaseUrl = ensureTrailingSlash(import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl)
 
 export function getPublishedAppUrl(slug?: string | null): string {
@@ -77,6 +81,8 @@ export function getDeployedAppUrl(appId?: string | null): string {
 }
 
 export const publicAppConfig = {
+  installUrl: '/docs/install-server',
+  githubUrl: 'https://github.com/rzvdaniel/automaton',
   publicSiteUrl,
   studioUrl,
   publicAppsBaseUrl,

@@ -1,248 +1,69 @@
 # Automaton
 
-Automaton is an AI-first platform for building, deploying, publishing, and running web apps.
+**Build with AI. Deploy on your own server.**
 
-> **Pre-alpha:** Automaton is under active development. Interfaces, installation steps, and data formats may change without a migration path. Do not use it for sensitive production workloads yet.
+Automaton is an open-source platform for deploying web apps, APIs and Actions on infrastructure you control. Build locally with your preferred coding agent, deploy with the CLI, and manage apps in Studio.
 
-Build apps locally with your preferred AI coding agent, describe their build/runtime contract explicitly, deploy them with the Automaton CLI, and publish them through Automaton Studio. Applications may use any technology available in the selected Runner workspace.
+[Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/)
 
-> AI can code. Automaton helps it ship.
+> **Early access.** The core app lifecycle has been exercised on our production server. Clean-server acceptance and recovery testing remain limited. Plan backups and a brief interruption during server updates.
 
-## What Automaton provides
+## Install
 
-- **CLI-first app workflow** — create, pull, deploy, and publish Automaton apps from a local folder.
-- **Studio** — authenticated UI for apps, publishing, runners, API keys, AI keys, admin features, projects, and account management.
-- **Published app hosting** — expose a healthy application runtime through public Automaton app URLs.
-- **Generic application contract** — declare structured build/runtime commands, port, health, environment, and persistent storage without selecting a framework.
-- **Runner model** — run the declared application process on your own infrastructure or managed runner infrastructure.
-- **AI-agent harness** — repository instructions, skills, and verification guidance for tools like Claude Code, Codex, Cursor, and Copilot.
-
-## Build and release automation
-
-GitHub Actions builds [production images](.github/workflows/build.yml), publishes
-[Runner images](.github/workflows/runner-image.yml) to GHCR, and provides manual
-[CLI/Runner NuGet packages](.github/workflows/nuget.yml) and
-[native Runner archives](.github/workflows/release.yml). The existing
-[server release workflow](.github/workflows/server-release.yml) assembles installer
-releases. Container publication uses `GITHUB_TOKEN`; NuGet publication additionally
-requires the `NUGET_ORG_API_KEY` repository secret. Azure pipeline definitions
-have been retired; there is no replacement automated all-project C# test pipeline.
-
-## Install on your server
-
-The installer targets x86_64 Ubuntu 24.04 or newer. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. Before you begin, prepare `api`, `studio`, and `apps` DNS records (including `*.apps`), and allow inbound ports 80, 443 and 5671. The server needs at least 10 GiB free disk space.
-
-1. Download the public installer, review it, and run it. It selects the latest stable server release and verifies the release bundle before installing:
-
-   ```bash
-   curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
-   less install-automaton.sh
-   sudo bash install-automaton.sh
-   ```
-
-   It asks for your domain and certificate email, creates protected server credentials, then starts API, Studio, Worker, MySQL, RabbitMQ and Traefik. Missing Docker Engine and Compose are installed automatically; an existing Docker Engine is preserved.
-
-   Add `--version server-vX.Y.Z` to pin a published release. The [server installation guide](docs/prod/install-automaton.md) also shows how to download and verify a specific bundle before running it.
-
-2. Open `https://studio.example.com/install`. On the server, run `sudo cat /etc/automaton/secrets/setup-token`, paste the token into Studio, check the installation, and create your first administrator.
-3. Sign in and install a Machine Management Runner from **Runners** before deploying apps. You can install it on this server or another machine.
-
-See the [server installation guide](docs/prod/install-automaton.md) for Cloudflare certificates, custom paths, configuration, recovery and backup details.
-
-For installed servers, `sudo bash /opt/automaton-server/update.sh` selects the newest stable server release from the public GHCR distribution package and updates compatible API, Worker and Studio images after making a recovery backup. Add `--version server-vX.Y.Z` to choose a specific release. The release assets are also publicly downloadable; see the guide for the offline bundle path and update limits.
-
-## Core architecture
-
-- **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)
-- **Studio frontend**: Vue 3 + TypeScript + Vite + PrimeVue (`src/automaton-studio-vue/`)
-- **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Api/`)
-- **Worker**: .NET background worker for CAP/RabbitMQ consumers and async side effects (`src/Automaton.Worker/`)
-- **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
-- **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)
-- **Core libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`
-
-AI provider implementation currently lives under `src/Automaton.Mcp/`; check current project naming and intent before extending it.
-
-## App model
-
-Automaton apps use a source/runtime split. The source layout is application-defined; the persisted `application` contract describes how to build and run it:
-
-- `source/` — editable application source
-- `live/` — disposable deployed artifact/runtime output
-- `application.build.command` — optional structured build command
-- `application.runtime.command` — structured runtime command for HTTP/public applications; optional only for finite-work or Actions-only apps
-- `application.health` and `application.storage` — readiness and durable data policy
-
-Studio editing, CLI pull, remix/fork, snapshots, and import/export should prefer `source/`.
-
-Public app serving must never expose source files, secrets, logs, runner state, or unsafe file types.
-
-## Requirements
-
-- .NET 9 SDK
-- Node.js 18+ and npm/pnpm
-- MySQL 5.7+ or MariaDB 10.2+
-- Docker, for local database/runner workflows
-
-## Quickstart for repository development
-
-### 1. Start local infrastructure
+Use an **x86_64 Ubuntu 24.04+ server**, a domain, and at least **10 GiB free disk space**. Configure `api`, `studio`, `apps` and `*.apps` DNS records; allow inbound TCP **80, 443 and 5671**. The [install guide](docs/prod/install-automaton.md) explains certificates and networking.
 
 ```bash
-# From repo root
-docker compose -f docker-compose.dev.yml up -d mysql
-docker compose -f docker-compose.rabbitmq.yml up -d
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
+less install-automaton.sh
+sudo bash install-automaton.sh
 ```
 
-Configure the backend connection string:
+The installer selects the latest stable release, verifies the bundle, installs Docker if needed, and starts the server. No source build or GitHub account is required.
+
+1. Open `https://studio.your-domain.com/install`.
+2. Read `sudo cat /etc/automaton/secrets/setup-token` on the server and create your administrator in Studio.
+3. In **Runners**, install a Machine Management Runner on this machine or another server. Apps need a Runner, including static sites.
+
+## Build and publish an app
+
+Install the CLI on your development computer, then connect it to **your server**:
 
 ```bash
-cd src/Automaton.Api
-dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+dotnet tool install -g Automaton.Cli
+automaton login --server https://api.your-domain.com
+mkdir my-app && cd my-app
+automaton new "My App"
 ```
 
-Apply migrations:
+The CLI currently requires the .NET 9 SDK for NuGet installation. The server installer uses containers and does not require a separate .NET installation. See the [CLI guide](https://automaton.monster/cli).
+
+Ask your coding agent to build the app. It should read the generated `AGENTS.md` and `automaton.json`, then validate, deploy and verify the real app behavior:
 
 ```bash
-dotnet tool install --global dotnet-ef
-dotnet ef database update
+automaton validate
+automaton deploy
+automaton publish --yes
 ```
 
-### 2. Run Studio backend
+Approve CLI login in **your Studio** when prompted. Keep credentials out of AI chat.
+
+## Update
 
 ```bash
-cd src/Automaton.Api
-dotnet run
+sudo bash /opt/automaton-server/update.sh
 ```
 
-Swagger:
+The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker and Studio. These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically. See [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server).
 
-- `https://localhost:7091/swagger/index.html`
-- `https://localhost:7091/swagger/v1/swagger.json`
+## What you get
 
-### 3. Run Worker
+- **Your Studio and API** on your domain, with app, user and access management.
+- **Static sites, APIs and Actions** on your own machines. Static sites share a serving container; APIs and jobs use bounded containers.
+- **Persistent app data** across redeploys, explicit machine placement and multiple Runner machines.
+- **Your AI workflow** with CLI-generated agent instructions and deployment checks.
 
-```bash
-cd src/Automaton.Worker
-dotnet run
-```
+The software is free under [Apache 2.0](LICENSE). You pay for your servers, domain and any AI services you choose. There is no required Automaton cloud subscription. You operate the installation, updates and backups.
 
-### 4. Run Studio frontend
+## Contribute
 
-```bash
-cd src/automaton-studio-vue
-npm install
-npm run dev
-```
-
-Default Vite dev URL:
-
-```txt
-http://localhost:5173
-```
-
-### 5. Run website
-
-```bash
-cd src/automaton-vue
-npm install
-npm run dev
-```
-
-## Type generation
-
-Generate TypeScript types from the backend OpenAPI spec:
-
-```bash
-cd src/automaton-studio-vue
-npm run generate:types
-```
-
-Then verify:
-
-```bash
-npm run type-check
-npm run build
-```
-
-## Runner
-
-Use the provided Compose file for production-like runner deployment:
-
-```bash
-# From repo root
-cp .env.example .env
-
-# Configure environment in .env
-# AUTOMATON_SERVER_URL=https://your-server-url
-# AUTOMATON_API_KEY=ak_runner_xxx
-
-# Start runner
-docker compose -f docker-compose.runner.yml up -d
-
-# Tail logs
-docker compose -f docker-compose.runner.yml logs -f runner
-
-# Stop/remove
-docker compose -f docker-compose.runner.yml down
-```
-
-Alternative manual runner for local debugging:
-
-```bash
-cd src/Automaton.Runner
-dotnet build -c Release
-dotnet publish -c Release --self-contained false
-AUTOMATON_API_KEY=ak_runner_xxx automaton-runner
-```
-
-See detailed guidance in `docs/runners/docker-runner.md`.
-
-## Build and verification
-
-### Backend and tests
-
-```bash
-dotnet test
-```
-
-### Studio frontend
-
-```bash
-cd src/automaton-studio-vue
-npm run type-check
-npm run build
-```
-
-### Website
-
-```bash
-cd src/automaton-vue
-npm run build
-```
-
-### Production scripts
-
-```bash
-bash -n scripts/install-automaton.sh scripts/update-automaton.sh scripts/host-storage.sh
-```
-
-Run only the commands relevant to the files you changed.
-
-Agents should start with `AGENTS.md`, then read the matching skill from `.agents/skills/`.
-
-Repository-owned skills cover generic runtime behavior, production deployment, and administrator documentation. Developer-local skills may also exist there but are not part of the repository contract.
-
-## Documentation
-
-- [Self-hosted roadmap](docs/roadmap/README.md) — proposed direction and milestones for simplifying the existing Runner architecture
-- `AGENTS.md` — repository-level agent/developer contract
-- `.agents/skills/` — task-specific AI agent skills
-- `docs/dev/messaging-rabbitmq.md` — internal CAP + RabbitMQ event publishing/consumption architecture
-- production `appsettings.Production.json` is mounted into both `Automaton.Api` and `Automaton.Worker`; RabbitMQ/MySQL credentials live there, not in the public reverse proxy
-- `docs/runners/docker-runner.md` — runner deployment details
-- `src/automaton-studio-vue/REDESIGN_PLAN.md` — frontend redesign notes, if still relevant
-
-## License
-
-Licensed under the Apache License 2.0.
+See [repository development](docs/development.md), the [roadmap](docs/roadmap/README.md), and [GitHub issues](https://github.com/rzvdaniel/automaton/issues). Coding agents should start with [AGENTS.md](AGENTS.md).
