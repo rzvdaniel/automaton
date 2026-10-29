@@ -13,7 +13,7 @@ TOOL_NAME="automaton"
 
 # Ensure .NET is available
 if ! command -v dotnet &>/dev/null; then
-    echo "ERROR: .NET runtime not found."
+    echo "ERROR: .NET SDK not found."
     echo "Install the .NET SDK (9 or later) from https://dot.net and re-run this script."
     exit 1
 fi

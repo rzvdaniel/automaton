@@ -18,9 +18,10 @@ If you are in an empty directory and the user asks you to build an Automaton app
    requirements and available runtime environment. Do not assume that tools
    installed locally are available on the assigned Runner.
 
-Assign a Machine Management Runner to the app's deployment target in Studio or
-with `automaton target add`. Do not assume an unassigned or unsupported Runner
-can host the app.
+The app's deployment target needs a Machine Management Runner. `automaton deploy`
+assigns the only online one available to the app; otherwise assign one in Studio
+or with `automaton set-runner`. Do not assume an unassigned or unsupported
+Runner can host the app.
 
 For an existing remote app, use `automaton link <app-id>` instead of creating
 another app, then read the generated local guidance before making changes.

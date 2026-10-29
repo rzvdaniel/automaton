@@ -12,6 +12,10 @@ describe('pageTitleForRoute', () => {
     expect(pageTitleForRoute('billing')).toBe('Billing')
   })
 
+  it('prefers the title declared in route meta', () => {
+    expect(pageTitleForRoute('admin-ai-settings', 'AI Settings')).toBe('AI Settings')
+  })
+
   it('falls back to Dashboard without a route name', () => {
     expect(pageTitleForRoute(undefined)).toBe('Dashboard')
   })

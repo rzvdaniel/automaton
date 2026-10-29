@@ -177,7 +177,13 @@ internal static class DeployCommandHandler
         DeployArguments arguments,
         DeploymentPlan plan)
     {
-        var (target, preparation) = await EnsureRunnerAsync(invocation, arguments, plan);
+        var selection = await EnsureRunnerAsync(invocation, arguments, plan);
+        if (selection.Failure != null)
+        {
+            return selection.Failure;
+        }
+
+        var target = selection.Target;
         var result = await plan.DeployService.DeployAsync(
             plan.Directory, arguments.Clean, arguments.Directory,
             arguments.EnvironmentName, target, invocation.GetCancellationToken());
@@ -188,10 +194,15 @@ internal static class DeployCommandHandler
                 invocation.GetCancellationToken());
             result = DeployCommand.ApplyTargetIdentity(result, target);
         }
-        return DeployCommand.MergePreparation(result, preparation);
+        return DeployCommand.MergePreparation(result, selection.Preparation);
     }
 
-    private static async Task<(DeploymentTargetInfo Target, DeployPreparationResult Preparation)> EnsureRunnerAsync(
+    private sealed record RunnerSelection(
+        DeploymentTargetInfo Target,
+        DeployPreparationResult Preparation,
+        DeployResult? Failure = null);
+
+    private static async Task<RunnerSelection> EnsureRunnerAsync(
         InvocationContext invocation,
         DeployArguments arguments,
         DeploymentPlan plan)
@@ -201,18 +212,47 @@ internal static class DeployCommandHandler
         {
             var assigned = await plan.TargetService.AssignRunnerAsync(
                 plan.Directory, plan.Target, arguments.Runner, arguments.EnvironmentName, cancellationToken);
-            return (assigned, plan.Preparation);
+            return new(assigned, plan.Preparation);
         }
         if (plan.Target.Runner != null)
         {
-            return (plan.Target, plan.Preparation);
+            return new(plan.Target, plan.Preparation);
         }
 
         // ValidateTarget only lets the Live environment through without a Runner, as a new app has none yet.
-        var target = await plan.TargetService.AssignOnlyAvailableRunnerAsync(
-            plan.Directory, plan.Target, arguments.EnvironmentName, cancellationToken);
-        return (target, BuildPreparation(target, assignedAutomatically: true));
+        // Validate the project first so a broken project is not left with a new assignment.
+        var invalidProject = plan.DeployService.ValidateLocalProject(
+            plan.Directory, arguments.Clean, arguments.Directory, arguments.EnvironmentName);
+        if (invalidProject != null)
+        {
+            return new(plan.Target, plan.Preparation, invalidProject);
+        }
+        try
+        {
+            var target = await plan.TargetService.AssignOnlyAvailableRunnerAsync(
+                plan.Directory, plan.Target, arguments.EnvironmentName, cancellationToken);
+            return new(target, BuildPreparation(target, assignedAutomatically: true));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return new(plan.Target, plan.Preparation, RunnerAssignmentFailure(plan.Target, exception.Message));
+        }
     }
+
+    private static DeployResult RunnerAssignmentFailure(DeploymentTargetInfo target, string message)
+        => new()
+        {
+            Success = false,
+            Summary = "Runner assignment failed",
+            TargetSlug = target.Slug,
+            TargetName = target.Name,
+            Checks = [new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, message)],
+            NextSteps =
+            [
+                "Run automaton runners to list available Runners",
+                "Assign one with automaton set-runner <runner> or automaton deploy --runner <runner>"
+            ]
+        };
 
     private static async Task<bool> CompleteDeploymentAsync(
         ConfigService config,

@@ -7,7 +7,6 @@ namespace Automaton.Cli.Services;
 
 public sealed class DeploymentTargetService(ConfigService config)
 {
-
     public async Task<(string AppName, IReadOnlyList<DeploymentTargetInfo> Targets)> ListAsync(
         string directory,
         string? environmentName = null,
@@ -202,7 +201,12 @@ public sealed class DeploymentTargetService(ConfigService config)
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runnerId = SelectOnlyAvailableRunnerId(await client.ListRunnersAsync(cancellationToken));
+            // List Runners in the app's own scope: the server only accepts a Runner visible there.
+            var app = await client.GetAppAsync(appId, cancellationToken);
+            var projectId = app.TryGetProperty("projectId", out var project) && project.ValueKind == JsonValueKind.String
+                ? project.GetString()
+                : null;
+            var runnerId = SelectOnlyAvailableRunnerId(await client.ListRunnersAsync(projectId, cancellationToken));
             await client.AssignDeploymentTargetRunnerAsync(
                 appId, target.Id, runnerId, ct: cancellationToken);
         }
@@ -210,7 +214,7 @@ public sealed class DeploymentTargetService(ConfigService config)
     }
 
     // A Runner is chosen automatically only when the choice is unambiguous: exactly one
-    // connected Machine Management Runner that can execute applications.
+    // online Machine Management Runner that can execute applications.
     public static string SelectOnlyAvailableRunnerId(JsonElement runners)
     {
         var available = runners.ValueKind == JsonValueKind.Array
@@ -220,27 +224,29 @@ public sealed class DeploymentTargetService(ConfigService config)
         {
             1 => available[0].GetProperty("id").GetString()!,
             0 => throw new InvalidOperationException(
-                "This app has no assigned Runner and no connected Machine Management Runner is available. " +
+                "This app has no assigned Runner and no online Machine Management Runner is available to it. " +
                 "Install or start one in Studio under Runners, then deploy again."),
             _ => throw new InvalidOperationException(
-                "This app has no assigned Runner and several Runners are available. " +
-                "Choose one with 'automaton set-runner <runner>' or 'automaton deploy --runner <runner>'. " +
-                "Run 'automaton runners' to list them.")
+                "This app has no assigned Runner and several online Runners are available. " +
+                "Choose one with 'automaton set-runner <runner>' or 'automaton deploy --runner <runner>'.")
         };
     }
 
+    // "status" is derived from connection and heartbeat, matching the server's readiness check.
+    // Retired per-user Hosted Runners are listed but can no longer run apps.
     private static bool IsAvailableForApplications(JsonElement runner)
-        => HasText(runner, "connectionId")
+        => IsString(runner, "status", "Online")
+           && !(runner.TryGetProperty("isHostedRunner", out var hosted) && hosted.ValueKind == JsonValueKind.True)
            && runner.TryGetProperty("canExecuteApplications", out var canExecute)
            && canExecute.ValueKind == JsonValueKind.True
            && runner.TryGetProperty("applicationProfile", out var profile)
            && profile.ValueKind == JsonValueKind.String
            && RunnerApplicationProfiles.TryNormalize(profile.GetString(), out _);
 
-    private static bool HasText(JsonElement value, string property)
+    private static bool IsString(JsonElement value, string property, string expected)
         => value.TryGetProperty(property, out var text)
            && text.ValueKind == JsonValueKind.String
-           && !string.IsNullOrWhiteSpace(text.GetString());
+           && string.Equals(text.GetString(), expected, StringComparison.OrdinalIgnoreCase);
 
     public async Task RemoveAsync(
         string directory,

@@ -22,7 +22,7 @@ const { isMobile, toggleMobile } = useSidebarState()
 const userMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 // Computed page title from route
-const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefined))
+const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefined, route.meta.title))
 
 // User display name
 const userDisplayName = computed(() => authStore.userName || authStore.userEmail || 'User')

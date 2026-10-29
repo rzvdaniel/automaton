@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 # Check for .NET
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: .NET runtime not found." -ForegroundColor Red
+    Write-Host "ERROR: .NET SDK not found." -ForegroundColor Red
     Write-Host "Install the .NET SDK (9 or later) from https://dot.net and re-run this script."
     exit 1
 }

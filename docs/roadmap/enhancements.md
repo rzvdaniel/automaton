@@ -45,7 +45,7 @@ before.
 
 ## Repair tests that fail on main
 
-**Problem.** These tests fail on `main` and no longer match current behavior:
+**Problem.** These tests fail on `main`:
 
 - CLI: `TargetCommand_ExposesRequiredManagementCommands` (expects removed
   `approve`/`revoke` subcommands), `Format_ShowsLiveRoleDestinationAndStatus`
@@ -53,8 +53,8 @@ before.
   `DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan`.
 - API: `SeedCatalog_ExplicitlyRegistersEveryEmbeddedSeed` (expects seven
   registered guidance seeds; the catalog has six).
-- Studio: `AppRuntimeLogs.test.ts` (multiline runtime output) and
-  `public-app-url.test.ts` (private link host).
+- Studio: `AppRuntimeLogs.test.ts` (multiline runtime output), and
+  `public-app-url.test.ts` (private link host), which fails intermittently.
 
 **Acceptance.** Each test either matches the intended current behavior or is
 removed with its obsolete feature, and the suites pass on `main`.
