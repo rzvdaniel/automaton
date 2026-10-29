@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using NUnit.Framework;
@@ -143,4 +144,64 @@ public class DeploymentTargetServiceTests
         Assert.That(exception!.Message, Does.Contain("default, server-eu"));
         Assert.That(exception.Message, Does.Not.Contain("automaton logs"));
     }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_ReturnsTheOnlyConnectedMachineManagementRunner()
+    {
+        var runners = Runners(
+            Runner("runner-1", connected: true),
+            Runner("runner-2", connected: false));
+
+        Assert.That(DeploymentTargetService.SelectOnlyAvailableRunnerId(runners), Is.EqualTo("runner-1"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_IgnoresRunnersThatCannotRunApplications()
+    {
+        var runners = Runners(
+            Runner("runner-1", connected: true),
+            Runner("runner-2", connected: true, canExecuteApplications: false),
+            Runner("runner-3", connected: true, profile: "Unknown"));
+
+        Assert.That(DeploymentTargetService.SelectOnlyAvailableRunnerId(runners), Is.EqualTo("runner-1"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_RequiresAChoiceWhenSeveralRunnersAreAvailable()
+    {
+        var runners = Runners(Runner("runner-1", connected: true), Runner("runner-2", connected: true));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            DeploymentTargetService.SelectOnlyAvailableRunnerId(runners));
+
+        Assert.That(exception!.Message, Does.Contain("automaton set-runner"));
+    }
+
+    [Test]
+    public void SelectOnlyAvailableRunnerId_ExplainsWhenNoRunnerIsAvailable()
+    {
+        var runners = Runners(Runner("runner-1", connected: false));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            DeploymentTargetService.SelectOnlyAvailableRunnerId(runners));
+
+        Assert.That(exception!.Message, Does.Contain("no connected Machine Management Runner"));
+    }
+
+    private static JsonElement Runners(params object[] runners)
+        => JsonSerializer.SerializeToElement(runners, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    private static object Runner(
+        string id,
+        bool connected,
+        bool canExecuteApplications = true,
+        string profile = "MachineManagement")
+        => new
+        {
+            Id = id,
+            Name = id,
+            ConnectionId = connected ? $"connection-{id}" : null,
+            ApplicationProfile = profile,
+            CanExecuteApplications = canExecuteApplications
+        };
 }

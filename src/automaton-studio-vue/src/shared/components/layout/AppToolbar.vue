@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
+import { pageTitleForRoute } from './page-title'
 
 const { isDark, toggleDarkMode } = useUserSettings()
 const authStore = useAuthStore()
@@ -21,31 +22,7 @@ const { isMobile, toggleMobile } = useSidebarState()
 const userMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 // Computed page title from route
-const pageTitle = computed(() => {
-  const name = route.name as string
-  if (!name) return 'Dashboard'
-  // Convert route name to title case (e.g., 'flow-list' -> 'Flows')
-  const titleMap: Record<string, string> = {
-    dashboard: 'Dashboard',
-    'flow-list': 'Flows',
-    'flow-generation': 'New Flow',
-    'app-list': 'Apps',
-    'app-editor': 'App Operations',
-    'step-list': 'Steps',
-    'step-editor': 'Step Editor',
-    runners: 'Runners',
-    'projects-list': 'Projects',
-    'project-settings': 'Project Settings',
-    apikeys: 'API Keys',
-    'ai-keys': 'AI Providers',
-    settings: 'Settings',
-    'admin-providers': 'Admin',
-    'admin-models': 'Admin',
-    'admin-provider-detail': 'Admin',
-    'admin-model-detail': 'Admin',
-  }
-  return titleMap[name] || name.charAt(0).toUpperCase() + name.slice(1)
-})
+const pageTitle = computed(() => pageTitleForRoute(route.name as string | undefined))
 
 // User display name
 const userDisplayName = computed(() => authStore.userName || authStore.userEmail || 'User')

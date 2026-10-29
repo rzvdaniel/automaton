@@ -4,7 +4,7 @@
 #   curl -fsSL https://your-server/install.sh | bash
 #   curl -fsSL https://your-server/install.sh | bash -s latest
 #
-# Requires .NET 9 runtime. Install from https://dot.net if not already present.
+# Requires the .NET 9 SDK or later. Install from https://dot.net if not already present.
 
 set -e
 
@@ -14,7 +14,7 @@ TOOL_NAME="automaton"
 # Ensure .NET is available
 if ! command -v dotnet &>/dev/null; then
     echo "ERROR: .NET runtime not found."
-    echo "Install .NET 9 from https://dot.net and re-run this script."
+    echo "Install the .NET SDK (9 or later) from https://dot.net and re-run this script."
     exit 1
 fi
 

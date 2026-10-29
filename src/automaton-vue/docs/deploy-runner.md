@@ -17,7 +17,7 @@ You can list connected Runners from the CLI:
 automaton runners
 ```
 
-Assign the Runner to the app environment before deployment. A Runner can host multiple app environments on the same machine.
+When it is your only connected Runner, `automaton deploy` assigns it to an app's Live environment automatically. With several Runners, choose one with `automaton set-runner <runner>` or `automaton deploy --runner <runner>`. A Runner can host multiple app environments on the same machine.
 
 ## Deploy an app
 

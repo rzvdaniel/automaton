@@ -74,7 +74,7 @@ async function copyCode(key: string, code: string) {
             </div>
 
             <p class="secondary-note">
-              The NuGet CLI requires the .NET 9 SDK. The server installer does not require a
+              The NuGet CLI requires the .NET 9 SDK or later. The server installer does not require a
               separate .NET installation.
             </p>
           </div>

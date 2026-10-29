@@ -144,7 +144,7 @@ Changing a deployed target's Runner requires confirmation because the selected t
 
 ## Operational rule
 
-Assign a Machine Management Runner explicitly for every new workload. Existing Hosted Runner records remain historical and cannot be managed through Studio.
+Every new workload needs a Machine Management Runner. When an app's Live environment has none and exactly one connected Machine Management Runner is available to the user, `automaton deploy` assigns it and reports the assignment. Otherwise, assign one explicitly. Existing Hosted Runner records remain historical and cannot be managed through Studio.
 
 A failed package/runtime application, or a result accepted by no Runner, is a failed CLI deployment with a nonzero exit code. Inspect the reported failure and target/Runner logs before retrying. A failed replacement can leave the previous healthy runtime serving; that availability does not make the attempted deployment successful. Restore-point warnings remain distinct from runtime failure.
 

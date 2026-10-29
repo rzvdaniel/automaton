@@ -37,7 +37,9 @@ report, state what was tested and observed, link the published app or execution
 when available, and name any requested behavior that could not be verified.
 Deployment status, a reachable URL, or a local build alone is not proof.
 
-Use an assigned Machine Management Runner for new self-hosted applications. Do not use a
+Use an assigned Machine Management Runner for new self-hosted applications. When the
+Live environment has none, `automaton deploy` assigns the only connected Machine
+Management Runner; with several, use the Runner the user names. Do not use a
 Privileged Host Runner as an automatic fallback. Privileged Host approval is
 persisted per app environment: after explicit user approval, run
 `automaton target approve <environment>` and use

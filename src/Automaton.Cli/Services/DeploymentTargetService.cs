@@ -1,10 +1,13 @@
+using System.Text.Json;
 using Automaton.Cli.Models;
+using Automaton.Core.Enums;
 using Spectre.Console;
 
 namespace Automaton.Cli.Services;
 
 public sealed class DeploymentTargetService(ConfigService config)
 {
+
     public async Task<(string AppName, IReadOnlyList<DeploymentTargetInfo> Targets)> ListAsync(
         string directory,
         string? environmentName = null,
@@ -189,6 +192,55 @@ public sealed class DeploymentTargetService(ConfigService config)
         }
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
     }
+
+    public async Task<DeploymentTargetInfo> AssignOnlyAvailableRunnerAsync(
+        string directory,
+        DeploymentTargetInfo target,
+        string? environmentName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (client, appId, _) = CreateClient(directory, environmentName);
+        using (client)
+        {
+            var runnerId = SelectOnlyAvailableRunnerId(await client.ListRunnersAsync(cancellationToken));
+            await client.AssignDeploymentTargetRunnerAsync(
+                appId, target.Id, runnerId, ct: cancellationToken);
+        }
+        return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
+    }
+
+    // A Runner is chosen automatically only when the choice is unambiguous: exactly one
+    // connected Machine Management Runner that can execute applications.
+    public static string SelectOnlyAvailableRunnerId(JsonElement runners)
+    {
+        var available = runners.ValueKind == JsonValueKind.Array
+            ? runners.EnumerateArray().Where(IsAvailableForApplications).ToList()
+            : [];
+        return available.Count switch
+        {
+            1 => available[0].GetProperty("id").GetString()!,
+            0 => throw new InvalidOperationException(
+                "This app has no assigned Runner and no connected Machine Management Runner is available. " +
+                "Install or start one in Studio under Runners, then deploy again."),
+            _ => throw new InvalidOperationException(
+                "This app has no assigned Runner and several Runners are available. " +
+                "Choose one with 'automaton set-runner <runner>' or 'automaton deploy --runner <runner>'. " +
+                "Run 'automaton runners' to list them.")
+        };
+    }
+
+    private static bool IsAvailableForApplications(JsonElement runner)
+        => HasText(runner, "connectionId")
+           && runner.TryGetProperty("canExecuteApplications", out var canExecute)
+           && canExecute.ValueKind == JsonValueKind.True
+           && runner.TryGetProperty("applicationProfile", out var profile)
+           && profile.ValueKind == JsonValueKind.String
+           && RunnerApplicationProfiles.TryNormalize(profile.GetString(), out _);
+
+    private static bool HasText(JsonElement value, string property)
+        => value.TryGetProperty(property, out var text)
+           && text.ValueKind == JsonValueKind.String
+           && !string.IsNullOrWhiteSpace(text.GetString());
 
     public async Task RemoveAsync(
         string directory,

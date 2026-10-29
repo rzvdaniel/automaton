@@ -154,8 +154,11 @@ internal static class DeployCommandHandler
             projectConfig?.Name, resolved.AppId, resolved.EnvironmentName, target, resolved.Server,
             arguments.AsJson, nonInteractive, ref headingWritten);
 
-    private static DeployPreparationResult BuildPreparation(DeploymentTargetInfo target)
-        => new()
+    private static DeployPreparationResult BuildPreparation(
+        DeploymentTargetInfo target, bool assignedAutomatically = false)
+    {
+        var runnerDescription = assignedAutomatically ? "the only available Runner" : "Runner";
+        return new()
         {
             Success = true,
             RunnerId = target.Runner?.Id,
@@ -165,22 +168,16 @@ internal static class DeployCommandHandler
                 : [new DeployCheckResult(
                     DeployCheckNames.RunnerAssignment,
                     true,
-                    $"environment '{target.Slug}' assigned to Runner {target.Runner.Name}")]
+                    $"environment '{target.Slug}' assigned to {runnerDescription} {target.Runner.Name}")]
         };
+    }
 
     private static async Task<DeployResult> DeployAsync(
         InvocationContext invocation,
         DeployArguments arguments,
         DeploymentPlan plan)
     {
-        var target = plan.Target;
-        if (!string.IsNullOrWhiteSpace(arguments.Runner))
-        {
-            target = await plan.TargetService.AssignRunnerAsync(
-                plan.Directory, target, arguments.Runner,
-                arguments.EnvironmentName, invocation.GetCancellationToken());
-        }
-
+        var (target, preparation) = await EnsureRunnerAsync(invocation, arguments, plan);
         var result = await plan.DeployService.DeployAsync(
             plan.Directory, arguments.Clean, arguments.Directory,
             arguments.EnvironmentName, target, invocation.GetCancellationToken());
@@ -191,7 +188,30 @@ internal static class DeployCommandHandler
                 invocation.GetCancellationToken());
             result = DeployCommand.ApplyTargetIdentity(result, target);
         }
-        return DeployCommand.MergePreparation(result, plan.Preparation);
+        return DeployCommand.MergePreparation(result, preparation);
+    }
+
+    private static async Task<(DeploymentTargetInfo Target, DeployPreparationResult Preparation)> EnsureRunnerAsync(
+        InvocationContext invocation,
+        DeployArguments arguments,
+        DeploymentPlan plan)
+    {
+        var cancellationToken = invocation.GetCancellationToken();
+        if (!string.IsNullOrWhiteSpace(arguments.Runner))
+        {
+            var assigned = await plan.TargetService.AssignRunnerAsync(
+                plan.Directory, plan.Target, arguments.Runner, arguments.EnvironmentName, cancellationToken);
+            return (assigned, plan.Preparation);
+        }
+        if (plan.Target.Runner != null)
+        {
+            return (plan.Target, plan.Preparation);
+        }
+
+        // ValidateTarget only lets the Live environment through without a Runner, as a new app has none yet.
+        var target = await plan.TargetService.AssignOnlyAvailableRunnerAsync(
+            plan.Directory, plan.Target, arguments.EnvironmentName, cancellationToken);
+        return (target, BuildPreparation(target, assignedAutomatically: true));
     }
 
     private static async Task<bool> CompleteDeploymentAsync(

@@ -60,6 +60,15 @@ public static class CliAppUrlBuilder
         return $"{ResolveStudioBaseUrl(server).TrimEnd('/')}/apps/{Uri.EscapeDataString(appId.Trim())}";
     }
 
+    // Opens the Logs view of the app page for one environment.
+    public static string BuildStudioLogsUrl(string? server, string? appId, string targetSlug)
+    {
+        var studioAppUrl = BuildStudioAppUrl(server, appId);
+        return string.IsNullOrWhiteSpace(studioAppUrl)
+            ? string.Empty
+            : $"{studioAppUrl}?view=logs&target={Uri.EscapeDataString(targetSlug)}";
+    }
+
     public static string BuildStudioApplicationUrl(string? server, string? appId)
     {
         var studioAppUrl = BuildStudioAppUrl(server, appId);

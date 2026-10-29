@@ -2,14 +2,14 @@
 # Usage (PowerShell):
 #   irm https://your-server/install.ps1 | iex
 #
-# Requires .NET 9 runtime. Install from https://dot.net if not already present.
+# Requires the .NET 9 SDK or later. Install from https://dot.net if not already present.
 
 $ErrorActionPreference = "Stop"
 
 # Check for .NET
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Host "ERROR: .NET runtime not found." -ForegroundColor Red
-    Write-Host "Install .NET 9 from https://dot.net and re-run this script."
+    Write-Host "Install the .NET SDK (9 or later) from https://dot.net and re-run this script."
     exit 1
 }
 

@@ -201,6 +201,7 @@ These are later improvements, not prerequisites for M3's single-server target or
 - Runner self-update/rollback and bootstrap/update helpers.
 - Backup automation, scheduling, destinations and restore tooling. Keep the documented manual backup guidance; it does not imply a legacy migration feature.
 - Compose builds, secure Compose-secret delivery, and further Compose, marketplace and sharing enhancements.
+- Smaller developer-experience improvements found while building apps, such as persisted runtime logs and real-time connections, are tracked in [enhancements](enhancements.md).
 
 The broader M1/M2 acceptance remains recorded in the [M1 guide](../implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
 
