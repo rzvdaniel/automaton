@@ -4,7 +4,7 @@
 
 Automaton is an open-source platform for deploying web apps, APIs and Actions on infrastructure you control. Build locally with your preferred coding agent, deploy with the CLI, and manage apps in Studio.
 
-[Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/)
+[Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps)
 
 > **Early access.** The core app lifecycle has been exercised on our production server. Clean-server acceptance and recovery testing remain limited. Plan backups and a brief interruption during server updates.
 
@@ -46,6 +46,10 @@ automaton publish --yes
 ```
 
 Approve CLI login in **your Studio** when prompted. Keep credentials out of AI chat.
+
+### Example apps
+
+[automaton-apps](https://github.com/rzvdaniel/automaton-apps) collects apps built and deployed on Automaton, such as [Untranslatable](https://untranslatable.apps.automaton.monster/), a multiplayer word-bluffing game.
 
 ## Update
 
