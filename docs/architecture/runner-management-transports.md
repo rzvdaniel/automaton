@@ -130,7 +130,7 @@ Runner pipeline #4951 passed from `e71ca380` and published `rzvdaniel/automaton-
 
 Using the retained unpublished app, authenticated app-file upload and download both completed through the Hosted Runner. Upload bytes staged by the Runner and download response bytes matched their expected SHA-256 values. A media upload completed and the persisted app-media bytes matched the expected SHA-256; its test file was removed. A supported CLI pull/deploy then uploaded five package files, applied them on the Runner, and returned a terminal successful deployment result without warnings. The app health endpoint returned `200 ready`, and its app-originated persistence marker endpoint returned HTTP 200 after deployment; this run did not capture a pre-deploy marker hash for comparison.
 
-At verification, the active Hosted Runner execution, management and command queues each had one consumer and zero ready/unacknowledged messages. Production `prod-verify.sh` passed. These checks do not close Slice 5 or the combined RM recovery/cutover acceptance.
+At verification, the active Hosted Runner execution, management and command queues each had one consumer and zero ready/unacknowledged messages. Production route verification passed. These checks do not close Slice 5 or the combined RM recovery/cutover acceptance.
 
 ## Same-host RM baseline — 2026-10-04
 

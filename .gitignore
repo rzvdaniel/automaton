@@ -118,3 +118,6 @@ src/automaton-vue/docs/.vitepress/dist/
 !src/automaton-vue/docs/.vitepress/theme/index.ts
 
 AgentRuns/
+
+# Host-local Machine Management Runner credentials and configuration
+/self-hosted-runners/

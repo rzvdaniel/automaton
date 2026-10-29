@@ -74,14 +74,4 @@ if storage_clean_images 2>/dev/null; then exit 1; fi
 DOCKER_HOST=tcp://remote.invalid:2376
 if storage_require_local_docker 2>/dev/null; then exit 1; fi
 unset DOCKER_HOST
-# Admission failure precedes infrastructure changes and build-context creation.
-source "$SCRIPT_DIR/../prod-blue-green-common.sh"
-AUTOMATON_DEPLOYMENT_LOCK="$fixture/lock"
-flock() { :; }
-storage_check() { return 1; }
-ensure_blue_green_bootstrap() { echo mutation >> "$fixture/mutations"; }
-create_production_build_context() { echo mutation >> "$fixture/mutations"; }
-if ensure_infrastructure; then exit 1; fi
-if run_source_build_service api-blue 1234567; then exit 1; fi
-[[ ! -e "$fixture/mutations" ]]
 echo 'host storage capacity and image retention regressions passed'

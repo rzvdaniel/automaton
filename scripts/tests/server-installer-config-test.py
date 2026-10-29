@@ -7,12 +7,32 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
 
 
 @unittest.skipUnless(os.geteuid() == 0, 'Requires root and existing Docker/Compose on Ubuntu 24.04; never installs Docker.')
 class InstallerEntrypointTests(unittest.TestCase):
+    def setUp(self):
+        tools = tempfile.TemporaryDirectory(prefix='automaton-installer-tools-')
+        self.addCleanup(tools.cleanup)
+        real_docker = shutil.which('docker')
+        docker = Path(tools.name) / 'docker'
+        docker.write_text(f'''#!/usr/bin/env python3
+import os, sys
+args = sys.argv[1:]
+if args[:2] in (['ps', '-aq'], ['volume', 'ls']):
+    sys.exit(0)
+if args == ['info'] or args == ['compose', 'version'] or (args[:1] == ['compose'] and args[-2:] == ['config', '--quiet']):
+    os.execv({real_docker!r}, [{real_docker!r}] + args)
+raise SystemExit('Unexpected Docker operation in installer fixture')
+''')
+        docker.chmod(0o755)
+        environment = patch.dict(os.environ, PATH=tools.name + ':' + os.environ['PATH'])
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def test_no_version_selects_latest_stable_server_release(self):
         with tempfile.TemporaryDirectory(prefix='automaton-installer-test-') as temporary:
             root = Path(temporary)
@@ -30,7 +50,8 @@ urllib.request.urlopen = release_page
 ''')
             (tools / 'curl').write_text('#!/bin/sh\nprintf "selected:%s\\n" "$*" >&2\nexit 1\n')
             (tools / 'curl').chmod(0o755)
-            result = subprocess.run(['bash', str(REPO / 'scripts/install-automaton.sh')],
+            result = subprocess.run(['bash', str(REPO / 'scripts/install-automaton.sh'),
+                                     '--install-dir', str(root / 'install'), '--config-dir', str(root / 'config')],
                                     env=os.environ | {'PATH': str(tools) + ':' + os.environ['PATH'],
                                                       'PYTHONPATH': str(root)},
                                     capture_output=True, text=True)

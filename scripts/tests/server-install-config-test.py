@@ -100,6 +100,9 @@ class InstallationConfigurationTests(unittest.TestCase):
     def test_cloudflare_mode_generates_wildcard_certificate_configuration(self):
         module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
         edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
+        self.assertEqual(edge['http']['routers']['apps']['rule'], 'Host(`apps.example.com`)')
+        self.assertNotIn('HostRegexp', json.dumps(edge['http']['routers']))
+        edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
         self.assertIn('*.apps.example.com', edge['tls']['stores']['default']['defaultGeneratedCert']['domain']['sans'])
         self.assertTrue((self.root / 'secrets/cloudflare-token').read_text())
 
