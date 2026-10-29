@@ -3,16 +3,20 @@ title: Getting started
 description: Install the CLI, create an Automaton app, and deploy it.
 ---
 
-# Quickstart
+# Build your first app
 
-Install and authenticate the CLI:
+First [install your server](./install-server), create your administrator and connect a Machine Management Runner. If you are joining a team, use the API URL your administrator provides.
+
+Install the CLI on your development computer and connect it to **your server**:
 
 ```bash
 dotnet tool install -g Automaton.Cli
-automaton login
+automaton login --server https://api.your-domain.com
 ```
 
-Create a project and link it to a remote app:
+The NuGet tool currently requires the .NET 9 SDK. Approve login in your own Studio; do not paste credentials into AI chat.
+
+Create a project and link it to an app on your installation:
 
 ```bash
 automaton new "My App"

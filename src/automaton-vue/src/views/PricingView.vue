@@ -7,112 +7,86 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 <template>
   <div class="pricing-page">
     <PublicSiteHeader />
-
     <main class="pricing-main">
       <section class="hero">
         <div class="shell hero-inner">
-          <span class="eyebrow">Preview Access</span>
-          <h1>Build now. Keep AI and runtime costs under your control.</h1>
+          <span class="eyebrow">Open source</span>
+          <h1>Own your installation.<br />Choose how you run it.</h1>
           <p>
-            Automaton Monster is currently in preview. Frontend apps can be hosted by Automaton.
-            Backend apps run on Runner containers you control. Managed runners and paid plans will
-            come later for developers and teams that want Automaton to manage backend infrastructure.
+            Automaton is an Apache 2.0 platform you install on your own infrastructure. The software
+            has no required cloud subscription. You cover hosting, your domain and any AI services
+            you choose.
           </p>
         </div>
       </section>
-
       <section class="plans">
         <div class="shell plan-grid">
           <article class="plan-card plan-card-primary">
             <div class="plan-top">
               <div>
-                <span class="plan-badge">Self-managed</span>
-                <h2>Free</h2>
+                <span class="plan-badge">Available today</span>
+                <h2>Self-hosted</h2>
               </div>
-              <div class="plan-price">$0</div>
+              <div class="plan-price">Free</div>
             </div>
-
             <p class="plan-copy">
-              Build, deploy, publish, and share apps for free when you bring your own AI tools
-              and your own backend Runner infrastructure.
+              Install your own Studio, API and Runner machines. Use the source, modify it, and
+              deploy apps on infrastructure you control.
             </p>
-
             <ul class="feature-list">
-              <li>Build and publish frontend apps</li>
-              <li>Public frontend app hosting</li>
-              <li>CLI + Studio access</li>
-              <li>Bring your own AI tools and providers</li>
-              <li>Use your own Runner containers for backend apps</li>
-              <li>No bundled AI credits or hidden token packages</li>
+              <li>Static sites, APIs and Actions</li>
+              <li>Your domain, users and app data</li>
+              <li>CLI and Studio on your own installation</li>
+              <li>Use your preferred AI coding tools</li>
+              <li>Installer and versioned updater</li>
+              <li>You operate capacity, backups and recovery</li>
             </ul>
-
-            <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">
-              Start building
-            </a>
+            <a :href="publicAppConfig.installUrl" class="button primary">Install Automaton</a>
           </article>
-
           <article class="plan-card">
             <div class="plan-top">
               <div>
-                <span class="plan-badge plan-badge-soon">Coming later</span>
-                <h2>Managed Runners</h2>
+                <span class="plan-badge plan-badge-soon">Under consideration</span>
+                <h2>Managed hosting</h2>
               </div>
-              <div class="plan-price muted">Paid</div>
             </div>
-
             <p class="plan-copy">
-              Hosted backend execution for developers and teams that want backend apps without
-              managing Runner infrastructure themselves.
+              Prefer someone else to run the installation? We are considering a managed option for
+              individuals and teams who want that help.
             </p>
-
             <ul class="feature-list">
-              <li>Managed backend execution</li>
-              <li>Hosted Runner provisioning</li>
-              <li>Simpler backend deployment</li>
-              <li>Runtime options for production apps</li>
-              <li>Less infrastructure to manage yourself</li>
+              <li>No public managed service is being offered here yet</li>
+              <li>No pricing, launch date or SLA has been announced</li>
+              <li>The open-source installation remains available independently</li>
             </ul>
-
-            <a href="mailto:hello@automaton.monster?subject=Managed%20Runners%20waitlist" class="button">
-              Join waitlist
-            </a>
+            <a :href="publicAppConfig.githubUrl + '/issues'" class="button"
+              >Discuss what you need</a
+            >
           </article>
         </div>
       </section>
-
       <section class="explainers">
         <div class="shell explainer-grid">
           <article class="info-card">
-            <h2>Why bring your own AI?</h2>
+            <h2>What does running it involve?</h2>
             <p>
-              Automaton is designed to work with the AI coding tools you already use. That keeps AI
-              usage visible, lets you choose the models you trust, and avoids bundling hidden AI
-              subscriptions into the platform.
+              Provide a supported Ubuntu server, domain and DNS. The installer prepares the
+              platform; you create the administrator and install a Machine Management Runner from
+              Studio. Keep backups and schedule updates: replacing the server containers can briefly
+              interrupt API, Studio and Worker.
             </p>
-            <ul class="feature-list compact">
-              <li>Use Cursor, Claude Code, Codex, Copilot, or another AI tool</li>
-              <li>Keep control over AI usage and cost</li>
-              <li>No opaque token bundles</li>
-              <li>Fits local agentic coding workflows</li>
-            </ul>
           </article>
-
           <article class="info-card">
-            <h2>Backend apps today</h2>
+            <h2>Bring your own AI tools</h2>
             <p>
-              Frontend apps are the simplest path and can be published immediately. Backend apps work
-              today too, but they run through self-hosted Runners that you control.
+              Your coding agent works locally and uses the CLI to deploy. Automaton does not require
+              an AI subscription from us or include bundled AI credits. Connect the CLI to your own
+              API URL and approve login in your own Studio.
             </p>
-            <ul class="feature-list compact">
-              <li>Frontend apps: hosted by Automaton</li>
-              <li>Backend apps: run through your own Runner</li>
-              <li>Good fit for developers who want runtime control</li>
-            </ul>
           </article>
         </div>
       </section>
     </main>
-
     <AppFooter />
   </div>
 </template>

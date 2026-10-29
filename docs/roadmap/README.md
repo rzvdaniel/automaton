@@ -14,6 +14,16 @@ This is the only active roadmap. It supersedes the staged master plan, archived 
 
 The core refactoring delivered a working single-server install/deploy flow **and removal of the superseded execution and hosting paths**, targeting fresh installations. Automatic migration of legacy Hosted Runner/account-storage installations, compatibility adapters, and preservation of their app IDs or URLs are not required. Existing installations and their data are not changed by this source cleanup; any retirement, export or manual move needs a separate explicit decision. Optional operations and feature expansion remain deferred.
 
+## Before broader public adoption
+
+The self-hosted positioning is now the intended onboarding story. Remaining release/operations checks are concrete:
+
+- Move the .NET 9 applications and Runner runtime to a supported LTS release before .NET 9 support ends on 10 November 2026. See [Microsoft’s support policy](https://dotnet.microsoft.com/en-us/platform/support/policy).
+- Align the server bundle’s Runner reference and the separately published CLI/Runner artifacts with the versions used in lifecycle acceptance. The installed server’s verified Runner currently differs from the fresh-release manifest; NuGet CLI publication is separate from server publication. Portable CLI downloads are not currently published as public GitHub release assets.
+- Repeat installation, CLI authorization, Runner enrollment, app deployment and update on a clean external Ubuntu host, then verify a restore with the matching database/configuration/key backup. Current production acceptance is an adopted server, not proof of this clean-host or restore path.
+- Measure server-update downtime and publish resource guidance from observed workloads. The updater replaces application containers in place; it does not provide zero-downtime control-plane updates or remote backups.
+- Keep public DNS/HTTPS and x86_64 Ubuntu requirements explicit. Private-only/offline and ARM installation are not the supported quickstart. Managed hosting remains a possible service, not an announced plan or SLA.
+
 ## Starting point and baseline
 
 Existing Automaton already deploys and serves apps, runs Actions, routes traffic and groups account containers with resource controls. Infrastructure and Hosted Runners use the same executable, but differ in permissions, assignment, provisioning, storage and execution paths. Combining their names or registrations would leave that duplication and its security implications intact.
