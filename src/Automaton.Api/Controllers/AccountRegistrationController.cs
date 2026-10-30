@@ -134,7 +134,7 @@ public sealed class AccountRegistrationController : BaseController
         if (string.IsNullOrWhiteSpace(command.PublicUsername))
             return await userManagerService.GenerateUniquePublicUsernameAsync(command.Name!);
 
-        if (!userManagerService.IsValidPublicUsername(command.PublicUsername))
+        if (!UsersService.IsValidPublicUsername(command.PublicUsername))
         {
             ModelState.AddModelError("PublicUsername", "Public username must be 3-32 characters, using only letters, numbers, hyphens, and underscores.");
             return null;

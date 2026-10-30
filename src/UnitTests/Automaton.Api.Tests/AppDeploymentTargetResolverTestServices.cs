@@ -41,6 +41,6 @@ internal static class AppDeploymentTargetResolverTestServices
                 User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"))
             }
         };
-        return new ResourceAuthorizationService(db, new UserContextService(accessor), accessor);
+        return new ResourceAuthorizationService(db, new UserContextService(accessor));
     }
 }

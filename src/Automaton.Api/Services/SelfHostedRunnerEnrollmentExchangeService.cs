@@ -46,7 +46,7 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
         if (candidate is null)
             return null;
 
-        var registration = await RegisterRunnerAsync(candidate.Enrollment, candidate.ExistingRunner, request, cancellationToken);
+        var registration = await RegisterRunnerAsync(candidate.Enrollment, candidate.ExistingRunner, request);
         candidate.Enrollment.Status = RunnerEnrollmentStatuses.Completed;
         candidate.Enrollment.UsedAtUtc = candidate.Now;
         candidate.Enrollment.RunnerId = registration.Runner.Id;
@@ -117,8 +117,7 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
     private async Task<RunnerRegistration> RegisterRunnerAsync(
         SelfHostedRunnerEnrollment enrollment,
         Runner? existingRunner,
-        RunnerEnrollmentExchangeRequest request,
-        CancellationToken cancellationToken)
+        RunnerEnrollmentExchangeRequest request)
     {
         var capabilities = enrollment.ApplicationProfile == RunnerApplicationProfiles.MachineManagement
             ? [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution, RunnerCapabilities.ManagedContainerExecution]

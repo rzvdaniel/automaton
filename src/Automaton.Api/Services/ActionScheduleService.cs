@@ -54,7 +54,7 @@ public sealed class ActionScheduleService
             OwnerUserId = userId,
             CreatedAtUtc = DateTime.UtcNow
         };
-        await ApplyAsync(schedule, request, userId, administrator, capability, ct);
+        await ApplyAsync(schedule, request, userId, capability, ct);
         db.ActionSchedules.Add(schedule);
         await db.SaveChangesAsync(ct);
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleCreated, "create", "Action schedule created", ct);
@@ -71,7 +71,7 @@ public sealed class ActionScheduleService
         var validationUserId = schedule.OwnerUserId ?? userId;
         var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-        await ApplyAsync(schedule, request, validationUserId, administrator, capability, ct);
+        await ApplyAsync(schedule, request, validationUserId, capability, ct);
         await db.SaveChangesAsync(ct);
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleUpdated, "update", "Action schedule updated", ct);
         return schedule;
@@ -85,7 +85,7 @@ public sealed class ActionScheduleService
             var validationUserId = schedule.OwnerUserId ?? userId;
             var capability = await GetCapabilityAsync(validationUserId, administrator: false, ct);
             if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-            await ValidateEffectiveAsync(schedule, validationUserId, administrator: false, capability, DateTime.UtcNow, ct);
+            await ValidateEffectiveAsync(schedule, validationUserId, capability, DateTime.UtcNow, ct);
             schedule.NextRunAtUtc = ActionSchedulePolicy.CalculateNextRun(schedule, DateTime.UtcNow)
                 ?? throw new InvalidOperationException("The schedule has no future occurrence.");
         }
@@ -124,10 +124,10 @@ public sealed class ActionScheduleService
         var userId = schedule.OwnerUserId ?? Guid.Empty;
         var capability = await GetCapabilityAsync(userId, administrator: false, ct);
         if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
-        await ValidateEffectiveAsync(schedule, userId, administrator: false, capability, DateTime.UtcNow, ct, requireFutureRun: false);
+        await ValidateEffectiveAsync(schedule, userId, capability, DateTime.UtcNow, ct, requireFutureRun: false);
     }
 
-    private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, bool administrator, ScheduledActionsCapability capability, CancellationToken ct)
+    private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, ScheduledActionsCapability capability, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 160) throw new InvalidOperationException("Schedule name is required and cannot exceed 160 characters.");
         AppActionManifestParser.ValidateKey(request.ActionKey);
@@ -149,7 +149,7 @@ public sealed class ActionScheduleService
         schedule.InputJson = inputJson;
         schedule.UpdatedAtUtc = DateTime.UtcNow;
 
-        await ValidateEffectiveAsync(schedule, userId, administrator, capability, DateTime.UtcNow, ct);
+        await ValidateEffectiveAsync(schedule, userId, capability, DateTime.UtcNow, ct);
         schedule.NextRunAtUtc = schedule.Enabled ? ActionSchedulePolicy.CalculateNextRun(schedule, DateTime.UtcNow) : null;
         if (schedule.Enabled && !schedule.NextRunAtUtc.HasValue)
             throw new InvalidOperationException("The schedule has no future occurrence.");
@@ -158,7 +158,7 @@ public sealed class ActionScheduleService
     internal static void ApplyTimingFields(ActionSchedule schedule, SaveActionScheduleRequest request)
         => ActionSchedulePolicy.ApplyTimingFields(schedule, request);
 
-    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, bool administrator, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
+    private async Task ValidateEffectiveAsync(ActionSchedule schedule, Guid userId, ScheduledActionsCapability capability, DateTime nowUtc, CancellationToken ct, bool requireFutureRun = true)
     {
         if (schedule.OwnerType == ActionScheduleOwnerTypes.System
             || schedule.ApplicationId == InfrastructureAppTrust.PlatformAppId)

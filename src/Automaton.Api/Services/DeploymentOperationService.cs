@@ -70,7 +70,7 @@ public sealed class DeploymentOperationService(
         }
         catch
         {
-            packageStore.TryDelete(packagePath);
+            DeploymentPackageStore.TryDelete(packagePath);
             throw;
         }
     }
@@ -117,7 +117,7 @@ public sealed class DeploymentOperationService(
 
         try
         {
-            await using var package = packageStore.OpenRead(operation.PackagePath);
+            await using var package = DeploymentPackageStore.OpenRead(operation.PackagePath);
             var file = new FormFile(package, 0, package.Length, "file", "deploy-package.zip");
             var result = await deploymentService.DeployPackageAsync(
                 operation.WebAppId,
@@ -190,7 +190,7 @@ public sealed class DeploymentOperationService(
                 .Select(item => item.Status)
                 .SingleOrDefaultAsync(CancellationToken.None);
             if (current is DeploymentOperationStatuses.Succeeded or DeploymentOperationStatuses.Failed)
-                packageStore.TryDelete(operation.PackagePath);
+                DeploymentPackageStore.TryDelete(operation.PackagePath);
         }
     }
 

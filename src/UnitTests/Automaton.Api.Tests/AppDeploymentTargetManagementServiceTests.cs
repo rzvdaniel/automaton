@@ -350,7 +350,7 @@ public class AppDeploymentTargetManagementServiceTests
                         "Test"))
                 }
             };
-            return new ResourceAuthorizationService(db, new UserContextService(accessor), accessor);
+            return new ResourceAuthorizationService(db, new UserContextService(accessor));
         }
 
         private static BackendRouteConfigService CreateRouteService(

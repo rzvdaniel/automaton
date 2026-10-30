@@ -155,7 +155,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
         IsSeedRetired = document.IsSeedRetired,
         CreatedAt = document.CreatedAt,
         UpdatedAt = document.UpdatedAt,
-        HasEmbeddedDefault = _service.HasEmbeddedDefault(document.Key)
+        HasEmbeddedDefault = AdminAiGuidanceService.HasEmbeddedDefault(document.Key)
     };
 }
 

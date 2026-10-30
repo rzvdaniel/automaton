@@ -34,9 +34,7 @@ internal static class UserAppsTestServices
 
         return new AppsService(
             dbContext,
-            userContextService,
             authorizationService,
-            null!,
             new AppMetadataService(dbContext, userContextService, null!, auditEventService),
             new AppMutationService(
                 dbContext,

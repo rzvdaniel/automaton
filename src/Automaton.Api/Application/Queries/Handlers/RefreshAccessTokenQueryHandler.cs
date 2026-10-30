@@ -11,21 +11,19 @@ namespace Automaton.Api.Application.Queries.Handlers
     {
         private readonly ApplicationDbContext dataContext;
         private readonly IJwtService jwtService;
-        private readonly IMediator mediator;
         private readonly UsersService userManagerService;
         private readonly ILogger<RefreshAccessTokenQueryHandler> logger;
 
         public RefreshAccessTokenQueryHandler
         (
             ApplicationDbContext dataContext, 
-            IJwtService jwtService, IMediator mediator,
+            IJwtService jwtService,
             UsersService userManagerService, 
             ILogger<RefreshAccessTokenQueryHandler> logger
         )
         {
             this.dataContext = dataContext;
             this.jwtService = jwtService;
-            this.mediator = mediator;
             this.userManagerService = userManagerService;
             this.logger = logger;
         }
@@ -80,7 +78,7 @@ namespace Automaton.Api.Application.Queries.Handlers
                 throw;
             }
 
-            var claims = GetCustomClaimsForUser(user.Id);
+            var claims = GetCustomClaimsForUser();
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
             var jwt = jwtService.GenerateToken(user.Id.ToString("N"), user.UserName, roles, claims);
             jwt.RefreshToken = newRefreshToken.Token;
@@ -90,7 +88,7 @@ namespace Automaton.Api.Application.Queries.Handlers
             return jwt;
         }
 
-        Dictionary<string, string> GetCustomClaimsForUser(Guid userId)
+        static Dictionary<string, string> GetCustomClaimsForUser()
         {
             //Get Custom Claims for User
             return new Dictionary<string, string>();

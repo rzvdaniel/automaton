@@ -41,12 +41,12 @@ public class UsersService
     {
         EnsureRegistrationMetadata(user, RegistrationProviders.Password);
 
-        if (_userManager.Users.Any(u => u.UserName == user.UserName))
+        if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
             throw new Exception($"User with user name {user.UserName} already registered");
         }
 
-        if (_userManager.Users.Any(u => u.Email == user.Email))
+        if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
             throw new Exception($"User with email address {user.Email} already registered");
         }
@@ -69,12 +69,12 @@ public class UsersService
     {
         EnsureRegistrationMetadata(user, RegistrationProviders.GitHub);
 
-        if (_userManager.Users.Any(u => u.UserName == user.UserName))
+        if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
             throw new Exception($"User with user name {user.UserName} already registered");
         }
 
-        if (_userManager.Users.Any(u => u.Email == user.Email))
+        if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
             throw new Exception($"User with email address {user.Email} already registered");
         }
@@ -746,7 +746,7 @@ public class UsersService
     /// <summary>
     /// Validate public username format
     /// </summary>
-    public bool IsValidPublicUsername(string publicUsername)
+    public static bool IsValidPublicUsername(string publicUsername)
     {
         if (string.IsNullOrWhiteSpace(publicUsername))
             return false;

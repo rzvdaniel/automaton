@@ -94,7 +94,7 @@ public class AdminMarketplaceAppsController : ControllerBase
         app.Category = string.IsNullOrWhiteSpace(request.Category) ? null : request.Category.Trim();
         app.ReviewStatus = NormalizeReviewStatus(request.ReviewStatus);
         app.AccessStatus = NormalizeAccessStatus(request.AccessStatus);
-        app.MarketplaceStatus = MapLegacyMarketplaceStatus(app.ReviewStatus, app.AccessStatus);
+        app.MarketplaceStatus = MapLegacyMarketplaceStatus(app.AccessStatus);
         app.MarketplaceModerationReason = string.IsNullOrWhiteSpace(request.MarketplaceModerationReason)
             ? null
             : request.MarketplaceModerationReason.Trim();
@@ -240,7 +240,7 @@ public class AdminMarketplaceAppsController : ControllerBase
         };
     }
 
-    private static string MapLegacyMarketplaceStatus(string reviewStatus, string accessStatus)
+    private static string MapLegacyMarketplaceStatus(string accessStatus)
     {
         if (accessStatus == AppAccessStatuses.Disabled)
         {

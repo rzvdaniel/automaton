@@ -13,7 +13,6 @@ public class FlowsService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly RunnerService runnerService;
-    private readonly ScheduleService scheduleService;
     private readonly RecentActivityService recentActivityService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly SensitiveVariableService sensitiveVariableService;
@@ -24,7 +23,6 @@ public class FlowsService
     (
         ApplicationDbContext dbContext,
         RunnerService runnerService,
-        ScheduleService scheduleService,
         RecentActivityService recentActivityService,
         UserContextService userContextService,
         ResourceAuthorizationService authorizationService,
@@ -33,7 +31,6 @@ public class FlowsService
     {
         this.dbContext = dbContext;
         this.runnerService = runnerService;
-        this.scheduleService = scheduleService;
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
         this.sensitiveVariableService = sensitiveVariableService;
@@ -111,7 +108,7 @@ public class FlowsService
 
         dbContext.FlowUsers.Add(flowUser);
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowCreated, flow.Name, flow.Id);
@@ -127,7 +124,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
         }
 
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var entity = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -141,7 +138,7 @@ public class FlowsService
         entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, flow.Name, id);
@@ -164,7 +161,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to delete flow {id}");
         }
 
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var flow = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (flow == null)
         {
@@ -177,7 +174,7 @@ public class FlowsService
         await DeleteSensitiveVariablesAsync(id);
 
         dbContext.Flows.Remove(flow);
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowDeleted, flowName, id);
@@ -213,7 +210,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to execute flow {flowId}");
         }
 
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId);
+        var flow = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == flowId, cancellationToken);
 
         if (flow == null)
         {
@@ -257,7 +254,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
         }
 
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var entity = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -273,7 +270,7 @@ public class FlowsService
         entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, settings.Name, id);

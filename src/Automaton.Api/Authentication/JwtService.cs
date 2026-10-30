@@ -38,7 +38,7 @@ namespace Automaton.Api.Authentication
                 new Claim(JwtRegisteredClaimNames.Sub, userId),
                 new Claim(JwtRegisteredClaimNames.UniqueName, userName),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, _options.IssuedAt.ToUnixEpochDate().ToString(),
+                new Claim(JwtRegisteredClaimNames.Iat, JwtOptions.IssuedAt.ToUnixEpochDate().ToString(),
                     ClaimValueTypes.Integer64)
             };
             if (roles != null && roles.Any())
@@ -63,7 +63,7 @@ namespace Automaton.Api.Authentication
                 _options.Issuer,
                 claims: jwtClaims,
                 expires: _options.Expiration,
-                notBefore: _options.NotBefore,
+                notBefore: JwtOptions.NotBefore,
                 audience: _options.Audience,
                 signingCredentials: _options.SigningCredentials
             );

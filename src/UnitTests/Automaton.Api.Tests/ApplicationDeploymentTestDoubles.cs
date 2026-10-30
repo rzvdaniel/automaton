@@ -267,7 +267,7 @@ internal static class DeploymentFixtureServiceFactory
     internal static AppFileStorageService CreateStorage(ApplicationDbContext db, TestWebHostEnvironment environment)
     {
         var userContext = new UserContextService(new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
-        var settings = new SettingsService(db, userContext, Options.Create(new AppFileRuleBaselineOptions()));
+        var settings = new SettingsService(db, Options.Create(new AppFileRuleBaselineOptions()));
         return new AppFileStorageService(environment, settings);
     }
 

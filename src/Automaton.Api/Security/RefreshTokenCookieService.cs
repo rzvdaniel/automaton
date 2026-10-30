@@ -6,12 +6,12 @@ public sealed class RefreshTokenCookieService
 {
     public const string CookieName = "automaton_refresh_token";
 
-    public string? GetRefreshToken(HttpContext httpContext)
+    public static string? GetRefreshToken(HttpContext httpContext)
     {
         return httpContext.Request.Cookies.TryGetValue(CookieName, out var token) ? token : null;
     }
 
-    public void AppendRefreshToken(HttpContext httpContext, string refreshToken, int lifetimeDays)
+    public static void AppendRefreshToken(HttpContext httpContext, string refreshToken, int lifetimeDays)
     {
         httpContext.Response.Cookies.Append(
             CookieName,
@@ -19,7 +19,7 @@ public sealed class RefreshTokenCookieService
             BuildCookieOptions(httpContext, lifetimeDays));
     }
 
-    public void ClearRefreshToken(HttpContext httpContext)
+    public static void ClearRefreshToken(HttpContext httpContext)
     {
         httpContext.Response.Cookies.Delete(
             CookieName,

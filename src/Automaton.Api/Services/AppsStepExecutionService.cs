@@ -16,7 +16,6 @@ public class AppsStepExecutionService
     private readonly ApplicationDbContext dataContext;
     private readonly UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory;
     private readonly RunnerExecutionDispatchService dispatch;
-    private readonly Serilog.ILogger logger;
 
     public AppsStepExecutionService(
         ApplicationDbContext dataContext,
@@ -26,7 +25,6 @@ public class AppsStepExecutionService
         this.dataContext = dataContext;
         this.customStepsServiceFactory = customStepsServiceFactory;
         this.dispatch = dispatch;
-        this.logger = Serilog.Log.ForContext<AppsStepExecutionService>();
     }
 
     /// <summary>

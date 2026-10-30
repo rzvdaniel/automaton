@@ -371,7 +371,7 @@ public sealed class RunnerExecutionOperationService(
         var file = new FileInfo(path);
         if (file.Length != transfer.Length)
             throw new ArgumentException("Download artifact length does not match its result metadata.");
-        var actualChecksum = await artifacts.ComputeSha256Async(path, token);
+        var actualChecksum = await DeploymentPackageStore.ComputeSha256Async(path, token);
         if (!string.Equals(actualChecksum, checksum, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Download artifact checksum does not match its result metadata.");
     }

@@ -134,7 +134,7 @@ public class StepMcpToolProvider : IMcpToolProvider
             return toolName switch
             {
                 "get_current_code" => await GetCurrentCodeAsync(arguments, contextId),
-                "execute_code" => await ExecuteCodeAsync(arguments, contextId),
+                "execute_code" => await ExecuteCodeAsync(arguments),
                 "save_code" => await SaveCodeAsync(arguments, contextId),
                 "get_step_variables" => await GetStepVariablesAsync(arguments, contextId),
                 _ => new McpToolResult
@@ -219,7 +219,7 @@ public class StepMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> ExecuteCodeAsync(JsonElement arguments, string? contextId)
+    private async Task<McpToolResult> ExecuteCodeAsync(JsonElement arguments)
     {
         var code = arguments.GetProperty("code").GetString();
         var language = arguments.GetProperty("language").GetString();

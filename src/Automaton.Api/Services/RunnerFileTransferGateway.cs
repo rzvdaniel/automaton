@@ -36,7 +36,7 @@ public sealed class RunnerFileTransferGateway(
             {
                 await using var stream = input.OpenReadStream();
                 inputPath = await store.StoreRunnerTransferAsync(operationId, input: true, stream, input.Length, token);
-                var sha256 = await store.ComputeSha256Async(inputPath, token);
+                var sha256 = await DeploymentPackageStore.ComputeSha256Async(inputPath, token);
                 command = command with { Length = input.Length, Sha256 = sha256 };
             }
 

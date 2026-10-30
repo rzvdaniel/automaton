@@ -17,17 +17,14 @@ public class AppsStepExecutionController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppsStepExecutionService stepExecutionService;
     private readonly Serilog.ILogger logger;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppsStepExecutionController(
         AppsService appsService,
         CustomStepsService customStepsService,
-        AppsStepExecutionService stepExecutionService,
-        PrivateAppLaunchService privateAppLaunchService)
+        AppsStepExecutionService stepExecutionService)
     {
         this.appsService = appsService;
         this.stepExecutionService = stepExecutionService;
-        this.privateAppLaunchService = privateAppLaunchService;
         this.logger = Serilog.Log.ForContext<AppsStepExecutionController>();
     }
 
@@ -240,7 +237,7 @@ public class AppsStepExecutionController : ControllerBase
     {
         if (User.Identity?.IsAuthenticated != true ||
             (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+             && !PrivateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
         {
             return Task.FromResult<ActionResult<AppStepExecutionResponse>>(Unauthorized(new { error = "Authentication required" }));
         }
@@ -254,7 +251,7 @@ public class AppsStepExecutionController : ControllerBase
     {
         if (User.Identity?.IsAuthenticated != true ||
             (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+             && !PrivateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
         {
             return Task.FromResult<ActionResult<IEnumerable<AppStepInfo>>>(Unauthorized(new { error = "Authentication required" }));
         }

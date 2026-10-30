@@ -17,17 +17,14 @@ public class SettingsService
     private const string AppDeployRulesKey = "Apps.DeployRules";
     
     private readonly ApplicationDbContext _dbContext;
-    private readonly UserContextService _userContextService;
     private readonly AppFileRuleBaselineOptions _appFileRuleBaseline;
     private readonly Serilog.ILogger _logger;
 
     public SettingsService(
         ApplicationDbContext dbContext,
-        UserContextService userContextService,
         IOptions<AppFileRuleBaselineOptions> appFileRuleBaseline)
     {
         _dbContext = dbContext;
-        _userContextService = userContextService;
         _appFileRuleBaseline = appFileRuleBaseline.Value ?? new AppFileRuleBaselineOptions();
         _logger = Serilog.Log.ForContext<SettingsService>();
     }

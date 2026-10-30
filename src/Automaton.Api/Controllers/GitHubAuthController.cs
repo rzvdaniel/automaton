@@ -24,7 +24,6 @@ public class GitHubAuthController : ControllerBase
     private readonly ConfigurationService _configurationService;
     private readonly GitHubOAuthOptions _gitHubOptions;
     private readonly ILogger<GitHubAuthController> _logger;
-    private readonly RefreshTokenCookieService _refreshTokenCookieService;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UsersService _usersService;
 
@@ -33,7 +32,6 @@ public class GitHubAuthController : ControllerBase
         ConfigurationService configurationService,
         IOptions<GitHubOAuthOptions> gitHubOptions,
         ILogger<GitHubAuthController> logger,
-        RefreshTokenCookieService refreshTokenCookieService,
         SignInManager<ApplicationUser> signInManager,
         UsersService usersService)
     {
@@ -41,7 +39,6 @@ public class GitHubAuthController : ControllerBase
         _configurationService = configurationService;
         _gitHubOptions = gitHubOptions.Value;
         _logger = logger;
-        _refreshTokenCookieService = refreshTokenCookieService;
         _signInManager = signInManager;
         _usersService = usersService;
     }
@@ -107,7 +104,7 @@ public class GitHubAuthController : ControllerBase
                 user,
                 _configurationService.RefreshTokenLifetime,
                 cancellationToken);
-            _refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, _configurationService.RefreshTokenLifetime);
+            RefreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, _configurationService.RefreshTokenLifetime);
             jwt.RefreshToken = string.Empty;
 
             return Redirect(BuildFrontendSuccessRedirect(jwt, returnUrl ?? "/"));

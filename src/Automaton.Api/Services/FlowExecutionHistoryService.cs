@@ -114,10 +114,10 @@ public class FlowExecutionHistoryService
 
     public async Task Update(Guid id, Models.FlowExecution flowExecution, CancellationToken cancellationToken)
     {
-        var entity = dbContext.FlowExecutions
+        var entity = await dbContext.FlowExecutions
             .Include(x => x.FlowExecutionUsers)
-            .SingleOrDefault(x => x.Id == id &&
-                x.FlowExecutionUsers.Any(x => x.UserId == userId));
+            .SingleOrDefaultAsync(x => x.Id == id &&
+                x.FlowExecutionUsers.Any(x => x.UserId == userId), cancellationToken);
 
         entity.Status = flowExecution.Status;
         entity.Finished = flowExecution.Finished;

@@ -218,7 +218,7 @@ public class AiApiKeyService
     /// <summary>
     /// For Desktop environments - read from environment variables
     /// </summary>
-    public Dictionary<string, string?> GetEnvironmentApiKeys()
+    public static Dictionary<string, string?> GetEnvironmentApiKeys()
     {
         var environmentKeys = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 

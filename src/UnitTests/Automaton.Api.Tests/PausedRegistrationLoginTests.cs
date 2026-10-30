@@ -29,7 +29,7 @@ public class PausedRegistrationLoginTests
         var services = new ServiceCollection().AddSingleton<IMediator>(mediator).BuildServiceProvider();
         var configuration = new ConfigurationService(new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["AppConfig:UserSignUp"] = "false" }).Build());
-        var controller = new AccountController(configuration, null!, null!, null!, new RefreshTokenCookieService())
+        var controller = new AccountController(configuration, null!, null!, null!)
         {
             ControllerContext = new ControllerContext
             {

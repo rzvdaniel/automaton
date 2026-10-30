@@ -25,29 +25,29 @@ public sealed class RunnerDeletionService(
             : null;
         await deletionPolicy.EnsureCanDeleteAsync(id, cancellationToken);
 
-        var entity = dbContext.Runners
+        var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id);
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-        if (entity == null)
+        if (runner == null)
             return;
 
-        if (!entity.DeletionRequestedAtUtc.HasValue || !hostCleanupConfirmed)
+        if (!runner.DeletionRequestedAtUtc.HasValue || !hostCleanupConfirmed)
             throw new InvalidOperationException("Prepare Runner removal and confirm its host cleanup before deleting the registration.");
-        if (RunnerPresenceEvaluator.IsOnline(entity.ConnectionId, entity.LastHeartbeatAtUtc, DateTime.UtcNow))
+        if (RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
             throw new InvalidOperationException("The Runner is still online. Run its uninstall command on the server before confirming removal.");
 
         await executions.RevokeAsync(id, cancellationToken);
-        if (entity.ApiKeyId is Guid keyId)
+        if (runner.ApiKeyId is Guid keyId)
         {
             var key = await dbContext.ApiKeys.SingleOrDefaultAsync(key => key.Id == keyId, cancellationToken);
             if (key is not null) key.IsActive = false;
         }
-        dbContext.Runners.Remove(entity);
+        dbContext.Runners.Remove(runner);
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
-        await RecordDeletedAsync(entity, cancellationToken);
+        await RecordDeletedAsync(runner, cancellationToken);
     }
 
     private Task RecordDeletedAsync(Runner entity, CancellationToken cancellationToken)

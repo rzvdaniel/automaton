@@ -85,31 +85,31 @@ public class RunnerService
             throw new UnauthorizedAccessException($"You do not have permission to update runner {id}");
         }
 
-        var entity = dbContext.Runners
+        var runnerEntity = await dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id);
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-        if (entity == null)
+        if (runnerEntity == null)
         {
             throw new InvalidOperationException($"Runner {id} not found");
         }
 
-        if (runner.InstallationId is not null && runner.InstallationId != entity.InstallationId)
+        if (runner.InstallationId is not null && runner.InstallationId != runnerEntity.InstallationId)
             throw new ArgumentException("Runner installation identity cannot be changed through the update API.", nameof(runner));
 
-        var capabilities = RunnerCapabilities.Normalize(runner.Capabilities, entity.Purpose);
+        var capabilities = RunnerCapabilities.Normalize(runner.Capabilities, runnerEntity.Purpose);
 
-        entity.Name = runner.Name;
-        entity.Version = runner.Version;
-        entity.MachineName = runner.MachineName;
-        entity.IpAddress = runner.IpAddress;
-        entity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, entity.Purpose);
+        runnerEntity.Name = runner.Name;
+        runnerEntity.Version = runner.Version;
+        runnerEntity.MachineName = runner.MachineName;
+        runnerEntity.IpAddress = runner.IpAddress;
+        runnerEntity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, runnerEntity.Purpose);
 
         // Mark entity as modified
-        dbContext.Entry(entity).State = EntityState.Modified;
+        dbContext.Entry(runnerEntity).State = EntityState.Modified;
 
         // Update runner entity
-        dbContext.Update(entity);
+        dbContext.Update(runnerEntity);
 
         // Save changes
         await dbContext.SaveChangesAsync(cancellationToken);

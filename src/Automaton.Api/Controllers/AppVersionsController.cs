@@ -82,7 +82,7 @@ public class AppVersionsController : BaseController
                 });
             }
 
-            var dto = MapVersionDto(result.Version!, appVersionService);
+            var dto = MapVersionDto(result.Version!);
 
             logger.LogDebug("[AppVersionsController] Created snapshot for app {AppId}, version {Version}", appId, result.Version!.VersionNumber);
             return StatusCode(StatusCodes.Status201Created, new CreateVersionSnapshotResponse
@@ -99,7 +99,7 @@ public class AppVersionsController : BaseController
         }
     }
 
-    private static AppVersionDto MapVersionDto(Entities.AppVersion version, AppVersionService appVersionService)
+    private static AppVersionDto MapVersionDto(Entities.AppVersion version)
     {
         return new AppVersionDto
         {
@@ -108,8 +108,8 @@ public class AppVersionsController : BaseController
             VersionNumber = version.VersionNumber,
             Summary = version.Summary ?? "Snapshot created",
             Trigger = version.Trigger.ToString(),
-            Source = appVersionService.GetEffectiveSource(version),
-            Reason = appVersionService.GetEffectiveReason(version),
+            Source = AppVersionService.GetEffectiveSource(version),
+            Reason = AppVersionService.GetEffectiveReason(version),
             CreatedAt = version.CreatedAt,
             CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
             AiSessionId = version.AiSessionId,

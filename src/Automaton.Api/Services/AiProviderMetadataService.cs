@@ -10,7 +10,6 @@ public class AiProviderMetadataService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiProviderMetadataService> logger;
-    private readonly IAiProvidersSettingsService settingsService;
 
     // Known fallback defaults when database has no default set
     private static readonly Dictionary<string, string> FallbackDefaults = new(StringComparer.OrdinalIgnoreCase)
@@ -20,11 +19,10 @@ public class AiProviderMetadataService
         ["Google"] = "gemini-1.5-pro"
     };
 
-    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger, IAiProvidersSettingsService settingsService)
+    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger)
     {
         this.dbContext = dbContext;
         this.logger = logger;
-        this.settingsService = settingsService;
     }
 
     /// <summary>

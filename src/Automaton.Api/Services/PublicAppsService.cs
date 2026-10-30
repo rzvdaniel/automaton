@@ -13,16 +13,13 @@ public class PublicAppsService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly PublishedAppsConfig publishedAppsConfig;
-    private readonly ILogger<PublicAppsService> logger;
 
     public PublicAppsService(
         ApplicationDbContext dataContext,
-        IOptions<PublishedAppsConfig> publishedAppsConfig,
-        ILogger<PublicAppsService> logger)
+        IOptions<PublishedAppsConfig> publishedAppsConfig)
     {
         this.dataContext = dataContext;
         this.publishedAppsConfig = publishedAppsConfig.Value;
-        this.logger = logger;
     }
 
     /// <summary>

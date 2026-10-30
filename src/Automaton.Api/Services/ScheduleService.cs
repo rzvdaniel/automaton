@@ -115,9 +115,9 @@ public class ScheduleService
 
     public async Task UpdateAsync(Guid id, ScheduleModel scheduleModel, CancellationToken cancellationToken)
     {
-        var schedule = dbContext.Schedules
+        var schedule = await dbContext.Schedules
             .Include(x => x.ScheduleUsers)
-            .SingleOrDefault(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId))
+            .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId), cancellationToken)
             ?? throw new KeyNotFoundException("Schedule not found.");
 
         schedule.Name = scheduleModel.Name;

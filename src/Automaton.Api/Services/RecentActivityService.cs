@@ -8,7 +8,6 @@ namespace Automaton.Api.Services
     public class RecentActivityService
     {
         private readonly ApplicationDbContext dbContext;
-        private readonly UserContextService userContextService;
         private readonly Serilog.ILogger logger;
         private readonly Guid userId;
 
@@ -17,7 +16,6 @@ namespace Automaton.Api.Services
             UserContextService userContextService)
         {
             this.dbContext = dbContext;
-            this.userContextService = userContextService;
             this.logger = Log.ForContext<RecentActivityService>();
             this.userId = userContextService.GetUserId();
         }

@@ -103,7 +103,7 @@ public class CustomStepsService
 
         dataContext.CustomStepUsers.Add(stepUser);
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepCreated, step.Name, entity.Id);
@@ -119,7 +119,7 @@ public class CustomStepsService
             throw new UnauthorizedAccessException($"You do not have permission to update custom step {id}");
         }
 
-        var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+        var entity = await dataContext.CustomSteps.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -139,7 +139,7 @@ public class CustomStepsService
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(step.Definition);
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepUpdated, step.Name, id);
@@ -162,7 +162,7 @@ public class CustomStepsService
             throw new UnauthorizedAccessException($"You do not have permission to delete custom step {id}");
         }
 
-        var customStep = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+        var customStep = await dataContext.CustomSteps.SingleOrDefaultAsync(x => x.Id == id);
 
         if (customStep == null)
         {
@@ -175,7 +175,7 @@ public class CustomStepsService
         await DeleteSensitiveVariablesAsync(id);
 
         dataContext.CustomSteps.Remove(customStep);
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepDeleted, stepName, id);
@@ -208,7 +208,7 @@ public class CustomStepsService
         CancellationToken cancellationToken)
     {
         var selectedRunnerIds = runnerIds.Distinct().ToArray();
-        await runnerExecutionService.EnsureCanExecuteAsync(selectedRunnerIds, userId, cancellationToken);
+        await CustomStepRunnerExecutionService.EnsureCanExecuteAsync(selectedRunnerIds, userId, cancellationToken);
 
         var customStep = await GetForExecutionAsync(customStepId);
         if (customStep is null)
@@ -223,8 +223,8 @@ public class CustomStepsService
     /// </summary>
     public async Task<CustomStep> GetForEditingAsync(Guid id)
     {
-        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
-            .SingleOrDefault(x => x.Id == id);
+        var stepEntity = await authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefaultAsync(x => x.Id == id);
 
         if (stepEntity == null)
         {
@@ -245,8 +245,8 @@ public class CustomStepsService
     /// </summary>
     public async Task<CustomStep?> GetForExecutionAsync(Guid id)
     {
-        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
-            .SingleOrDefault(x => x.Id == id);
+        var stepEntity = await authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefaultAsync(x => x.Id == id);
 
         if (stepEntity == null)
         {
@@ -267,8 +267,8 @@ public class CustomStepsService
     /// </summary>
     public async Task<CustomStep?> GetByNameForExecutionAsync(string name)
     {
-        var entity = authorizationService.GetAccessibleCustomStepsQuery()
-            .FirstOrDefault(x => x.Name == name);
+        var entity = await authorizationService.GetAccessibleCustomStepsQuery()
+            .FirstOrDefaultAsync(x => x.Name == name);
 
         if (entity == null)
         {

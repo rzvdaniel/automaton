@@ -128,7 +128,7 @@ public sealed class AppPublicationService(
         if (!await authorizationService.CanUpdateAppAsync(id))
             throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
 
-        var entity = dataContext.WebApps.SingleOrDefault(app => app.Id == id);
+        var entity = await dataContext.WebApps.SingleOrDefaultAsync(app => app.Id == id);
         if (entity == null)
             throw new InvalidOperationException($"App {id} not found");
 

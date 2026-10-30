@@ -416,7 +416,6 @@ public class AppFileStorageServiceTests
         var userContext = new UserContextService(new HttpContextAccessor());
         var settingsService = new SettingsService(
             dbContext,
-            userContext,
             Options.Create(new AppFileRuleBaselineOptions
             {
                 RemixSourceExclude = [".git", ".env", ".env.*", "appsettings.*.json", "*.local.*", "secrets.json", "secrets", "secrets/**"],

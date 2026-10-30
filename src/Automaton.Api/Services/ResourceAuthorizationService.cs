@@ -2,7 +2,6 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using System.Security.Claims;
 
 namespace Automaton.Api.Services;
@@ -15,20 +14,15 @@ public class ResourceAuthorizationService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
-    private readonly Serilog.ILogger logger;
-    private readonly IHttpContextAccessor httpContextAccessor;
 
     private Guid UserId => userContextService.GetUserId();
 
     public ResourceAuthorizationService(
         ApplicationDbContext dbContext,
-        UserContextService userContextService,
-        IHttpContextAccessor? httpContextAccessor = null)
+        UserContextService userContextService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
-        this.httpContextAccessor = httpContextAccessor ?? new HttpContextAccessor();
-        this.logger = Log.ForContext<ResourceAuthorizationService>();
     }
 
     #region Apps Authorization

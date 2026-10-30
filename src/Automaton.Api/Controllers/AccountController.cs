@@ -20,19 +20,16 @@ public class AccountController : BaseController
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
-    private readonly RefreshTokenCookieService refreshTokenCookieService;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext,
         UsersService userManagerService,
-        ConfirmedEmailGuardService confirmedEmailGuardService,
-        RefreshTokenCookieService refreshTokenCookieService)
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.configurationService = configurationService;
         this.dataContext = dataContext;
         this.userManagerService = userManagerService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
-        this.refreshTokenCookieService = refreshTokenCookieService;
     }
 
     [HttpPost]
@@ -43,7 +40,7 @@ public class AccountController : BaseController
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
         var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
-        refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
+        RefreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
         jwt.RefreshToken = string.Empty;
 
         return Ok(jwt);
@@ -67,7 +64,7 @@ public class AccountController : BaseController
         );
 
         await userManagerService.RevokeAllRefreshTokensAsync(userId, cancellationToken);
-        refreshTokenCookieService.ClearRefreshToken(HttpContext);
+        RefreshTokenCookieService.ClearRefreshToken(HttpContext);
 
         await dataContext.SaveChangesAsync(cancellationToken);
 
@@ -115,7 +112,7 @@ public class AccountController : BaseController
             return BadRequest(ModelState);
         }
 
-        if (!userManagerService.IsValidPublicUsername(request.NewPublicUsername))
+        if (!UsersService.IsValidPublicUsername(request.NewPublicUsername))
         {
             ModelState.AddModelError("NewPublicUsername", "Public username must be 3-32 characters, using only letters, numbers, hyphens, and underscores.");
             return BadRequest(ModelState);

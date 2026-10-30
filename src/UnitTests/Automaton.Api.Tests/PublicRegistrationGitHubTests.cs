@@ -38,7 +38,7 @@ public class PublicRegistrationGitHubTests
             .Build());
         return new GitHubAuthController(null!, configuration,
             Options.Create(new GitHubOAuthOptions()), NullLogger<GitHubAuthController>.Instance,
-            null!, null!, users);
+            null!, users);
     }
 
     private sealed class RegistrationUserManager(ApplicationUser? user) : UserManager<ApplicationUser>(

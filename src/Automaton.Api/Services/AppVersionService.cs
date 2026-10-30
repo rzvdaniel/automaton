@@ -324,14 +324,14 @@ public class AppVersionService
         return (maxVersion ?? 0) + 1;
     }
 
-    public string GetEffectiveSource(AppVersion version)
+    public static string GetEffectiveSource(AppVersion version)
     {
         return !string.IsNullOrWhiteSpace(version.Source)
             ? version.Source
             : GetDefaultSource(version.Trigger);
     }
 
-    public string GetEffectiveReason(AppVersion version)
+    public static string GetEffectiveReason(AppVersion version)
     {
         return !string.IsNullOrWhiteSpace(version.Reason)
             ? version.Reason
@@ -376,6 +376,6 @@ public class AppVersionService
             return false;
         }
 
-        return fileStorageService.DirectoriesMatch(currentSourcePath, latestSnapshotPath);
+        return AppFileStorageService.DirectoriesMatch(currentSourcePath, latestSnapshotPath);
     }
 }
