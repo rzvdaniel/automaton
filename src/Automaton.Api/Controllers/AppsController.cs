@@ -220,15 +220,6 @@ public class AppsController : BaseController
         return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, AppModel app)
-    {
-        try { await appsService.Update(id, app); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
-
-        return NoContent();
-    }
-
     [HttpDelete("{id}")]
     [Authorize(Policy = "AllowApiKey")]
     [ServiceFilter(typeof(AppDeploymentTargetExceptionFilter))]
