@@ -24,6 +24,12 @@ the existing files before choosing commands, paths, or dependencies.
     entry point and record the observed result.
 13. If it fails, inspect the exact failure and fix it.
 14. Publish when it is within the requested app delivery or an existing standing authorization. Do not ask for separate publication approval again; honor any user restriction to keep the app private or unpublished. For authorized non-interactive publication, use `automaton publish --yes` and verify the published URL.
+15. A published app is listed in the public marketplace by default. Give it a
+    listing: `automaton listing set --summary "..." --description "..."
+    --category <category> --tags "a,b"`, `automaton listing cover <image>` and
+    `automaton listing add-screenshot <images>`. Use real screenshots of the
+    running app (PNG, JPG, WEBP or GIF, up to 2 MB, at most 8), and check the
+    result with `automaton listing show`.
 
 Every completed app needs proof that its requested behavior works. For a web
 app, exercise the main user interaction in a browser, including writes and

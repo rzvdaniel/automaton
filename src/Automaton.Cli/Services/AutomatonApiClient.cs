@@ -507,6 +507,43 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    // ── Marketplace listing ───────────────────────────────────────────────────
+
+    // Fields left out of the payload are not changed.
+    public async Task UpdateListingAsync(string appId, object listing, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(listing, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/apps/{appId}/listing", content, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public Task<JsonElement> UploadListingCoverAsync(
+        string appId, Stream image, string fileName, string contentType, CancellationToken ct = default)
+        => UploadImageAsync($"api/apps/{appId}/upload-background", image, fileName, contentType, ct);
+
+    public Task<JsonElement> UploadListingScreenshotAsync(
+        string appId, Stream image, string fileName, string contentType, CancellationToken ct = default)
+        => UploadImageAsync($"api/apps/{appId}/screenshots", image, fileName, contentType, ct);
+
+    public async Task DeleteListingScreenshotAsync(string appId, string screenshotId, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync(
+            $"api/apps/{appId}/screenshots/{Uri.EscapeDataString(screenshotId)}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    private async Task<JsonElement> UploadImageAsync(
+        string url, Stream image, string fileName, string contentType, CancellationToken ct)
+    {
+        using var content = new MultipartFormDataContent();
+        var file = new StreamContent(image);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(file, "file", fileName);
+        using var resp = await _http.PostAsync(url, content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── App files ─────────────────────────────────────────────────────────────
 
     public async Task<JsonElement> ListScopedFilesAsync(string appId, string scope, CancellationToken ct = default)

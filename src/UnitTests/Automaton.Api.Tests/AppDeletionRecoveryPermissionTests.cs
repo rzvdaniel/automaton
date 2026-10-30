@@ -68,6 +68,7 @@ public sealed class AppDeletionRecoveryPermissionTests
                 }
             }
         };
-        Assert.That(await controller.Delete(Guid.NewGuid()), Is.TypeOf<ForbidResult>());
+        var result = await controller.Delete(Guid.NewGuid()) as ObjectResult;
+        Assert.That(result?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
     }
 }

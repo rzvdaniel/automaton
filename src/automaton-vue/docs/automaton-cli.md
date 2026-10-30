@@ -72,11 +72,14 @@ automaton sync-ai
 automaton pull
 automaton runners
 automaton publish
+automaton listing show
 ```
 
 `sync-ai` restores the canonical local guidance files. `pull` downloads app
 source. `runners` lists available Runners. `publish` makes the latest deployment
-public and requires explicit user approval.
+public and requires explicit user approval. `listing` sets the app's marketplace
+summary, description, category, tags, cover and screenshots; see
+[Publish](./publish#marketplace-listing).
 
 The optional positional argument to `automaton deploy` selects a remote
 deployment target. Its `--env <name>` option instead selects a local project

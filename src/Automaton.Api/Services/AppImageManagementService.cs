@@ -5,6 +5,7 @@ namespace Automaton.Api.Services;
 
 public sealed class AppImageManagementService(
     AppsService appsService,
+    ResourceAuthorizationService authorizationService,
     IWebHostEnvironment environment,
     ILogger<AppImageManagementService> logger)
 {
@@ -20,6 +21,11 @@ public sealed class AppImageManagementService(
             {
                 logger.LogWarning("Thumbnail upload attempt by user {User} to app not owned: {AppId}", userName ?? "Unknown", appId);
                 return AppImageOperationResult.NotFound();
+            }
+
+            if (!await authorizationService.CanUpdateAppAsync(appId))
+            {
+                return Denied("Thumbnail upload", appId, userName);
             }
 
             var validationError = Validate(file, appId);
@@ -68,6 +74,11 @@ public sealed class AppImageManagementService(
             {
                 logger.LogWarning("Screenshot upload attempt by user {User} to app not owned: {AppId}", userName ?? "Unknown", appId);
                 return AppImageOperationResult.NotFound();
+            }
+
+            if (!await authorizationService.CanUpdateAppAsync(appId))
+            {
+                return Denied("Screenshot upload", appId, userName);
             }
 
             if (file is null || file.Length == 0)
@@ -122,6 +133,11 @@ public sealed class AppImageManagementService(
             {
                 logger.LogWarning("Screenshot delete attempt by user {User} to app not owned: {AppId}", userName ?? "Unknown", appId);
                 return AppImageOperationResult.NotFound();
+            }
+
+            if (!await authorizationService.CanUpdateAppAsync(appId))
+            {
+                return Denied("Screenshot delete", appId, userName);
             }
 
             var imageUrl = await appsService.DeleteScreenshotAsync(appId, screenshotId);
@@ -239,6 +255,13 @@ public sealed class AppImageManagementService(
         }
     }
 
+    // Seeing an app (for example as a project Viewer) is not enough to change its images.
+    private AppImageOperationResult Denied(string operation, Guid appId, string? userName)
+    {
+        logger.LogWarning("{Operation} denied for user {User} without update access to app {AppId}", operation, userName ?? "Unknown", appId);
+        return AppImageOperationResult.Forbidden();
+    }
+
     private static bool IsWithinDirectory(string filePath, string directory)
     {
         var fullPath = Path.GetFullPath(filePath);
@@ -257,6 +280,7 @@ public sealed record AppImageOperationResult(
     public static AppImageOperationResult SuccessPayload(object payload) => new(StatusCodes.Status200OK, Payload: payload);
     public static AppImageOperationResult NoContent() => new(StatusCodes.Status204NoContent);
     public static AppImageOperationResult NotFound(string? error = null) => new(StatusCodes.Status404NotFound, ErrorMessage: error);
+    public static AppImageOperationResult Forbidden() => new(StatusCodes.Status403Forbidden, ErrorMessage: "You do not have permission to change this app.");
     public static AppImageOperationResult BadRequest(string error) => new(StatusCodes.Status400BadRequest, ErrorMessage: error);
     public static AppImageOperationResult Failure(string error = "Failed to upload image") => new(StatusCodes.Status500InternalServerError, ErrorMessage: error);
 }

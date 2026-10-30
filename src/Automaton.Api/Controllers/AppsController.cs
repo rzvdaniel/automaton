@@ -1,3 +1,4 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Constants;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
@@ -235,8 +236,7 @@ public class AppsController : BaseController
         [FromQuery] bool recoverInterrupted = false,
         [FromQuery] bool abandonOfflineRuntimes = false)
     {
-        var apiKeyScope = User.FindFirst("api_key_scope")?.Value;
-        if (apiKeyScope is not null && apiKeyScope is not ("Developer" or "FullAccess")) return Forbid();
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         if ((recoverInterrupted || abandonOfflineRuntimes) && !User.IsInRole("Admin") && !User.IsInRole("SysAdmin")) return Forbid();
         if (abandonOfflineRuntimes && !recoverInterrupted)
             return BadRequest(new { message = "Abandoning offline runtimes requires interrupted-deletion recovery." });
@@ -334,27 +334,38 @@ public class AppsController : BaseController
     }
 
     [HttpPost("{id}/upload-background")]
+    [Authorize(Policy = "AllowApiKey")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadBackgroundImage(Guid id, IFormFile file)
     {
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         var result = await appImageManagementService.UploadAsync(id, file, User.Identity?.Name);
         return ToImageOperationResult(result, "Failed to upload image");
     }
 
     [HttpPost("{id}/screenshots")]
+    [Authorize(Policy = "AllowApiKey")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadScreenshot(Guid id, IFormFile file)
     {
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         var result = await appImageManagementService.UploadScreenshotAsync(id, file, User.Identity?.Name);
         return ToImageOperationResult(result, "Failed to upload screenshot");
     }
 
     [HttpDelete("{id}/screenshots/{screenshotId:guid}")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> DeleteScreenshot(Guid id, Guid screenshotId)
     {
+        if (!HasAppWriteKeyScope()) return KeyScopeDenied();
         var result = await appImageManagementService.DeleteScreenshotAsync(id, screenshotId, User.Identity?.Name);
         return ToImageOperationResult(result, "Failed to delete screenshot");
     }
+
+    private bool HasAppWriteKeyScope() => AppChangeKeyScope.IsAllowed(User);
+
+    private ObjectResult KeyScopeDenied()
+        => StatusCode(StatusCodes.Status403Forbidden, new { message = AppChangeKeyScope.DeniedMessage });
 
     private IActionResult ToImageOperationResult(AppImageOperationResult result, string failureMessage)
         => result.StatusCode switch
@@ -362,6 +373,7 @@ public class AppsController : BaseController
             StatusCodes.Status200OK when result.Payload is not null => Ok(result.Payload),
             StatusCodes.Status200OK => Ok(new { imageUrl = result.ImageUrl }),
             StatusCodes.Status204NoContent => NoContent(),
+            StatusCodes.Status403Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
             StatusCodes.Status404NotFound => NotFound(new { message = result.ErrorMessage ?? "App not found" }),
             StatusCodes.Status400BadRequest => BadRequest(new { message = result.ErrorMessage }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = result.ErrorMessage ?? failureMessage })

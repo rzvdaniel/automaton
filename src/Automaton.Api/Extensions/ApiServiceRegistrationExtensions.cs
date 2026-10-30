@@ -508,6 +508,7 @@ internal static class ApiAppCatalogRegistration
         services.AddScoped<RunnerRemovalService>();
         services.AddScoped<AppsService>();
         services.AddScoped<AppImageManagementService>();
+        services.AddScoped<AppMarketplaceListingService>();
         services.AddScoped<AppRuntimeArchiveUploadService>();
         services.AddScoped<IAppDeploymentTargetResolver, AppDeploymentTargetResolver>();
         services.AddScoped<AppFileRunnerResolver>();
