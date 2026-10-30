@@ -328,31 +328,8 @@ public class ResourceAuthorizationService
         return await CanExecuteFlowAsync(flowId, UserId, cancellationToken);
     }
 
-    public async Task<bool> CanExecuteFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.FlowUsers
-            .AnyAsync(u => u.FlowId == flowId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership with execute permission (ProjectAdmin or Developer only)
-        var hasProjectAccess = await dbContext.ProjectFlows
-            .Where(pf => pf.FlowId == flowId)
-            .Join(
-                dbContext.ProjectMembers,
-                pf => pf.ProjectId,
-                pm => pm.ProjectId,
-                (pf, pm) => new { pf, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
-                          (x.pm.Role == ProjectRole.ProjectAdmin || x.pm.Role == ProjectRole.Developer),
-                      cancellationToken);
-
-        return hasProjectAccess;
-    }
+    public Task<bool> CanExecuteFlowAsync(Guid flowId, Guid userId, CancellationToken cancellationToken = default)
+        => CanUpdateFlowAsync(flowId, userId, cancellationToken);
 
     #endregion
 
@@ -458,31 +435,8 @@ public class ResourceAuthorizationService
         return await CanExecuteCustomStepAsync(stepId, UserId, cancellationToken);
     }
 
-    public async Task<bool> CanExecuteCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.CustomStepUsers
-            .AnyAsync(u => u.CustomStepId == stepId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership with execute permission
-        var hasProjectAccess = await dbContext.ProjectCustomSteps
-            .Where(pcs => pcs.CustomStepId == stepId)
-            .Join(
-                dbContext.ProjectMembers,
-                pcs => pcs.ProjectId,
-                pm => pm.ProjectId,
-                (pcs, pm) => new { pcs, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
-                          (x.pm.Role == ProjectRole.ProjectAdmin || x.pm.Role == ProjectRole.Developer),
-                      cancellationToken);
-
-        return hasProjectAccess;
-    }
+    public Task<bool> CanExecuteCustomStepAsync(Guid stepId, Guid userId, CancellationToken cancellationToken = default)
+        => CanUpdateCustomStepAsync(stepId, userId, cancellationToken);
 
     #endregion
 

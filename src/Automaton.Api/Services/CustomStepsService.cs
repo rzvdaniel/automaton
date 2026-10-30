@@ -243,23 +243,7 @@ public class CustomStepsService
     /// Get custom step with decrypted sensitive variables for execution.
     /// Use this method when preparing to send step to a runner.
     /// </summary>
-    public async Task<CustomStep?> GetForExecutionAsync(Guid id)
-    {
-        var stepEntity = await authorizationService.GetAccessibleCustomStepsQuery()
-            .SingleOrDefaultAsync(x => x.Id == id);
-
-        if (stepEntity == null)
-        {
-            return null;
-        }
-
-        var step = MapToModel(stepEntity);
-
-        // ✅ Decrypt sensitive variables for execution
-        await DecryptSensitiveVariablesAsync(step.Definition);
-
-        return step;
-    }
+    public Task<CustomStep?> GetForExecutionAsync(Guid id) => GetForEditingAsync(id);
 
     /// <summary>
     /// Get custom step by name with decrypted sensitive variables for execution.
