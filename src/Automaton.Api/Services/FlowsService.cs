@@ -13,7 +13,6 @@ public class FlowsService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly RunnerService runnerService;
-    private readonly ScheduleService scheduleService;
     private readonly RecentActivityService recentActivityService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly SensitiveVariableService sensitiveVariableService;
@@ -24,7 +23,6 @@ public class FlowsService
     (
         ApplicationDbContext dbContext,
         RunnerService runnerService,
-        ScheduleService scheduleService,
         RecentActivityService recentActivityService,
         UserContextService userContextService,
         ResourceAuthorizationService authorizationService,
@@ -33,7 +31,6 @@ public class FlowsService
     {
         this.dbContext = dbContext;
         this.runnerService = runnerService;
-        this.scheduleService = scheduleService;
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
         this.sensitiveVariableService = sensitiveVariableService;
@@ -51,9 +48,9 @@ public class FlowsService
                 .Include(m => m.FlowUsers)
             from s in dbContext.FlowExecutions
                 .Where(s => m.Id == s.FlowId)
-                .DefaultIfEmpty()
                 .OrderByDescending(x => x.Started)
-                .Take(1)    
+                .Take(1)
+                .DefaultIfEmpty()
             select new FlowInfo
             {
                 Id = m.Id,
@@ -68,11 +65,16 @@ public class FlowsService
         return flows;
     }
 
-    public Flow Get(Guid id)
+    public Flow? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var entity = authorizationService.GetAccessibleFlowsQuery()
             .SingleOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return null;
+        }
 
         var flow = DeserializeFlow(entity.Body);
 
@@ -111,7 +113,7 @@ public class FlowsService
 
         dbContext.FlowUsers.Add(flowUser);
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowCreated, flow.Name, flow.Id);
@@ -127,7 +129,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
         }
 
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var entity = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -141,7 +143,7 @@ public class FlowsService
         entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, flow.Name, id);
@@ -164,7 +166,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to delete flow {id}");
         }
 
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var flow = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (flow == null)
         {
@@ -177,7 +179,7 @@ public class FlowsService
         await DeleteSensitiveVariablesAsync(id);
 
         dbContext.Flows.Remove(flow);
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowDeleted, flowName, id);
@@ -213,7 +215,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to execute flow {flowId}");
         }
 
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId);
+        var flow = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == flowId, cancellationToken);
 
         if (flow == null)
         {
@@ -237,6 +239,10 @@ public class FlowsService
     public FlowSettings GetSettings(Guid id)
     {
         var flow = Get(id);
+        if (flow is null)
+        {
+            throw new InvalidOperationException($"Flow {id} not found or not accessible.");
+        }
 
         var settings = new FlowSettings
         {
@@ -249,7 +255,7 @@ public class FlowsService
         return settings;
     }
 
-    public async Task UpdateSettings(Guid id, FlowSettings settings)
+    public async Task UpdateSettings(Guid id, UpdateFlowSettingsRequest settings)
     {
         // Check if user can update this flow
         if (!await authorizationService.CanUpdateFlowAsync(id))
@@ -257,7 +263,7 @@ public class FlowsService
             throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
         }
 
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+        var entity = await dbContext.Flows.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -273,7 +279,7 @@ public class FlowsService
         entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, settings.Name, id);
@@ -302,10 +308,8 @@ public class FlowsService
         Guid flowId,
         string scope)
     {
-        foreach (var kvp in variables.ToList())
+        foreach (var variable in variables.Values.ToList())
         {
-            var variable = kvp.Value;
-
             if (variable.IsSensitive && !string.IsNullOrEmpty(variable.Value))
             {
                 // Check if value is already a reference
@@ -314,9 +318,11 @@ public class FlowsService
                     try
                     {
                         // Encrypt and store in SensitiveVariables table
+                        var variableName = variable.Name
+                            ?? throw new InvalidOperationException("Sensitive flow variables require a name.");
                         var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
                             userId,
-                            variable.Name,
+                            variableName,
                             variable.Value,
                             SensitiveVariableResourceType.Flow,
                             flowId,
@@ -351,13 +357,11 @@ public class FlowsService
 
     private async Task DecryptVariableDictionaryAsync(IDictionary<string, StepVariable> variables)
     {
-        foreach (var kvp in variables.ToList())
+        foreach (var variable in variables.Values.ToList())
         {
-            var variable = kvp.Value;
-
-            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            if (variable.IsSensitive && variable.Value is { } reference && IsSensitiveReference(reference))
             {
-                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(reference);
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
@@ -372,9 +376,9 @@ public class FlowsService
         }
     }
 
-    private bool IsSensitiveReference(string? value)
+    private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+        return value is not null && value.StartsWith("${sensitive:") && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
@@ -424,10 +428,7 @@ public class FlowsService
 
     #endregion
 
-    private static Flow DeserializeFlow(string jsonFlow)
-    {
-        var flow = JsonSerializer.Deserialize<Flow>(jsonFlow);
-
-        return flow;
-    }
+    private static Flow DeserializeFlow(string jsonFlow) =>
+        JsonSerializer.Deserialize<Flow>(jsonFlow)
+            ?? throw new InvalidOperationException("Stored flow data does not contain a workflow.");
 }

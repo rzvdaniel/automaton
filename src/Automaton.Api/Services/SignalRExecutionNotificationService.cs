@@ -7,18 +7,18 @@ namespace Automaton.Api.Services
     public class SignalRExecutionNotificationService : IExecutionNotificationService
     {
         private readonly IHubContext<Hubs.AutomatonHub> hubContext;
-        private readonly string connectionId;
+        private readonly string? connectionId;
 
         public SignalRExecutionNotificationService(
             IHubContext<Hubs.AutomatonHub> hubContext,
-            string connectionId = null)
+            string? connectionId = null)
         {
             this.hubContext = hubContext;
             this.connectionId = connectionId;
         }
 
         public async Task SendLogUpdate(Guid workflowId, Guid executionId, string level, string message,
-            string stepId = null, string stepName = null, string exception = null)
+            string? stepId = null, string? stepName = null, string? exception = null)
         {
             var logData = new
             {

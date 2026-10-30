@@ -12,8 +12,8 @@ public class ExecuteFlow : WorkflowStep
     private readonly StepVariableParser variableParser;
 
     public Guid FlowId { get; set; }
-    public IList<StepVariable> InputVariables { get; set; }
-    public IList<StepVariable> OutputVariables { get; set; }
+    public IList<StepVariable> InputVariables { get; set; } = [];
+    public IList<StepVariable> OutputVariables { get; set; } = [];
 
     public ExecuteFlow
     (
@@ -97,7 +97,7 @@ public class ExecuteFlow : WorkflowStep
 
                 // Find matching InputVariable in child flow by name
                 var childInputVar = childFlow.InputVariables.Values
-                    .FirstOrDefault(v => v.Name.Equals(inputMapping.Name, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(v => string.Equals(v.Name, inputMapping.Name, StringComparison.OrdinalIgnoreCase));
 
                 if (childInputVar != null)
                 {

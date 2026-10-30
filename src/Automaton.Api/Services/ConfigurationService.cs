@@ -5,7 +5,6 @@ namespace Automaton.Api.Services;
 
 public class ConfigurationService
 {
-    private readonly IConfiguration configuration;
     private readonly AuthenticationSettings authenticationSettings = new();
     public readonly AppConfig AppConfig = new();
     public readonly EmailConfig EmailConfig = new();
@@ -34,14 +33,12 @@ public class ConfigurationService
 
     public ConfigurationService(IConfiguration configuration)
     {
-        this.configuration = configuration;
-        
-        this.configuration.GetSection(nameof(AuthenticationSettings)).Bind(authenticationSettings);
-        this.configuration.GetSection(nameof(AppConfig)).Bind(AppConfig);
-        this.configuration.GetSection(nameof(UserPasswordConfig)).Bind(userPasswordConfig);
-        this.configuration.GetSection(nameof(UserLockoutConfig)).Bind(userLockoutConfig);
-        this.configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
-        this.configuration.GetSection(CloudflareTurnstileOptions.SectionName).Bind(CloudflareTurnstileOptions);
+        configuration.GetSection(nameof(AuthenticationSettings)).Bind(authenticationSettings);
+        configuration.GetSection(nameof(AppConfig)).Bind(AppConfig);
+        configuration.GetSection(nameof(UserPasswordConfig)).Bind(userPasswordConfig);
+        configuration.GetSection(nameof(UserLockoutConfig)).Bind(userLockoutConfig);
+        configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
+        configuration.GetSection(CloudflareTurnstileOptions.SectionName).Bind(CloudflareTurnstileOptions);
     }
 
     public bool IsDatabaseTypeMsSql()

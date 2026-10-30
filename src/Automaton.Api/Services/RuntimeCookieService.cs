@@ -61,7 +61,7 @@ public class RuntimeCookieService
         this.publishedAppsConfig = publishedAppsConfig.Value;
     }
 
-    public DateTimeOffset GetDefaultExpiry() => DateTimeOffset.UtcNow.Add(RuntimeCookieLifetime);
+    public static DateTimeOffset GetDefaultExpiry() => DateTimeOffset.UtcNow.Add(RuntimeCookieLifetime);
 
     public string CreateRuntimeCookie(Guid appId, Guid userId, DateTimeOffset? expiry = null)
     {

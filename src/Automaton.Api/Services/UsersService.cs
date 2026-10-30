@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 using Automaton.Api.Models;
@@ -41,14 +41,14 @@ public class UsersService
     {
         EnsureRegistrationMetadata(user, RegistrationProviders.Password);
 
-        if (_userManager.Users.Any(u => u.UserName == user.UserName))
+        if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
-            throw new Exception($"User with user name {user.UserName} already registered");
+            throw new InvalidOperationException($"User with user name {user.UserName} already registered");
         }
 
-        if (_userManager.Users.Any(u => u.Email == user.Email))
+        if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
-            throw new Exception($"User with email address {user.Email} already registered");
+            throw new InvalidOperationException($"User with email address {user.Email} already registered");
         }
 
         var result = await _userManager.CreateAsync(user, password);
@@ -58,7 +58,7 @@ public class UsersService
             var exceptionText = result.Errors.Aggregate(
                 "User Creation Failed - Identity Exception. Errors were: \n\r\n\r",
                 (current, error) => current + (" - " + error.Description + "\n\r"));
-            throw new Exception(exceptionText);
+            throw new InvalidOperationException(exceptionText);
         }
 
         // Assign default subscription plan allowance
@@ -69,14 +69,14 @@ public class UsersService
     {
         EnsureRegistrationMetadata(user, RegistrationProviders.GitHub);
 
-        if (_userManager.Users.Any(u => u.UserName == user.UserName))
+        if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
-            throw new Exception($"User with user name {user.UserName} already registered");
+            throw new InvalidOperationException($"User with user name {user.UserName} already registered");
         }
 
-        if (_userManager.Users.Any(u => u.Email == user.Email))
+        if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
-            throw new Exception($"User with email address {user.Email} already registered");
+            throw new InvalidOperationException($"User with email address {user.Email} already registered");
         }
 
         var result = await _userManager.CreateAsync(user);
@@ -86,7 +86,7 @@ public class UsersService
             var exceptionText = result.Errors.Aggregate(
                 "User Creation Failed - Identity Exception. Errors were: \n\r\n\r",
                 (current, error) => current + (" - " + error.Description + "\n\r"));
-            throw new Exception(exceptionText);
+            throw new InvalidOperationException(exceptionText);
         }
 
         await AssignDefaultPlanAsync(user.Id);
@@ -100,7 +100,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating password!");
+            throw new InvalidOperationException("Error in updating password!");
         }
     }
 
@@ -135,7 +135,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating Profile!");
+            throw new InvalidOperationException("Error in updating Profile!");
         }
     }
 
@@ -151,7 +151,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating public username!");
+            throw new InvalidOperationException("Error in updating public username!");
         }
     }
 
@@ -159,10 +159,10 @@ public class UsersService
     {
         var result = await _userManager.FindByIdAsync(userId.ToString());
         if (result == null)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
 
         if (result.IsDeleted)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
 
         return result;
     }
@@ -172,7 +172,7 @@ public class UsersService
         var result = await _userManager.FindByEmailAsync(emailOrUserName) ??
                      await _userManager.FindByNameAsync(emailOrUserName);
         if (result == null)
-            throw new Exception($"User with Email or UserName '{emailOrUserName}' not found!");
+            throw new InvalidOperationException($"User with Email or UserName '{emailOrUserName}' not found!");
 
         return result;
     }
@@ -278,7 +278,7 @@ public class UsersService
     {
         if (user.IsDeleted)
         {
-            throw new Exception("Invalid credentials.");
+            throw new InvalidOperationException("Invalid credentials.");
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
@@ -286,7 +286,7 @@ public class UsersService
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
         {
-            throw new Exception("Failed to update last login timestamp.");
+            throw new InvalidOperationException("Failed to update last login timestamp.");
         }
     }
 
@@ -394,7 +394,7 @@ public class UsersService
             return await _userManager.GeneratePasswordResetTokenAsync(user);
         }
 
-        throw new Exception();
+        throw new InvalidOperationException();
     }
 
     public async Task<string> GenerateEmailConfirmationTokenAsync(Guid userId)
@@ -414,13 +414,13 @@ public class UsersService
         var user = await GetUserById(userId);
 
         if (user == null)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
         
         var result = await _userManager.ResetPasswordAsync(user, token, password);
 
         if (!result.Succeeded)
         {
-            throw new Exception($"Error in resetting password");
+            throw new InvalidOperationException($"Error in resetting password");
         }
     }
 
@@ -432,7 +432,7 @@ public class UsersService
         var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
         if (!result.Succeeded)
         {
-            throw new Exception(disabled ? "Failed to disable user." : "Failed to enable user.");
+            throw new InvalidOperationException(disabled ? "Failed to disable user." : "Failed to enable user.");
         }
 
         await RevokeAllRefreshTokensAsync(userId, cancellationToken);
@@ -605,7 +605,7 @@ public class UsersService
         var result = await _userManager.AddToRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Adding Role!");
+            throw new InvalidOperationException("Error in Adding Role!");
         }
 
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -630,11 +630,13 @@ public class UsersService
 
     public async Task AddRole(Guid userId, Guid roleId)
     {
-        var role = await _roleManager.FindByIdAsync(roleId.ToString());
-        var result = await _userManager.AddToRoleAsync(await GetUserById(userId), role.Name);
+        var role = await _roleManager.FindByIdAsync(roleId.ToString())
+            ?? throw new InvalidOperationException($"Role {roleId} not found.");
+        var roleName = role.Name ?? throw new InvalidOperationException($"Role {roleId} has no name.");
+        var result = await _userManager.AddToRoleAsync(await GetUserById(userId), roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Adding Role!");
+            throw new InvalidOperationException("Error in Adding Role!");
         }
     }
 
@@ -644,7 +646,7 @@ public class UsersService
         var result = await _userManager.RemoveFromRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Removing Role!");
+            throw new InvalidOperationException("Error in Removing Role!");
         }
 
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -669,11 +671,13 @@ public class UsersService
 
     public async Task RemoveRole(Guid userId, Guid roleId)
     {
-        var role = await _roleManager.FindByIdAsync(roleId.ToString());
-        var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), role.Name);
+        var role = await _roleManager.FindByIdAsync(roleId.ToString())
+            ?? throw new InvalidOperationException($"Role {roleId} not found.");
+        var roleName = role.Name ?? throw new InvalidOperationException($"Role {roleId} has no name.");
+        var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Removing Role!");
+            throw new InvalidOperationException("Error in Removing Role!");
         }
     }
 
@@ -746,7 +750,7 @@ public class UsersService
     /// <summary>
     /// Validate public username format
     /// </summary>
-    public bool IsValidPublicUsername(string publicUsername)
+    public static bool IsValidPublicUsername(string publicUsername)
     {
         if (string.IsNullOrWhiteSpace(publicUsername))
             return false;
@@ -755,13 +759,13 @@ public class UsersService
             return false;
 
         // Must match pattern: alphanumeric, hyphens, underscores only
-        return Regex.IsMatch(publicUsername, @"^[a-zA-Z0-9_\-]+$");
+        return Regex.IsMatch(publicUsername, @"^[a-zA-Z0-9_\-]+$", RegexOptions.None, TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
     /// Convert display name to URL-safe slug
     /// </summary>
-    private string ConvertToSlug(string input)
+    private static string ConvertToSlug(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
             return "user";
@@ -773,13 +777,13 @@ public class UsersService
         slug = new string(slug.Where(c => (int)c < 128).ToArray());
 
         // Remove invalid characters (keep only alphanumeric, spaces, hyphens, underscores)
-        slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "");
+        slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Replace spaces with hyphens
-        slug = Regex.Replace(slug, @"\s+", "-");
+        slug = Regex.Replace(slug, @"\s+", "-", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Remove multiple consecutive hyphens
-        slug = Regex.Replace(slug, @"-+", "-");
+        slug = Regex.Replace(slug, @"-+", "-", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Trim hyphens from start and end
         slug = slug.Trim('-', '_');

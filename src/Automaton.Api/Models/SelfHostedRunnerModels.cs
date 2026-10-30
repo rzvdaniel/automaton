@@ -6,7 +6,7 @@ public sealed record CreateSelfHostedRunnerInstallationRequest
 {
     public string RunnerName { get; init; } = string.Empty;
     public string ApplicationProfile { get; init; } = RunnerApplicationProfiles.MachineManagement;
-    public bool AcknowledgeHostAccess { get; init; }
+    public bool AcknowledgeHostAccess { get; init; } = false;
 }
 
 public sealed record SelfHostedRunnerInstallationResponse

@@ -110,7 +110,7 @@ public class RunnerDeploymentTargetIsolationTests
     }
 
     [Test]
-    public async Task CleanupTargetAsync_WhenRuntimeCleanupFailsPreservesTargetMetadata()
+    public void CleanupTargetAsync_WhenRuntimeCleanupFailsPreservesTargetMetadata()
     {
         var workspace = new RunnerWorkspaceService();
         var processManager = new StubBackendProcessManager

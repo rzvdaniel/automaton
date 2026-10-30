@@ -17,13 +17,11 @@ namespace Automaton.Api.Services;
 public class AppMemoryService
 {
     private readonly ApplicationDbContext _db;
-    private readonly IAiChatHistoryService _chatHistory;
     private readonly AppMemoryConfig _config;
 
-    public AppMemoryService(ApplicationDbContext db, IAiChatHistoryService chatHistory, IOptions<AiProvidersConfig> options)
+    public AppMemoryService(ApplicationDbContext db, IOptions<AiProvidersConfig> options)
     {
         _db          = db;
-        _chatHistory = chatHistory;
         _config      = options.Value.AppMemory;
     }
 

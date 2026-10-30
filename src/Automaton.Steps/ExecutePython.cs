@@ -14,10 +14,10 @@ public class ExecutePython : WorkflowStep
     public string? Code { get; set; }
 
     [IgnorePropertyParsing(true)]
-    public IList<StepVariable> CodeInputVariables { get; set; }
+    public IList<StepVariable> CodeInputVariables { get; set; } = [];
 
     [IgnorePropertyParsing(true)]
-    public IList<StepVariable> CodeOutputVariables { get; set; }
+    public IList<StepVariable> CodeOutputVariables { get; set; } = [];
 
     public ExecutePython(ScriptEngineHost scriptHost)
     {
@@ -33,11 +33,15 @@ public class ExecutePython : WorkflowStep
         };
 
         // ✅ Convert input variables - avoid double-encoding strings
-        var inputVariablesDictionary = CodeInputVariables.ToDictionary(x => x.Name, x => x.Value);
+        var inputVariablesDictionary = CodeInputVariables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+            .ToDictionary(variable => variable.Name, variable => variable.Value ?? string.Empty);
 
-        var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
+        var execution = scriptHost.Execute(resource, inputVariablesDictionary);
+        if (!execution.Success)
+            throw new InvalidOperationException(execution.Error?.Message ?? "Python script execution failed.");
 
-        SetCodeOutputVariables(context, scriptVariables);
+        SetCodeOutputVariables(context, execution.OutputVariables);
 
         return Task.FromResult(ExecutionResult.Next());
     }

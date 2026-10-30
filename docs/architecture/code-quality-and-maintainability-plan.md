@@ -1,6 +1,6 @@
 # Code quality and maintainability implementation plan
 
-Status: Stage 0's all-project analyzer inventory and Stage 1's build-time analyzer enforcement are implemented on `codex/complexity-quality-gate`. `Automaton.All.sln` includes all 22 tracked C# projects, and `CA1502`, `CA1506`, and `S3776` are build errors. The Studio Server Azure pipeline builds and tests that solution on pushes and pull requests targeting `main`; it also publishes the API artifact. GitHub's branch-protection API rejected access because the private repository's current plan does not support that feature, so required-check enforcement remains unavailable.
+Status: Stage 0's all-project analyzer inventory and Stage 1's initial build-time analyzer enforcement were implemented on `codex/complexity-quality-gate`. `SonarAnalyzer.CSharp` and its rules have since been removed from normal builds. `CA1502` remains configured as an error through the .NET analyzers. The Studio Server Azure pipeline builds and tests `Automaton.All.sln` on pushes and pull requests targeting `main`; it also publishes the API artifact. GitHub's branch-protection API rejected access because the private repository's current plan does not support that feature, so required-check enforcement remains unavailable.
 
 Date: 2026-09-23. Repository inspection baseline: `3eb1c2cd`.
 
@@ -25,7 +25,7 @@ The following observations come from repository inspection, not a completed stat
 | Supporting types mixed with services | Public result records follow `RunnerService`; `StripeOptions` is declared in `StripeService.cs`; `AppsTunnelConfig` lives under `Services` | Establish ownership and placement conventions before moving files. |
 | Existing dependency safeguards | `src/UnitTests/Automaton.Architecture.Tests/DistributedPlatformArchitectureTests.cs` checks project references | Extend the existing test project rather than creating another architecture framework by default. |
 | CI and branch enforcement | Azure pipeline definitions are retired; no replacement automated all-project C# test pipeline is configured. GitHub Actions handles build and release automation. | Run `dotnet test Automaton.All.sln` locally when full-suite validation is needed. Required checks need a repository policy mechanism supported by the current plan. |
-| Analyzer configuration | Root `.editorconfig` promotes CA1502, CA1506, and S3776 to errors; `src/Directory.Build.targets` adds SonarAnalyzer.CSharp to the tracked projects | Review and clear findings before promoting more rules or tightening thresholds. |
+| Analyzer configuration | Root `.editorconfig` promotes CA1502 to an error; .NET analyzers run through the SDK | Review findings before promoting more rules or tightening thresholds. |
 | Frontend checks exist | Studio has type checking, ESLint, and Vitest; the retired Azure Vue pipeline no longer runs these checks | Reuse them and ensure quality checks do not modify source. The current `lint` script uses `--fix`. |
 
 Actual method complexity, coupling, duplication, test adequacy, and change frequency remain to be measured. Candidate cleanup order must follow that evidence.
@@ -65,21 +65,21 @@ Do not create a global `Utilities` or `Models` dumping ground, promote every res
 
 ## Tooling and enforcement decision
 
-Use existing .NET analyzers plus a pinned `SonarAnalyzer.CSharp` package for local feedback. Centralize package/configuration policy for every C# project under `src/` without replacing project-specific settings. Pin the analyzer version and metric thresholds in repository configuration.
+Use the .NET analyzers provided by the SDK for local feedback. Keep severity and metric configuration centralized for C# projects under `src/` without replacing project-specific settings.
 
-Configure selected diagnostic severities through `.editorconfig`; configure analyzer-specific numeric parameters through the supported mechanism for the pinned analyzer version. Prove configuration with a deliberately violating sample. Do not assume an arbitrary EditorConfig key changes a Sonar threshold.
+Configure selected diagnostic severities through `.editorconfig` and .NET analyzer parameters through `src/CodeMetricsConfig.txt`.
 
-SonarQube Server or Cloud is optional for history, PR reporting, and centralized quality profiles. The initial gate must work without a hosted service or credentials. Before adopting a service, verify repository integration, current edition capabilities, licensing, and source-data requirements. Avoid duplicate local and scanner analyzer configuration that yields inconsistent results.
+The repository does not use a Sonar package scanner. Hosted analysis services are outside the current build policy.
 
 ### Initial thresholds
 
-These values were calibrated against the initial inventory. Stage 1 promotes the three measured complexity/coupling diagnostics to build errors so the cleanup backlog is visible in normal builds.
+These values were calibrated against the initial inventory. The cyclomatic complexity threshold remains active; the cognitive-complexity and coupling values below are historical and are not enforced by the current build.
 
 | Signal | Initial value | Treatment |
 | --- | --- | --- |
-| Cognitive complexity | Greater than 15 per method | Build error until historical violations are resolved |
-| Cyclomatic complexity | Greater than 15 per method | Build error until historical violations are resolved |
-| Type/method coupling | Existing analyzer threshold | Build error until historical violations are resolved |
+| Cognitive complexity | Greater than 15 per method | Historical Sonar signal; not enforced by the current build |
+| Cyclomatic complexity | 15 or greater per method | Build error until historical violations are resolved; keep methods below 15 |
+| Type/method coupling | Existing analyzer threshold | Historical Sonar signal; use design review, not a build gate. Keep classes cohesive and split by distinct responsibilities, not to reduce class size or coupling counts. |
 | Control-flow nesting | More than 3 levels | Review signal; choose a supported analyzer rather than count braces |
 | Method size | More than about 60 logical lines | Review signal; document the measurement convention |
 | Constructor dependencies | More than 7 injected dependencies | Responsibility review, not a demand for a dependency-bag object |
@@ -92,10 +92,10 @@ Use one authoritative diagnostic for each blocking concept. For example, avoid s
 
 ### Build-time error policy
 
-1. Keep the analyzer package and thresholds centrally configured so every project under `src/` runs the same rules during ordinary builds.
-2. Treat `CA1502`, `CA1506`, and `S3776` as compiler build errors. Do not grandfather existing findings behind a baseline or suppress them just to restore a green build.
+1. Keep active .NET analyzer configuration centrally defined for projects under `src/`.
+2. Treat `CA1502` as a compiler build error. Do not grandfather its findings behind a baseline or suppress them just to restore a green build.
 3. Build the affected project during focused work so diagnostics identify the relevant symbols. Build `Automaton.All.sln` before handoff and in CI to cover all projects, tests, and fixtures.
-4. Fix the historical errors in reviewable, behavior-preserving batches. Use the analyzer's diagnostic IDs, locations, and measured scores to guide each batch; do not approximate scores or refactor solely to lower numbers.
+4. Fix the historical errors in reviewable, behavior-preserving batches. Use the analyzer's diagnostic IDs, locations, and measured scores to guide each batch; do not approximate scores or refactor solely to lower numbers. Keep class boundaries aligned with distinct responsibilities, and avoid trivial helper methods that only lower a metric.
 5. If an analyzer finding is demonstrably false-positive or incompatible with required behavior, document the exact rule/symbol and removal condition and request review for a narrow exception.
 
 ## Delivery stages
@@ -292,11 +292,8 @@ These examples are not a complete verification suite. The all-project analyzer b
 - [Generic runtime skill](../../.agents/skills/generic-runtime/SKILL.md)
 - [Admin documentation skill](../../.agents/skills/admin-docs/SKILL.md)
 - [Existing architecture guardrails](../../src/UnitTests/Automaton.Architecture.Tests/DistributedPlatformArchitectureTests.cs)
-- [Sonar .NET analyzer configuration](https://github.com/SonarSource/sonar-dotnet#configuring-rules)
-- [Sonar cognitive complexity rule metadata](https://github.com/SonarSource/sonar-dotnet/blob/master/analyzers/rspec/cs/S3776.json)
 - [.NET analyzer configuration](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/configuration-files)
 - [.NET cyclomatic complexity rule CA1502](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca1502)
-- [Sonar new-code quality approach](https://docs.sonarsource.com/sonarqube-server/2025.5/user-guide/about-new-code)
 - [Codex repository guidance and verification practices](https://learn.chatgpt.com/guides/best-practices)
 
 External references explain the tools; the adopted repository configuration and tests remain authoritative. Recheck version-specific parameters and service capabilities during implementation.

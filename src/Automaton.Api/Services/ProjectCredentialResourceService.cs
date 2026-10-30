@@ -61,7 +61,7 @@ public sealed class ProjectCredentialResourceService(
             ApiKeyName = apiKey.Name,
             AddedAt = projectApiKey.AddedAt,
             AddedBy = userId,
-            AddedByName = userName
+            AddedByName = userName ?? userId.ToString()
         };
     }
 
@@ -114,7 +114,7 @@ public sealed class ProjectCredentialResourceService(
             {
                 ProjectId = link.ProjectId,
                 ApiKeyId = link.ApiKeyId,
-                ApiKeyName = link.ApiKey.Name,
+                ApiKeyName = link.ApiKey == null ? "Unavailable API key" : link.ApiKey.Name,
                 AddedAt = link.AddedAt,
                 AddedBy = link.AddedBy,
                 AddedByName = link.AddedByUser != null ? link.AddedByUser.UserName ?? string.Empty : string.Empty
@@ -171,7 +171,7 @@ public sealed class ProjectCredentialResourceService(
             AiApiKeyName = apiKey.Name,
             AddedAt = projectAiApiKey.AddedAt,
             AddedBy = userId,
-            AddedByName = userName
+            AddedByName = userName ?? userId.ToString()
         };
     }
 
@@ -224,7 +224,7 @@ public sealed class ProjectCredentialResourceService(
             {
                 ProjectId = link.ProjectId,
                 AiApiKeyId = link.AiApiKeyId,
-                AiApiKeyName = link.AiApiKey.Name,
+                AiApiKeyName = link.AiApiKey == null ? "Unavailable AI API key" : link.AiApiKey.Name,
                 AddedAt = link.AddedAt,
                 AddedBy = link.AddedBy,
                 AddedByName = link.AddedByUser != null ? link.AddedByUser.UserName ?? string.Empty : string.Empty

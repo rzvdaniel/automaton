@@ -11,14 +11,9 @@ namespace Automaton.Api.Controllers;
 public class AiApiKeysController : ControllerBase
 {
     private readonly AiApiKeyService aiApiKeyService;
-    private readonly ILogger<AiApiKeysController> logger;
-
-    public AiApiKeysController(
-        AiApiKeyService aiApiKeyService,
-        ILogger<AiApiKeysController> logger)
+    public AiApiKeysController(AiApiKeyService aiApiKeyService)
     {
         this.aiApiKeyService = aiApiKeyService;
-        this.logger = logger;
     }
 
     [HttpGet]
@@ -151,7 +146,7 @@ public class AiApiKeysController : ControllerBase
     [HttpGet("environment")]
     public ActionResult<Dictionary<string, string?>> GetEnvironmentApiKeys()
     {
-        var environmentKeys = aiApiKeyService.GetEnvironmentApiKeys();
+        var environmentKeys = AiApiKeyService.GetEnvironmentApiKeys();
 
         // Filter out null/empty values for security
         var filteredKeys = environmentKeys

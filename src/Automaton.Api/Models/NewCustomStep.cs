@@ -2,5 +2,6 @@
 
 public class NewCustomStep
 {
-    public string Name { get; set; }
+    [System.ComponentModel.DataAnnotations.Required]
+    public string Name { get; set; } = string.Empty;
 }

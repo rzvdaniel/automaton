@@ -6,7 +6,8 @@ internal static class AiGuidanceMarkdownFrontMatter
 {
     private static readonly Regex FrontMatterRegex = new(
         @"\A---\r?\n(?<frontMatter>[\s\S]*?)\r?\n---\r?\n?",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
 
     public static ParsedGuidanceMarkdown Parse(string? markdown)
     {

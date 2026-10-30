@@ -65,12 +65,12 @@ public class CustomStepsService
         return steps;
     }
 
-    public CustomStep Get(Guid id)
+    public CustomStep? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefault(x => x.Id == id);
-        var step = MapToModel(stepEntity);
+        var step = MapToModelIfPresent(stepEntity, webAppLookup: null);
 
         // Return step with encrypted references as-is for UI
         // UI password inputs will handle visual hiding
@@ -103,7 +103,7 @@ public class CustomStepsService
 
         dataContext.CustomStepUsers.Add(stepUser);
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepCreated, step.Name, entity.Id);
@@ -111,7 +111,7 @@ public class CustomStepsService
         return entity.Id;
     }
 
-    public async Task Update(Guid id, CustomStep step)
+    public async Task Update(Guid id, UpdateCustomStepRequest step)
     {
         // Check if user can update this custom step (personal owner OR project member with Developer/Admin role)
         if (!await authorizationService.CanUpdateCustomStepAsync(id))
@@ -119,7 +119,7 @@ public class CustomStepsService
             throw new UnauthorizedAccessException($"You do not have permission to update custom step {id}");
         }
 
-        var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+        var entity = await dataContext.CustomSteps.SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -139,7 +139,7 @@ public class CustomStepsService
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(step.Definition);
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepUpdated, step.Name, id);
@@ -162,7 +162,7 @@ public class CustomStepsService
             throw new UnauthorizedAccessException($"You do not have permission to delete custom step {id}");
         }
 
-        var customStep = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+        var customStep = await dataContext.CustomSteps.SingleOrDefaultAsync(x => x.Id == id);
 
         if (customStep == null)
         {
@@ -175,7 +175,7 @@ public class CustomStepsService
         await DeleteSensitiveVariablesAsync(id);
 
         dataContext.CustomSteps.Remove(customStep);
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Log activity
         await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepDeleted, stepName, id);
@@ -208,7 +208,7 @@ public class CustomStepsService
         CancellationToken cancellationToken)
     {
         var selectedRunnerIds = runnerIds.Distinct().ToArray();
-        await runnerExecutionService.EnsureCanExecuteAsync(selectedRunnerIds, userId, cancellationToken);
+        await CustomStepRunnerExecutionService.EnsureCanExecuteAsync(selectedRunnerIds, userId, cancellationToken);
 
         var customStep = await GetForExecutionAsync(customStepId);
         if (customStep is null)
@@ -221,10 +221,10 @@ public class CustomStepsService
     /// <summary>
     /// Get custom step with decrypted sensitive variables for UI editing
     /// </summary>
-    public async Task<CustomStep> GetForEditingAsync(Guid id)
+    public async Task<CustomStep?> GetForEditingAsync(Guid id)
     {
-        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
-            .SingleOrDefault(x => x.Id == id);
+        var stepEntity = await authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefaultAsync(x => x.Id == id);
 
         if (stepEntity == null)
         {
@@ -243,23 +243,7 @@ public class CustomStepsService
     /// Get custom step with decrypted sensitive variables for execution.
     /// Use this method when preparing to send step to a runner.
     /// </summary>
-    public async Task<CustomStep?> GetForExecutionAsync(Guid id)
-    {
-        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
-            .SingleOrDefault(x => x.Id == id);
-
-        if (stepEntity == null)
-        {
-            return null;
-        }
-
-        var step = MapToModel(stepEntity);
-
-        // ✅ Decrypt sensitive variables for execution
-        await DecryptSensitiveVariablesAsync(step.Definition);
-
-        return step;
-    }
+    public async Task<CustomStep?> GetForExecutionAsync(Guid id) => await GetForEditingAsync(id);
 
     /// <summary>
     /// Get custom step by name with decrypted sensitive variables for execution.
@@ -267,8 +251,8 @@ public class CustomStepsService
     /// </summary>
     public async Task<CustomStep?> GetByNameForExecutionAsync(string name)
     {
-        var entity = authorizationService.GetAccessibleCustomStepsQuery()
-            .FirstOrDefault(x => x.Name == name);
+        var entity = await authorizationService.GetAccessibleCustomStepsQuery()
+            .FirstOrDefaultAsync(x => x.Name == name);
 
         if (entity == null)
         {
@@ -299,7 +283,7 @@ public class CustomStepsService
     }
 
     private async Task ProcessVariableListAsync(
-        IList<Core.Models.StepVariable> variables,
+        IList<Core.Models.StepVariable>? variables,
         Guid customStepId,
         string scope)
     {
@@ -315,9 +299,11 @@ public class CustomStepsService
                     try
                     {
                         // Encrypt and store in SensitiveVariables table
+                        var variableName = variable.Name
+                            ?? throw new InvalidOperationException("Sensitive custom step variables require a name.");
                         var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
                             userId,
-                            variable.Name,
+                            variableName,
                             variable.Value,
                             SensitiveVariableResourceType.CustomStep,
                             customStepId,
@@ -352,15 +338,15 @@ public class CustomStepsService
         await DecryptVariableListAsync(definition.CodeOutputVariables);
     }
 
-    private async Task DecryptVariableListAsync(IList<Core.Models.StepVariable> variables)
+    private async Task DecryptVariableListAsync(IList<Core.Models.StepVariable>? variables)
     {
         if (variables == null) return;
 
         foreach (var variable in variables)
         {
-            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            if (variable.IsSensitive && variable.Value is { } reference && IsSensitiveReference(reference))
             {
-                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(reference);
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
@@ -375,9 +361,9 @@ public class CustomStepsService
         }
     }
 
-    private bool IsSensitiveReference(string? value)
+    private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+        return value is not null && value.StartsWith("${sensitive:") && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
@@ -434,8 +420,6 @@ public class CustomStepsService
 
     private static CustomStep MapToModel(Entities.CustomStep entity, Dictionary<Guid, WebApp>? webAppLookup)
     {
-        if (entity == null) return null;
-
         // Look up WebApp info if available
         Guid? webAppId = null;
         string? webAppName = null;
@@ -461,6 +445,12 @@ public class CustomStepsService
             WebAppId = webAppId,
             WebAppName = webAppName,
             Definition = JsonSerializer.Deserialize<CustomStepDefinition>(entity.Definition ?? "{}")
+                ?? new CustomStepDefinition()
         };
     }
+
+    private static CustomStep? MapToModelIfPresent(
+        Entities.CustomStep? entity,
+        Dictionary<Guid, WebApp>? webAppLookup) =>
+        entity is null ? null : MapToModel(entity, webAppLookup);
 }

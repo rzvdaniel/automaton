@@ -33,7 +33,7 @@ public sealed class CreateAppDeploymentTargetRequest
     public string Name { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
     public Guid? RunnerId { get; init; }
-    public bool IsDefault { get; init; }
+    public bool IsDefault { get; init; } = false;
 }
 
 public sealed class UpdateAppDeploymentTargetRequest
@@ -45,5 +45,5 @@ public sealed class UpdateAppDeploymentTargetRequest
 public sealed class AssignAppDeploymentTargetRunnerRequest
 {
     public Guid? RunnerId { get; init; }
-    public bool CleanupDeployedRuntime { get; init; }
+    public bool CleanupDeployedRuntime { get; init; } = false;
 }

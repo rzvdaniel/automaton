@@ -15,7 +15,7 @@ public class UserGitHubToken
     /// <summary>
     /// Encrypted GitHub Personal Access Token
     /// </summary>
-    public string EncryptedToken { get; set; }
+    public string EncryptedToken { get; set; } = string.Empty;
     
     /// <summary>
     /// GitHub username associated with this token

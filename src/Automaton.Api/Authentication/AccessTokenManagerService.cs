@@ -23,15 +23,15 @@ namespace Automaton.Api.Authentication
             _jwtOptions = jwtOptions;
         }
 
-        public async Task<bool> CurrentAccessTokenIsActive()
-            => await CurrentAccessTokenIsActive(await GetCurrentAccessTokenAsync());
-
-        public async Task DeactivateCurrentAccessTokenAsync()
-            => await DeactivateAccessTokenAsync(await GetCurrentAccessTokenAsync());
-
         //If there is any value for this token is cache this token will revoked - we store cancled token in redis cache if not exist token in our black list tokens in redis token is active
         public async Task<bool> CurrentAccessTokenIsActive(string token)
             => string.IsNullOrWhiteSpace(await _redisCache.GetStringAsync(GetKey(token)));
+
+        public async Task<bool> CurrentAccessTokenIsActive()
+        {
+            var token = await GetCurrentAccessTokenAsync();
+            return string.IsNullOrWhiteSpace(token) || await CurrentAccessTokenIsActive(token);
+        }
 
         //We only store deactivated access token in centralized redis
         public async Task DeactivateAccessTokenAsync(string token)
@@ -42,11 +42,26 @@ namespace Automaton.Api.Authentication
             });
         }
 
-        private async Task<string> GetCurrentAccessTokenAsync()
+        public async Task DeactivateCurrentAccessTokenAsync()
+        {
+            var token = await GetCurrentAccessTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                await DeactivateAccessTokenAsync(token);
+            }
+        }
+
+        private async Task<string?> GetCurrentAccessTokenAsync()
         {
             //tokens will only be saved to the context if SaveTokens = true; in the startup else will be null although
             //we can get access token from header directly with *_httpContextAccessor.HttpContext.Request.Headers["Authorization"]*
-            return await _httpContextAccessor.HttpContext.GetTokenAsync(JwtBearerDefaults.AuthenticationScheme,
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext is null)
+            {
+                return null;
+            }
+
+            return await httpContext.GetTokenAsync(JwtBearerDefaults.AuthenticationScheme,
                 "access_token");
         }
 

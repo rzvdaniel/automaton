@@ -10,17 +10,14 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System.Text.Json;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Automaton.Api.Data
 {
-    [SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling",
-        Justification = "This EF Core context intentionally maps the shared database model and exposes its entity sets. Splitting declarations across base classes would hide coupling without separating responsibilities.")]
     public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>, ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>, IDataContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-        private IDbContextTransaction _transaction;
+        private IDbContextTransaction? _transaction;
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -186,35 +183,50 @@ namespace Automaton.Api.Data
 
         public int Commit()
         {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be committed.");
             try
             {
                 var saveChanges = SaveChanges();
-                _transaction.Commit();
+                transaction.Commit();
                 return saveChanges;
             }
             finally
             {
-                _transaction.Dispose();
+                transaction.Dispose();
+                _transaction = null;
             }
         }
 
         public void Rollback()
         {
-            _transaction.Rollback();
-            _transaction.Dispose();
-        }
-
-        public Task<int> CommitAsync()
-        {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be rolled back.");
             try
             {
-                var saveChangesAsync = SaveChangesAsync();
-                _transaction.Commit();
-                return saveChangesAsync;
+                transaction.Rollback();
             }
             finally
             {
-                _transaction.Dispose();
+                transaction.Dispose();
+                _transaction = null;
+            }
+        }
+
+        public async Task<int> CommitAsync()
+        {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be committed.");
+            try
+            {
+                var saveChanges = await SaveChangesAsync();
+                await transaction.CommitAsync();
+                return saveChanges;
+            }
+            finally
+            {
+                await transaction.DisposeAsync();
+                _transaction = null;
             }
         }
     }

@@ -47,7 +47,7 @@ public class StripeWebhookController : ControllerBase
         }
         catch (StripeException ex)
         {
-            _logger.LogWarning("Stripe webhook rejected: {Message}", ex.Message);
+            _logger.LogWarning(ex, "Stripe webhook rejected: {Message}", ex.Message);
             return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)

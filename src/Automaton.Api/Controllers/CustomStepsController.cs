@@ -39,12 +39,16 @@ public class CustomStepsController : BaseController
         var customStepId = await customStepsService.Create(customStep);
 
         var newCustomStep = await customStepsService.GetForEditingAsync(customStepId);
+        if (newCustomStep is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newCustomStep.Id }, newCustomStep);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, CustomStep customStep)
+    public async Task<IActionResult> Put(Guid id, UpdateCustomStepRequest customStep)
     {
         await customStepsService.Update(id, customStep);
 
@@ -68,7 +72,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet("by-name/{name}")]
-    public async Task<ActionResult<CustomStep>> GetByName(string name)
+    public ActionResult<CustomStep> GetByName(string name)
     {
         var step = customStepsService.GetByName(name);
 

@@ -14,12 +14,9 @@ namespace Automaton.Api.Controllers;
 public class TokenController : BaseController
 {
     private readonly ConfigurationService configurationService;
-    private readonly RefreshTokenCookieService refreshTokenCookieService;
-
-    public TokenController(ConfigurationService configurationService, RefreshTokenCookieService refreshTokenCookieService)
+    public TokenController(ConfigurationService configurationService)
     {
         this.configurationService = configurationService;
-        this.refreshTokenCookieService = refreshTokenCookieService;
     }
 
     [HttpPost]
@@ -29,23 +26,23 @@ public class TokenController : BaseController
     {
         try
         {
-            var refreshToken = command.Token ?? refreshTokenCookieService.GetRefreshToken(HttpContext);
+            var refreshToken = command.Token ?? RefreshTokenCookieService.GetRefreshToken(HttpContext);
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                refreshTokenCookieService.ClearRefreshToken(HttpContext);
+                RefreshTokenCookieService.ClearRefreshToken(HttpContext);
                 return Unauthorized();
             }
 
             var refreshAccessTokenQuery = new RefreshAccessTokenQuery(configurationService.RefreshTokenLifetime, refreshToken);
             var jwt = await Mediator.Send(refreshAccessTokenQuery, cancellationToken);
-            refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
+            RefreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
             jwt.RefreshToken = string.Empty;
 
             return Ok(jwt);
         }
         catch (AuthenticationException)
         {
-            refreshTokenCookieService.ClearRefreshToken(HttpContext);
+            RefreshTokenCookieService.ClearRefreshToken(HttpContext);
             return Unauthorized();
         }
     }
@@ -62,10 +59,10 @@ public class TokenController : BaseController
     [AllowAnonymous]
     public async Task<IActionResult> RevokeRefreshToken(RevokeRefreshTokenCommand command, CancellationToken ct)
     {
-        var refreshToken = command.Token ?? refreshTokenCookieService.GetRefreshToken(HttpContext);
+        var refreshToken = command.Token ?? RefreshTokenCookieService.GetRefreshToken(HttpContext);
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
-            refreshTokenCookieService.ClearRefreshToken(HttpContext);
+            RefreshTokenCookieService.ClearRefreshToken(HttpContext);
             return NoContent();
         }
 
@@ -76,7 +73,7 @@ public class TokenController : BaseController
 
         command.Token = refreshToken;
         await Mediator.Send(command, ct);
-        refreshTokenCookieService.ClearRefreshToken(HttpContext);
+        RefreshTokenCookieService.ClearRefreshToken(HttpContext);
 
         return NoContent();
     }
@@ -85,14 +82,14 @@ public class TokenController : BaseController
     [AllowAnonymous]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        var refreshToken = refreshTokenCookieService.GetRefreshToken(HttpContext);
+        var refreshToken = RefreshTokenCookieService.GetRefreshToken(HttpContext);
         if (!string.IsNullOrWhiteSpace(refreshToken))
         {
             var userId = User.Identity?.IsAuthenticated == true ? GetUserId() : Guid.Empty;
             await Mediator.Send(new RevokeRefreshTokenCommand(userId, refreshToken), ct);
         }
 
-        refreshTokenCookieService.ClearRefreshToken(HttpContext);
+        RefreshTokenCookieService.ClearRefreshToken(HttpContext);
         return NoContent();
     }
 }

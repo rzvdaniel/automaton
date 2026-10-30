@@ -52,7 +52,7 @@ namespace Automaton.Api.Application.Commands.Handlers
                     Variables =
                     {
                         { "WebsiteUrl", ConfigurationService.WebsiteUrl},
-                        { "SupportEmail", ConfigurationService.EmailConfig.SupportEmail!},
+                        { "SupportEmail", ConfigurationService.EmailConfig.SupportEmail},
                         { "Name", user.Name },
                     }
                 };
@@ -61,7 +61,7 @@ namespace Automaton.Api.Application.Commands.Handlers
             }
             catch (Exception ex)
             {
-                Logger.Log(LogLevel.Debug, "Could not reset user password.");
+                Logger.LogDebug(ex, "Could not reset user password.");
                 throw;
             }       
         }

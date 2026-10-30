@@ -13,7 +13,7 @@ public class CustomStep : WorkflowStep
     [IgnorePropertyParsing(true)]
     public string? Code { get; set; }
 
-    public string Language { get; set; }
+    public string Language { get; set; } = string.Empty;
 
     private StepVariableParser StepVariableParser { get; } = new StepVariableParser();
 
@@ -30,7 +30,7 @@ public class CustomStep : WorkflowStep
         var result = ExecutionResult.Next();
         var logs = new List<string>();
 
-        void OnScriptTextWrittenLocal(object sender, string text)
+        void OnScriptTextWrittenLocal(object? sender, string text)
         {
             logs.Add(text);
         }
@@ -45,11 +45,15 @@ public class CustomStep : WorkflowStep
                 Content = Code
             };
 
-            var inputVariablesDictionary = CodeInputVariables.ToDictionary(x => x.Name, x => x.Value);
+            var inputVariablesDictionary = CodeInputVariables
+                .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+                .ToDictionary(variable => variable.Name, variable => variable.Value ?? string.Empty);
 
-            var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
+            var execution = scriptHost.Execute(resource, inputVariablesDictionary);
+            if (!execution.Success)
+                throw new InvalidOperationException(execution.Error?.Message ?? "Custom step script execution failed.");
 
-            SetOutputVariables(context, scriptVariables);
+            SetOutputVariables(context, execution.OutputVariables);
 
             result.InternalLogs = logs;
             return Task.FromResult(result);
@@ -76,7 +80,7 @@ public class CustomStep : WorkflowStep
     protected override void SetupProperties(StepExecutionContext context)
     {
         Code = GetInputString(nameof(Code));
-        Language = GetInputString(nameof(Language));
+        Language = GetInputString(nameof(Language)) ?? string.Empty;
 
         var inputsVariable = Inputs.Values.FirstOrDefault(v => v.Name == nameof(CodeInputVariables));
         if (inputsVariable?.Value is string json)

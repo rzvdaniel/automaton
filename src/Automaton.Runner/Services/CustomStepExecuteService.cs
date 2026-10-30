@@ -33,7 +33,9 @@ public class CustomStepExecuteService
         try
         {
             // ✅ Convert input variables - avoid double-encoding strings
-            var inputVars = customStep.CodeInputVariables?.ToDictionary(v => v.Name, v => v.Value) ?? [];
+            var inputVars = customStep.CodeInputVariables
+                .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+                .ToDictionary(variable => variable.Name, variable => variable.Value ?? string.Empty);
 
             // Convert output variable definitions
             var ouputVariableNames = customStep.CodeOutputVariables?

@@ -19,18 +19,15 @@ public class AppFilesController : ControllerBase
     private readonly ApplicationDbContext dataContext;
     private readonly AppFileUploadService uploadService;
     private readonly AppFileDownloadService downloadService;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppFilesController(
         ApplicationDbContext dataContext,
         AppFileUploadService uploadService,
-        AppFileDownloadService downloadService,
-        PrivateAppLaunchService privateAppLaunchService)
+        AppFileDownloadService downloadService)
     {
         this.dataContext = dataContext;
         this.uploadService = uploadService;
         this.downloadService = downloadService;
-        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -58,7 +55,7 @@ public class AppFilesController : ControllerBase
     public async Task<IActionResult> UploadPrivate(Guid appId, IFormFile file, CancellationToken ct)
     {
         if (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-            && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
+            && !PrivateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
         {
             return Unauthorized();
         }
@@ -123,7 +120,7 @@ public class AppFilesController : ControllerBase
     public async Task DownloadPrivate(Guid appId, string sessionId, CancellationToken ct)
     {
         if (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-            && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
+            && !PrivateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
         {
             Response.StatusCode = 401;
             return;

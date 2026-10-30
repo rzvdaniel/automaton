@@ -20,9 +20,9 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         Func<Task<RunnerInstallationProfile?>> loadProfile)
         => (this.execute, this.loadProfile) = (execute, loadProfile);
 
-    public async Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
+    public Task<DockerImageIdentity> ResolveImageAsync(string image, CancellationToken cancellationToken = default)
     {
-        throw new InvalidOperationException("Brokered image resolution requires deployment context.");
+        return Task.FromException<DockerImageIdentity>(new InvalidOperationException("Brokered image resolution requires deployment context."));
     }
 
     public async Task RunBuildAsync(DockerBuildRequest request, IReadOnlyDictionary<string, string> environment, CancellationToken cancellationToken = default)
@@ -120,8 +120,8 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         }, cancellationToken));
     }
 
-    public async Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
+    public Task StartApplicationAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+        => Task.FromException(new InvalidOperationException("Brokered existing-container operations require application scope."));
 
     public async Task<DockerApplicationContainer> StartApplicationAsync(DockerApplicationContainerRequest request, CancellationToken cancellationToken = default)
     {
@@ -130,20 +130,20 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         return created;
     }
 
-    public async Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
+    public Task StopAndRemoveAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+        => Task.FromException(new InvalidOperationException("Brokered existing-container operations require application scope."));
 
-    public async Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default)
-        => throw new InvalidOperationException("Brokered existing-container operations require application scope.");
+    public Task<bool> IsRunningAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+        => Task.FromException<bool>(new InvalidOperationException("Brokered existing-container operations require application scope."));
 
-    public async Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+    public Task<DockerContainerIdentity> InspectAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
-        throw new InvalidOperationException("Brokered existing-container operations require application scope.");
+        return Task.FromException<DockerContainerIdentity>(new InvalidOperationException("Brokered existing-container operations require application scope."));
     }
 
-    public async Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
+    public Task<string> GetLogsAsync(string containerIdOrName, CancellationToken cancellationToken = default)
     {
-        throw new InvalidOperationException("Brokered existing-container operations require application scope.");
+        return Task.FromException<string>(new InvalidOperationException("Brokered existing-container operations require application scope."));
     }
 
     public async Task<ApplicationContainerStartResult> StartApplicationAsync(ApplicationContainerScope scope, string id, CancellationToken cancellationToken = default)

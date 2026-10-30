@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Automaton.Api.Models;
 
 public record SubscriptionPlanResponse
@@ -19,12 +21,15 @@ public record CreateSubscriptionPlanRequest
 {
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    [JsonRequired]
     public decimal PriceUsd { get; init; }
     public string? StripeProductId { get; init; }
     public string? StripePriceId { get; init; }
+    [JsonRequired]
     public bool IsDefault { get; init; }
     public bool IsActive { get; init; } = true;
     public PlanCapabilities Capabilities { get; init; } = PlanCapabilities.Default;
+    [JsonRequired]
     public int SortOrder { get; init; }
 }
 

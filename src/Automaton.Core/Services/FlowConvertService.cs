@@ -63,6 +63,9 @@ public class FlowConvertService : IFlowConvertService<Flow>
             foreach (var step in steps)
             {
                 var stepType = step.FindType();
+                if (stepType == null)
+                    throw new InvalidOperationException($"Could not find workflow step type '{step.Type}'.");
+
                 var workflowStep = scopedProvider.GetService(stepType) as WorkflowStep;
 
                 if (workflowStep == null)

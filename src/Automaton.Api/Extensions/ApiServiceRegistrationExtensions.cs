@@ -3,6 +3,7 @@ using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
 using Destructurama;
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.MySql;
@@ -28,7 +29,6 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Extensions;
 using Automaton.Api.Entities;
 using Automaton.Api.Authentication.GitHub;
-using Automaton.Api.Logging;
 using Automaton.Api.Areas.Identity;
 using Automaton.Api.Data;
 using Automaton.Api.Services.Mcp;
@@ -40,6 +40,7 @@ using Automaton.Api.Authorization;
 using Automaton.Api.Middleware;
 using Automaton.Api.Hubs;
 using Automaton.Api.Messaging;
+using Automaton.Api.Logging;
 using Automaton.Messaging.Abstractions;
 using Automaton.Identity;
 using Automaton.Infrastructure;
@@ -247,12 +248,7 @@ internal static class ApiAuthorizationRegistration
             // This policy accepts EITHER API Key OR JWT/Identity authentication
             options.AddPolicy("AllowApiKey", policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
-              .RequireAuthenticatedUser()
-              .RequireAssertion(context =>
-              {
-                  var scopeClaim = context.User.FindFirst("api_key_scope")?.Value;
-                  return true;
-              }));
+              .RequireAuthenticatedUser());
 
             options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
@@ -424,7 +420,7 @@ internal static class ApiLoggerConfiguration
             .Destructure.UsingAttributes()
             .Destructure.JsonNetTypes()
             .Enrich.With<EventTypeEnricher>()
-            .Enrich.With(services.GetService<UserNameEnricher>())
+            .Enrich.With(services.GetRequiredService<UserNameEnricher>())
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning);
     }
@@ -466,9 +462,9 @@ internal static class ApiHangfireRegistration
         var configurationManager = applicationBuilder.Configuration;
         services.AddHangfire(x =>
         {
-            object handler = configurationService.DatabaseType switch
+            switch (configurationService.DatabaseType)
             {
-                ConfigurationService.MySqlDatabaseType =>
+                case ConfigurationService.MySqlDatabaseType:
                     x.UseStorage(new MySqlStorage(configurationManager.GetConnectionString("MySqlConnection"),
                         new MySqlStorageOptions
                         {
@@ -480,10 +476,11 @@ internal static class ApiHangfireRegistration
                             DashboardJobListLimit = 50000,
                             TransactionTimeout = TimeSpan.FromMinutes(1),
                             TablesPrefix = "hangfire."
-                        })),
-
-                _ => throw new Exception($"Unsupported hangfire provider: {configurationService.DatabaseType}")
-            };
+                        }));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported hangfire provider: {configurationService.DatabaseType}");
+            }
         });
 
         services.AddHangfireServer();
@@ -803,7 +800,8 @@ internal static class ApiFoundationRegistration
 
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
 
-        services.AddFluentValidation(fv => fv.RegisterValidatorsFromAssemblyContaining<Program>());
+        services.AddFluentValidationAutoValidation();
+        services.AddValidatorsFromAssemblyContaining<Program>();
 
         services.AddScripting();
         services.AddAutomatonSteps();

@@ -79,9 +79,10 @@ public sealed class RuntimeTunnelRequestSender(
 
             return response;
         }
-        catch (TimeoutException)
+        catch (TimeoutException exception)
         {
             logger.LogWarning(
+                exception,
                 "Runtime tunnel timed out for app {AppId}, target {TargetId}, runner {RunnerId}",
                 appId,
                 deploymentTargetId,
@@ -119,7 +120,10 @@ public sealed class RuntimeTunnelRequestSender(
             BodyBytes = body,
             HeaderValues = request.Headers
                 .Where(header => !HopByHopHeaders.Contains(header.Key))
-                .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
+                .ToDictionary(
+                    header => header.Key,
+                    header => header.Value.OfType<string>().ToArray(),
+                    StringComparer.OrdinalIgnoreCase),
             Destination = staticSite ? TunnelDestinations.StaticSite : TunnelDestinations.RuntimeGateway,
             RuntimeAppId = appId,
             RuntimeDeploymentTargetId = deploymentTargetId,

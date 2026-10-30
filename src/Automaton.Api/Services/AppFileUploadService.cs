@@ -6,7 +6,7 @@ namespace Automaton.Api.Services;
 public sealed class AppFileUploadService(
     IRunnerFileTransferGateway transfers,
     AppFileRunnerResolver runnerResolver,
-    ILogger<Controllers.AppFilesController> logger)
+    ILogger<AppFileUploadService> logger)
 {
     private static readonly TimeSpan UploadDeadline = TimeSpan.FromMinutes(10);
 

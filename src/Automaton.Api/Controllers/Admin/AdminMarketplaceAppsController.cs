@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -93,7 +94,7 @@ public class AdminMarketplaceAppsController : ControllerBase
         app.Category = string.IsNullOrWhiteSpace(request.Category) ? null : request.Category.Trim();
         app.ReviewStatus = NormalizeReviewStatus(request.ReviewStatus);
         app.AccessStatus = NormalizeAccessStatus(request.AccessStatus);
-        app.MarketplaceStatus = MapLegacyMarketplaceStatus(app.ReviewStatus, app.AccessStatus);
+        app.MarketplaceStatus = MapLegacyMarketplaceStatus(app.AccessStatus);
         app.MarketplaceModerationReason = string.IsNullOrWhiteSpace(request.MarketplaceModerationReason)
             ? null
             : request.MarketplaceModerationReason.Trim();
@@ -239,7 +240,7 @@ public class AdminMarketplaceAppsController : ControllerBase
         };
     }
 
-    private static string MapLegacyMarketplaceStatus(string reviewStatus, string accessStatus)
+    private static string MapLegacyMarketplaceStatus(string accessStatus)
     {
         if (accessStatus == AppAccessStatuses.Disabled)
         {
@@ -256,7 +257,12 @@ public class AdminMarketplaceAppsController : ControllerBase
 
     private static string Slugify(string value)
     {
-        var slug = Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
+        var slug = Regex.Replace(
+            value.Trim().ToLowerInvariant(),
+            @"[^a-z0-9]+",
+            "-",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(1)).Trim('-');
         return string.IsNullOrWhiteSpace(slug) ? Guid.NewGuid().ToString("N") : slug;
     }
 
@@ -318,6 +324,7 @@ public class AdminMarketplaceAppDto
 
 public class UpdateMarketplaceAppRequest
 {
+    [JsonRequired]
     public bool IsFeatured { get; set; }
     public string? Category { get; set; }
     public string? ReviewStatus { get; set; }

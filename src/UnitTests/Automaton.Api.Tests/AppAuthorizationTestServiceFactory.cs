@@ -44,7 +44,6 @@ internal static class AppAuthorizationTestServiceFactory
         var environment = new AppAuthorizationTestWebHostEnvironment(contentRootPath ?? Path.GetTempPath());
         var settings = new SettingsService(
             db,
-            userContext,
             Options.Create(new AppFileRuleBaselineOptions
             {
                 RemixSourceExclude = [
@@ -91,9 +90,7 @@ internal static class AppAuthorizationTestServiceFactory
     private static AppsService ComposeAppsService(AppsServiceDependencies dependencies) =>
         new(
             dependencies.Db,
-            dependencies.UserContext,
             dependencies.Authorization,
-            dependencies.Storage,
             new AppMetadataService(dependencies.Db, dependencies.UserContext, dependencies.Storage, dependencies.Audit),
             CreateMutationService(dependencies),
             CreatePublicationService(dependencies),

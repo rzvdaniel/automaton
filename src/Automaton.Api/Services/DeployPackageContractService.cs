@@ -62,13 +62,12 @@ internal static class DeployPackageContractService
             throw new InvalidOperationException("Deploy package manifest must be a JSON object.");
         }
 
-        foreach (var property in root.EnumerateObject())
-        {
-            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                return property.Value;
-            }
-        }
+        var value = root.EnumerateObject()
+            .Where(property => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            .Select(property => (JsonElement?)property.Value)
+            .FirstOrDefault();
+        if (value.HasValue)
+            return value.Value;
 
         throw new InvalidOperationException($"Deploy package manifest property '{name}' is required.");
     }

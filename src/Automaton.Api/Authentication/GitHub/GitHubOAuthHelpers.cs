@@ -53,7 +53,7 @@ public static class GitHubOAuthHelpers
         var queryParams = QueryHelpers.ParseQuery(uri.Query)
             .ToDictionary(
                 pair => pair.Key,
-                pair => pair.Value.ToString(),
+                pair => (string?)pair.Value.ToString(),
                 StringComparer.OrdinalIgnoreCase);
 
         queryParams[key] = value;

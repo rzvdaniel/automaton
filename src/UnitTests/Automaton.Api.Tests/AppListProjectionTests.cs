@@ -1,5 +1,6 @@
 using Automaton.Api.Services;
 using Automaton.Api.Models;
+using Automaton.Api.Middleware;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;

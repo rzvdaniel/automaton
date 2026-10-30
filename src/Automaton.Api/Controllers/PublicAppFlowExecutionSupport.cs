@@ -202,7 +202,7 @@ internal static class PublicAppFlowExecutionSupport
         foreach (var input in inputs)
         {
             var matchingVariable = flow.InputVariables.Values
-                .FirstOrDefault(variable => variable.Name.Equals(input.Key, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(variable => string.Equals(variable.Name, input.Key, StringComparison.OrdinalIgnoreCase));
             if (matchingVariable is null)
             {
                 missing.Add(input.Key);

@@ -32,7 +32,9 @@ public class Sequence : WorkflowStep
 
         while (nextStepId != SequenceEndStepId)
         {
-            var child = WorkflowDefinition.Steps[nextStepId];
+            if (nextStepId == null || WorkflowDefinition == null
+                || !WorkflowDefinition.Steps.TryGetValue(nextStepId, out var child))
+                throw new InvalidOperationException("The sequence references a missing child step or is not attached to a workflow.");
 
             children.Add(child);
 

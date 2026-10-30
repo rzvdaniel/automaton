@@ -1,5 +1,7 @@
 using Serilog.Core;
 
+namespace Automaton.Api.Logging;
+
 public class UserNameEnricher : ILogEventEnricher
 {
     readonly IHttpContextAccessor _httpContextAccessor;
@@ -9,17 +11,15 @@ public class UserNameEnricher : ILogEventEnricher
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory factory)
+    public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
-        if (!(_httpContextAccessor.HttpContext?.User.Identity.IsAuthenticated ?? false))
+        var identity = _httpContextAccessor.HttpContext?.User.Identity;
+        if (identity?.IsAuthenticated != true)
         {
             return;
         }
 
-        var user = _httpContextAccessor.HttpContext.User;
-        var userName = user.Identity.Name;
-
-        var userNameProperty = factory.CreateProperty("UserName", userName);
+        var userNameProperty = propertyFactory.CreateProperty("UserName", identity.Name);
         logEvent.AddOrUpdateProperty(userNameProperty);
     }
 }

@@ -7,8 +7,8 @@ namespace Automaton.Api.Authentication
     public interface IAccessTokenManagerService
     {
         Task<bool> CurrentAccessTokenIsActive();
-        Task DeactivateCurrentAccessTokenAsync();
         Task<bool> CurrentAccessTokenIsActive(string token);
+        Task DeactivateCurrentAccessTokenAsync();
         Task DeactivateAccessTokenAsync(string token);
     }
 }

@@ -2,6 +2,8 @@ using Murmur;
 using Serilog.Core;
 using System.Text;
 
+namespace Automaton.Api.Logging;
+
 public class EventTypeEnricher : ILogEventEnricher
 {
     public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory propertyFactory)

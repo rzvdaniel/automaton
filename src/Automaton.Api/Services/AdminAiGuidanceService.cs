@@ -208,7 +208,7 @@ public sealed class AdminAiGuidanceService
         return true;
     }
 
-    public bool HasEmbeddedDefault(string key) => AutomatonGuidanceSeedCatalog.HasEmbeddedDefault(key);
+    public static bool HasEmbeddedDefault(string key) => AutomatonGuidanceSeedCatalog.HasEmbeddedDefault(key);
 
     private async Task EnsureUniqueAsync(string key, Guid? excludeId, CancellationToken cancellationToken)
     {

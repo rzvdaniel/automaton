@@ -10,4 +10,4 @@ var logSuccessfulRequests = applicationBuilder.Configuration.GetValue<bool>("Req
 await app.InitializeAutomatonApiAsync();
 app.UseAutomatonApiPipeline(corsOrigins, logSuccessfulRequests);
 
-app.Run();
+await app.RunAsync();

@@ -108,7 +108,7 @@ public class PrivateAppLaunchService
         return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 
-    public bool IsScopedPrivateAppPrincipal(ClaimsPrincipal user, Guid appId)
+    public static bool IsScopedPrivateAppPrincipal(ClaimsPrincipal user, Guid appId)
     {
         if (user.Identity?.IsAuthenticated != true)
         {

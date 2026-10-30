@@ -17,7 +17,7 @@ public sealed class RunnerEnrollmentExchangeResponse
     public string RunnerName { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string Purpose { get; set; } = string.Empty;
-    public string ApplicationProfile { get; set; } = string.Empty;
+    public string? ApplicationProfile { get; set; }
     public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
     public string InstallationId { get; set; } = string.Empty;
 }

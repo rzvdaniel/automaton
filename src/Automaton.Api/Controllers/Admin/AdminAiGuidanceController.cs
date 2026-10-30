@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -53,7 +54,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.OutputPath,
                 request.ContentMarkdown,
                 request.IsEnabled,
-                request.RequiredByDefault,
+                request.RequiredByDefault ?? false,
                 request.IsModelLoadable,
                 request.SortOrder,
                 cancellationToken);
@@ -85,7 +86,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.OutputPath,
                 request.ContentMarkdown,
                 request.IsEnabled,
-                request.RequiredByDefault,
+                request.RequiredByDefault ?? false,
                 request.IsModelLoadable,
                 request.SortOrder,
                 cancellationToken);
@@ -154,7 +155,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
         IsSeedRetired = document.IsSeedRetired,
         CreatedAt = document.CreatedAt,
         UpdatedAt = document.UpdatedAt,
-        HasEmbeddedDefault = _service.HasEmbeddedDefault(document.Key)
+        HasEmbeddedDefault = AdminAiGuidanceService.HasEmbeddedDefault(document.Key)
     };
 }
 
@@ -170,7 +171,7 @@ public sealed class AiGuidanceAdminResponse
     public string? OutputPath { get; set; }
     public string ContentMarkdown { get; set; } = string.Empty;
     public bool IsEnabled { get; set; }
-    public bool RequiredByDefault { get; set; }
+    public bool RequiredByDefault { get; set; } = false;
     public bool IsModelLoadable { get; set; }
     public int SortOrder { get; set; }
     public int Version { get; set; }
@@ -208,7 +209,7 @@ public sealed class UpsertAiGuidanceRequest
     public string ContentMarkdown { get; set; } = string.Empty;
 
     public bool IsEnabled { get; set; } = true;
-    public bool RequiredByDefault { get; set; }
+    public bool? RequiredByDefault { get; set; } = false;
     public bool IsModelLoadable { get; set; } = true;
     public int SortOrder { get; set; } = 100;
 }

@@ -43,8 +43,8 @@ namespace Automaton.Api.Application.Queries.Handlers
                 RegisteredToUtc = request.RegisteredToUtc,
                 SortField = request.SortField,
                 SortOrder = request.SortOrder,
-                PageIndex = request.PageIndex,
-                PageSize = request.PageSize
+                PageIndex = request.PageIndex ?? 0,
+                PageSize = request.PageSize ?? 100
             };
 
         private Task<Dictionary<Guid, int>> LoadAppCountsAsync(
@@ -90,7 +90,8 @@ namespace Automaton.Api.Application.Queries.Handlers
             {
                 Id = user.Id,
                 Name = user.Name,
-                Email = user.Email,
+                Email = user.Email
+                    ?? throw new InvalidOperationException($"User {user.Id} has no email address."),
                 EmailConfirmed = user.EmailConfirmed,
                 PublicUsername = user.PublicUsername,
                 RegisteredAtUtc = user.RegisteredAtUtc,

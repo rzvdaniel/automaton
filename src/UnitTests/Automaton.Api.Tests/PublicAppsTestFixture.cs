@@ -35,8 +35,7 @@ internal sealed class PublicAppsTestFixture : IAsyncDisposable
         await db.SaveChangesAsync();
         var service = new PublicAppsService(
             db,
-            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.example.test" }),
-            NullLogger<PublicAppsService>.Instance);
+            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.example.test" }));
         return new PublicAppsTestFixture(db, service);
     }
 

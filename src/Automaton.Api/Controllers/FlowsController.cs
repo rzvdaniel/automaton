@@ -41,6 +41,10 @@ public class FlowsController : BaseController
         var flowId = await flowsService.Create(flow);
 
         var newFlow = flowsService.Get(flowId);
+        if (newFlow is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newFlow.Id }, newFlow);
     }
@@ -91,7 +95,7 @@ public class FlowsController : BaseController
     }
 
     [HttpPut("settings/{id}")]
-    public async Task<IActionResult> UpdateSettings(Guid id, FlowSettings settings)
+    public async Task<IActionResult> UpdateSettings(Guid id, UpdateFlowSettingsRequest settings)
     {
         await flowsService.UpdateSettings(id, settings);
 

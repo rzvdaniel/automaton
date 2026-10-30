@@ -1,4 +1,4 @@
-﻿using Automaton.Api.Authentication;
+using Automaton.Api.Authentication;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using MediatR;
@@ -11,21 +11,19 @@ namespace Automaton.Api.Application.Queries.Handlers
     {
         private readonly ApplicationDbContext dataContext;
         private readonly IJwtService jwtService;
-        private readonly IMediator mediator;
         private readonly UsersService userManagerService;
         private readonly ILogger<RefreshAccessTokenQueryHandler> logger;
 
         public RefreshAccessTokenQueryHandler
         (
             ApplicationDbContext dataContext, 
-            IJwtService jwtService, IMediator mediator,
+            IJwtService jwtService,
             UsersService userManagerService, 
             ILogger<RefreshAccessTokenQueryHandler> logger
         )
         {
             this.dataContext = dataContext;
             this.jwtService = jwtService;
-            this.mediator = mediator;
             this.userManagerService = userManagerService;
             this.logger = logger;
         }
@@ -39,7 +37,7 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             if (refreshToken == null)
             {
-                throw new Exception("Refresh token not found.");
+                throw new InvalidOperationException("Refresh token not found.");
             }
 
             refreshToken.ValidateRefreshToken();
@@ -48,41 +46,18 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             if (user == null)
             {
-                throw new Exception($"User: '{refreshToken.UserId}' not found.");
+                throw new InvalidOperationException($"User: '{refreshToken.UserId}' not found.");
             }
 
             var newRefreshToken = new RefreshToken(user.Id, request.RefreshTokenExpirationDays);
 
-            try
-            {
-                dataContext.BeginTransaction();
-                
-                // Detach the old token and remove it
-                dataContext.Entry(refreshToken).State = EntityState.Deleted;
-                
-                // Add the new token
-                await dataContext.Set<RefreshToken>().AddAsync(newRefreshToken, cancellationToken);
-                
-                // SaveChanges instead of SaveChangesAsync to respect the transaction
-                await dataContext.SaveChangesAsync(cancellationToken);
-                
-                dataContext.Commit();
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                dataContext.Rollback();
-                logger.LogWarning($"Concurrency issue refreshing token for user {user.Id}. The token may have been already refreshed or revoked elsewhere.");
-                throw new Exception("Refresh token refresh operation failed. Please try again.", ex);
-            }
-            catch
-            {
-                dataContext.Rollback();
-                throw;
-            }
+            await ReplaceRefreshTokenAsync(refreshToken, newRefreshToken, user.Id, cancellationToken);
 
-            var claims = GetCustomClaimsForUser(user.Id);
+            var claims = GetCustomClaimsForUser();
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
-            var jwt = jwtService.GenerateToken(user.Id.ToString("N"), user.UserName, roles, claims);
+            var userName = user.UserName
+                ?? throw new InvalidOperationException($"User {user.Id} has no username for token issuance.");
+            var jwt = jwtService.GenerateToken(user.Id.ToString("N"), userName, roles, claims);
             jwt.RefreshToken = newRefreshToken.Token;
 
             logger.Log(LogLevel.Debug, "AccessTokenRefreshed Event Published.");
@@ -90,10 +65,40 @@ namespace Automaton.Api.Application.Queries.Handlers
             return jwt;
         }
 
-        Dictionary<string, string> GetCustomClaimsForUser(Guid userId)
+        static Dictionary<string, string> GetCustomClaimsForUser()
         {
             //Get Custom Claims for User
             return new Dictionary<string, string>();
+        }
+
+        private async Task ReplaceRefreshTokenAsync(
+            RefreshToken currentToken,
+            RefreshToken replacementToken,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            await using var transaction = await dataContext.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                dataContext.Entry(currentToken).State = EntityState.Deleted;
+                await dataContext.Set<RefreshToken>().AddAsync(replacementToken, cancellationToken);
+                await dataContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                logger.LogWarning(
+                    ex,
+                    "Concurrency issue refreshing token for user {UserId}. The token may have been already refreshed or revoked elsewhere.",
+                    userId);
+                throw new InvalidOperationException("Refresh token refresh operation failed. Please try again.", ex);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
         }
     }
 }

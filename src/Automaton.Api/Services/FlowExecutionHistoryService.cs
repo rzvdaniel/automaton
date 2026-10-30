@@ -114,10 +114,15 @@ public class FlowExecutionHistoryService
 
     public async Task Update(Guid id, Models.FlowExecution flowExecution, CancellationToken cancellationToken)
     {
-        var entity = dbContext.FlowExecutions
+        var entity = await dbContext.FlowExecutions
             .Include(x => x.FlowExecutionUsers)
-            .SingleOrDefault(x => x.Id == id &&
-                x.FlowExecutionUsers.Any(x => x.UserId == userId));
+            .SingleOrDefaultAsync(x => x.Id == id &&
+                x.FlowExecutionUsers.Any(x => x.UserId == userId), cancellationToken);
+
+        if (entity is null)
+        {
+            throw new InvalidOperationException($"Flow execution {id} was not found or is not accessible.");
+        }
 
         entity.Status = flowExecution.Status;
         entity.Finished = flowExecution.Finished;

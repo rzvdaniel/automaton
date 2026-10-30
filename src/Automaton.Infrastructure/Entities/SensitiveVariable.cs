@@ -11,12 +11,12 @@ public class SensitiveVariable
     /// <summary>
     /// Display name for the variable (for user identification)
     /// </summary>
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     
     /// <summary>
     /// Encrypted variable value using AES-256
     /// </summary>
-    public string EncryptedValue { get; set; }
+    public string EncryptedValue { get; set; } = string.Empty;
     
     /// <summary>
     /// Optional description
@@ -26,7 +26,7 @@ public class SensitiveVariable
     /// <summary>
     /// Type of resource this variable belongs to (Flow, CustomStep)
     /// </summary>
-    public string ResourceType { get; set; }
+    public string ResourceType { get; set; } = string.Empty;
     
     /// <summary>
     /// ID of the parent resource (FlowId or CustomStepId)
@@ -36,7 +36,7 @@ public class SensitiveVariable
     /// <summary>
     /// Variable scope: Input or Output
     /// </summary>
-    public string VariableScope { get; set; }
+    public string VariableScope { get; set; } = string.Empty;
     
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -48,5 +48,5 @@ public class SensitiveVariable
     
     public bool IsActive { get; set; } = true;
     
-    public virtual ICollection<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
+    public virtual ICollection<SensitiveVariableUser> SensitiveVariableUsers { get; set; } = new List<SensitiveVariableUser>();
 }

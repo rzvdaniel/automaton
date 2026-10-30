@@ -135,7 +135,7 @@ public class UsersServiceAuditTests
                 [],
                 new UpperInvariantLookupNormalizer(),
                 new IdentityErrorDescriber(),
-                null,
+                new EmptyServiceProvider(),
                 NullLogger<UserManager<ApplicationUser>>.Instance)
         {
             this.user = user;
@@ -180,7 +180,7 @@ public class UsersServiceAuditTests
         public Task<IdentityResult> CreateAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult(IdentityResult.Success);
         public Task<IdentityResult> UpdateAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult(IdentityResult.Success);
         public Task<IdentityResult> DeleteAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult(IdentityResult.Success);
-        public Task<string?> GetRoleIdAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult<string?>(role.Id.ToString());
+        public Task<string> GetRoleIdAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult(role.Id.ToString());
         public Task<string?> GetRoleNameAsync(ApplicationRole role, CancellationToken cancellationToken) => Task.FromResult(role.Name);
         public Task SetRoleNameAsync(ApplicationRole role, string? roleName, CancellationToken cancellationToken)
         {

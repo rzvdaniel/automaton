@@ -11,14 +11,25 @@ public class ScriptEngineHost : IScriptEngineHost
         this.configuration = configuration;
     }
 
-    public IDictionary<string, string> Execute(ScriptResource resource, IDictionary<string, string> inputs)
+    public ScriptExecutionResult Execute(ScriptResource resource, IDictionary<string, string> inputs)
     {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentNullException.ThrowIfNull(inputs);
+
+        var contentType = resource.ContentType;
+        if (string.IsNullOrWhiteSpace(contentType))
+            throw new ArgumentException("A script content type is required.", nameof(resource));
+
+        var code = resource.Content;
+        if (code == null)
+            throw new ArgumentException("Script content is required.", nameof(resource));
+
         try
         {
             // Create ScriptEngineFactory on demand
             var engineFactory = new ScriptEngineFactory(configuration);
             engineFactory.EventRaisingStreamWriter.NewText += OnTextWritten;
-            var engine = engineFactory.GetEngine(resource.ContentType);
+            var engine = engineFactory.GetEngine(contentType);
 
             // Set output callback if supported
             if (engine is IOutputCallbackScriptEngine outputEngine)
@@ -26,7 +37,7 @@ public class ScriptEngineHost : IScriptEngineHost
                 outputEngine.OutputCallback = line => ScriptTextWritten?.Invoke(this, line);
             }
 
-            var result = engine.Execute(resource.Content, inputs);
+            var result = engine.ExecuteScript(code, inputs);
 
             return result;
         }

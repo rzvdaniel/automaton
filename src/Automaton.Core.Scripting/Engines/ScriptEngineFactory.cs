@@ -31,7 +31,7 @@ namespace Automaton.Core.Scripting.Engines
             {
                 engines[PythonScrypt] = new PythonNetScriptEngine(configuration);
             }
-            catch (Exception ex)
+            catch
             {
                 throw;
             }
@@ -43,7 +43,13 @@ namespace Automaton.Core.Scripting.Engines
             engines[BatchScript] = new BatchScriptEngine();
         }
 
-        public IScriptEngine GetEngine(string contentType) => engines[contentType];
+        public IScriptEngine GetEngine(string contentType)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
+            return engines.TryGetValue(contentType, out var engine)
+                ? engine
+                : throw new NotSupportedException($"Script content type '{contentType}' is not supported.");
+        }
     }
 
     public class ScriptEngineConfiguration

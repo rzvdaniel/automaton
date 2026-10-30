@@ -1,7 +1,9 @@
 using Automaton.Api.Services;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Controllers;
 
@@ -53,7 +55,7 @@ public class SensitiveVariablesController : ControllerBase
 
             return CreatedAtAction(nameof(GetSensitiveVariable), new { id = sensitiveVar.Id }, response);
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             return Forbid();
         }
@@ -65,13 +67,8 @@ public class SensitiveVariablesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<SensitiveVariableResponse>> GetSensitiveVariable(Guid id)
+    public ActionResult<SensitiveVariableResponse> GetSensitiveVariable(Guid id)
     {
-        var userId = GetUserId();
-
-        var sensitiveVar = await sensitiveVariableService.GetSensitiveVariablesForResourceAsync(
-            string.Empty, Guid.Empty, userId); // This needs refactoring
-
         // For now, return NotFound
         // TODO: Implement GetSensitiveVariableByIdAsync method in service
         return NotFound();
@@ -147,23 +144,28 @@ public class SensitiveVariablesController : ControllerBase
 // DTOs
 public class CreateSensitiveVariableRequest
 {
-    public string Name { get; set; }
-    public string Value { get; set; }
+    [Required]
+    public string Name { get; set; } = string.Empty;
+    [Required]
+    public string Value { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string ResourceType { get; set; }
+    [Required]
+    public string ResourceType { get; set; } = string.Empty;
+    [JsonRequired]
     public Guid ResourceId { get; set; }
-    public string VariableScope { get; set; }
+    [Required]
+    public string VariableScope { get; set; } = string.Empty;
     public Guid? ExistingId { get; set; }
 }
 
 public class SensitiveVariableResponse
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string ResourceType { get; set; }
+    public string ResourceType { get; set; } = string.Empty;
     public Guid ResourceId { get; set; }
-    public string VariableScope { get; set; }
+    public string VariableScope { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
@@ -171,5 +173,5 @@ public class SensitiveVariableResponse
 
 public class DecryptedVariableResponse
 {
-    public string Value { get; set; }
+    public string Value { get; set; } = string.Empty;
 }

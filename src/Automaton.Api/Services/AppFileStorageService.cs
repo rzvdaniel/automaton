@@ -16,7 +16,6 @@ public class AppFileStorageService
     private const string LiveFolder = "live";
     private const string VersionsFolder = "versions";
     public const int MaximumRetainedVersionSnapshots = 10;
-    private readonly IWebHostEnvironment webHostEnvironment;
     private readonly Serilog.ILogger logger;
     private readonly string baseStoragePath;
     private readonly SettingsService settingsService;
@@ -45,7 +44,6 @@ public class AppFileStorageService
 
     public AppFileStorageService(IWebHostEnvironment webHostEnvironment, SettingsService settingsService)
     {
-        this.webHostEnvironment = webHostEnvironment;
         this.settingsService = settingsService;
         this.logger = Log.ForContext<AppFileStorageService>();
         
@@ -368,7 +366,7 @@ public class AppFileStorageService
         return null;
     }
 
-    public bool DirectoriesMatch(string currentPath, string snapshotPath)
+    public static bool DirectoriesMatch(string currentPath, string snapshotPath)
     {
         if (!Directory.Exists(currentPath) || !Directory.Exists(snapshotPath))
         {
@@ -494,7 +492,7 @@ public class AppFileStorageService
         var sourcePath = GetSourcePath(userId, appId);
         ValidateFileExtension(relativePath);
         await AppArchiveStorageBounds.WriteBoundedTextFileAsync(sourcePath, relativePath, content);
-        await MarkSourceModifiedAsync(userId, appId, relativePath);
+        await MarkSourceModifiedAsync(userId, appId);
     }
 
     /// <summary>
@@ -503,7 +501,7 @@ public class AppFileStorageService
     public async Task DeleteSourceFileAsync(Guid userId, Guid appId, string relativePath)
     {
         await DeleteFileAsync(GetSourcePath(userId, appId), relativePath);
-        await MarkSourceModifiedAsync(userId, appId, relativePath);
+        await MarkSourceModifiedAsync(userId, appId);
     }
 
     /// <summary>
@@ -512,7 +510,7 @@ public class AppFileStorageService
     public async Task DeleteSourceDirectoryAsync(Guid userId, Guid appId, string relativePath)
     {
         await DeleteDirectoryAsync(GetSourcePath(userId, appId), relativePath);
-        await MarkSourceModifiedAsync(userId, appId, relativePath);
+        await MarkSourceModifiedAsync(userId, appId);
     }
 
     /// <summary>
@@ -648,9 +646,8 @@ public class AppFileStorageService
         return HasAnyEntries(GetSourcePath(userId, appId));
     }
 
-    private Task MarkSourceModifiedAsync(Guid userId, Guid appId, string relativePath)
+    private Task MarkSourceModifiedAsync(Guid userId, Guid appId)
     {
-        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
         var modifiedAtUtc = DateTime.UtcNow;
 
         return UpdateAppStorageMetadataAsync(userId, appId, metadata =>
@@ -715,8 +712,15 @@ public class AppFileStorageService
         return migrated;
     }
 
-    private static DateTime? Max(DateTime? left, DateTime? right) =>
-        left.HasValue && right.HasValue ? (left > right ? left : right) : left ?? right;
+    private static DateTime? Max(DateTime? left, DateTime? right)
+    {
+        if (!left.HasValue)
+            return right;
+        if (!right.HasValue)
+            return left;
+
+        return left > right ? left : right;
+    }
 
     private static string SelectLegacyRuntimeSource(LegacyComponentStorageMetadata? frontend, LegacyComponentStorageMetadata? backend)
     {
@@ -795,15 +799,7 @@ public class AppFileStorageService
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var fileName = Path.GetFileName(normalized);
 
-        foreach (var rawRule in rules)
-        {
-            if (MatchesExcludePattern(normalized, fileName, segments, rawRule))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return rules.Any(rawRule => MatchesExcludePattern(normalized, fileName, segments, rawRule));
     }
 
     private static bool MatchesExcludePattern(
@@ -959,7 +955,7 @@ public class AppFileStorageService
             : null;
     }
 
-    public Task WriteFileAtPathAsync(string rootPath, string relativePath, string content, bool validateExtension = true)
+    public static Task WriteFileAtPathAsync(string rootPath, string relativePath, string content, bool validateExtension = true)
     {
         if (validateExtension)
             ValidateFileExtension(relativePath);
@@ -977,7 +973,7 @@ public class AppFileStorageService
         return Task.CompletedTask;
     }
 
-    public Task DeleteFileAtPathAsync(string rootPath, string relativePath)
+    public static Task DeleteFileAtPathAsync(string rootPath, string relativePath)
     {
         return DeleteFileAsync(rootPath, relativePath);
     }
@@ -993,7 +989,7 @@ public class AppFileStorageService
         return Task.CompletedTask;
     }
 
-    public Task DeleteDirectoryAtPathAsync(string rootPath, string relativePath)
+    public static Task DeleteDirectoryAtPathAsync(string rootPath, string relativePath)
     {
         return DeleteDirectoryAsync(rootPath, relativePath);
     }

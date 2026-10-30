@@ -44,7 +44,7 @@ public sealed class DeploymentPackageStore(
         }
     }
 
-    public FileStream OpenRead(string path)
+    public static FileStream OpenRead(string path)
     {
         return new FileStream(
             path,
@@ -126,14 +126,14 @@ public sealed class DeploymentPackageStore(
         }
     }
 
-    public async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
+    public static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
     {
         await using var stream = OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream, cancellationToken);
         return Convert.ToHexString(hash);
     }
 
-    public void TryDelete(string path)
+    public static void TryDelete(string path)
     {
         try
         {

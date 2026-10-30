@@ -2,6 +2,7 @@ using Automaton.Api.Services;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Controllers;
 
@@ -67,6 +68,7 @@ public sealed class AppActionsController : ControllerBase
 
 public sealed class RunAppActionRequest
 {
+    [JsonRequired]
     public System.Text.Json.JsonElement Input { get; set; }
 }
 

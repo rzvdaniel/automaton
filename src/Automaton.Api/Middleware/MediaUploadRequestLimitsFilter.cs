@@ -37,6 +37,7 @@ public sealed class MediaUploadRequestLimitsFilter : IAsyncResourceFilter
     }
 }
 
+[AttributeUsage(AttributeTargets.Method)]
 public sealed class MediaUploadRequestLimitsAttribute : TypeFilterAttribute
 {
     public MediaUploadRequestLimitsAttribute()

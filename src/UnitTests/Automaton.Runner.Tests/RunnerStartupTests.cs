@@ -75,7 +75,7 @@ public sealed class RunnerStartupTests
     }
 
     [Test]
-    public async Task FastApiReadinessWait_StopsWhenServiceIsStopping()
+    public void FastApiReadinessWait_StopsWhenServiceIsStopping()
     {
         using var host = Program.CreateHostBuilder([]).Build();
         var runner = host.Services.GetRequiredService<RunnerHostService>();

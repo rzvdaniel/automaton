@@ -251,14 +251,15 @@ public sealed class DeployService
         checks.Add(appLinkCheck);
         var credentialsCheck = ValidateCredentials(server, apiKey, nextSteps);
         checks.Add(credentialsCheck);
-        if (!appLinkCheck.Success
-            || !credentialsCheck.Success
-            || projectConfig is null
-            || string.IsNullOrWhiteSpace(server)
-            || string.IsNullOrWhiteSpace(apiKey))
+        var context = GetLocalPreflightContext(appLinkCheck, credentialsCheck, projectConfig, server, apiKey);
+        if (context is null)
         {
             return new LocalDeployPreflight(projectConfig, server, apiKey, appId, directoryOverride, checks, nextSteps, false);
         }
+
+        projectConfig = context.Value.ProjectConfig;
+        server = context.Value.Server;
+        apiKey = context.Value.ApiKey;
 
         var deploymentApplication = projectConfig.Application;
         try
@@ -305,6 +306,25 @@ public sealed class DeployService
         }
 
         return new LocalDeployPreflight(projectConfig, server, apiKey, appId, deployDirectory, checks, nextSteps, true);
+    }
+
+    private static (Models.AutomatonConfig ProjectConfig, string Server, string ApiKey)? GetLocalPreflightContext(
+        DeployCheckResult appLinkCheck,
+        DeployCheckResult credentialsCheck,
+        Models.AutomatonConfig? projectConfig,
+        string? server,
+        string? apiKey)
+    {
+        if (!appLinkCheck.Success
+            || !credentialsCheck.Success
+            || projectConfig is null
+            || string.IsNullOrWhiteSpace(server)
+            || string.IsNullOrWhiteSpace(apiKey))
+        {
+            return null;
+        }
+
+        return (projectConfig, server, apiKey);
     }
 
     private async Task<(bool Ready, string Message, string NextStep, string State)> WaitForManagedRuntimeAsync(

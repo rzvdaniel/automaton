@@ -56,7 +56,7 @@ namespace Automaton.Api.Application.Commands.Handlers
                 Variables =
                 {
                     { "WebsiteUrl", ConfigurationService.WebsiteUrl},
-                    { "SupportEmail", ConfigurationService.EmailConfig.SupportEmail!},
+                    { "SupportEmail", ConfigurationService.EmailConfig.SupportEmail},
                     { "Name", user.Name },
                     { "ResetPasswordUrl", resetPasswordUrl },
                 }

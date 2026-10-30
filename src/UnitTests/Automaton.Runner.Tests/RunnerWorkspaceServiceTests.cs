@@ -369,7 +369,7 @@ public class RunnerWorkspaceServiceTests
     public void PrepareApplicationStorage_RefreshesWritablePermissionsForContainerUsers()
     {
         if (OperatingSystem.IsWindows())
-            Assert.Ignore("Unix directory permissions are enforced on Linux Runner hosts.");
+            return;
 
         var appId = Guid.NewGuid();
         var originalWorkspaceRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
@@ -392,10 +392,12 @@ public class RunnerWorkspaceServiceTests
             service.PrepareApplicationStorage(appId, storage);
 
             var requiredWritePermissions = UnixFileMode.UserWrite | UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+            var dataPermissions = File.GetUnixFileMode(dataDirectory) & requiredWritePermissions;
+            var mountPermissions = File.GetUnixFileMode(mountDirectory) & requiredWritePermissions;
             Assert.Multiple(() =>
             {
-                Assert.That(File.GetUnixFileMode(dataDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
-                Assert.That(File.GetUnixFileMode(mountDirectory) & requiredWritePermissions, Is.EqualTo(requiredWritePermissions));
+                Assert.That(dataPermissions, Is.EqualTo(requiredWritePermissions));
+                Assert.That(mountPermissions, Is.EqualTo(requiredWritePermissions));
             });
         }
         finally

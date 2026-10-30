@@ -15,9 +15,6 @@ namespace Automaton.Api.Services;
 public class AppsService
 {
     private readonly ApplicationDbContext dataContext;
-    private readonly UserContextService userContextService;
-    private readonly ResourceAuthorizationService authorizationService;
-    private readonly AppFileStorageService fileStorageService;
     private readonly AppMetadataService appMetadataService;
     private readonly AppMutationService appMutationService;
     private readonly AppPublicationService appPublicationService;
@@ -26,14 +23,9 @@ public class AppsService
     private readonly AppListingService appListingService;
     private readonly Serilog.ILogger logger;
 
-    // ✅ Helper property to get current userId (respects impersonation)
-    private Guid UserId => userContextService.GetUserId();
-
     public AppsService(
         ApplicationDbContext dataContext,
-        UserContextService userContextService,
         ResourceAuthorizationService authorizationService,
-        AppFileStorageService fileStorageService,
         AppMetadataService appMetadataService,
         AppMutationService appMutationService,
         AppPublicationService appPublicationService,
@@ -42,9 +34,6 @@ public class AppsService
     )
     {
         this.dataContext = dataContext;
-        this.userContextService = userContextService;
-        this.authorizationService = authorizationService;
-        this.fileStorageService = fileStorageService;
         this.appMetadataService = appMetadataService;
         this.appMutationService = appMutationService;
         this.appPublicationService = appPublicationService;
@@ -74,9 +63,9 @@ public class AppsService
         CancellationToken cancellationToken = default)
         => appQueryService.UpdateTagSettingsAsync(appId, tags, cancellationToken);
 
-    public AppModel Get(Guid id) => appQueryService.Get(id);
+    public AppModel? Get(Guid id) => appQueryService.Get(id);
 
-    public Task<PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<PublishedAppInfo?> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
         => appQueryService.GetPublishedAppInfoAsync(slug, cancellationToken);
 
     public Task<PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(
@@ -149,8 +138,8 @@ public class AppsService
         var slug = displayName.ToLowerInvariant()
             .Replace(' ', '-')
             .Replace('_', '-');
-        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
-        slug = Regex.Replace(slug, @"\-+", "-").Trim('-');
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+        slug = Regex.Replace(slug, @"\-+", "-", RegexOptions.None, TimeSpan.FromSeconds(1)).Trim('-');
         if (string.IsNullOrEmpty(slug)) slug = "app";
         if (slug.Length > PublishedAppHostNames.MaximumSlugLength)
         {
@@ -165,16 +154,8 @@ public class AppsService
         return slug;
     }
 
-    private static bool IsValidUrlSlug(string slug)
-    {
-        // URL slug validation: lowercase letters, numbers, hyphens
-        return PublishedAppHostNames.IsValidPublishedSlug(slug);
-    }
-
     internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null, Guid? ownerId = null)
     {
-        if (entity == null) return null;
-
         return new Models.AppModel
         {
             Id = entity.Id,

@@ -71,7 +71,11 @@ public class AutomatonMcpClientToolExposureTests
     {
         public string ProviderName => "FakeProvider";
         public string DefaultModel => "fake-model";
-        public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
+        public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated
+        {
+            add { }
+            remove { }
+        }
 
         public List<string> ReceivedToolNames { get; } = [];
 

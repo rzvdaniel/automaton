@@ -82,7 +82,7 @@ public sealed class AppQueryService(
         return true;
     }
 
-    public AppModel Get(Guid id)
+    public AppModel? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var appEntity = authorizationService.GetAccessibleAppsQuery()
@@ -121,7 +121,7 @@ public sealed class AppQueryService(
     /// Returns app info without requiring ownership (for authentication checks).
     /// Used by published app runtime execution endpoints.
     /// </summary>
-    public async Task<PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task<PublishedAppInfo?> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
     {
         var appEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)

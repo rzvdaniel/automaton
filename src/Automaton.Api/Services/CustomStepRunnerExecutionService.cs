@@ -14,7 +14,7 @@ public sealed class CustomStepRunnerExecutionService(
 {
     private readonly Serilog.ILogger logger = Log.ForContext<CustomStepRunnerExecutionService>();
 
-    public Task EnsureCanExecuteAsync(
+    public static Task EnsureCanExecuteAsync(
         IReadOnlyCollection<Guid> selectedRunnerIds,
         Guid userId,
         CancellationToken cancellationToken)

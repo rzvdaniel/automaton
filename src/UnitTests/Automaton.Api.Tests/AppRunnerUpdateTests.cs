@@ -33,7 +33,7 @@ public class AppRunnerUpdateTests
         await using var db = AppAuthorizationTestData.CreateDbContext();
         var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
         await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, !requiresAuthentication);
-        var model = service.Get(appId);
+        var model = service.Get(appId) ?? throw new InvalidOperationException("The seeded application should be available.");
         model.RequiresAuthentication = requiresAuthentication;
 
         await service.Update(appId, model);
@@ -81,7 +81,7 @@ public class AppRunnerUpdateTests
         await using var db = AppAuthorizationTestData.CreateDbContext();
         var service = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
         await SeedDeployedAuthenticationAppAsync(db, service, ownerId, appId, runnerId, requiresAuthentication);
-        var model = service.Get(appId);
+        var model = service.Get(appId) ?? throw new InvalidOperationException("The seeded application should be available.");
         model.RequiresAuthentication = !requiresAuthentication;
         await service.Update(appId, model);
         var routePath = Path.Combine(tempRoot.Path, "AppData", "traefik-dynamic", "managed-runtime-routes.yml");
@@ -98,7 +98,9 @@ public class AppRunnerUpdateTests
 
         // Recreate the service and model to represent a later request, not a local flag.
         var retryService = AppAuthorizationTestServiceFactory.CreateAppsService(db, ownerId, tempRoot.Path);
-        await retryService.Update(appId, retryService.Get(appId));
+        var retryModel = retryService.Get(appId)
+            ?? throw new InvalidOperationException("The application should remain available for the retry.");
+        await retryService.Update(appId, retryModel);
 
         var repairedRoute = await File.ReadAllTextAsync(routePath);
         Assert.That(repairedRoute.Contains("forwardAuth:", StringComparison.Ordinal), Is.EqualTo(requiresAuthentication));

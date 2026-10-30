@@ -105,7 +105,8 @@ public class RunnerRegistrationTests
         // Act - Simulate what happens when user clears settings
         // In the real scenario, cleanup would delete the runner config
         // But the runner ID should be preserved for potential re-use
-        var savedRunnerId = storageService.GetRunnerId();
+        var savedRunnerId = storageService.GetRunnerId()
+            ?? throw new InvalidOperationException("The registered Runner ID should be retained before cleanup.");
         await storageService.DeleteRunnerConfigAsync();
 
         // Verify runner config is cleared

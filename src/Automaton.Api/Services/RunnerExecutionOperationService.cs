@@ -251,11 +251,19 @@ public sealed class RunnerExecutionOperationService(
         var failure = await ResolveAssignmentFailureAsync(keyId, operation, request, token);
         if (failure is null) return false;
 
-        var result = request.HostContainer is not null
-            ? CreateFailedHostContainerResult(failure)
-            : request.Action is { Kind: "execute" }
-                ? MachineActionAssignmentRevalidator.CreateFailedResult(operation.Id, failure)
-            : CreateFailedFileTransferResult(failure);
+        RunnerExecutionResult result;
+        if (request.HostContainer is not null)
+        {
+            result = CreateFailedHostContainerResult(failure);
+        }
+        else if (request.Action is { Kind: "execute" })
+        {
+            result = MachineActionAssignmentRevalidator.CreateFailedResult(operation.Id, failure);
+        }
+        else
+        {
+            result = CreateFailedFileTransferResult(failure);
+        }
         await ApplyAsync(keyId, operationId, result, token, authenticatedUserId, runnerId);
         return true;
     }
@@ -371,7 +379,7 @@ public sealed class RunnerExecutionOperationService(
         var file = new FileInfo(path);
         if (file.Length != transfer.Length)
             throw new ArgumentException("Download artifact length does not match its result metadata.");
-        var actualChecksum = await artifacts.ComputeSha256Async(path, token);
+        var actualChecksum = await DeploymentPackageStore.ComputeSha256Async(path, token);
         if (!string.Equals(actualChecksum, checksum, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Download artifact checksum does not match its result metadata.");
     }

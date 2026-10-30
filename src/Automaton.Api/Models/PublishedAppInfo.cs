@@ -7,8 +7,8 @@ namespace Automaton.Api.Models;
 public class PublishedAppInfo
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
-    public string PublicUrl { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; }
     public Guid? OwnerId { get; set; }
     public Guid? ExecutionRunnerId { get; set; }

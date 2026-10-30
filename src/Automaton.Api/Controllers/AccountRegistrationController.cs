@@ -50,6 +50,7 @@ public sealed class AccountRegistrationController : BaseController
 
     [HttpGet]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public IActionResult RegistrationStatus() => Ok(new
     {
         enabled = !configurationService.NoUserSignUp,
@@ -76,7 +77,9 @@ public sealed class AccountRegistrationController : BaseController
             return BadRequest(ModelState);
 
         var user = CreateUser(registerUserCommand, publicUsername);
-        await accountRegistrationService.RegisterAsync(user, registerUserCommand.Password, GetCorrelationId());
+        var password = registerUserCommand.Password
+            ?? throw new InvalidOperationException("A password is required to register an account.");
+        await accountRegistrationService.RegisterAsync(user, password, GetCorrelationId());
 
         return StatusCode(StatusCodes.Status201Created, new
         {
@@ -134,7 +137,7 @@ public sealed class AccountRegistrationController : BaseController
         if (string.IsNullOrWhiteSpace(command.PublicUsername))
             return await userManagerService.GenerateUniquePublicUsernameAsync(command.Name!);
 
-        if (!userManagerService.IsValidPublicUsername(command.PublicUsername))
+        if (!UsersService.IsValidPublicUsername(command.PublicUsername))
         {
             ModelState.AddModelError("PublicUsername", "Public username must be 3-32 characters, using only letters, numbers, hyphens, and underscores.");
             return null;
@@ -170,13 +173,14 @@ public sealed class AccountRegistrationController : BaseController
 
     private async Task SendEmailConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
+        var email = user.Email ?? throw new InvalidOperationException("A user email is required for email confirmation.");
         var token = await userManagerService.GenerateEmailConfirmationTokenAsync(user.Id);
         var confirmationUrl = emailConfirmationLinkBuilder.Build(user.Id, token);
         var userDetails = new EmailData
         {
             Template = "AutomatonConfirmEmail",
             From = new EmailAccount { Email = ResolveUserFacingFromEmail() },
-            To = [new EmailAccount { Email = user.Email, Name = user.Name }],
+            To = [new EmailAccount { Email = email, Name = user.Name }],
             Variables =
             {
                 { "Name", user.Name },

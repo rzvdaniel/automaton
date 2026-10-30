@@ -17,7 +17,8 @@ public sealed class AdminDocumentationService
     private static readonly FileExtensionContentTypeProvider AssetContentTypes = new();
     private static readonly Regex FrontMatterRegex = new(
         @"\A---\r?\n(?<frontMatter>[\s\S]*?)\r?\n---\r?\n?",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
 
     private readonly IWebHostEnvironment _environment;
 
@@ -169,10 +170,11 @@ public sealed class AdminDocumentationService
 
     private static ParsedDocumentationFrontMatter ParseFrontMatter(string content)
     {
-        var match = FrontMatterRegex.Match(content ?? string.Empty);
+        var source = content ?? string.Empty;
+        var match = FrontMatterRegex.Match(source);
         if (!match.Success)
         {
-            return new ParsedDocumentationFrontMatter(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), content);
+            return new ParsedDocumentationFrontMatter(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), source);
         }
 
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -195,7 +197,7 @@ public sealed class AdminDocumentationService
             metadata[key] = value;
         }
 
-        return new ParsedDocumentationFrontMatter(metadata, content[match.Length..]);
+        return new ParsedDocumentationFrontMatter(metadata, source[match.Length..]);
     }
 
     private static int ParseOrder(string? rawOrder)

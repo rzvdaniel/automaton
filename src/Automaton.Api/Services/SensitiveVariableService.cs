@@ -61,28 +61,11 @@ public class SensitiveVariableService
         // Encrypt the value
         var encryptedValue = EncryptValue(value);
 
-        SensitiveVariable sensitiveVar;
-
-        if (existingId.HasValue)
-        {
-            // Update existing
-            sensitiveVar = await dbContext.SensitiveVariables
-                .FirstOrDefaultAsync(sv => sv.Id == existingId.Value);
-
-            if (sensitiveVar == null)
-            {
-                throw new InvalidOperationException($"Sensitive variable {existingId.Value} not found");
-            }
-
-            sensitiveVar.Name = name;
-            sensitiveVar.EncryptedValue = encryptedValue;
-            sensitiveVar.Description = description;
-            sensitiveVar.UpdatedAt = DateTime.UtcNow;
-        }
-        else
-        {
-            // Create new
-            sensitiveVar = new SensitiveVariable
+        var sensitiveVar = existingId.HasValue
+            ? await dbContext.SensitiveVariables
+                .FirstOrDefaultAsync(sv => sv.Id == existingId.Value)
+                ?? throw new InvalidOperationException($"Sensitive variable {existingId.Value} not found")
+            : new SensitiveVariable
             {
                 Id = Guid.NewGuid(),
                 Name = name,
@@ -96,6 +79,16 @@ public class SensitiveVariableService
                 IsActive = true
             };
 
+        if (existingId.HasValue)
+        {
+            sensitiveVar.Name = name;
+            sensitiveVar.EncryptedValue = encryptedValue;
+            sensitiveVar.Description = description;
+            sensitiveVar.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            // Create new
             dbContext.SensitiveVariables.Add(sensitiveVar);
 
             // Create user link
@@ -243,9 +236,9 @@ public class SensitiveVariableService
         foreach (var kvp in variables)
         {
             // Check if value is a sensitive variable reference (format: "${sensitive:guid}")
-            if (kvp.Value?.StartsWith("${sensitive:") == true && kvp.Value.EndsWith("}"))
+            if (kvp.Value is { } value && value.StartsWith("${sensitive:") && value.EndsWith('}'))
             {
-                var guidPart = kvp.Value.Substring(12, kvp.Value.Length - 13); // Extract GUID
+                var guidPart = value.Substring(12, value.Length - 13); // Extract GUID
                 if (Guid.TryParse(guidPart, out var sensitiveVarId))
                 {
                     var decryptedValue = await GetDecryptedValueAsync(sensitiveVarId, userId);
@@ -253,7 +246,7 @@ public class SensitiveVariableService
                 }
                 else
                 {
-                    result[kvp.Key] = kvp.Value; // Invalid reference, keep as-is
+                    result[kvp.Key] = value; // Invalid reference, keep as-is
                 }
             }
             else

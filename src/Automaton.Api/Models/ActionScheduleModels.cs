@@ -7,6 +7,7 @@ namespace Automaton.Api.Models;
 
 public sealed class SaveActionScheduleRequest
 {
+    [JsonRequired]
     public Guid ApplicationId { get; set; }
     public string ActionKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -21,12 +22,16 @@ public sealed class SaveActionScheduleRequest
     public bool Enabled { get; set; } = true;
     public string ConcurrencyPolicy { get; set; } = "SkipIfRunning";
     public string MisfirePolicy { get; set; } = "Skip";
+    [JsonRequired]
     public JsonElement Input { get; set; }
 }
 
 public sealed class ExplicitOffsetDateTimeConverter : JsonConverter<DateTimeOffset?>
 {
-    private static readonly Regex ExplicitOffset = new(@"(?:[zZ]|[+-]\d{2}:\d{2})$", RegexOptions.Compiled);
+    private static readonly Regex ExplicitOffset = new(
+        @"(?:[zZ]|[+-]\d{2}:\d{2})$",
+        RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
 
     public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

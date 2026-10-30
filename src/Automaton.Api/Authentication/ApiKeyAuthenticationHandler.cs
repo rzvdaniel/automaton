@@ -13,7 +13,7 @@ namespace Automaton.Api.Authentication;
 public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 {
     public const string DefaultScheme = "ApiKey";
-    public string Scheme => DefaultScheme;
+    public static string Scheme => DefaultScheme;
     public string HeaderName { get; set; } = "X-API-Key";
     public string QueryParameterName { get; set; } = "api_key";
 }
@@ -110,12 +110,16 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Name, user.UserName ?? user.Email),
-            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Name, user.UserName ?? user.Email ?? userId.ToString()),
             new("api_key_scope", apiKeyEntity.Scope.ToString()),
             new("api_key_id", apiKeyEntity.Id.ToString()),
             new("uid", userId.ToString())
         };
+
+        if (user.Email is { } email)
+        {
+            claims.Add(new Claim(ClaimTypes.Email, email));
+        }
 
         AddRoleClaims(claims, await userManager.GetRolesAsync(user));
 

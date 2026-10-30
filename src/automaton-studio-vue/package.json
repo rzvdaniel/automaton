@@ -10,8 +10,7 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint . --fix",
-    "format": "prettier --write src/",
-    "prepare": "husky"
+    "format": "prettier --write src/"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -47,7 +46,6 @@
     "@vue/tsconfig": "^0.8.1",
     "eslint": "^9.39.2",
     "eslint-plugin-vue": "^10.6.2",
-    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "prettier": "^3.7.4",
     "typescript": "~5.9.3",

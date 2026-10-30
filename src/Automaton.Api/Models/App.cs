@@ -1,5 +1,6 @@
 using Automaton.Api.Enums;
 using Automaton.Core.Models;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Models;
 
@@ -7,14 +8,17 @@ public class AppModel
 {
     public Guid Id { get; set; }
     public Guid? UserId { get; set; } // Owner user ID (for file path resolution)
-    public string Name { get; set; }
-    public string Summary { get; set; }
-    public string Description { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    [JsonRequired]
     public bool IsPublished { get; set; }
+    [JsonRequired]
     public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; }
+    [JsonRequired]
     public bool RequiresAuthentication { get; set; } = true;
     public string RuntimeVisibility { get; set; } = AppRuntimeVisibilities.Private;
     public string CatalogVisibility { get; set; } = AppCatalogVisibilities.Unlisted;

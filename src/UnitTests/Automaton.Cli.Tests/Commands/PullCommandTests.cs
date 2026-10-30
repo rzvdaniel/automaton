@@ -81,7 +81,7 @@ public class PullCommandTests
     }
 
     [Test]
-    public async Task ResolveAppAsync_WhenSlugIsNotAccessibleExplainsAcceptedIdentifiers()
+    public void ResolveAppAsync_WhenSlugIsNotAccessibleExplainsAcceptedIdentifiers()
     {
         using var httpClient = new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -217,7 +217,7 @@ public class PullCommandTests
     }
 
     [Test]
-    public async Task StagedPull_DoesNotExposePartialProjectWhenLaterDownloadFails()
+    public void StagedPull_DoesNotExposePartialProjectWhenLaterDownloadFails()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
         var targetDirectory = Path.Combine(root, "project");

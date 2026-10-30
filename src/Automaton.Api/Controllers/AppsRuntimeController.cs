@@ -53,7 +53,7 @@ public sealed class AppsRuntimeController(
     private void AppendRuntimeCookie(Guid appId)
     {
         var userId = userContextService.GetUserId();
-        var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
+        var expiresAtUtc = RuntimeCookieService.GetDefaultExpiry();
         var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(appId, userId, expiresAtUtc);
         Response.Cookies.Append(
             RuntimeCookieConstants.GetCookieName(appId),

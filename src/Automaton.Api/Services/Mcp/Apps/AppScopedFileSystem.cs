@@ -62,11 +62,6 @@ public class AppScopedFileSystem : LocalScopedFileSystem
         await base.RenameFolderAsync(fromRelativePath, toRelativePath);
     }
 
-    public override Task DeleteFolderAsync(string relativePath)
-    {
-        return base.DeleteFolderAsync(relativePath);
-    }
-
     public override Task<IEnumerable<string>> ListFilesAsync()
     {
         if (!Directory.Exists(RootPath))

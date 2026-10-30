@@ -31,12 +31,14 @@ public class RoleManagerService
 
     public async Task<ApplicationRole> GetRole(string name)
     {
-        return await _roleManager.FindByNameAsync(name);
+        return await _roleManager.FindByNameAsync(name)
+            ?? throw new KeyNotFoundException("Role not found.");
     }
 
     public async Task<ApplicationRole> GetRole(Guid roleId)
     {
-        return await _roleManager.FindByIdAsync(roleId.ToString());
+        return await _roleManager.FindByIdAsync(roleId.ToString())
+            ?? throw new KeyNotFoundException("Role not found.");
     }
 
     public async Task RemoveClaim(string roleName, RoleClaim claim)

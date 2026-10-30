@@ -5,6 +5,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Controllers;
 
@@ -215,15 +216,26 @@ public class AppsController : BaseController
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         var newApp = appsService.Get(appId);
+        if (newApp is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, AppModel app)
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> Put(Guid id, UpdateAppRequest request)
     {
-        try { await appsService.Update(id, app); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        try
+        {
+            await appsService.Update(id, request.ToAppModel());
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
 
         return NoContent();
     }
@@ -280,7 +292,7 @@ public class AppsController : BaseController
                 Message = "Application publish failed.",
                 ActorUserId = userContextService.GetUserId(),
                 Metadata = new { Error = ex.Message, request.PublicUrl }
-            });
+            }, cancellationToken);
             return BadRequest(new { message = ex.Message });
         }
 
@@ -311,7 +323,7 @@ public class AppsController : BaseController
                 Message = "Application unpublish failed.",
                 ActorUserId = userContextService.GetUserId(),
                 Metadata = new { Error = ex.Message }
-            });
+            }, cancellationToken);
             return BadRequest(new { message = ex.Message });
         }
 
@@ -415,6 +427,8 @@ public class UpdateRunnerRequest
 
 public class SetSampleStatusRequest
 {
+    [JsonRequired]
     public bool IsSample { get; set; }
+    [JsonRequired]
     public bool IsFeatured { get; set; }
 }

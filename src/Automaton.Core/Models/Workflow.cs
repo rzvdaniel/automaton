@@ -7,9 +7,9 @@ public class Workflow
 {
     public Guid Id { get; set; }
 
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
-    public string StartupDefinitionId { get; set; }
+    public string StartupDefinitionId { get; set; } = string.Empty;
 
     public IDictionary<string, StepVariable> Variables { get; set; }
 
@@ -19,7 +19,7 @@ public class Workflow
 
     public List<WorkflowDefinition> Definitions { get; set; }
 
-    public event EventHandler<SetVariableNotification> SetWorkflowVariable;
+    public event EventHandler<SetVariableNotification>? SetWorkflowVariable;
 
     public Workflow()
     {
@@ -29,7 +29,7 @@ public class Workflow
         Definitions = new List<WorkflowDefinition>();
     }
 
-    public WorkflowDefinition GetStartupDefinition()
+    public WorkflowDefinition? GetStartupDefinition()
     {
         return Definitions.SingleOrDefault(x => x.Id == StartupDefinitionId);
     }
@@ -39,9 +39,9 @@ public class Workflow
         return Variables.Any(x => x.Value.Name == name);
     }
 
-    public StepVariable GetVariableByName(string name)
+    public StepVariable? GetVariableByName(string name)
     {
-        return Variables.SingleOrDefault(x => x.Value.Name == name).Value;
+        return Variables.Values.SingleOrDefault(variable => variable.Name == name);
     }
 
     public IEnumerable<StepVariable> GetVariables(IEnumerable<string> names)
@@ -53,6 +53,9 @@ public class Workflow
 
     public void SetVariable(StepVariable variable)
     {
+        if (string.IsNullOrEmpty(variable.Id))
+            throw new ArgumentException("A workflow variable must have an id before it can be added.", nameof(variable));
+
         if (Variables.ContainsKey(variable.Id))
         {
             Variables[variable.Id] = variable;

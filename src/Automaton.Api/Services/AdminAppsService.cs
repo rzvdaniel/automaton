@@ -121,7 +121,7 @@ public class AdminAppsService
 
         record.App.ReviewStatus = NormalizeReviewStatus(request.ReviewStatus);
         record.App.AccessStatus = NormalizeAccessStatus(request.AccessStatus);
-        record.App.MarketplaceStatus = MapLegacyMarketplaceStatus(record.App.ReviewStatus, record.App.AccessStatus);
+        record.App.MarketplaceStatus = MapLegacyMarketplaceStatus(record.App.AccessStatus);
         record.App.MarketplaceModerationReason = string.IsNullOrWhiteSpace(request.MarketplaceModerationReason)
             ? null
             : request.MarketplaceModerationReason.Trim();
@@ -157,7 +157,13 @@ public class AdminAppsService
 
     private void EnsureAdminAccess() => adminAuthorizationService.EnsureAdmin();
 
-    private async Task<AdminOwnedAppRecord?> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken, bool throwWhenMissing = true)
+    private async Task<AdminOwnedAppRecord> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        return await RequireOwnedAppForAdminAsync(appId, cancellationToken, throwWhenMissing: true)
+            ?? throw new InvalidOperationException("App not found.");
+    }
+
+    private async Task<AdminOwnedAppRecord?> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken, bool throwWhenMissing)
     {
         EnsureAdminAccess();
         var app = await dataContext.WebApps
@@ -252,7 +258,7 @@ public class AdminAppsService
         };
     }
 
-    private static string MapLegacyMarketplaceStatus(string reviewStatus, string accessStatus)
+    private static string MapLegacyMarketplaceStatus(string accessStatus)
     {
         if (accessStatus == AppAccessStatuses.Disabled)
         {

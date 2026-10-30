@@ -55,7 +55,7 @@ public class AdminLogsController : ControllerBase
                 Action = x.Action,
                 EntityType = x.EntityType,
                 EntityId = x.EntityId,
-                EntityDisplay = GetEntityDisplay(x.EntityType, x.EntityId, x.MetadataJson),
+                EntityDisplay = GetEntityDisplay(x.EntityId, x.MetadataJson),
                 UserId = x.UserId,
                 TargetUserId = x.TargetUserId,
                 UserName = x.UserName,
@@ -186,7 +186,7 @@ public class AdminLogsController : ControllerBase
         return Ok(levels);
     }
 
-    private static string? GetEntityDisplay(string entityType, Guid? entityId, string? metadataJson)
+    private static string? GetEntityDisplay(Guid? entityId, string? metadataJson)
     {
         var metadataName = TryReadMetadataDisplayName(metadataJson);
         if (!string.IsNullOrWhiteSpace(metadataName))

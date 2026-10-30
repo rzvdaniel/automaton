@@ -21,20 +21,17 @@ public class AppsFlowExecutionController : ControllerBase
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly RunnerService runnerService;
     private readonly ILogger<AppsFlowExecutionController> logger;
-    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppsFlowExecutionController(
         AppsService appsService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         RunnerService runnerService,
-        ILogger<AppsFlowExecutionController> logger,
-        PrivateAppLaunchService privateAppLaunchService)
+        ILogger<AppsFlowExecutionController> logger)
     {
         this.appsService = appsService;
         this.flowsServiceFactory = flowsServiceFactory;
         this.runnerService = runnerService;
         this.logger = logger;
-        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     /// <summary>
@@ -248,7 +245,7 @@ public class AppsFlowExecutionController : ControllerBase
     {
         if (User.Identity?.IsAuthenticated != true ||
             (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
-             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+             && !PrivateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
         {
             return Task.FromResult<IActionResult>(Unauthorized(new { message = "Authentication required" }));
         }
@@ -287,10 +284,10 @@ public class WebAppFlowExecutionResponse
 {
     public bool Success { get; set; }
     public Guid FlowId { get; set; }
-    public string Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public int RunnerCount { get; set; }
     public DateTime ExecutedAt { get; set; }
-    public string Message { get; set; }
-    public Dictionary<string, string?> OutputVariables { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public Dictionary<string, string?> OutputVariables { get; set; } = new();
     public List<string>? Logs { get; set; }
 }

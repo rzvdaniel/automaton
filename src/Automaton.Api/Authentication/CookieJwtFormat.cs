@@ -20,19 +20,21 @@ public class CookieJwtFormat : ISecureDataFormat<AuthenticationTicket>
         throw new System.NotImplementedException();
     }
 
-    public string Protect(AuthenticationTicket data, string purpose)
+    public string Protect(AuthenticationTicket data, string? purpose)
     {
         throw new System.NotImplementedException();
     }
 
-    public AuthenticationTicket Unprotect(string protectedText)
+    public AuthenticationTicket? Unprotect(string? protectedText)
     {
         return Unprotect(protectedText, null);
     }
 
-    public AuthenticationTicket Unprotect(string protectedText, string purpose)
+    public AuthenticationTicket? Unprotect(string? protectedText, string? purpose)
     {
-        var principal = _jwtService.ValidateToken(protectedText, _validationParameters);
+        var principal = string.IsNullOrWhiteSpace(protectedText)
+            ? null
+            : _jwtService.ValidateToken(protectedText, _validationParameters);
         if (principal == null)
         {
             return null;

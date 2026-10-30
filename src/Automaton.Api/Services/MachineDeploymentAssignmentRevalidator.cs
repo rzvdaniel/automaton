@@ -18,11 +18,7 @@ internal sealed class MachineDeploymentAssignmentRevalidator(
         RunnerFileTransferCommand request,
         CancellationToken token)
     {
-        var runner = await db.Runners.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == runnerId && item.ApiKeyId == apiKeyId, token);
-        if (runner is null || runner.Purpose != RunnerPurposes.Managed
-            || !RunnerApplicationProfiles.TryNormalize(runner.ApplicationProfile, out var profile)
-            || profile != RunnerApplicationProfiles.MachineManagement)
+        if (!await IsMachineManagementRunnerAsync(apiKeyId, runnerId, token))
             return null;
 
         if (!TryReadBinding(request, out var binding))
@@ -42,6 +38,16 @@ internal sealed class MachineDeploymentAssignmentRevalidator(
         if (!await IsWorkspaceAssignedAsync(request.AppId, runnerId, actorId, token))
             return Failure("workspace_assignment_missing", "The workspace is no longer assigned to this Machine Management Runner.");
         return null;
+    }
+
+    private async Task<bool> IsMachineManagementRunnerAsync(Guid apiKeyId, Guid runnerId, CancellationToken token)
+    {
+        var runner = await db.Runners.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == runnerId && item.ApiKeyId == apiKeyId, token);
+        return runner is not null
+            && runner.Purpose == RunnerPurposes.Managed
+            && RunnerApplicationProfiles.TryNormalize(runner.ApplicationProfile, out var profile)
+            && profile == RunnerApplicationProfiles.MachineManagement;
     }
 
     private static bool TryReadBinding(RunnerFileTransferCommand request, out DeploymentBinding binding)

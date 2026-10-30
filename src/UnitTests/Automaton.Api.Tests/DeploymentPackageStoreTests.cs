@@ -31,6 +31,7 @@ public sealed class DeploymentPackageStoreTests
         {
             Directory.Delete(root, recursive: true);
         }
+
     }
 
     [Test]
@@ -56,7 +57,7 @@ public sealed class DeploymentPackageStoreTests
     }
 
     [Test]
-    public async Task StoreAsync_UsesStagingAndRemovesPartialFileAfterCopyFailure()
+    public void StoreAsync_UsesStagingAndRemovesPartialFileAfterCopyFailure()
     {
         var root = CreateRoot();
         var directory = Path.Combine(root, "AppData", "deployment-operations");

@@ -158,9 +158,9 @@ public abstract class AiConversationControllerBase : BaseController
                 isSystemKey,
                 preparation.ConversationToken);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException exception)
         {
-            _logger.LogDebug("AI conversation stream cancelled");
+            _logger.LogDebug(exception, "AI conversation stream cancelled");
 
             // Client cancelled/closed stream — still persist consumed token usage.
             await _historyPersistenceService.FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);

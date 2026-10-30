@@ -40,7 +40,7 @@ public sealed class AppPublicationService(
         string marketplacePreviewMode = MarketplacePreviewModes.Launchable,
         CancellationToken cancellationToken = default)
     {
-        if (!await authorizationService.CanUpdateAppAsync(id))
+        if (!await authorizationService.CanUpdateAppAsync(id, cancellationToken))
             throw new UnauthorizedAccessException($"You do not have permission to publish app {id}");
 
         var entity = await dataContext.WebApps
@@ -57,7 +57,7 @@ public sealed class AppPublicationService(
             throw new InvalidOperationException("This URL is already taken");
 
         if (executionRunnerId.HasValue)
-            await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
+            await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId, cancellationToken);
 
         var isMachineStaticPublication = machineStaticPublication is not null
             && await machineStaticPublication.PublishIfAssignedAsync(entity, runtimeVisibility, UserId, cancellationToken);
@@ -79,12 +79,12 @@ public sealed class AppPublicationService(
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync(cancellationToken);
-        await RecordPublishedAppAsync(entity, id, ownerId, publicUrl, requiresAuthentication, isForkable);
+        await RecordPublishedAppAsync(entity, id, ownerId, publicUrl, requiresAuthentication, isForkable, cancellationToken);
     }
 
     public async Task Unpublish(Guid id, CancellationToken cancellationToken = default)
     {
-        if (!await authorizationService.CanUpdateAppAsync(id))
+        if (!await authorizationService.CanUpdateAppAsync(id, cancellationToken))
             throw new UnauthorizedAccessException($"You do not have permission to unpublish app {id}");
 
         var entity = await dataContext.WebApps
@@ -100,7 +100,7 @@ public sealed class AppPublicationService(
         entity.Updated = DateTime.UtcNow;
         // Keep PublicUrl for re-publishing with the same slug.
         await dataContext.SaveChangesAsync(cancellationToken);
-        await RecordUnpublishedAppAsync(entity, id);
+        await RecordUnpublishedAppAsync(entity, id, cancellationToken);
         if (machineStaticPublication is not null)
             await machineStaticPublication.QueueRemovalIfAssignedAsync(id, UserId, cancellationToken);
     }
@@ -128,7 +128,7 @@ public sealed class AppPublicationService(
         if (!await authorizationService.CanUpdateAppAsync(id))
             throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
 
-        var entity = dataContext.WebApps.SingleOrDefault(app => app.Id == id);
+        var entity = await dataContext.WebApps.SingleOrDefaultAsync(app => app.Id == id);
         if (entity == null)
             throw new InvalidOperationException($"App {id} not found");
 
@@ -162,7 +162,8 @@ public sealed class AppPublicationService(
         Guid ownerId,
         string publicUrl,
         bool requiresAuthentication,
-        bool isForkable)
+        bool isForkable,
+        CancellationToken cancellationToken)
     {
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -182,7 +183,7 @@ public sealed class AppPublicationService(
                 IsForkable = isForkable,
                 OwnerUserId = ownerId
             }
-        });
+        }, cancellationToken);
 
         await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
         {
@@ -200,13 +201,13 @@ public sealed class AppPublicationService(
                 RunnerId = GetDefaultRunnerId(entity),
                 IsForkable = isForkable
             }
-        });
+        }, cancellationToken);
 
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, appId);
-        await backendRouteConfigService.RefreshAsync();
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, appId, cancellationToken);
+        await backendRouteConfigService.RefreshAsync(cancellationToken);
     }
 
-    private async Task RecordUnpublishedAppAsync(WebApp entity, Guid appId)
+    private async Task RecordUnpublishedAppAsync(WebApp entity, Guid appId, CancellationToken cancellationToken)
     {
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -218,7 +219,7 @@ public sealed class AppPublicationService(
             Outcome = AuditOutcomes.Success,
             ActorUserId = UserId,
             Metadata = new { entity.PublicUrl, entity.Version }
-        });
+        }, cancellationToken);
 
         await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
         {
@@ -229,10 +230,10 @@ public sealed class AppPublicationService(
             Message = "Application unpublished.",
             ActorUserId = UserId,
             Metadata = new { entity.PublicUrl, entity.Version }
-        });
+        }, cancellationToken);
 
-        await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, appId);
-        await backendRouteConfigService.RefreshAsync();
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, appId, cancellationToken);
+        await backendRouteConfigService.RefreshAsync(cancellationToken);
     }
 
     private Guid? ResolveAppOwnerId(WebApp appEntity)

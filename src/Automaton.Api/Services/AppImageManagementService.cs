@@ -205,11 +205,11 @@ public sealed class AppImageManagementService(
         return true;
     }
 
-    private async Task DeleteExistingImagesAsync(string directory)
+    private Task DeleteExistingImagesAsync(string directory)
     {
         try
         {
-            if (!Directory.Exists(directory)) return;
+            if (!Directory.Exists(directory)) return Task.CompletedTask;
             foreach (var file in new DirectoryInfo(directory).GetFiles("*.*", SearchOption.TopDirectoryOnly))
             {
                 try
@@ -227,6 +227,8 @@ public sealed class AppImageManagementService(
         {
             logger.LogError(exception, "Error cleaning up old thumbnails in {Directory}", directory);
         }
+
+        return Task.CompletedTask;
     }
 
     private string GetAppMediaDirectory(Guid appId, string mediaFolder = "app-thumbnails")

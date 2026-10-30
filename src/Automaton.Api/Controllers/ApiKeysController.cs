@@ -153,7 +153,7 @@ public class ApiKeysController : BaseController
         {
             IsValid = true,
             UserId = userId,
-            UserName = user.UserName ?? user.Email,
+            UserName = user.UserName ?? user.Email ?? userId.ToString(),
             Scope = apiKeyEntity.Scope,
             KeyPrefix = apiKeyEntity.KeyPrefix
         });

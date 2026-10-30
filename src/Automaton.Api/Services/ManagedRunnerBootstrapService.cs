@@ -58,7 +58,7 @@ public sealed class ManagedRunnerBootstrapService
         return GetRunnerPresenceResult(assignedRunner);
     }
 
-    private ManagedRunnerBootstrapResult GetRunnerPresenceResult(Runner runner)
+    private static ManagedRunnerBootstrapResult GetRunnerPresenceResult(Runner runner)
         => RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow)
             ? ManagedRunnerBootstrapResult.Ready(runner.Id)
             : ManagedRunnerBootstrapResult.Unavailable("The assigned Runner is offline.");

@@ -50,8 +50,8 @@ public class ScheduleService
                 Name = schedule.Name,
                 Cron = scheduleHash["Cron"],
                 CreatedAt = DateTime.Parse(scheduleHash["CreatedAt"]),
-                RunnerIds = JsonSerializer.Deserialize<IEnumerable<Guid>>(schedule.RunnerIds),
-                CronRecurrence = JsonSerializer.Deserialize<CronRecurrence>(schedule.CronRecurrence)
+                RunnerIds = JsonSerializer.Deserialize<IEnumerable<Guid>>(schedule.RunnerIds) ?? Array.Empty<Guid>(),
+                CronRecurrence = JsonSerializer.Deserialize<CronRecurrence>(schedule.CronRecurrence) ?? new CronRecurrence()
             };
 
             scheduleModels.Add(scheduleModel);     
@@ -63,7 +63,8 @@ public class ScheduleService
     public async Task<ScheduleModel> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var schedule = await dbContext.Schedules
-            .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId), cancellationToken: cancellationToken);
+            .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId), cancellationToken: cancellationToken)
+            ?? throw new KeyNotFoundException("Schedule not found.");
 
         using var connection = JobStorage.Current.GetConnection();
 
@@ -75,8 +76,8 @@ public class ScheduleService
             FlowId = schedule.FlowId,
             Cron = scheduleHash["Cron"],
             CreatedAt = DateTime.Parse(scheduleHash["CreatedAt"]),
-            RunnerIds = JsonSerializer.Deserialize<IEnumerable<Guid>>(schedule.RunnerIds),
-            CronRecurrence = JsonSerializer.Deserialize<CronRecurrence>(schedule.CronRecurrence)
+            RunnerIds = JsonSerializer.Deserialize<IEnumerable<Guid>>(schedule.RunnerIds) ?? Array.Empty<Guid>(),
+            CronRecurrence = JsonSerializer.Deserialize<CronRecurrence>(schedule.CronRecurrence) ?? new CronRecurrence()
         };        
 
         return scheduleModel;
@@ -114,9 +115,10 @@ public class ScheduleService
 
     public async Task UpdateAsync(Guid id, ScheduleModel scheduleModel, CancellationToken cancellationToken)
     {
-        var schedule = dbContext.Schedules
+        var schedule = await dbContext.Schedules
             .Include(x => x.ScheduleUsers)
-            .SingleOrDefault(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId));
+            .SingleOrDefaultAsync(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId), cancellationToken)
+            ?? throw new KeyNotFoundException("Schedule not found.");
 
         schedule.Name = scheduleModel.Name;
         schedule.CronRecurrence = JsonSerializer.Serialize(scheduleModel.CronRecurrence);
@@ -135,7 +137,8 @@ public class ScheduleService
 
     public void Remove(Guid id)
     {
-        var schedule = dbContext.Schedules.SingleOrDefault(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId));
+        var schedule = dbContext.Schedules.SingleOrDefault(x => x.Id == id && x.ScheduleUsers.Any(x => x.UserId == userId))
+            ?? throw new KeyNotFoundException("Schedule not found.");
 
         dbContext.Schedules.Remove(schedule);
 

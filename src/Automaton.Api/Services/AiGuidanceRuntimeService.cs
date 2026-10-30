@@ -174,14 +174,13 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         HashSet<string> seedKeys,
         DateTime now)
     {
-        var changed = 0;
-        foreach (var source in _embeddedGuidanceProvider.GetSeedSources())
-        {
-            if (SynchronizeSeedSource(source.RelativePath, source.Content, existingDocuments, seedKeys, now))
-                changed++;
-        }
-
-        return changed;
+        return _embeddedGuidanceProvider.GetSeedSources()
+            .Count(source => SynchronizeSeedSource(
+                source.RelativePath,
+                source.Content,
+                existingDocuments,
+                seedKeys,
+                now));
     }
 
     private bool SynchronizeSeedSource(

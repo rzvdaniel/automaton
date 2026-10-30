@@ -97,6 +97,7 @@ public class EmailRateLimitFilter : IAsyncActionFilter
     }
 }
 
+[AttributeUsage(AttributeTargets.Method)]
 public sealed class EmailRateLimitAttribute : TypeFilterAttribute
 {
     public EmailRateLimitAttribute(string keyPrefix, int permitLimit, int windowSeconds)

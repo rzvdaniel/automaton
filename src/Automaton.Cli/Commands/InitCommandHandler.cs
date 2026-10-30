@@ -22,7 +22,13 @@ internal static class InitCommandHandler
     private static async Task LinkExistingAppAsync(
         ConfigService config, string cwd, string appId, string? server, string? apiKey, bool asJson)
     {
-        if (!asJson && string.IsNullOrWhiteSpace(appId)) appId = PromptForAppId();
+        if (!asJson && string.IsNullOrWhiteSpace(appId)) appId = PromptForAppId() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(appId))
+        {
+            WriteFailure("Init failed", [], ["Pass an app ID or answer the app ID prompt"]);
+            Environment.ExitCode = 1;
+            return;
+        }
         var result = await new LinkAppService(config).LinkAsync(cwd, appId, server, apiKey);
         if (asJson)
         {

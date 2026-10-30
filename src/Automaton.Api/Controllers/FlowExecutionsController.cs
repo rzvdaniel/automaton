@@ -82,7 +82,7 @@ public class FlowExecutionsController : BaseController
             logger?.LogDebug("Received flow execution save request for {ExecutionId} of flow {FlowId} with {LogCount} logs", 
                 flowExecution.Id, flowExecution.FlowId, flowExecution.Logs?.Count ?? 0);
 
-            var result = await Task.Run(() => flowExecutionService.Add(flowExecution), cancellationToken);
+            await Task.Run(() => flowExecutionService.Add(flowExecution), cancellationToken);
             
             logger?.LogDebug("Successfully saved flow execution {ExecutionId}", flowExecution.Id);
             return Ok(new { Success = true, Message = "Flow execution saved successfully", ExecutionId = flowExecution.Id });

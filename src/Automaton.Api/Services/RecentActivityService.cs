@@ -8,7 +8,6 @@ namespace Automaton.Api.Services
     public class RecentActivityService
     {
         private readonly ApplicationDbContext dbContext;
-        private readonly UserContextService userContextService;
         private readonly Serilog.ILogger logger;
         private readonly Guid userId;
 
@@ -17,7 +16,6 @@ namespace Automaton.Api.Services
             UserContextService userContextService)
         {
             this.dbContext = dbContext;
-            this.userContextService = userContextService;
             this.logger = Log.ForContext<RecentActivityService>();
             this.userId = userContextService.GetUserId();
         }
@@ -46,7 +44,7 @@ namespace Automaton.Api.Services
             ActivityType activityType,
             string entityName,
             Guid? entityId = null,
-            string description = null,
+            string? description = null,
             CancellationToken cancellationToken = default)
         {
             try
@@ -114,7 +112,7 @@ namespace Automaton.Api.Services
             };
         }
 
-        private string GenerateDescription(ActivityType activityType, string entityName)
+        private static string GenerateDescription(ActivityType activityType, string entityName)
         {
             return activityType switch
             {

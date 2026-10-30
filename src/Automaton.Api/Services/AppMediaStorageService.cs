@@ -133,9 +133,9 @@ public sealed class AppMediaStorageService
             await response.Body.FlushAsync(token);
             return StatusCodes.Status200OK;
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException exception)
         {
-            logger.LogWarning("Runner media result artifact was missing for operation {OperationId}.", operationId);
+            logger.LogWarning(exception, "Runner media result artifact was missing for operation {OperationId}.", operationId);
             return StatusCodes.Status502BadGateway;
         }
     }

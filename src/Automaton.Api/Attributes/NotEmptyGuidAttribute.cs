@@ -6,6 +6,7 @@ namespace Automaton.Api.Attributes
     /// <summary>
     /// Validates Guid value for Guid.Empty
     /// </summary>
+    [AttributeUsage(AttributeTargets.Parameter)]
     public class NotEmptyGuidAttribute : ValidationAttribute
     {
         public NotEmptyGuidAttribute()
@@ -34,7 +35,7 @@ namespace Automaton.Api.Attributes
         /// <param name="value">Guid value to be validated</param>
         /// <param name="validationContext">Current validation context</param>
         /// <returns>True if value is not Guid.Empty, otherwise False</returns>
-        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             if (
                 (value is Guid && (Guid)value != Guid.Empty) ||

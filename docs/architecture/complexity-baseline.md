@@ -1,6 +1,6 @@
 # Complexity and coupling cleanup backlog
 
-The Sonar and .NET analyzers run during normal C# builds. `CA1502` (cyclomatic complexity), `CA1506` (coupling), and `S3776` (cognitive complexity) are errors. The error diagnostics are the source of truth for developers and coding agents; no external service or checked-in exception baseline is used.
+The inventory below is historical and includes findings from the now-removed Sonar analyzer. Current C# builds use the .NET analyzers; `CA1502` (cyclomatic complexity) is configured as an error. `S3776` and `CA1506` are no longer build analyzers.
 
 ## Initial inventory
 

@@ -1,4 +1,4 @@
-﻿#nullable disable
+﻿#nullable enable
 
 using Automaton;
 using Automaton.Core.Enums;
@@ -11,14 +11,14 @@ public class Runner
     [Required]
     public Guid Id { get; set; }
     [Required]
-    public string Name { get; set; }
-    public string ConnectionId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? ConnectionId { get; set; }
     public DateTime? LastHeartbeatAtUtc { get; set; }
     public DateTime? LastConnectedAtUtc { get; set; }
     public DateTime? LastDisconnectedAtUtc { get; set; }
     [ConcurrencyCheck]
     public DateTime? DeletionRequestedAtUtc { get; set; }
-    public string Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public string? Version { get; set; }
     public string? MachineName { get; set; }
     public string? IpAddress { get; set; }
@@ -71,7 +71,7 @@ public class Runner
     /// </summary>
     public string? ScriptEngineSettings { get; set; }
 
-    public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; }
+    public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; } = Array.Empty<RunnerUser>();
 
     // Project linking
     public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();

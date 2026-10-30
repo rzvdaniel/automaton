@@ -18,7 +18,7 @@ public sealed class UserHardDeleteService(
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
         }
 
         var auditMetadata = new

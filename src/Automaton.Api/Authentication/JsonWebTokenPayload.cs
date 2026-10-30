@@ -4,13 +4,13 @@ namespace Automaton.Api.Authentication
 {
     public class JsonWebTokenPayload
     {
-        public string UserName { get; set; }
-        public string UserId { get; set; }
+        public string? UserName { get; set; }
+        public string UserId { get; set; } = string.Empty;
         
-        public IReadOnlyList<string> Roles { get; set; }
+        public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
         public long Expires { get; set; }
         
-        public string Audience { get; set; }
-        public IDictionary<string, string> Claims { get; set; }
+        public string Audience { get; set; } = string.Empty;
+        public IDictionary<string, string> Claims { get; set; } = new Dictionary<string, string>();
     }
 }

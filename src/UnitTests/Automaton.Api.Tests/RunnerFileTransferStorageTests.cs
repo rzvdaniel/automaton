@@ -133,7 +133,7 @@ public sealed class RunnerFileTransferStorageTests
 
         public async Task MarkCompletedAsync()
         {
-            var operation = await db.RunnerExecutionOperations.SingleAsync(item => item.Id == operationId);
+            var operation = await db.RunnerExecutionOperations.SingleAsync(item => item.Id == OperationId);
             operation.CompletedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
         }

@@ -106,11 +106,11 @@ public sealed class AppMutationService(
             throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
         }
 
-        var entity = dataContext.WebApps
+        var entity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
             .Include(x => x.WebAppScreenshots)
             .Include(x => x.DeploymentTargets)
-            .SingleOrDefault(x => x.Id == id);
+            .SingleOrDefaultAsync(x => x.Id == id);
 
         if (entity == null)
         {
@@ -211,16 +211,15 @@ public sealed class AppMutationService(
             throw new UnauthorizedAccessException($"You do not have permission to delete app {id}");
         }
 
-        var app = dataContext.WebApps
+        var app = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
-            .SingleOrDefault(x => x.Id == id);
+            .SingleOrDefaultAsync(x => x.Id == id);
 
         if (app == null)
         {
             throw new InvalidOperationException($"App {id} not found");
         }
 
-        var appName = app.Name;
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
         await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted, abandonOfflineRuntimes);

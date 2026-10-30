@@ -28,7 +28,7 @@ internal static class RunnerFileTransferTargetAmbiguityScenario
     public static async Task<bool> RunAsync()
     {
         await using var fixture = await CreateFixtureAsync();
-        await QueueUntargetedMediaTransferAsync(fixture);
+        QueueUntargetedMediaTransferAsync(fixture);
         return await fixture.Db.RunnerExecutionOperations.AnyAsync(
             item => item.Id == fixture.OperationId && item.CompletedAtUtc == null);
     }
@@ -74,7 +74,7 @@ internal static class RunnerFileTransferTargetAmbiguityScenario
         return new Fixture(db, runnerId, userId, appId, Guid.NewGuid());
     }
 
-    private static async Task QueueUntargetedMediaTransferAsync(Fixture fixture)
+    private static void QueueUntargetedMediaTransferAsync(Fixture fixture)
     {
         Assert.CatchAsync<OperationCanceledException>(() => CreateGateway(fixture).ExecuteAsync(
             fixture.OperationId,

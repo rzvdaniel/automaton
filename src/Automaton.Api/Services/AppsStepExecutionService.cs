@@ -16,7 +16,6 @@ public class AppsStepExecutionService
     private readonly ApplicationDbContext dataContext;
     private readonly UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory;
     private readonly RunnerExecutionDispatchService dispatch;
-    private readonly Serilog.ILogger logger;
 
     public AppsStepExecutionService(
         ApplicationDbContext dataContext,
@@ -26,7 +25,6 @@ public class AppsStepExecutionService
         this.dataContext = dataContext;
         this.customStepsServiceFactory = customStepsServiceFactory;
         this.dispatch = dispatch;
-        this.logger = Serilog.Log.ForContext<AppsStepExecutionService>();
     }
 
     /// <summary>
@@ -131,7 +129,7 @@ public class AppsStepExecutionService
     {
         var testRunId = !string.IsNullOrWhiteSpace(bodyTestRunId)
             ? bodyTestRunId.Trim()
-            : string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
+            : headerTestRunId?.Trim();
 
         if (!string.IsNullOrWhiteSpace(testRunId))
         {
@@ -164,7 +162,7 @@ public class AppsStepExecutionService
     /// at runtime - they always use the decrypted values from the step definition.
     /// Only non-sensitive variables can be overridden by the caller.
     /// </summary>
-    private void ApplyRuntimeInputs(Models.CustomStep step, Dictionary<string, string> inputs)
+    private static void ApplyRuntimeInputs(Models.CustomStep step, Dictionary<string, string> inputs)
     {
         if (step.Definition?.CodeInputVariables == null || inputs == null || inputs.Count == 0)
         {
@@ -181,7 +179,9 @@ public class AppsStepExecutionService
             }
 
             // For non-sensitive variables, apply the runtime override if provided
-            if (inputs.TryGetValue(inputVar.Name, out var runtimeValue))
+            var inputName = inputVar.Name
+                ?? throw new InvalidOperationException("Custom step input variables require a name.");
+            if (inputs.TryGetValue(inputName, out var runtimeValue))
             {
                 inputVar.Value = runtimeValue;
             }
@@ -285,7 +285,7 @@ public class AppsStepExecutionService
     /// <summary>
     /// Aggregate output variables from multiple runner results
     /// </summary>
-    private Dictionary<string, string> AggregateOutputVariables(List<RunnerCustomStepResult> results)
+    private static Dictionary<string, string> AggregateOutputVariables(List<RunnerCustomStepResult> results)
     {
         var output = new Dictionary<string, string>();
 

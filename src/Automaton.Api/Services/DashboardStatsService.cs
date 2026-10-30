@@ -106,7 +106,7 @@ namespace Automaton.Api.Services
 
             var today = DateTime.UtcNow.Date;
             var thisWeekStart = today.AddDays(-(int)today.DayOfWeek);
-            var thisMonthStart = new DateTime(today.Year, today.Month, 1);
+            var thisMonthStart = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var executionsToday = await CountExecutionsSinceAsync(today, cancellationToken);
             var executionsThisWeek = await CountExecutionsSinceAsync(thisWeekStart, cancellationToken);
             var executionsThisMonth = await CountExecutionsSinceAsync(thisMonthStart, cancellationToken);
@@ -154,7 +154,7 @@ namespace Automaton.Api.Services
                     FlowId = flowGroup.Key.FlowId,
                     FlowName = flowGroup.Key.Name,
                     ExecutionCount = flowGroup.Count(),
-                    SuccessRate = flowGroup.Count() > 0
+                    SuccessRate = flowGroup.Any()
                         ? (double)flowGroup.Count(execution => execution.Status == WorkflowStatus.Success.ToString()) / flowGroup.Count() * 100
                         : 0,
                     LastExecuted = flowGroup.Max(execution => execution.Started)

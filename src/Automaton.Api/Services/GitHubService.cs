@@ -1,4 +1,4 @@
-using Octokit;
+﻿using Octokit;
 
 namespace Automaton.Api.Services;
 
@@ -56,7 +56,7 @@ public class GitHubService
 
         try
         {
-            var repo = await client.Repository.Create(newRepo);
+            await client.Repository.Create(newRepo);
             logger.Debug("Created GitHub repository: {Owner}/{Repo}", user.Login, repoName);
             return $"{user.Login}/{repoName}";
         }

@@ -203,8 +203,10 @@ public class ExternalMcpController : ControllerBase
         return null;
     }
 
-    private async Task<object> HandleToolCall(JsonElement req, Guid userId, CancellationToken ct)
+    private async Task<object> HandleToolCall(JsonElement req, Guid userId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (!req.TryGetProperty("params", out var p))
             throw new ArgumentException("Missing 'params' in tools/call request");
 
