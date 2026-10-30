@@ -67,10 +67,17 @@ public abstract class WorkflowStep
 
     public virtual WorkflowStep? GetNextStep()
     {
-        return NextStepId != null && WorkflowDefinition != null
-            && WorkflowDefinition.Steps.TryGetValue(NextStepId, out var nextStep)
-                ? nextStep
-                : null;
+        if (NextStepId == null)
+            return null;
+
+        if (WorkflowDefinition == null)
+            throw new InvalidOperationException($"Workflow step '{Id}' is not attached to a workflow definition.");
+
+        if (!WorkflowDefinition.Steps.TryGetValue(NextStepId, out var nextStep))
+            throw new InvalidOperationException(
+                $"Workflow step '{Id}' references missing next step '{NextStepId}' in definition '{WorkflowDefinition.Id}'.");
+
+        return nextStep;
     }
 
     protected StepVariable? GetInputVariable(string name)
@@ -92,15 +99,14 @@ public abstract class WorkflowStep
         {
             if (string.IsNullOrEmpty(input.Value.Name))
             {
-                logger.Warning("Ignoring workflow input with no name for {StepType}", stepType.Name);
-                continue;
+                throw new InvalidOperationException($"Workflow step '{Id}' has an input with no name.");
             }
 
             var stepProperty = stepType.GetProperty(input.Value.Name);
             if (stepProperty == null)
             {
-                logger.Warning("Ignoring workflow input {InputName} because {StepType} has no matching property", input.Value.Name, stepType.Name);
-                continue;
+                throw new InvalidOperationException(
+                    $"Workflow input '{input.Value.Name}' does not match a property on step type '{stepType.Name}'.");
             }
             var variable = input.Value;
             var value = ResolveInputValue(variable, stepProperty, context);

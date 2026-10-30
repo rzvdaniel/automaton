@@ -74,10 +74,12 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
         var result = new ScriptExecutionResult
         {
             OutputVariables = variables
-                .Where(kvp => kvp.Key != "error" && kvp.Key != "output")
+                .Where(kvp => kvp.Key != "error")
                 .ToDictionary(
                     kvp => kvp.Key,
-                    kvp => JsonConvert.SerializeObject(kvp.Value)),  // ← JSON serialize
+                    kvp => kvp.Key == "output"
+                        ? kvp.Value?.ToString() ?? string.Empty
+                        : JsonConvert.SerializeObject(kvp.Value)),
             StandardOutput = variables.ContainsKey("output") ? variables["output"]?.ToString() ?? string.Empty : string.Empty
         };
 
