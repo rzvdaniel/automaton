@@ -23,15 +23,12 @@ namespace Automaton.Api.Authentication
             _jwtOptions = jwtOptions;
         }
 
-        public async Task<bool> CurrentAccessTokenIsActive()
-            => await CurrentAccessTokenIsActive(await GetCurrentAccessTokenAsync());
-
-        public async Task DeactivateCurrentAccessTokenAsync()
-            => await DeactivateAccessTokenAsync(await GetCurrentAccessTokenAsync());
-
         //If there is any value for this token is cache this token will revoked - we store cancled token in redis cache if not exist token in our black list tokens in redis token is active
         public async Task<bool> CurrentAccessTokenIsActive(string token)
             => string.IsNullOrWhiteSpace(await _redisCache.GetStringAsync(GetKey(token)));
+
+        public async Task<bool> CurrentAccessTokenIsActive()
+            => await CurrentAccessTokenIsActive(await GetCurrentAccessTokenAsync());
 
         //We only store deactivated access token in centralized redis
         public async Task DeactivateAccessTokenAsync(string token)
@@ -41,6 +38,9 @@ namespace Automaton.Api.Authentication
                 AbsoluteExpirationRelativeToNow = _jwtOptions.ValidFor
             });
         }
+
+        public async Task DeactivateCurrentAccessTokenAsync()
+            => await DeactivateAccessTokenAsync(await GetCurrentAccessTokenAsync());
 
         private async Task<string> GetCurrentAccessTokenAsync()
         {

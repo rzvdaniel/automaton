@@ -173,8 +173,9 @@ public sealed class DeploymentOperationService(
             {
                 await leaseTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (leaseCancellation.IsCancellationRequested)
             {
+                logger.LogDebug("Deployment execution lease renewal cancelled for operation {OperationId}", operationId);
             }
             catch (Exception exception)
             {

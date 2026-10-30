@@ -6,6 +6,8 @@ public sealed class RefreshTokenCookieService
 {
     public const string CookieName = "automaton_refresh_token";
 
+    private RefreshTokenCookieService() { }
+
     public static string? GetRefreshToken(HttpContext httpContext)
     {
         return httpContext.Request.Cookies.TryGetValue(CookieName, out var token) ? token : null;

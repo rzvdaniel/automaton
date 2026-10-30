@@ -12,7 +12,10 @@ public sealed class ManagedRuntimeRouteReconciliationService(
             await scope.ServiceProvider.GetRequiredService<BackendRouteConfigService>()
                 .RefreshAsync(stoppingToken);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Managed runtime route reconciliation cancelled during API shutdown");
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Managed runtime route reconciliation failed during API startup");

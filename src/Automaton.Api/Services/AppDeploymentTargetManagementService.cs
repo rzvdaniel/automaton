@@ -166,9 +166,6 @@ public sealed partial class AppDeploymentTargetManagementService(
             {
                 runner = await runnerAuthorizationPolicy.AuthorizeAsync(
                     app, request.RunnerId.Value, userId, cancellationToken);
-                if (target.ExecutionRunnerId != runner.Id)
-                {
-                }
             }
             if (target.ExecutionRunnerId == runner?.Id)
             {

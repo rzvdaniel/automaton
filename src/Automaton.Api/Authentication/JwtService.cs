@@ -123,7 +123,7 @@ namespace Automaton.Api.Authentication
                     _jwtSecurityTokenHandler.ValidateToken(token,
                         tokenValidationParameters ?? _tokenValidationParameters, out var securityToken);
 
-                if (principal == null || !(securityToken is JwtSecurityToken jwt))
+                if (principal == null || securityToken is not JwtSecurityToken)
                 {
                     throw new SecurityTokenException("Invalid token");
                 }

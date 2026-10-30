@@ -1,6 +1,6 @@
 ﻿namespace Automaton.Api.Enums;
 
-public class UserRole
+public static class UserRole
 {
     public const string SystemAdministrator = "SysAdmin";
     public const string Administrator = "Admin";
