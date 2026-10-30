@@ -14,7 +14,7 @@ internal static class RunnerRuntimeProcessManagerRecoveryScenarios
         var scenario = await CreatePersistedCandidateScenarioAsync();
         using var manager = CreateManager(scenario.Workspace, scenario.Registry);
         await manager.StartAsync(CancellationToken.None);
-        await AssertPersistedCandidateWasFencedAsync(scenario);
+        AssertPersistedCandidateWasFenced(scenario);
         await manager.StopAsync(scenario.AppId, scenario.TargetId);
     }
 
@@ -23,7 +23,7 @@ internal static class RunnerRuntimeProcessManagerRecoveryScenarios
         var scenario = await CreateFirstDeploymentCandidateScenarioAsync();
         using var manager = CreateManager(scenario.Workspace, scenario.Registry);
         await manager.StartAsync(CancellationToken.None);
-        await AssertFirstDeploymentCandidateWasRebuiltAsync(scenario);
+        AssertFirstDeploymentCandidateWasRebuilt(scenario);
         await manager.StopAsync(scenario.AppId, scenario.TargetId);
     }
 
@@ -138,7 +138,7 @@ internal static class RunnerRuntimeProcessManagerRecoveryScenarios
         return path;
     }
 
-    private static async Task AssertPersistedCandidateWasFencedAsync(RecoveryScenario scenario)
+    private static void AssertPersistedCandidateWasFenced(RecoveryScenario scenario)
     {
         var recovered = ReadMetadata(scenario.MetadataPath);
         Assert.Multiple(() =>
@@ -154,7 +154,7 @@ internal static class RunnerRuntimeProcessManagerRecoveryScenarios
         });
     }
 
-    private static async Task AssertFirstDeploymentCandidateWasRebuiltAsync(RecoveryScenario scenario)
+    private static void AssertFirstDeploymentCandidateWasRebuilt(RecoveryScenario scenario)
     {
         var recovered = ReadMetadata(scenario.MetadataPath);
         Assert.Multiple(() =>

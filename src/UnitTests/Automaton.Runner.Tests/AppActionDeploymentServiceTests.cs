@@ -70,7 +70,7 @@ public class AppActionDeploymentServiceTests
     }
 
     [Test]
-    public async Task MachineManagementRejectsPythonDependencyPreparationBeforeCreatingEnvironment()
+    public void MachineManagementRejectsPythonDependencyPreparationBeforeCreatingEnvironment()
     {
         var previousProfile = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE");
         var appId = Guid.NewGuid();

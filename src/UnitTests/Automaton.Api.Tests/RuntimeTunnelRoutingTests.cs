@@ -17,7 +17,7 @@ public sealed class RuntimeTunnelRoutingTests
     {
         var route = (RouteAttribute?)typeof(RuntimeTunnelController)
             .GetCustomAttributes(typeof(RouteAttribute), inherit: true)
-            .Single();
+            .Single() ?? throw new InvalidOperationException("The runtime tunnel controller must define a route.");
         var publishedCatchAllOrder = -10;
 
         Assert.That(route.Order, Is.LessThan(publishedCatchAllOrder));

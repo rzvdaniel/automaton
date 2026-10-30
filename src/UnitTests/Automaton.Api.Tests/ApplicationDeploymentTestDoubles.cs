@@ -666,14 +666,14 @@ internal sealed class PackageTransferGateway(
         if (invocationDelay is { } delay) await Task.Delay(delay, CancellationToken.None);
         var deployment = new RunnerFileTransferResult
         {
-            Success = runnerResult.Success,
-            Error = runnerResult.Message,
-            Deployment = runnerResult
+            Success = RunnerResult.Success,
+            Error = RunnerResult.Message,
+            Deployment = RunnerResult
         };
         return (operationId, new RunnerExecutionResult
         {
-            Outcome = runnerResult.Success ? "Succeeded" : "Failed",
-            Error = runnerResult.Success ? null : runnerResult.Message,
+            Outcome = RunnerResult.Success ? "Succeeded" : "Failed",
+            Error = RunnerResult.Success ? null : RunnerResult.Message,
             FileTransferResult = deployment
         });
     }

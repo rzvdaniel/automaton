@@ -38,8 +38,8 @@ public class InternalRuntimeController : ControllerBase
 
     [HttpGet("auth")]
     public async Task<IActionResult> AuthorizeRuntimeRequest(
-        [FromHeader(Name = RuntimeCookieConstants.AppIdHeader)] string[]? appIdHeaders,
-        [FromHeader(Name = RuntimeCookieConstants.ProxyAuthHeader)] string[]? proxyAuthHeaders,
+        [FromHeader(Name = RuntimeCookieConstants.AppIdHeader)] string?[]? appIdHeaders,
+        [FromHeader(Name = RuntimeCookieConstants.ProxyAuthHeader)] string?[]? proxyAuthHeaders,
         CancellationToken cancellationToken)
     {
         if (!IsAuthorizedProxyRequest(proxyAuthHeaders?.FirstOrDefault()))

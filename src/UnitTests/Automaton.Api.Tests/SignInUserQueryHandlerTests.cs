@@ -94,7 +94,7 @@ public class SignInUserQueryHandlerTests
                 [],
                 new UpperInvariantLookupNormalizer(),
                 new IdentityErrorDescriber(),
-                null,
+                new EmptyServiceProvider(),
                 NullLogger<UserManager<ApplicationUser>>.Instance)
         {
             this.user = user;

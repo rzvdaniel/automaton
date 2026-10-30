@@ -10,7 +10,7 @@ internal static class RunnerRuntimeProcessManagerFailedReplacementScenario
     public static async Task RunAsync()
     {
         var context = await StartOriginalRuntimeAsync();
-        await AssertReplacementFailsAsync(context);
+        AssertReplacementFails(context);
         RunnerRuntimeProcessManagerReplacementAssertions.AssertFailedReplacementWasRolledBack(
             context.MetadataPath,
             context.Registry,
@@ -39,7 +39,7 @@ internal static class RunnerRuntimeProcessManagerFailedReplacementScenario
         return new ScenarioContext(manager, registry, appId, targetId, metadataPath, original, originalRoute.Port);
     }
 
-    private static async Task AssertReplacementFailsAsync(ScenarioContext context)
+    private static void AssertReplacementFails(ScenarioContext context)
     {
         var replacement = CreateContract(["--startup-delay", "5000"]);
         replacement.Health.StartupTimeoutSeconds = 1;
