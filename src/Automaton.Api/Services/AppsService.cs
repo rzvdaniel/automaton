@@ -63,9 +63,9 @@ public class AppsService
         CancellationToken cancellationToken = default)
         => appQueryService.UpdateTagSettingsAsync(appId, tags, cancellationToken);
 
-    public AppModel Get(Guid id) => appQueryService.Get(id);
+    public AppModel? Get(Guid id) => appQueryService.Get(id);
 
-    public Task<PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<PublishedAppInfo?> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
         => appQueryService.GetPublishedAppInfoAsync(slug, cancellationToken);
 
     public Task<PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(
@@ -156,8 +156,6 @@ public class AppsService
 
     internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null, Guid? ownerId = null)
     {
-        if (entity == null) return null;
-
         return new Models.AppModel
         {
             Id = entity.Id,

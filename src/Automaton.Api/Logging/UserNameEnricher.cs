@@ -13,15 +13,13 @@ public class UserNameEnricher : ILogEventEnricher
 
     public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
-        if (!(_httpContextAccessor.HttpContext?.User.Identity.IsAuthenticated ?? false))
+        var identity = _httpContextAccessor.HttpContext?.User.Identity;
+        if (identity?.IsAuthenticated != true)
         {
             return;
         }
 
-        var user = _httpContextAccessor.HttpContext.User;
-        var userName = user.Identity.Name;
-
-        var userNameProperty = propertyFactory.CreateProperty("UserName", userName);
+        var userNameProperty = propertyFactory.CreateProperty("UserName", identity.Name);
         logEvent.AddOrUpdateProperty(userNameProperty);
     }
 }

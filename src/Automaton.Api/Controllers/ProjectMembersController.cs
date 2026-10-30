@@ -107,6 +107,10 @@ public class ProjectMembersController : BaseController
             }
 
             var member = await memberService.AddMemberAsync(projectId, request);
+            if (member is null)
+            {
+                return Forbid();
+            }
             
             return CreatedAtAction(
                 nameof(GetMember), 

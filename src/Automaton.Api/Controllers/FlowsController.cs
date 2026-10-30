@@ -41,6 +41,10 @@ public class FlowsController : BaseController
         var flowId = await flowsService.Create(flow);
 
         var newFlow = flowsService.Get(flowId);
+        if (newFlow is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newFlow.Id }, newFlow);
     }

@@ -134,19 +134,19 @@ public class PublishedAppStorageService
         return BuildPublicAppUrl(config.PublicBaseUrl, slug);
     }
 
-    public Task<byte[]?> ReadPublishedFileBytesAsync(string slug, string relativePath)
+    public async Task<byte[]?> ReadPublishedFileBytesAsync(string slug, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(slug))
         {
-            return Task.FromResult<byte[]?>(null);
+            return null;
         }
 
         var rootPath = GetRootPath();
         var appPath = ResolveSafePath(rootPath, slug.Trim());
         var filePath = ResolveSafePath(appPath, relativePath);
         return File.Exists(filePath)
-            ? File.ReadAllBytesAsync(filePath)
-            : Task.FromResult<byte[]?>(null);
+            ? await File.ReadAllBytesAsync(filePath)
+            : null;
     }
 
     internal static string BuildPublicAppUrl(string? publicBaseUrl, string slug)

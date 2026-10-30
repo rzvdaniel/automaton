@@ -44,7 +44,7 @@ namespace Automaton.Api.Services
             ActivityType activityType,
             string entityName,
             Guid? entityId = null,
-            string description = null,
+            string? description = null,
             CancellationToken cancellationToken = default)
         {
             try

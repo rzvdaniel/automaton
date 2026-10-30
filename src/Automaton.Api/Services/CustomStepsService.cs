@@ -65,12 +65,12 @@ public class CustomStepsService
         return steps;
     }
 
-    public CustomStep Get(Guid id)
+    public CustomStep? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefault(x => x.Id == id);
-        var step = MapToModel(stepEntity);
+        var step = MapToModelIfPresent(stepEntity, webAppLookup: null);
 
         // Return step with encrypted references as-is for UI
         // UI password inputs will handle visual hiding
@@ -221,7 +221,7 @@ public class CustomStepsService
     /// <summary>
     /// Get custom step with decrypted sensitive variables for UI editing
     /// </summary>
-    public async Task<CustomStep> GetForEditingAsync(Guid id)
+    public async Task<CustomStep?> GetForEditingAsync(Guid id)
     {
         var stepEntity = await authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefaultAsync(x => x.Id == id);
@@ -283,7 +283,7 @@ public class CustomStepsService
     }
 
     private async Task ProcessVariableListAsync(
-        IList<Core.Models.StepVariable> variables,
+        IList<Core.Models.StepVariable>? variables,
         Guid customStepId,
         string scope)
     {
@@ -299,9 +299,11 @@ public class CustomStepsService
                     try
                     {
                         // Encrypt and store in SensitiveVariables table
+                        var variableName = variable.Name
+                            ?? throw new InvalidOperationException("Sensitive custom step variables require a name.");
                         var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
                             userId,
-                            variable.Name,
+                            variableName,
                             variable.Value,
                             SensitiveVariableResourceType.CustomStep,
                             customStepId,
@@ -336,15 +338,15 @@ public class CustomStepsService
         await DecryptVariableListAsync(definition.CodeOutputVariables);
     }
 
-    private async Task DecryptVariableListAsync(IList<Core.Models.StepVariable> variables)
+    private async Task DecryptVariableListAsync(IList<Core.Models.StepVariable>? variables)
     {
         if (variables == null) return;
 
         foreach (var variable in variables)
         {
-            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            if (variable.IsSensitive && variable.Value is { } reference && IsSensitiveReference(reference))
             {
-                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(reference);
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
@@ -361,7 +363,7 @@ public class CustomStepsService
 
     private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith('}');
+        return value is not null && value.StartsWith("${sensitive:") && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
@@ -418,8 +420,6 @@ public class CustomStepsService
 
     private static CustomStep MapToModel(Entities.CustomStep entity, Dictionary<Guid, WebApp>? webAppLookup)
     {
-        if (entity == null) return null;
-
         // Look up WebApp info if available
         Guid? webAppId = null;
         string? webAppName = null;
@@ -445,6 +445,12 @@ public class CustomStepsService
             WebAppId = webAppId,
             WebAppName = webAppName,
             Definition = JsonSerializer.Deserialize<CustomStepDefinition>(entity.Definition ?? "{}")
+                ?? new CustomStepDefinition()
         };
     }
+
+    private static CustomStep? MapToModelIfPresent(
+        Entities.CustomStep? entity,
+        Dictionary<Guid, WebApp>? webAppLookup) =>
+        entity is null ? null : MapToModel(entity, webAppLookup);
 }

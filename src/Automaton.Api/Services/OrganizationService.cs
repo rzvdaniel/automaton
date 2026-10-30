@@ -44,20 +44,21 @@ public class OrganizationService : IOrganizationService
 
     public async Task<IEnumerable<OrganizationListItem>> ListUserOrganizationsAsync(CancellationToken cancellationToken = default)
     {
-        var organizations = await dbContext.OrganizationMembers
-            .Where(om => om.UserId == UserId && om.IsActive)
-            .Include(om => om.Organization)
-            .Select(om => new OrganizationListItem
+        var organizations = await (
+            from membership in dbContext.OrganizationMembers
+            join organization in dbContext.Organizations on membership.OrganizationId equals organization.Id
+            where membership.UserId == UserId && membership.IsActive
+            select new OrganizationListItem
             {
-                Id = om.Organization.Id,
-                Name = om.Organization.Name,
-                Description = om.Organization.Description,
-                Slug = om.Organization.Slug,
-                LogoUrl = om.Organization.LogoUrl,
-                Role = om.Role,
-                MemberCount = om.Organization.Members.Count(m => m.IsActive),
-                ProjectCount = om.Organization.Projects.Count(p => p.IsActive),
-                UpdatedAt = om.Organization.UpdatedAt ?? om.Organization.CreatedAt
+                Id = organization.Id,
+                Name = organization.Name,
+                Description = organization.Description,
+                Slug = organization.Slug,
+                LogoUrl = organization.LogoUrl,
+                Role = membership.Role,
+                MemberCount = dbContext.OrganizationMembers.Count(member => member.OrganizationId == organization.Id && member.IsActive),
+                ProjectCount = dbContext.Projects.Count(project => project.OrganizationId == organization.Id && project.IsActive),
+                UpdatedAt = organization.UpdatedAt ?? organization.CreatedAt
             })
             .OrderByDescending(o => o.UpdatedAt)
             .ToListAsync(cancellationToken);
@@ -352,10 +353,14 @@ public class OrganizationService : IOrganizationService
         }
 
         // Check if user is already a member of the organization
-        var isAlreadyMember = await dbContext.OrganizationMembers
-            .AnyAsync(om => om.OrganizationId == organizationId
-                && om.User.Email == request.Email
-                && om.IsActive, cancellationToken);
+        var isAlreadyMember = await (
+            from membership in dbContext.OrganizationMembers
+            join memberUser in dbContext.Users on membership.UserId equals memberUser.Id
+            where membership.OrganizationId == organizationId
+                && memberUser.Email == request.Email
+                && membership.IsActive
+            select membership.Id)
+            .AnyAsync(cancellationToken);
 
         if (isAlreadyMember)
         {
@@ -619,6 +624,9 @@ public class OrganizationService : IOrganizationService
             return null;
         }
 
+        var memberUser = member.User
+            ?? throw new InvalidOperationException($"Organization member {member.UserId} has no associated user.");
+
         // Update the role
         member.Role = request.Role;
 
@@ -643,8 +651,8 @@ public class OrganizationService : IOrganizationService
             Id = member.Id,
             OrganizationId = member.OrganizationId,
             UserId = member.UserId,
-            UserName = member.User.UserName ?? string.Empty,
-            Email = member.User.Email ?? string.Empty,
+            UserName = memberUser.UserName ?? string.Empty,
+            Email = memberUser.Email ?? string.Empty,
             Role = member.Role,
             JoinedAt = member.JoinedAt,
             InvitedBy = member.InvitedBy,
@@ -667,9 +675,12 @@ public class OrganizationService : IOrganizationService
         }
 
         // Verify app belongs to organization (via project)
-        var appProject = await dbContext.ProjectApps
-            .Include(pa => pa.Project)
-            .FirstOrDefaultAsync(pa => pa.WebAppId == appId && pa.Project.OrganizationId == organizationId, cancellationToken);
+        var appProject = await (
+            from projectApp in dbContext.ProjectApps
+            join project in dbContext.Projects on projectApp.ProjectId equals project.Id
+            where projectApp.WebAppId == appId && project.OrganizationId == organizationId
+            select projectApp)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (appProject == null)
         {
@@ -925,9 +936,12 @@ public class OrganizationService : IOrganizationService
         }
 
         // Get all apps from projects in this organization
-        return await dbContext.ProjectApps
-            .Where(pa => pa.Project.OrganizationId == organizationId && pa.Project.IsActive)
-            .Select(pa => pa.WebApp!)
+        return await (
+            from projectApp in dbContext.ProjectApps
+            join project in dbContext.Projects on projectApp.ProjectId equals project.Id
+            join app in dbContext.WebApps on projectApp.WebAppId equals app.Id
+            where project.OrganizationId == organizationId && project.IsActive
+            select app)
             .Distinct()
             .ToListAsync(cancellationToken);
     }
@@ -1044,23 +1058,24 @@ public class OrganizationService : IOrganizationService
             return Enumerable.Empty<PendingInvitationDto>();
         }
 
-        var pendingInvitations = await dbContext.OrganizationInvitations
-            .Where(i => i.Email.ToLower() == currentUserEmail.ToLower()
-                && !i.IsConsumed 
-                && i.ExpiresAt > DateTime.UtcNow
-                && !userOrganizationIds.Contains(i.OrganizationId))
-            .Include(i => i.Organization)
-            .OrderByDescending(i => i.CreatedAt)
-            .Select(i => new PendingInvitationDto
+        var pendingInvitations = await (
+            from invitation in dbContext.OrganizationInvitations
+            join organization in dbContext.Organizations on invitation.OrganizationId equals organization.Id
+            where invitation.Email.ToLower() == currentUserEmail.ToLower()
+                && !invitation.IsConsumed
+                && invitation.ExpiresAt > DateTime.UtcNow
+                && !userOrganizationIds.Contains(invitation.OrganizationId)
+            orderby invitation.CreatedAt descending
+            select new PendingInvitationDto
             {
-                InvitationId = i.Id,
-                OrganizationId = i.OrganizationId,
-                OrganizationName = i.Organization.Name,
-                OrganizationSlug = i.Organization.Slug,
-                Role = i.Role,
-                InvitedAt = i.CreatedAt,
-                ExpiresAt = i.ExpiresAt,
-                Token = i.Token
+                InvitationId = invitation.Id,
+                OrganizationId = invitation.OrganizationId,
+                OrganizationName = organization.Name,
+                OrganizationSlug = organization.Slug,
+                Role = invitation.Role,
+                InvitedAt = invitation.CreatedAt,
+                ExpiresAt = invitation.ExpiresAt,
+                Token = invitation.Token
             })
             .ToListAsync(cancellationToken);
 

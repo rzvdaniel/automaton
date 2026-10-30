@@ -39,22 +39,22 @@ public class ProjectService
     /// </summary>
     public async Task<IEnumerable<ProjectListItem>> ListUserProjectsAsync(CancellationToken cancellationToken = default)
     {
-        var projects = await dbContext.ProjectMembers
-            .Where(pm => pm.UserId == UserId && pm.IsActive)
-            .Include(pm => pm.Project)
-                .ThenInclude(p => p.Organization)
-            .Select(pm => new ProjectListItem
+        var projects = await (
+            from membership in dbContext.ProjectMembers
+            join project in dbContext.Projects on membership.ProjectId equals project.Id
+            where membership.UserId == UserId && membership.IsActive
+            select new ProjectListItem
             {
-                Id = pm.Project.Id,
-                Name = pm.Project.Name,
-                DisplayName = pm.Project.DisplayName,
-                Description = pm.Project.Description,
-                Role = pm.Role,
-                MemberCount = pm.Project.Members.Count(m => m.IsActive),
-                UpdatedAt = pm.Project.Updated,
-                OrganizationId = pm.Project.OrganizationId,
-                OrganizationName = pm.Project.Organization != null ? pm.Project.Organization.Name : null,
-                IsActive = pm.Project.IsActive
+                Id = project.Id,
+                Name = project.Name,
+                DisplayName = project.DisplayName,
+                Description = project.Description,
+                Role = membership.Role,
+                MemberCount = dbContext.ProjectMembers.Count(member => member.ProjectId == project.Id && member.IsActive),
+                UpdatedAt = project.Updated,
+                OrganizationId = project.OrganizationId,
+                OrganizationName = project.Organization != null ? project.Organization.Name : null,
+                IsActive = project.IsActive
             })
             .OrderByDescending(p => p.UpdatedAt)
             .ToListAsync(cancellationToken);

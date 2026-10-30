@@ -130,23 +130,47 @@ internal static class AiModelUpdateApplier
 {
     public static void Apply(AiModel model, AdminUpdateAiModelRequest request)
     {
+        ApplyDisplaySettings(model, request);
+        ApplyModelPolicy(model, request);
+        ApplyCapabilities(model, request);
+        ApplyUsageLimits(model, request);
+        ApplyExtraBody(model, request.ExtraBodyJson);
+        model.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ApplyDisplaySettings(AiModel model, AdminUpdateAiModelRequest request)
+    {
         if (request.DisplayName is not null) model.DisplayName = request.DisplayName;
         if (request.Description is not null) model.Description = request.Description;
+        if (request.SortOrder.HasValue) model.SortOrder = request.SortOrder.Value;
+    }
+
+    private static void ApplyModelPolicy(AiModel model, AdminUpdateAiModelRequest request)
+    {
         if (request.IsActive.HasValue) model.IsActive = request.IsActive.Value;
         if (request.IsDefault.HasValue) model.IsDefault = request.IsDefault.Value;
         if (request.IsPlanningModel.HasValue) model.IsPlanningModel = request.IsPlanningModel.Value;
-        if (request.MaxTokens.HasValue) model.MaxTokens = request.MaxTokens.Value;
+    }
+
+    private static void ApplyCapabilities(AiModel model, AdminUpdateAiModelRequest request)
+    {
         if (request.SupportsStreaming.HasValue) model.SupportsStreaming = request.SupportsStreaming.Value;
         if (request.SupportsTools.HasValue) model.SupportsTools = request.SupportsTools.Value;
         if (request.SupportsVision.HasValue) model.SupportsVision = request.SupportsVision.Value;
+    }
+
+    private static void ApplyUsageLimits(AiModel model, AdminUpdateAiModelRequest request)
+    {
+        if (request.MaxTokens.HasValue) model.MaxTokens = request.MaxTokens.Value;
         if (request.CostPer1MTokensInput.HasValue) model.CostPer1MTokensInput = request.CostPer1MTokensInput.Value;
         if (request.CostPer1MTokensOutput.HasValue) model.CostPer1MTokensOutput = request.CostPer1MTokensOutput.Value;
-        if (request.ExtraBodyJson is not null)
-        {
-            model.ExtraBodyJson = string.IsNullOrWhiteSpace(request.ExtraBodyJson) ? null : request.ExtraBodyJson;
-        }
+    }
 
-        if (request.SortOrder.HasValue) model.SortOrder = request.SortOrder.Value;
-        model.UpdatedAt = DateTime.UtcNow;
+    private static void ApplyExtraBody(AiModel model, string? extraBodyJson)
+    {
+        if (extraBodyJson is not null)
+        {
+            model.ExtraBodyJson = string.IsNullOrWhiteSpace(extraBodyJson) ? null : extraBodyJson;
+        }
     }
 }

@@ -90,7 +90,8 @@ namespace Automaton.Api.Application.Queries.Handlers
             {
                 Id = user.Id,
                 Name = user.Name,
-                Email = user.Email,
+                Email = user.Email
+                    ?? throw new InvalidOperationException($"User {user.Id} has no email address."),
                 EmailConfirmed = user.EmailConfirmed,
                 PublicUsername = user.PublicUsername,
                 RegisteredAtUtc = user.RegisteredAtUtc,

@@ -37,19 +37,19 @@ public class ChatSessionDto
     /// <summary>
     /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
     /// </summary>
-    public string? ComplexityTier { get; set; }
+    public string ComplexityTier { get; set; }
 
     /// <summary>
     /// Effective verification strategy resolved for this session.
     /// Values: continuous, balanced, final-gate.
     /// </summary>
-    public string? EffectiveVerificationStrategy { get; set; }
+    public string EffectiveVerificationStrategy { get; set; }
 
     /// <summary>
     /// Effective execution policy resolved for this session.
     /// Values: default, lean-tools.
     /// </summary>
-    public string? EffectiveExecutionPolicy { get; set; }
+    public string EffectiveExecutionPolicy { get; set; }
 }
 
 /// <summary>
@@ -69,7 +69,7 @@ public class ChatMessageDto
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
     public int? TotalTokens { get; set; }
-    public string? Model { get; set; }
+    public string Model { get; set; }
 }
 
 /// <summary>
@@ -102,7 +102,7 @@ public class SaveChatMessageRequest
     // Token usage
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
-    public string? Model { get; set; }
+    public string Model { get; set; }
 
     // Anthropic prompt cache stats
     public int? CacheReadTokens { get; set; }

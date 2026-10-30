@@ -157,7 +157,13 @@ public class AdminAppsService
 
     private void EnsureAdminAccess() => adminAuthorizationService.EnsureAdmin();
 
-    private async Task<AdminOwnedAppRecord?> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken, bool throwWhenMissing = true)
+    private async Task<AdminOwnedAppRecord> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        return await RequireOwnedAppForAdminAsync(appId, cancellationToken, throwWhenMissing: true)
+            ?? throw new InvalidOperationException("App not found.");
+    }
+
+    private async Task<AdminOwnedAppRecord?> RequireOwnedAppForAdminAsync(Guid appId, CancellationToken cancellationToken, bool throwWhenMissing)
     {
         EnsureAdminAccess();
         var app = await dataContext.WebApps

@@ -56,6 +56,7 @@ public sealed class RunnerExecutionsController(
         try
         {
             var stream = await artifacts!.OpenInputAsync(KeyId(), RunnerId(), ActorId(), id, token);
+            if (stream is null) return NotFound();
             Response.Headers.CacheControl = "no-store";
             return File(stream, "application/octet-stream", enableRangeProcessing: false);
         }

@@ -20,9 +20,9 @@ namespace Automaton.Api.Application.Commands.Handlers
             await userManager.UpdateProfile(
                 new Models.UserProfile
                 {
-                    Id = command.Id.Value,
+                    Id = command.Id ?? throw new InvalidOperationException("A user ID is required to update the profile."),
                     Name = command.Name,
-                    Email = command.Email
+                    Email = command.Email ?? throw new InvalidOperationException("An email address is required to update the profile.")
                 }
             );
 

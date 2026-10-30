@@ -10,18 +10,15 @@ namespace Automaton.Api.Authentication
         private readonly JwtOptions _options;
         private TokenValidationParameters _tokenValidationParameters = new();
         private readonly ILogger<JwtService> _logger;
-        private readonly AuthenticationSettings _settings;
-
-        public JwtService(JwtOptions options, ILogger<JwtService> logger, AuthenticationSettings settings)
+        public JwtService(JwtOptions options, ILogger<JwtService> logger)
         {
             _logger = logger;
-            _settings = settings;
             _options = options;
             InitializeJwtParameters();
         }
 
-        public JsonWebToken GenerateToken(string userId, string userName, IReadOnlyList<string> roles = null,
-            IDictionary<string, string> claims = null)
+        public JsonWebToken GenerateToken(string userId, string userName, IReadOnlyList<string>? roles = null,
+            IDictionary<string, string>? claims = null)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
@@ -54,11 +51,6 @@ namespace Automaton.Api.Authentication
                                ?? Array.Empty<Claim>();
 
             jwtClaims.AddRange(customClaims);
-            if (string.IsNullOrWhiteSpace(_settings.RsaSettings?.RsaPrivateKey))
-            {
-                return null;
-            }
-
             var jwt = new JwtSecurityToken(
                 _options.Issuer,
                 claims: jwtClaims,
@@ -79,8 +71,8 @@ namespace Automaton.Api.Authentication
             };
         }
 
-        public JsonWebTokenPayload ValidateAndGetTokenPayload(string token,
-            TokenValidationParameters tokenValidationParameters = null)
+        public JsonWebTokenPayload? ValidateAndGetTokenPayload(string token,
+            TokenValidationParameters? tokenValidationParameters = null)
         {
             try
             {
@@ -99,7 +91,7 @@ namespace Automaton.Api.Authentication
                 {
                     UserId = jwt.Subject,
                     UserName = jwt.Claims.SingleOrDefault(x => x.Type == ClaimTypes.Name)?.Value,
-                    Roles = !string.IsNullOrWhiteSpace(roles) ? roles.Split() : null,
+                    Roles = !string.IsNullOrWhiteSpace(roles) ? roles.Split() : Array.Empty<string>(),
                     Expires = jwt.ValidTo.ToUnixEpochDate(),
                     Claims = jwt.Claims.ToDictionary(k => k.Type, v => v.Value)
                 };
@@ -116,7 +108,7 @@ namespace Automaton.Api.Authentication
             }
         }
 
-        public ClaimsPrincipal ValidateToken(string token, TokenValidationParameters tokenValidationParameters = null)
+        public ClaimsPrincipal? ValidateToken(string token, TokenValidationParameters? tokenValidationParameters = null)
         {
             try
             {

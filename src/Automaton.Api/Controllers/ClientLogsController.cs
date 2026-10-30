@@ -24,25 +24,20 @@ public class ClientLogsController : BaseController
         {
             Enum.TryParse(log.Level, out LogEventLevel logLevel);
 
-            foreach (var property in log.Properties)
+            foreach (var property in log.Properties ?? [])
             {
                 LogContext.PushProperty(property.Key, property.Value);
             }
 
-            var exception = HasException(log.Exception) ? GetException(log.Exception) : null;
+            var exception = log.Exception is { Length: > 0 } exceptionText ? GetException(exceptionText) : null;
 
-            logger.Write(logLevel, exception, log.MessageTemplate);
+            logger.Write(logLevel, exception, log.MessageTemplate ?? string.Empty);
         }
 
         return NoContent();
     }
 
-    private static bool HasException(string? exceptionText)
-    {
-        return !string.IsNullOrEmpty(exceptionText);
-    }
-
-    private static Exception GetException(string? exceptionText)
+    private static Exception GetException(string exceptionText)
     {
         var exception = new Exception(CleanupExceptionText(exceptionText));
 

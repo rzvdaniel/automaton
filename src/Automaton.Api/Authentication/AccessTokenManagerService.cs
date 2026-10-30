@@ -28,7 +28,10 @@ namespace Automaton.Api.Authentication
             => string.IsNullOrWhiteSpace(await _redisCache.GetStringAsync(GetKey(token)));
 
         public async Task<bool> CurrentAccessTokenIsActive()
-            => await CurrentAccessTokenIsActive(await GetCurrentAccessTokenAsync());
+        {
+            var token = await GetCurrentAccessTokenAsync();
+            return string.IsNullOrWhiteSpace(token) || await CurrentAccessTokenIsActive(token);
+        }
 
         //We only store deactivated access token in centralized redis
         public async Task DeactivateAccessTokenAsync(string token)
@@ -40,13 +43,25 @@ namespace Automaton.Api.Authentication
         }
 
         public async Task DeactivateCurrentAccessTokenAsync()
-            => await DeactivateAccessTokenAsync(await GetCurrentAccessTokenAsync());
+        {
+            var token = await GetCurrentAccessTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                await DeactivateAccessTokenAsync(token);
+            }
+        }
 
-        private async Task<string> GetCurrentAccessTokenAsync()
+        private async Task<string?> GetCurrentAccessTokenAsync()
         {
             //tokens will only be saved to the context if SaveTokens = true; in the startup else will be null although
             //we can get access token from header directly with *_httpContextAccessor.HttpContext.Request.Headers["Authorization"]*
-            return await _httpContextAccessor.HttpContext.GetTokenAsync(JwtBearerDefaults.AuthenticationScheme,
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext is null)
+            {
+                return null;
+            }
+
+            return await httpContext.GetTokenAsync(JwtBearerDefaults.AuthenticationScheme,
                 "access_token");
         }
 

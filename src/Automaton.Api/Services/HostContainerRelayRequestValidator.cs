@@ -16,22 +16,42 @@ internal static class HostContainerRelayRequestValidator
             return operationFailure;
         }
 
-        if (serverPrepared && request.Scope.MachineRunnerId != Guid.Empty
-            && HostContainerRelayRequestPreparer.RequiresContainerLimits(request.Operation)
-            && (request.ContainerLimits?.IsValid() != true
-                || request.SharedMemoryMb is not (>= 16 and <= 1024)
-                || request.DockerLogMaxSizeMb is not (>= 1 and <= 1024)
-                || request.DockerLogMaxFiles is not (>= 1 and <= 20)))
-            return Failure("resource_policy_unavailable", "The queued container operation has no valid server-derived resource bounds.");
-
-        if (serverPrepared && request.Scope.MachineRunnerId != Guid.Empty
-            && HostContainerRelayRequestPreparer.RequiresDiskAdmission(request.Operation)
-            && request.MinimumFreeDiskMb is not (>= 256 and <= 1_048_576))
-            return Failure("resource_policy_unavailable", "The queued machine operation has no valid server-derived free-disk reserve.");
+        var resourcePolicyFailure = ValidateServerResourcePolicy(request, serverPrepared);
+        if (resourcePolicyFailure is not null)
+        {
+            return resourcePolicyFailure;
+        }
 
         if (HostContainerRuntimeValidation.IsRuntimeOperation(request.Operation))
         {
             return ValidateRuntimeRequest(request, serverPrepared);
+        }
+
+        return null;
+    }
+
+    private static HostContainerExecutionResponse? ValidateServerResourcePolicy(
+        HostContainerExecutionRequest request,
+        bool serverPrepared)
+    {
+        if (!serverPrepared || request.Scope.MachineRunnerId == Guid.Empty)
+        {
+            return null;
+        }
+
+        if (HostContainerRelayRequestPreparer.RequiresContainerLimits(request.Operation)
+            && (request.ContainerLimits?.IsValid() != true
+                || request.SharedMemoryMb is not (>= 16 and <= 1024)
+                || request.DockerLogMaxSizeMb is not (>= 1 and <= 1024)
+                || request.DockerLogMaxFiles is not (>= 1 and <= 20)))
+        {
+            return Failure("resource_policy_unavailable", "The queued container operation has no valid server-derived resource bounds.");
+        }
+
+        if (HostContainerRelayRequestPreparer.RequiresDiskAdmission(request.Operation)
+            && request.MinimumFreeDiskMb is not (>= 256 and <= 1_048_576))
+        {
+            return Failure("resource_policy_unavailable", "The queued machine operation has no valid server-derived free-disk reserve.");
         }
 
         return null;
@@ -117,10 +137,7 @@ internal static class HostContainerRelayRequestValidator
         HostContainerExecutionRequest request,
         bool serverPrepared)
     {
-        if (request.Command is null
-            || (!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null || request.MinimumFreeDiskMb is not null))
-            || request.CandidateId != Guid.Empty || request.Storage is not null
-            || request.HostPort != 0 || request.ContainerPort != 0)
+        if (request.Command is null || HasUnsupportedBuildInputs(request, serverPrepared))
         {
             return Failure("invalid_request", "RunBuild requires a command and server-derived resources.");
         }
@@ -130,14 +147,24 @@ internal static class HostContainerRelayRequestValidator
             return Failure("invalid_request", "The build timeout must be between 1 and 86400 seconds.");
         }
 
-        var command = request.Command;
-        if (request.Environment is null || command.Arguments is null || command.Environment is null
-            || string.IsNullOrWhiteSpace(command.Executable))
+        if (HasInvalidBuildCommand(request))
         {
             return Failure("invalid_request", "RunBuild contains an invalid command or environment.");
         }
 
         return null;
+    }
+
+    private static bool HasUnsupportedBuildInputs(HostContainerExecutionRequest request, bool serverPrepared) =>
+        (!serverPrepared && (request.Resources is not null || request.ContainerLimits is not null || request.MinimumFreeDiskMb is not null))
+        || request.CandidateId != Guid.Empty || request.Storage is not null
+        || request.HostPort != 0 || request.ContainerPort != 0;
+
+    private static bool HasInvalidBuildCommand(HostContainerExecutionRequest request)
+    {
+        var command = request.Command;
+        return request.Environment is null || command is null || command.Arguments is null
+            || command.Environment is null || string.IsNullOrWhiteSpace(command.Executable);
     }
 
     private static HostContainerExecutionResponse? ValidateRuntimeRequest(

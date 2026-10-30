@@ -48,9 +48,9 @@ public class FlowsService
                 .Include(m => m.FlowUsers)
             from s in dbContext.FlowExecutions
                 .Where(s => m.Id == s.FlowId)
-                .DefaultIfEmpty()
                 .OrderByDescending(x => x.Started)
-                .Take(1)    
+                .Take(1)
+                .DefaultIfEmpty()
             select new FlowInfo
             {
                 Id = m.Id,
@@ -65,11 +65,16 @@ public class FlowsService
         return flows;
     }
 
-    public Flow Get(Guid id)
+    public Flow? Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var entity = authorizationService.GetAccessibleFlowsQuery()
             .SingleOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return null;
+        }
 
         var flow = DeserializeFlow(entity.Body);
 
@@ -234,6 +239,10 @@ public class FlowsService
     public FlowSettings GetSettings(Guid id)
     {
         var flow = Get(id);
+        if (flow is null)
+        {
+            throw new InvalidOperationException($"Flow {id} not found or not accessible.");
+        }
 
         var settings = new FlowSettings
         {
@@ -309,9 +318,11 @@ public class FlowsService
                     try
                     {
                         // Encrypt and store in SensitiveVariables table
+                        var variableName = variable.Name
+                            ?? throw new InvalidOperationException("Sensitive flow variables require a name.");
                         var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
                             userId,
-                            variable.Name,
+                            variableName,
                             variable.Value,
                             SensitiveVariableResourceType.Flow,
                             flowId,
@@ -348,9 +359,9 @@ public class FlowsService
     {
         foreach (var variable in variables.Values.ToList())
         {
-            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            if (variable.IsSensitive && variable.Value is { } reference && IsSensitiveReference(reference))
             {
-                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(reference);
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
@@ -367,7 +378,7 @@ public class FlowsService
 
     private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith('}');
+        return value is not null && value.StartsWith("${sensitive:") && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
@@ -417,10 +428,7 @@ public class FlowsService
 
     #endregion
 
-    private static Flow DeserializeFlow(string jsonFlow)
-    {
-        var flow = JsonSerializer.Deserialize<Flow>(jsonFlow);
-
-        return flow;
-    }
+    private static Flow DeserializeFlow(string jsonFlow) =>
+        JsonSerializer.Deserialize<Flow>(jsonFlow)
+            ?? throw new InvalidOperationException("Stored flow data does not contain a workflow.");
 }

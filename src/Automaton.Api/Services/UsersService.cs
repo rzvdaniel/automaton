@@ -630,8 +630,10 @@ public class UsersService
 
     public async Task AddRole(Guid userId, Guid roleId)
     {
-        var role = await _roleManager.FindByIdAsync(roleId.ToString());
-        var result = await _userManager.AddToRoleAsync(await GetUserById(userId), role.Name);
+        var role = await _roleManager.FindByIdAsync(roleId.ToString())
+            ?? throw new InvalidOperationException($"Role {roleId} not found.");
+        var roleName = role.Name ?? throw new InvalidOperationException($"Role {roleId} has no name.");
+        var result = await _userManager.AddToRoleAsync(await GetUserById(userId), roleName);
         if (!result.Succeeded)
         {
             throw new InvalidOperationException("Error in Adding Role!");
@@ -669,8 +671,10 @@ public class UsersService
 
     public async Task RemoveRole(Guid userId, Guid roleId)
     {
-        var role = await _roleManager.FindByIdAsync(roleId.ToString());
-        var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), role.Name);
+        var role = await _roleManager.FindByIdAsync(roleId.ToString())
+            ?? throw new InvalidOperationException($"Role {roleId} not found.");
+        var roleName = role.Name ?? throw new InvalidOperationException($"Role {roleId} has no name.");
+        var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), roleName);
         if (!result.Succeeded)
         {
             throw new InvalidOperationException("Error in Removing Role!");

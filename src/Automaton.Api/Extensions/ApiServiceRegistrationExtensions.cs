@@ -3,6 +3,7 @@ using Automaton.Ai.Extensions;
 using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
 using Destructurama;
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.MySql;
@@ -419,7 +420,7 @@ internal static class ApiLoggerConfiguration
             .Destructure.UsingAttributes()
             .Destructure.JsonNetTypes()
             .Enrich.With<EventTypeEnricher>()
-            .Enrich.With(services.GetService<UserNameEnricher>())
+            .Enrich.With(services.GetRequiredService<UserNameEnricher>())
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning);
     }
@@ -799,7 +800,8 @@ internal static class ApiFoundationRegistration
 
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
 
-        services.AddFluentValidation(fv => fv.RegisterValidatorsFromAssemblyContaining<Program>());
+        services.AddFluentValidationAutoValidation();
+        services.AddValidatorsFromAssemblyContaining<Program>();
 
         services.AddScripting();
         services.AddAutomatonSteps();

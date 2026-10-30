@@ -39,6 +39,10 @@ public class CustomStepsController : BaseController
         var customStepId = await customStepsService.Create(customStep);
 
         var newCustomStep = await customStepsService.GetForEditingAsync(customStepId);
+        if (newCustomStep is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newCustomStep.Id }, newCustomStep);
     }

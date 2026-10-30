@@ -119,6 +119,11 @@ public class FlowExecutionHistoryService
             .SingleOrDefaultAsync(x => x.Id == id &&
                 x.FlowExecutionUsers.Any(x => x.UserId == userId), cancellationToken);
 
+        if (entity is null)
+        {
+            throw new InvalidOperationException($"Flow execution {id} was not found or is not accessible.");
+        }
+
         entity.Status = flowExecution.Status;
         entity.Finished = flowExecution.Finished;
 

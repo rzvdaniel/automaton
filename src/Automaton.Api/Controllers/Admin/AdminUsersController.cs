@@ -191,6 +191,7 @@ public class AdminUsersController : BaseController
 
     private async Task SendEmailConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
+        var email = user.Email ?? throw new InvalidOperationException("A user email is required for email confirmation.");
         var token = await usersService.GenerateEmailConfirmationTokenAsync(user.Id);
         var confirmationUrl = BuildEmailConfirmationUrl(user.Id, token);
 
@@ -198,7 +199,7 @@ public class AdminUsersController : BaseController
         {
             Template = "AutomatonConfirmEmail",
             From = new EmailAccount { Email = ResolveUserFacingFromEmail() },
-            To = [new EmailAccount { Email = user.Email, Name = user.Name }],
+            To = [new EmailAccount { Email = email, Name = user.Name }],
             Variables =
             {
                 { "Name", user.Name },

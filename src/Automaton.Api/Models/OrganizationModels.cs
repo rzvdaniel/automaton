@@ -175,7 +175,7 @@ public class PendingInvitationDto
     public Guid InvitationId { get; set; }
     public Guid OrganizationId { get; set; }
     public string OrganizationName { get; set; } = string.Empty;
-    public string OrganizationSlug { get; set; } = string.Empty;
+    public string? OrganizationSlug { get; set; }
     public OrganizationRole Role { get; set; }
     public DateTime InvitedAt { get; set; }
     public DateTime ExpiresAt { get; set; }

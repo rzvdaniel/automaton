@@ -54,23 +54,18 @@ public class AppVersionsController : BaseController
                 return Unauthorized(new { message = "User context not available" });
             }
 
-            // Determine trigger type
-            var triggerStr = request?.Trigger ?? "ManualSave";
-            if (!Enum.TryParse<AppVersionTrigger>(triggerStr, out var trigger))
-            {
-                trigger = AppVersionTrigger.ManualSave;
-            }
+            var snapshotRequest = NormalizeSnapshotRequest(request);
 
             // Create the snapshot
             var result = await appVersionService.CreateSnapshotAsync(
                 appId,
                 userId,
-                trigger,
+                snapshotRequest.Trigger,
                 aiSessionId: null,
                 aiModel: null,
-                summary: string.IsNullOrWhiteSpace(request?.Summary) ? null : request.Summary,
-                source: string.IsNullOrWhiteSpace(request?.Source) ? null : request.Source,
-                reason: string.IsNullOrWhiteSpace(request?.Reason) ? null : request.Reason
+                summary: snapshotRequest.Summary,
+                source: snapshotRequest.Source,
+                reason: snapshotRequest.Reason
             );
 
             if (!result.SnapshotCreated)
@@ -117,4 +112,23 @@ public class AppVersionsController : BaseController
             SnapshotCreated = true
         };
     }
+
+    private static (AppVersionTrigger Trigger, string? Summary, string? Source, string? Reason) NormalizeSnapshotRequest(
+        CreateVersionSnapshotRequest? request)
+    {
+        var triggerValue = request?.Trigger ?? "ManualSave";
+        var trigger = Enum.TryParse<AppVersionTrigger>(triggerValue, out var parsedTrigger)
+            ? parsedTrigger
+            : AppVersionTrigger.ManualSave;
+
+        return (
+            trigger,
+            NormalizeOptionalText(request?.Summary),
+            NormalizeOptionalText(request?.Source),
+            NormalizeOptionalText(request?.Reason));
+    }
+
+    private static string? NormalizeOptionalText(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
 }

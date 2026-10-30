@@ -67,25 +67,15 @@ public class ProjectMemberService
         var project = await dbContext.Projects
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
-        var members = await dbContext.ProjectMembers
+        var memberRecords = await dbContext.ProjectMembers
             .Where(pm => pm.ProjectId == projectId && pm.IsActive)
             .Include(pm => pm.User)
             .Include(pm => pm.Inviter)
-            .Select(pm => new ProjectMemberDto
-            {
-                ProjectId = pm.ProjectId,
-                UserId = pm.UserId,
-                UserName = pm.User.UserName ?? string.Empty,
-                Email = pm.User.Email ?? string.Empty,
-                Role = pm.Role,
-                JoinedAt = pm.JoinedAt,
-                InvitedBy = pm.InvitedBy,
-                InvitedByName = pm.Inviter != null ? pm.Inviter.UserName : null,
-                IsActive = pm.IsActive,
-                IsOwner = project != null && pm.UserId == project.OwnerId
-            })
-            .OrderBy(m => m.JoinedAt)
+            .OrderBy(pm => pm.JoinedAt)
             .ToListAsync(cancellationToken);
+        var members = memberRecords
+            .Select(member => MapMemberToDto(member, project?.OwnerId))
+            .ToList();
 
         logger.Debug("Listed {Count} members for project {ProjectId}", members.Count, projectId);
         return members;
@@ -247,7 +237,8 @@ public class ProjectMemberService
     {
         var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
         var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-        return $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}";
+        var email = user.Email ?? throw new InvalidOperationException("A user email is required to create a password setup link.");
+        return $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(email)}&code={encodedResetToken}";
     }
 
     private EmailData CreateInvitationEmail(
@@ -346,19 +337,7 @@ public class ProjectMemberService
             cancellationToken: cancellationToken);
 
 
-        return new ProjectMemberDto
-        {
-            ProjectId = membership.ProjectId,
-            UserId = membership.UserId,
-            UserName = membership.User.UserName ?? string.Empty,
-            Email = membership.User.Email ?? string.Empty,
-            Role = membership.Role,
-            JoinedAt = membership.JoinedAt,
-            InvitedBy = membership.InvitedBy,
-            InvitedByName = membership.Inviter?.UserName,
-            IsActive = membership.IsActive,
-            IsOwner = false
-        };
+        return MapMemberToDto(membership, project.OwnerId);
     }
 
     /// <summary>
@@ -447,18 +426,25 @@ public class ProjectMemberService
             return null;
         }
 
+        return MapMemberToDto(membership, project?.OwnerId);
+    }
+
+    private static ProjectMemberDto MapMemberToDto(ProjectMember membership, Guid? projectOwnerId)
+    {
+        var user = membership.User
+            ?? throw new InvalidOperationException($"Project member {membership.UserId} has no associated user.");
         return new ProjectMemberDto
         {
             ProjectId = membership.ProjectId,
             UserId = membership.UserId,
-            UserName = membership.User.UserName ?? string.Empty,
-            Email = membership.User.Email ?? string.Empty,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
             Role = membership.Role,
             JoinedAt = membership.JoinedAt,
             InvitedBy = membership.InvitedBy,
             InvitedByName = membership.Inviter?.UserName,
             IsActive = membership.IsActive,
-            IsOwner = project != null && membership.UserId == project.OwnerId
+            IsOwner = projectOwnerId == membership.UserId
         };
     }
 }

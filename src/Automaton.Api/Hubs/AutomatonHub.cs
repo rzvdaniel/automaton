@@ -204,6 +204,11 @@ public class AutomatonHub : Hub
     private RunnerDetails? GetRunnerOrNull()
     {
         var httpContext = Context.GetHttpContext();
+        if (httpContext is null)
+        {
+            return null;
+        }
+
         var runnerId = httpContext.Request.Headers[RunnerIdHeader].ToString();
         var runnerName = httpContext.Request.Headers[RunnerNameHeader].ToString();
         var connectionId = Context.ConnectionId;
@@ -243,10 +248,11 @@ public class AutomatonHub : Hub
 
     private Guid GetUserId()
     {
-        var userId = Context.User.Claims
+        var userId = Context.User?.Claims
             .Where(x => x.Type == UserIdClaim || x.Type == ClaimTypes.NameIdentifier)
             .Select(x => Guid.TryParse(x.Value, out var parsedUserId) ? parsedUserId : Guid.Empty)
-            .FirstOrDefault(x => x != Guid.Empty);
+            .FirstOrDefault(x => x != Guid.Empty)
+            ?? Guid.Empty;
 
         if (userId == Guid.Empty)
         {

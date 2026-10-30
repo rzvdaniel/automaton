@@ -6,6 +6,22 @@ using Automaton.Api.Data;
 
 namespace Automaton.Api.Authorization;
 
+internal static class ProjectAuthorizationIdentifiers
+{
+    public static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId)
+    {
+        var userIdValue = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdValue, out userId);
+    }
+
+    public static bool TryGetProjectId(HttpContext? httpContext, out Guid projectId)
+    {
+        var projectIdValue = httpContext?.Request.RouteValues["projectId"]?.ToString()
+            ?? httpContext?.Request.RouteValues["id"]?.ToString();
+        return Guid.TryParse(projectIdValue, out projectId);
+    }
+}
+
 /// <summary>
 /// Handles authorization for project membership requirements
 /// </summary>
@@ -30,8 +46,7 @@ public class ProjectMemberHandler : AuthorizationHandler<ProjectMemberRequiremen
         ProjectMemberRequirement requirement)
     {
         // Get user ID from claims
-        var userIdString = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+        if (!ProjectAuthorizationIdentifiers.TryGetUserId(context.User, out var userId))
         {
             _logger.LogWarning("Authorization failed: User ID not found in claims or invalid format");
             return;
@@ -45,10 +60,7 @@ public class ProjectMemberHandler : AuthorizationHandler<ProjectMemberRequiremen
             return;
         }
 
-        var projectIdString = httpContext.Request.RouteValues["projectId"]?.ToString()
-                           ?? httpContext.Request.RouteValues["id"]?.ToString();
-
-        if (string.IsNullOrEmpty(projectIdString) || !Guid.TryParse(projectIdString, out var projectId))
+        if (!ProjectAuthorizationIdentifiers.TryGetProjectId(httpContext, out var projectId))
         {
             _logger.LogWarning("Authorization failed: Project ID not found in route or invalid format");
             return;
@@ -106,8 +118,7 @@ public class ProjectAdminHandler : AuthorizationHandler<ProjectAdminRequirement>
         AuthorizationHandlerContext context,
         ProjectAdminRequirement requirement)
     {
-        var userIdString = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+        if (!ProjectAuthorizationIdentifiers.TryGetUserId(context.User, out var userId))
         {
             return;
         }
@@ -118,10 +129,7 @@ public class ProjectAdminHandler : AuthorizationHandler<ProjectAdminRequirement>
             return;
         }
 
-        var projectIdString = httpContext.Request.RouteValues["projectId"]?.ToString()
-                           ?? httpContext.Request.RouteValues["id"]?.ToString();
-
-        if (string.IsNullOrEmpty(projectIdString) || !Guid.TryParse(projectIdString, out var projectId))
+        if (!ProjectAuthorizationIdentifiers.TryGetProjectId(httpContext, out var projectId))
         {
             return;
         }
@@ -170,8 +178,7 @@ public class ProjectResourceManagerHandler : AuthorizationHandler<ProjectResourc
         AuthorizationHandlerContext context,
         ProjectResourceManagerRequirement requirement)
     {
-        var userIdString = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+        if (!ProjectAuthorizationIdentifiers.TryGetUserId(context.User, out var userId))
         {
             return;
         }
@@ -182,10 +189,7 @@ public class ProjectResourceManagerHandler : AuthorizationHandler<ProjectResourc
             return;
         }
 
-        var projectIdString = httpContext.Request.RouteValues["projectId"]?.ToString()
-                           ?? httpContext.Request.RouteValues["id"]?.ToString();
-
-        if (string.IsNullOrEmpty(projectIdString) || !Guid.TryParse(projectIdString, out var projectId))
+        if (!ProjectAuthorizationIdentifiers.TryGetProjectId(httpContext, out var projectId))
         {
             return;
         }
@@ -235,8 +239,7 @@ public class ProjectAppExecutorHandler : AuthorizationHandler<ProjectAppExecutor
         AuthorizationHandlerContext context,
         ProjectAppExecutorRequirement requirement)
     {
-        var userIdString = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+        if (!ProjectAuthorizationIdentifiers.TryGetUserId(context.User, out var userId))
         {
             return;
         }
@@ -247,10 +250,7 @@ public class ProjectAppExecutorHandler : AuthorizationHandler<ProjectAppExecutor
             return;
         }
 
-        var projectIdString = httpContext.Request.RouteValues["projectId"]?.ToString()
-                           ?? httpContext.Request.RouteValues["id"]?.ToString();
-
-        if (string.IsNullOrEmpty(projectIdString) || !Guid.TryParse(projectIdString, out var projectId))
+        if (!ProjectAuthorizationIdentifiers.TryGetProjectId(httpContext, out var projectId))
         {
             return;
         }

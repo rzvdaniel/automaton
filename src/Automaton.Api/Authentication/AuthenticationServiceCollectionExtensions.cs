@@ -12,7 +12,7 @@ namespace Automaton.Api.Authentication
     {
         public static void AddJwtAuthentication(this IServiceCollection services,
             IConfiguration configuration,
-            TokenValidationParameters parameters = null)
+            TokenValidationParameters? parameters = null)
         {
             JwtOptions jwtOptions = new JwtOptions();
             var authSettings = new AuthenticationSettings();
@@ -132,7 +132,7 @@ namespace Automaton.Api.Authentication
             return GetHmacKey(setting);
         }
 
-        private static SigningCredentials GetHmacKey(AuthenticationSettings setting)
+        private static SigningCredentials? GetHmacKey(AuthenticationSettings setting)
         {
             if (string.IsNullOrWhiteSpace(setting.HMacSettings?.SecretKey))
             {
@@ -143,7 +143,7 @@ namespace Automaton.Api.Authentication
             return new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         }
 
-        private static SigningCredentials GetRsaKey(AuthenticationSettings setting)
+        private static SigningCredentials? GetRsaKey(AuthenticationSettings setting)
         {
             if (setting.RsaSettings is null)
                 return null;

@@ -222,7 +222,7 @@ public class ProjectsController : BaseController
             
             if (role == null)
             {
-                return Ok(new { isMember = false, role = (string)null });
+                return Ok(new { isMember = false, role = (string?)null });
             }
 
             return Ok(new { isMember = true, role = role.ToString() });

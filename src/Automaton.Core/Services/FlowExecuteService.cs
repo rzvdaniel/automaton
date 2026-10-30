@@ -49,7 +49,7 @@ public class FlowExecuteService : BaseFlowExecuteService<Flow>
 public class NullExecutionNotificationService : IExecutionNotificationService
 {
     public Task SendLogUpdate(Guid workflowId, Guid executionId, string level, string message, 
-        string stepId = null, string stepName = null, string exception = null)
+        string? stepId = null, string? stepName = null, string? exception = null)
     {
         return Task.CompletedTask;
     }

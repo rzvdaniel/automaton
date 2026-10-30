@@ -55,7 +55,9 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             var claims = GetCustomClaimsForUser();
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
-            var jwt = jwtService.GenerateToken(user.Id.ToString("N"), user.UserName, roles, claims);
+            var userName = user.UserName
+                ?? throw new InvalidOperationException($"User {user.Id} has no username for token issuance.");
+            var jwt = jwtService.GenerateToken(user.Id.ToString("N"), userName, roles, claims);
             jwt.RefreshToken = newRefreshToken.Token;
 
             logger.Log(LogLevel.Debug, "AccessTokenRefreshed Event Published.");

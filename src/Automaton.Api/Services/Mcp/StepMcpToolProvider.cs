@@ -133,10 +133,10 @@ public class StepMcpToolProvider : IMcpToolProvider
         {
             return toolName switch
             {
-                "get_current_code" => await GetCurrentCodeAsync(arguments, contextId),
-                "execute_code" => await ExecuteCodeAsync(arguments),
+                "get_current_code" => GetCurrentCode(arguments, contextId),
+                "execute_code" => ExecuteCode(arguments),
                 "save_code" => await SaveCodeAsync(arguments, contextId),
-                "get_step_variables" => await GetStepVariablesAsync(arguments, contextId),
+                "get_step_variables" => GetStepVariables(arguments, contextId),
                 _ => new McpToolResult
                 {
                     Success = false,
@@ -155,7 +155,7 @@ public class StepMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? contextId)
+    private McpToolResult GetCurrentCode(JsonElement arguments, string? contextId)
     {
         try
         {
@@ -219,7 +219,7 @@ public class StepMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> ExecuteCodeAsync(JsonElement arguments)
+    private McpToolResult ExecuteCode(JsonElement arguments)
     {
         var code = arguments.GetProperty("code").GetString();
         var language = arguments.GetProperty("language").GetString();
@@ -250,7 +250,9 @@ public class StepMcpToolProvider : IMcpToolProvider
                 var step = _customStepsService.Get(stepId);
                 if (step?.Definition?.CodeOutputVariables != null)
                 {
-                    outputVariableNames = step.Definition.CodeOutputVariables.Select(v => v.Name);
+                    outputVariableNames = step.Definition.CodeOutputVariables
+                        .Select(variable => variable.Name)
+                        .OfType<string>();
                 }
             }
 
@@ -347,7 +349,7 @@ public class StepMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> GetStepVariablesAsync(JsonElement arguments, string? contextId)
+    private McpToolResult GetStepVariables(JsonElement arguments, string? contextId)
     {
         try
         {

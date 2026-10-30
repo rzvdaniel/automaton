@@ -175,7 +175,7 @@ public class ProjectResourceService
             {
                 ProjectId = pa.ProjectId,
                 AppId = pa.WebAppId,
-                AppName = pa.WebApp.Name,
+                AppName = pa.WebApp == null ? "Unavailable app" : pa.WebApp.Name,
                 AddedAt = pa.AddedAt,
                 AddedBy = pa.AddedBy,
                 AddedByName = pa.AddedByUser != null ? pa.AddedByUser.UserName ?? string.Empty : string.Empty
@@ -305,7 +305,7 @@ public class ProjectResourceService
             {
                 ProjectId = pf.ProjectId,
                 FlowId = pf.FlowId,
-                FlowName = pf.Flow.Name,
+                FlowName = pf.Flow == null ? "Unavailable flow" : pf.Flow.Name,
                 AddedAt = pf.AddedAt,
                 AddedBy = pf.AddedBy,
                 AddedByName = pf.AddedByUser != null ? pf.AddedByUser.UserName ?? string.Empty : string.Empty
@@ -451,7 +451,7 @@ public class ProjectResourceService
             {
                 ProjectId = pr.ProjectId,
                 RunnerId = pr.RunnerId,
-                RunnerName = pr.Runner.Name,
+                RunnerName = pr.Runner == null ? "Unavailable runner" : pr.Runner.Name,
                 AddedAt = pr.AddedAt,
                 AddedBy = pr.AddedBy,
                 AddedByName = pr.AddedByUser != null ? pr.AddedByUser.UserName ?? string.Empty : string.Empty
@@ -582,7 +582,7 @@ public class ProjectResourceService
             {
                 ProjectId = pcs.ProjectId,
                 StepId = pcs.CustomStepId,
-                StepName = pcs.CustomStep.Name,
+                StepName = pcs.CustomStep == null ? "Unavailable custom step" : pcs.CustomStep.Name,
                 AddedAt = pcs.AddedAt,
                 AddedBy = pcs.AddedBy,
                 AddedByName = pcs.AddedByUser != null ? pcs.AddedByUser.UserName ?? string.Empty : string.Empty

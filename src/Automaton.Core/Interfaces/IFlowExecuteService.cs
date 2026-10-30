@@ -17,7 +17,7 @@ namespace Automaton.Core.Interfaces
     public interface IExecutionNotificationService
     {
         Task SendLogUpdate(Guid workflowId, Guid executionId, string level, string message, 
-            string stepId = null, string stepName = null, string exception = null);
+            string? stepId = null, string? stepName = null, string? exception = null);
         Task SendStepExecution(string stepId);
         Task SendVariableUpdate(StepVariable variable);
     }

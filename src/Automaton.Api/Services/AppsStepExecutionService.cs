@@ -179,7 +179,9 @@ public class AppsStepExecutionService
             }
 
             // For non-sensitive variables, apply the runtime override if provided
-            if (inputs.TryGetValue(inputVar.Name, out var runtimeValue))
+            var inputName = inputVar.Name
+                ?? throw new InvalidOperationException("Custom step input variables require a name.");
+            if (inputs.TryGetValue(inputName, out var runtimeValue))
             {
                 inputVar.Value = runtimeValue;
             }

@@ -120,7 +120,10 @@ public sealed class RuntimeTunnelRequestSender(
             BodyBytes = body,
             HeaderValues = request.Headers
                 .Where(header => !HopByHopHeaders.Contains(header.Key))
-                .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
+                .ToDictionary(
+                    header => header.Key,
+                    header => header.Value.OfType<string>().ToArray(),
+                    StringComparer.OrdinalIgnoreCase),
             Destination = staticSite ? TunnelDestinations.StaticSite : TunnelDestinations.RuntimeGateway,
             RuntimeAppId = appId,
             RuntimeDeploymentTargetId = deploymentTargetId,

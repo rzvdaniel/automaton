@@ -78,8 +78,8 @@ These values were calibrated against the initial inventory. The cyclomatic compl
 | Signal | Initial value | Treatment |
 | --- | --- | --- |
 | Cognitive complexity | Greater than 15 per method | Historical Sonar signal; not enforced by the current build |
-| Cyclomatic complexity | Greater than 15 per method | Build error until historical violations are resolved |
-| Type/method coupling | Existing analyzer threshold | Historical Sonar signal; use design review, not a build gate |
+| Cyclomatic complexity | 15 or greater per method | Build error until historical violations are resolved; keep methods below 15 |
+| Type/method coupling | Existing analyzer threshold | Historical Sonar signal; use design review, not a build gate. Keep classes cohesive and split by distinct responsibilities, not to reduce class size or coupling counts. |
 | Control-flow nesting | More than 3 levels | Review signal; choose a supported analyzer rather than count braces |
 | Method size | More than about 60 logical lines | Review signal; document the measurement convention |
 | Constructor dependencies | More than 7 injected dependencies | Responsibility review, not a demand for a dependency-bag object |
@@ -95,7 +95,7 @@ Use one authoritative diagnostic for each blocking concept. For example, avoid s
 1. Keep active .NET analyzer configuration centrally defined for projects under `src/`.
 2. Treat `CA1502` as a compiler build error. Do not grandfather its findings behind a baseline or suppress them just to restore a green build.
 3. Build the affected project during focused work so diagnostics identify the relevant symbols. Build `Automaton.All.sln` before handoff and in CI to cover all projects, tests, and fixtures.
-4. Fix the historical errors in reviewable, behavior-preserving batches. Use the analyzer's diagnostic IDs, locations, and measured scores to guide each batch; do not approximate scores or refactor solely to lower numbers.
+4. Fix the historical errors in reviewable, behavior-preserving batches. Use the analyzer's diagnostic IDs, locations, and measured scores to guide each batch; do not approximate scores or refactor solely to lower numbers. Keep class boundaries aligned with distinct responsibilities, and avoid trivial helper methods that only lower a metric.
 5. If an analyzer finding is demonstrably false-positive or incompatible with required behavior, document the exact rule/symbol and removal condition and request review for a narrow exception.
 
 ## Delivery stages

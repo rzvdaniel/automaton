@@ -216,6 +216,10 @@ public class AppsController : BaseController
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         var newApp = appsService.Get(appId);
+        if (newApp is null)
+        {
+            return NotFound();
+        }
 
         return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
     }
