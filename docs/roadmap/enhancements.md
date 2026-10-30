@@ -52,7 +52,9 @@ before.
   (expects "Automaton Hosted"), and
   `DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan`.
 - API: `SeedCatalog_ExplicitlyRegistersEveryEmbeddedSeed` (expects seven
-  registered guidance seeds; the catalog has six).
+  registered guidance seeds; the catalog has six),
+  `ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned`, and
+  `ExecuteAsync_RequiresPersistedApprovalForPrivilegedHostTarget`.
 - Studio: `AppRuntimeLogs.test.ts` (multiline runtime output), and
   `public-app-url.test.ts` (private link host), which fails intermittently.
 

@@ -37,6 +37,7 @@ internal static class CliCommandCatalog
         root.AddCommand(SetRunnerCommand.Build(config));
         root.AddCommand(ConfigCommand.Build(config));
         root.AddCommand(TargetCommand.Build(config));
+        root.AddCommand(ListingCommand.Build(config));
     }
 
 }
