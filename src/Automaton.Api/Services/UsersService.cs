@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 using Automaton.Api.Models;
@@ -43,12 +43,12 @@ public class UsersService
 
         if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
-            throw new Exception($"User with user name {user.UserName} already registered");
+            throw new InvalidOperationException($"User with user name {user.UserName} already registered");
         }
 
         if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
-            throw new Exception($"User with email address {user.Email} already registered");
+            throw new InvalidOperationException($"User with email address {user.Email} already registered");
         }
 
         var result = await _userManager.CreateAsync(user, password);
@@ -58,7 +58,7 @@ public class UsersService
             var exceptionText = result.Errors.Aggregate(
                 "User Creation Failed - Identity Exception. Errors were: \n\r\n\r",
                 (current, error) => current + (" - " + error.Description + "\n\r"));
-            throw new Exception(exceptionText);
+            throw new InvalidOperationException(exceptionText);
         }
 
         // Assign default subscription plan allowance
@@ -71,12 +71,12 @@ public class UsersService
 
         if (await _userManager.Users.AnyAsync(u => u.UserName == user.UserName))
         {
-            throw new Exception($"User with user name {user.UserName} already registered");
+            throw new InvalidOperationException($"User with user name {user.UserName} already registered");
         }
 
         if (await _userManager.Users.AnyAsync(u => u.Email == user.Email))
         {
-            throw new Exception($"User with email address {user.Email} already registered");
+            throw new InvalidOperationException($"User with email address {user.Email} already registered");
         }
 
         var result = await _userManager.CreateAsync(user);
@@ -86,7 +86,7 @@ public class UsersService
             var exceptionText = result.Errors.Aggregate(
                 "User Creation Failed - Identity Exception. Errors were: \n\r\n\r",
                 (current, error) => current + (" - " + error.Description + "\n\r"));
-            throw new Exception(exceptionText);
+            throw new InvalidOperationException(exceptionText);
         }
 
         await AssignDefaultPlanAsync(user.Id);
@@ -100,7 +100,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating password!");
+            throw new InvalidOperationException("Error in updating password!");
         }
     }
 
@@ -135,7 +135,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating Profile!");
+            throw new InvalidOperationException("Error in updating Profile!");
         }
     }
 
@@ -151,7 +151,7 @@ public class UsersService
 
         if (!result.Succeeded)
         {
-            throw new Exception("Error in updating public username!");
+            throw new InvalidOperationException("Error in updating public username!");
         }
     }
 
@@ -159,10 +159,10 @@ public class UsersService
     {
         var result = await _userManager.FindByIdAsync(userId.ToString());
         if (result == null)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
 
         if (result.IsDeleted)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
 
         return result;
     }
@@ -172,7 +172,7 @@ public class UsersService
         var result = await _userManager.FindByEmailAsync(emailOrUserName) ??
                      await _userManager.FindByNameAsync(emailOrUserName);
         if (result == null)
-            throw new Exception($"User with Email or UserName '{emailOrUserName}' not found!");
+            throw new InvalidOperationException($"User with Email or UserName '{emailOrUserName}' not found!");
 
         return result;
     }
@@ -278,7 +278,7 @@ public class UsersService
     {
         if (user.IsDeleted)
         {
-            throw new Exception("Invalid credentials.");
+            throw new InvalidOperationException("Invalid credentials.");
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
@@ -286,7 +286,7 @@ public class UsersService
         var result = await _userManager.UpdateAsync(user);
         if (!result.Succeeded)
         {
-            throw new Exception("Failed to update last login timestamp.");
+            throw new InvalidOperationException("Failed to update last login timestamp.");
         }
     }
 
@@ -394,7 +394,7 @@ public class UsersService
             return await _userManager.GeneratePasswordResetTokenAsync(user);
         }
 
-        throw new Exception();
+        throw new InvalidOperationException();
     }
 
     public async Task<string> GenerateEmailConfirmationTokenAsync(Guid userId)
@@ -414,13 +414,13 @@ public class UsersService
         var user = await GetUserById(userId);
 
         if (user == null)
-            throw new Exception($"User with userId {userId} not found!");
+            throw new InvalidOperationException($"User with userId {userId} not found!");
         
         var result = await _userManager.ResetPasswordAsync(user, token, password);
 
         if (!result.Succeeded)
         {
-            throw new Exception($"Error in resetting password");
+            throw new InvalidOperationException($"Error in resetting password");
         }
     }
 
@@ -432,7 +432,7 @@ public class UsersService
         var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
         if (!result.Succeeded)
         {
-            throw new Exception(disabled ? "Failed to disable user." : "Failed to enable user.");
+            throw new InvalidOperationException(disabled ? "Failed to disable user." : "Failed to enable user.");
         }
 
         await RevokeAllRefreshTokensAsync(userId, cancellationToken);
@@ -605,7 +605,7 @@ public class UsersService
         var result = await _userManager.AddToRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Adding Role!");
+            throw new InvalidOperationException("Error in Adding Role!");
         }
 
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -634,7 +634,7 @@ public class UsersService
         var result = await _userManager.AddToRoleAsync(await GetUserById(userId), role.Name);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Adding Role!");
+            throw new InvalidOperationException("Error in Adding Role!");
         }
     }
 
@@ -644,7 +644,7 @@ public class UsersService
         var result = await _userManager.RemoveFromRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Removing Role!");
+            throw new InvalidOperationException("Error in Removing Role!");
         }
 
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -673,7 +673,7 @@ public class UsersService
         var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), role.Name);
         if (!result.Succeeded)
         {
-            throw new Exception("Error in Removing Role!");
+            throw new InvalidOperationException("Error in Removing Role!");
         }
     }
 

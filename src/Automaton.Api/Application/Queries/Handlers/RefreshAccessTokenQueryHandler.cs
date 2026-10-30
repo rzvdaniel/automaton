@@ -1,4 +1,4 @@
-﻿using Automaton.Api.Authentication;
+using Automaton.Api.Authentication;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
 using MediatR;
@@ -37,7 +37,7 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             if (refreshToken == null)
             {
-                throw new Exception("Refresh token not found.");
+                throw new InvalidOperationException("Refresh token not found.");
             }
 
             refreshToken.ValidateRefreshToken();
@@ -46,7 +46,7 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             if (user == null)
             {
-                throw new Exception($"User: '{refreshToken.UserId}' not found.");
+                throw new InvalidOperationException($"User: '{refreshToken.UserId}' not found.");
             }
 
             var newRefreshToken = new RefreshToken(user.Id, request.RefreshTokenExpirationDays);
@@ -87,7 +87,7 @@ namespace Automaton.Api.Application.Queries.Handlers
             {
                 await transaction.RollbackAsync(CancellationToken.None);
                 logger.LogWarning($"Concurrency issue refreshing token for user {userId}. The token may have been already refreshed or revoked elsewhere.");
-                throw new Exception("Refresh token refresh operation failed. Please try again.", ex);
+                throw new InvalidOperationException("Refresh token refresh operation failed. Please try again.", ex);
             }
             catch
             {

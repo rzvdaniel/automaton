@@ -32,12 +32,12 @@ public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebTo
 
         if (user == null)
         {
-            throw new Exception("Invalid credentials.");
+            throw new InvalidOperationException("Invalid credentials.");
         }
 
         if (user.IsDeleted)
         {
-            throw new Exception("Invalid credentials.");
+            throw new InvalidOperationException("Invalid credentials.");
         }
 
         if (!user.LockoutEnabled)
@@ -45,14 +45,14 @@ public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebTo
             var lockoutResult = await userManager.SetLockoutEnabledAsync(user, true);
             if (!lockoutResult.Succeeded)
             {
-                throw new Exception("Invalid credentials.");
+                throw new InvalidOperationException("Invalid credentials.");
             }
         }
 
         var signInResult = await signInManager.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: true);
         if (!signInResult.Succeeded)
         {
-            throw new Exception("Invalid credentials.");
+            throw new InvalidOperationException("Invalid credentials.");
         }
 
         await usersService.MarkSuccessfulLoginAsync(user);
