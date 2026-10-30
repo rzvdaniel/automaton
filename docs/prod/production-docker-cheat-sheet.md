@@ -29,6 +29,15 @@ Traefik terminates HTTPS and the TLS Runner broker connection. The API writes re
 
 Verify origin routes with `curl --resolve` and public hostnames after changes. Check API and apps-host `/healthz`, Studio, installation status, and any separate website. Verify the broker certificate/hostname and an AMQP response on its configured address. Container health or a Traefik ping alone is insufficient.
 
+For Runners connecting over the public network, Traefik's TLS broker port 5671 must
+listen on the public interface. An adopted installation's `compose.override.yaml`
+can restrict this listener to a private address even when DNS points to the public
+address. Review that port mapping if public connections are refused while private
+connections succeed. Keep plaintext RabbitMQ private. Back up the override before
+changing it, validate Compose, recreate only Traefik, and verify both HTTPS routes
+and a certificate-validated AMQP handshake. Test from another network to establish
+external reachability.
+
 ## Storage maintenance
 
 ```bash

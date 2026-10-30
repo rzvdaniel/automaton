@@ -17,7 +17,7 @@ public class TargetCommandStructureTests
 
         Assert.That(
             command.Subcommands.Select(item => item.Name),
-            Is.EquivalentTo(new[] { "list", "add", "approve", "revoke", "remove", "primary", "default" }));
+            Is.EquivalentTo(new[] { "list", "add", "remove", "primary", "default" }));
 
         Assert.That(
             command.Subcommands.Single(item => item.Name == "default").IsHidden,
@@ -32,6 +32,8 @@ public class TargetCommandStructureTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("approve"));
+            Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("revoke"));
             Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("approve-privileged-host"));
             Assert.That(target.Subcommands.Select(item => item.Name), Does.Not.Contain("revoke-privileged-host"));
             Assert.That(

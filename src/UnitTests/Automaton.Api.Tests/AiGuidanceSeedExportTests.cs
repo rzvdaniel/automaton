@@ -19,7 +19,7 @@ public sealed class AiGuidanceSeedExportTests
         var catalogPaths = AutomatonGuidanceSeedCatalog.GetEntries().Select(entry => entry.RelativePath).ToArray();
 
         Assert.That(embeddedPaths, Is.EqualTo(catalogPaths.OrderBy(path => path, StringComparer.Ordinal).ToArray()));
-        Assert.That(catalogPaths, Has.Length.EqualTo(7));
+        Assert.That(catalogPaths, Has.Length.EqualTo(6));
         Assert.That(
             AutomatonGuidanceSeedCatalog.GetEntries()
                 .Where(entry => entry.OutputPath is not null)
@@ -65,6 +65,9 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(exportedText, Does.Contain("no HTTP endpoint"));
             Assert.That(exportedText, Does.Contain("automaton create"));
             Assert.That(exportedText, Does.Contain("not linked in the current environment"));
+            Assert.That(normalizedExportedText, Does.Contain("WebSocket upgrades and streamed responses, such as Server-Sent Events, are not supported."));
+            Assert.That(normalizedExportedText, Does.Contain("poll a JSON endpoint"));
+            Assert.That(exportedText, Does.Not.Contain("automaton target approve"));
             Assert.That(exportedText, Does.Not.Contain("When the app has no server-side process"));
 
             foreach (var staleTerm in new[]

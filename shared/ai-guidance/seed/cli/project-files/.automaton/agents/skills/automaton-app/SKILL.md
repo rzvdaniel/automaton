@@ -56,6 +56,12 @@ port, health path, and data directory explicit whenever the app has a runtime.
 Keep generated output and dependencies out of durable source unless the user
 specifically asks for them.
 
+Automaton forwards each HTTP request to the runtime and returns the complete
+response once the app has finished it. WebSocket upgrades and streamed
+responses, such as Server-Sent Events, are not supported. For live updates,
+poll a JSON endpoint and keep each request within the server's configured
+request timeout.
+
 Automaton does not require a language, framework, package manager, source
 layout, or application architecture. The remote Runner performs the configured
 build. The app must listen on the effective port supplied through
