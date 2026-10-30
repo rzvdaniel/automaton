@@ -3150,6 +3150,7 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 

@@ -48,7 +48,8 @@ internal static class IdentityAiModelConfiguration
 
                 entity.Property(e => e.Source)
                     .IsRequired()
-                    .HasDefaultValue(ApiKeySource.Manual);
+                    .HasDefaultValue(ApiKeySource.Manual)
+                    .HasSentinel((ApiKeySource)0);
 
                 entity.Property(e => e.Description).HasMaxLength(500);
 

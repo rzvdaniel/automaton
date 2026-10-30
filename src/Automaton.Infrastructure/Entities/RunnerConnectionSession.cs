@@ -11,7 +11,7 @@ public class RunnerConnectionSession
     public string ConnectionId { get; set; } = string.Empty;
     public DateTime ConnectedAtUtc { get; set; }
     public DateTime? DisconnectedAtUtc { get; set; }
-    public string DisconnectReason { get; set; } = string.Empty;
+    public string? DisconnectReason { get; set; }
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
 
