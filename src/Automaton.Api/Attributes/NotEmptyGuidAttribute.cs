@@ -6,6 +6,7 @@ namespace Automaton.Api.Attributes
     /// <summary>
     /// Validates Guid value for Guid.Empty
     /// </summary>
+    [AttributeUsage(AttributeTargets.Parameter)]
     public class NotEmptyGuidAttribute : ValidationAttribute
     {
         public NotEmptyGuidAttribute()

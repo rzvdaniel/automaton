@@ -40,6 +40,7 @@ using Automaton.Api.Authorization;
 using Automaton.Api.Middleware;
 using Automaton.Api.Hubs;
 using Automaton.Api.Messaging;
+using Automaton.Api.Logging;
 using Automaton.Messaging.Abstractions;
 using Automaton.Identity;
 using Automaton.Infrastructure;

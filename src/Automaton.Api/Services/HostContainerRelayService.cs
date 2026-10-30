@@ -74,7 +74,7 @@ internal static class HostContainerRelayRequestPreparer
         {
             Scope = new HostContainerScope(
                 Guid.Empty, Guid.Empty, state.Target.WebAppId, state.Target.Id,
-                request.Scope.DeploymentAttemptId, state.MachineRunner!.Id),
+                request.Scope.DeploymentAttemptId, state.MachineRunner.Id),
             Resources = requiresContainerLimits
                 ? new HostContainerResourceRef(HostContainerResourceKinds.Source,
                     HostContainerResourceKinds.Artifact, HostContainerResourceKinds.ApplicationData)

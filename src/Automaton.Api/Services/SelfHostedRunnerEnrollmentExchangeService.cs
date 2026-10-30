@@ -91,7 +91,7 @@ public sealed class SelfHostedRunnerEnrollmentExchangeService(
         RunnerEnrollmentExchangeRequest request,
         CancellationToken cancellationToken)
     {
-        var tokenHash = HashToken(request.EnrollmentToken!.Trim());
+        var tokenHash = HashToken(request.EnrollmentToken.Trim());
         var enrollment = await db.SelfHostedRunnerEnrollments
             .FirstOrDefaultAsync(x => x.EnrollmentTokenHash == tokenHash, cancellationToken);
         if (enrollment is null || enrollment.Status != RunnerEnrollmentStatuses.Pending)

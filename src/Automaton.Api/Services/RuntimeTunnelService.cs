@@ -147,6 +147,6 @@ public sealed class RuntimeTunnelService(
             && !string.IsNullOrWhiteSpace(target.WebApp.PublicUrl)
             && RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement
             && string.Equals(host,
-                PublishedAppHostNames.BuildPublishedAppHost(target.WebApp.PublicUrl!, publishedAppsConfig.PublicBaseUrlHost),
+                PublishedAppHostNames.BuildPublishedAppHost(target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost),
                 StringComparison.OrdinalIgnoreCase);
 }

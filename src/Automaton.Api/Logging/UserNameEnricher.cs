@@ -1,5 +1,7 @@
 using Serilog.Core;
 
+namespace Automaton.Api.Logging;
+
 public class UserNameEnricher : ILogEventEnricher
 {
     readonly IHttpContextAccessor _httpContextAccessor;
