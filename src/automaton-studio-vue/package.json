@@ -23,7 +23,7 @@
     "@codemirror/lang-yaml": "^6.1.2",
     "@microsoft/signalr": "^9.0.6",
     "@primevue/themes": "^4.5.4",
-    "axios": "^1.13.2",
+    "axios": "^1.20.0",
     "chart.js": "^4.5.1",
     "codemirror": "^6.0.2",
     "marked": "^15.0.12",
@@ -49,8 +49,8 @@
     "jsdom": "^29.1.1",
     "prettier": "^3.7.4",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4",
-    "vitest": "^4.1.10",
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.1.4"
   }
 }
