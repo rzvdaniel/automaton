@@ -13,6 +13,23 @@ public class FileStorageService
     private readonly string installationIdFile;
 
     public FileStorageService()
+        : this(GetConfigDirectory())
+    {
+    }
+
+    internal FileStorageService(string configDirectory)
+    {
+        this.configDirectory = configDirectory;
+        runnerConfigFile = Path.Combine(configDirectory, "runner.json");
+        serverConfigFile = Path.Combine(configDirectory, "server.json");
+        apiKeyFile = Path.Combine(configDirectory, "api-key");
+        installationProfileFile = Path.Combine(configDirectory, "installation-profile.json");
+        installationIdFile = Path.Combine(configDirectory, "installation-id");
+
+        EnsureConfigDirectoryExists();
+    }
+
+    private static string GetConfigDirectory()
     {
         // Check if running as a Windows service (SYSTEM account won't have normal APPDATA)
         var isService = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("USERPROFILE")) ||
@@ -21,21 +38,11 @@ public class FileStorageService
         if (isService)
         {
             // When running as service, use config folder in working directory
-            configDirectory = Path.Combine(Directory.GetCurrentDirectory(), "config");
+            return Path.Combine(Directory.GetCurrentDirectory(), "config");
         }
-        else
-        {
-            // When running interactively, use user's AppData
-            configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
-        }
-        
-        runnerConfigFile = Path.Combine(configDirectory, "runner.json");
-        serverConfigFile = Path.Combine(configDirectory, "server.json");
-        apiKeyFile = Path.Combine(configDirectory, "api-key");
-        installationProfileFile = Path.Combine(configDirectory, "installation-profile.json");
-        installationIdFile = Path.Combine(configDirectory, "installation-id");
 
-        EnsureConfigDirectoryExists();
+        // When running interactively, use user's AppData
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
     }
 
     // Environment variables remain supported for existing deployments. Enrolled
@@ -101,10 +108,22 @@ public class FileStorageService
         var json = JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(installationProfileFile, json);
         TryRestrictFile(installationProfileFile);
+
+        if (!string.IsNullOrWhiteSpace(profile.InstallationId))
+        {
+            await SaveInstallationIdAsync(profile.InstallationId);
+        }
     }
 
     public async Task<string> GetOrCreateInstallationIdAsync()
     {
+        var profile = await LoadInstallationProfileAsync();
+        if (!string.IsNullOrWhiteSpace(profile?.InstallationId))
+        {
+            await SaveInstallationIdAsync(profile.InstallationId);
+            return profile.InstallationId;
+        }
+
         if (File.Exists(installationIdFile))
         {
             var existing = (await File.ReadAllTextAsync(installationIdFile)).Trim();
@@ -113,9 +132,14 @@ public class FileStorageService
         }
 
         var installationId = $"ri_{Guid.NewGuid():N}";
-        await File.WriteAllTextAsync(installationIdFile, installationId);
-        TryRestrictFile(installationIdFile);
+        await SaveInstallationIdAsync(installationId);
         return installationId;
+    }
+
+    private async Task SaveInstallationIdAsync(string installationId)
+    {
+        await File.WriteAllTextAsync(installationIdFile, installationId.Trim());
+        TryRestrictFile(installationIdFile);
     }
 
     public async Task<RunnerInstallationProfile?> LoadInstallationProfileAsync()
