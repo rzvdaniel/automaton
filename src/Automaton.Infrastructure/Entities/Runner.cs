@@ -71,7 +71,7 @@ public class Runner
     /// </summary>
     public string? ScriptEngineSettings { get; set; }
 
-    public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; } = Array.Empty<RunnerUser>();
+    public virtual ICollection<RunnerUser> RunnerUsers { get; set; } = new List<RunnerUser>();
 
     // Project linking
     public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();
