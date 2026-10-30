@@ -85,7 +85,7 @@ public sealed class AppFileDownloadServiceTests
             var transfers = new FakeTransferGateway();
             var service = new AppFileDownloadService(transfers,
                 new AppFileRunnerResolver(new StubTargetResolver(db)),
-                NullLogger<Automaton.Api.Controllers.AppFilesController>.Instance);
+                NullLogger<AppFileDownloadService>.Instance);
             return new DownloadFixture(ownerId, appId, db, transfers, service);
         }
 

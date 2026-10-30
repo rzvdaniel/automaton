@@ -1,4 +1,6 @@
-# Critical analyzer findings remediation plan
+# Historical Sonar analyzer findings remediation plan
+
+> This document records decisions made while `SonarAnalyzer.CSharp` was installed. The package and its build rules have since been removed; the `S*` diagnostics below are not active local build gates.
 
 Status: batches 1–3 were merged in [PR #302](https://github.com/rzvdaniel/automaton/pull/302) (merge commit `c8b5899a`). The five rules `S4830`, `S5445`, `S4502`, `S2930`, and `S2190` are build errors on `main`. Batch 4 is being handled in smaller, reviewable slices; [PR #303](https://github.com/rzvdaniel/automaton/pull/303) updates request-scoped cancellation and replaces avoidable raw-header/query reads with model binding. Its review follow-up makes default-plan replacement atomic and wraps user-plan assignment, Hosted Runner state/provisioning events, and audit writing in the CAP-backed transaction with a request-independent completion token. [PR #304](https://github.com/rzvdaniel/automaton/pull/304) and [PR #305](https://github.com/rzvdaniel/automaton/pull/305) are merged: the Runner cancellation slices address `HubService` heartbeat ownership and shutdown, service-stop cancellation for local FastAPI shutdown/readiness waits, and replacement-runtime candidate ownership during old-runtime exit. PR #305's regression waits for the old runtime route to leave the registry while its replacement remains pending, then verifies promotion. The heartbeat lifecycle test covers cancellation while waiting for its next tick; an in-flight SignalR send still lacks a practical connection fixture. Remaining Runner background cancellation findings and the request-size dispositions are still open. `S6444` remains planned. This document does not authorize a production deployment.
 
@@ -6,7 +8,7 @@ Baseline: `dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal` 
 
 ## Goal and ordering
 
-Remove confirmed security and reliability risks first, then turn the resolved rules into build errors where that produces a reliable safeguard. Keep the existing `S1764` and `S2757` error gates. Do not promote a rule that still has unexplained historical findings, silence a whole rule to pass CI, or change runtime behavior just to make a warning disappear.
+This historical plan recommended removing confirmed security and reliability risks, then promoting selected Sonar rules into build errors. Those Sonar gates are no longer active after removing the package; the remediation history remains useful context for the code changes and review decisions.
 
 | Priority | Rule and inventory | Why it is here | Initial decision |
 | --- | --- | --- | --- |

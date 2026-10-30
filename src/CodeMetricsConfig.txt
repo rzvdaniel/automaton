@@ -1,6 +1,2 @@
 # CA1502 reports methods with cyclomatic complexity greater than 15.
 CA1502: 15
-
-# CA1506 counts distinct referenced types, not constructor parameters.
-CA1506(Type): 60
-CA1506(Method): 30
