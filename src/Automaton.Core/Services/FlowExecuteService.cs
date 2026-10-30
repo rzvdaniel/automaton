@@ -11,8 +11,8 @@ public class FlowExecuteService : BaseFlowExecuteService<Flow>
     public FlowExecuteService(
         FlowConvertService flowConvertService, 
         string applicationName,
-        IExecutionNotificationService notificationService = null,
-        IWorkflowExecutionPersistenceService persistenceService = null)
+        IExecutionNotificationService? notificationService = null,
+        IWorkflowExecutionPersistenceService? persistenceService = null)
         : base(flowConvertService, 
                notificationService ?? new NullExecutionNotificationService(), 
                applicationName,

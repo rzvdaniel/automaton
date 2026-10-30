@@ -4,10 +4,10 @@ namespace Automaton.Studio.Extensions;
 
 public static class StepExtensions
 {
-    public static Type FindType(this Step step)
+    public static Type? FindType(this Step step)
     {
         var fullClassName = $"Automaton.Steps.{step.Type}, Automaton.Steps";
-        var type = Type.GetType(fullClassName, true, true);
+        var type = Type.GetType(fullClassName, throwOnError: false, ignoreCase: true);
 
         return type;
     }

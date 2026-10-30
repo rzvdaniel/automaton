@@ -23,7 +23,7 @@ namespace Automaton.Core.Services
             IFlowConvertService<TFlow> flowConvertService,
             IExecutionNotificationService notificationService,
             string applicationName,
-            IWorkflowExecutionPersistenceService persistenceService = null)
+            IWorkflowExecutionPersistenceService? persistenceService = null)
         {
             this.flowConvertService = flowConvertService;
             this.notificationService = notificationService;
@@ -45,7 +45,7 @@ namespace Automaton.Core.Services
                 await notificationService.SendVariableUpdate(e.Variable);
             };
 
-            WorkflowExecution workflowExecution = null;
+            WorkflowExecution? workflowExecution = null;
             
             try
             {
@@ -98,19 +98,19 @@ namespace Automaton.Core.Services
         /// <summary>
         /// IFlowExecuteService implementation - works with Workflow directly
         /// </summary>
-        public virtual async Task<WorkflowExecution> Execute(Workflow workflow, int executeDelay =0, CancellationToken cancellationToken = default)
+        public virtual Task<WorkflowExecution> Execute(Workflow workflow, int executeDelay =0, CancellationToken cancellationToken = default)
         {
-            return await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
+            return ExecuteWorkflow(workflow, executeDelay, cancellationToken);
         }
 
         /// <summary>
         /// IFlowExecuteService implementation - works with Flow (needs to be implemented by derived classes if supported)
         /// For backward compatibility - should be overridden to avoid ambiguous calls
         /// </summary>
-        public virtual async Task<WorkflowExecution> Execute(Flow flow, CancellationToken cancellationToken = default)
+        public virtual Task<WorkflowExecution> Execute(Flow flow, CancellationToken cancellationToken = default)
         {
             // Base implementation throws - derived classes can override if they support Flow conversion
-            throw new NotSupportedException($"{GetType().Name} does not support direct Flow execution. Use the domain-specific Execute method instead.");
+            return Task.FromException<WorkflowExecution>(new NotSupportedException($"{GetType().Name} does not support direct Flow execution. Use the domain-specific Execute method instead."));
         }
 
         /// <summary>
@@ -119,7 +119,8 @@ namespace Automaton.Core.Services
         protected virtual async Task<WorkflowExecution> ExecuteWorkflow(Workflow workflow, int executeDelay =0, CancellationToken cancellationToken = default)
         {
             using var workflowExecution = new WorkflowExecution(workflow.Id, applicationName);
-            var definition = workflow.GetStartupDefinition();
+            var definition = workflow.GetStartupDefinition()
+                ?? throw new InvalidOperationException($"Workflow '{workflow.Id}' has no startup definition '{workflow.StartupDefinitionId}'.");
             var step = definition.GetFirstStep();
 
             // Set up logging context
@@ -149,7 +150,9 @@ namespace Automaton.Core.Services
             var nameKeyedOutputs = new Dictionary<string, StepVariable>(StringComparer.OrdinalIgnoreCase);
             foreach (var sv in workflow.OutputVariables.Values)
             {
-                var key = !string.IsNullOrWhiteSpace(sv.Name) ? sv.Name! : sv.Id;
+                var key = !string.IsNullOrWhiteSpace(sv.Name)
+                    ? sv.Name
+                    : sv.Id ?? throw new InvalidOperationException("An output variable must have a name or id.");
                 // Last-in wins if duplicate names; ensures stable result
                 nameKeyedOutputs[key] = sv;
             }
@@ -330,9 +333,9 @@ namespace Automaton.Core.Services
             WorkflowExecution workflowExecution,
             string level,
             string message,
-            string stepId = null,
-            string stepName = null,
-            Exception exception = null,
+            string? stepId = null,
+            string? stepName = null,
+            Exception? exception = null,
             CancellationToken cancellationToken = default)
         {
             //1. Add to workflow execution for persistence
@@ -359,7 +362,7 @@ namespace Automaton.Core.Services
             }
         }
 
-        protected virtual void LogToSerilog(string level, string message, Exception exception = null)
+        protected virtual void LogToSerilog(string level, string message, Exception? exception = null)
         {
             switch (level.ToLowerInvariant())
             {

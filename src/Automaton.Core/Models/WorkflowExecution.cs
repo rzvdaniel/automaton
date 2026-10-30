@@ -30,7 +30,7 @@ public class WorkflowExecution : IDisposable
         Application = application;
     }
 
-    public void AddLog(string level, string message, string stepId = null, string stepName = null, Exception exception = null)
+    public void AddLog(string level, string message, string? stepId = null, string? stepName = null, Exception? exception = null)
     {
         logs.Add(new ExecutionLogEntry
         {
@@ -58,9 +58,9 @@ public class WorkflowExecution : IDisposable
 public class ExecutionLogEntry
 {
     public DateTime Timestamp { get; set; }
-    public string Level { get; set; }
-    public string Message { get; set; }
-    public string StepId { get; set; }
-    public string StepName { get; set; }
-    public string Exception { get; set; }
+    public string Level { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? StepId { get; set; }
+    public string? StepName { get; set; }
+    public string? Exception { get; set; }
 }

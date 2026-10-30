@@ -10,7 +10,7 @@ namespace Automaton.Core.Extensions
         /// <typeparam name="T">The type of object being copied.</typeparam>
         /// <param name="source">The object instance to copy.</param>
         /// <returns>The copied object.</returns>
-        public static T CloneJson<T>(this T source)
+        public static T? CloneJson<T>(this T? source)
         {
             // Don't serialize a null object, simply return the default for that object
             if (ReferenceEquals(source, null)) return default;

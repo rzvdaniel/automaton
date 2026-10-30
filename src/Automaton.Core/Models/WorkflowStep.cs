@@ -9,17 +9,17 @@ public abstract class WorkflowStep
 {
     protected readonly ILogger logger;
 
-    public virtual string Id { get; set; }
+    public virtual string Id { get; set; } = string.Empty;
 
-    public virtual string Name { get; set; }
+    public virtual string Name { get; set; } = string.Empty;
 
-    public string DisplayName { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
 
-    public string Description { get; set; }
+    public string Description { get; set; } = string.Empty;
 
     public string? ParentId { get; set; }
 
-    public string Type { get; set; }
+    public string Type { get; set; } = string.Empty;
 
     public string? NextStepId { get; set; }
 
@@ -42,12 +42,12 @@ public abstract class WorkflowStep
     {
         // Need to deep clone the incoming step to avoid Inputs and Outputs
         // being updated during execution of the flow and then passed back to designer
-        var stepClone = step.CloneJson();
+        var stepClone = step.CloneJson() ?? throw new InvalidOperationException("The workflow step could not be cloned.");
 
         Id = stepClone.Id;
         Name = stepClone.Name;
         DisplayName = stepClone.DisplayName;
-        Description = stepClone.Description;
+        Description = stepClone.Description ?? string.Empty;
         Type = stepClone.Type;
         NextStepId = stepClone.NextStepId;
         ParentId = stepClone.ParentId;
@@ -67,7 +67,10 @@ public abstract class WorkflowStep
 
     public virtual WorkflowStep? GetNextStep()
     {
-        return NextStepId != null ? WorkflowDefinition.Steps[NextStepId] : null;
+        return NextStepId != null && WorkflowDefinition != null
+            && WorkflowDefinition.Steps.TryGetValue(NextStepId, out var nextStep)
+                ? nextStep
+                : null;
     }
 
     protected StepVariable? GetInputVariable(string name)
@@ -87,7 +90,18 @@ public abstract class WorkflowStep
         var stepType = GetType();
         foreach (var input in Inputs)
         {
+            if (string.IsNullOrEmpty(input.Value.Name))
+            {
+                logger.Warning("Ignoring workflow input with no name for {StepType}", stepType.Name);
+                continue;
+            }
+
             var stepProperty = stepType.GetProperty(input.Value.Name);
+            if (stepProperty == null)
+            {
+                logger.Warning("Ignoring workflow input {InputName} because {StepType} has no matching property", input.Value.Name, stepType.Name);
+                continue;
+            }
             var variable = input.Value;
             var value = ResolveInputValue(variable, stepProperty, context);
             AssignInputValue(stepProperty, value);
@@ -100,7 +114,7 @@ public abstract class WorkflowStep
         if (string.IsNullOrEmpty(value))
         {
             var runtimeVar = context.Workflow.Variables.Values
-                .FirstOrDefault(item => item.Name.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(item => string.Equals(item.Name, variable.Name, StringComparison.OrdinalIgnoreCase));
             if (runtimeVar != null)
             {
                 value = runtimeVar.Value;

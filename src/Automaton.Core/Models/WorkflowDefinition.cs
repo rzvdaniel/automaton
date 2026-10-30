@@ -2,7 +2,7 @@
 
 public class WorkflowDefinition
 {
-    public string Id { get; set; }
+    public string Id { get; set; } = string.Empty;
 
     public IDictionary<string, WorkflowStep> Steps { get; set; } = new Dictionary<string, WorkflowStep>();
 
