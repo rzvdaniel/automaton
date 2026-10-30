@@ -281,7 +281,7 @@ public class AppsController : BaseController
                 Message = "Application publish failed.",
                 ActorUserId = userContextService.GetUserId(),
                 Metadata = new { Error = ex.Message, request.PublicUrl }
-            });
+            }, cancellationToken);
             return BadRequest(new { message = ex.Message });
         }
 
@@ -312,7 +312,7 @@ public class AppsController : BaseController
                 Message = "Application unpublish failed.",
                 ActorUserId = userContextService.GetUserId(),
                 Metadata = new { Error = ex.Message }
-            });
+            }, cancellationToken);
             return BadRequest(new { message = ex.Message });
         }
 
