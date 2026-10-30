@@ -50,6 +50,7 @@ public sealed class AccountRegistrationController : BaseController
 
     [HttpGet]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public IActionResult RegistrationStatus() => Ok(new
     {
         enabled = !configurationService.NoUserSignUp,

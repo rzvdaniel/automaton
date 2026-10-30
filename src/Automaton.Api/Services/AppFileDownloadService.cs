@@ -6,7 +6,7 @@ namespace Automaton.Api.Services;
 public sealed class AppFileDownloadService(
     IRunnerFileTransferGateway transfers,
     AppFileRunnerResolver runnerResolver,
-    ILogger<Controllers.AppFilesController> logger)
+    ILogger<AppFileDownloadService> logger)
 {
     private static readonly TimeSpan DownloadDeadline = TimeSpan.FromMinutes(10);
 

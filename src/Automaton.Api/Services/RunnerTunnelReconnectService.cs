@@ -18,9 +18,8 @@ public sealed class RunnerTunnelReconnectService(
         // the latest target to every compatible Runner's serial management queue.
         var registeredRunners = await dbContext.Runners.AsNoTracking()
             // Legacy registrations without a bound credential remain eligible for reconciliation.
-            .Where(runner => runner.ApiKeyId.HasValue
-                ? runner.ApiKey != null && runner.ApiKey.IsActive
-                : true)
+            .Where(runner => !runner.ApiKeyId.HasValue
+                || runner.ApiKey != null && runner.ApiKey.IsActive)
             // Completed Hosted enrollment retains RunnerId after deletion clears
             // the Hosted Runner links and removes queues. BYO enrollment uses a
             // separate durable identity record, even with the same key source.

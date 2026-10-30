@@ -98,7 +98,7 @@ namespace Automaton.Api.Authentication
                 {
                     UserId = jwt.Subject,
                     UserName = jwt.Claims.SingleOrDefault(x => x.Type == ClaimTypes.Name)?.Value,
-                    Roles = string.IsNullOrWhiteSpace(roles) == false ? roles.Split() : null,
+                    Roles = !string.IsNullOrWhiteSpace(roles) ? roles.Split() : null,
                     Expires = jwt.ValidTo.ToUnixEpochDate(),
                     Claims = jwt.Claims.ToDictionary(k => k.Type, v => v.Value)
                 };

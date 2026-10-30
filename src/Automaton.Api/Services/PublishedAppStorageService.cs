@@ -349,16 +349,18 @@ public class PublishedAppStorageService
 
     private static IEnumerable<HtmlReference> EnumerateHtmlReferences(string html)
     {
-        for (var i = 0; i < html.Length; i++)
+        var i = 0;
+        while (i < html.Length)
         {
             var attribute = TryReadReferenceAttribute(html, i);
             if (attribute is null || !TryReadReferenceValue(html, i, attribute, out var reference, out var nextIndex))
             {
+                i++;
                 continue;
             }
 
             yield return new HtmlReference(attribute, reference);
-            i = nextIndex;
+            i = nextIndex + 1;
         }
     }
 

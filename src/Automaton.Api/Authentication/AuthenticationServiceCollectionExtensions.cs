@@ -117,7 +117,7 @@ namespace Automaton.Api.Authentication
         }
 
         public static long ToUnixEpochDate(this DateTime date)
-            => (long) Math.Round((date.ToUniversalTime() - new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero))
+            => (long) Math.Round((date.ToUniversalTime() - DateTimeOffset.UnixEpoch)
                 .TotalSeconds);
 
         private static SigningCredentials GetCredentialSigningKey(AuthenticationSettings setting)
