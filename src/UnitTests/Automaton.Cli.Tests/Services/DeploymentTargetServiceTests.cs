@@ -75,7 +75,7 @@ public class DeploymentTargetServiceTests
     }
 
     [Test]
-    public void Format_ShowsLiveRoleDestinationAndStatus()
+    public void Format_ShowsMachineManagementDestinationForLegacyHostedRunner()
     {
         var hosted = DefaultTarget with
         {
@@ -84,7 +84,7 @@ public class DeploymentTargetServiceTests
 
         Assert.That(
             DeploymentTargetService.Format(hosted),
-            Is.EqualTo("Default (default) · Live · Automaton Hosted · Running"));
+            Is.EqualTo("Default (default) · Live · Machine Management Runner · Running"));
     }
 
     [Test]

@@ -65,3 +65,7 @@ and whose output path is set. The built-in export is exactly `AGENTS.md` and
 `.automaton/agents/skills/automaton-app/SKILL.md`. Studio, MCP, and shared
 guidance remain available to their own consumers without leaking into local
 project files.
+
+The exported app skill includes the HTTP forwarding limitation: WebSocket upgrades
+and streaming responses, including Server-Sent Events, are unsupported. After a
+server update, run `automaton sync-ai` in existing projects to refresh this guidance.

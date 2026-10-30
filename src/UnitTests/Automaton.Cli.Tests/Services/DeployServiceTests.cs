@@ -277,9 +277,10 @@ public class DeployServiceTests
 
         var result = await service.DeployAsync(projectRoot, clean: false, directoryOverride: null);
 
+        Assert.That(result.Success, Is.False);
         Assert.That(result.NextSteps, Does.Contain("No eligible Runner Host is available for managed Hosted Runner provisioning."));
-        Assert.That(result.NextSteps.Any(step => step.Contains("protocol-4 Infrastructure Runner with HostContainerExecution", StringComparison.Ordinal)), Is.True);
         Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Normal hosted Runner provisioning requires an Infrastructure Runner transport.");
     }
 
     [Test]
