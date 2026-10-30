@@ -103,12 +103,14 @@ public sealed class LinkAppService
         string appId,
         string server,
         string apiKey,
-        string? environmentName,
+        string environmentName,
         ICollection<CommandDiagnosticCheck> checks,
         ISet<string> nextSteps)
     {
-        var root = _config.FindNearestProjectRoot(directory)!;
-        var projectConfig = _config.TryLoadProjectConfig(root)!;
+        var root = _config.FindNearestProjectRoot(directory)
+            ?? throw new InvalidOperationException("Could not find the Automaton project root.");
+        var projectConfig = _config.TryLoadProjectConfig(root)
+            ?? throw new InvalidOperationException("The Automaton project configuration is invalid or unreadable.");
         var environment = _config.LoadNamedEnvironmentConfig(directory, environmentName) ?? new GlobalConfig();
         return new LinkContext(directory, appId, server, apiKey, environmentName,
             Path.Combine(root, "automaton.json"), projectConfig, environment, checks, nextSteps);
@@ -202,7 +204,7 @@ public sealed class LinkAppService
         string AppId,
         string Server,
         string ApiKey,
-        string? EnvironmentName,
+        string EnvironmentName,
         string ProjectConfigPath,
         AutomatonConfig ProjectConfig,
         GlobalConfig Environment,

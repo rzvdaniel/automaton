@@ -41,12 +41,16 @@ public sealed class NewAppService
             return validationFailure;
         }
 
+        var validatedName = name!.Trim();
+        var validatedServer = server!;
+        var validatedApiKey = apiKey!;
+
         var configPath = Path.Combine(directory, "automaton.json");
         var existingConfig = _config.TryLoadProjectConfig(directory);
 
         try
         {
-            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, name.Trim()));
+            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, validatedName));
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.LocalScaffold,
                 true,
@@ -54,7 +58,7 @@ public sealed class NewAppService
 
             try
             {
-                var guidanceReferences = await _getGuidanceAsync(server, apiKey, cancellationToken);
+                var guidanceReferences = await _getGuidanceAsync(validatedServer, validatedApiKey, cancellationToken);
                 var guidance = _aiGuidancePackService.Sync(directory, guidanceReferences);
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
             }
@@ -68,11 +72,11 @@ public sealed class NewAppService
                 nextSteps.Add("Run automaton sync-ai later to pull the latest guidance from the server");
             }
 
-            var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
+            var (appId, appName) = await _createAppAsync(validatedServer, validatedApiKey, validatedName, cancellationToken);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
 
             var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, resolvedEnvironmentName) ?? new GlobalConfig();
-            namedEnvironment.Server = server;
+            namedEnvironment.Server = validatedServer;
             namedEnvironment.AppId = appId;
             _config.SaveNamedEnvironmentConfig(directory, resolvedEnvironmentName, namedEnvironment);
             _config.SaveProjectEnvironmentSelection(directory, new ProjectEnvironmentSelection { Default = resolvedEnvironmentName });
@@ -205,7 +209,7 @@ public sealed class NewAppService
             return Failure(checks, nextSteps, server, name);
         }
 
-        var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, environmentName);
+        var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, environmentName!);
         var existingAppId = namedEnvironment?.AppId ?? projectConfig?.AppId;
         if (string.IsNullOrWhiteSpace(existingAppId)) return null;
         checks.Add(new CommandDiagnosticCheck(

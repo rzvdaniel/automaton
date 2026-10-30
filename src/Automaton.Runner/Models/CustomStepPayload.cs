@@ -8,9 +8,9 @@ namespace Automaton.Runner.Console.Models;
 public class CustomStepPayload
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
-    public string Code { get; set; }
-    public string Language { get; set; }
-    public List<StepVariable> CodeInputVariables { get; set; }
-    public List<StepVariable> CodeOutputVariables { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public string Language { get; set; } = string.Empty;
+    public List<StepVariable> CodeInputVariables { get; set; } = [];
+    public List<StepVariable> CodeOutputVariables { get; set; } = [];
 }

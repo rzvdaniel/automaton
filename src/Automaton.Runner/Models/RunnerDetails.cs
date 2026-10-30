@@ -5,7 +5,7 @@ namespace Automaton.Runner.Console.Models;
 public class RunnerDetails
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public string? ConnectionId { get; set; }
     public RunnerStatus Status { get; set; }
     public DateTime? LastHeartbeatAtUtc { get; set; }

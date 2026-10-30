@@ -8,7 +8,7 @@ internal static class RunnerRuntimeMetadataPolicy
     public static bool HasComposeContract(ApplicationContract contract) => contract.Compose is not null;
 
     public static bool HasComposeMetadata(RunnerRuntimeDeploymentMetadata? metadata)
-        => DeserializeCompose(metadata) is not null;
+        => metadata is not null && DeserializeCompose(metadata) is not null;
 
     public static bool IsStoppedContract(ApplicationContract contract)
         => contract.Runtime.Command is null && contract.Compose is null;
@@ -52,14 +52,17 @@ internal static class RunnerRuntimeMetadataPolicy
             && (!string.IsNullOrWhiteSpace(metadata.Runtime?.Image)
                 || !string.IsNullOrWhiteSpace(metadata.ComposeJson) && !string.IsNullOrWhiteSpace(metadata.ComposeProjectId));
 
-    public static ApplicationContract CreateApplicationContract(RunnerRuntimeDeploymentMetadata metadata)
-        => new()
+    public static ApplicationContract CreateApplicationContract(RunnerRuntimeDeploymentMetadata? metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        return new()
         {
             Runtime = CloneRuntimeWithResolvedImage(metadata.Runtime, metadata.ResolvedRuntimeImage),
             Health = metadata.Health ?? new ApplicationHealthSpec(),
             Storage = metadata.Storage ?? new ApplicationStorageSpec(),
             Compose = DeserializeCompose(metadata)
         };
+    }
 
     public static string? SerializeCompose(ApplicationComposeSpec? compose)
         => compose is null ? null : JsonSerializer.Serialize(compose);

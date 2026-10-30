@@ -4,7 +4,7 @@ namespace Automaton.Steps;
 
 public class EmitLog : WorkflowStep
 {
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
 
     protected override Task<ExecutionResult> RunAsync(StepExecutionContext context)
     {

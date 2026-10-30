@@ -7,6 +7,6 @@
     {
         event EventHandler<string> ScriptTextWritten;
 
-        IDictionary<string, string> Execute(ScriptResource resource, IDictionary<string, string> inputs);
+        ScriptExecutionResult Execute(ScriptResource resource, IDictionary<string, string> inputs);
     }
 }

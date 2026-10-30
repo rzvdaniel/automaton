@@ -27,7 +27,7 @@ public class EventRaisingStreamWriter : MemoryStream
         base.WriteByte(value);
     }
 
-    public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+    public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
     {
         NewText?.Invoke(this, Encoding.Default.GetString(buffer, offset, count));
 

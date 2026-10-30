@@ -125,7 +125,7 @@ namespace Automaton.Core.Scripting.Engines.Python
                     // Always apply configured paths for this engine instance, even if Python was already initialized
                     ApplyConfiguredPathsToSyspath();
                 }
-                catch (Exception ex)
+                catch
                 {
                     throw;
                 }
@@ -156,7 +156,7 @@ namespace Automaton.Core.Scripting.Engines.Python
                 if (finalPaths.Any())
                     AddPathsToPythonSearchPath(finalPaths);
             }
-            catch (Exception ex)
+            catch
             {
             }
         }

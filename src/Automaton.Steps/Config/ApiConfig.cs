@@ -2,8 +2,8 @@
 
 public class ApiConfig
 {
-    public string BaseUrl { get; set; }
-    public string WorkflowHubUrl { get; set; }
-    public string RegistrationApiUrl { get; set; }
-    public string FlowsUrl { get; set; }
+    public string BaseUrl { get; set; } = string.Empty;
+    public string WorkflowHubUrl { get; set; } = string.Empty;
+    public string RegistrationApiUrl { get; set; } = string.Empty;
+    public string FlowsUrl { get; set; } = string.Empty;
 }

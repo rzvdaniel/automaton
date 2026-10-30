@@ -1054,6 +1054,12 @@ public class RunnerHostService
                 }             
             }
 
+            if (string.IsNullOrWhiteSpace(server))
+            {
+                WriteLine("❌ Server URL cannot be empty. Keeping current server.");
+                server = configService.BaseUrl;
+            }
+
             await configService.UpdateServerUrlAsync(server);
             WriteLine($"✅ Server configured and saved: {server}");
             return server;

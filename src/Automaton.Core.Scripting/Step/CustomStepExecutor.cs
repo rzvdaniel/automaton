@@ -103,7 +103,11 @@ public class CustomStepExecutor
             Content = code
         };
 
-        return _scriptHost.Execute(resource, inputVariables);
+        var execution = _scriptHost.Execute(resource, inputVariables);
+        if (!execution.Success)
+            throw new InvalidOperationException(execution.Error?.Message ?? "Custom step script execution failed.");
+
+        return execution.OutputVariables.ToDictionary(pair => pair.Key, pair => pair.Value);
     }
 
     private Dictionary<string, string> ExtractOutputVariables
