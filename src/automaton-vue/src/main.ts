@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import { analytics } from './services/analytics'
 import './assets/main.css'
+import './assets/site.css'
 
 const app = createApp(App)
 
