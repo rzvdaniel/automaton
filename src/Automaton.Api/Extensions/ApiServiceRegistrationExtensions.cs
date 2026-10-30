@@ -28,7 +28,6 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Extensions;
 using Automaton.Api.Entities;
 using Automaton.Api.Authentication.GitHub;
-using Automaton.Api.Logging;
 using Automaton.Api.Areas.Identity;
 using Automaton.Api.Data;
 using Automaton.Api.Services.Mcp;

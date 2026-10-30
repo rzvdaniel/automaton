@@ -13,7 +13,7 @@ public abstract class BaseController : ControllerBase
 
     protected IMediator Mediator => _mediator ??= HttpContext.RequestServices.GetRequiredService<IMediator>();
 
-    public BaseController()
+    protected BaseController()
     {
     }
 

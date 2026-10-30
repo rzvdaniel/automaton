@@ -14,7 +14,7 @@ public class NoOpEmailService : IEmailService
         _env = env;
     }
 
-    public Task<bool> Send(EmailData email, CancellationToken cancellationToken)
+    public Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Skipping email send in {Environment}", _env.EnvironmentName);
         // Return true so app flow continues, but consider returning a richer result in some apps

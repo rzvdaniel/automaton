@@ -11,7 +11,7 @@ public class UserNameEnricher : ILogEventEnricher
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory factory)
+    public void Enrich(Serilog.Events.LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
         if (!(_httpContextAccessor.HttpContext?.User.Identity.IsAuthenticated ?? false))
         {
@@ -21,7 +21,7 @@ public class UserNameEnricher : ILogEventEnricher
         var user = _httpContextAccessor.HttpContext.User;
         var userName = user.Identity.Name;
 
-        var userNameProperty = factory.CreateProperty("UserName", userName);
+        var userNameProperty = propertyFactory.CreateProperty("UserName", userName);
         logEvent.AddOrUpdateProperty(userNameProperty);
     }
 }
