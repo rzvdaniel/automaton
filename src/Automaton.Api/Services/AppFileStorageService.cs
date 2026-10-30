@@ -799,15 +799,7 @@ public class AppFileStorageService
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var fileName = Path.GetFileName(normalized);
 
-        foreach (var rawRule in rules)
-        {
-            if (MatchesExcludePattern(normalized, fileName, segments, rawRule))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return rules.Any(rawRule => MatchesExcludePattern(normalized, fileName, segments, rawRule));
     }
 
     private static bool MatchesExcludePattern(

@@ -299,10 +299,8 @@ public class FlowsService
         Guid flowId,
         string scope)
     {
-        foreach (var kvp in variables.ToList())
+        foreach (var variable in variables.Values.ToList())
         {
-            var variable = kvp.Value;
-
             if (variable.IsSensitive && !string.IsNullOrEmpty(variable.Value))
             {
                 // Check if value is already a reference
@@ -348,10 +346,8 @@ public class FlowsService
 
     private async Task DecryptVariableDictionaryAsync(IDictionary<string, StepVariable> variables)
     {
-        foreach (var kvp in variables.ToList())
+        foreach (var variable in variables.Values.ToList())
         {
-            var variable = kvp.Value;
-
             if (variable.IsSensitive && IsSensitiveReference(variable.Value))
             {
                 var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
