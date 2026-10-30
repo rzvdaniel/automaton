@@ -755,7 +755,7 @@ public class UsersService
             return false;
 
         // Must match pattern: alphanumeric, hyphens, underscores only
-        return Regex.IsMatch(publicUsername, @"^[a-zA-Z0-9_\-]+$");
+        return Regex.IsMatch(publicUsername, @"^[a-zA-Z0-9_\-]+$", RegexOptions.None, TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
@@ -773,13 +773,13 @@ public class UsersService
         slug = new string(slug.Where(c => (int)c < 128).ToArray());
 
         // Remove invalid characters (keep only alphanumeric, spaces, hyphens, underscores)
-        slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "");
+        slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Replace spaces with hyphens
-        slug = Regex.Replace(slug, @"\s+", "-");
+        slug = Regex.Replace(slug, @"\s+", "-", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Remove multiple consecutive hyphens
-        slug = Regex.Replace(slug, @"-+", "-");
+        slug = Regex.Replace(slug, @"-+", "-", RegexOptions.None, TimeSpan.FromSeconds(1));
 
         // Trim hyphens from start and end
         slug = slug.Trim('-', '_');

@@ -141,7 +141,11 @@ public class PublicAppsController : ControllerBase
     private static bool IsValidUsername(string username)
     {
         // Allow alphanumeric, underscore, and hyphen (no @ symbol needed)
-        return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-]+$");
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            username,
+            @"^[a-zA-Z0-9_\-]+$",
+            System.Text.RegularExpressions.RegexOptions.None,
+            TimeSpan.FromSeconds(1));
     }
 
     private Guid? TryGetCurrentUserId()

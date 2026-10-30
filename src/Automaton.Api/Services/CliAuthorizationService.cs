@@ -228,15 +228,15 @@ public sealed class CliAuthorizationService
             return null;
 
         var now = DateTime.UtcNow;
-        var status = request.ExpiresAt <= now && !request.CompletedAt.HasValue
-            ? "expired"
-            : request.CancelledAt.HasValue
-                ? "cancelled"
-            : request.CompletedAt.HasValue
-                ? "completed"
-                : request.ApprovedAt.HasValue
-                    ? "approved"
-                    : "pending";
+        var status = "pending";
+        if (request.ApprovedAt.HasValue)
+            status = "approved";
+        if (request.CompletedAt.HasValue)
+            status = "completed";
+        if (request.CancelledAt.HasValue)
+            status = "cancelled";
+        if (request.ExpiresAt <= now && !request.CompletedAt.HasValue)
+            status = "expired";
 
         return new CliAuthorizationDetails(
             request.DeviceName,

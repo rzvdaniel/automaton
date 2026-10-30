@@ -712,8 +712,15 @@ public class AppFileStorageService
         return migrated;
     }
 
-    private static DateTime? Max(DateTime? left, DateTime? right) =>
-        left.HasValue && right.HasValue ? (left > right ? left : right) : left ?? right;
+    private static DateTime? Max(DateTime? left, DateTime? right)
+    {
+        if (!left.HasValue)
+            return right;
+        if (!right.HasValue)
+            return left;
+
+        return left > right ? left : right;
+    }
 
     private static string SelectLegacyRuntimeSource(LegacyComponentStorageMetadata? frontend, LegacyComponentStorageMetadata? backend)
     {

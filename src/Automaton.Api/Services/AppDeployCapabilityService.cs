@@ -5,7 +5,7 @@ namespace Automaton.Api.Services;
 
 public class AppDeployCapabilityService : IAppDeployCapabilityService
 {
-    public async Task<AppDeployCapabilitiesResponse> GetCapabilitiesAsync(
+    public Task<AppDeployCapabilitiesResponse> GetCapabilitiesAsync(
         Guid ownerId,
         Guid appId,
         CancellationToken cancellationToken = default)
@@ -37,9 +37,9 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
         // capability disabled instead of exposing a request path it cannot fulfill.
         var canDeployApplicationFromStudio = false;
 
-        return new AppDeployCapabilitiesResponse
+        return Task.FromResult(new AppDeployCapabilitiesResponse
         {
             CanDeployApplicationFromStudio = canDeployApplicationFromStudio,
-        };
+        });
     }
 }

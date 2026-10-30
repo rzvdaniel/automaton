@@ -209,25 +209,25 @@ public class AdminAiProvidersController : ControllerBase
         await dbContext.SaveChangesAsync();
 
         var isStatusChange = request.IsActive.HasValue && previousIsActive != provider.IsActive;
+        var eventType = AuditEventTypes.AiProviderUpdated;
+        var action = AuditActions.Updated;
+        var message = $"AI provider '{provider.Name}' was updated";
+        if (isStatusChange)
+        {
+            eventType = provider.IsActive ? AuditEventTypes.AiProviderEnabled : AuditEventTypes.AiProviderDisabled;
+            action = provider.IsActive ? AuditActions.Enabled : AuditActions.Disabled;
+            message = provider.IsActive
+                ? $"AI provider '{provider.Name}' was enabled"
+                : $"AI provider '{provider.Name}' was disabled";
+        }
+
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
-            EventType = isStatusChange
-                ? provider.IsActive
-                    ? AuditEventTypes.AiProviderEnabled
-                    : AuditEventTypes.AiProviderDisabled
-                : AuditEventTypes.AiProviderUpdated,
-            Action = isStatusChange
-                ? provider.IsActive
-                    ? AuditActions.Enabled
-                    : AuditActions.Disabled
-                : AuditActions.Updated,
+            EventType = eventType,
+            Action = action,
             EntityType = AuditEntityTypes.AiProvider,
             EntityId = provider.Id,
-            Message = isStatusChange
-                ? provider.IsActive
-                    ? $"AI provider '{provider.Name}' was enabled"
-                    : $"AI provider '{provider.Name}' was disabled"
-                : $"AI provider '{provider.Name}' was updated",
+            Message = message,
             Outcome = AuditOutcomes.Success,
             Metadata = new
             {

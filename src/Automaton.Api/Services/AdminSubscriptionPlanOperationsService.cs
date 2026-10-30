@@ -20,11 +20,14 @@ public sealed class AdminSubscriptionPlanOperationsService(
     {
         var isActive = request.IsActive;
         var isDefault = isActive && request.IsDefault;
-        await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(
-                isDefault ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted,
-                cancellationToken)
-            : null;
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+        if (dbContext.Database.IsRelational())
+        {
+            var isolationLevel = isDefault ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted;
+            transaction = await dbContext.Database.BeginTransactionAsync(isolationLevel, cancellationToken);
+        }
+
+        await using var transactionScope = transaction;
 
         if (isDefault)
         {
@@ -38,9 +41,9 @@ public sealed class AdminSubscriptionPlanOperationsService(
         await dbContext.SaveChangesAsync(cancellationToken);
         await WritePlanCreatedAuditAsync(plan, cancellationToken);
 
-        if (transaction is not null)
+        if (transactionScope is not null)
         {
-            await transaction.CommitAsync(cancellationToken);
+            await transactionScope.CommitAsync(cancellationToken);
         }
 
         return plan;

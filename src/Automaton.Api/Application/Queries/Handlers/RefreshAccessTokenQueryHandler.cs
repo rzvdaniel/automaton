@@ -51,32 +51,7 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             var newRefreshToken = new RefreshToken(user.Id, request.RefreshTokenExpirationDays);
 
-            try
-            {
-                dataContext.BeginTransaction();
-                
-                // Detach the old token and remove it
-                dataContext.Entry(refreshToken).State = EntityState.Deleted;
-                
-                // Add the new token
-                await dataContext.Set<RefreshToken>().AddAsync(newRefreshToken, cancellationToken);
-                
-                // SaveChanges instead of SaveChangesAsync to respect the transaction
-                await dataContext.SaveChangesAsync(cancellationToken);
-                
-                dataContext.Commit();
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                dataContext.Rollback();
-                logger.LogWarning($"Concurrency issue refreshing token for user {user.Id}. The token may have been already refreshed or revoked elsewhere.");
-                throw new Exception("Refresh token refresh operation failed. Please try again.", ex);
-            }
-            catch
-            {
-                dataContext.Rollback();
-                throw;
-            }
+            await ReplaceRefreshTokenAsync(refreshToken, newRefreshToken, user.Id, cancellationToken);
 
             var claims = GetCustomClaimsForUser();
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
@@ -92,6 +67,33 @@ namespace Automaton.Api.Application.Queries.Handlers
         {
             //Get Custom Claims for User
             return new Dictionary<string, string>();
+        }
+
+        private async Task ReplaceRefreshTokenAsync(
+            RefreshToken currentToken,
+            RefreshToken replacementToken,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            await using var transaction = await dataContext.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                dataContext.Entry(currentToken).State = EntityState.Deleted;
+                await dataContext.Set<RefreshToken>().AddAsync(replacementToken, cancellationToken);
+                await dataContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                logger.LogWarning($"Concurrency issue refreshing token for user {userId}. The token may have been already refreshed or revoked elsewhere.");
+                throw new Exception("Refresh token refresh operation failed. Please try again.", ex);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
         }
     }
 }

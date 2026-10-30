@@ -257,7 +257,12 @@ public class AdminMarketplaceAppsController : ControllerBase
 
     private static string Slugify(string value)
     {
-        var slug = Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
+        var slug = Regex.Replace(
+            value.Trim().ToLowerInvariant(),
+            @"[^a-z0-9]+",
+            "-",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(1)).Trim('-');
         return string.IsNullOrWhiteSpace(slug) ? Guid.NewGuid().ToString("N") : slug;
     }
 

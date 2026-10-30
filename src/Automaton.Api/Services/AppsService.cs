@@ -138,8 +138,8 @@ public class AppsService
         var slug = displayName.ToLowerInvariant()
             .Replace(' ', '-')
             .Replace('_', '-');
-        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
-        slug = Regex.Replace(slug, @"\-+", "-").Trim('-');
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+        slug = Regex.Replace(slug, @"\-+", "-", RegexOptions.None, TimeSpan.FromSeconds(1)).Trim('-');
         if (string.IsNullOrEmpty(slug)) slug = "app";
         if (slug.Length > PublishedAppHostNames.MaximumSlugLength)
         {

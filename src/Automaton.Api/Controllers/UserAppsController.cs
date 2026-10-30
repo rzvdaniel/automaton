@@ -203,11 +203,11 @@ public class UserAppsController : ControllerBase
             return html;
         }
 
-        var apiHost = useCurrentHostApiBase
-            ? Request.Host.Host
-            : Request.Host.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
-                ? $"api.{Request.Host.Host["apps.".Length..]}"
-                : Request.Host.Host;
+        var apiHost = Request.Host.Host;
+        if (!useCurrentHostApiBase && apiHost.StartsWith("apps.", StringComparison.OrdinalIgnoreCase))
+        {
+            apiHost = $"api.{apiHost["apps.".Length..]}";
+        }
         var apiBaseUrl = $"{Request.Scheme}://{apiHost}";
         if (Request.Host.Port.HasValue)
         {

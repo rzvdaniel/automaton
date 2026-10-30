@@ -68,7 +68,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet("by-name/{name}")]
-    public async Task<ActionResult<CustomStep>> GetByName(string name)
+    public ActionResult<CustomStep> GetByName(string name)
     {
         var step = customStepsService.GetByName(name);
 

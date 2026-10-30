@@ -168,7 +168,7 @@ public sealed class DeploymentOperationService(
         }
         finally
         {
-            leaseCancellation.Cancel();
+            await leaseCancellation.CancelAsync();
             try
             {
                 await leaseTask;

@@ -129,7 +129,7 @@ public class AppsStepExecutionService
     {
         var testRunId = !string.IsNullOrWhiteSpace(bodyTestRunId)
             ? bodyTestRunId.Trim()
-            : string.IsNullOrWhiteSpace(headerTestRunId) ? null : headerTestRunId.Trim();
+            : headerTestRunId?.Trim();
 
         if (!string.IsNullOrWhiteSpace(testRunId))
         {

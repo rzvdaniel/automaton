@@ -28,7 +28,10 @@ public sealed class SaveActionScheduleRequest
 
 public sealed class ExplicitOffsetDateTimeConverter : JsonConverter<DateTimeOffset?>
 {
-    private static readonly Regex ExplicitOffset = new(@"(?:[zZ]|[+-]\d{2}:\d{2})$", RegexOptions.Compiled);
+    private static readonly Regex ExplicitOffset = new(
+        @"(?:[zZ]|[+-]\d{2}:\d{2})$",
+        RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
 
     public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
