@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
-import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
-import type { MarketplaceAppCard } from '@/types/marketplace'
+import MarketplaceAppRow from '@/components/site/MarketplaceAppRow.vue'
+import SiteFooter from '@/components/site/SiteFooter.vue'
+import SiteHeader from '@/components/site/SiteHeader.vue'
+import { publicAppConfig } from '@/config/publicAppConfig'
+import { useMarketplaceApps } from '@/composables/useMarketplaceApps'
+import { useSiteTheme } from '@/composables/useSiteTheme'
 
 const MARKETPLACE_TAKE = 5
 
@@ -46,52 +49,14 @@ function showToast(message: string) {
 
 const { apps, loading, error, loadApps } = useMarketplaceApps(MARKETPLACE_TAKE)
 
-function appInitial(app: MarketplaceAppCard) {
-  return [...app.name.trim()][0]?.toUpperCase() ?? '?'
-}
-
-function appLaunchUrl(app: MarketplaceAppCard) {
-  return app.canLaunch ? getPublishedAppUrl(app.publicUrl) : ''
-}
-
-// The rest of the public site is dark; the homepage paints the page itself.
-onMounted(() => {
-  document.body.classList.add('site-home')
-  void loadApps(MARKETPLACE_TAKE)
-})
-onBeforeUnmount(() => {
-  document.body.classList.remove('site-home')
-  clearTimeout(toastTimer)
-})
+useSiteTheme()
+onMounted(() => void loadApps(MARKETPLACE_TAKE))
+onBeforeUnmount(() => clearTimeout(toastTimer))
 </script>
 
 <template>
-  <div class="home">
-    <header class="band top">
-      <div class="wrap">
-        <RouterLink class="brand" to="/" aria-label="Automaton home">
-          <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
-            <rect x="1.5" y="1.5" width="37" height="37" rx="10" class="mark-bg" />
-            <path class="mark-face" d="M10 15l5 4-5 4M30 15l-5 4 5 4M17 27h6" />
-          </svg>
-          Automaton
-        </RouterLink>
-        <nav class="nav" aria-label="Main">
-          <a href="#start">Get started</a>
-          <a href="#apps">Apps</a>
-          <a :href="publicAppConfig.docsUrl">Docs</a>
-          <a class="gh" :href="publicAppConfig.githubUrl" target="_blank" rel="noopener">
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-              />
-            </svg>
-            GitHub
-          </a>
-          <a class="btn small primary" href="#start">Install</a>
-        </nav>
-      </div>
-    </header>
+  <div class="site home">
+    <SiteHeader />
 
     <main>
       <section class="band hero">
@@ -383,31 +348,7 @@ onBeforeUnmount(() => {
                 No public apps yet. Publish one from Studio and it appears here.
               </p>
               <ul v-else>
-                <li v-for="app in apps" :key="app.id" class="app-row">
-                  <img
-                    v-if="app.thumbnailUrl"
-                    class="app-thumb"
-                    :src="resolveMarketplaceAssetUrl(app.thumbnailUrl)"
-                    alt=""
-                    loading="lazy"
-                  />
-                  <span v-else class="app-thumb app-initial" aria-hidden="true">{{ appInitial(app) }}</span>
-                  <div class="app-text">
-                    <RouterLink class="app-name" :to="`/apps/${app.id}`">{{ app.name }}</RouterLink>
-                    <p class="app-summary">{{ app.summary || app.category || 'A public Automaton app' }}</p>
-                    <p v-if="app.creatorDisplayName || app.creatorPublicUsername" class="app-by">
-                      by {{ app.creatorDisplayName || app.creatorPublicUsername }}
-                    </p>
-                  </div>
-                  <a
-                    v-if="appLaunchUrl(app)"
-                    class="btn small"
-                    :href="appLaunchUrl(app)"
-                    target="_blank"
-                    rel="noopener"
-                    :aria-label="`Open ${app.name}`"
-                  >Open</a>
-                </li>
+                <li v-for="app in apps" :key="app.id"><MarketplaceAppRow :app="app" /></li>
               </ul>
             </div>
           </div>
@@ -483,205 +424,14 @@ onBeforeUnmount(() => {
       </section>
     </main>
 
-    <footer class="band foot">
-      <div class="wrap">
-        <span>Automaton · open source under Apache 2.0</span>
-        <nav aria-label="Footer">
-          <a :href="publicAppConfig.docsUrl">Docs</a>
-          <a :href="publicAppConfig.githubUrl" target="_blank" rel="noopener">GitHub</a>
-          <a :href="`${publicAppConfig.githubUrl}/releases`" target="_blank" rel="noopener">Releases</a>
-          <RouterLink to="/apps">Public apps</RouterLink>
-          <a :href="publicAppConfig.exampleAppsUrl" target="_blank" rel="noopener">Example apps</a>
-          <a :href="publicAppConfig.llmsUrl">llms.txt</a>
-        </nav>
-      </div>
-    </footer>
+    <SiteFooter />
 
     <div class="toast" :class="{ show: toast }" role="status" aria-live="polite">{{ toast }}</div>
   </div>
 </template>
 
-<!-- Tokens live on the body class so the whole page, including overscroll, uses them. -->
-<style>
-body.site-home {
-  --paper: #fdfdfb;
-  --panel: #f3f2ee;
-  --ink: #17181c;
-  --ink-soft: #55565e;
-  --line: #e2e0da;
-  --signal: #f26a1b;
-  --signal-ink: #a23d05;
-  --on-signal: #17181c;
-  --code-bg: #17181c;
-  --code-fg: #f3f2ee;
-  --code-dim: #9a9ba2;
-  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
-  --body: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  background: var(--paper);
-  color: var(--ink);
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  body.site-home {
-    --paper: #121316;
-    --panel: #1b1c20;
-    --ink: #f1f0eb;
-    --ink-soft: #a9aab1;
-    --line: #2c2d33;
-    --signal: #ff7a2e;
-    --signal-ink: #ffa36b;
-    --code-bg: #0b0c0e;
-    --code-fg: #f1f0eb;
-    --code-dim: #8a8b92;
-    color-scheme: dark;
-  }
-}
-</style>
-
 <style scoped>
-.home {
-  min-height: 100vh;
-  background: var(--paper);
-  color: var(--ink);
-  font: 17px/1.6 var(--body);
-}
-
-.home a {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--signal);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-.home a:hover {
-  color: var(--signal-ink);
-}
-.home :focus-visible {
-  outline: 3px solid var(--signal);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-h1,
-h2,
-h3 {
-  font-family: var(--display);
-  line-height: 1.05;
-  text-wrap: balance;
-  letter-spacing: -0.02em;
-}
-code,
-pre {
-  font-family: var(--mono);
-}
-
-.band {
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-.wrap {
-  max-width: 1120px;
-  margin: 0 auto;
-}
-.eyebrow {
-  font: 600 0.75rem/1 var(--body);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--signal-ink);
-}
-
-/* Header */
-.top .wrap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 22px;
-}
-.home .brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font: 700 1.2rem var(--display);
-  text-decoration: none;
-  color: var(--ink);
-}
-.mark {
-  width: 34px;
-  height: 34px;
-  flex: none;
-}
-.mark-bg {
-  fill: var(--ink);
-}
-.mark-face {
-  fill: none;
-  stroke: var(--signal);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  font-size: 0.95rem;
-}
-.home .nav a:not(.btn) {
-  text-decoration: none;
-  color: var(--ink-soft);
-}
-.home .nav a:not(.btn):hover {
-  color: var(--ink);
-}
-.nav .gh {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.nav svg {
-  width: 17px;
-  height: 17px;
-  fill: currentColor;
-}
-
-/* Buttons */
-.home .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font: 600 1rem var(--body);
-  padding: 13px 22px;
-  border-radius: 999px;
-  border: 1.5px solid var(--ink);
-  text-decoration: none;
-  color: var(--ink);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    background 0.15s ease;
-}
-.home .btn:hover {
-  transform: translateY(-1px);
-  color: var(--ink);
-}
-.home .btn.primary {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--on-signal);
-}
-.home .btn.small {
-  padding: 8px 16px;
-  font-size: 0.9rem;
-}
-.btn .arrow {
-  transition: transform 0.15s ease;
-}
-.btn:hover .arrow {
-  transform: translateX(3px);
-}
+/* Shared tokens, type, buttons, header and footer come from assets/site.css and components/site. */
 
 /* Hero */
 .hero .wrap {
@@ -698,17 +448,6 @@ pre {
 }
 .hero h1 .hl {
   color: var(--signal-ink);
-}
-.lede {
-  font-size: 1.2rem;
-  color: var(--ink-soft);
-  max-width: 34rem;
-}
-.cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 30px;
 }
 .facts {
   display: flex;
@@ -819,20 +558,6 @@ pre {
   display: grid;
   gap: 36px;
 }
-.section-head {
-  display: grid;
-  gap: 12px;
-  max-width: 66ch;
-  align-content: start;
-}
-.section-head h2 {
-  font-size: clamp(2rem, 4vw, 2.9rem);
-  font-weight: 700;
-}
-.section-head p {
-  color: var(--ink-soft);
-  font-size: 1.1rem;
-}
 .rule {
   border: 0;
   border-top: 1px solid var(--line);
@@ -932,7 +657,7 @@ pre {
   max-width: 34rem;
   margin-top: 14px;
 }
-.signal-band .eyebrow {
+.site .signal-band .eyebrow {
   color: var(--on-signal);
   opacity: 0.75;
 }
@@ -1053,52 +778,6 @@ pre {
   display: grid;
   gap: 10px;
 }
-.app-row {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 18px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-}
-.app-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  object-fit: cover;
-  border: 1.5px solid var(--ink);
-}
-.app-initial {
-  display: grid;
-  place-items: center;
-  background: var(--signal);
-  color: var(--on-signal);
-  font: 800 1.5rem var(--display);
-}
-.app-text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.home .app-name {
-  font: 700 1.15rem var(--display);
-  text-decoration: none;
-}
-.home .app-name:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--signal);
-}
-.app-summary,
-.app-by {
-  color: var(--ink-soft);
-  font-size: 0.92rem;
-  overflow-wrap: anywhere;
-}
-.app-by {
-  font-size: 0.82rem;
-}
 .app-state {
   padding: 22px;
   border-radius: 18px;
@@ -1155,23 +834,6 @@ pre {
   padding-right: 22px;
 }
 
-/* Footer */
-.foot .wrap {
-  padding-block: 36px 48px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 16px;
-  color: var(--ink-soft);
-  font-size: 0.92rem;
-  border-top: 1px solid var(--line);
-}
-.foot nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-}
-
 .toast {
   position: fixed;
   left: 50%;
@@ -1188,15 +850,6 @@ pre {
 }
 .toast.show {
   opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home *,
-  .home *::before,
-  .home *::after {
-    animation: none !important;
-    transition: none !important;
-  }
 }
 
 @media (max-width: 900px) {
@@ -1227,22 +880,8 @@ pre {
 }
 
 @media (max-width: 620px) {
-  .home .nav a:not(.gh):not(.btn) {
-    display: none;
-  }
   .marketplace {
     padding: 20px;
-  }
-  .app-row {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-  .app-row .btn {
-    grid-column: 2;
-    justify-self: start;
-  }
-  .app-thumb {
-    width: 48px;
-    height: 48px;
   }
   .reason {
     grid-template-columns: 48px minmax(0, 1fr);
