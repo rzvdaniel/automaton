@@ -51,10 +51,12 @@ before.
   `approve`/`revoke` subcommands), `Format_ShowsLiveRoleDestinationAndStatus`
   (expects "Automaton Hosted"), and
   `DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan`.
-- API: `SeedCatalog_ExplicitlyRegistersEveryEmbeddedSeed` (expects seven
-  registered guidance seeds; the catalog has six),
-  `ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned`, and
-  `ExecuteAsync_RequiresPersistedApprovalForPrivilegedHostTarget`.
+- API: 82 of 794 tests. Most seed runners without an application profile and
+  now throw `Unknown application Runner profile ''` from
+  `RunnerApplicationProfiles.Normalize`, since the legacy profiles were
+  removed (runner assignment, deployment targets, durable actions, machine
+  management). `SeedCatalog_ExplicitlyRegistersEveryEmbeddedSeed` also expects
+  seven registered guidance seeds; the catalog has six.
 - Studio: `AppRuntimeLogs.test.ts` (multiline runtime output), and
   `public-app-url.test.ts` (private link host), which fails intermittently.
 

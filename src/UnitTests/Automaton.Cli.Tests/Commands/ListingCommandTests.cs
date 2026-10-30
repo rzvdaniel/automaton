@@ -88,4 +88,22 @@ public class ListingCommandTests
             async () => await service.SetAsync(Directory.GetCurrentDirectory(), null, new MarketplaceListingUpdate()),
             Throws.InvalidOperationException.With.Message.Contains("--summary"));
     }
+
+    [Test]
+    public void RemoveScreenshotAsync_RejectsSomethingThatIsNotAnId()
+    {
+        var service = new MarketplaceListingService(new ConfigService());
+
+        Assert.That(
+            async () => await service.RemoveScreenshotAsync(Directory.GetCurrentDirectory(), null, "cover.png"),
+            Throws.InvalidOperationException.With.Message.Contains("automaton listing show"));
+    }
+
+    [Test]
+    public void ListingUpdate_SendsOnlyTheListingFields()
+    {
+        var json = JsonSerializer.Serialize(new MarketplaceListingUpdate(Summary: "A word game"));
+
+        Assert.That(json, Does.Not.Contain("IsEmpty"));
+    }
 }

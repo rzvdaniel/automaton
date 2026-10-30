@@ -56,8 +56,8 @@ automaton listing add-screenshot lobby.png reveal.png
 automaton listing show
 ```
 
-Options you leave out of `listing set` stay unchanged; `--category ""` clears
-the category. The summary is up to 200 characters and the description up to
+Options you leave out of `listing set` stay unchanged; `--clear-category` and
+`--clear-tags` remove those fields. Publishing again keeps the listing. The summary is up to 200 characters and the description up to
 500. Images are PNG, JPG, WEBP or GIF up to 2 MB; an app has one cover and up
 to 8 screenshots. Remove a screenshot with
 `automaton listing remove-screenshot <id>`, using an ID from `listing show`.

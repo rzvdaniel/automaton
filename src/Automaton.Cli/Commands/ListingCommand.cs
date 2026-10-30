@@ -36,24 +36,29 @@ public static class ListingCommand
     {
         var summaryOption = new Option<string?>("--summary", "One-line summary shown on app cards (up to 200 characters)");
         var descriptionOption = new Option<string?>("--description", "Full description shown on the app page (up to 500 characters)");
-        var categoryOption = new Option<string?>("--category", "Marketplace category, for example Games; pass \"\" to clear it");
+        var categoryOption = new Option<string?>("--category", "Marketplace category, for example Games");
         var tagsOption = new Option<string?>("--tags", "Comma-separated tags, for example \"game,multiplayer\"; replaces the current tags");
+        var clearCategoryOption = new Option<bool>("--clear-category", "Remove the category");
+        var clearTagsOption = new Option<bool>("--clear-tags", "Remove all tags");
         var options = new CommonOptions(config);
         var command = new Command("set", "Change the listing text. Options you leave out stay as they are")
         {
-            summaryOption, descriptionOption, categoryOption, tagsOption
+            summaryOption, descriptionOption, categoryOption, tagsOption, clearCategoryOption, clearTagsOption
         };
         options.AddTo(command);
         command.SetHandler(context =>
         {
-            var tags = context.ParseResult.GetValueForOption(tagsOption);
-            var update = new MarketplaceListingUpdate(
-                context.ParseResult.GetValueForOption(summaryOption),
-                context.ParseResult.GetValueForOption(descriptionOption),
-                context.ParseResult.GetValueForOption(categoryOption),
-                tags?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            return RunAsync(context, options,
-                (service, directory, environment) => service.SetAsync(directory, environment, update, context.GetCancellationToken()));
+            var parse = context.ParseResult;
+            return RunAsync(context, options, (service, directory, environment) =>
+            {
+                var update = new MarketplaceListingUpdate(
+                    parse.GetValueForOption(summaryOption),
+                    parse.GetValueForOption(descriptionOption),
+                    Clearable(parse.GetValueForOption(categoryOption), parse.GetValueForOption(clearCategoryOption), "category"),
+                    Clearable(parse.GetValueForOption(tagsOption), parse.GetValueForOption(clearTagsOption), "tags")?
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                return service.SetAsync(directory, environment, update, context.GetCancellationToken());
+            });
         });
         return command;
     }
@@ -146,6 +151,16 @@ public static class ListingCommand
             ? "(none)"
             : string.Join(Environment.NewLine, listing.Screenshots.Select(shot => shot.Id))));
         AnsiConsole.Write(table);
+    }
+
+    // An empty value tells the API to clear the field.
+    private static string? Clearable(string? value, bool clear, string field)
+    {
+        if (clear && value is not null)
+        {
+            throw new InvalidOperationException($"Use either --{field} or --clear-{field}, not both.");
+        }
+        return clear ? "" : value;
     }
 
     private static string Or(string? value) => string.IsNullOrWhiteSpace(value) ? "(none)" : value;

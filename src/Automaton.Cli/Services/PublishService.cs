@@ -42,12 +42,13 @@ public sealed class PublishService
             var approvalFailure = ResolvePublishApproval(context, resolved.Settings!, yes, nonInteractive, checks);
             if (approvalFailure != null) return approvalFailure;
 
+            var listing = ReadCurrentListing(app);
             await client.PublishAppAsync(
                 context.AppId,
                 resolved.Settings!.Slug,
                 resolved.Settings.RequiresAuthentication,
-                category: null,
-                tags: null,
+                listing.Category,
+                listing.Tags,
                 resolved.Settings.IsForkable,
                 cancellationToken);
             return CreatePublishSuccess(context, resolved.Settings, checks);
@@ -259,6 +260,10 @@ public sealed class PublishService
         return !string.IsNullOrWhiteSpace(value)
             && System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), "^[a-z0-9\\-]+$");
     }
+
+    // Publishing replaces the category and tags, so re-send the ones set with automaton listing or Studio.
+    internal static (string? Category, string? Tags) ReadCurrentListing(JsonElement app)
+        => (TryReadString(app, "category"), TryReadString(app, "tags"));
 
     private static string? TryReadString(JsonElement element, string propertyName)
     {

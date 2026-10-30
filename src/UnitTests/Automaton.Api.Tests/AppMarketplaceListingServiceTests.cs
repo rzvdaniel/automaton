@@ -1,24 +1,16 @@
-using System.Security.Claims;
-using Automaton.Api.Authentication;
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
-using Automaton.Api.Entities;
-using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging.Abstractions;
+using Automaton.Api.Services.Interfaces;
 using NUnit.Framework;
+using static Automaton.Api.Tests.AppMarketplaceListingTestData;
 
 namespace Automaton.Api.Tests;
 
 [TestFixture]
 public sealed class AppMarketplaceListingServiceTests
 {
-    private static readonly Guid AppId = Guid.NewGuid();
-    private static readonly Guid ProjectId = Guid.NewGuid();
-    private static readonly Guid OwnerId = Guid.NewGuid();
-    private static readonly Guid DeveloperId = Guid.NewGuid();
-    private static readonly Guid ViewerId = Guid.NewGuid();
-
     [Test]
     public async Task UpdateAsync_ChangesOnlyTheFieldsSent()
     {
@@ -118,69 +110,55 @@ public sealed class AppMarketplaceListingServiceTests
     }
 
     [Test]
-    public async Task ImageChanges_RequireUpdateAccessNotJustVisibility()
+    public async Task UpdateAsync_RejectsInactiveCategoriesWithoutListingThem()
     {
         using var db = CreateSeededDb();
 
-        var viewer = await CreateImageService(db, ViewerId).UploadScreenshotAsync(AppId, null, "viewer");
-        var developer = await CreateImageService(db, DeveloperId).UploadScreenshotAsync(AppId, null, "developer");
+        var result = await CreateService(db, DeveloperId).UpdateAsync(AppId, new UpdateAppListingRequest(Category: "Retired"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(viewer.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
-            // The developer passes the permission check and reaches file validation.
-            Assert.That(developer.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
+            Assert.That(result.Status, Is.EqualTo(AppListingUpdateStatus.Invalid));
+            Assert.That(result.Error, Does.Not.Contain("Retired category"));
         });
     }
 
-    [TestCase(null, true)]
-    [TestCase("Developer", true)]
-    [TestCase("FullAccess", true)]
-    [TestCase("ReadOnly", false)]
-    [TestCase("Runner", false)]
-    public void AppChangeKeyScope_AllowsSignedInUsersAndWritableKeys(string? scope, bool allowed)
+    [Test]
+    public async Task UpdateAsync_WritesAnAuditEventOnlyWhenSomethingChanges()
     {
-        var claims = scope is null ? Array.Empty<Claim>() : [new Claim("api_key_scope", scope)];
-        var user = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        using var db = CreateSeededDb();
+        var audit = new RecordingAudit();
+        var service = CreateService(db, DeveloperId, audit);
 
-        Assert.That(AppChangeKeyScope.IsAllowed(user), Is.EqualTo(allowed));
+        await service.UpdateAsync(AppId, new UpdateAppListingRequest(Summary: "A word game"));
+        await service.UpdateAsync(AppId, new UpdateAppListingRequest(Summary: "A word game"));
+
+        Assert.That(audit.EventTypes, Is.EqualTo(new[] { AuditEventTypes.AppMetadataUpdated }));
     }
 
-    private static AppMarketplaceListingService CreateService(ApplicationDbContext db, Guid userId)
+    private static AppMarketplaceListingService CreateService(ApplicationDbContext db, Guid userId, RecordingAudit? audit = null)
     {
         var userContext = AppAuthorizationTestData.CreateUserContextService(userId);
         return new AppMarketplaceListingService(
             db,
             new ResourceAuthorizationService(db, userContext),
-            new RecentActivityService(db, userContext));
+            userContext,
+            new RecentActivityService(db, userContext),
+            audit ?? new RecordingAudit());
     }
 
-    private static AppImageManagementService CreateImageService(ApplicationDbContext db, Guid userId)
+    private sealed class RecordingAudit : IAuditEventService
     {
-        var userContext = AppAuthorizationTestData.CreateUserContextService(userId);
-        return new AppImageManagementService(
-            AppAuthorizationTestServiceFactory.CreateAppsService(db, userId),
-            new ResourceAuthorizationService(db, userContext),
-            new AppAuthorizationTestWebHostEnvironment(Path.GetTempPath()),
-            NullLogger<AppImageManagementService>.Instance);
-    }
+        public List<string?> EventTypes { get; } = [];
 
-    private static ApplicationDbContext CreateSeededDb()
-    {
-        var db = AppAuthorizationTestData.CreateDbContext();
-        AppAuthorizationTestData.SeedProjectScopedApp(db, AppId, ProjectId, OwnerId, DeveloperId);
-        db.ProjectMembers.Add(new ProjectMember
+        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default)
         {
-            ProjectId = ProjectId,
-            UserId = ViewerId,
-            Role = ProjectRole.Viewer,
-            JoinedAt = DateTime.UtcNow,
-            IsActive = true
-        });
-        db.MarketplaceCategories.AddRange(
-            new MarketplaceCategory { Id = Guid.NewGuid(), Name = "Education", Slug = "education", SortOrder = 1 },
-            new MarketplaceCategory { Id = Guid.NewGuid(), Name = "Games", Slug = "games", SortOrder = 2 });
-        db.SaveChanges();
-        return db;
+            EventTypes.Add(request.EventType);
+            return Task.CompletedTask;
+        }
+
+        public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null,
+            string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }

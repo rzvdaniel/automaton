@@ -1,4 +1,5 @@
 using Automaton.Api.Authentication;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,8 @@ public sealed class AppMarketplaceListingController(AppMarketplaceListingService
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Update(Guid id, UpdateAppListingRequest request, CancellationToken cancellationToken)
     {
-        if (!AppChangeKeyScope.IsAllowed(User)) return Forbid();
+        if (!AppChangeKeyScope.IsAllowed(User))
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = AppChangeKeyScope.DeniedMessage });
         var result = await listingService.UpdateAsync(id, request, cancellationToken);
         return result.Status switch
         {

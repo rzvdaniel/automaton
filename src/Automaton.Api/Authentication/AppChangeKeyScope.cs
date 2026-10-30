@@ -9,6 +9,8 @@ namespace Automaton.Api.Authentication;
 /// </summary>
 public static class AppChangeKeyScope
 {
+    public const string DeniedMessage = "This API key cannot change apps. Use a key with the Developer scope.";
+
     public static bool IsAllowed(ClaimsPrincipal user)
     {
         var scope = user.FindFirst("api_key_scope")?.Value;

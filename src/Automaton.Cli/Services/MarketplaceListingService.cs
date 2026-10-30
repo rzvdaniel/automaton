@@ -27,7 +27,7 @@ public sealed class MarketplaceListingService(ConfigService config)
         if (update.IsEmpty)
         {
             throw new InvalidOperationException(
-                "Nothing to change. Pass at least one of --summary, --description, --category or --tags.");
+                "Nothing to change. Pass at least one of --summary, --description, --category, --tags, --clear-category or --clear-tags.");
         }
 
         var (client, appId) = CreateClient(directory, environmentName);
@@ -58,7 +58,7 @@ public sealed class MarketplaceListingService(ConfigService config)
             throw new InvalidOperationException("Pass at least one image file.");
         }
 
-        // Check every file first, so a bad path never leaves a half-uploaded set.
+        // Check every file first, so a missing or oversized file is caught before anything uploads.
         var paths = imagePaths.Select(ValidateImage).ToList();
         var (client, appId) = CreateClient(directory, environmentName);
         using (client)
@@ -71,9 +71,17 @@ public sealed class MarketplaceListingService(ConfigService config)
                     "Remove some with 'automaton listing remove-screenshot <id>'.");
             }
 
-            foreach (var path in paths)
+            for (var index = 0; index < paths.Count; index++)
             {
-                await UploadAsync(path, (stream, name, type) => client.UploadListingScreenshotAsync(appId, stream, name, type, ct));
+                try
+                {
+                    await UploadAsync(paths[index], (stream, name, type) => client.UploadListingScreenshotAsync(appId, stream, name, type, ct));
+                }
+                catch (Exception exception) when (index > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Uploaded {index} of {paths.Count} screenshots, then {imagePaths[index]} failed: {exception.Message}", exception);
+                }
             }
             return ReadListing(appId, await client.GetAppAsync(appId, ct));
         }
@@ -82,10 +90,16 @@ public sealed class MarketplaceListingService(ConfigService config)
     public async Task<MarketplaceListing> RemoveScreenshotAsync(
         string directory, string? environmentName, string screenshotId, CancellationToken ct = default)
     {
+        if (!Guid.TryParse(screenshotId, out var id))
+        {
+            throw new InvalidOperationException(
+                $"Not a screenshot ID: {screenshotId}. Run 'automaton listing show' to see the IDs.");
+        }
+
         var (client, appId) = CreateClient(directory, environmentName);
         using (client)
         {
-            await client.DeleteListingScreenshotAsync(appId, screenshotId.Trim(), ct);
+            await client.DeleteListingScreenshotAsync(appId, id.ToString(), ct);
             return ReadListing(appId, await client.GetAppAsync(appId, ct));
         }
     }

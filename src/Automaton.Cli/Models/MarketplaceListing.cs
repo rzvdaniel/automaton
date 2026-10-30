@@ -1,12 +1,15 @@
+using System.Text.Json.Serialization;
+
 namespace Automaton.Cli.Models;
 
-/// <summary>Fields left null are not changed. An empty category clears it.</summary>
+/// <summary>Fields left null are not changed. An empty category or tag list clears it.</summary>
 public sealed record MarketplaceListingUpdate(
     string? Summary = null,
     string? Description = null,
     string? Category = null,
     IReadOnlyList<string>? Tags = null)
 {
+    [JsonIgnore]
     public bool IsEmpty => Summary is null && Description is null && Category is null && Tags is null;
 }
 
