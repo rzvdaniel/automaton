@@ -1,4 +1,4 @@
-#nullable disable
+#nullable enable
 
 using Automaton;
 using System.ComponentModel.DataAnnotations;
@@ -18,14 +18,14 @@ public class Setting
     [Key]
     [Required]
     [MaxLength(255)]
-    public string Key { get; set; }
+    public string Key { get; set; } = string.Empty;
 
     /// <summary>
     /// JSON-serialized value of the setting
     /// Can store simple strings or complex objects
     /// </summary>
     [Required]
-    public string Value { get; set; }
+    public string Value { get; set; } = string.Empty;
 
     /// <summary>
     /// Timestamp of last update for audit purposes

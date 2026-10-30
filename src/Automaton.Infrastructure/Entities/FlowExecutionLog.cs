@@ -1,4 +1,4 @@
-#nullable disable
+#nullable enable
 using Automaton;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,11 +9,11 @@ namespace Automaton.Api.Entities
     {
         public Guid Id { get; set; }
         public Guid FlowExecutionId { get; set; }
-        public string LogsJson { get; set; } // JSON array of log entries
+        public string LogsJson { get; set; } = "[]"; // JSON array of log entries
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        public virtual FlowExecution FlowExecution { get; set; }
+        public virtual FlowExecution FlowExecution { get; set; } = null!;
         
         public List<LogEntry> GetLogEntries()
         {
@@ -47,10 +47,10 @@ namespace Automaton.Api.Entities
         public DateTime Timestamp { get; set; }
         
         [JsonPropertyName("level")]
-        public string Level { get; set; } // Info, Warning, Error, Debug  
+        public string Level { get; set; } = string.Empty; // Info, Warning, Error, Debug
         
         [JsonPropertyName("message")]
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
         
         // Optional properties - excluded when null or empty
         [JsonPropertyName("exception")]
