@@ -22,7 +22,7 @@ namespace Automaton.Core.Tests.Extensions
             original.Inputs.Add("input1", inputVariable);
 
             // Act
-            var clone = original.CloneJson();
+            var clone = original.CloneJson() ?? throw new InvalidOperationException("The Step should be cloned.");
 
             // Assert
             Assert.That(clone, Is.Not.Null);
@@ -139,7 +139,7 @@ namespace Automaton.Core.Tests.Extensions
             };
 
             // Act
-            var clone = original.CloneJson();
+            var clone = original.CloneJson() ?? throw new InvalidOperationException("The Step should be cloned.");
             clone.Id = "modified-id";
             clone.Name = "modified-name";
 

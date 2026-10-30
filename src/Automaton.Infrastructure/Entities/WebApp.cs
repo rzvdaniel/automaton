@@ -10,10 +10,10 @@ public class WebApp
     /// <summary>Durable owner of whole-app deletion; admission stays closed until released or deleted.</summary>
     [ConcurrencyCheck]
     public Guid? DeletionClaimId { get; set; }
-    public string Name { get; set; }
-    public string Summary { get; set; }
-    public string Description { get; set; }
-    public string Definition { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Definition { get; set; } = string.Empty;
 
     /// <summary>
     /// Serialized stack-neutral build, runtime, health, and storage contract.
@@ -131,8 +131,8 @@ public class WebApp
     public DateTime Updated { get; set; }
 
     // Navigation properties
-    public virtual ICollection<WebAppUser> WebAppUsers { get; set; }
+    public virtual ICollection<WebAppUser> WebAppUsers { get; set; } = new List<WebAppUser>();
     public virtual ICollection<WebAppScreenshot> WebAppScreenshots { get; set; } = new List<WebAppScreenshot>();
-    public virtual ICollection<ProjectApp> ProjectApps { get; set; }
+    public virtual ICollection<ProjectApp> ProjectApps { get; set; } = new List<ProjectApp>();
     public virtual ICollection<AppDeploymentTarget> DeploymentTargets { get; set; } = new List<AppDeploymentTarget>();
 }

@@ -7,7 +7,7 @@ namespace Automaton.Api.Authentication
     {
         public Guid Id { get; private set; }
         public Guid UserId { get; private set; }
-        public string Token { get; private set; }
+        public string Token { get; private set; } = string.Empty;
         public DateTime CreatedAt { get; private set; }
         public DateTime? RevokedAt { get; private set; }
         public bool Revoked => RevokedAt.HasValue;

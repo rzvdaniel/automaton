@@ -17,7 +17,7 @@ namespace Automaton.Api.Data
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-        private IDbContextTransaction _transaction;
+        private IDbContextTransaction? _transaction;
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -183,35 +183,50 @@ namespace Automaton.Api.Data
 
         public int Commit()
         {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be committed.");
             try
             {
                 var saveChanges = SaveChanges();
-                _transaction.Commit();
+                transaction.Commit();
                 return saveChanges;
             }
             finally
             {
-                _transaction.Dispose();
+                transaction.Dispose();
+                _transaction = null;
             }
         }
 
         public void Rollback()
         {
-            _transaction.Rollback();
-            _transaction.Dispose();
-        }
-
-        public Task<int> CommitAsync()
-        {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be rolled back.");
             try
             {
-                var saveChangesAsync = SaveChangesAsync();
-                _transaction.Commit();
-                return saveChangesAsync;
+                transaction.Rollback();
             }
             finally
             {
-                _transaction.Dispose();
+                transaction.Dispose();
+                _transaction = null;
+            }
+        }
+
+        public async Task<int> CommitAsync()
+        {
+            var transaction = _transaction
+                ?? throw new InvalidOperationException("A transaction must be started before it can be committed.");
+            try
+            {
+                var saveChanges = await SaveChangesAsync();
+                await transaction.CommitAsync();
+                return saveChanges;
+            }
+            finally
+            {
+                await transaction.DisposeAsync();
+                _transaction = null;
             }
         }
     }

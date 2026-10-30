@@ -19,7 +19,7 @@ public class AppVersion
     public string SnapshotPath { get; set; } = string.Empty;
     public string? FilesChangeSummary { get; set; }
 
-    public virtual WebApp WebApp { get; set; }
+    public virtual WebApp WebApp { get; set; } = null!;
     
     [ForeignKey(nameof(CreatedBy))]
     public virtual ApplicationUser? CreatedByUser { get; set; }
