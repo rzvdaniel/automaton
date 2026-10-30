@@ -12,7 +12,7 @@ public class Runner
     public Guid Id { get; set; }
     [Required]
     public string Name { get; set; } = string.Empty;
-    public string ConnectionId { get; set; } = string.Empty;
+    public string? ConnectionId { get; set; }
     public DateTime? LastHeartbeatAtUtc { get; set; }
     public DateTime? LastConnectedAtUtc { get; set; }
     public DateTime? LastDisconnectedAtUtc { get; set; }
