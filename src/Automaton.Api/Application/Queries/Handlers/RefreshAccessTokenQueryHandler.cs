@@ -86,7 +86,10 @@ namespace Automaton.Api.Application.Queries.Handlers
             catch (DbUpdateConcurrencyException ex)
             {
                 await transaction.RollbackAsync(CancellationToken.None);
-                logger.LogWarning($"Concurrency issue refreshing token for user {userId}. The token may have been already refreshed or revoked elsewhere.");
+                logger.LogWarning(
+                    ex,
+                    "Concurrency issue refreshing token for user {UserId}. The token may have been already refreshed or revoked elsewhere.",
+                    userId);
                 throw new InvalidOperationException("Refresh token refresh operation failed. Please try again.", ex);
             }
             catch

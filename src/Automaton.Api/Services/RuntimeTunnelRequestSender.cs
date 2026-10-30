@@ -79,9 +79,10 @@ public sealed class RuntimeTunnelRequestSender(
 
             return response;
         }
-        catch (TimeoutException)
+        catch (TimeoutException exception)
         {
             logger.LogWarning(
+                exception,
                 "Runtime tunnel timed out for app {AppId}, target {TargetId}, runner {RunnerId}",
                 appId,
                 deploymentTargetId,
