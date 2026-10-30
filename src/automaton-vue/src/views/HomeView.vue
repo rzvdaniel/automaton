@@ -19,15 +19,7 @@ automaton login --server https://api.your-domain.com
 automaton new "My App"
 automaton deploy
 automaton publish --yes`
-const agentPrompt = `Build [APP IDEA] and publish it to my self-hosted Automaton server.
-My API URL is https://api.example.com (replace with my server URL).
-
-Read ${publicAppConfig.llmsUrl} first.
-Use the Automaton CLI: run automaton new, follow the generated
-AGENTS.md, then automaton validate, automaton deploy and
-automaton publish --yes. Verify the live app works before you
-tell me it is done. Let me approve login in my Studio;
-never ask for API keys in chat.`
+const agentPrompt = `Build [APP IDEA] and publish it to my Automaton server at ${publicAppConfig.apiBaseUrl}.`
 
 const toast = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | undefined
