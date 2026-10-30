@@ -284,10 +284,10 @@ public class WebAppFlowExecutionResponse
 {
     public bool Success { get; set; }
     public Guid FlowId { get; set; }
-    public string Status { get; set; }
+    public string Status { get; set; } = string.Empty;
     public int RunnerCount { get; set; }
     public DateTime ExecutedAt { get; set; }
-    public string Message { get; set; }
-    public Dictionary<string, string?> OutputVariables { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public Dictionary<string, string?> OutputVariables { get; set; } = new();
     public List<string>? Logs { get; set; }
 }

@@ -8,7 +8,7 @@ namespace Automaton.Api.Authentication
     {
         private readonly JwtSecurityTokenHandler _jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
         private readonly JwtOptions _options;
-        private TokenValidationParameters _tokenValidationParameters;
+        private TokenValidationParameters _tokenValidationParameters = new();
         private readonly ILogger<JwtService> _logger;
         private readonly AuthenticationSettings _settings;
 
@@ -54,7 +54,7 @@ namespace Automaton.Api.Authentication
                                ?? Array.Empty<Claim>();
 
             jwtClaims.AddRange(customClaims);
-            if (string.IsNullOrWhiteSpace(_settings.RsaSettings.RsaPrivateKey))
+            if (string.IsNullOrWhiteSpace(_settings.RsaSettings?.RsaPrivateKey))
             {
                 return null;
             }
@@ -66,6 +66,7 @@ namespace Automaton.Api.Authentication
                 notBefore: JwtOptions.NotBefore,
                 audience: _options.Audience,
                 signingCredentials: _options.SigningCredentials
+                    ?? throw new InvalidOperationException("JWT signing credentials are not configured.")
             );
             var token = new JwtSecurityTokenHandler().WriteToken(jwt);
 
@@ -143,7 +144,8 @@ namespace Automaton.Api.Authentication
             {
                 // Specify the key used to sign the token
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = _options.SigningCredentials.Key,
+                IssuerSigningKey = _options.SigningCredentials?.Key
+                    ?? throw new InvalidOperationException("JWT signing credentials are not configured."),
                 // Ensure the token audience matches our audience value (default true)
                 ValidateAudience = _options.ValidateAudience,
                 ValidAudience = _options.Audience,

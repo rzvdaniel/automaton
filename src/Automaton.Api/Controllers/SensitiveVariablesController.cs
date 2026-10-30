@@ -1,4 +1,5 @@
 using Automaton.Api.Services;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -143,24 +144,28 @@ public class SensitiveVariablesController : ControllerBase
 // DTOs
 public class CreateSensitiveVariableRequest
 {
-    public string Name { get; set; }
-    public string Value { get; set; }
+    [Required]
+    public string Name { get; set; } = string.Empty;
+    [Required]
+    public string Value { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string ResourceType { get; set; }
+    [Required]
+    public string ResourceType { get; set; } = string.Empty;
     [JsonRequired]
     public Guid ResourceId { get; set; }
-    public string VariableScope { get; set; }
+    [Required]
+    public string VariableScope { get; set; } = string.Empty;
     public Guid? ExistingId { get; set; }
 }
 
 public class SensitiveVariableResponse
 {
     public Guid Id { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string ResourceType { get; set; }
+    public string ResourceType { get; set; } = string.Empty;
     public Guid ResourceId { get; set; }
-    public string VariableScope { get; set; }
+    public string VariableScope { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
@@ -168,5 +173,5 @@ public class SensitiveVariableResponse
 
 public class DecryptedVariableResponse
 {
-    public string Value { get; set; }
+    public string Value { get; set; } = string.Empty;
 }

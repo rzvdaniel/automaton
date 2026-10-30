@@ -29,8 +29,8 @@ namespace Automaton.Api.Models
     public class RecentAppMetric
     {
         public Guid Id { get; set; }
-        public string Name { get; set; }
-        public string Summary { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
         public bool IsPublished { get; set; }
         public string? PublicUrl { get; set; }
         public int ViewCount { get; set; }
@@ -40,9 +40,9 @@ namespace Automaton.Api.Models
     public class PublishedAppMetric
     {
         public Guid Id { get; set; }
-        public string Name { get; set; }
-        public string Summary { get; set; }
-        public string PublicUrl { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
+        public string PublicUrl { get; set; } = string.Empty;
         public int ViewCount { get; set; }
         public DateTime? PublishedAt { get; set; }
     }
@@ -58,7 +58,7 @@ namespace Automaton.Api.Models
     public class FlowHealthMetric
     {
         public Guid FlowId { get; set; }
-        public string FlowName { get; set; }
+        public string FlowName { get; set; } = string.Empty;
         public int ExecutionCount { get; set; }
         public double SuccessRate { get; set; }
         public DateTime LastExecuted { get; set; }

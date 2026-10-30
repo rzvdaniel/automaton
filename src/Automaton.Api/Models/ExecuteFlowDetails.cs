@@ -7,6 +7,6 @@ namespace Automaton.Api.Models
     {
         [JsonRequired]
         public Guid FlowId { get; set; }
-        public IEnumerable<Guid> RunnerIds { get; set; }
+        public IEnumerable<Guid> RunnerIds { get; set; } = Array.Empty<Guid>();
     }
 }

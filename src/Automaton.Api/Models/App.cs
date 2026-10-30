@@ -7,9 +7,9 @@ public class AppModel
 {
     public Guid Id { get; set; }
     public Guid? UserId { get; set; } // Owner user ID (for file path resolution)
-    public string Name { get; set; }
-    public string Summary { get; set; }
-    public string Description { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public bool IsPublished { get; set; }
     public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }

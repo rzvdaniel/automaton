@@ -21,7 +21,8 @@ namespace Automaton.Api.Authentication
             configuration.GetSection(nameof(AuthenticationSettings)).Bind(authSettings);
 
             configuration.GetSection(nameof(JwtOptions)).Bind(jwtOptions);
-            jwtOptions.SigningCredentials = GetCredentialSigningKey(authSettings);
+            jwtOptions.SigningCredentials = GetCredentialSigningKey(authSettings)
+                ?? throw new InvalidOperationException("Authentication signing credentials are not configured.");
 
             services.TryAddSingleton(jwtOptions);
             services.TryAddSingleton(authSettings);
@@ -51,7 +52,8 @@ namespace Automaton.Api.Authentication
                 // Specify the key used to sign the token
                 ValidateIssuerSigningKey = true,
                 RequireSignedTokens = true,
-                IssuerSigningKey = options.SigningCredentials.Key,
+                IssuerSigningKey = options.SigningCredentials?.Key
+                    ?? throw new InvalidOperationException("JWT signing credentials are not configured."),
                 // Ensure the token hasn't expired
                 RequireExpirationTime = true,
                 ValidateLifetime = true,
@@ -120,9 +122,9 @@ namespace Automaton.Api.Authentication
             => (long) Math.Round((date.ToUniversalTime() - DateTimeOffset.UnixEpoch)
                 .TotalSeconds);
 
-        private static SigningCredentials GetCredentialSigningKey(AuthenticationSettings setting)
+        private static SigningCredentials? GetCredentialSigningKey(AuthenticationSettings setting)
         {
-            if (setting.RsaSettings != null)
+            if (setting.RsaSettings is not null)
             {
                 return GetRsaKey(setting);
             }
@@ -132,7 +134,7 @@ namespace Automaton.Api.Authentication
 
         private static SigningCredentials GetHmacKey(AuthenticationSettings setting)
         {
-            if (setting.HMacSettings == null)
+            if (string.IsNullOrWhiteSpace(setting.HMacSettings?.SecretKey))
             {
                 return null;
             }
@@ -143,7 +145,7 @@ namespace Automaton.Api.Authentication
 
         private static SigningCredentials GetRsaKey(AuthenticationSettings setting)
         {
-            if (setting.RsaSettings == null)
+            if (setting.RsaSettings is null)
                 return null;
 
             if (setting.RsaSettings.IsIssuer)
@@ -163,6 +165,8 @@ namespace Automaton.Api.Authentication
             {
                 RSA publicRsa = RSA.Create();
                 var publicKeyXml = setting.RsaSettings.RsaPublicKey;
+                if (string.IsNullOrWhiteSpace(publicKeyXml))
+                    return null;
                 publicRsa.FromXmlString(publicKeyXml);
                 var publicKey = new RsaSecurityKey(publicRsa);
                 return new SigningCredentials(publicKey, SecurityAlgorithms.RsaSha256);
