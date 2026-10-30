@@ -75,7 +75,8 @@ public sealed class RunnerQueryService(
     public Runner Get(Guid id)
     {
         var runner = authorizationService.GetAccessibleRunnersQuery()
-            .SingleOrDefault(x => x.Id == id);
+            .SingleOrDefault(x => x.Id == id)
+            ?? throw new KeyNotFoundException("Runner not found.");
         dbContext.Entry(runner).Reload();
         return runner;
     }
@@ -127,7 +128,7 @@ public sealed class RunnerQueryService(
             .Where(x => ids.Contains(x.RunnerId));
         query = projectId.HasValue
             ? query.Where(x => x.ProjectId == projectId.Value)
-            : query.Where(x => x.Project.Members.Any(member => member.UserId == userId && member.IsActive));
+            : query.Where(x => x.Project != null && x.Project.Members.Any(member => member.UserId == userId && member.IsActive));
 
         var links = await query.ToListAsync(cancellationToken);
         return links
@@ -137,7 +138,7 @@ public sealed class RunnerQueryService(
                 group =>
                 {
                     var first = group.First();
-                    return (first.ProjectId, first.Project.DisplayName);
+                    return (first.ProjectId, first.Project?.DisplayName ?? string.Empty);
                 });
     }
 

@@ -164,7 +164,7 @@ public class AppsStepExecutionService
     /// at runtime - they always use the decrypted values from the step definition.
     /// Only non-sensitive variables can be overridden by the caller.
     /// </summary>
-    private void ApplyRuntimeInputs(Models.CustomStep step, Dictionary<string, string> inputs)
+    private static void ApplyRuntimeInputs(Models.CustomStep step, Dictionary<string, string> inputs)
     {
         if (step.Definition?.CodeInputVariables == null || inputs == null || inputs.Count == 0)
         {
@@ -285,7 +285,7 @@ public class AppsStepExecutionService
     /// <summary>
     /// Aggregate output variables from multiple runner results
     /// </summary>
-    private Dictionary<string, string> AggregateOutputVariables(List<RunnerCustomStepResult> results)
+    private static Dictionary<string, string> AggregateOutputVariables(List<RunnerCustomStepResult> results)
     {
         var output = new Dictionary<string, string>();
 

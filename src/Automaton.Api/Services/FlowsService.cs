@@ -249,7 +249,7 @@ public class FlowsService
         return settings;
     }
 
-    public async Task UpdateSettings(Guid id, FlowSettings settings)
+    public async Task UpdateSettings(Guid id, UpdateFlowSettingsRequest settings)
     {
         // Check if user can update this flow
         if (!await authorizationService.CanUpdateFlowAsync(id))
@@ -372,9 +372,9 @@ public class FlowsService
         }
     }
 
-    private bool IsSensitiveReference(string? value)
+    private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+        return value?.StartsWith("${sensitive:") == true && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)

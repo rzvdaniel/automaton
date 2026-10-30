@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -318,6 +319,7 @@ public class AdminMarketplaceAppDto
 
 public class UpdateMarketplaceAppRequest
 {
+    [JsonRequired]
     public bool IsFeatured { get; set; }
     public string? Category { get; set; }
     public string? ReviewStatus { get; set; }

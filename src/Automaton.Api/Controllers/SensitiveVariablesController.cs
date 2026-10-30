@@ -2,6 +2,7 @@ using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Controllers;
 
@@ -53,7 +54,7 @@ public class SensitiveVariablesController : ControllerBase
 
             return CreatedAtAction(nameof(GetSensitiveVariable), new { id = sensitiveVar.Id }, response);
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             return Forbid();
         }
@@ -65,13 +66,8 @@ public class SensitiveVariablesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<SensitiveVariableResponse>> GetSensitiveVariable(Guid id)
+    public ActionResult<SensitiveVariableResponse> GetSensitiveVariable(Guid id)
     {
-        var userId = GetUserId();
-
-        var sensitiveVar = await sensitiveVariableService.GetSensitiveVariablesForResourceAsync(
-            string.Empty, Guid.Empty, userId); // This needs refactoring
-
         // For now, return NotFound
         // TODO: Implement GetSensitiveVariableByIdAsync method in service
         return NotFound();
@@ -151,6 +147,7 @@ public class CreateSensitiveVariableRequest
     public string Value { get; set; }
     public string? Description { get; set; }
     public string ResourceType { get; set; }
+    [JsonRequired]
     public Guid ResourceId { get; set; }
     public string VariableScope { get; set; }
     public Guid? ExistingId { get; set; }

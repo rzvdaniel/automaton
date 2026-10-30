@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Models;
 
@@ -68,6 +69,7 @@ public class ProjectListItem
 public class AddProjectMemberRequest
 {
     public string Email { get; set; } = string.Empty;
+    [JsonRequired]
     public ProjectRole Role { get; set; }
     public bool CreateAccountIfNotExists { get; set; } = true;
 }
@@ -77,6 +79,7 @@ public class AddProjectMemberRequest
 /// </summary>
 public class UpdateProjectMemberRequest
 {
+    [JsonRequired]
     public ProjectRole Role { get; set; }
 }
 

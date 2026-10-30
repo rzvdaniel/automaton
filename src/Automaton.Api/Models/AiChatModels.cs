@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using System.Text.Json.Serialization;
 
 
 #nullable disable
@@ -76,7 +77,9 @@ public class ChatMessageDto
 /// </summary>
 public class CreateChatSessionRequest
 {
+    [JsonRequired]
     public ChatResourceType ResourceType { get; set; }
+    [JsonRequired]
     public Guid ResourceId { get; set; }
     public string Title { get; set; }
     public string Provider { get; set; }
@@ -88,9 +91,11 @@ public class CreateChatSessionRequest
 /// </summary>
 public class SaveChatMessageRequest
 {
+    [JsonRequired]
     public Guid SessionId { get; set; }
     public string Role { get; set; }
     public string Content { get; set; }
+    [JsonRequired]
     public ChatMessageType MessageType { get; set; }
     public string Metadata { get; set; }
     
@@ -109,6 +114,7 @@ public class SaveChatMessageRequest
 /// </summary>
 public class SaveChatMessagesRequest
 {
+    [JsonRequired]
     public Guid SessionId { get; set; }
     public List<ChatMessageItem> Messages { get; set; }
 }
@@ -120,6 +126,7 @@ public class ChatMessageItem
 {
     public string Role { get; set; }
     public string Content { get; set; }
+    [JsonRequired]
     public ChatMessageType MessageType { get; set; }
     public string Metadata { get; set; }
 }

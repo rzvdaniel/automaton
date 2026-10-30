@@ -135,7 +135,6 @@ public sealed class SelfHostedRunnerInstallationService(
     private string BuildCommand(SelfHostedRunnerEnrollment enrollment, string token)
     {
         var root = $"/opt/automaton/self-hosted-runners/{enrollment.InstallationId}";
-        var workspace = $"{root}/workspace";
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
         var machineWorkspaceVolume = $"automaton-machine-runner-{enrollment.InstallationId}-workspace";
         var network = $"automaton-self-hosted-{enrollment.InstallationId}-runtime";

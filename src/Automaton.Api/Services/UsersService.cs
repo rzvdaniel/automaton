@@ -761,7 +761,7 @@ public class UsersService
     /// <summary>
     /// Convert display name to URL-safe slug
     /// </summary>
-    private string ConvertToSlug(string input)
+    private static string ConvertToSlug(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
             return "user";

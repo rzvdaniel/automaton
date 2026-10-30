@@ -43,8 +43,8 @@ namespace Automaton.Api.Application.Queries.Handlers
                 RegisteredToUtc = request.RegisteredToUtc,
                 SortField = request.SortField,
                 SortOrder = request.SortOrder,
-                PageIndex = request.PageIndex,
-                PageSize = request.PageSize
+                PageIndex = request.PageIndex ?? 0,
+                PageSize = request.PageSize ?? 100
             };
 
         private Task<Dictionary<Guid, int>> LoadAppCountsAsync(

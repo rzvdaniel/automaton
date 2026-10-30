@@ -114,7 +114,7 @@ namespace Automaton.Api.Services
             };
         }
 
-        private string GenerateDescription(ActivityType activityType, string entityName)
+        private static string GenerateDescription(ActivityType activityType, string entityName)
         {
             return activityType switch
             {

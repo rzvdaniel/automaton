@@ -111,7 +111,7 @@ public class CustomStepsService
         return entity.Id;
     }
 
-    public async Task Update(Guid id, CustomStep step)
+    public async Task Update(Guid id, UpdateCustomStepRequest step)
     {
         // Check if user can update this custom step (personal owner OR project member with Developer/Admin role)
         if (!await authorizationService.CanUpdateCustomStepAsync(id))
@@ -375,9 +375,9 @@ public class CustomStepsService
         }
     }
 
-    private bool IsSensitiveReference(string? value)
+    private static bool IsSensitiveReference(string? value)
     {
-        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+        return value?.StartsWith("${sensitive:") == true && value.EndsWith('}');
     }
 
     private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)

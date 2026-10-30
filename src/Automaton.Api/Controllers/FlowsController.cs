@@ -91,7 +91,7 @@ public class FlowsController : BaseController
     }
 
     [HttpPut("settings/{id}")]
-    public async Task<IActionResult> UpdateSettings(Guid id, FlowSettings settings)
+    public async Task<IActionResult> UpdateSettings(Guid id, UpdateFlowSettingsRequest settings)
     {
         await flowsService.UpdateSettings(id, settings);
 

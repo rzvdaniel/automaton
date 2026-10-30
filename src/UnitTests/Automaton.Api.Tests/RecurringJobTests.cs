@@ -2,6 +2,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Hangfire;
 using Hangfire.MemoryStorage;
+using System.Text.Json;
 
 namespace Automaton.Api.Tests
 {
@@ -14,6 +15,28 @@ namespace Automaton.Api.Tests
     /// </summary>
     public class RecurringJobTests
     {
+        [Test]
+        public void ScheduleIdIsRequiredWhenDeserializingRequest()
+        {
+            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ScheduleModel>("{\"Name\":\"daily\"}"));
+        }
+
+        [Test]
+        public void MissingCronFieldsKeepTheirExistingDefaults()
+        {
+            var recurrence = JsonSerializer.Deserialize<CronRecurrence>("{}")!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(recurrence.CronType, Is.EqualTo(CronType.Never));
+                Assert.That(recurrence.Minute, Is.EqualTo(0));
+                Assert.That(recurrence.Hour, Is.EqualTo(0));
+                Assert.That(recurrence.Day, Is.EqualTo(1));
+                Assert.That(recurrence.DayOfWeek, Is.EqualTo(DayOfWeek.Monday));
+                Assert.That(recurrence.Month, Is.EqualTo(1));
+            });
+        }
+
         [SetUp]
         public void Setup()
         {

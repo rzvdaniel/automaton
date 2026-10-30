@@ -1,5 +1,6 @@
 ﻿using Automaton.Api.Enums;
 using Automaton.Core.Enums;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Models;
 
@@ -55,4 +56,15 @@ public class RunnerDetails
     public DateTime? MachineStorageMeasuredAtUtc { get; set; }
     public string? MachineStorageMeasurementStatus { get; set; }
     public string? MachineStorageMeasurementError { get; set; }
+}
+
+public class UpdateRunnerRequest
+{
+    [JsonRequired]
+    public string Name { get; set; } = string.Empty;
+    public string? Version { get; set; }
+    public string? MachineName { get; set; }
+    public string? IpAddress { get; set; }
+    public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
+    public string? InstallationId { get; set; }
 }

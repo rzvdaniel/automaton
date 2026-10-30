@@ -61,7 +61,7 @@ namespace Automaton.Api.Application.Commands.Handlers
             }
             catch (Exception ex)
             {
-                Logger.Log(LogLevel.Debug, "Could not reset user password.");
+                Logger.LogDebug(ex, "Could not reset user password.");
                 throw;
             }       
         }

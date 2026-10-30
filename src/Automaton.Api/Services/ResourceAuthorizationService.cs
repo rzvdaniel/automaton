@@ -606,7 +606,7 @@ public class ResourceAuthorizationService
 
         // Apps where user is project member
         var projectAppIds = dbContext.ProjectApps
-            .Where(pa => pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+            .Where(pa => pa.Project != null && pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
             .Select(pa => pa.WebAppId);
 
         var projectApps = dbContext.WebApps
@@ -631,7 +631,7 @@ public class ResourceAuthorizationService
 
         // Flows where user is project member
         var projectFlowIds = dbContext.ProjectFlows
-            .Where(pf => pf.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+            .Where(pf => pf.Project != null && pf.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
             .Select(pf => pf.FlowId);
 
         var projectFlows = dbContext.Flows
@@ -656,7 +656,7 @@ public class ResourceAuthorizationService
 
         // Steps where user is project member
         var projectStepIds = dbContext.ProjectCustomSteps
-            .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+            .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
             .Select(pcs => pcs.CustomStepId);
 
         var projectSteps = dbContext.CustomSteps
@@ -681,7 +681,7 @@ public class ResourceAuthorizationService
 
         // Runners where user is project member
         var projectRunnerIds = dbContext.ProjectRunners
-            .Where(pr => pr.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+            .Where(pr => pr.Project != null && pr.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
             .Select(pr => pr.RunnerId);
 
         var projectRunners = dbContext.Runners
@@ -712,7 +712,7 @@ public class ResourceAuthorizationService
             // Project mode - return only apps in that project (if user has access)
             return dbContext.WebApps
                 .Where(a => a.ProjectApps.Any(pa => pa.ProjectId == projectId && 
-                                                     pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+                                                     pa.Project != null && pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
         }
     }
 
@@ -737,7 +737,7 @@ public class ResourceAuthorizationService
         {
             // Project mode - return only flows in that project (if user has access)
             var projectFlowIds = dbContext.ProjectFlows
-                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
                 .Select(pcs => pcs.FlowId);
 
             var projectFlows = dbContext.Flows
@@ -768,7 +768,7 @@ public class ResourceAuthorizationService
         {
             // Project mode - return only steps in that project (if user has access)
             var projectStepsIds = dbContext.ProjectCustomSteps
-                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Where(pcs => pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
                 .Select(pcs => pcs.CustomStepId);
 
             var projectSteps = dbContext.CustomSteps
@@ -801,7 +801,7 @@ public class ResourceAuthorizationService
             var projectRunnerIds = dbContext.ProjectRunners
                 .Where(pcs =>
                     pcs.ProjectId == projectId.Value &&
-                    pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                    pcs.Project != null && pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
                 .Select(pcs => pcs.RunnerId);
 
             var projectRunners = dbContext.Runners
@@ -832,7 +832,7 @@ public class ResourceAuthorizationService
         {
             // Project mode - return only API keys in that project (if user has access)
             return dbContext.ApiKeys
-                .Where(ak => ak.ProjectApiKeys.Any(pak => pak.ProjectId == projectId && 
+                .Where(ak => ak.ProjectApiKeys.Any(pak => pak.ProjectId == projectId && pak.Project != null &&
                                                            pak.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
         }
     }
@@ -857,7 +857,7 @@ public class ResourceAuthorizationService
         {
             // Project mode - return only AI API keys in that project (if user has access)
             return dbContext.AiApiKeys
-                .Where(ak => ak.ProjectAiApiKeys.Any(pak => pak.ProjectId == projectId && 
+                .Where(ak => ak.ProjectAiApiKeys.Any(pak => pak.ProjectId == projectId && pak.Project != null &&
                                                              pak.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)) && 
                              ak.IsActive);
         }

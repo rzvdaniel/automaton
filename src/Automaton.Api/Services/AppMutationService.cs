@@ -220,7 +220,6 @@ public sealed class AppMutationService(
             throw new InvalidOperationException($"App {id} not found");
         }
 
-        var appName = app.Name;
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
         await appDeletionService.DeleteResourcesAsync(id, app, ownerId, recoverInterrupted, abandonOfflineRuntimes);

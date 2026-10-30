@@ -5,6 +5,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Controllers;
 
@@ -415,6 +416,8 @@ public class UpdateRunnerRequest
 
 public class SetSampleStatusRequest
 {
+    [JsonRequired]
     public bool IsSample { get; set; }
+    [JsonRequired]
     public bool IsFeatured { get; set; }
 }

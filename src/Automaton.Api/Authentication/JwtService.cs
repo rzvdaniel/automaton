@@ -87,7 +87,7 @@ namespace Automaton.Api.Authentication
                 ClaimsPrincipal principal =
                     tokenHandler.ValidateToken(token, tokenValidationParameters ?? _tokenValidationParameters,
                         out var securityToken);
-                if (principal == null || !(securityToken is JwtSecurityToken jwt))
+                if (principal == null || securityToken is not JwtSecurityToken jwt)
                 {
                     throw new SecurityTokenException("Invalid token");
                 }

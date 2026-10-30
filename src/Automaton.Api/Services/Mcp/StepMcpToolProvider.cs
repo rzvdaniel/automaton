@@ -5,6 +5,7 @@ using Automaton.Mcp.Models;
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Models;
+using Automaton.Api.Models;
 
 namespace Automaton.Api.Services.Mcp;
 
@@ -196,7 +197,7 @@ public class StepMcpToolProvider : IMcpToolProvider
                     hasErrorHandling = currentCode.Contains("try") || currentCode.Contains("catch") || currentCode.Contains("except"),
                     hasLogging = currentCode.Contains("INFO:") || currentCode.Contains("WARN:") || currentCode.Contains("ERROR:"),
                     isEmptyOrTemplate = string.IsNullOrWhiteSpace(currentCode) || 
-                                       (currentCode.Trim().StartsWith("#") && currentCode.Trim().Split('\n').Length <= 3)
+                                       (currentCode.Trim().StartsWith('#') && currentCode.Trim().Split('\n').Length <= 3)
                 },
                 message = "Current code retrieved successfully"
             };
@@ -317,7 +318,17 @@ public class StepMcpToolProvider : IMcpToolProvider
             // Update step with new code
             step.Definition.Code = code;
             
-            await _customStepsService.Update(stepId, step);
+            await _customStepsService.Update(stepId, new UpdateCustomStepRequest
+            {
+                Name = step.Name,
+                DisplayName = step.DisplayName,
+                Description = step.Description,
+                MoreInfo = step.MoreInfo,
+                Icon = step.Icon,
+                Category = step.Category,
+                VisibleInExplorer = step.VisibleInExplorer,
+                Definition = step.Definition
+            });
 
             return new McpToolResult
             {

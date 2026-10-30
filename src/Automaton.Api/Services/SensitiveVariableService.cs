@@ -243,7 +243,7 @@ public class SensitiveVariableService
         foreach (var kvp in variables)
         {
             // Check if value is a sensitive variable reference (format: "${sensitive:guid}")
-            if (kvp.Value?.StartsWith("${sensitive:") == true && kvp.Value.EndsWith("}"))
+            if (kvp.Value?.StartsWith("${sensitive:") == true && kvp.Value.EndsWith('}'))
             {
                 var guidPart = kvp.Value.Substring(12, kvp.Value.Length - 13); // Extract GUID
                 if (Guid.TryParse(guidPart, out var sensitiveVarId))

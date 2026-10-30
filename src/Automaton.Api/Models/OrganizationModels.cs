@@ -1,4 +1,5 @@
 using Automaton.Api.Enums;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Models;
 
@@ -25,6 +26,7 @@ public class UpdateOrganizationRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [JsonRequired]
     public bool AllowPublicSignup { get; set; }
     public string? RequireEmailDomain { get; set; }
     public string? LogoUrl { get; set; }
@@ -88,6 +90,7 @@ public class OrganizationListItem
 public class InviteMemberRequest
 {
     public string Email { get; set; } = string.Empty;
+    [JsonRequired]
     public OrganizationRole Role { get; set; }
 }
 
@@ -104,6 +107,7 @@ public class AcceptInvitationRequest
 /// </summary>
 public class UpdateOrganizationMemberRequest
 {
+    [JsonRequired]
     public OrganizationRole Role { get; set; }
 }
 
@@ -134,6 +138,7 @@ public class OrganizationMemberDto
 /// </summary>
 public class AssignAppRequest
 {
+    [JsonRequired]
     public Guid UserId { get; set; }
 }
 

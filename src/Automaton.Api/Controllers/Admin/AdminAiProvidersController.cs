@@ -1,5 +1,6 @@
 using Automaton.Mcp.SystemPrompts;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -454,10 +455,15 @@ public class GlobalAiDefaultsResponse
 
 public class IterationLimitsConfigResponse
 {
+    [JsonRequired]
     public int Simple     { get; set; }
+    [JsonRequired]
     public int Medium     { get; set; }
+    [JsonRequired]
     public int Large      { get; set; }
+    [JsonRequired]
     public int Enterprise { get; set; }
+    [JsonRequired]
     public int Autonomous { get; set; }
 }
 
@@ -477,9 +483,13 @@ public class AiProvidersOperationalConfigResponse
 
 public class SaveAiSettingsRequest
 {
+    [JsonRequired]
     public int MaxConversationHistoryMessages { get; set; }
+    [JsonRequired]
     public int MaxIterations                  { get; set; }
+    [JsonRequired]
     public int MaxConsecutiveFailures         { get; set; }
+    [JsonRequired]
     public int DefaultMaxOutputTokens         { get; set; }
     public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
     public bool AppVerificationAllowUserOverride { get; set; } = true;

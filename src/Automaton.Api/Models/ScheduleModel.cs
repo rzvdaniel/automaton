@@ -1,16 +1,19 @@
 ﻿using Automaton.Api.Enums;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Api.Models;
 
 public class ScheduleModel
 {
+    [JsonRequired]
     public Guid Id { get; set; }
 
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
+    [JsonRequired]
     public Guid FlowId { get; set; }
 
-    public IEnumerable<Guid> RunnerIds { get; set; }
+    public IEnumerable<Guid> RunnerIds { get; set; } = Array.Empty<Guid>();
 
     public CronRecurrence CronRecurrence { get; set; }
 
@@ -25,24 +28,16 @@ public class ScheduleModel
 
     public string GetCron()
     {
-        switch (CronRecurrence.CronType)
+        var recurrence = CronRecurrence;
+        return (recurrence.CronType ?? CronType.Never) switch
         {
-            case CronType.Minutely:
-                return Hangfire.Cron.Minutely();
-            case CronType.Hourly:
-                return Hangfire.Cron.Hourly(CronRecurrence.Minute);
-            case CronType.Daily:
-                return Hangfire.Cron.Daily(hour: CronRecurrence.Hour, minute: CronRecurrence.Minute);
-            case CronType.Weekly:
-                return Hangfire.Cron.Weekly(dayOfWeek: CronRecurrence.DayOfWeek, hour: CronRecurrence.Hour, minute: CronRecurrence.Minute);
-            case CronType.Monthly:
-                return Hangfire.Cron.Monthly(day: CronRecurrence.Day, hour: CronRecurrence.Hour, minute: CronRecurrence.Minute);
-            case CronType.Yearly:
-                return Hangfire.Cron.Yearly(month: CronRecurrence.Month, day: CronRecurrence.Day, hour: CronRecurrence.Hour, minute: CronRecurrence.Minute);
-            case CronType.Never:
-                return Hangfire.Cron.Never();
-            default:
-                return Hangfire.Cron.Never();
-        }
+            CronType.Minutely => Hangfire.Cron.Minutely(),
+            CronType.Hourly => Hangfire.Cron.Hourly(recurrence.Minute ?? 0),
+            CronType.Daily => Hangfire.Cron.Daily(hour: recurrence.Hour ?? 0, minute: recurrence.Minute ?? 0),
+            CronType.Weekly => Hangfire.Cron.Weekly(dayOfWeek: recurrence.DayOfWeek ?? DayOfWeek.Monday, hour: recurrence.Hour ?? 0, minute: recurrence.Minute ?? 0),
+            CronType.Monthly => Hangfire.Cron.Monthly(day: recurrence.Day ?? 1, hour: recurrence.Hour ?? 0, minute: recurrence.Minute ?? 0),
+            CronType.Yearly => Hangfire.Cron.Yearly(month: recurrence.Month ?? 1, day: recurrence.Day ?? 1, hour: recurrence.Hour ?? 0, minute: recurrence.Minute ?? 0),
+            _ => Hangfire.Cron.Never()
+        };
     }
 }

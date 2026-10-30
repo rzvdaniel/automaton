@@ -44,7 +44,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, CustomStep customStep)
+    public async Task<IActionResult> Put(Guid id, UpdateCustomStepRequest customStep)
     {
         await customStepsService.Update(id, customStep);
 

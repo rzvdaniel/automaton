@@ -247,12 +247,7 @@ internal static class ApiAuthorizationRegistration
             // This policy accepts EITHER API Key OR JWT/Identity authentication
             options.AddPolicy("AllowApiKey", policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
-              .RequireAuthenticatedUser()
-              .RequireAssertion(context =>
-              {
-                  var scopeClaim = context.User.FindFirst("api_key_scope")?.Value;
-                  return true;
-              }));
+              .RequireAuthenticatedUser());
 
             options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
                 policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
@@ -466,9 +461,9 @@ internal static class ApiHangfireRegistration
         var configurationManager = applicationBuilder.Configuration;
         services.AddHangfire(x =>
         {
-            object handler = configurationService.DatabaseType switch
+            switch (configurationService.DatabaseType)
             {
-                ConfigurationService.MySqlDatabaseType =>
+                case ConfigurationService.MySqlDatabaseType:
                     x.UseStorage(new MySqlStorage(configurationManager.GetConnectionString("MySqlConnection"),
                         new MySqlStorageOptions
                         {
@@ -480,10 +475,11 @@ internal static class ApiHangfireRegistration
                             DashboardJobListLimit = 50000,
                             TransactionTimeout = TimeSpan.FromMinutes(1),
                             TablesPrefix = "hangfire."
-                        })),
-
-                _ => throw new Exception($"Unsupported hangfire provider: {configurationService.DatabaseType}")
-            };
+                        }));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported hangfire provider: {configurationService.DatabaseType}");
+            }
         });
 
         services.AddHangfireServer();

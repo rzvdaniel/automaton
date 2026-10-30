@@ -650,7 +650,6 @@ public class AppFileStorageService
 
     private Task MarkSourceModifiedAsync(Guid userId, Guid appId, string relativePath)
     {
-        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
         var modifiedAtUtc = DateTime.UtcNow;
 
         return UpdateAppStorageMetadataAsync(userId, appId, metadata =>

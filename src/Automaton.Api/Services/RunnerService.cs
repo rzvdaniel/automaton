@@ -77,7 +77,7 @@ public class RunnerService
 
     public Task<int> CloseStaleConnectionSessionsAsync(CancellationToken cancellationToken)
         => connectionSessionService.CloseStaleConnectionSessionsAsync(cancellationToken);
-    public async Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
+    public async Task Update(Guid id, UpdateRunnerRequest runner, CancellationToken cancellationToken)
     {
         // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
         if (!await authorizationService.CanUpdateRunnerAsync(id, cancellationToken))
@@ -114,6 +114,17 @@ public class RunnerService
         // Save changes
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
+        => Update(id, new UpdateRunnerRequest
+        {
+            Name = runner.Name,
+            Version = runner.Version,
+            MachineName = runner.MachineName,
+            IpAddress = runner.IpAddress,
+            Capabilities = runner.Capabilities,
+            InstallationId = runner.InstallationId
+        }, cancellationToken);
 
     public bool Exists(string name)
     {

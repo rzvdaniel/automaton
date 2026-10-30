@@ -31,7 +31,7 @@ public class RunnersController : BaseController
 
     [HttpPut("{id}")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> Put(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
+    public async Task<IActionResult> Put(Guid id, Automaton.Api.Models.UpdateRunnerRequest runner, CancellationToken cancellationToken)
     {
         try { await runnersService.Update(id, runner, cancellationToken); }
         catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
