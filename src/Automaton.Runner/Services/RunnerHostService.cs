@@ -692,6 +692,10 @@ public class RunnerHostService
         {
             runnerName = $"AutoRunner-{Environment.MachineName}";
         }
+        else if (await AdoptServerNameForStoredIdAsync(runnerName))
+        {
+            runnerName = configService.ApplicationName; // Keep a rename made in Studio.
+        }
 
         return await registrationWorkflow.RegisterRunnerAsync(runnerName);
     }
@@ -712,6 +716,11 @@ public class RunnerHostService
 
         var runnerName = configService.ApplicationName;
         if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            return;
+        }
+
+        if (await AdoptServerNameForStoredIdAsync(runnerName))
         {
             return;
         }
@@ -748,6 +757,48 @@ public class RunnerHostService
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
             logger.Warning(ex, "Failed to reconcile runner identity before hub connect for {RunnerName}", runnerName);
+        }
+    }
+
+    // The stored Runner ID is the identity; the name can be changed in Studio after installation.
+    // When the server knows this ID, use its current name so a renamed Runner keeps working after a
+    // restart and the startup name update does not rename it back.
+    private async Task<bool> AdoptServerNameForStoredIdAsync(string localName)
+    {
+        if (!Guid.TryParse(configService.RunnerId, out var runnerId))
+        {
+            return false;
+        }
+
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners");
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            var runners = await response.Content.ReadAsAsync<List<RunnerDetails>>();
+            var serverRunner = runners?.FirstOrDefault(runner => runner.Id == runnerId);
+            if (serverRunner is null || string.IsNullOrWhiteSpace(serverRunner.Name))
+            {
+                return false;
+            }
+
+            if (!string.Equals(serverRunner.Name, localName, StringComparison.Ordinal))
+            {
+                Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", serverRunner.Name);
+                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), serverRunner.Name);
+                logger.Information("Runner {RunnerId} was renamed on the server from {OldName} to {RunnerName}; using the server name", runnerId, localName, serverRunner.Name);
+                WriteLine($"?? Using the server's name for this Runner: {serverRunner.Name}");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Could not look up Runner {RunnerId} by ID; falling back to its name", runnerId);
+            return false;
         }
     }
 

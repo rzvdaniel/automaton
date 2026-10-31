@@ -11,26 +11,33 @@ public sealed class RunnerUpgradeCommandTests
     [TestCase("sh_invalid")]
     [TestCase("sh_'; docker system prune")]
     public void RejectsInvalidInstallationIdentity(string? installation)
-        => Assert.Throws<InvalidOperationException>(() => RunnerUpgradeCommand.Build(Guid.NewGuid(), installation, Image));
+        => Assert.Throws<InvalidOperationException>(() => RunnerUpgradeCommand.Build(Guid.NewGuid(), installation, Image, "Runner"));
 
     [TestCase("")]
     [TestCase("image'; rm -rf /")]
     [TestCase("Image:Latest")]
     public void RejectsUnsafeImageReference(string image)
-        => Assert.Throws<InvalidOperationException>(() => RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", image));
+        => Assert.Throws<InvalidOperationException>(() => RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", image, "Runner"));
 
     [Test]
     public void TargetsTheInstallationContainerAndKeepsItsIdentity()
     {
         var runnerId = Guid.NewGuid();
         var installation = $"sh_{Guid.NewGuid():N}";
-        var command = RunnerUpgradeCommand.Build(runnerId, installation, Image);
+        var command = RunnerUpgradeCommand.Build(runnerId, installation, Image, "Server Machine Management");
 
         Assert.That(command, Does.Contain($"container='automaton-self-hosted-{installation[3..15]}'"));
         Assert.That(command, Does.Contain($"AUTOMATON_RUNNER_INSTALLATION_ID={installation}"));
         Assert.That(command, Does.Contain(runnerId.ToString("D")));
         Assert.That(command, Does.Contain("restoring the previous container"));
+        Assert.That(command, Does.Contain("'AUTOMATON_RUNNER_NAME=Server Machine Management'"));
+        Assert.That(command, Does.Contain("Connected to server successfully"));
     }
+
+    [TestCase("")]
+    [TestCase("line\nbreak")]
+    public void RejectsUnusableRunnerName(string name)
+        => Assert.Throws<InvalidOperationException>(() => RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, name));
 
     [Test]
     public async Task GeneratedScriptIsValidShell()
@@ -39,7 +46,7 @@ public sealed class RunnerUpgradeCommandTests
         var start = new ProcessStartInfo("/bin/sh", "-n") { RedirectStandardInput = true,
             RedirectStandardError = true, UseShellExecute = false };
         using var process = Process.Start(start)!;
-        await process.StandardInput.WriteAsync(RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image));
+        await process.StandardInput.WriteAsync(RunnerUpgradeCommand.Build(Guid.NewGuid(), $"sh_{Guid.NewGuid():N}", Image, "O'Brien's Runner"));
         process.StandardInput.Close();
         var error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
