@@ -29,7 +29,7 @@ describe('resolveStoreConfig', () => {
     expect(config.apiBaseUrl).toBe('https://api.example.com/')
     expect(config.publicAppsBaseUrl).toBe('https://apps.example.com')
     expect(config.studioUrl).toBe('https://studio.example.com/')
-    expect(config.storeTitle).toBe('App Store')
+    expect(config.storeTitle).toBe('Automaton App Store')
   })
 
   it('falls back to build environment for local development', () => {

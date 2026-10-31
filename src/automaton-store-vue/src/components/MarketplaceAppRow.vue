@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { getPublishedAppUrl } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -9,7 +8,6 @@ const props = defineProps<{ app: MarketplaceAppCard }>()
 
 const initial = computed(() => [...props.app.name.trim()][0]?.toUpperCase() ?? '?')
 const thumbnail = computed(() => resolveMarketplaceAssetUrl(props.app.thumbnailUrl))
-const launchUrl = computed(() => (props.app.canLaunch ? getPublishedAppUrl(props.app.publicUrl) : ''))
 const creator = computed(() => props.app.creatorDisplayName || props.app.creatorPublicUsername || '')
 const summary = computed(() => props.app.summary || props.app.description || 'A public Automaton app')
 </script>
@@ -34,7 +32,7 @@ const summary = computed(() => props.app.summary || props.app.description || 'A 
         <template v-if="app.category">{{ app.category }}</template>
       </p>
     </div>
-    <a v-if="launchUrl" class="btn small" :href="launchUrl" target="_blank" rel="noopener" :aria-label="`Open ${app.name}`">Open</a>
+    <RouterLink class="btn small" :to="`/apps/${app.id}`" :aria-label="`View ${app.name} details`">Open</RouterLink>
   </article>
 </template>
 

@@ -12,7 +12,7 @@ export interface StoreConfigSources {
   origin: string
 }
 
-const defaultTitle = 'App Store'
+const defaultTitle = 'Automaton App Store'
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '')
