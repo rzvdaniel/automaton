@@ -39,12 +39,7 @@ Every Automaton installation ships a public app store at `store.<domain>`. It is
 
 ### 5. Update — `update-automaton.sh`
 
-Implemented: the updater no longer requires an identical `compose.yaml`. It compares the effective Compose configuration and allows added or changed application services while MySQL, RabbitMQ, Traefik, volumes, secrets and networks stay identical and no service is removed. The manifest may gain `STORE_IMAGE`. Updaters installed by earlier releases still refuse the first store release, so that one update uses the downloaded `update-automaton.sh` (documented in the install guide). The store image's GHCR package starts private and must be made public before the first store release passes the anonymous pull check.
-
-- Accept a manifest with `STORE_IMAGE`; pull and start `api worker studio store` together.
-- Migrate older installs idempotently: add store runtime config, CORS origin, Traefik route and certificate SAN when missing (new configure-on-update path; `configure.py` currently writes only new files).
-- Back up and restore the new configuration with the existing recovery backup.
-- Store check after update is a warning that names the missing `store.<domain>` DNS record; it does not roll back API/Worker/Studio.
+Implemented in #460: the updater compares the effective Compose configuration and allows added or changed application services while MySQL, RabbitMQ, Traefik, volumes, secrets and networks stay identical and no service is removed. It pulls and starts only release-owned application services (not override additions), runs `configure.py --ensure-store` after the verified backup, and only warns when the store does not answer. The manifest may gain `STORE_IMAGE`. Updaters installed by earlier releases still refuse the first store release, so that one update uses the downloaded `update-automaton.sh` (documented in the install guide). The store image's GHCR package starts private and must be made public before the first store release passes the anonymous pull check.
 
 ### 6. Store setting — API and Studio
 

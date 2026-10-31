@@ -115,6 +115,9 @@ PY
 
 old_compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml")
+# Services owned by the release, without operator override additions such as sidecars.
+old_release_services=$("${old_compose[@]}" config --services)
+new_release_services=$("${new_compose[@]}" config --services)
 override="$install_dir/compose.override.yaml"
 if [[ -e "$override" || -L "$override" ]]; then
     [[ -f "$override" && ! -L "$override" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
@@ -125,7 +128,7 @@ fi
 "${new_compose[@]}" config --format json > "$working/new-compose.json"
 # Releases may add or change application services. Infrastructure, persistent volumes,
 # secrets and networks must stay identical; those changes need a reviewed migration.
-application_services=$(python3 - "$working/old-compose.json" "$working/new-compose.json" <<'PY'
+python3 - "$working/old-compose.json" "$working/new-compose.json" <<'PY'
 import json, sys
 old, new = (json.load(open(path)) for path in sys.argv[1:3])
 infrastructure = ('mysql', 'rabbitmq', 'traefik')
@@ -138,12 +141,12 @@ for name in infrastructure:
 for section in ('volumes', 'secrets', 'networks'):
     if old.get(section) != new.get(section):
         raise SystemExit(f'This release changes Compose {section}. A reviewed migration is required.')
-print(' '.join(name for name in new_services if name not in infrastructure))
 PY
-)
-read -r -a application_services <<< "$application_services"
-old_services=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1])).get("services", {})))' "$working/old-compose.json")
-for service in $old_services; do
+application_services=()
+for service in $new_release_services; do
+    [[ " mysql rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
+done
+for service in $old_release_services; do
     container=$("${old_compose[@]}" ps -q "$service")
     [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation before updating." >&2; exit 1; }
 done
@@ -183,7 +186,10 @@ fi
 if [[ " ${application_services[*]} " == *' store '* ]]; then
     [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
     echo 'Adding app store configuration if missing.'
-    python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-store
+    if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-store; then
+        echo "App store configuration failed; services were not changed. Fix the reported configuration file, or restore it from $backup/config.tar.gz, then rerun the update." >&2
+        exit 1
+    fi
 fi
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull "${application_services[@]}"
@@ -197,8 +203,8 @@ if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-er
     echo "Public route validation failed. Previous manifest and recovery backup remain at $backup. Assess the services before recovery." >&2
     exit 1
 fi
-if [[ " ${application_services[*]} " == *' store '* ]] && ! curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors "https://store.$domain/" >/dev/null; then
-    printf 'Warning: the app store did not answer at https://store.%s/. Point a DNS record for store.%s to this server; the rest of the update is complete.\n' "$domain" "$domain" >&2
+if [[ " ${application_services[*]} " == *' store '* ]] && ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://store.$domain/" >/dev/null; then
+    printf 'Warning: the app store did not answer at https://store.%s/. Point a DNS record for store.%s to this server, then restart Traefik so it requests the certificate; the rest of the update is complete.\n' "$domain" "$domain" >&2
 fi
 install -m 0600 "$bundle/release.env" "$install_dir/release.env"
 install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"

@@ -64,6 +64,7 @@ elif args[0]=='cp':
         archive.addfile(item, io.BytesIO(data))
 elif args[0]=='compose':
     if 'config' in args and '--format' in args: print(open(args[args.index('-f')+1]).read())
+    elif 'config' in args and '--services' in args: print(*json.load(open(args[args.index('-f')+1]))['services'], sep=chr(10))
     elif 'ps' in args: print('container-'+args[-1])
     elif 'exec' in args: print('-- Dump completed on 2026-01-01')
     elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
@@ -114,7 +115,9 @@ elif args[0]=='compose':
         self.assertEqual((self.install / 'release.env').read_text(), manifest('2'))
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         up, = [args for args in calls if args[0] == 'compose' and 'up' in args]
-        self.assertEqual(up[-4:], ['api', 'worker', 'studio', 'store'])
+        pull, = [args for args in calls if args[0] == 'compose' and 'pull' in args]
+        self.assertEqual(sorted(up[up.index('600') + 1:]), ['api', 'store', 'studio', 'worker'])
+        self.assertEqual(sorted(pull[pull.index('pull') + 1:]), ['api', 'store', 'studio', 'worker'])
         self.assertNotIn('mysql', up)
         settings = json.loads((self.config / 'appsettings.Production.json').read_text())
         self.assertIn('https://store.example.invalid', settings['Cors']['AllowedOrigins'])
@@ -133,6 +136,38 @@ elif args[0]=='compose':
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('Point a DNS record for store.example.invalid', result.stderr)
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+
+    def test_override_sidecar_is_not_pulled_or_required(self):
+        override = self.install / 'compose.override.yaml'
+        override.write_text(json.dumps({'services': {'backup-sidecar': {'image': 'sidecar'}}}))
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        for args in calls:
+            if args[0] == 'compose' and ('pull' in args or 'up' in args or 'ps' in args):
+                self.assertNotIn('backup-sidecar', args)
+
+    def test_removed_service_or_volume_change_is_refused(self):
+        without_worker = json.loads(compose())
+        del without_worker['services']['worker']
+        changed_volumes = json.loads(compose())
+        changed_volumes['volumes'] = {'mysql-data': {'external': True}}
+        for candidate, message in ((without_worker, 'removes a service'), (changed_volumes, 'changes Compose volumes')):
+            result = self.update(*self.bundle(compose_file=json.dumps(candidate)))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(message, result.stderr)
+            self.assertFalse((self.install / 'backups').exists())
+
+    def test_invalid_operator_settings_stop_before_services_change(self):
+        (self.config / 'appsettings.Production.json').write_text('{"Cors": {"AllowedOrigins": "https://studio.example.invalid"}}')
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Cors.AllowedOrigins as a list', result.stderr)
+        self.assertIn('config.tar.gz', result.stderr)
+        self.assertFalse(any('up' in json.loads(line) for line in log.read_text().splitlines()))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
 
     def test_compose_infrastructure_change_preserves_installation(self):
         result = self.update(*self.bundle(compose_file=compose(mysql_image='mysql-next')))
@@ -167,7 +202,8 @@ elif args[0]=='compose':
         result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = [json.loads(line) for line in log.read_text().splitlines()]
-        compose = [args for args in calls if args[0] == 'compose' and '-f' in args]
+        # `config --services` deliberately lists release-owned services without the override.
+        compose = [args for args in calls if args[0] == 'compose' and '-f' in args and '--services' not in args]
         self.assertTrue(compose)
         for args in compose:
             self.assertIn(str(override), args)

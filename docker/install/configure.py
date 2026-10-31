@@ -33,6 +33,8 @@ def replace_json(path, value):
     with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
         temporary = Path(stream.name)
         stream.write(json.dumps(value, indent=2))
+        stream.flush()
+        os.fsync(stream.fileno())
     try:
         temporary.chmod(mode)
         os.replace(temporary, path)
@@ -62,14 +64,19 @@ def ensure_store(root):
     store_config.chmod(0o644)  # Public URLs only; readable by the nginx worker through its bind mount.
     settings_path = root / 'appsettings.Production.json'
     settings = json.loads(settings_path.read_text())
-    origins = settings.setdefault('Cors', {}).setdefault('AllowedOrigins', [])
+    origins = settings.setdefault('Cors', {}).setdefault('AllowedOrigins', []) if isinstance(settings, dict) else None
+    if not isinstance(origins, list):
+        raise ValueError(f'{settings_path} must contain Cors.AllowedOrigins as a list.')
     if urls['store'] not in origins:
         origins.append(urls['store'])
         replace_json(settings_path, settings)
     edge_path = root / 'dynamic' / 'installation.yml'
     edge = json.loads(edge_path.read_text())
-    http = edge.setdefault('http', {})
-    services, routers = http.setdefault('services', {}), http.setdefault('routers', {})
+    http = edge.setdefault('http', {}) if isinstance(edge, dict) else None
+    services = http.setdefault('services', {}) if isinstance(http, dict) else None
+    routers = http.setdefault('routers', {}) if isinstance(http, dict) else None
+    if not isinstance(services, dict) or not isinstance(routers, dict):
+        raise ValueError(f'{edge_path} must contain http.services and http.routers objects.')
     if 'store' not in services or 'store' not in routers:
         services.setdefault('store', {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}})
         routers.setdefault('store', store_router(domain, resolver))
@@ -218,5 +225,5 @@ if __name__ == '__main__':
             parser.error('--domain and --email are required.')
         else:
             configure(args.config_dir, args.domain.lower(), args.email, args.tls_mode, args.runner_image)
-    except (ValueError, OSError, KeyError, json.JSONDecodeError) as error:
+    except (ValueError, OSError, KeyError) as error:  # JSONDecodeError is a ValueError.
         parser.exit(1, f'Configuration failed: {error}\n')
