@@ -33,12 +33,15 @@ YAML
 compose=(docker compose -p "$project" --env-file "$bundle/release.env" -f "$bundle/compose.yaml" -f "$fixture/override.yaml")
 cleanup() { local status=$?; if (( status != 0 )); then "${compose[@]}" logs --tail 60 api worker traefik >&2; fi; "${compose[@]}" down -v --remove-orphans >/dev/null; rm -rf -- "$fixture"; }
 trap cleanup EXIT
-"${compose[@]}" up -d --wait --wait-timeout 600 mysql rabbitmq api worker studio traefik
+"${compose[@]}" up -d --wait --wait-timeout 600 mysql rabbitmq api worker studio store traefik
 address="http://$("${compose[@]}" port api 8080)"
 https_address="$("${compose[@]}" port traefik 443)"
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/" | grep -q '<!doctype html>'
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/runtime-config.js" | python3 -c 'import sys; data=sys.stdin.read(); assert "https://api.example.invalid" in data and "https://apps.example.invalid" in data'
 curl -kfSsI -H 'Host: studio.example.invalid' "https://$https_address/runtime-config.js" | grep -qi 'cache-control: no-store'
+curl -kfSs -H 'Host: store.example.invalid' "https://$https_address/apps/any-app" | grep -q '<!doctype html>'
+curl -kfSs -H 'Host: store.example.invalid' "https://$https_address/runtime-config.js" | python3 -c 'import sys; data=sys.stdin.read(); assert "https://api.example.invalid" in data and "https://studio.example.invalid" in data'
+curl -fSs -o /dev/null -D - -H 'Origin: https://store.example.invalid' "$address/api/public/marketplace/categories" | grep -qi 'access-control-allow-origin: https://store.example.invalid'
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/api/install/status" | python3 -c 'import json,sys; assert not json.load(sys.stdin)["installationComplete"]'
 python3 - "$("${compose[@]}" port traefik 5671)" <<'PYBROKER'
 import socket, ssl, sys

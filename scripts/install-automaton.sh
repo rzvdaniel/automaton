@@ -35,7 +35,7 @@ for dir in "$install_dir" "$config_dir"; do
 done
 exec 9>/run/lock/automaton-install.lock
 flock -n 9 || { echo 'Another installer is running.' >&2; exit 1; }
-unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE MYSQL_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
+unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE STORE_IMAGE MYSQL_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
 if $status_only; then
     compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
     if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
@@ -163,7 +163,7 @@ fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
 import re, sys
-required={'API_IMAGE','STUDIO_IMAGE','WORKER_IMAGE','MYSQL_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
+required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','MYSQL_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
 entries=dict(line.strip().split('=',1) for line in open(sys.argv[1]) if line.strip() and not line.startswith('#'))
 if set(entries) != required or any(not re.fullmatch(r'[a-zA-Z0-9_./:@-]+',v) for v in entries.values()):
     raise SystemExit('Invalid release image manifest.')
@@ -184,7 +184,7 @@ export CONFIG_DIR="$config_dir"
 printf 'CONFIG_DIR=%s\n' "$config_dir" > "$install_dir/.env"
 compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 "${compose[@]}" config --quiet
-printf 'DNS must resolve api.%s, studio.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain"
+printf 'DNS must resolve api.%s, studio.%s, store.%s, apps.%s and *.apps.%s to this server. Allow inbound TCP 80, 443 and 5671.\n' "$domain" "$domain" "$domain" "$domain" "$domain"
 if $configure_only; then
     echo 'Configuration prepared. No services were started.'
     exit 0
@@ -194,6 +194,8 @@ fi
 # Validate actual public HTTPS/API routing as well as container health.
 curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response'
 curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
+curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
+    || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
 python3 - "$domain" <<'PYBROKER'
 import socket, ssl, sys
 with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:

@@ -1,17 +1,20 @@
 # Install Automaton on your server
 
-The server release installs API, Studio, Worker, MySQL, RabbitMQ and Traefik together with Docker Compose. The installer supports **Ubuntu 24.04 or newer on x86_64** with public DNS. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. When installing Docker, the installer uses Docker's Ubuntu apt repository, which must publish packages for the host's Ubuntu codename. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
+The server release installs API, Studio, the public app store, Worker, MySQL, RabbitMQ and Traefik together with Docker Compose. The installer supports **Ubuntu 24.04 or newer on x86_64** with public DNS. Use an Ubuntu release supported by Docker; LTS releases are recommended for servers. When installing Docker, the installer uses Docker's Ubuntu apt repository, which must publish packages for the host's Ubuntu codename. HTTPS uses HTTP validation by default; Cloudflare DNS validation is optional for wildcard certificates. It uses prebuilt images, generates unique credentials and stores configuration outside any Git checkout.
 
-A server release must first be published by the maintainer using the **Publish Automaton Server** GitHub Actions workflow. Run it from the repository's Actions tab on `main`, choose **Run workflow**, and enter a new version such as `0.1.0` (without the `server-v` prefix). It builds and publishes the API, Worker and Studio images, resolves infrastructure image digests, runs an isolated installation smoke test, then creates a GitHub release tagged `server-v0.1.0` with the installer, bundle and checksum. The commands below require that release; source changes alone do not publish an installer release or upgrade any running instance.
+A server release must first be published by the maintainer using the **Publish Automaton Server** GitHub Actions workflow. Run it from the repository's Actions tab on `main`, choose **Run workflow**, and enter a new version such as `0.1.0` (without the `server-v` prefix). It builds and publishes the API, Worker, Studio and store images, resolves infrastructure image digests, runs an isolated installation smoke test, then creates a GitHub release tagged `server-v0.1.0` with the installer, bundle and checksum. The commands below require that release; source changes alone do not publish an installer release or upgrade any running instance.
 
 ## Before starting
 
 Have a domain you can configure, a certificate notification email, sudo access, and at least 10 GiB free disk space. Docker does not need to be preinstalled: the installer adds Docker Engine and Compose when missing, without replacing an existing Docker Engine. Point these DNS records to the server:
 
-- `api.example.com`
-- `studio.example.com`
-- `apps.example.com`
-- `*.apps.example.com`
+| Record | Serves |
+|---|---|
+| `api.example.com` | API for the CLI and Studio; TLS Runner broker on port 5671 |
+| `studio.example.com` | Studio administration |
+| `store.example.com` | Public app store: apps whose owners chose to list them |
+| `apps.example.com` | Published app routing |
+| `*.apps.example.com` | Your deployed apps, one hostname each |
 
 Use records that reach the server directly for setup. Keep the API hostname directly reachable afterward because Runners use its TLS broker port 5671. Allow inbound TCP 80 and 443 for HTTPS and 5671 for the TLS Runner broker. MySQL, plaintext RabbitMQ and RabbitMQ administration are not exposed on host ports. Your server must have outgoing internet access to download images and request certificates.
 
@@ -104,7 +107,17 @@ sudo bash /opt/automaton-server/update.sh
 
 To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
-For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it as shown above, with or without an explicit version. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
+**Updating to the first release with the app store.** Updaters installed by earlier releases refuse it, because it adds a service. Run the new updater once; afterwards `/opt/automaton-server/update.sh` works as before:
+
+```bash
+curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/update-automaton.sh -o update-automaton.sh
+less update-automaton.sh
+sudo bash update-automaton.sh
+```
+
+Add a `store.example.com` DNS record before or after this update. Until it resolves, the updater completes and prints a warning instead of failing.
+
+For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it as shown above, with or without an explicit version. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, and checks the current stack. Releases may add or change application services (API, Worker, Studio, store); it refuses releases that remove a service or change MySQL, RabbitMQ, Traefik, Compose volumes, secrets, networks or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before changing anything. It then adds missing app store configuration (store runtime settings, API CORS origin and Traefik route; credentials are untouched) and pulls and applies the application images. Compose recreates only services whose image or configuration changed. Public Studio/API routes are checked before the installed version is recorded; an unreachable store only produces a warning. Existing domains, credentials, database and volumes are preserved.
 
 Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
 

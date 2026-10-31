@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the standalone updater with disposable manifests and mocked service commands."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -11,11 +12,22 @@ import unittest
 
 REPO = Path(__file__).resolve().parents[2]
 IMAGES = ('API', 'WORKER', 'STUDIO', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
+APPLICATION_IMAGES = ('API', 'WORKER', 'STUDIO', 'STORE')
 
 
-def manifest(app_digit, infrastructure_digit='0'):
-    return ''.join(f'{name}_IMAGE=example.invalid/{name.lower()}@sha256:{(app_digit if name in ("API", "WORKER", "STUDIO") else infrastructure_digit) * 64}\n'
-                   for name in IMAGES)
+def manifest(app_digit, infrastructure_digit='0', store=True):
+    names = IMAGES + (('STORE',) if store else ())
+    return ''.join(f'{name}_IMAGE=example.invalid/{name.lower()}@sha256:{(app_digit if name in APPLICATION_IMAGES else infrastructure_digit) * 64}\n'
+                   for name in names)
+
+
+def compose(store=True, mysql_image='mysql'):
+    # JSON is valid YAML; the fake docker prints it for `compose config --format json`.
+    services = {name: {'image': name} for name in ('mysql', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
+    services['mysql']['image'] = mysql_image
+    if store:
+        services['store'] = {'image': 'store'}
+    return json.dumps({'services': services, 'volumes': {'mysql-data': {}}})
 
 
 @unittest.skipUnless(hasattr(os, 'geteuid') and os.geteuid() == 0, 'Requires root on Ubuntu; does not touch a live installation.')
@@ -28,12 +40,14 @@ class ServerUpdaterTests(unittest.TestCase):
         self.config = self.root / 'config'
         self.install.mkdir()
         self.config.mkdir()
-        (self.install / 'release.env').write_text(manifest('1'))
-        (self.install / 'compose.yaml').write_text('services: {}\n')
+        (self.install / 'release.env').write_text(manifest('1', store=False))
+        (self.install / 'compose.yaml').write_text(compose(store=False))
         (self.install / '.env').write_text(f'CONFIG_DIR={self.config}\n')
         (self.install / 'version').write_text('server-v0.1.1\n')
         (self.config / 'installation.json').write_text('{"domain":"example.invalid"}\n')
-        (self.config / 'appsettings.Production.json').write_text('{}\n')
+        (self.config / 'appsettings.Production.json').write_text('{"Cors":{"AllowedOrigins":["https://studio.example.invalid"]}}\n')
+        (self.config / 'dynamic').mkdir()
+        (self.config / 'dynamic/installation.yml').write_text('{"http":{"routers":{},"services":{}}}')
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         docker = self.bin / 'docker'
@@ -49,7 +63,8 @@ elif args[0]=='cp':
         item=tarfile.TarInfo('entry'); item.size=len(data)
         archive.addfile(item, io.BytesIO(data))
 elif args[0]=='compose':
-    if 'ps' in args: print('container-'+args[-1])
+    if 'config' in args and '--format' in args: print(open(args[args.index('-f')+1]).read())
+    elif 'ps' in args: print('container-'+args[-1])
     elif 'exec' in args: print('-- Dump completed on 2026-01-01')
     elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
 ''')
@@ -59,11 +74,12 @@ elif args[0]=='compose':
             tool.chmod(0o755)
         self.environment = os.environ | {'PATH': str(self.bin) + ':' + os.environ['PATH']}
 
-    def bundle(self, target=None):
+    def bundle(self, target=None, compose_file=None):
         source = self.root / 'bundle-source' / 'automaton-server'
         source.mkdir(parents=True, exist_ok=True)
         (source / 'release.env').write_text(target or manifest('2'))
-        (source / 'compose.yaml').write_text('services: {}\n')
+        (source / 'compose.yaml').write_text(compose_file or compose())
+        shutil.copy2(REPO / 'docker/install/configure.py', source / 'configure.py')
         (source / 'version').write_text('server-v0.1.2\n')
         shutil.copy2(REPO / 'scripts/update-automaton.sh', source / 'update.sh')
         shutil.copy2(REPO / 'scripts/install-automaton.sh', source / 'install.sh')
@@ -88,8 +104,42 @@ elif args[0]=='compose':
         backup, = (self.install / 'backups').iterdir()
         for name in ('database.sql', 'config.tar.gz', 'api-keys.tar.gz', 'worker-keys.tar.gz', 'api-data.tar.gz', 'release.env', 'SHA256SUMS'):
             self.assertTrue((backup / name).is_file(), name)
-        self.assertEqual((backup / 'release.env').read_text(), manifest('1'))
+        self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
+
+    def test_adds_app_store_to_installation_without_it(self):
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('2'))
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        up, = [args for args in calls if args[0] == 'compose' and 'up' in args]
+        self.assertEqual(up[-4:], ['api', 'worker', 'studio', 'store'])
+        self.assertNotIn('mysql', up)
+        settings = json.loads((self.config / 'appsettings.Production.json').read_text())
+        self.assertIn('https://store.example.invalid', settings['Cors']['AllowedOrigins'])
+        edge = json.loads((self.config / 'dynamic/installation.yml').read_text())
+        self.assertEqual(edge['http']['routers']['store']['rule'], 'Host(`store.example.invalid`)')
+        self.assertIn('https://api.example.invalid', (self.config / 'store-runtime-config.js').read_text())
+        # The recovery backup holds the configuration from before the store was added.
+        backup, = (self.install / 'backups').iterdir()
+        with tarfile.open(backup / 'config.tar.gz') as archive:
+            names = archive.getnames()
+        self.assertNotIn(f'{self.config.name}/store-runtime-config.js', names)
+
+    def test_missing_store_dns_warns_without_failing(self):
+        (self.bin / 'curl').write_text('#!/bin/sh\ncase "$*" in\n  *store.example.invalid*) exit 6 ;;\n  *) echo \'{"installationComplete":true}\' ;;\nesac\n')
+        result = self.update(*self.bundle())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Point a DNS record for store.example.invalid', result.stderr)
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+
+    def test_compose_infrastructure_change_preserves_installation(self):
+        result = self.update(*self.bundle(compose_file=compose(mysql_image='mysql-next')))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('changes mysql', result.stderr)
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
+        self.assertFalse((self.install / 'backups').exists())
 
     def test_bad_checksum_and_infrastructure_change_preserve_installation(self):
         archive, checksum = self.bundle()
@@ -99,18 +149,17 @@ elif args[0]=='compose':
         result = self.update(archive, checksum)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('reviewed infrastructure migration', result.stderr)
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1'))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
         self.assertFalse((self.install / 'backups').exists())
 
     def test_failed_service_update_keeps_previous_manifest_and_backup(self):
         result = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1'})
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((self.install / 'release.env').read_text(), manifest('1'))
+        self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
         backup, = (self.install / 'backups').iterdir()
         self.assertTrue((backup / 'database.sql').is_file())
 
     def test_preserves_and_uses_reviewed_override_for_both_manifests(self):
-        import json
         override = self.install / 'compose.override.yaml'
         content = 'services:\n  mysql:\n    image: example.invalid/retained-mysql@sha256:' + '9' * 64 + '\n'
         override.write_text(content)

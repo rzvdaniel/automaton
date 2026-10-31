@@ -27,6 +27,55 @@ def write_new(path, content):
 
 
 
+def replace_json(path, value):
+    # Atomically rewrite a configuration file in place, keeping its permissions.
+    mode = path.stat().st_mode & 0o777
+    with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(json.dumps(value, indent=2))
+    try:
+        temporary.chmod(mode)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def public_urls(domain):
+    return {name: f'https://{name}.{domain}' for name in ('api', 'studio', 'apps', 'store')}
+
+
+def store_router(domain, resolver):
+    return dict(entryPoints=['websecure'], rule=f'Host(`store.{domain}`)', service='store',
+                tls={'certResolver': resolver}, priority=100)
+
+
+def ensure_store(root):
+    """Add the public app store to an installation; idempotent and safe for existing installations."""
+    state = json.loads((root / 'installation.json').read_text())
+    domain = state['domain']
+    resolver = 'cloudflare' if state.get('tls_mode') == 'cloudflare' else 'letsencrypt'
+    urls = public_urls(domain)
+    store_config = root / 'store-runtime-config.js'
+    write_new(store_config, 'globalThis.__AUTOMATON_CONFIG__ = ' + json.dumps(dict(
+        apiBaseUrl=urls['api'], publicAppsBaseUrl=urls['apps'], studioUrl=urls['studio'], storeTitle='App Store')) + ';\n')
+    store_config.chmod(0o644)  # Public URLs only; readable by the nginx worker through its bind mount.
+    settings_path = root / 'appsettings.Production.json'
+    settings = json.loads(settings_path.read_text())
+    origins = settings.setdefault('Cors', {}).setdefault('AllowedOrigins', [])
+    if urls['store'] not in origins:
+        origins.append(urls['store'])
+        replace_json(settings_path, settings)
+    edge_path = root / 'dynamic' / 'installation.yml'
+    edge = json.loads(edge_path.read_text())
+    http = edge.setdefault('http', {})
+    services, routers = http.setdefault('services', {}), http.setdefault('routers', {})
+    if 'store' not in services or 'store' not in routers:
+        services.setdefault('store', {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}})
+        routers.setdefault('store', store_router(domain, resolver))
+        replace_json(edge_path, edge)
+
+
 def secret(root, name, length=32):
     path = root / 'secrets' / name
     write_new(path, secrets.token_hex(length))
@@ -81,7 +130,8 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
     secret(root, 'mysql-root-password')
     broker_password = secret(root, 'rabbitmq-password')
     setup_token = secret(root, 'setup-token')
-    api, studio, apps = f'https://api.{domain}', f'https://studio.{domain}', f'https://apps.{domain}'
+    urls = public_urls(domain)
+    api, studio, apps, store = urls['api'], urls['studio'], urls['apps'], urls['store']
     resolver = 'cloudflare' if tls_mode == 'cloudflare' else 'letsencrypt'
     settings = {
         'ConnectionStrings': {'MySqlConnection': f'Server=mysql;Database=automaton;User=automaton;Password={password};'},
@@ -90,7 +140,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
         'HostedRunnerRabbitMq': dict(Host=f'api.{domain}', Port=5671, TlsEnabled=True, TlsServerName=f'api.{domain}'),
         'InfrastructureRunnerRabbitMq': dict(Host=f'api.{domain}', Port=5671, TlsEnabled=True, TlsServerName=f'api.{domain}'),
         'Bootstrap': {'Token': setup_token},
-        'Cors': {'AllowedOrigins': [studio, api]},
+        'Cors': {'AllowedOrigins': [studio, api, store]},
         'JwtOptions': dict(ValidateIssuer=True, Issuer=api, ValidateAudience=False, Audience='Automaton.Studio'),
         'AuthenticationSettings': {'RsaSettings': rsa_settings(root), 'HMacSettings': {'SecretKey': secret(root, 'hmac-key')}},
         'AppConfig': dict(DatabaseType='MySql', ApiUrl=api, WebsiteUrl=studio, UserSignUp=False,
@@ -129,6 +179,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
     edge = {'http': {'routers': {}, 'services': {
         'api': {'loadBalancer': {'servers': [{'url': 'http://api:8080'}]}},
         'studio': {'loadBalancer': {'servers': [{'url': 'http://studio:80'}]}},
+        'store': {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}},
     }}, 'tcp': {'routers': {'broker': {'entryPoints': ['broker'], 'rule': f'HostSNI(`api.{domain}`)',
                                      'service': 'broker', 'tls': {'certResolver': resolver}}},
                 'services': {'broker': {'loadBalancer': {'servers': [{'address': 'rabbitmq:5672'}]}}}},
@@ -140,21 +191,32 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
                                              tls={'certResolver': resolver}, priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
+    edge['http']['routers']['store'] = store_router(domain, resolver)
     if tls_mode == 'http':
         edge.pop('tls')
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))
+    ensure_store(root)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-dir', required=True, type=Path)
-    parser.add_argument('--domain', required=True)
-    parser.add_argument('--email', required=True)
+    parser.add_argument('--domain')
+    parser.add_argument('--email')
+    parser.add_argument('--ensure-store', action='store_true',
+                        help='Add the app store to an existing installation without changing credentials.')
     parser.add_argument('--tls-mode', choices=['http', 'cloudflare'], default='http')
     parser.add_argument('--runner-image', default='rzvdaniel/automaton-runner:latest')
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        configure(args.config_dir, args.domain.lower(), args.email, args.tls_mode, args.runner_image)
-    except (ValueError, OSError) as error:
+        if args.ensure_store:
+            if not (args.config_dir / 'installation.json').is_file():
+                raise ValueError('No existing installation configuration was found.')
+            ensure_store(args.config_dir)
+        elif not args.domain or not args.email:
+            parser.error('--domain and --email are required.')
+        else:
+            configure(args.config_dir, args.domain.lower(), args.email, args.tls_mode, args.runner_image)
+    except (ValueError, OSError, KeyError, json.JSONDecodeError) as error:
         parser.exit(1, f'Configuration failed: {error}\n')

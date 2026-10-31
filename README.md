@@ -10,7 +10,7 @@ Automaton is an open-source platform for deploying web apps, APIs and Actions on
 
 ## Install
 
-Use an **x86_64 Ubuntu 24.04+ server**, a domain, and at least **10 GiB free disk space**. Configure `api`, `studio`, `apps` and `*.apps` DNS records; allow inbound TCP **80, 443 and 5671**. The [install guide](docs/prod/install-automaton.md) explains certificates and networking.
+Use an **x86_64 Ubuntu 24.04+ server**, a domain, and at least **10 GiB free disk space**. Configure `api`, `studio`, `store`, `apps` and `*.apps` DNS records; allow inbound TCP **80, 443 and 5671** (5671 is the TLS broker Runners connect to). The [install guide](docs/prod/install-automaton.md) explains certificates and networking.
 
 ```bash
 curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
@@ -57,11 +57,12 @@ Approve CLI login in **your Studio** when prompted. Keep credentials out of AI c
 sudo bash /opt/automaton-server/update.sh
 ```
 
-The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker and Studio. These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically. See [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server).
+The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server). These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically. See [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server).
 
 ## What you get
 
 - **Your Studio and API** on your domain, with app, user and access management.
+- **Your app store** at `store.your-domain.com`, listing the apps their owners choose to publish.
 - **Static sites, APIs and Actions** on your own machines. Static sites share a serving container; APIs and jobs use bounded containers.
 - **Persistent app data** across redeploys, explicit machine placement and multiple Runner machines.
 - **Your AI workflow** with CLI-generated agent instructions and deployment checks.

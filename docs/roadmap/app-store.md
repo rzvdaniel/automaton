@@ -34,12 +34,12 @@ Every Automaton installation ships a public app store at `store.<domain>`. It is
 ### 4. Installation — `docker/install/compose.yaml`, `configure.py`, `install-automaton.sh`
 
 - `store` service: `${STORE_IMAGE:?}`, mounts `store-runtime-config.js`, depends on healthy API.
-- `configure.py`: write `store-runtime-config.js`; add `https://store.<domain>` to `Cors.AllowedOrigins`; Traefik service and `Host(\`store.<domain>\`)` router; include `store.<domain>` in the Cloudflare-mode certificate SANs.
+- `configure.py`: write `store-runtime-config.js`; add `https://store.<domain>` to `Cors.AllowedOrigins`; Traefik service and `Host(\`store.<domain>\`)` router; the router obtains its certificate through the configured resolver in both TLS modes.
 - Installer DNS message lists `store`; post-install check requests `https://store.<domain>/` (warning, not failure).
 
 ### 5. Update — `update-automaton.sh`
 
-Current blockers (found while implementing step 3): the updater refuses any release whose `compose.yaml` differs from the installed one ("A reviewed migration is required"), and both installer and updater require `release.env` to contain exactly the seven existing image keys. This step must introduce a supported, tested compose/manifest migration path; `STORE_IMAGE` is added to `release.env` in the same change. The store image's GHCR package starts private and must be made public before it joins the anonymous pull check.
+Implemented: the updater no longer requires an identical `compose.yaml`. It compares the effective Compose configuration and allows added or changed application services while MySQL, RabbitMQ, Traefik, volumes, secrets and networks stay identical and no service is removed. The manifest may gain `STORE_IMAGE`. Updaters installed by earlier releases still refuse the first store release, so that one update uses the downloaded `update-automaton.sh` (documented in the install guide). The store image's GHCR package starts private and must be made public before the first store release passes the anonymous pull check.
 
 - Accept a manifest with `STORE_IMAGE`; pull and start `api worker studio store` together.
 - Migrate older installs idempotently: add store runtime config, CORS origin, Traefik route and certificate SAN when missing (new configure-on-update path; `configure.py` currently writes only new files).
@@ -54,7 +54,7 @@ Current blockers (found while implementing step 3): the updater refuses any rele
 
 ### 7. Tests
 
-- `scripts/tests/server-installer-config-test.py`: store config, route, CORS, Cloudflare SAN.
+- `scripts/tests/server-installer-config-test.py`: store config, route, CORS, idempotent migration of an existing configuration.
 - `scripts/tests/server-updater-test.py`: upgrade from a release without `STORE_IMAGE`; missing store DNS produces a warning only.
 - `scripts/tests/server-install-smoke.sh`: request the store.
 - API tests for `StoreMode` enforcement.

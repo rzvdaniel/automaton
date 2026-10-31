@@ -56,7 +56,7 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertIn('https://api.example.com', (self.root / 'studio-runtime-config.js').read_text())
         self.assertIn('https://apps.example.com', (self.root / 'studio-runtime-config.js').read_text())
         for path in self.root.rglob('*'):
-            if path.is_file(): self.assertEqual(path.stat().st_mode & 0o777, 0o644 if path.name == 'studio-runtime-config.js' else 0o600)
+            if path.is_file(): self.assertEqual(path.stat().st_mode & 0o777, 0o644 if path.name.endswith('-runtime-config.js') else 0o600)
         from cryptography.hazmat.primitives.asymmetric import rsa
         import base64
         import xml.etree.ElementTree as xml
@@ -65,6 +65,48 @@ class InstallationConfigurationTests(unittest.TestCase):
         key = rsa.RSAPrivateNumbers(numbers['P'], numbers['Q'], numbers['D'], numbers['DP'], numbers['DQ'], numbers['InverseQ'],
                                     rsa.RSAPublicNumbers(numbers['Exponent'], numbers['Modulus'])).private_key()
         self.assertEqual(key.key_size, 3072)
+
+    def test_fresh_installation_includes_app_store(self):
+        self.configure()
+        settings = json.loads((self.root / 'appsettings.Production.json').read_text())
+        self.assertIn('https://store.example.com', settings['Cors']['AllowedOrigins'])
+        edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
+        self.assertEqual(edge['http']['routers']['store']['rule'], 'Host(`store.example.com`)')
+        self.assertEqual(edge['http']['routers']['store']['service'], 'store')
+        self.assertEqual(edge['http']['services']['store']['loadBalancer']['servers'], [{'url': 'http://store:80'}])
+        store_config = (self.root / 'store-runtime-config.js').read_text()
+        for url in ('https://api.example.com', 'https://apps.example.com', 'https://studio.example.com'):
+            self.assertIn(url, store_config)
+
+    def test_ensure_store_migrates_existing_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        # Recreate a configuration written before the app store existed, with an operator edit.
+        settings_path = self.root / 'appsettings.Production.json'
+        settings = json.loads(settings_path.read_text())
+        settings['Cors']['AllowedOrigins'].remove('https://store.example.com')
+        settings['EmailConfig']['EmailHost'] = 'mail.example.com'
+        settings_path.write_text(json.dumps(settings))
+        edge_path = self.root / 'dynamic/installation.yml'
+        edge = json.loads(edge_path.read_text())
+        del edge['http']['routers']['store'], edge['http']['services']['store']
+        edge_path.write_text(json.dumps(edge))
+        (self.root / 'store-runtime-config.js').unlink()
+        secrets_before = {p.name: p.read_bytes() for p in (self.root / 'secrets').iterdir()}
+
+        module.ensure_store(self.root)
+
+        settings = json.loads(settings_path.read_text())
+        self.assertEqual(settings['Cors']['AllowedOrigins'].count('https://store.example.com'), 1)
+        self.assertEqual(settings['EmailConfig']['EmailHost'], 'mail.example.com')
+        self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
+        edge = json.loads(edge_path.read_text())
+        self.assertEqual(edge['http']['routers']['store']['tls'], {'certResolver': 'cloudflare'})
+        self.assertIn('*.apps.example.com', edge['tls']['stores']['default']['defaultGeneratedCert']['domain']['sans'])
+        self.assertEqual((self.root / 'store-runtime-config.js').stat().st_mode & 0o777, 0o644)
+        self.assertEqual(secrets_before, {p.name: p.read_bytes() for p in (self.root / 'secrets').iterdir()})
+        before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        module.ensure_store(self.root)
+        self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
 
     def test_domain_change_does_not_rewrite_existing_installation(self):
         self.configure()
