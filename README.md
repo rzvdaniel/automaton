@@ -59,6 +59,8 @@ sudo bash /opt/automaton-server/update.sh
 
 The updater verifies the latest compatible release and makes a local recovery backup before replacing API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server). These services can be briefly unavailable. Infrastructure upgrades and existing Runner updates require separate review; this command does not upgrade every machine automatically. See [updates and recovery](docs/prod/install-automaton.md#update-an-installed-server).
 
+Your server backs itself up nightly (database and keys, 7 days, on the server). Also turn on your hosting provider's server backups; see [backups and restore](docs/prod/install-automaton.md#backups-and-restore).
+
 ## What you get
 
 - **Your Studio and API** on your domain, with app, user and access management.
@@ -67,7 +69,7 @@ The updater verifies the latest compatible release and makes a local recovery ba
 - **Persistent app data** across redeploys, explicit machine placement and multiple Runner machines.
 - **Your AI workflow** with CLI-generated agent instructions and deployment checks.
 
-The software is free under [Apache 2.0](LICENSE). You pay for your servers, domain and any AI services you choose. There is no required Automaton cloud subscription. You operate the installation, updates and backups.
+The software is free under [Apache 2.0](LICENSE). You pay for your servers, domain and any AI services you choose. There is no required Automaton cloud subscription. You operate the installation and updates; nightly backups are set up for you, and off-server copies are yours to keep.
 
 ## Contribute
 

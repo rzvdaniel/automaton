@@ -31,6 +31,7 @@ public static class InstallationReadiness
         checks.Add(new("Public DNS and ports", "unverified",
             "Check api, studio, store, apps and *.apps DNS records from outside this server, and allow inbound TCP 80, 443 and 5671."));
         checks.Add(await CheckSmtpAsync(smtpSettings, token));
+        checks.Add(InstallationBackups.ToCheck(await InstallationBackups.ReadAsync(configuration, token), DateTimeOffset.UtcNow));
         return checks;
     }
 

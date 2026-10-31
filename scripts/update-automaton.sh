@@ -90,8 +90,31 @@ PY
 bundle="$working/automaton-server"
 [[ -f "$bundle/release.env" && -f "$bundle/compose.yaml" && -f "$bundle/version" && -f "$bundle/update.sh" && -f "$bundle/install.sh" ]] || { echo 'The release bundle is incomplete.' >&2; exit 1; }
 [[ "$(cat "$bundle/version")" == "$version" ]] || { echo 'Release version does not match the bundle.' >&2; exit 1; }
+# Continue with the verified release's own updater, so changes to the update procedure itself
+# apply in this update instead of the next one. It reuses this verified bundle offline.
+if [[ -z "${AUTOMATON_UPDATER_FROM_BUNDLE:-}" ]] && ! cmp -s "$bundle/update.sh" "${BASH_SOURCE[0]}"; then
+    echo "Continuing with the $version updater."
+    exec env AUTOMATON_UPDATER_FROM_BUNDLE=1 bash "$bundle/update.sh" --version "$version" \
+        --bundle "$working/automaton-server.tar.gz" --checksum "$working/automaton-server.tar.gz.sha256" \
+        --install-dir "$install_dir" --config-dir "$config_dir" --backup-dir "$backup_root" --keep-backups "$keep_backups"
+fi
+# Nightly backups are on by default. Also runs when the release is already installed, so servers whose
+# previous updater predates backups get them by running update.sh again. Failures only warn.
+ensure_backups() {
+    local script
+    for script in backup.sh restore.sh; do
+        if [[ -f "$bundle/$script" ]]; then install -m 0700 "$bundle/$script" "$install_dir/$script"; fi
+    done
+    [[ -f "$install_dir/backup.sh" ]] || return 0
+    if bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer \
+        && { [[ -n "$(bash "$install_dir/backup.sh" --install-dir "$install_dir" --list)" ]] || bash "$install_dir/backup.sh" --install-dir "$install_dir"; }; then
+        return 0
+    fi
+    echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
+}
 if cmp -s "$bundle/release.env" "$install_dir/release.env"; then
     echo 'This release is already installed.'
+    ensure_backups
     exit 0
 fi
 if [[ -f "$install_dir/version" ]]; then
@@ -227,6 +250,7 @@ install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
 echo "Updated to $version. Recovery backup: $backup"
+ensure_backups
 # Housekeeping runs only after success; a failure here never affects the completed update.
 # Only directories this updater created (server-v<version>-<UTC time>-<random>) are rotated.
 mapfile -t old_backups < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended \

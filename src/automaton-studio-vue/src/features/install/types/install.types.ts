@@ -61,3 +61,21 @@ export interface SmtpSettingsUpdate {
   fromEmail: string
   supportEmail: string
 }
+
+export interface InstallationBackup {
+  name: string
+  createdAt: string
+  sizeBytes: number
+  restoreCommand: string
+}
+
+export interface InstallationBackupStatus {
+  available: boolean
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  lastError: string | null
+  keep: number
+  directory: string | null
+  backupNowCommand: string
+  backups: InstallationBackup[]
+}

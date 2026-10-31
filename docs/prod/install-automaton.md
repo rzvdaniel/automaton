@@ -107,6 +107,8 @@ sudo bash /opt/automaton-server/update.sh
 
 To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
+After verifying a release, the updater continues with that release's own `update.sh`, so changes to the update procedure apply in the same update. It also installs `backup.sh` and `restore.sh`, enables nightly backups and takes a first backup if none exists. Servers on 0.1.18 or earlier still run their previous updater for that first update: run `sudo bash /opt/automaton-server/update.sh` a second time afterwards to enable backups (it reports that the release is already installed and sets them up). Later updates need a single run.
+
 **Updating to the first release with the app store.** Updaters installed by earlier releases refuse it, because it adds a service. Run the new updater once; afterwards `/opt/automaton-server/update.sh` works as before:
 
 ```bash
@@ -133,9 +135,36 @@ An adopted installation may keep a root-owned `compose.override.yaml` beside `co
 
 Use `update.sh` for subsequent releases. `install.sh --status` supports the override; rerunning the fresh installer against an override installation is refused to protect its imported settings. Manual Compose commands on an adopted server must also include `-f compose.override.yaml`. Retain the stopped original containers and verified configuration/data backups until public routes, database records, broker connectivity and an actual subsequent updater run have been checked. The public marketing website is outside the standalone server bundle and needs its own retained service and route when migrating a server that hosts it.
 
-## Back up before relying on the installation
+## Backups and restore
 
-Ignored files and filesystem permissions do not prevent accidental deletion. Back up `/etc/automaton`, `/opt/automaton-server`, the MySQL volume and the API data/API key/Worker key volumes to encrypted off-host storage. Keep the backup decryption key separately. Use an application-consistent database backup or quiesced volume snapshot and verify a restore on another host. Certificate and broker volumes also contain persistent operational state. No remote backup destination or automatic backup scheduler is configured by this installer.
+Every installation takes **nightly backups by default**. The installer enables them and takes the first backup immediately; the updater enables them on existing servers. A systemd timer (`automaton-backup.timer`) runs `/opt/automaton-server/backup.sh` every night between 03:00 and 04:00 server time, and catches up after downtime.
+
+Each backup is a folder `/opt/automaton-server/backups/nightly/automaton-YYYYMMDDTHHMMSSZ` with a consistent MySQL dump (`database.sql.gz`), the API and Worker Data Protection keys that decrypt it, the server version and a checksum file. The newest 7 are kept. Backups are root-only. **Admin → Installation → Backups** in Studio lists them with the command to restore each one, and the **Backups** check turns into an error when the last backup failed or is older than 36 hours.
+
+```bash
+sudo bash /opt/automaton-server/backup.sh            # back up now
+sudo bash /opt/automaton-server/backup.sh --list     # list backups
+sudo systemctl list-timers automaton-backup.timer    # next scheduled run
+sudo journalctl -u automaton-backup.service          # backup logs
+```
+
+These backups live on the same server, so they protect against mistakes and failed updates, not against losing the server. Also:
+
+1. **Turn on your hosting provider's server backups** (for example Hetzner Backups or DigitalOcean Backups). Their disk images include `/etc/automaton`, the Docker volumes and the nightly dumps above, which makes them restorable. A snapshot taken while MySQL is writing is only crash-consistent; the nightly dump inside it is consistent.
+2. **Copy backups off the provider** if losing the hosting account would hurt: copy `/opt/automaton-server/backups/nightly` and `/etc/automaton` to encrypted storage elsewhere. Keep the encryption key separately.
+3. **Test a restore** once, ideally on another server.
+
+### Restore a backup
+
+Restoring replaces the whole database and the Data Protection keys with the backup. Everything written after the backup (users, apps, deployments, settings) is lost. Choose a backup in Studio or with `--list`, then run on the server:
+
+```bash
+sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
+```
+
+The command verifies the backup's checksums, shows what will be replaced, and asks you to type the server's domain. It then saves the current state as a new backup, stops API, Worker, Studio and the app store, recreates the database from the dump, restores the keys, starts the services and checks Studio. For automation, pass `--confirm example.com` instead of typing. Restoring a backup from an older server version onto a newer one is supported (the API applies newer migrations on start); restoring onto an older server version is not. Apps keep running on their Runners during a restore; app data stored by apps themselves is not part of these backups.
+
+To move to a new server, install the same release there, copy a backup folder into `/opt/automaton-server/backups/nightly/` and restore it. `/etc/automaton` holds the remaining secrets (signing keys, database and broker passwords); copy it from your provider snapshot or off-host copy when the new server must accept existing sessions and Runners.
 
 ## Status and recovery
 

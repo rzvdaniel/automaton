@@ -56,6 +56,7 @@ services:
       - api-data:/app/AppData
       - api-keys:/app/data-protection-keys
       - ${CONFIG_DIR:?}/dynamic:/app/AppData/traefik-dynamic
+      - ${CONFIG_DIR:?}/status:/app/installation-status:ro
     healthcheck:
       test: [CMD, curl, -fsS, http://127.0.0.1:8080/healthz]
       interval: 10s

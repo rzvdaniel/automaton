@@ -56,6 +56,18 @@ sudo bash /opt/automaton-server/update.sh
 
 The updater selects the latest compatible stable release, checks its checksum, creates a local recovery backup, then replaces API, Worker, Studio and the app store. Updating to the first release with the app store needs the new updater once; see the complete guide linked below. These services can briefly be unavailable. Infrastructure changes and Runner-machine upgrades are separate operations; app workloads are not automatically moved to another server.
 
-Keep a recovery plan. Local updater backups do not protect against losing the host, and no remote backup service is configured automatically. Preserve the database, app data, configuration and matching Data Protection keys together.
+## Backups
+
+Your server backs itself up every night by default: a consistent copy of the database and the keys that decrypt it, kept for 7 days in `/opt/automaton-server/backups/nightly`. **Admin → Installation → Backups** in Studio shows each backup and the command to restore it.
+
+These backups live on the same server. Also turn on your hosting provider's server backups (snapshots), and copy backups to storage elsewhere if losing the server or hosting account would hurt.
+
+To restore, run the command Studio shows on the server, for example:
+
+```bash
+sudo bash /opt/automaton-server/restore.sh automaton-20261101T031500Z
+```
+
+It asks you to type your domain, saves the current state first, then replaces the database and keys with the backup. Everything written after that backup is lost.
 
 See the [complete installation, update and recovery guide](https://github.com/rzvdaniel/automaton/blob/main/docs/prod/install-automaton.md) for networking, custom paths, protected settings, adopted installations and recovery limits.

@@ -19,4 +19,13 @@ The control plane needs a separate Machine Management Runner to execute applicat
 
 To update a standalone server, run `sudo bash /opt/automaton-server/update.sh --version server-vX.Y.Z` on the host using a published release. The updater verifies the bundle, saves a protected recovery backup of the database, configuration and Data Protection keys, and checks health after updating compatible API, Worker and Studio images. Keep that backup in encrypted off-host storage. Releases that change Compose or infrastructure image digests need a separately reviewed migration. The installer itself only resumes its original release. See [server installation and updates](../../../../../docs/prod/install-automaton.md) for recovery and offline bundle instructions.
 
+## Backups
+
+**Admin → Installation → Backups** (system administrators) lists the server's nightly backups with their time, size and the command that restores each one. The **Backups** check under **Configuration status** is *configured* when the last backup succeeded within 36 hours, *error* when it failed or is older, and *unverified* on servers that have not received backups yet (run the latest server update). Studio cannot start a backup or a restore: both run on the server with sudo, because restoring stops the API that serves Studio.
+
+- **Back up now:** `sudo bash /opt/automaton-server/backup.sh`
+- **Restore:** copy the backup's command from Studio and run it on the server. It asks for the server domain, saves the current state as a new backup, then replaces the whole database and Data Protection keys. Everything written after the backup is lost.
+
+Nightly backups stay on the server. Turn on the hosting provider's server backups and keep an off-server copy as described in [backups and restore](../../../../../docs/prod/install-automaton.md#backups-and-restore).
+
 Other server configuration belongs to the host operator. Optional OAuth and billing settings are edited in the protected host configuration and applied by recreating API/Worker. Protect the configuration, database, application data and persistent cryptographic keys with encrypted off-host backups. Losing encryption keys can prevent recovery even when the database survives.
