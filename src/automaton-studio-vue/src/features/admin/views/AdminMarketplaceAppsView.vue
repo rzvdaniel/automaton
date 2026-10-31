@@ -13,6 +13,8 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import apiClient from '@/shared/services/api/axios-instance'
 import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
+import { adminSettingsService } from '../services/adminSettingsService'
+import type { StoreMode } from '../types/admin.types'
 
 interface MarketplaceApp {
   id: string
@@ -60,7 +62,40 @@ const accessOptions = [
   { label: 'Disabled', value: 'disabled' },
 ]
 
-onMounted(loadData)
+const storeModeOptions: { label: string; value: StoreMode }[] = [
+  { label: 'Public', value: 'public' },
+  { label: 'Disabled', value: 'disabled' },
+]
+const storeMode = ref<StoreMode>('public')
+const isSavingStoreMode = ref(false)
+// Installed servers serve the store beside Studio at store.<domain>.
+const storeUrl = computed(() => window.location.origin.replace('//studio.', '//store.'))
+
+onMounted(() => {
+  void loadData()
+  void loadStoreMode()
+})
+
+async function loadStoreMode() {
+  try {
+    storeMode.value = (await adminSettingsService.getStoreSettings()).mode
+  } catch {
+    toast.add({ severity: 'error', summary: 'App store', detail: 'Could not load the app store setting.', life: 4000 })
+  }
+}
+
+async function saveStoreMode(mode: StoreMode) {
+  isSavingStoreMode.value = true
+  try {
+    storeMode.value = (await adminSettingsService.saveStoreSettings({ mode })).mode
+    toast.add({ severity: 'success', summary: 'App store', detail: mode === 'public' ? 'The app store is public.' : 'The app store is turned off.', life: 3000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'App store', detail: 'Could not save the app store setting.', life: 4000 })
+    await loadStoreMode()
+  } finally {
+    isSavingStoreMode.value = false
+  }
+}
 
 async function loadData() {
   isLoading.value = true
@@ -292,6 +327,32 @@ function combinedStatusLabel(app: MarketplaceApp): string {
       </div>
     </div>
 
+    <Card class="store-settings">
+      <template #content>
+        <div class="store-settings-row">
+          <div>
+            <h3 class="store-settings-title">App store</h3>
+            <p class="text-color-secondary">
+              <template v-if="storeMode === 'public'">
+                Anyone can browse listed apps at
+                <a :href="storeUrl" target="_blank" rel="noopener">{{ storeUrl }}</a>.
+              </template>
+              <template v-else>The public app store is turned off. Listed apps stay listed and reappear when it is turned on.</template>
+            </p>
+          </div>
+          <Select
+            v-model="storeMode"
+            :options="storeModeOptions"
+            option-label="label"
+            option-value="value"
+            :disabled="isSavingStoreMode"
+            aria-label="App store visibility"
+            @update:model-value="saveStoreMode"
+          />
+        </div>
+      </template>
+    </Card>
+
     <div class="summary-grid">
       <Card>
         <template #content>
@@ -513,6 +574,26 @@ function combinedStatusLabel(app: MarketplaceApp): string {
 </template>
 
 <style scoped>
+.store-settings {
+  margin-bottom: 1rem;
+}
+
+.store-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.store-settings-title {
+  margin: 0 0 0.25rem;
+}
+
+.store-settings-row p {
+  margin: 0;
+}
+
 .marketplace-admin-view {
   display: flex;
   flex-direction: column;

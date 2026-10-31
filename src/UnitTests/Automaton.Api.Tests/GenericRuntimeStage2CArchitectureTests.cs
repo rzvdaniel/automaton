@@ -82,7 +82,7 @@ public sealed class GenericRuntimeStage3ArchitectureTests
             Path.Combine(repositoryRoot, "src", "Automaton.Api", "Controllers", "PublicMarketplaceController.cs"),
             Path.Combine(repositoryRoot, "src", "automaton-studio-vue", "src", "features", "apps", "stores", "app-editor.store.ts"),
             Path.Combine(repositoryRoot, "src", "Automaton.Api", "Services", "AppForkingService.cs"),
-            Path.Combine(repositoryRoot, "src", "automaton-vue", "src", "views", "AppMarketplaceDetailView.vue")
+            Path.Combine(repositoryRoot, "src", "automaton-store-vue", "src", "views", "AppMarketplaceDetailView.vue")
         };
         var forbidden = new[]
         {

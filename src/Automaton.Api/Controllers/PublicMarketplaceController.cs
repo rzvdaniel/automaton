@@ -2,6 +2,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Middleware;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +15,7 @@ namespace Automaton.Api.Controllers;
 [ApiController]
 [Route("api/public/marketplace")]
 [AllowAnonymous]
+[RequireStoreEnabled]
 public class PublicMarketplaceController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;

@@ -1,3 +1,4 @@
+using Automaton.Api.Middleware;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,7 @@ namespace Automaton.Api.Controllers;
 [Route("api/public")]
 [ApiController]
 [AllowAnonymous]
+[RequireStoreEnabled]
 public class PublicAppsController : ControllerBase
 {
     private readonly PublicAppsService publicAppsService;

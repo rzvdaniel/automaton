@@ -31,6 +31,10 @@ const defaultStudioUrl = import.meta.env.DEV
   ? 'http://localhost:5173/'
   : 'https://studio.automaton.monster/'
 
+const defaultStoreUrl = import.meta.env.DEV
+  ? 'http://localhost:5176/'
+  : 'https://store.automaton.monster/'
+
 const defaultApiBaseUrl = import.meta.env.DEV
   ? 'https://localhost:7091/'
   : 'https://api.automaton.monster/'
@@ -43,6 +47,7 @@ const publicSiteUrl = ensureTrailingSlash(
   import.meta.env.VITE_PUBLIC_SITE_URL || defaultPublicSiteUrl,
 )
 const studioUrl = ensureTrailingSlash(import.meta.env.VITE_STUDIO_URL || defaultStudioUrl)
+const storeUrl = ensureTrailingSlash(import.meta.env.VITE_STORE_URL || defaultStoreUrl)
 const publicAppsBaseUrl = trimTrailingSlash(
   import.meta.env.VITE_PUBLIC_APPS_BASE_URL || defaultPublicAppsBaseUrl,
 )
@@ -86,6 +91,7 @@ export const publicAppConfig = {
   exampleAppsUrl: 'https://github.com/rzvdaniel/automaton-apps',
   publicSiteUrl,
   studioUrl,
+  storeUrl,
   publicAppsBaseUrl,
   docsUrl: joinUrl(publicSiteUrl, 'docs'),
   apiBaseUrl,
