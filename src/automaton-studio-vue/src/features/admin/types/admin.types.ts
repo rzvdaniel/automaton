@@ -596,3 +596,9 @@ export interface AdminAppModerationRequest {
   accessStatus?: string
   marketplaceModerationReason?: string
 }
+
+export type StoreMode = 'public' | 'disabled'
+
+export interface StoreSettings {
+  mode: StoreMode
+}

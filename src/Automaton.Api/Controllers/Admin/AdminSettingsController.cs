@@ -38,6 +38,24 @@ public class AdminSettingsController : ControllerBase
         }
     }
 
+    [HttpGet("store")]
+    public async Task<ActionResult<StoreSettings>> GetStore()
+        => Ok(await _settingsService.GetStoreSettingsAsync());
+
+    [HttpPut("store")]
+    public async Task<IActionResult> UpdateStore([FromBody] StoreSettings settings)
+    {
+        try
+        {
+            await _settingsService.SaveStoreSettingsAsync(settings);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPut("app-deploy-rules")]
     public async Task<IActionResult> UpdateAppDeployRules([FromBody] AppDeployRulesSettings settings)
     {

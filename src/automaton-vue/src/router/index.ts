@@ -1,6 +1,13 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import { applySeo, type SeoMeta } from '@/seo/useSeo'
+import { publicAppConfig } from '@/config/publicAppConfig'
+
+// The public app store moved to its own site with the same paths (it maps /apps to /).
+function redirectToStore(to: RouteLocationNormalized) {
+  window.location.replace(new URL(to.fullPath, publicAppConfig.storeUrl).toString())
+  return false
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,16 +17,7 @@ const router = createRouter({
       name: 'home',
       component: HomeView,
     },
-    {
-      path: '/apps',
-      name: 'apps',
-      component: () => import('@/views/AppsView.vue'),
-    },
-    {
-      path: '/apps/:appId',
-      name: 'app-marketplace-detail',
-      component: () => import('@/views/AppMarketplaceDetailView.vue'),
-    },
+    { path: '/apps/:rest(.*)*', name: 'apps', component: HomeView, beforeEnter: redirectToStore },
     {
       path: '/cli',
       name: 'cli',
@@ -30,16 +28,7 @@ const router = createRouter({
       name: 'pricing',
       component: () => import('@/views/PricingView.vue'),
     },
-    {
-      path: '/creators/:publicUsername/apps/:appId',
-      name: 'creator-app-detail',
-      component: () => import('@/views/CreatorAppDetailView.vue'),
-    },
-    {
-      path: '/creators/:publicUsername',
-      name: 'creator-store',
-      component: () => import('@/views/CreatorStoreView.vue'),
-    },
+    { path: '/creators/:rest(.*)*', name: 'creators', component: HomeView, beforeEnter: redirectToStore },
   ],
   scrollBehavior(to) {
     if (to.hash) {

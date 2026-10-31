@@ -15,6 +15,7 @@ namespace Automaton.Api.Services;
 public class SettingsService
 {
     private const string AppDeployRulesKey = "Apps.DeployRules";
+    private const string StoreSettingsKey = "Store.Settings";
     
     private readonly ApplicationDbContext _dbContext;
     private readonly AppFileRuleBaselineOptions _appFileRuleBaseline;
@@ -64,6 +65,29 @@ public class SettingsService
             AppDeployRulesKey,
             settings,
             "App deploy exclude defaults for source/frontend/backend packaging.");
+    }
+
+    public async Task<StoreSettings> GetStoreSettingsAsync()
+    {
+        var settings = await GetSettingAsync<StoreSettings>(StoreSettingsKey);
+        // Missing or unknown values keep the documented default: a public store.
+        return settings?.Mode == StoreSettings.Disabled
+            ? new StoreSettings { Mode = StoreSettings.Disabled }
+            : new StoreSettings();
+    }
+
+    public Task SaveStoreSettingsAsync(StoreSettings settings)
+    {
+        var mode = settings.Mode?.Trim().ToLowerInvariant();
+        if (mode is not (StoreSettings.Public or StoreSettings.Disabled))
+        {
+            throw new ArgumentException($"Store mode must be '{StoreSettings.Public}' or '{StoreSettings.Disabled}'.");
+        }
+
+        return SaveSettingAsync(
+            StoreSettingsKey,
+            new StoreSettings { Mode = mode },
+            "Public app store visibility for this installation.");
     }
 
     private async Task<T?> GetSettingAsync<T>(string key)

@@ -43,6 +43,8 @@ Implemented in #460: the updater compares the effective Compose configuration an
 
 ### 6. Store setting — API and Studio
 
+Implemented: `Store.Settings` (`public` default, `disabled`), `GET/PUT api/admin/settings/store`, public `GET api/public/store/status`; marketplace and creator public endpoints return 404 when disabled; toggle on **Admin → Marketplace Apps**; the store shows a turned-off page. The marketing site redirects `/apps*` and `/creators/*` to the store (nginx 301 plus client-side), deployed manually after production runs the store release.
+
 - Installation setting `StoreMode` (`Public` default, `Disabled`), persisted with existing installation settings.
 - `PublicMarketplaceController` returns 404 for catalog endpoints when disabled; expose a small status endpoint the store can read.
 - Toggle in Studio **Admin → Installation**.
