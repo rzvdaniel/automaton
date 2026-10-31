@@ -9,6 +9,7 @@ backup_root=''
 version=''
 bundle_archive=''
 bundle_checksum=''
+keep_backups=3
 while (($#)); do
     case "$1" in
         --version) version="${2:?Missing release version}"; shift 2 ;;
@@ -17,7 +18,8 @@ while (($#)); do
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --backup-dir) backup_root="${2:?Missing backup directory}"; shift 2 ;;
-        --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; exit 0 ;;
+        --keep-backups) keep_backups="${2:?Missing number of backups to keep}"; shift 2 ;;
+        --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH] [--keep-backups N]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; echo 'After a successful update, keeps the newest N update backups (default 3) and removes the previous release application images.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -32,6 +34,7 @@ backup_root=${backup_root:-$install_dir/backups}
 [[ "$(realpath -m "$backup_root")" != "$(realpath -m "$config_dir")"* ]] || { echo 'Keep backups outside the live configuration directory.' >&2; exit 1; }
 [[ -z "$bundle_archive" || -n "$bundle_checksum" ]] || { echo 'An offline bundle needs --checksum.' >&2; exit 1; }
 [[ -n "$bundle_archive" || -z "$bundle_checksum" ]] || { echo '--checksum needs --bundle.' >&2; exit 1; }
+[[ "$keep_backups" =~ ^[1-9][0-9]*$ ]] || { echo '--keep-backups must be 1 or more.' >&2; exit 1; }
 
 exec 9>/run/lock/automaton-install.lock
 flock -n 9 || { echo 'Another installation or update is running.' >&2; exit 1; }
@@ -212,4 +215,30 @@ install -m 0644 "$bundle/version" "$install_dir/version"
 install -m 0700 "$bundle/update.sh" "$install_dir/update.sh"
 install -m 0700 "$bundle/install.sh" "$install_dir/install.sh"
 echo "Updated to $version. Recovery backup: $backup"
+# Housekeeping runs only after success; a failure here never affects the completed update.
+# Only directories this updater created (server-v<version>-<UTC time>-<random>) are rotated.
+mapfile -t old_backups < <(find "$backup_root" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended \
+    -regex '.*/server-v[0-9][^/]*-[0-9]{8}T[0-9]{6}Z-[A-Za-z0-9]{6}' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2- | tail -n +"$((keep_backups + 1))")
+for old_backup in "${old_backups[@]}"; do
+    [[ "$old_backup" != "$backup" ]] || continue
+    rm -rf -- "$old_backup" && echo "Removed old update backup: $old_backup" || echo "Warning: could not remove $old_backup" >&2
+done
+# Remove the previous release's application images unless a container still uses them.
+python3 - "$backup/release.env" "$bundle/release.env" <<'PY' | while IFS= read -r image; do
+import sys
+def read(path):
+    return dict(line.strip().split('=', 1) for line in open(path) if line.strip())
+old, new = read(sys.argv[1]), read(sys.argv[2])
+current = set(new.values())
+for name in ('API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'STORE_IMAGE'):
+    if old.get(name) and old[name] not in current:
+        print(old[name])
+PY
+    if docker image inspect "$image" >/dev/null 2>&1; then
+        docker image rm "$image" >/dev/null 2>&1 && echo "Removed previous image: $image" || echo "Kept previous image still in use: $image"
+    fi
+done
+free_kb=$(df -Pk "$backup_root" | awk 'NR==2 {print $4}')
+printf 'Free disk space: %s GiB.\n' "$((free_kb / 1048576))"
+(( free_kb >= 10485760 )) || echo 'Warning: less than 10 GiB is free; the next update will refuse to start until space is freed.' >&2
 echo 'Copy the backup to encrypted off-host storage; keep the database and Data Protection keys together.'

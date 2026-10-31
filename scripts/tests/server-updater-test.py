@@ -177,6 +177,54 @@ elif args[0]=='compose':
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
         self.assertFalse((self.install / 'backups').exists())
 
+    def old_backups(self, count):
+        backups = self.install / 'backups'
+        backups.mkdir(mode=0o700, exist_ok=True)
+        created = []
+        for index in range(count):
+            folder = backups / f'server-v0.0.{index}-2026010{index}T000000Z-abc12{index}'
+            folder.mkdir()
+            os.utime(folder, (1_700_000_000 + index, 1_700_000_000 + index))
+            created.append(folder)
+        manual = backups / 'broker-listener-20260101T000000Z'
+        manual.mkdir()
+        os.utime(manual, (1_600_000_000, 1_600_000_000))
+        return created, manual
+
+    def test_successful_update_rotates_backups_and_previous_images(self):
+        created, manual = self.old_backups(4)
+        log = self.root / 'docker.log'
+        result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        remaining = sorted(p.name for p in (self.install / 'backups').iterdir())
+        new_backup = [p for p in (self.install / 'backups').iterdir() if p.name.startswith('server-v0.1.2-')]
+        self.assertEqual(len(new_backup), 1)
+        # Newest three update backups: the new one plus the two most recent old ones.
+        self.assertEqual(sorted(remaining), sorted([new_backup[0].name, created[3].name, created[2].name, manual.name]))
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        removed = [args[-1] for args in calls if args[:2] == ['image', 'rm']]
+        self.assertEqual(sorted(removed), sorted(f'example.invalid/{name}@sha256:{"1" * 64}' for name in ('api', 'worker', 'studio')))
+        self.assertIn('Free disk space:', result.stdout)
+
+    def test_keep_backups_option_and_failed_update_keep_everything(self):
+        created, manual = self.old_backups(3)
+        failed = self.update(*self.bundle(), extra={'FAKE_UP_FAIL': '1'})
+        self.assertNotEqual(failed.returncode, 0)
+        for folder in created + [manual]:
+            self.assertTrue(folder.exists(), folder)
+        archive, checksum = self.bundle()
+        result = subprocess.run(['bash', str(REPO / 'scripts/update-automaton.sh'), '--version', 'server-v0.1.2',
+                                 '--install-dir', str(self.install), '--config-dir', str(self.config),
+                                 '--bundle', str(archive), '--checksum', str(checksum), '--keep-backups', '1'],
+                                env=self.environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        update_backups = [p for p in (self.install / 'backups').iterdir() if p.name.startswith('server-v')]
+        self.assertEqual(len(update_backups), 1)
+        self.assertTrue(manual.exists())
+        invalid = subprocess.run(['bash', str(REPO / 'scripts/update-automaton.sh'), '--keep-backups', '0'],
+                                 env=self.environment, capture_output=True, text=True)
+        self.assertIn('--keep-backups must be 1 or more', invalid.stderr)
+
     def test_bad_checksum_and_infrastructure_change_preserve_installation(self):
         archive, checksum = self.bundle()
         checksum.write_text('0' * 64 + '  automaton-server.tar.gz\n')
