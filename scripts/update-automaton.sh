@@ -9,10 +9,6 @@ backup_root=''
 version=''
 bundle_archive=''
 bundle_checksum=''
-website_image=''
-website_compose=''
-website_service=''
-website_url=''
 while (($#)); do
     case "$1" in
         --version) version="${2:?Missing release version}"; shift 2 ;;
@@ -21,39 +17,11 @@ while (($#)); do
         --install-dir) install_dir="${2:?Missing installation directory}"; shift 2 ;;
         --config-dir) config_dir="${2:?Missing configuration directory}"; shift 2 ;;
         --backup-dir) backup_root="${2:?Missing backup directory}"; shift 2 ;;
-        --website-image) website_image="${2:?Missing website image}"; shift 2 ;;
-        --website-compose) website_compose="${2:?Missing website Compose file}"; shift 2 ;;
-        --website-service) website_service="${2:?Missing website service}"; shift 2 ;;
-        --website-url) website_url="${2:?Missing website URL}"; shift 2 ;;
-        --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH]'; echo 'Website: sudo bash update-automaton.sh --website-image IMAGE@sha256:DIGEST --website-compose FILE --website-service SERVICE --website-url HTTPS_URL'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; exit 0 ;;
+        --help) echo 'Usage: sudo bash update-automaton.sh [--version server-vX.Y.Z] [--bundle automaton-server.tar.gz --checksum automaton-server.tar.gz.sha256] [--install-dir PATH] [--config-dir PATH] [--backup-dir PATH]'; echo 'Without --version, selects the latest stable published server distribution. Offline bundles require --version.'; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 [[ $EUID == 0 ]] || { echo 'Run the updater with sudo.' >&2; exit 1; }
-if [[ -n "$website_image$website_compose$website_service$website_url" ]]; then
-    [[ -n "$website_image" && -n "$website_compose" && -n "$website_service" && -n "$website_url" && -z "$version$bundle_archive$bundle_checksum$backup_root" ]] || { echo 'Specify all website options without server release options.' >&2; exit 1; }
-    [[ "$website_image" =~ ^[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}$ ]] || { echo 'Use an immutable website image digest.' >&2; exit 1; }
-    [[ "$website_compose" =~ ^/[a-zA-Z0-9_./-]+$ && -f "$website_compose" && ! -L "$website_compose" ]] || { echo 'Use an absolute, regular website Compose file.' >&2; exit 1; }
-    [[ "$website_service" =~ ^[a-zA-Z0-9_-]+$ && "$website_url" =~ ^https://[a-zA-Z0-9.-]+/?$ ]] || { echo 'Use a valid website service and HTTPS URL.' >&2; exit 1; }
-    command -v docker >/dev/null && docker compose version >/dev/null && docker info >/dev/null
-    command -v python3 >/dev/null && command -v curl >/dev/null
-    exec 9>/run/lock/automaton-install.lock
-    flock -n 9 || { echo 'Another installation or update is running.' >&2; exit 1; }
-    compose_dir=$(dirname -- "$website_compose")
-    compose=(docker compose --project-directory "$compose_dir" -f "$website_compose")
-    "${compose[@]}" config --quiet
-    current_container=$("${compose[@]}" ps -q "$website_service")
-    [[ -n "$current_container" && "$(docker inspect -f '{{.State.Running}}' "$current_container")" == true ]] || { echo 'Website service is not running.' >&2; exit 1; }
-    current_image=$("${compose[@]}" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"][sys.argv[1]]["image"])' "$website_service")
-    [[ "$current_image" =~ ^[a-zA-Z0-9_./:-]+$ ]] || { echo 'Website service image must be a tag.' >&2; exit 1; }
-    docker pull "$website_image"
-    docker tag "$(docker inspect -f '{{.Image}}' "$current_container")" "$current_image-previous"
-    docker tag "$website_image" "$current_image"
-    "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 120 "$website_service"
-    curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "$website_url" >/dev/null
-    echo "Updated $website_service to $website_image and verified $website_url"
-    exit 0
-fi
 [[ -n "$version" || -z "$bundle_archive" ]] || { echo 'Specify --version when using an offline bundle.' >&2; exit 1; }
 [[ -z "$version" || "$version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Specify --version server-vX.Y.Z.' >&2; exit 1; }
 for dir in "$install_dir" "$config_dir"; do
