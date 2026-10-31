@@ -17,10 +17,11 @@ root=Path(sys.argv[1])
 p=root/'traefik.yml'; config=json.loads(p.read_text()); config.pop('certificatesResolvers')
 config['ping']={'entryPoint':'health'}; config['entryPoints']['health']={'address':':8082'}
 p.write_text(json.dumps(config))
-p=root/'dynamic/installation.yml'; edge=json.loads(p.read_text()); edge.pop('tls',None)
-for group in ('http','tcp'):
-    for router in edge[group]['routers'].values(): router['tls']={}
-p.write_text(json.dumps(edge))
+for name in ('installation.yml', 'store.yml'):
+    p=root/'dynamic'/name; edge=json.loads(p.read_text()); edge.pop('tls',None)
+    for group in ('http','tcp'):
+        for router in edge.get(group, {}).get('routers', {}).values(): router['tls']={}
+    p.write_text(json.dumps(edge))
 PYCONFIG
 # Preinstalled images may be selected for local validation; released manifests use digests.
 cat > "$fixture/override.yaml" <<'YAML'
