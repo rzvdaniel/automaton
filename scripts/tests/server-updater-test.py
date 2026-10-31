@@ -42,7 +42,7 @@ import io, json, os, sys, tarfile
 args=sys.argv[1:]
 if os.environ.get('FAKE_DOCKER_LOG'):
     with open(os.environ['FAKE_DOCKER_LOG'], 'a') as log: print(json.dumps(args), file=log)
-if args[0]=='inspect': print('true')
+if args[0]=='inspect': print('sha256:'+'b'*64 if '{{.Image}}' in args else 'true')
 elif args[0]=='cp':
     with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
         data=b'key-or-data'
@@ -50,6 +50,7 @@ elif args[0]=='cp':
         archive.addfile(item, io.BytesIO(data))
 elif args[0]=='compose':
     if 'ps' in args: print('container-'+args[-1])
+    elif 'config' in args and '--format' in args: print(json.dumps({'services': {'website-green': {'image': 'example.invalid/website:current'}}}))
     elif 'exec' in args: print('-- Dump completed on 2026-01-01')
     elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
 ''')
@@ -149,6 +150,28 @@ esac
         result = subprocess.run(command, env=self.environment, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('selected:ghcr.io/rzvdaniel/automaton-server-distribution:server-v0.1.10', result.stderr)
+        self.assertFalse((self.install / 'backups').exists())
+
+    def test_website_mode_updates_only_selected_service(self):
+        import json
+        compose = self.root / 'website-compose.yaml'
+        compose.write_text('services:\n  website-green:\n    image: example.invalid/website:current\n')
+        log = self.root / 'docker.log'
+        image = 'example.invalid/website@sha256:' + 'a' * 64
+        result = subprocess.run(
+            ['bash', str(REPO / 'scripts/update-automaton.sh'), '--website-image', image,
+             '--website-compose', str(compose), '--website-service', 'website-green',
+             '--website-url', 'https://example.invalid'],
+            env=self.environment | {'FAKE_DOCKER_LOG': str(log)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertIn(['pull', image], calls)
+        self.assertIn(['tag', 'sha256:' + 'b' * 64, 'example.invalid/website:current-previous'], calls)
+        self.assertIn(['tag', image, 'example.invalid/website:current'], calls)
+        up_calls = [args for args in calls if args[0] == 'compose' and 'up' in args]
+        self.assertEqual(len(up_calls), 1)
+        self.assertEqual(up_calls[0][-1], 'website-green')
+        self.assertIn('--no-deps', up_calls[0])
         self.assertFalse((self.install / 'backups').exists())
 
 

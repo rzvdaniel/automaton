@@ -21,7 +21,7 @@ sudo docker compose --env-file release.env --env-file .env -f compose.yaml -f co
 
 Omit the override argument where none exists. Never share resolved Compose output or raw secrets. Preserve signing/encryption keys and Data Protection volumes with the database for recovery.
 
-The marketing website is separate from the server bundle. The adopted host retains its `website-green` container on the original network. If using the old Compose file for that website, select only that service with `--no-deps --no-build`; never start retired infrastructure services. Their containers and deployment scripts have been removed.
+The marketing website is separate from the server bundle. The adopted host retains its `website-green` container on the original network. Use the [updater's website mode](install-automaton.md#update-an-installed-server) with the published image digest and retained Compose file; it selects only that service with `--no-deps --no-build`. Never start retired infrastructure services. Their containers and deployment scripts have been removed.
 
 ## Routing and verification
 

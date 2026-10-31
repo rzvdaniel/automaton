@@ -104,6 +104,18 @@ sudo bash /opt/automaton-server/update.sh
 
 To select a particular published release, add `--version server-vX.Y.Z`. The updater refuses a version older than the installed version. Offline `--bundle` updates still require an explicit `--version`.
 
+The same updater has a separate mode for a marketing website retained in an existing Compose project. Supply the immutable website image reference from the successful `Build website` workflow artifact, the retained Compose file and service, and the public URL:
+
+```bash
+sudo bash /opt/automaton-server/update.sh \
+  --website-image ghcr.io/OWNER/REPO-website@sha256:DIGEST \
+  --website-compose /path/to/docker-compose.prod.yml \
+  --website-service website-green \
+  --website-url https://YOUR_DOMAIN
+```
+
+This mode pulls the specified image, tags the prior container image with a `-previous` suffix, updates only the selected website service with `--no-deps --no-build`, waits for its health check, and checks the public URL. It does not update the server release or run database backup and migration steps. Use it only for a retained website service whose Compose image is a tag and whose current container is running.
+
 For installations before the updater was bundled, transfer the reviewed `update-automaton.sh` release asset once and run it as shown above, with or without an explicit version. The updater pulls the release bundle from the public `ghcr.io/rzvdaniel/automaton-server-distribution` package, verifies the bundle checksum and version, checks the current stack, and refuses releases that change Compose or infrastructure image digests. It makes a root-only recovery directory under `/opt/automaton-server/backups` (override with `--backup-dir`), containing a consistent MySQL dump, configuration, API data, API and Worker Data Protection keys, and the previous release manifest. It verifies the archives and checksums before pulling and applying the new API, Worker and Studio images. Compose recreates only services whose image changed. Public Studio/API routes are checked before the installed version is recorded. Existing domains, credentials, database and volumes are preserved.
 
 Copy the recovery directory to encrypted off-host storage, and retain the matching database and key-ring backup. A local backup alone does not protect against host loss. If an update fails after containers begin changing, do not rerun it blindly: the previous manifest and recovery data are retained, but database migrations may make an image-only rollback unsafe. Restore the database, configuration and keys together before bringing back old images when a migration has run. The updater intentionally does not perform an automatic database rollback that could discard writes after cutover. Use `--bundle /path/automaton-server.tar.gz --checksum /path/automaton-server.tar.gz.sha256` for an authenticated or offline release transfer.
