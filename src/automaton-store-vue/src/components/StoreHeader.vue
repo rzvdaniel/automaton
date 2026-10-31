@@ -23,6 +23,10 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 </template>
 
 <style scoped>
+/* `.site` supplies the theme on every page; only page roots fill the viewport. */
+.top.site {
+  min-height: 0;
+}
 .top .wrap {
   display: flex;
   align-items: center;

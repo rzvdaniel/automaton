@@ -15,6 +15,10 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 </template>
 
 <style scoped>
+/* `.site` supplies the theme on every page; only page roots fill the viewport. */
+.foot.site {
+  min-height: 0;
+}
 .foot .wrap {
   padding-block: 36px 48px;
   display: flex;
