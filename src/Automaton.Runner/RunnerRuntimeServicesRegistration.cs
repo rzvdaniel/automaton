@@ -12,6 +12,7 @@ internal static class RunnerRuntimeServicesRegistration
         services.AddSingleton<RunnerRuntimeRegistry>();
         services.AddSingleton<IApplicationContainerRuntime>(RunnerApplicationContainerRuntimeFactory.Create);
         services.AddSingleton<IRunnerApplicationBuildExecutor, RunnerApplicationBuildExecutor>();
+        services.AddSingleton<IRuntimeSecretSource, RunnerRuntimeSecretSource>();
         services.AddSingleton<RunnerRuntimeContainerManager>();
         services.AddSingleton<IAppRuntimeProcessManager>(provider => provider.GetRequiredService<RunnerRuntimeContainerManager>());
         services.AddHostedService<RunnerRuntimeContainerHostedService>();

@@ -20,7 +20,6 @@ Read credentials such as API keys from environment variables named in the
 Action's documentation, never from source files. The app owner sets them as app
 secrets in Studio (**App → Settings → Secrets**); each Action run receives them
 as environment variables, and their values are removed from logs and results.
-Running apps do not receive app secrets.
 
 Deploy Actions with `automaton deploy`. Validate with
 `automaton action validate <action-key>`. Invoke a deployed Action with

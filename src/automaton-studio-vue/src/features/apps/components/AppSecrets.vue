@@ -87,9 +87,11 @@ function message(failure: unknown, fallback: string) {
 <template>
   <div class="flex flex-column gap-3">
     <p class="m-0 text-color-secondary">
-      Secrets are passed to this app's Actions as environment variables, for example API keys or storage credentials.
-      They are stored encrypted, never shown again after saving, and removed from Action logs and results. Running
-      apps do not receive them yet.
+      Secrets are passed to this app as environment variables, for example API keys or storage credentials: to each
+      Action run, and to the running app (API or server-rendered site) whenever it starts. They are stored encrypted,
+      never shown again after saving, and removed from Action logs and results. A running app picks up a change on its
+      next start: redeploy it with <code>automaton deploy</code>. Static sites cannot use secrets, because their files
+      are sent to the browser.
     </p>
     <DataTable :value="secrets" size="small" data-key="name">
       <template #empty>No secrets yet.</template>

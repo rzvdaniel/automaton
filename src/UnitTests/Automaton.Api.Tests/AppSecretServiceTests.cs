@@ -67,6 +67,27 @@ public sealed class AppSecretServiceTests
         Assert.That(await service.ResolveForExecutionAsync(otherApp, CancellationToken.None), Is.Empty);
     }
 
+    [Test]
+    public async Task RuntimeSecretsAreReleasedOnlyToTheRunnerAssignedToTheTarget()
+    {
+        var (service, db, appId, ownerId) = Create();
+        await service.SetAsync(appId, ownerId, "TOKEN", "value", CancellationToken.None);
+        var runnerId = Guid.NewGuid();
+        db.Runners.Add(new() { Id = runnerId, Name = "runner", RunnerUsers = [] });
+        await db.SaveChangesAsync();
+        var target = await db.AppDeploymentTargets.SingleAsync(target => target.WebAppId == appId);
+        target.ExecutionRunnerId = runnerId;
+        await db.SaveChangesAsync();
+        var targetId = target.Id;
+
+        var resolved = await service.ResolveForRuntimeAsync(appId, targetId, runnerId, CancellationToken.None);
+        Assert.That(resolved["TOKEN"], Is.EqualTo("value"));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.ResolveForRuntimeAsync(appId, targetId, Guid.NewGuid(), CancellationToken.None));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.ResolveForRuntimeAsync(Guid.NewGuid(), targetId, runnerId, CancellationToken.None));
+    }
+
     private static (AppSecretService Service, ApplicationDbContext Db, Guid AppId, Guid OwnerId) Create()
     {
         var db = AppAuthorizationTestData.CreateDbContext();
