@@ -79,7 +79,7 @@ PY
 }
 
 install_timer() {
-    install -m 0644 /dev/stdin /etc/systemd/system/automaton-backup.service <<UNIT
+    cat > /etc/systemd/system/automaton-backup.service <<UNIT
 [Unit]
 Description=Automaton nightly database and key backup
 After=docker.service
@@ -89,7 +89,7 @@ Requires=docker.service
 Type=oneshot
 ExecStart=/usr/bin/env bash $install_dir/backup.sh --install-dir $install_dir --keep $keep
 UNIT
-    install -m 0644 /dev/stdin /etc/systemd/system/automaton-backup.timer <<'UNIT'
+    cat > /etc/systemd/system/automaton-backup.timer <<'UNIT'
 [Unit]
 Description=Run the Automaton backup nightly
 
@@ -101,6 +101,7 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+    chmod 0644 /etc/systemd/system/automaton-backup.service /etc/systemd/system/automaton-backup.timer
     systemctl daemon-reload
     systemctl enable --now automaton-backup.timer >/dev/null
     echo "Nightly backups enabled (automaton-backup.timer); keeping the newest $keep in $backup_root."
