@@ -1,6 +1,6 @@
 # 05 Self-maintenance
 
-Updated: 31 October 2026. Status: planned. Local nightly backups are shipped (server 0.1.19); the maintenance-app platform and the first maintenance app are not started.
+Updated: 31 October 2026. Status: in progress (step 1 done for Actions; next: step 2, app permissions). Local nightly backups are shipped (server 0.1.19).
 
 Automaton should maintain its own server with its own building blocks: apps, Actions and schedules. Maintenance logic lives in ordinary, premade apps instead of growing platform code for each task. The platform adds only small, generic capabilities those apps need. This also demonstrates the product: an Automaton server managing itself the same way users manage their apps.
 
@@ -33,7 +33,7 @@ A source folder in this repository (for example `maintenance-apps/offsite-backup
 
 Each step is generic platform work or one maintenance app, delivered and verified on its own. Steps 1–3 are prerequisites for step 5.
 
-1. **App secrets.** Encrypted per-app secrets (Data Protection key ring, like Studio-managed SMTP), set in Studio and by API, never returned after saving, passed as environment variables to the app's Actions and runtime. Generic: every app can use them. *Acceptance:* a secret set in Studio reaches an Action run, is absent from logs, API responses and source, and survives backup/restore.
+1. **App secrets** — *done for Actions* (this PR): **App → Settings → Secrets** and `api/apps/{id}/secrets` (write-only values, owner/updater permission), stored with the existing encrypted secret store, delivered to every Action run and redacted from logs and results; deleted with the app. Runtime delivery is deferred: the Runner restarts runtimes from local metadata without the API, so runtime secrets need a Runner-side design. Original scope: encrypted per-app secrets (Data Protection key ring, like Studio-managed SMTP), set in Studio and by API, never returned after saving, passed as environment variables to the app's Actions and runtime. Generic: every app can use them. *Acceptance:* a secret set in Studio reaches an Action run, is absent from logs, API responses and source, and survives backup/restore.
 2. **App permissions.** An app declares requested permissions in `automaton.json` (for example `"permissions": ["backups:read"]`). Installing or changing them requires administrator approval in Studio; the platform then issues a scoped, revocable key and stores it as an app secret. Unapproved or revoked permissions are rejected by the API. *Acceptance:* a scoped key can call only its approved endpoints; revoking the approval stops the next call.
 3. **Encrypted backup download (`backups:read`).** `backup.sh` additionally writes an encrypted archive of each nightly backup with a per-installation backup key; the API serves it read-only to `backups:read` keys. The backup key is shown once in **Admin → Installation → Backups** for the administrator to keep in a password manager; restoring off-site copies on a new server needs it. *Acceptance:* the archive decrypts only with the backup key and restores on another server.
 4. **Template install and Admin → Maintenance.** The catalog, install, settings, permission approval, default schedules and update behavior described above.

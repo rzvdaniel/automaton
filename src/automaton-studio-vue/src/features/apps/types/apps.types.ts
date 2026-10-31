@@ -428,3 +428,9 @@ export function getFileIcon(filePath: string): string {
       return 'pi pi-file'
   }
 }
+
+export interface AppSecretSummary {
+  name: string
+  version: number
+  updatedAtUtc: string
+}

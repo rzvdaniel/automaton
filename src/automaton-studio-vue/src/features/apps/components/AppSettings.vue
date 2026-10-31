@@ -16,6 +16,7 @@ import Select from 'primevue/select'
 import Button from 'primevue/button'
 import CopyCommand from './CopyCommand.vue'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
+import AppSecrets from './AppSecrets.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -43,7 +44,7 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'targets' | 'secrets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
@@ -539,6 +540,14 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'targets'"
               />
               <Button
+                label="Secrets"
+                icon="pi pi-lock"
+                text
+                :class="{ 'surface-hover': activeSection === 'secrets' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'secrets'"
+              />
+              <Button
                 label="Appearance"
                 icon="pi pi-image"
                 text
@@ -705,6 +714,13 @@ async function handleSaveTemplateStatus() {
               @view-logs="emit('viewTargetLogs', $event)"
               @targets-changed="emit('targetsChanged', $event)"
             />
+          </template>
+        </Card>
+
+        <Card v-if="activeSection === 'secrets'">
+          <template #title>Secrets</template>
+          <template #content>
+            <AppSecrets v-if="app" :app-id="app.id" />
           </template>
         </Card>
 

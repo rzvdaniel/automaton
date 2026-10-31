@@ -23,6 +23,7 @@ public sealed class AppActionExecutionService
     private readonly ResourceAuthorizationService authorizationService;
     private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly IAppActionExecutionGateway runnerGateway;
+    private readonly AppSecretService? appSecrets;
 
     public AppActionExecutionService(
         ApplicationDbContext db,
@@ -30,13 +31,15 @@ public sealed class AppActionExecutionService
         ResourceAuthorizationService authorizationService,
         IAppDeploymentTargetResolver deploymentTargetResolver,
         IAppActionExecutionGateway runnerGateway,
-        IOptions<MachineContainerResourceOptions>? machineResources = null)
+        IOptions<MachineContainerResourceOptions>? machineResources = null,
+        AppSecretService? appSecrets = null)
     {
         this.db = db;
         this.appsService = appsService;
         this.authorizationService = authorizationService;
         this.deploymentTargetResolver = deploymentTargetResolver;
         this.runnerGateway = runnerGateway;
+        this.appSecrets = appSecrets;
         this.machineResources = machineResources?.Value;
     }
 
@@ -145,6 +148,10 @@ public sealed class AppActionExecutionService
             ActionKey = actionKey, ExpectedDeploymentHash = deployedAction.ContentHash,
             Input = input.ValueKind == JsonValueKind.Undefined ? JsonSerializer.SerializeToElement<object?>(null) : input.Clone(),
         };
+        // The request is stored encrypted and fetched by the Runner over HTTPS; the Runner passes
+        // secrets to the Action container as environment variables and redacts them from logs.
+        if (appSecrets is not null)
+            request.Secrets = await appSecrets.ResolveForExecutionAsync(appId, cancellationToken);
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {
             if (machineResources?.IsValid() != true)

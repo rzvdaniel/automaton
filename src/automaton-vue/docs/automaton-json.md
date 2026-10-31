@@ -78,6 +78,10 @@ Run `automaton validate`, then `automaton deploy`. Deployment is asynchronous.
 Wait for `Succeeded` before treating the app as deployed. Publishing is a
 separate action and requires explicit approval.
 
+## App secrets
+
+Keep credentials out of `automaton.json` and source files. Set them as app secrets in Studio under **App → Settings → Secrets**: a name such as `S3_SECRET_KEY` (capital letters, digits and underscores) and its value. Values are stored encrypted, are never shown again after saving, and are passed to the app's **Actions** as environment variables; Action logs and results have them replaced by `[REDACTED]`. Saving an existing name replaces its value. Running apps (the HTTP runtime) do not receive app secrets yet.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`
