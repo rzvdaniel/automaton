@@ -168,7 +168,7 @@ function close() {
         :closable="false"
         class="mb-4"
       >
-        Prepare an Ubuntu host with Docker Engine installed and running. ext4 is the tested storage baseline; working Docker storage on XFS or another filesystem does not need to be moved. The command checks Ubuntu and Docker availability, but does not install Docker or move or reconfigure its data.
+        Prepare an Ubuntu host with Docker Engine installed and running. The server where you installed Automaton already qualifies and can host its own Runner. ext4 is the tested storage baseline; working Docker storage on XFS or another filesystem does not need to be moved. The command checks Ubuntu and Docker availability, but does not install Docker or move or reconfigure its data.
       </Message>
       <div class="field">
         <label for="self-hosted-runner-name" class="font-semibold block mb-2">Runner name</label>

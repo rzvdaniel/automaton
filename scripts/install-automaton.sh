@@ -192,8 +192,9 @@ fi
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
+echo 'Waiting for HTTPS certificates. Certificate errors printed while they are issued are expected and retried.'
 curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response'
-curl --fail --silent --show-error "https://studio.$domain/" >/dev/null
+curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null
 curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
     || printf 'Warning: the app store did not answer at https://store.%s/. Check its DNS record; the rest of the installation is complete.\n' "$domain" >&2
 python3 - "$domain" <<'PYBROKER'
@@ -203,5 +204,5 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         broker.sendall(b'AMQP\x00\x00\x09\x01')
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
-printf '\nOpen https://studio.%s/install and enter the setup token from:\n  sudo cat %s/secrets/setup-token\n' "$domain" "$config_dir"
+printf '\nOpen https://studio.%s/install and enter the setup token from:\n  sudo cat %s/secrets/setup-token; echo\n' "$domain" "$config_dir"
 printf 'Protect %s and the Compose volumes with encrypted off-host backups before relying on this installation.\n' "$config_dir"
