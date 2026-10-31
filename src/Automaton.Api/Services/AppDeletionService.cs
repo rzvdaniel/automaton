@@ -53,6 +53,7 @@ public sealed class AppDeletionService(
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
             await fileStorageService.DeleteAppAsync(ownerId, appId);
             await appClaims.AssertOwnedAsync(executor, appClaimId.Value, CancellationToken.None);
+            await AppSecretService.RemoveAllForAppAsync(dataContext, appId, CancellationToken.None);
             dataContext.WebApps.Remove(app);
             await dataContext.SaveChangesAsync();
         }

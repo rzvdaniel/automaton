@@ -4,6 +4,7 @@
  */
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
+  AppSecretSummary,
   AppDeploymentTarget,
   App,
   AppListItem,
@@ -105,6 +106,19 @@ class AppsService {
     const params = projectId ? { projectId } : {}
     const { data } = await apiClient.get<string[]>('/api/apps/tags', { params })
     return data
+  }
+
+  async listSecrets(appId: string): Promise<AppSecretSummary[]> {
+    const { data } = await apiClient.get<AppSecretSummary[]>(`/api/apps/${appId}/secrets`)
+    return data
+  }
+
+  async setSecret(appId: string, name: string, value: string): Promise<void> {
+    await apiClient.put(`/api/apps/${appId}/secrets/${encodeURIComponent(name)}`, { value })
+  }
+
+  async deleteSecret(appId: string, name: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${appId}/secrets/${encodeURIComponent(name)}`)
   }
 
   async getTagSettings(id: string): Promise<AppTagSettings> {
