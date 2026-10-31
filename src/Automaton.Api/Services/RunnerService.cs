@@ -105,13 +105,9 @@ public class RunnerService
         runnerEntity.IpAddress = runner.IpAddress;
         runnerEntity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, runnerEntity.Purpose);
 
-        // Mark entity as modified
-        dbContext.Entry(runnerEntity).State = EntityState.Modified;
-
-        // Update runner entity
-        dbContext.Update(runnerEntity);
-
-        // Save changes
+        // Save only the fields above. Marking the whole entity modified would also write the
+        // connection state loaded earlier, overwriting a hub reconnect that completes meanwhile
+        // and leaving a connected Runner shown as offline.
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -215,7 +211,6 @@ public class RunnerService
 
         runner.ScriptEngineSettings = settingsJson;
 
-        dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Debug("Updated script engine settings for runner {RunnerId}", id);
