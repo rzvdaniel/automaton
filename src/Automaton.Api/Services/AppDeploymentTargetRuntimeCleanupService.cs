@@ -61,6 +61,14 @@ public sealed class AppDeploymentTargetRuntimeCleanupService(
         {
             throw;
         }
+        catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
+        {
+            // The Runner answered but could not perform cleanup; an outdated Runner rejects newer commands.
+            await RecordCleanupFailureAsync(
+                target,
+                $"The Runner could not clean up this target: {exception.Message} If the Runner is outdated, upgrade it from Studio > Runners.",
+                CancellationToken.None);
+        }
         catch (Exception)
         {
             await RecordCleanupFailureAsync(

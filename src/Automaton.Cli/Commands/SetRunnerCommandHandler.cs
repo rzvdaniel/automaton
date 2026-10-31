@@ -6,12 +6,12 @@ namespace Automaton.Cli.Commands;
 
 internal static class SetRunnerCommandHandler
 {
-    internal static async Task HandleAsync(ConfigService config, string? runner, bool clear, bool asJson)
+    internal static async Task HandleAsync(ConfigService config, string? runner, bool clear, bool asJson, bool cleanupRuntime = false)
     {
         try
         {
             EnsureSelection(runner, clear);
-            var target = await UpdateAssignmentAsync(config, runner, clear);
+            var target = await UpdateAssignmentAsync(config, runner, clear, cleanupRuntime);
             WriteSuccess(target, runner, clear, asJson);
             Environment.ExitCode = 0;
         }
@@ -32,14 +32,14 @@ internal static class SetRunnerCommandHandler
     }
 
     private static async Task<DeploymentTargetInfo> UpdateAssignmentAsync(
-        ConfigService config, string? runner, bool clear)
+        ConfigService config, string? runner, bool clear, bool cleanupRuntime)
     {
         var directory = Directory.GetCurrentDirectory();
         var service = new DeploymentTargetService(config);
         var target = await service.ResolveAsync(directory, slug: null);
         return clear
-            ? await service.ClearRunnerAsync(directory, target)
-            : await service.AssignRunnerAsync(directory, target, runner!);
+            ? await service.ClearRunnerAsync(directory, target, cleanupRuntime: cleanupRuntime)
+            : await service.AssignRunnerAsync(directory, target, runner!, cleanupRuntime: cleanupRuntime);
     }
 
     private static void WriteSuccess(

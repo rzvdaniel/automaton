@@ -65,6 +65,16 @@ public class RunnersController : BaseController
         catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
     }
 
+    [HttpPost("{id}/upgrade")]
+    [Authorize]
+    public async Task<IActionResult> PrepareUpgrade(Guid id, [FromServices] RunnerUpgradeService upgrade,
+        CancellationToken cancellationToken)
+    {
+        try { return Ok(await upgrade.PrepareAsync(id, cancellationToken)); }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+        catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
+    }
+
     [HttpGet("status")]
     public async Task<ActionResult<RunnerStatusResponse>> GetStatus(CancellationToken cancellationToken)
     {

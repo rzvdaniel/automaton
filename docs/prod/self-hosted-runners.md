@@ -4,8 +4,9 @@ Studio can create a one-time Docker installation command for the existing Automa
 Runner. The Machine Management profile installs one trusted management Runner on a
 customer-owned machine. Workloads run in separate containers. This document describes
 the current installation and the data customers must protect manually; machine
-storage telemetry is shown in Studio for Machine Management Runners. There is not
-yet a supported update procedure for Machine Management installations.
+storage telemetry is shown in Studio for Machine Management Runners. Studio provides an
+upgrade command for Machine Management installations; see
+[Machine Management Runner updates](#machine-management-runner-updates).
 
 ## Installation
 
@@ -134,9 +135,18 @@ a separate operator decision.
 
 ## Machine Management Runner updates
 
-Machine Management installations do not yet have a supported Runner update or
-rollback procedure. The generated Studio command is for enrolling a new installation;
-do not rerun it as an upgrade. Runner self-update and rollback remain deferred work.
+Upgrade a Machine Management Runner from **Studio -> Runners -> Upgrade runner**. Studio
+shows a command to run on the Runner's server. It verifies the container's installation
+and Runner identity, pulls the server's configured Runner image
+(`HostedRunners.DockerImage`, updated by each server release), and recreates the Runner
+container with the same identity, configuration, workspace volume and network. Deployed
+app containers keep running. If the new container does not start, the command restores
+the previous one. Rerunning it when the Runner is current makes no changes.
+
+Upgrade Runners installed from server releases before 0.1.15: they run an older Runner
+that cannot clean up, move or delete deployed apps. The install command is for enrolling
+a new installation; do not rerun it as an upgrade. Automatic Runner self-update is not
+provided.
 
 ## Manual testing
 

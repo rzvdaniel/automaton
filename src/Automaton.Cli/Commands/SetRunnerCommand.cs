@@ -9,16 +9,19 @@ public static class SetRunnerCommand
     {
         var runnerArgument = new Argument<string?>("runner", () => null, "Runner ID, slug, or exact Runner name");
         var clearOption = new Option<bool>("--clear", "Clear the Live target's Runner assignment");
+        var cleanupOption = new Option<bool>("--cleanup-runtime",
+            "Stop and remove the deployed runtime from the current Runner before changing it; redeploy afterwards");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command("set-runner", "Assign or clear the Runner for the Live environment")
         {
             runnerArgument,
             clearOption,
+            cleanupOption,
             jsonOption
         };
-        command.SetHandler((string? runner, bool clear, bool asJson) =>
-            SetRunnerCommandHandler.HandleAsync(config, runner, clear, asJson),
-            runnerArgument, clearOption, jsonOption);
+        command.SetHandler((string? runner, bool clear, bool cleanupRuntime, bool asJson) =>
+            SetRunnerCommandHandler.HandleAsync(config, runner, clear, asJson, cleanupRuntime),
+            runnerArgument, clearOption, cleanupOption, jsonOption);
         return command;
     }
 }

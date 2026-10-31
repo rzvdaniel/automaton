@@ -164,7 +164,8 @@ public sealed class DeploymentTargetService(ConfigService config)
         DeploymentTargetInfo target,
         string runnerReference,
         string? environmentName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool cleanupRuntime = false)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
@@ -172,7 +173,7 @@ public sealed class DeploymentTargetService(ConfigService config)
             var runner = await ResolveRunnerAsync(
                 client, runnerReference, cancellationToken);
             await client.AssignDeploymentTargetRunnerAsync(
-                appId, target.Id, runner, ct: cancellationToken);
+                appId, target.Id, runner, cleanupRuntime, ct: cancellationToken);
         }
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
     }
@@ -181,13 +182,14 @@ public sealed class DeploymentTargetService(ConfigService config)
         string directory,
         DeploymentTargetInfo target,
         string? environmentName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool cleanupRuntime = false)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
             await client.AssignDeploymentTargetRunnerAsync(
-                appId, target.Id, null, ct: cancellationToken);
+                appId, target.Id, null, cleanupRuntime, ct: cancellationToken);
         }
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
     }

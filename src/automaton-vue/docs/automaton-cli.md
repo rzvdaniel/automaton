@@ -76,7 +76,7 @@ automaton listing show
 ```
 
 `sync-ai` restores the canonical local guidance files. `pull` downloads app
-source. `runners` lists available Runners. `publish` makes the latest deployment
+source. `runners` lists available Runners. To move a deployed Live environment to another Runner, run `automaton set-runner <runner> --cleanup-runtime`, then `automaton deploy`; a published static site stays published. `publish` makes the latest deployment
 public and requires explicit user approval. `listing` sets the app's marketplace
 summary, description, category, tags, cover and screenshots; see
 [Publish](./publish#marketplace-listing).

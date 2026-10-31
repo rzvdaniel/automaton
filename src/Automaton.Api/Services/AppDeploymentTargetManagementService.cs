@@ -180,7 +180,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                 if (!request.CleanupDeployedRuntime)
                 {
                     throw new AppDeploymentTargetConflictException(
-                        "This target is deployed. Explicit runtime cleanup is required before changing its Runner.");
+                        "This target is deployed. Its runtime must be removed from the current Runner before changing it: confirm the move in Studio, or run automaton set-runner with --cleanup-runtime, then redeploy.");
                 }
                 await runtimeCleanupService.CleanupRuntimeAsync(target, cancellationToken);
                 ResetDeploymentState(target);
