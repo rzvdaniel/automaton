@@ -19,8 +19,9 @@ There is no pull-request image publication or production-host image build.
 Use the workflow summary and its `runner-image` artifact to obtain the published
 `repository@sha256:<digest>` reference. Verify its OCI source-revision label
 before updating a machine. Do not substitute `latest` for acceptance evidence.
-Existing pinned Docker Hub images remain usable as rollback artifacts; their
-registry is no longer the active build/publish authority.
+The Docker Hub repository `rzvdaniel/automaton-runner` is retired: nothing
+builds, publishes or installs from it. Runners still running a Docker Hub digest
+keep working from their local image; reinstall them from Studio to move to GHCR.
 
 GHCR publishing uses the workflow's `GITHUB_TOKEN`; no Docker Hub secret is
 required. A newly created GHCR package is private by default. Make the Runner

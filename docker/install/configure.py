@@ -78,6 +78,19 @@ def ensure_store(root):
     }}))
 
 
+def update_runner_image(root, previous, current):
+    """Point Studio's Runner install command at a release's Runner image; keep operator-chosen images."""
+    path = root / 'appsettings.Production.json'
+    settings = json.loads(path.read_text())
+    runners = settings.get('HostedRunners') if isinstance(settings, dict) else None
+    if not isinstance(runners, dict) or runners.get('DockerImage') not in (previous, current):
+        return False
+    if runners['DockerImage'] != current:
+        runners['DockerImage'] = current
+        replace_json(path, settings)
+    return True
+
+
 def secret(root, name, length=32):
     path = root / 'secrets' / name
     write_new(path, secrets.token_hex(length))
@@ -103,7 +116,7 @@ def rsa_settings(root):
     return json.loads(path.read_text())
 
 
-def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/automaton-runner:latest"):
+def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdaniel/automaton-runner:latest"):
     if not re.fullmatch(r'(?=.{1,180}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', domain):
         raise ValueError('Use a public domain such as example.com, without a scheme or path.')
     if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
@@ -206,11 +219,19 @@ if __name__ == '__main__':
     parser.add_argument('--ensure-store', action='store_true',
                         help='Add the app store to an existing installation without changing credentials.')
     parser.add_argument('--tls-mode', choices=['http', 'cloudflare'], default='http')
-    parser.add_argument('--runner-image', default='rzvdaniel/automaton-runner:latest')
+    parser.add_argument('--runner-image', default='ghcr.io/rzvdaniel/automaton-runner:latest')
+    parser.add_argument('--update-runner-image', nargs=2, metavar=('PREVIOUS', 'CURRENT'),
+                        help='Use the release Runner image for new Runners unless an operator chose another image.')
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        if args.ensure_store:
+        if args.update_runner_image:
+            previous, current = args.update_runner_image
+            if update_runner_image(args.config_dir, previous, current):
+                print('New Runners will use the Runner image from this release.')
+            else:
+                print('Keeping the custom Runner image configured in HostedRunners.DockerImage.')
+        elif args.ensure_store:
             if not (args.config_dir / 'installation.json').is_file():
                 raise ValueError('No existing installation configuration was found.')
             ensure_store(args.config_dir)

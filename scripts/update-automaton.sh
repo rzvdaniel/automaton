@@ -111,7 +111,7 @@ def read(path):
 old, new = read(sys.argv[1]), read(sys.argv[2])
 if not set(old) <= set(new):
     raise SystemExit('This release removes an image. A reviewed migration is required.')
-for name in ('MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'):
+for name in ('MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE'):
     if old[name] != new[name]:
         raise SystemExit(f'{name} changed. A reviewed infrastructure migration is required.')
 PY
@@ -194,10 +194,22 @@ if [[ " ${application_services[*]} " == *' store '* ]]; then
         exit 1
     fi
 fi
+old_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
+new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2-)
+recreate=()
+if [[ "$old_runner_image" != "$new_runner_image" ]]; then
+    [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
+    # Only new Runner installations use this image; running Runners are not changed.
+    if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --update-runner-image "$old_runner_image" "$new_runner_image"; then
+        echo "Runner image configuration failed; services were not changed. Restore it from $backup/config.tar.gz if needed, then rerun the update." >&2
+        exit 1
+    fi
+    recreate=(--force-recreate)  # API reads the updated settings file only at startup.
+fi
 echo 'Backup verified. Pulling release images.'
 "${new_compose[@]}" pull "${application_services[@]}"
 echo "Updating ${application_services[*]}."
-if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${application_services[@]}"; then
+if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${application_services[@]}"; then
     echo "Update did not reach healthy state. Previous manifest and recovery backup remain at $backup. Do not retry until the database and running services are assessed." >&2
     exit 1
 fi

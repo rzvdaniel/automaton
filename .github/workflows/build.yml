@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: production-images-${{ github.ref }}
@@ -39,12 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Resolve image name
         id: image
         env:
@@ -58,7 +51,7 @@ jobs:
           context: .
           file: docker/Dockerfile.${{ matrix.component }}
           platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: false
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -70,16 +63,3 @@ jobs:
             VITE_GITHUB_AUTH_API_BASE_URL=
             VITE_SUBSCRIPTIONS_ENABLED=false
             VITE_APP_TITLE=Automaton Studio
-      - name: Record the image reference
-        if: github.event_name != 'pull_request'
-        env:
-          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          COMPONENT: ${{ matrix.component }}
-        run: |
-          printf '%s\n' "$IMAGE" > "$COMPONENT.image"
-          printf 'Source: `%s`\n\nImage: `%s`\n' "$GITHUB_SHA" "$IMAGE" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
-        with:
-          name: image-${{ matrix.component }}
-          path: '*.image'

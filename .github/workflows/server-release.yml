@@ -116,15 +116,20 @@ jobs:
             echo "WORKER_IMAGE=$(cat worker.image)"
             echo "STUDIO_IMAGE=$(cat studio.image)"
             echo "STORE_IMAGE=$(cat store.image)"
+            resolve() {
+              docker pull "$2" >&2
+              printf '%s=%s\n' "$1" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$2")"
+            }
             if [[ -n "$previous" ]]; then
-              grep -E '^(MYSQL|RABBITMQ|TRAEFIK|RUNNER)_IMAGE=' previous-release/automaton-server/release.env
+              # Infrastructure stays pinned across releases; changing it needs a reviewed migration.
+              grep -E '^(MYSQL|RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
             else
-              for pair in MYSQL_IMAGE=mysql:8.4 RABBITMQ_IMAGE=rabbitmq:4-management TRAEFIK_IMAGE=traefik:v3 RUNNER_IMAGE=rzvdaniel/automaton-runner:latest; do
-                image="${pair#*=}"
-                docker pull "$image" >&2
-                printf '%s=%s\n' "${pair%%=*}" "$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
-              done
+              resolve MYSQL_IMAGE mysql:8.4
+              resolve RABBITMQ_IMAGE rabbitmq:4-management
+              resolve TRAEFIK_IMAGE traefik:v3
             fi
+            # New Runners install the latest smoke-tested Runner image built from main.
+            resolve RUNNER_IMAGE ghcr.io/rzvdaniel/automaton-runner:latest
           } > automaton-server/release.env
       - uses: docker/login-action@v3
         with:

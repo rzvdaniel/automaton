@@ -3,7 +3,7 @@ name: automaton-prod
 # Production stack: Traefik + MySQL + API + Studio + Website
 #
 # Runners are deployed independently — see docker-compose.runner.yml or
-# https://hub.docker.com/r/rzvdaniel/automaton-runner
+# https://github.com/rzvdaniel/automaton/pkgs/container/automaton-runner
 #
 # Prerequisites on the Hetzner server:
 #   1. Clone this repo to /opt/automaton
@@ -34,7 +34,7 @@ x-api-common: &api-common
     PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
     HostedRunners__Enabled: ${HOSTED_RUNNERS_ENABLED:-true}
     HostedRunners__ServerUrl: https://${API_DOMAIN:?API_DOMAIN is required in .env}
-    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
+    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-ghcr.io/rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimePort: ${HOSTED_RUNNER_RUNTIME_PORT:-8080}
@@ -78,7 +78,7 @@ x-worker-common: &worker-common
     Logging__File__Path: /app/logs
     HostedRunners__Enabled: ${HOSTED_RUNNERS_ENABLED:-true}
     HostedRunners__ServerUrl: https://${API_DOMAIN:?API_DOMAIN is required in .env}
-    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
+    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-ghcr.io/rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimePort: ${HOSTED_RUNNER_RUNTIME_PORT:-8080}
