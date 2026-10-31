@@ -10,6 +10,7 @@ import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import SelfHostedRunnerInstallDialog from '../components/SelfHostedRunnerInstallDialog.vue'
 import RunnerRemovalDialog from '../components/RunnerRemovalDialog.vue'
+import RunnerUpgradeDialog from '../components/RunnerUpgradeDialog.vue'
 import { isAxiosError } from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -22,6 +23,7 @@ import {
   getStatusSeverity,
   type Runner,
   type RunnerRemovalInstructions,
+  type RunnerUpgradeInstructions,
   isRunnerLinkedToProject,
 } from '../types/runners.types'
 import { classifyRunner, isVisibleApplicationRunner } from '../utils/runner-classification'
@@ -38,6 +40,9 @@ const showSelfHostedInstallDialog = ref(false)
 const removalInstructions = ref<RunnerRemovalInstructions | null>(null)
 const removalRunnerName = ref('')
 const showRemovalDialog = ref(false)
+const upgradeInstructions = ref<RunnerUpgradeInstructions | null>(null)
+const upgradeRunnerName = ref('')
+const showUpgradeDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
 const autoRefreshIntervalMs = 15000
@@ -208,6 +213,25 @@ async function deleteRunner(runner: Runner) {
       severity: 'error',
       summary: 'Error',
       detail: isAxiosError(err) ? err.response?.data?.message ?? 'Failed to prepare Runner removal' : 'Failed to prepare Runner removal',
+      life: 10000,
+    })
+  }
+}
+
+function canUpgrade(runner: Runner) {
+  return !runner.isHostedRunner && runner.applicationProfile === 'MachineManagement'
+}
+
+async function openUpgrade(runner: Runner) {
+  try {
+    upgradeInstructions.value = await runnersService.prepareUpgrade(runner.id)
+    upgradeRunnerName.value = runner.name
+    showUpgradeDialog.value = true
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: isAxiosError(err) ? err.response?.data?.message ?? 'Failed to prepare the Runner upgrade' : 'Failed to prepare the Runner upgrade',
       life: 10000,
     })
   }
@@ -404,6 +428,15 @@ onUnmounted(() => {
 
             <!-- Actions Menu -->
             <div class="flex gap-1">
+              <Button
+                v-if="canUpgrade(runner)"
+                v-tooltip.top="'Upgrade runner'"
+                icon="pi pi-refresh"
+                text
+                rounded
+                size="small"
+                @click.stop="openUpgrade(runner)"
+              />
               <Button
                 v-if="!runner.isHostedRunner && !isRunnerLinkedToProject(runner)"
                 v-tooltip.top="'Delete runner'"
@@ -629,6 +662,15 @@ onUnmounted(() => {
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button
+                  v-if="canUpgrade(data)"
+                  v-tooltip.top="'Upgrade runner'"
+                  icon="pi pi-refresh"
+                  text
+                  rounded
+                  size="small"
+                  @click.stop="openUpgrade(data)"
+                />
+                <Button
                   v-if="!data.isHostedRunner && !isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Delete runner'"
                   icon="pi pi-trash"
@@ -653,6 +695,10 @@ onUnmounted(() => {
     <RunnerRemovalDialog v-if="removalInstructions" :key="removalInstructions.runnerId"
       v-model:visible="showRemovalDialog" :instructions="removalInstructions"
       :runner-name="removalRunnerName" @removed="loadRunners" />
+
+    <RunnerUpgradeDialog v-if="upgradeInstructions" :key="upgradeInstructions.runnerId"
+      v-model:visible="showUpgradeDialog" :instructions="upgradeInstructions"
+      :runner-name="upgradeRunnerName" />
 
 
   </div>

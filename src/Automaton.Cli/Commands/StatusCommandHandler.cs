@@ -86,9 +86,18 @@ internal static class StatusCommandHandler
     }
 
     private static string? ResolveArtifactDirectory(ProjectContext context)
-        => !string.IsNullOrWhiteSpace(context.Config.Application.Build.OutputDirectory)
-            ? ZipService.ResolveDeployDirectory(context.Directory, context.Config.Application.Build.OutputDirectory)
-            : null;
+    {
+        var outputDirectory = context.Config.Application.Build.OutputDirectory;
+        if (string.IsNullOrWhiteSpace(outputDirectory)) return null;
+        try
+        {
+            return ZipService.ResolveDeployDirectory(context.Directory, outputDirectory);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null; // The assigned Runner builds the output; there is no local copy yet.
+        }
+    }
 
     private static string? ReadString(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) ? value.GetString() : null;

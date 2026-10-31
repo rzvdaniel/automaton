@@ -123,7 +123,7 @@ public class AppDeploymentTargetManagementServiceTests
                 new AssignAppDeploymentTargetRunnerRequest { RunnerId = newRunner.Id },
                 fixture.UserId));
 
-        Assert.That(exception!.Message, Does.Contain("Explicit runtime cleanup"));
+        Assert.That(exception!.Message, Does.Contain("--cleanup-runtime"));
     }
 
     [Test]

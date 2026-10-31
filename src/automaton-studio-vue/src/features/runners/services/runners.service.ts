@@ -7,6 +7,7 @@ import type {
   CreateSelfHostedRunnerInstallationRequest,
   Runner,
   RunnerRemovalInstructions,
+  RunnerUpgradeInstructions,
   RunnerStatusResponse,
   SelfHostedRunnerInstallation,
   SelfHostedRunnerInstallationStatusResponse,
@@ -38,6 +39,11 @@ class RunnersService {
    */
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/runners/${id}`, { params: { hostCleanupConfirmed: true } })
+  }
+
+  async prepareUpgrade(id: string): Promise<RunnerUpgradeInstructions> {
+    const { data } = await apiClient.post<RunnerUpgradeInstructions>(`/api/runners/${id}/upgrade`)
+    return data
   }
 
   async prepareRemoval(id: string): Promise<RunnerRemovalInstructions> {

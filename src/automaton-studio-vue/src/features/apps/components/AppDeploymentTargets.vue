@@ -367,9 +367,10 @@ function isAdvancedVisible(target: AppDeploymentTarget): boolean {
 function showError(error: unknown, fallback: string) {
   const detail =
     typeof error === 'object' && error && 'response' in error
-      ? ((error as { response?: { data?: { message?: string; detail?: string } } }).response?.data
-          ?.message ??
+      ? ((error as { response?: { data?: { message?: string; detail?: string; title?: string } } }).response
+          ?.data?.message ??
         (error as { response?: { data?: { detail?: string } } }).response?.data?.detail ??
+        (error as { response?: { data?: { title?: string } } }).response?.data?.title ??
         fallback)
       : error instanceof Error
         ? error.message

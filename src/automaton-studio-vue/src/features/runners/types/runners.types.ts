@@ -75,6 +75,13 @@ export interface RunnerRemovalInstructions {
   uninstallCommand: string
 }
 
+export interface RunnerUpgradeInstructions {
+  runnerId: string
+  image: string
+  upToDate: boolean
+  upgradeCommand: string
+}
+
 export const RunnerApplicationProfiles = {
   MachineManagement: 'MachineManagement',
 } as const
