@@ -59,7 +59,7 @@ const adminNavItems: NavItem[] = [
 ]
 
 const utilityNavItems: NavItem[] = [
-  { label: 'CLI & SDKs', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
+  { label: 'CLI', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
   { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },

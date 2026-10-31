@@ -6,7 +6,7 @@ export const downloadsRoutes: RouteRecordRaw[] = [
     name: 'downloads',
     component: () => import('./views/DownloadsView.vue'),
     meta: {
-      title: 'Downloads',
+      title: 'Automaton CLI',
     },
   },
 ]

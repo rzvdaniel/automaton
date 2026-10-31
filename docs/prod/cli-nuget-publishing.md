@@ -14,10 +14,8 @@ packages. Azure pipeline secrets are not transferred automatically. The workflow
 rejects publishing from another branch and reports a missing key explicitly;
 package builds and artifact downloads do not need this secret.
 
-Standalone Runner archives are built separately by
-[Build native Runner archives](../../.github/workflows/release.yml), using the
-current Runner project and .NET 9. Production server and Runner container images
-have their own build workflows; see [deploying the Runner](deploying-runner.md).
+Runners are distributed as container images only; see
+[deploying the Runner](deploying-runner.md).
 
 ## 2. Install the Locally Packed CLI Globally for Development
 
