@@ -96,16 +96,18 @@ if [[ -f "$install_dir/version" ]]; then
     [[ "$current_version" =~ ^server-v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]] || { echo 'Installed version marker is invalid.' >&2; exit 1; }
     dpkg --compare-versions "${version#server-v}" gt "${current_version#server-v}" || { echo 'Choose a newer server release.' >&2; exit 1; }
 fi
-cmp -s "$bundle/compose.yaml" "$install_dir/compose.yaml" || { echo 'This release changes Compose. A reviewed migration is required.' >&2; exit 1; }
 python3 - "$install_dir/release.env" "$bundle/release.env" <<'PY'
 import re, sys
 def read(path):
     entries = dict(line.strip().split('=', 1) for line in open(path) if line.strip())
     required = {'API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'}
-    if set(entries) != required or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
+    # STORE_IMAGE was added after the first releases; older installed manifests do not have it.
+    if set(entries) not in (required, required | {'STORE_IMAGE'}) or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
         raise SystemExit('Invalid release image manifest.')
     return entries
 old, new = read(sys.argv[1]), read(sys.argv[2])
+if not set(old) <= set(new):
+    raise SystemExit('This release removes an image. A reviewed migration is required.')
 for name in ('MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'):
     if old[name] != new[name]:
         raise SystemExit(f'{name} changed. A reviewed infrastructure migration is required.')
@@ -113,15 +115,38 @@ PY
 
 old_compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
 new_compose=(docker compose --project-directory "$install_dir" --env-file "$bundle/release.env" --env-file "$install_dir/.env" -f "$bundle/compose.yaml")
+# Services owned by the release, without operator override additions such as sidecars.
+old_release_services=$("${old_compose[@]}" config --services)
+new_release_services=$("${new_compose[@]}" config --services)
 override="$install_dir/compose.override.yaml"
 if [[ -e "$override" || -L "$override" ]]; then
     [[ -f "$override" && ! -L "$override" ]] || { echo 'The installation Compose override must be a regular, non-symlink file.' >&2; exit 1; }
     old_compose+=(-f "$override")
     new_compose+=(-f "$override")
 fi
-"${old_compose[@]}" config --quiet
-"${new_compose[@]}" config --quiet
-for service in mysql rabbitmq api worker studio traefik; do
+"${old_compose[@]}" config --format json > "$working/old-compose.json"
+"${new_compose[@]}" config --format json > "$working/new-compose.json"
+# Releases may add or change application services. Infrastructure, persistent volumes,
+# secrets and networks must stay identical; those changes need a reviewed migration.
+python3 - "$working/old-compose.json" "$working/new-compose.json" <<'PY'
+import json, sys
+old, new = (json.load(open(path)) for path in sys.argv[1:3])
+infrastructure = ('mysql', 'rabbitmq', 'traefik')
+old_services, new_services = old.get('services', {}), new.get('services', {})
+if not set(old_services) <= set(new_services):
+    raise SystemExit('This release removes a service. A reviewed migration is required.')
+for name in infrastructure:
+    if old_services.get(name) != new_services.get(name):
+        raise SystemExit(f'This release changes {name}. A reviewed infrastructure migration is required.')
+for section in ('volumes', 'secrets', 'networks'):
+    if old.get(section) != new.get(section):
+        raise SystemExit(f'This release changes Compose {section}. A reviewed migration is required.')
+PY
+application_services=()
+for service in $new_release_services; do
+    [[ " mysql rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
+done
+for service in $old_release_services; do
     container=$("${old_compose[@]}" ps -q "$service")
     [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo "$service is not running; repair the installation before updating." >&2; exit 1; }
 done
@@ -158,10 +183,18 @@ for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archi
 if [[ -f "$override" ]]; then
     (cd "$backup" && sha256sum compose.override.yaml >> SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
 fi
+if [[ " ${application_services[*]} " == *' store '* ]]; then
+    [[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
+    echo 'Adding app store configuration if missing.'
+    if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-store; then
+        echo "App store configuration failed; services were not changed. Fix the reported configuration file, or restore it from $backup/config.tar.gz, then rerun the update." >&2
+        exit 1
+    fi
+fi
 echo 'Backup verified. Pulling release images.'
-"${new_compose[@]}" pull api worker studio
-echo 'Updating API, Worker and Studio.'
-if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 api worker studio; then
+"${new_compose[@]}" pull "${application_services[@]}"
+echo "Updating ${application_services[*]}."
+if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${application_services[@]}"; then
     echo "Update did not reach healthy state. Previous manifest and recovery backup remain at $backup. Do not retry until the database and running services are assessed." >&2
     exit 1
 fi
@@ -169,6 +202,9 @@ if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-er
     || ! curl --fail --silent --show-error "https://studio.$domain/" >/dev/null; then
     echo "Public route validation failed. Previous manifest and recovery backup remain at $backup. Assess the services before recovery." >&2
     exit 1
+fi
+if [[ " ${application_services[*]} " == *' store '* ]] && ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://store.$domain/" >/dev/null; then
+    printf 'Warning: the app store did not answer at https://store.%s/. Point a DNS record for store.%s to this server, then restart Traefik so it requests the certificate; the rest of the update is complete.\n' "$domain" "$domain" >&2
 fi
 install -m 0600 "$bundle/release.env" "$install_dir/release.env"
 install -m 0644 "$bundle/compose.yaml" "$install_dir/compose.yaml"

@@ -85,7 +85,7 @@ urllib.request.urlopen = release_page
             bundle = root / 'bundle'; bundle.mkdir()
             for name in ('configure.py', 'compose.yaml'):
                 shutil.copy2(REPO / 'docker/install' / name, bundle / name)
-            images = ('API', 'STUDIO', 'WORKER', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
+            images = ('API', 'STUDIO', 'STORE', 'WORKER', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
             (bundle / 'release.env').write_text(''.join(f'{name}_IMAGE=example.invalid/test@sha256:{"0" * 64}\n' for name in images))
             command = ['bash', str(REPO / 'scripts/install-automaton.sh'), '--configure-only',
                        '--install-dir', str(root / 'install'), '--config-dir', str(root / 'config'),

@@ -78,6 +78,14 @@ services:
     logging: *logging
     depends_on:
       api: {condition: service_healthy}
+  store:
+    image: ${STORE_IMAGE:?}
+    volumes:
+      - ${CONFIG_DIR:?}/store-runtime-config.js:/usr/share/nginx/html/runtime-config.js:ro
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      api: {condition: service_healthy}
   traefik:
     image: ${TRAEFIK_IMAGE:?}
     restart: unless-stopped

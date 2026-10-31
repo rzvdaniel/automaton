@@ -115,9 +115,7 @@ jobs:
             echo "API_IMAGE=$(cat server.image)"
             echo "WORKER_IMAGE=$(cat worker.image)"
             echo "STUDIO_IMAGE=$(cat studio.image)"
-            # store.image is built and published, but STORE_IMAGE joins the manifest only with the
-            # installer/updater support that accepts it (docs/roadmap/app-store.md, step 5). Its new GHCR
-            # package starts private; make it public before adding it to the anonymous pull check below.
+            echo "STORE_IMAGE=$(cat store.image)"
             if [[ -n "$previous" ]]; then
               grep -E '^(MYSQL|RABBITMQ|TRAEFIK|RUNNER)_IMAGE=' previous-release/automaton-server/release.env
             else
@@ -139,7 +137,8 @@ jobs:
           trap 'rm -rf "$public_config"' EXIT
           while IFS= read -r reference; do
             docker --config "$public_config" pull "$reference"
-          done < <(cat server.image worker.image studio.image)
+          # A new GHCR package starts private; make it public, then rerun, if this fails for store.
+          done < <(cat server.image worker.image studio.image store.image)
       - name: Smoke test isolated installation
         run: |
           sudo apt-get update
