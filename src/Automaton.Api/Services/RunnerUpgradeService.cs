@@ -19,6 +19,6 @@ public sealed class RunnerUpgradeService(
         var runner = await db.Runners.AsNoTracking().SingleAsync(runner => runner.Id == id, token);
         var image = hostedRunnerOptions.Value.DockerImage;
         var upToDate = string.Equals(runner.ImageDigest, image, StringComparison.Ordinal);
-        return new(id, image, upToDate, RunnerUpgradeCommand.Build(id, runner.InstallationId, image));
+        return new(id, image, upToDate, RunnerUpgradeCommand.Build(id, runner.InstallationId, image, runner.Name));
     }
 }
