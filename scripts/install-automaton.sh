@@ -179,6 +179,9 @@ install -m 0644 "$bundle_dir/compose.yaml" "$install_dir/compose.yaml"
 if [[ -f "$bundle_dir/version" ]]; then install -m 0644 "$bundle_dir/version" "$install_dir/version"; fi
 if [[ -f "$bundle_dir/update.sh" ]]; then install -m 0700 "$bundle_dir/update.sh" "$install_dir/update.sh"; fi
 if [[ -f "$bundle_dir/install.sh" ]]; then install -m 0700 "$bundle_dir/install.sh" "$install_dir/install.sh"; fi
+for script in backup.sh restore.sh; do
+    if [[ -f "$bundle_dir/$script" ]]; then install -m 0700 "$bundle_dir/$script" "$install_dir/$script"; fi
+done
 export CONFIG_DIR="$config_dir"
 # Persist only the configuration path alongside the release manifest, for future Compose commands.
 printf 'CONFIG_DIR=%s\n' "$config_dir" > "$install_dir/.env"
@@ -205,4 +208,9 @@ with socket.create_connection(('127.0.0.1', 5671), timeout=10) as raw:
         if not broker.recv(8): raise SystemExit('The Runner broker TLS route did not respond.')
 PYBROKER
 printf '\nOpen https://studio.%s/install and enter the setup token from:\n  sudo cat %s/secrets/setup-token; echo\n' "$domain" "$config_dir"
-printf 'Protect %s and the Compose volumes with encrypted off-host backups before relying on this installation.\n' "$config_dir"
+# Nightly database and key backups are on by default; take the first one now.
+if [[ -f "$install_dir/backup.sh" ]]; then
+    bash "$install_dir/backup.sh" --install-dir "$install_dir" --install-timer && bash "$install_dir/backup.sh" --install-dir "$install_dir" \
+        || echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
+fi
+printf 'Backups: nightly database and key backups are kept in %s/backups/nightly. Also enable your provider'"'"'s server backups (snapshots) and copy %s off-host.\n' "$install_dir" "$config_dir"

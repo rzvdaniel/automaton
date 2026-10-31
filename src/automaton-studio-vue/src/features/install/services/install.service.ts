@@ -1,5 +1,5 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { InstallCommand, InstallationStatusResponse, InstallationCheck } from '../types/install.types'
+import type { InstallCommand, InstallationStatusResponse, InstallationCheck, InstallationBackupStatus } from '../types/install.types'
 
 class InstallService {
   async getStatus(): Promise<InstallationStatusResponse> {
@@ -11,6 +11,11 @@ class InstallService {
     const { data } = await apiClient.post<InstallationCheck[]>('/api/install/checks', null, {
       headers: { 'X-Automaton-Setup-Token': setupToken },
     })
+    return data
+  }
+
+  async getBackups(): Promise<InstallationBackupStatus> {
+    const { data } = await apiClient.get<InstallationBackupStatus>('/api/install/backups')
     return data
   }
 

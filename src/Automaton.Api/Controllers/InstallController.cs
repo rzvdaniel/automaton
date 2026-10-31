@@ -35,6 +35,11 @@ public class InstallController(InstallService installService, IConfiguration con
         return Ok(await InstallationReadiness.CheckAsync(db, configuration, smtpSettings, token));
     }
 
+    [HttpGet("backups")]
+    [Authorize(Roles = UserRole.SystemAdministrator)]
+    public async Task<IActionResult> GetBackups(CancellationToken token)
+        => Ok(await InstallationBackups.ReadAsync(configuration, token));
+
     [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> Post(InstallCommand command, CancellationToken cancellationToken)
