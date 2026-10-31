@@ -29,7 +29,7 @@ public static class InstallationReadiness
             urlsConfigured ? "API and Studio addresses are saved. This does not verify DNS or public access."
                 : "Configure the API and Studio addresses on the server."));
         checks.Add(new("Public DNS and ports", "unverified",
-            "Check api, studio, apps and *.apps DNS records from outside this server, and allow inbound TCP 80, 443 and 5671."));
+            "Check api, studio, store, apps and *.apps DNS records from outside this server, and allow inbound TCP 80, 443 and 5671."));
         checks.Add(await CheckSmtpAsync(smtpSettings, token));
         return checks;
     }

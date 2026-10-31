@@ -58,7 +58,7 @@ For offline preparation with an already downloaded bundle, extract `automaton-se
 Open `https://studio.example.com/install`. Read the setup token locally:
 
 ```bash
-sudo cat /etc/automaton/secrets/setup-token
+sudo cat /etc/automaton/secrets/setup-token; echo
 ```
 
 Paste it into **Server setup token**, select **Check installation**, and create the administrator with your name, email and password. Use at least 12 characters, including uppercase, lowercase, a number and a symbol. Sign in when setup completes.

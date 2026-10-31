@@ -42,7 +42,7 @@ Ask your coding agent to build the app. It should read the generated `AGENTS.md`
 ```bash
 automaton validate
 automaton deploy
-automaton publish --yes
+automaton publish --yes --slug my-app
 ```
 
 Approve CLI login in **your Studio** when prompted. Keep credentials out of AI chat.

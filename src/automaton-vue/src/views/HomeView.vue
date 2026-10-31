@@ -185,7 +185,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
           <ul class="req">
             <li><span>Server</span><span>x86_64, Ubuntu 24.04+</span></li>
             <li><span>Free disk space</span><span>10 GiB or more</span></li>
-            <li><span>DNS records</span><span>api, studio, apps, *.apps</span></li>
+            <li><span>DNS records</span><span>api, studio, store, apps, *.apps</span></li>
             <li><span>Open ports</span><span>TCP 80, 443, 5671</span></li>
             <li><span>On your computer</span><span>.NET 9 SDK or later</span></li>
           </ul>
