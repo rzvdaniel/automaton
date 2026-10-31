@@ -40,12 +40,14 @@ function siblingHost(origin: string, name: string) {
 
 export function resolveStoreConfig({ runtime = {}, env = {}, origin }: StoreConfigSources): StoreConfig {
   const apiBaseUrl = pick(runtime.apiBaseUrl, env.VITE_API_BASE_URL, siblingHost(origin, 'api')) || origin
-  const publicAppsBaseUrl = pick(runtime.publicAppsBaseUrl, env.VITE_PUBLIC_APPS_BASE_URL, siblingHost(origin, 'apps'))
+  // Without an apps host (local or custom store host), the API serves published apps by path.
+  const publicAppsBaseUrl =
+    pick(runtime.publicAppsBaseUrl, env.VITE_PUBLIC_APPS_BASE_URL, siblingHost(origin, 'apps')) || apiBaseUrl
   const studioUrl = pick(runtime.studioUrl, env.VITE_STUDIO_URL, siblingHost(origin, 'studio'))
 
   return {
     apiBaseUrl: ensureTrailingSlash(apiBaseUrl),
-    publicAppsBaseUrl: publicAppsBaseUrl ? trimTrailingSlash(publicAppsBaseUrl) : '',
+    publicAppsBaseUrl: trimTrailingSlash(publicAppsBaseUrl),
     studioUrl: studioUrl ? ensureTrailingSlash(studioUrl) : '',
     storeTitle: pick(runtime.storeTitle, env.VITE_STORE_TITLE) || defaultTitle,
     logoUrl: pick(runtime.logoUrl, env.VITE_STORE_LOGO_URL),

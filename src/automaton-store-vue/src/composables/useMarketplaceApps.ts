@@ -22,6 +22,20 @@ export function resolveMarketplaceAssetUrl(url?: string | null) {
   return `${publicAppConfig.apiBaseUrl}${url.replace(/^\/+/, '')}`
 }
 
+export async function fetchList<T>(url: string): Promise<T[]> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}.`)
+  }
+
+  const body: unknown = await response.json()
+  if (!Array.isArray(body)) {
+    throw new Error('Expected a list response.')
+  }
+
+  return body as T[]
+}
+
 export function useMarketplaceApps(defaultTake = 10) {
   const categories = ref<string[]>([])
   const apps = ref<MarketplaceAppCard[]>([])
@@ -33,8 +47,11 @@ export function useMarketplaceApps(defaultTake = 10) {
   const featuredApps = computed(() => apps.value.filter((app) => app.isFeatured))
 
   async function loadCategories() {
-    const response = await fetch(`${marketplaceApiBaseUrl}/categories`)
-    categories.value = await response.json()
+    try {
+      categories.value = await fetchList<string>(`${marketplaceApiBaseUrl}/categories`)
+    } catch {
+      categories.value = []
+    }
   }
 
   async function loadApps(take = defaultTake) {
@@ -54,8 +71,7 @@ export function useMarketplaceApps(defaultTake = 10) {
 
       query.set('take', String(take))
 
-      const response = await fetch(`${marketplaceApiBaseUrl}/apps?${query.toString()}`)
-      apps.value = await response.json()
+      apps.value = await fetchList<MarketplaceAppCard>(`${marketplaceApiBaseUrl}/apps?${query.toString()}`)
     } catch (err) {
       error.value = err
       apps.value = []

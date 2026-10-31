@@ -39,7 +39,15 @@ describe('resolveStoreConfig', () => {
     })
 
     expect(config.apiBaseUrl).toBe('https://localhost:7091/')
+    expect(config.publicAppsBaseUrl).toBe('https://localhost:7091')
     expect(config.studioUrl).toBe('')
+  })
+
+  it('serves published apps from the API when no apps host is known', () => {
+    const config = resolveStoreConfig({ origin: 'https://apps-catalog.example.org' })
+
+    expect(config.apiBaseUrl).toBe('https://apps-catalog.example.org/')
+    expect(config.publicAppsBaseUrl).toBe('https://apps-catalog.example.org')
   })
 })
 
@@ -53,6 +61,15 @@ describe('buildPublishedAppUrl', () => {
   it('namespaces paths for local hosts', () => {
     expect(buildPublishedAppUrl('https://localhost:7091', 'my-app', 'http://localhost:5176')).toBe(
       'https://localhost:7091/apps/my-app/',
+    )
+  })
+
+  it('namespaces paths when the base has a path or is a loopback address', () => {
+    expect(buildPublishedAppUrl('https://example.com/prefix', 'my-app', 'https://store.example.com')).toBe(
+      'https://example.com/prefix/apps/my-app/',
+    )
+    expect(buildPublishedAppUrl('http://127.0.0.1:7091', 'a b', 'http://localhost:5176')).toBe(
+      'http://127.0.0.1:7091/apps/a%20b/',
     )
   })
 
