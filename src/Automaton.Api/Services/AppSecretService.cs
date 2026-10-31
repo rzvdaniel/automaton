@@ -76,6 +76,17 @@ public sealed partial class AppSecretService(
         return current.ToDictionary(secret => secret.Name, secret => protector.Unprotect(secret.ProtectedValue), StringComparer.Ordinal);
     }
 
+    /// <summary>Current secret values for a runtime start, only for a target assigned to the requesting Runner.</summary>
+    public async Task<Dictionary<string, string>> ResolveForRuntimeAsync(
+        Guid appId, Guid deploymentTargetId, Guid runnerId, CancellationToken token)
+    {
+        var assigned = await db.AppDeploymentTargets.AnyAsync(target =>
+            target.Id == deploymentTargetId && target.WebAppId == appId && target.ExecutionRunnerId == runnerId, token);
+        if (!assigned)
+            throw new UnauthorizedAccessException("The deployment target is not assigned to this Runner.");
+        return await ResolveForExecutionAsync(appId, token);
+    }
+
     /// <summary>Stages removal of every secret of an app; the caller saves with the app deletion.</summary>
     public static async Task RemoveAllForAppAsync(ApplicationDbContext db, Guid appId, CancellationToken token)
     {

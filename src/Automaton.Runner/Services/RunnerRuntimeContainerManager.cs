@@ -16,6 +16,7 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     private readonly RunnerRuntimeRegistry registry;
     private readonly IApplicationContainerRuntime containers;
     private readonly ILogger<RunnerRuntimeContainerManager> logger;
+    private readonly IRuntimeSecretSource? secretSource;
     private readonly object gate = new();
     private readonly Dictionary<DeploymentRuntimeKey, ActiveContainer> active = [];
     private readonly HashSet<string> pendingReconciliation = new(StringComparer.OrdinalIgnoreCase);
@@ -28,8 +29,10 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         RunnerWorkspaceService workspace,
         RunnerRuntimeRegistry registry,
         IApplicationContainerRuntime containers,
-        ILogger<RunnerRuntimeContainerManager> logger)
+        ILogger<RunnerRuntimeContainerManager> logger,
+        IRuntimeSecretSource? secretSource = null)
     {
+        this.secretSource = secretSource;
         this.workspace = workspace;
         metadataStore = new RunnerRuntimeMetadataStore(workspace);
         this.registry = registry;
@@ -420,12 +423,16 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         if (containers is not IStagedApplicationContainerRuntime stagedContainers)
             throw new InvalidOperationException("Managed application lifecycle requires the staged Docker container boundary.");
         var command = attempt.Contract.Runtime.Command!;
+        // Loaded at every start, including restarts after a Runner or host restart. A failure stops this
+        // start and leaves it to the reconcile retry: a runtime never starts without its secrets.
+        var secrets = secretSource is null ? null
+            : await secretSource.GetAsync(attempt.AppId, attempt.TargetId, cancellationToken);
         var started = await stagedContainers.CreateApplicationAsync(
             new DockerApplicationContainerRequest(
                 attempt.Candidate.ContainerName!, attempt.RuntimeImage, attempt.Artifact,
                 command.WorkingDirectory, command, attempt.Contract.Runtime.Port, attempt.EffectivePort,
                 attempt.Storage.DataDirectory, attempt.Storage.Mounts, attempt.AppId, attempt.TargetId,
-                attempt.CandidateId, attempt.Contract.Storage, attempt.Contract.Runtime.User),
+                attempt.CandidateId, attempt.Contract.Storage, attempt.Contract.Runtime.User, secrets),
             cancellationToken);
         attempt.Candidate.ContainerId = started.Id;
         attempt.Candidate.ContainerName = started.Name;

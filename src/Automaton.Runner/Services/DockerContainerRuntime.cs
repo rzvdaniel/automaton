@@ -31,7 +31,8 @@ public sealed record DockerApplicationContainerRequest(
     Guid DeploymentTargetId,
     Guid CandidateId = default,
     ApplicationStorageSpec? Storage = null,
-    string? User = null);
+    string? User = null,
+    IReadOnlyDictionary<string, string>? Secrets = null);
 
 public sealed record DockerApplicationContainer(
     string Id,
@@ -247,6 +248,8 @@ public sealed class DockerContainerRuntime : IApplicationContainerRuntime, IStag
         };
         foreach (var pair in request.Command.Environment)
             environment[pair.Key] = pair.Value;
+        foreach (var pair in request.Secrets ?? new Dictionary<string, string>())
+            if (!pair.Key.StartsWith("AUTOMATON_", StringComparison.Ordinal)) environment[pair.Key] = pair.Value;
         foreach (var mount in request.StorageMounts)
             environment[$"AUTOMATON_STORAGE_{mount.Key.ToUpperInvariant()}"] = $"/automaton/data/{mount.Key}";
         AddEnvironment(args, environment);

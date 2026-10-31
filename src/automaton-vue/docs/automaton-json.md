@@ -80,7 +80,7 @@ separate action and requires explicit approval.
 
 ## App secrets
 
-Keep credentials out of `automaton.json` and source files. Set them as app secrets in Studio under **App → Settings → Secrets**: a name such as `S3_SECRET_KEY` (capital letters, digits and underscores) and its value. Values are stored encrypted, are never shown again after saving, and are passed to the app's **Actions** as environment variables; Action logs and results have them replaced by `[REDACTED]`. Saving an existing name replaces its value. Running apps (the HTTP runtime) do not receive app secrets yet.
+Keep credentials out of `automaton.json` and source files. Set them as app secrets in Studio under **App → Settings → Secrets**: a name such as `S3_SECRET_KEY` (capital letters, digits and underscores) and its value. Values are stored encrypted, are never shown again after saving, and are passed as environment variables to each **Action** run and to the **running app** (API or server-rendered site) whenever it starts, including after a server restart. Action logs and results have them replaced by `[REDACTED]`. Saving an existing name replaces its value; a running app picks up the change on its next start, so redeploy it with `automaton deploy`. Read secrets from the environment in code (for example `process.env.STRIPE_KEY` or `os.environ["STRIPE_KEY"]`); never write them into source or build output. Static sites cannot use secrets, because their files are sent to the browser. Compose apps do not receive app secrets yet.
 
 ## Create or link
 

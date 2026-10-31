@@ -12,6 +12,8 @@ internal sealed class RunnerExecutionApiClient : IDisposable
         => await GetAsync<RunnerBrokerConfiguration>("api/runner-executions/configuration", token);
     public Task<RunnerExecutionAssignment> AssignmentAsync(Guid id, CancellationToken token)
         => GetAsync<RunnerExecutionAssignment>($"api/runner-executions/{id:D}", token);
+    public async Task<IReadOnlyDictionary<string, string>> RuntimeSecretsAsync(Guid appId, Guid deploymentTargetId, CancellationToken token)
+        => await GetAsync<Dictionary<string, string>>($"api/runner-runtime/apps/{appId:D}/targets/{deploymentTargetId:D}/secrets", token);
     public Task<RunnerExecutionAssignment> StatusAsync(Guid id, CancellationToken token)
         => GetAsync<RunnerExecutionAssignment>($"api/runner-executions/{id:D}/status", token);
 
