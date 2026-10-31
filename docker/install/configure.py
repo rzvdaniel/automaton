@@ -70,17 +70,12 @@ def ensure_store(root):
     if urls['store'] not in origins:
         origins.append(urls['store'])
         replace_json(settings_path, settings)
-    edge_path = root / 'dynamic' / 'installation.yml'
-    edge = json.loads(edge_path.read_text())
-    http = edge.setdefault('http', {}) if isinstance(edge, dict) else None
-    services = http.setdefault('services', {}) if isinstance(http, dict) else None
-    routers = http.setdefault('routers', {}) if isinstance(http, dict) else None
-    if not isinstance(services, dict) or not isinstance(routers, dict):
-        raise ValueError(f'{edge_path} must contain http.services and http.routers objects.')
-    if 'store' not in services or 'store' not in routers:
-        services.setdefault('store', {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}})
-        routers.setdefault('store', store_router(domain, resolver))
-        replace_json(edge_path, edge)
+    (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
+    # A separate dynamic file: adopted installations may keep a hand-written YAML installation.yml.
+    write_new(root / 'dynamic' / 'store.yml', json.dumps({'http': {
+        'routers': {'store': store_router(domain, resolver)},
+        'services': {'store': {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}}},
+    }}))
 
 
 def secret(root, name, length=32):
@@ -186,7 +181,6 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
     edge = {'http': {'routers': {}, 'services': {
         'api': {'loadBalancer': {'servers': [{'url': 'http://api:8080'}]}},
         'studio': {'loadBalancer': {'servers': [{'url': 'http://studio:80'}]}},
-        'store': {'loadBalancer': {'servers': [{'url': 'http://store:80'}]}},
     }}, 'tcp': {'routers': {'broker': {'entryPoints': ['broker'], 'rule': f'HostSNI(`api.{domain}`)',
                                      'service': 'broker', 'tls': {'certResolver': resolver}}},
                 'services': {'broker': {'loadBalancer': {'servers': [{'address': 'rabbitmq:5672'}]}}}},
@@ -198,7 +192,6 @@ def configure(root, domain, email, tls_mode="http", runner_image="rzvdaniel/auto
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
                                              tls={'certResolver': resolver}, priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
-    edge['http']['routers']['store'] = store_router(domain, resolver)
     if tls_mode == 'http':
         edge.pop('tls')
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))

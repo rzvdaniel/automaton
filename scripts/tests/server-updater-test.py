@@ -47,7 +47,7 @@ class ServerUpdaterTests(unittest.TestCase):
         (self.config / 'installation.json').write_text('{"domain":"example.invalid"}\n')
         (self.config / 'appsettings.Production.json').write_text('{"Cors":{"AllowedOrigins":["https://studio.example.invalid"]}}\n')
         (self.config / 'dynamic').mkdir()
-        (self.config / 'dynamic/installation.yml').write_text('{"http":{"routers":{},"services":{}}}')
+        (self.config / 'dynamic/installation.yml').write_text('http:\n  routers: {}\n')
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         docker = self.bin / 'docker'
@@ -121,8 +121,9 @@ elif args[0]=='compose':
         self.assertNotIn('mysql', up)
         settings = json.loads((self.config / 'appsettings.Production.json').read_text())
         self.assertIn('https://store.example.invalid', settings['Cors']['AllowedOrigins'])
-        edge = json.loads((self.config / 'dynamic/installation.yml').read_text())
+        edge = json.loads((self.config / 'dynamic/store.yml').read_text())
         self.assertEqual(edge['http']['routers']['store']['rule'], 'Host(`store.example.invalid`)')
+        self.assertEqual((self.config / 'dynamic/installation.yml').read_text(), 'http:\n  routers: {}\n')
         self.assertIn('https://api.example.invalid', (self.config / 'store-runtime-config.js').read_text())
         # The recovery backup holds the configuration from before the store was added.
         backup, = (self.install / 'backups').iterdir()

@@ -70,8 +70,9 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.configure()
         settings = json.loads((self.root / 'appsettings.Production.json').read_text())
         self.assertIn('https://store.example.com', settings['Cors']['AllowedOrigins'])
-        edge = json.loads((self.root / 'dynamic/installation.yml').read_text())
+        edge = json.loads((self.root / 'dynamic/store.yml').read_text())
         self.assertEqual(edge['http']['routers']['store']['rule'], 'Host(`store.example.com`)')
+        self.assertNotIn('store', json.loads((self.root / 'dynamic/installation.yml').read_text())['http']['routers'])
         self.assertEqual(edge['http']['routers']['store']['service'], 'store')
         self.assertEqual(edge['http']['services']['store']['loadBalancer']['servers'], [{'url': 'http://store:80'}])
         store_config = (self.root / 'store-runtime-config.js').read_text()
@@ -86,10 +87,10 @@ class InstallationConfigurationTests(unittest.TestCase):
         settings['Cors']['AllowedOrigins'].remove('https://store.example.com')
         settings['EmailConfig']['EmailHost'] = 'mail.example.com'
         settings_path.write_text(json.dumps(settings))
-        edge_path = self.root / 'dynamic/installation.yml'
-        edge = json.loads(edge_path.read_text())
-        del edge['http']['routers']['store'], edge['http']['services']['store']
-        edge_path.write_text(json.dumps(edge))
+        # Adopted installations may keep a hand-written YAML installation.yml; it must stay untouched.
+        installation_path = self.root / 'dynamic/installation.yml'
+        installation_path.write_text('http:\n  routers: {}\n')
+        (self.root / 'dynamic/store.yml').unlink()
         (self.root / 'store-runtime-config.js').unlink()
         secrets_before = {p.name: p.read_bytes() for p in (self.root / 'secrets').iterdir()}
 
@@ -99,9 +100,9 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual(settings['Cors']['AllowedOrigins'].count('https://store.example.com'), 1)
         self.assertEqual(settings['EmailConfig']['EmailHost'], 'mail.example.com')
         self.assertEqual(settings_path.stat().st_mode & 0o777, 0o600)
-        edge = json.loads(edge_path.read_text())
+        edge = json.loads((self.root / 'dynamic/store.yml').read_text())
         self.assertEqual(edge['http']['routers']['store']['tls'], {'certResolver': 'cloudflare'})
-        self.assertIn('*.apps.example.com', edge['tls']['stores']['default']['defaultGeneratedCert']['domain']['sans'])
+        self.assertEqual(installation_path.read_text(), 'http:\n  routers: {}\n')
         self.assertEqual((self.root / 'store-runtime-config.js').stat().st_mode & 0o777, 0o644)
         self.assertEqual(secrets_before, {p.name: p.read_bytes() for p in (self.root / 'secrets').iterdir()})
         before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
