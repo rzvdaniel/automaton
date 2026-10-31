@@ -1,6 +1,6 @@
-# Installed app store
+# 02 Installed app store
 
-Status: planned (31 October 2026).
+Status: done. Shipped in server 0.1.12 (PRs #460–#462) and live on production. The [follow-ups](#follow-ups) are ideas, not commitments.
 
 ## Decision
 
