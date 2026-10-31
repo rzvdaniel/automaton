@@ -1,7 +1,7 @@
-# Enhancements
+# 03 Enhancements
 
 Improvements found while building and operating apps on Automaton. They are not
-milestone prerequisites; the [roadmap](README.md) remains the plan of record.
+milestone prerequisites; the [roadmap index](README.md) lists all plans.
 Each item states the problem, the current evidence, and the acceptance that
 closes it.
 
