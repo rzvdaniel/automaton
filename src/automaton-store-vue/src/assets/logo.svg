@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Automaton Monster Logo</title>
+  <desc id="desc">A green rounded square icon with white chevron eyes and a small flat mouth.</desc>
+
+  <defs>
+    <linearGradient id="green" x1="180" y1="70" x2="860" y2="950" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06C46F"/>
+      <stop offset="1" stop-color="#05A85F"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000000" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="72" width="880" height="880" rx="145" fill="url(#green)" filter="url(#softShadow)"/>
+
+  <path d="M252 391 L350 456 L252 521"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M772 391 L674 456 L772 521"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M444 658 H580"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="44"
+        stroke-linecap="round"/>
+</svg>
