@@ -3,7 +3,8 @@
 Improvements found while building and operating apps on Automaton. They are not
 milestone prerequisites; the [roadmap index](README.md) lists all plans.
 Each item states the problem, the current evidence, and the acceptance that
-closes it.
+closes it. Work: parent issue [#495](https://github.com/rzvdaniel/automaton/issues/495) (runtime logs #496, real-time
+connections #497, failing tests #498).
 
 ## Keep runtime logs readable after the fact
 
@@ -45,7 +46,7 @@ before.
 
 ## Repair tests that fail on main
 
-**Problem.** These tests fail on `main`:
+**Problem.** These tests fail on `main` (current counts in #498):
 
 - CLI: `TargetCommand_ExposesRequiredManagementCommands` (expects removed
   `approve`/`revoke` subcommands), `Format_ShowsLiveRoleDestinationAndStatus`

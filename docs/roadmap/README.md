@@ -24,8 +24,8 @@ Each plan is a numbered file. The number is a permanent ID, not a priority: new 
 | # | Plan | Status |
 | --- | --- | --- |
 | 05 | [Self-maintenance](05-self-maintenance.md) | **In progress** ([#490](https://github.com/rzvdaniel/automaton/issues/490)): app secrets and shared vault done; next app permissions (#483) and the audit log (#479) |
-| 04 | [.NET 10 LTS](04-dotnet-10.md) | Postponed (decided 31 October 2026). .NET 9 support ends 10 November 2026; after that it gets no security fixes |
-| 03 | [Enhancements](03-enhancements.md) | Ongoing list: persisted runtime logs, real-time connections, failing tests on main |
+| 04 | [.NET 10 LTS](04-dotnet-10.md) | ([#492](https://github.com/rzvdaniel/automaton/issues/492)) Postponed (decided 31 October 2026). .NET 9 support ends 10 November 2026; after that it gets no security fixes |
+| 03 | [Enhancements](03-enhancements.md) | ([#495](https://github.com/rzvdaniel/automaton/issues/495)) Ongoing list: persisted runtime logs, real-time connections, failing tests on main |
 | 01 | [Self-hosted core](01-self-hosted-core.md) | Done (M1–M4). Open before team use: two-user isolation and combined restart/replay acceptance |
 | 02 | [App store](02-app-store.md) | Done (server 0.1.12). Follow-up ideas only |
 
