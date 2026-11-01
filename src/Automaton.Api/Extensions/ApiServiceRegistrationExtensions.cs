@@ -225,6 +225,8 @@ internal static class ApiAuthenticationRegistration
                     options.HeaderName = "X-API-Key";
                     options.QueryParameterName = "api_key";
                 })
+            .AddScheme<AppPermissionAuthenticationOptions, AppPermissionAuthenticationHandler>(
+                AppPermissionAuthenticationOptions.Scheme, _ => { })
             .AddGitHubOAuth(applicationBuilder.Configuration);
 
         // Define specific authorization policies for different access levels
@@ -263,6 +265,12 @@ internal static class ApiAuthorizationRegistration
             options.AddPolicy("Administrators", policy =>
                 policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
 
+            options.AddPolicy(AppPermissionAuthenticationOptions.BackupsReadPolicy, policy => policy
+                .AddAuthenticationSchemes(AppPermissionAuthenticationOptions.Scheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => context.User.IsInRole(UserRole.SystemAdministrator)
+                    || context.User.HasClaim("app_permission", AppPermissionApproval.BackupsRead)));
+
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>
                 policy.Requirements.Add(new ProjectAdminRequirement()));
@@ -299,6 +307,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<AppSecretService>();
+        services.AddScoped<AppPermissionService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
         services.AddHostedService<SecretGrantCleanupService>();
         services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();

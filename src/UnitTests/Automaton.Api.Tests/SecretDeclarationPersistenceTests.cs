@@ -24,13 +24,15 @@ public sealed class SecretDeclarationPersistenceTests
         await service.PersistSecretDeclarationsAsync(appId, new ApplicationContract
         {
             Runtime = { Port = 9090 },
-            Secrets = [new() { Name = "STRIPE_KEY" }]
+            Secrets = [new() { Name = "STRIPE_KEY" }],
+            Permissions = ["backups:read"]
         }, CancellationToken.None);
 
         var stored = ApplicationContractSerialization.Deserialize((await db.WebApps.SingleAsync(item => item.Id == appId)).ApplicationContractJson);
         Assert.Multiple(() =>
         {
             Assert.That(stored.Secrets.Select(secret => secret.Name), Is.EqualTo(new[] { "STRIPE_KEY" }));
+            Assert.That(stored.Permissions, Is.EqualTo(new[] { "backups:read" }));
             Assert.That(stored.Runtime.Port, Is.EqualTo(8080), "the rest of the contract changes only when the deployment succeeds");
         });
     }

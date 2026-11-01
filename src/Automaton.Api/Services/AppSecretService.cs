@@ -128,6 +128,11 @@ public sealed class AppSecretService(
         var vaults = await VaultsAsync(appId, token);
         var values = await CurrentValuesAsync(vaults.App, null, token);
         var declarations = await DeclarationsAsync(appId, token);
+        var permissionKey = await db.AppPermissionApprovals
+            .Where(approval => approval.AppId == appId && approval.Permission == AppPermissionApproval.BackupsRead && approval.ProtectedKey != null)
+            .Select(approval => approval.ProtectedKey).FirstOrDefaultAsync(token);
+        if (permissionKey is not null)
+            values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(permissionKey);
         var wanted = declarations.Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
         if (wanted.Count == 0) return values;
 

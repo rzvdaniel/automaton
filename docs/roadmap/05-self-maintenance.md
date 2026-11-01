@@ -1,6 +1,6 @@
 # 05 Self-maintenance
 
-Updated: 31 October 2026. Status: in progress (steps 1, 1a and 1b done; next: step 2 app permissions). Work and status: parent issue [#490](https://github.com/rzvdaniel/automaton/issues/490) and its sub-issues; this file holds the design. Local nightly backups are shipped (server 0.1.19).
+Updated: 1 November 2026. Status: in progress (steps 1, 1a, 1b and 2 delivered in PR closing #483; next: step 3 encrypted backup download). Work and status: parent issue [#490](https://github.com/rzvdaniel/automaton/issues/490) and its sub-issues; this file holds the design. Local nightly backups are shipped (server 0.1.19).
 
 Automaton should maintain its own server with its own building blocks: apps, Actions and schedules. Maintenance logic lives in ordinary, premade apps instead of growing platform code for each task. The platform adds only small, generic capabilities those apps need. This also demonstrates the product: an Automaton server managing itself the same way users manage their apps.
 

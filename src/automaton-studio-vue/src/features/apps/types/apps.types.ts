@@ -137,6 +137,14 @@ export interface ApplicationContract {
   runtime: ApplicationRuntimeSpec
   health: ApplicationHealthSpec
   storage: ApplicationStorageSpec
+  secrets?: ApplicationSecretDeclaration[]
+  permissions?: string[]
+}
+
+export interface ApplicationSecretDeclaration {
+  name: string
+  description?: string | null
+  from?: string | null
 }
 
 export interface AppListItem {

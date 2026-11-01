@@ -82,8 +82,22 @@ public sealed class DeploymentPackageFinalizationService(
         catch (InvalidOperationException) { return; }
         catch (System.Text.Json.JsonException) { return; }
         var declarations = packageApplication.Secrets ?? [];
-        if (System.Text.Json.JsonSerializer.Serialize(stored.Secrets) == System.Text.Json.JsonSerializer.Serialize(declarations)) return;
+        var permissions = packageApplication.Permissions ?? [];
+        if (System.Text.Json.JsonSerializer.Serialize(stored.Secrets) == System.Text.Json.JsonSerializer.Serialize(declarations)
+            && System.Text.Json.JsonSerializer.Serialize(stored.Permissions) == System.Text.Json.JsonSerializer.Serialize(permissions)) return;
         stored.Secrets = declarations;
+        stored.Permissions = permissions;
+        var removedApprovals = await dataContext.AppPermissionApprovals
+            .Where(approval => approval.AppId == appId && !permissions.Contains(approval.Permission))
+            .ToListAsync(cancellationToken);
+        foreach (var approval in removedApprovals)
+        {
+            if (approval.ProtectedKey is not null || approval.Status == AppPermissionStatuses.Approved)
+                approval.Status = AppPermissionStatuses.Revoked;
+            approval.ProtectedKey = null;
+            approval.TokenHash = null;
+            approval.UpdatedAtUtc = DateTime.UtcNow;
+        }
         app.ApplicationContractJson = ApplicationContractSerialization.Serialize(stored);
         await dataContext.SaveChangesAsync(cancellationToken);
     }

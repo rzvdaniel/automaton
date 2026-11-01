@@ -17,6 +17,7 @@ import CodeEditor from '@/features/apps/components/CodeEditor.vue'
 import { getLanguageFromExtension, type FileNode } from '@/features/apps/types/apps.types'
 import type { AdminAppDetails } from '../types/admin.types'
 import { adminAppsService } from '../services/adminAppsService'
+import type { AdminAppPermissionStatus } from '../services/adminAppsService'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,8 @@ const activeContent = ref('')
 const reviewStatus = ref('approved')
 const accessStatus = ref('active')
 const moderationReason = ref('')
+const permissions = ref<AdminAppPermissionStatus[]>([])
+const savingPermission = ref<string | null>(null)
 
 const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
@@ -68,6 +71,7 @@ async function loadApp() {
 
     details.value = appDetails
     fileTree.value = files
+    void loadPermissions()
 
     const firstReadableFile = findFirstFile(files)
     if (firstReadableFile) {
@@ -82,6 +86,27 @@ async function loadApp() {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+async function loadPermissions() {
+  try {
+    permissions.value = await adminAppsService.getPermissions(appId.value)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Failed to load app permissions', life: 3000 })
+  }
+}
+
+async function setPermission(item: AdminAppPermissionStatus, approved: boolean) {
+  savingPermission.value = item.permission
+  const summary = approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected'
+  try {
+    permissions.value = await adminAppsService.setPermission(appId.value, item.permission, approved)
+    toast.add({ severity: 'success', summary, life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
+  } finally {
+    savingPermission.value = null
   }
 }
 
@@ -353,6 +378,24 @@ onMounted(() => {
               </template>
             </Card>
           </div>
+        </TabPanel>
+
+        <TabPanel header="Permissions" value="permissions">
+          <Card class="detail-card">
+            <template #title>App permissions</template>
+            <template #content>
+              <p>Apps receive access only after a system administrator approves a requested permission.</p>
+              <div v-if="permissions.length === 0" class="empty-state">This app has not requested any permissions.</div>
+              <div v-for="item in permissions" :key="item.permission" class="detail-item">
+                <div><strong>{{ item.permission }}</strong> <Tag :value="item.status" /></div>
+                <Button v-if="item.approved" label="Revoke" severity="danger" outlined :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                <template v-else>
+                  <Button label="Approve" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
+                  <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                </template>
+              </div>
+            </template>
+          </Card>
         </TabPanel>
 
         <TabPanel header="Source Code" value="source-code">
