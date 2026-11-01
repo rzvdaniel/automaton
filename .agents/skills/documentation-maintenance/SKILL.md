@@ -16,6 +16,7 @@ Before editing, locate the closest relevant guide and compare its claims with th
 
 ## Roadmaps
 
+- Roadmap files hold design and decisions; GitHub issues hold the work. A plan in progress has a parent issue, and each step or follow-up is a sub-issue with full context, acceptance criteria and native *blocked by* links (see the [roadmap index](../../../docs/roadmap/README.md)). Pick work from issues without open blockers. Put new work you find into a new sub-issue, not into the roadmap text, and close the issue from the PR that completes it.
 - Update the relevant roadmap in the same change when scope, status, ordering, acceptance evidence, or remaining work changes.
 - Record completion with the evidence that supports it: implementation/PR or revision, release state where relevant, validation performed, and any remaining limitation. Do not claim live acceptance from source review or automated tests alone.
 - Keep pending work actionable and ordered. State prerequisites, acceptance gates, dependencies, and explicitly deferred work when they affect the next step.
