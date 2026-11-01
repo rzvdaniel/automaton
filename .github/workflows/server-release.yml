@@ -5,6 +5,11 @@ on:
       version:
         description: 'Server version, e.g. 0.1.0 (creates server-v0.1.0)'
         required: true
+      cli:
+        description: 'Publish the CLI to NuGet: auto (when src/Automaton.Cli or src/Automaton.Core changed since the previous server release), always, or never'
+        type: choice
+        options: [auto, always, never]
+        default: auto
 permissions:
   contents: read
 jobs:
@@ -172,3 +177,39 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           gh release create "server-v$VERSION" --target "$GITHUB_SHA" --title "Automaton Server $VERSION" --generate-notes automaton-server.tar.gz automaton-server.tar.gz.sha256 scripts/install-automaton.sh scripts/update-automaton.sh
+
+  # Keeps the CLI on NuGet in step with the server: a server release that changes the CLI or the
+  # automaton.json contract (Automaton.Core) also publishes the CLI. It starts nuget.yml rather than
+  # calling it, so publishing runs as nuget.yml and matches the NuGet trusted publishing policy.
+  cli:
+    needs: bundle
+    if: inputs.cli != 'never' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish the CLI when it changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          MODE: ${{ inputs.cli }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          # The newest server tag other than the one this run just created.
+          previous=$(git tag --list 'server-v*' --sort=-creatordate | grep -vx "server-v$VERSION" | head -1 || true)
+          if [[ "$MODE" == auto && -n "$previous" ]]             && git diff --quiet "$previous" "$GITHUB_SHA" -- src/Automaton.Cli src/Automaton.Core; then
+            echo "The CLI and contract are unchanged since $previous; the NuGet CLI stays as it is."
+            exit 0
+          fi
+          today=$(date -u +%Y%m%d)
+          published=$(curl -fsS https://api.nuget.org/v3-flatcontainer/automaton.cli/index.json || echo '{"versions":[]}')
+          n=$(printf '%s' "$published" | jq -r --arg d "1.0.$today."             '[.versions[] | select(startswith($d)) | ltrimstr($d) | tonumber] | (max // 0) + 1')
+          cli_version="1.0.$today.$n"
+          echo "Publishing CLI $cli_version for server-v$VERSION (changes since ${previous:-the first release})."
+          gh workflow run nuget.yml --ref main -f version="$cli_version" -f publish=true
+          echo "### CLI $cli_version publishing started with [Pack CLI and Runner](../actions/workflows/nuget.yml)" >> "$GITHUB_STEP_SUMMARY"

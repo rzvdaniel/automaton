@@ -11,7 +11,7 @@ A live deployment requires an explicit user request. Use the versioned installer
 ## Server release and update
 
 1. Check the Git working tree and preserve unrelated changes. Keep Git network operations under the deployment user; never copy Git credentials to root.
-2. Validate affected code and scripts, merge the reviewed change, and publish a versioned bundle through `.github/workflows/server-release.yml`.
+2. Validate affected code and scripts, merge the reviewed change, and publish a versioned bundle through `.github/workflows/server-release.yml`. Its `cli` input (default `auto`) also publishes the CLI to NuGet when `src/Automaton.Cli` or `src/Automaton.Core` changed since the previous release, so users never get a CLI older than the server's `automaton.json` contract; check that the started **Pack CLI and Runner** run succeeds.
 3. Inspect migrations and existing data before applying a release. Preserve configured signing/encryption keys, credentials, Data Protection keys and persistent volumes.
 4. Run the installation's `update.sh` (default `/opt/automaton-server/update.sh`). It verifies the release checksum, backs up configuration/database/key material and updates the application images. Never use the fresh installer to overwrite an existing configuration.
 5. Adopted installations can retain a reviewed `compose.override.yaml`; the updater must apply and back up the same override for the installed and candidate release. Do not silently upgrade their pinned database/broker versions.
