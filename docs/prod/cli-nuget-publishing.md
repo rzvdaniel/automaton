@@ -8,11 +8,15 @@ explicit NuGet version such as `1.0.20261027.1`, and leave **publish** off for a
 dry run. It builds both projects in Release and uploads packages, checksums and
 the exact source revision as GitHub Actions artifacts. It does not run tests.
 
-To publish, run it on `main` with **publish** enabled. Configure the repository's
-`NUGET_ORG_API_KEY` Actions secret with a NuGet.org key scoped to the intended
-packages. Azure pipeline secrets are not transferred automatically. The workflow
-rejects publishing from another branch and reports a missing key explicitly;
-package builds and artifact downloads do not need this secret.
+To publish, run it on `main` with **publish** enabled. Publishing uses NuGet
+[trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing):
+the `NuGet/login` step exchanges the workflow's GitHub OIDC token for a NuGet key
+valid for about an hour, so no long-lived key is stored. It needs a trusted
+publishing policy on nuget.org (account **rzvdaniel** → Trusted Publishing) with
+repository owner `rzvdaniel`, repository `automaton`, workflow file `nuget.yml`
+and no environment. Renaming the workflow file or moving the repository needs a
+matching policy change. The workflow rejects publishing from another branch;
+package builds and artifact downloads need no NuGet access.
 
 Runners are distributed as container images only; see
 [deploying the Runner](deploying-runner.md).
