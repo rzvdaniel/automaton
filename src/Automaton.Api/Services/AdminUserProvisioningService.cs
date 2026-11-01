@@ -60,10 +60,11 @@ public sealed class AdminUserProvisioningService(
             if (!string.IsNullOrWhiteSpace(request.Name) && user.Name != request.Name.Trim())
             {
                 user.Name = request.Name.Trim();
-                await userManager.UpdateAsync(user);
+                var renamed = await userManager.UpdateAsync(user);
+                if (!renamed.Succeeded) throw new InvalidOperationException("The name could not be updated. Try again.");
             }
             if (request.Administrator && !await userManager.IsInRoleAsync(user, UserRole.Administrator))
-                await AddAdministratorAsync(user, address, AuditEventTypes.UserInvited);
+                await AddAdministratorAsync(user, address, AuditEventTypes.UserInvited, existing: true);
         }
         else
         {
@@ -204,22 +205,23 @@ public sealed class AdminUserProvisioningService(
         if (problems.Count > 0) throw new ArgumentException("The password is not accepted. " + string.Join(" ", problems));
     }
 
-    private async Task AddAdministratorAsync(ApplicationUser user, string address, string eventType)
+    private async Task AddAdministratorAsync(ApplicationUser user, string address, string eventType, bool existing = false)
     {
         var result = await userManager.AddToRoleAsync(user, UserRole.Administrator);
         if (result.Succeeded) return;
         await audit.WriteAsync(new AuditEventWriteRequest
         {
-            Action = AuditActions.Created,
+            Action = existing ? AuditActions.Updated : AuditActions.Created,
             EntityType = AuditEntityTypes.User,
             EntityId = user.Id,
             TargetUserId = user.Id,
             EventType = eventType,
             Outcome = AuditOutcomes.Failed,
-            Message = "The account was created, but the administrator role could not be added.",
+            Message = existing ? "The administrator role could not be added." : "The account was created, but the administrator role could not be added.",
             Metadata = new { Email = address, Administrator = true }
         }, CancellationToken.None);
-        throw new InvalidOperationException("The account was created, but the administrator role could not be added. Add it from the user's page.");
+        throw new InvalidOperationException((existing ? "The administrator role could not be added." : "The account was created, but the administrator role could not be added.")
+            + " Add it from the user's page.");
     }
 
     private async Task<bool> SendInvitationAsync(ApplicationUser user, string? invitedByName, CancellationToken token)

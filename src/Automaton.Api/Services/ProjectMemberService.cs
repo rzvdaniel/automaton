@@ -99,7 +99,8 @@ public class ProjectMemberService
 
         // Project admins add people who already have an account. New accounts come only from a server
         // administrator (Admin -> Users -> Add user), because public sign-up is disabled on purpose.
-        var user = await userManager.FindByEmailAsync(request.Email?.Trim() ?? string.Empty);
+        request.Email = request.Email?.Trim() ?? string.Empty; // the token and email use the same address as the lookup
+        var user = await userManager.FindByEmailAsync(request.Email);
         var project = currentMembership.Project;
         if (user == null || user.IsDeleted)
             throw new ProjectMemberAccountMissingException(request.Email ?? string.Empty);

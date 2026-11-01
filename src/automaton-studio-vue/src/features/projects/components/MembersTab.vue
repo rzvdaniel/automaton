@@ -199,7 +199,9 @@ async function handleInvite() {
     inviteForm.value.email = '';
     inviteForm.value.role = ProjectRole.Viewer;
   } catch (error) {
-    // Error handled by service
+    // Most often: the person has no account yet and a server administrator has to invite them first.
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    toast.add({ severity: 'error', summary: 'Could not add member', detail: message ?? 'The member could not be added.', life: 8000 })
   }
 }
 
