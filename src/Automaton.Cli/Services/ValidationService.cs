@@ -85,11 +85,12 @@ public sealed class ValidationService
 
         if (remoteAppCheck.Check.Success
             && await PermissionStatusCheck.FindWaitingAsync(resolvedServer!, resolvedApiKey!, resolvedAppId!,
-                projectConfig?.Application.Permissions, cancellationToken) is { } waitingPermissions)
+                projectConfig?.Application.Permissions, cancellationToken) is { } permissionOutcome)
         {
             // Approval is a person's decision, so this stays a warning even with --strict.
-            nextSteps.Add("Ask a system administrator to approve the app's permissions (automaton permissions status shows the link)");
-            checks.Add(new ValidationCheckResult(PermissionStatusCheck.CheckName, true, waitingPermissions, IsWarning: true));
+            if (permissionOutcome.Waiting)
+                nextSteps.Add("Ask a system administrator to approve the app's permissions (automaton permissions status shows the link)");
+            checks.Add(new ValidationCheckResult(PermissionStatusCheck.CheckName, true, permissionOutcome.Message, IsWarning: true));
         }
 
         var success = checks.All(check => check.Success);

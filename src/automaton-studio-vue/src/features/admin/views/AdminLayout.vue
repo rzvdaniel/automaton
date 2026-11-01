@@ -20,8 +20,14 @@ interface AdminNavItem {
 }
 
 // Permission requests waiting for a system administrator, shown on the Apps entry.
+// Only system administrators can approve, so only they see (and pay for) the count.
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
 const waitingForApproval = ref(0)
 async function refreshWaiting() {
+  if (!isSystemAdministrator.value) {
+    waitingForApproval.value = 0
+    return
+  }
   try {
     waitingForApproval.value = (await adminAppsService.listApps({ waiting: true, pageSize: 1 })).waitingForApprovalTotal
   } catch {
@@ -105,7 +111,7 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
-const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || authStore.user?.roles?.includes('SysAdmin')))
+const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || isSystemAdministrator.value))
 
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)
@@ -118,8 +124,9 @@ const navigate = (to: string) => {
 onMounted(() => {
   void refreshWaiting()
 })
-// Approving or rejecting on an app page changes the count; refresh when moving between admin pages.
-watch(() => route.fullPath, () => {
+// Approving or rejecting on an app page changes the count; refresh when moving to another admin page,
+// not on query changes such as search keystrokes.
+watch(() => route.path, () => {
   void refreshWaiting()
 })
 

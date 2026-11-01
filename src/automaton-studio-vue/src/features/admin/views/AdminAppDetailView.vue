@@ -39,7 +39,8 @@ const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
 const ownerUserName = computed(() => String(route.query.ownerUserName || details.value?.ownerName || 'User'))
 // Opened from Admin → Apps (or an approval link): breadcrumbs and Back return there.
-const fromAppsList = computed(() => route.query.from === 'apps' || !ownerUserId.value)
+// Decided from the link alone, so the breadcrumb does not change once the details load.
+const fromAppsList = computed(() => route.query.from === 'apps' || !route.query.ownerUserId)
 // Tab order: Overview, Permissions, Source Code. `?tab=permissions` opens the approval tab directly.
 const activeTab = ref(route.query.tab === 'permissions' ? 1 : 0)
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')

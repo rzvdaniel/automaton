@@ -57,7 +57,7 @@ public static class PermissionsCommand
         {
             CliJson.Write(new { success = true, permissions = result.GetProperty("permissions"),
                 waiting = result.GetProperty("waiting"),
-                approvalUrl = result.TryGetProperty("approvalUrl", out var url) ? url : default,
+                approvalUrl = result.TryGetProperty("approvalUrl", out var url) && url.ValueKind == JsonValueKind.String ? url.GetString() : null,
                 notDeployed });
             return;
         }

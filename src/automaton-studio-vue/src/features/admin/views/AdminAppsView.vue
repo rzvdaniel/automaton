@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
@@ -15,6 +16,11 @@ import { adminAppsService, type AdminAppListItem } from '../services/adminAppsSe
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+// Only system administrators approve permissions; others can look but are not invited to review.
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+// Access status is stored lowercase ("active", "suspended", ...); only flag anything that is not active.
+const isRestricted = (status?: string | null) => !!status && status.toLowerCase() !== 'active'
 const toast = useToast()
 
 const pageSize = 25
@@ -67,7 +73,7 @@ function openApp(app: AdminAppListItem) {
       from: 'apps',
       ownerUserId: app.ownerUserId || undefined,
       ownerUserName: app.ownerName || undefined,
-      tab: app.waitingPermissions.length > 0 ? 'permissions' : undefined,
+      tab: isSystemAdministrator.value && app.waitingPermissions.length > 0 ? 'permissions' : undefined,
     },
   })
 }
@@ -88,6 +94,13 @@ watch(search, () => {
   searchTimer = setTimeout(reload, 300)
 })
 watch(waitingOnly, reload)
+// Back/forward or a link changes the query without touching the inputs; follow it.
+watch(() => route.query, (query) => {
+  const nextSearch = String(query.search || '')
+  const nextWaiting = query.waiting === 'true'
+  if (nextSearch !== search.value.trim()) search.value = nextSearch
+  if (nextWaiting !== waitingOnly.value) waitingOnly.value = nextWaiting
+})
 
 onMounted(() => {
   void loadApps()
@@ -158,7 +171,7 @@ onMounted(() => {
             <template #body="{ data }">
               <div class="tags">
                 <Tag :severity="data.isPublished ? 'success' : 'secondary'" :value="data.isPublished ? 'Published' : 'Draft'" />
-                <Tag v-if="data.accessStatus && data.accessStatus !== 'Active'" severity="danger" :value="data.accessStatus" />
+                <Tag v-if="isRestricted(data.accessStatus)" severity="danger" :value="data.accessStatus" />
                 <Tag
                   v-for="permission in data.waitingPermissions"
                   :key="permission"
@@ -176,7 +189,7 @@ onMounted(() => {
           <Column header="" style="width: 120px">
             <template #body="{ data }">
               <Button
-                :label="data.waitingPermissions.length > 0 ? 'Review' : 'Open'"
+                :label="isSystemAdministrator && data.waitingPermissions.length > 0 ? 'Review' : 'Open'"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
                 link

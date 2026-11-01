@@ -33,4 +33,15 @@ public sealed class PermissionStatusCheckTests
         using var status = JsonDocument.Parse("""{"permissions":[],"waiting":["backups:read"],"approvalUrl":null}""");
         Assert.That(PermissionStatusCheck.Describe(status.RootElement), Does.EndWith("in Studio: Admin → Apps"));
     }
+
+    [Test]
+    public async Task AFailedCheckIsNotReportedAsWaiting()
+    {
+        // Nothing listens on port 1, so the request fails; deploy must not suggest asking for an approval.
+        var outcome = await PermissionStatusCheck.FindWaitingAsync("http://127.0.0.1:1", "key", Guid.NewGuid().ToString(),
+            ["backups:read"], CancellationToken.None);
+        Assert.That(outcome, Is.Not.Null);
+        Assert.That(outcome!.Waiting, Is.False);
+        Assert.That(outcome.Message, Does.StartWith("could not check requested permissions"));
+    }
 }
