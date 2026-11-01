@@ -46,25 +46,37 @@ public sealed class AdminUserProvisioningService(
     public async Task<AdminProvisionedUser> InviteAsync(AdminInviteUserRequest request, string? invitedByName,
         bool callerIsSystemAdministrator, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var address = NormalizeEmail(request.Email);
         EnsureMayGrant(request.Administrator, callerIsSystemAdministrator);
 
         var user = await userManager.FindByEmailAsync(address);
         var resent = user is not null;
-        if (user is not null && await userManager.HasPasswordAsync(user))
-            throw new AdminUserConflictException($"{address} already has an account. Use Forgot password to recover it.");
-        if (user is null)
+        if (user is not null)
+        {
+            if (!await IsPendingInvitationAsync(user))
+                throw new AdminUserConflictException($"{address} already has an account. Use Forgot password to recover it, or manage it from the user list.");
+            // A resend applies what the administrator chose this time.
+            if (!string.IsNullOrWhiteSpace(request.Name) && user.Name != request.Name.Trim())
+            {
+                user.Name = request.Name.Trim();
+                await userManager.UpdateAsync(user);
+            }
+            if (request.Administrator && !await userManager.IsInRoleAsync(user, UserRole.Administrator))
+                await AddAdministratorAsync(user, address, AuditEventTypes.UserInvited);
+        }
+        else
         {
             user = await NewUserAsync(address, request.Name, RegistrationProviders.Invitation);
             await users.CreateUserWithoutPasswordAsync(user);
-            if (request.Administrator) await AddAdministratorAsync(user);
+            if (request.Administrator) await AddAdministratorAsync(user, address, AuditEventTypes.UserInvited);
         }
 
         string? warning = null;
         var sent = true;
         try
         {
-            sent = await SendInvitationAsync(user, invitedByName, token);
+            sent = await SendInvitationAsync(user, invitedByName, CancellationToken.None);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -86,13 +98,14 @@ public sealed class AdminUserProvisioningService(
             Outcome = sent ? AuditOutcomes.Success : AuditOutcomes.Failed,
             Message = resent ? "User invitation sent again." : "User invited by an administrator.",
             Metadata = new { Email = address, request.Administrator, InvitationSent = sent, Resent = resent }
-        }, token);
+        }, CancellationToken.None); // the account exists now; record it even if the caller has gone
         return new AdminProvisionedUser(user.Id, address, user.Name, sent, resent, null, warning);
     }
 
     public async Task<AdminProvisionedUser> CreateAsync(AdminCreateUserRequest request, bool callerIsSystemAdministrator,
         CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var address = NormalizeEmail(request.Email);
         EnsureMayGrant(request.Administrator, callerIsSystemAdministrator);
         if (await userManager.FindByEmailAsync(address) is not null)
@@ -100,11 +113,12 @@ public sealed class AdminUserProvisioningService(
 
         var generated = string.IsNullOrEmpty(request.Password);
         var password = generated ? GeneratePassword() : request.Password!;
+        if (!generated) await EnsurePasswordAcceptedAsync(password);
         var user = await NewUserAsync(address, request.Name, RegistrationProviders.AdminCreated);
         // The administrator vouches for the address; no confirmation email is sent.
         user.EmailConfirmed = true;
         await users.CreateUser(user, password);
-        if (request.Administrator) await AddAdministratorAsync(user);
+        if (request.Administrator) await AddAdministratorAsync(user, address, AuditEventTypes.UserCreatedByAdministrator);
 
         await audit.WriteAsync(new AuditEventWriteRequest
         {
@@ -116,7 +130,7 @@ public sealed class AdminUserProvisioningService(
             Outcome = AuditOutcomes.Success,
             Message = "User created by an administrator.",
             Metadata = new { Email = address, request.Administrator, PasswordGenerated = generated }
-        }, token);
+        }, CancellationToken.None); // the account exists now; record it even if the caller has gone
         return new AdminProvisionedUser(user.Id, address, user.Name, false, false, generated ? password : null, null);
     }
 
@@ -168,10 +182,44 @@ public sealed class AdminUserProvisioningService(
         RegistrationProvider = provider
     };
 
-    private async Task AddAdministratorAsync(ApplicationUser user)
+    /// <summary>
+    /// A pending invitation is an account an administrator invited that was never used: no password, no external
+    /// login (GitHub), not deleted and not locked. Anything else is a real account and is not touched.
+    /// </summary>
+    private async Task<bool> IsPendingInvitationAsync(ApplicationUser user)
+        => !user.IsDeleted
+           && !await userManager.HasPasswordAsync(user)
+           && (await userManager.GetLoginsAsync(user)).Count == 0
+           && !await userManager.IsLockedOutAsync(user);
+
+    private async Task EnsurePasswordAcceptedAsync(string password)
+    {
+        var probe = new ApplicationUser { PublicUsername = string.Empty };
+        var problems = new List<string>();
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var result = await validator.ValidateAsync(userManager, probe, password);
+            problems.AddRange(result.Errors.Select(error => error.Description));
+        }
+        if (problems.Count > 0) throw new ArgumentException("The password is not accepted. " + string.Join(" ", problems));
+    }
+
+    private async Task AddAdministratorAsync(ApplicationUser user, string address, string eventType)
     {
         var result = await userManager.AddToRoleAsync(user, UserRole.Administrator);
-        if (!result.Succeeded) throw new InvalidOperationException("The account was created, but the administrator role could not be added.");
+        if (result.Succeeded) return;
+        await audit.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.User,
+            EntityId = user.Id,
+            TargetUserId = user.Id,
+            EventType = eventType,
+            Outcome = AuditOutcomes.Failed,
+            Message = "The account was created, but the administrator role could not be added.",
+            Metadata = new { Email = address, Administrator = true }
+        }, CancellationToken.None);
+        throw new InvalidOperationException("The account was created, but the administrator role could not be added. Add it from the user's page.");
     }
 
     private async Task<bool> SendInvitationAsync(ApplicationUser user, string? invitedByName, CancellationToken token)
@@ -216,6 +264,6 @@ public sealed class AdminUserProvisioningService(
         catch (FormatException)
         {
         }
-        throw new ArgumentException("Enter a valid email address.", nameof(value));
+        throw new ArgumentException("Enter a valid email address.");
     }
 }

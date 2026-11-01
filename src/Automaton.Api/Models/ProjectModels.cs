@@ -71,7 +71,9 @@ public class AddProjectMemberRequest
     public string Email { get; set; } = string.Empty;
     [JsonRequired]
     public ProjectRole Role { get; set; }
-    public bool CreateAccountIfNotExists { get; set; } = true;
+    /// <summary>Ignored. Kept so older clients still deserialize; project invites never create accounts.</summary>
+    [Obsolete("Project invites never create accounts; a server administrator invites new users.")]
+    public bool CreateAccountIfNotExists { get; set; }
 }
 
 /// <summary>

@@ -42,6 +42,9 @@
             />
           </div>
         </div>
+        <p class="text-sm mt-2 mb-0" style="color: var(--p-text-muted-color)">
+          The person needs an Automaton account on this server. If they don't have one, ask a server administrator to invite them first.
+        </p>
       </template>
     </Card>
 
@@ -191,7 +194,6 @@ async function handleInvite() {
     await store.addMember(props.projectId, {
       email: inviteForm.value.email,
       role: inviteForm.value.role,
-      createAccountIfNotExists: true,
     });
 
     inviteForm.value.email = '';

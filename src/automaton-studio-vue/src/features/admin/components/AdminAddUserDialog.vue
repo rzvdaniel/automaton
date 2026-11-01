@@ -73,8 +73,13 @@ async function submit() {
 
 async function copyPassword() {
   if (!result.value?.generatedPassword) return
-  await navigator.clipboard.writeText(result.value.generatedPassword)
-  copied.value = true
+  try {
+    await navigator.clipboard.writeText(result.value.generatedPassword)
+    copied.value = true
+  } catch {
+    // Clipboard access can be refused (permissions, insecure origin); the password stays visible to copy by hand.
+    error.value = 'Could not copy automatically. Select the password and copy it by hand.'
+  }
 }
 </script>
 
@@ -123,6 +128,7 @@ async function copyPassword() {
 
     <template v-else>
       <div class="form">
+        <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
         <Message v-if="result.warning" severity="warn" :closable="false">{{ result.warning }}</Message>
         <Message v-else-if="result.invitationSent" severity="success" :closable="false">
           {{ result.resent ? 'Invitation sent again' : 'Invitation sent' }} to {{ result.email }}.

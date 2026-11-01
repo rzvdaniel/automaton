@@ -82,8 +82,7 @@ public class ProjectMemberService
     }
 
     /// <summary>
-    /// Add a member to a project. Creates account if it doesn't exist.
-    /// Only ProjectAdmin can add members.
+    /// Add an existing user to a project. Only ProjectAdmin can add members; unknown emails are refused.
     /// </summary>
     public async Task<ProjectMemberDto?> AddMemberAsync(Guid projectId, AddProjectMemberRequest request, CancellationToken cancellationToken = default)
     {
@@ -98,41 +97,13 @@ public class ProjectMemberService
             return null;
         }
 
-        // Find or create user
-        var user = await userManager.FindByEmailAsync(request.Email);
+        // Project admins add people who already have an account. New accounts come only from a server
+        // administrator (Admin -> Users -> Add user), because public sign-up is disabled on purpose.
+        var user = await userManager.FindByEmailAsync(request.Email?.Trim() ?? string.Empty);
         var project = currentMembership.Project;
-        var createdNewUser = false;
-
-        if (user == null)
-        {
-            if (!request.CreateAccountIfNotExists)
-            {
-                throw new InvalidOperationException($"User with email '{request.Email}' does not exist and account creation is disabled");
-            }
-
-            // Generate unique public username from email
-            var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(request.Email);
-
-            // Create new user account
-            user = new ApplicationUser
-            {
-                UserName = request.Email,
-                Email = request.Email,
-                PublicUsername = publicUsername,
-                EmailConfirmed = false,
-                IsEnterpriseEnabled = true // Enable enterprise features for invited users
-            };
-
-            var result = await userManager.CreateAsync(user);
-            if (!result.Succeeded)
-            {
-                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                throw new InvalidOperationException($"Failed to create user account: {errors}");
-            }
-
-            createdNewUser = true;
-            logger.Debug("Created new user {UserId} ({Email}) for project invitation", user.Id, user.Email);
-        }
+        if (user == null || user.IsDeleted)
+            throw new ProjectMemberAccountMissingException(request.Email ?? string.Empty);
+        const bool createdNewUser = false;
 
         await SendInvitationEmailAsync(projectId, project, user, request, createdNewUser, cancellationToken);
 
@@ -444,3 +415,7 @@ public class ProjectMemberService
         };
     }
 }
+
+/// <summary>No account exists for the email; a server administrator has to invite the person first.</summary>
+public sealed class ProjectMemberAccountMissingException(string email)
+    : InvalidOperationException($"No account exists for {email}. Ask a server administrator to invite them first, then add them to the project.");

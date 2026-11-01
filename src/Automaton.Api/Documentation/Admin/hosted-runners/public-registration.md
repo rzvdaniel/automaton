@@ -35,7 +35,9 @@ Administrators add people from **Admin → Users → Add user**:
 - **Create with password** creates the account with a password the administrator types or generates. A generated password is shown once and never stored in readable form; no email is sent. Use it for test accounts and people without email.
 - Only system administrators can make the new user an administrator. Both actions are administrator-only, require a browser or JWT login (API keys are refused) and appear in **Admin → Audit Events** (`UserInvited`, `UserCreatedByAdministrator`) without passwords.
 
-Adding an email that has no account to a project also creates the account and emails the same kind of password link.
+Project admins can add only people who already have an account. Adding an unknown email to a project is refused with a message to ask a server administrator for an invitation first; project invites never create accounts.
+
+Admins add people while signup is paused; you can use plus addresses such as `you+test1@example.com` for separate test accounts that still reach your inbox.
 
 ## Existing-account execution review
 
