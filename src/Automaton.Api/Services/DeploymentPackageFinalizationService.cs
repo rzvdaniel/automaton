@@ -68,6 +68,26 @@ public sealed class DeploymentPackageFinalizationService(
         await staticPublication.PublishIfAssignedAsync(app, app.RuntimeVisibility, ownerId, cancellationToken);
     }
 
+    /// <summary>
+    /// Stores the package's secret declarations before the Runner starts the new runtime, which loads
+    /// secrets while the rest of the contract is persisted only after the deployment succeeds.
+    /// </summary>
+    public async Task PersistSecretDeclarationsAsync(Guid appId, ApplicationContract packageApplication, CancellationToken cancellationToken)
+    {
+        var app = await dataContext.WebApps.SingleOrDefaultAsync(item => item.Id == appId, cancellationToken);
+        if (app is null) return;
+        ApplicationContract stored;
+        try { stored = ApplicationContractSerialization.Deserialize(app.ApplicationContractJson); }
+        // A stored contract that no longer reads stays untouched; the deployment finalizes a new one.
+        catch (InvalidOperationException) { return; }
+        catch (System.Text.Json.JsonException) { return; }
+        var declarations = packageApplication.Secrets ?? [];
+        if (System.Text.Json.JsonSerializer.Serialize(stored.Secrets) == System.Text.Json.JsonSerializer.Serialize(declarations)) return;
+        stored.Secrets = declarations;
+        app.ApplicationContractJson = ApplicationContractSerialization.Serialize(stored);
+        await dataContext.SaveChangesAsync(cancellationToken);
+    }
+
     public Task RestoreRoutesAsync() => backendRouteConfigService.RefreshAsync(CancellationToken.None);
 
     private async Task PersistSourceAsync(
