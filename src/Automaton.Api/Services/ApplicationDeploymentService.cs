@@ -72,6 +72,8 @@ public sealed class ApplicationDeploymentService
         var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
         await deploymentTargetStateService.MarkStartedAsync(
             appId, target.Id, cancellationToken, deploymentOperationId, executionAttemptId);
+        // The Runner loads secrets while it starts the new runtime, before the contract is finalized.
+        await packageFinalizationService.PersistSecretDeclarationsAsync(appId, packageApplication, cancellationToken);
         var targetStateFinalized = false;
         var pendingRouteApplied = false;
 
