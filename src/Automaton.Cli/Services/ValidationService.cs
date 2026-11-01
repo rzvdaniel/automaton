@@ -75,6 +75,14 @@ public sealed class ValidationService
 
         checks.Add(remoteAppCheck.Check);
 
+        if (remoteAppCheck.Check.Success
+            && await SecretStatusCheck.FindMissingAsync(resolvedServer!, resolvedApiKey!, resolvedAppId!,
+                projectConfig?.Application.Secrets, cancellationToken) is { } missingSecrets)
+        {
+            nextSteps.Add("Run automaton secrets status and fill missing secrets with automaton secrets set");
+            checks.Add(CreateWarningOrFailure(SecretStatusCheck.CheckName, missingSecrets, strict));
+        }
+
         var success = checks.All(check => check.Success);
 
         return new ValidationResult

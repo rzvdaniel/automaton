@@ -3669,6 +3669,10 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)

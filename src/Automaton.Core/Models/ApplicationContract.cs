@@ -15,10 +15,55 @@ public sealed class ApplicationContract
     public ApplicationStorageSpec Storage { get; set; } = new();
     public ApplicationComposeSpec? Compose { get; set; }
 
+    /// <summary>
+    /// Secrets the app needs by name. An app secret of that name wins; otherwise a declared name is
+    /// filled from the project vault, then the owner's vault. Undeclared vault secrets never reach the app.
+    /// </summary>
+    public List<ApplicationSecretDeclaration> Secrets { get; set; } = [];
+
     public bool IsStaticSite => Runtime.Command is null
         && Compose is null
         && Build.Command is not null
         && !string.IsNullOrWhiteSpace(Build.OutputDirectory);
+}
+
+/// <summary>A secret the app expects as an environment variable.</summary>
+public sealed class ApplicationSecretDeclaration
+{
+    /// <summary>The environment variable name the app reads.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Optional one-line explanation, shown to people and AI agents filling the secret.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Optional source in a vault under another name: <c>project:NAME</c> or <c>user:NAME</c>.</summary>
+    public string? From { get; set; }
+}
+
+/// <summary>Names and sources of declared secrets.</summary>
+public static class ApplicationSecretNames
+{
+    public const string ProjectScope = "project";
+    public const string UserScope = "user";
+    public const int MaxDescriptionLength = 200;
+
+    /// <summary>Environment variable names: capital letters, digits and underscores, not starting with a digit or AUTOMATON_.</summary>
+    public static bool IsValidName(string? name)
+        => name is { Length: > 0 and <= 100 }
+            && (name[0] is '_' or (>= 'A' and <= 'Z'))
+            && name.All(c => c is '_' or (>= 'A' and <= 'Z') or (>= '0' and <= '9'))
+            && !name.StartsWith("AUTOMATON_", StringComparison.Ordinal);
+
+    /// <summary>Parses <c>project:NAME</c> or <c>user:NAME</c>.</summary>
+    public static bool TryParseFrom(string? from, out string scope, out string name)
+    {
+        scope = name = string.Empty;
+        var separator = from?.IndexOf(':') ?? -1;
+        if (separator <= 0) return false;
+        scope = from![..separator];
+        name = from[(separator + 1)..];
+        return scope is ProjectScope or UserScope && IsValidName(name);
+    }
 }
 
 /// <summary>A normalized, deliberately small Docker Compose deployment contract.</summary>
@@ -179,8 +224,31 @@ public static class ApplicationContractValidator
         ValidateHealth(contract.Health, errors);
         ValidateStorage(contract.Storage, errors);
         ValidateCompose(contract, errors);
+        ValidateSecrets(contract.Secrets, errors);
 
         return errors;
+    }
+
+    private static void ValidateSecrets(List<ApplicationSecretDeclaration>? secrets, ICollection<string> errors)
+    {
+        if (secrets is null) return;
+        if (secrets.Count > 50) errors.Add("secrets can declare at most 50 names");
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var secret in secrets)
+        {
+            if (secret is null || !ApplicationSecretNames.IsValidName(secret.Name))
+            {
+                errors.Add("secrets[].name must be capital letters, digits and underscores, not starting with a digit or AUTOMATON_");
+                continue;
+            }
+            if (!names.Add(secret.Name))
+                errors.Add($"secrets declares {secret.Name} more than once");
+            if (secret.Description is { } description
+                && (description.Length > ApplicationSecretNames.MaxDescriptionLength || description.Any(char.IsControl)))
+                errors.Add($"secrets.{secret.Name}.description must be one line of at most {ApplicationSecretNames.MaxDescriptionLength} characters");
+            if (secret.From is not null && !ApplicationSecretNames.TryParseFrom(secret.From, out _, out _))
+                errors.Add($"secrets.{secret.Name}.from must be project:NAME or user:NAME");
+        }
     }
 
     private static void ValidateBuild(ApplicationBuildSpec? build, ICollection<string> errors)
