@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Configuration;
+using Polly;
+using Polly.Retry;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -70,45 +72,58 @@ public sealed class HostContainerExecutionApiClient(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
         DateTime deadline,
         CancellationToken cancellationToken,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        TimeProvider? time = null,
+        Func<double>? jitter = null)
     {
-        delay ??= Task.Delay;
-        while (DateTime.UtcNow < deadline)
+        time ??= TimeProvider.System;
+        jitter ??= Random.Shared.NextDouble;
+        // Transient failures are retried on the stepped schedule (2s, 5s, 15s, then every 30s) until the
+        // operation deadline; a rate limit waits as long as the server asks. Other answers return at once.
+        var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage> { TimeProvider = time }
+            .AddRetry(new RetryStrategyOptions<HttpResponseMessage>
+            {
+                MaxRetryAttempts = int.MaxValue,
+                ShouldHandle = args => ValueTask.FromResult(args.Outcome switch
+                {
+                    { Result: { } response } => IsTransient(response.StatusCode),
+                    { Exception: HttpRequestException exception } => IsTransient(exception.StatusCode),
+                    { Exception: OperationCanceledException } => !cancellationToken.IsCancellationRequested,
+                    _ => false
+                }),
+                DelayGenerator = args =>
+                {
+                    var delay = args.Outcome.Result is { StatusCode: HttpStatusCode.TooManyRequests } limited
+                        ? InfrastructureResultDelivery.GetRetryDelay(limited, time.GetUtcNow())
+                        : RetrySchedule.Delay(args.AttemptNumber, RetrySchedule.RequestCeiling, jitter());
+                    var remaining = deadline - time.GetUtcNow().UtcDateTime;
+                    // Wait out the remaining time at most; the next attempt then reports the deadline.
+                    return ValueTask.FromResult<TimeSpan?>(delay < remaining ? delay : remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                },
+                OnRetry = args =>
+                {
+                    if (args.Outcome.Result is { } response)
+                    {
+                        Serilog.Log.Warning(
+                            "Host-container API returned HTTP {StatusCode}; retrying the existing operation in {RetryDelay}.",
+                            (int)response.StatusCode, args.RetryDelay);
+                        response.Dispose();
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning(args.Outcome.Exception,
+                            "Host-container API request failed; retrying the existing operation in {RetryDelay}.", args.RetryDelay);
+                    }
+                    return default;
+                }
+            })
+            .Build();
+
+        return await pipeline.ExecuteAsync(async token =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            HttpResponseMessage response;
-            try
-            {
-                response = await send(cancellationToken);
-            }
-            catch (HttpRequestException exception) when (IsTransient(exception.StatusCode))
-            {
-                Serilog.Log.Warning(exception, "Host-container API request failed; retrying the existing operation.");
-                await DelayBeforeDeadlineAsync(TimeSpan.FromSeconds(2), deadline, cancellationToken, delay);
-                continue;
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                Serilog.Log.Warning("Host-container API request timed out; retrying the existing operation.");
-                await DelayBeforeDeadlineAsync(TimeSpan.FromSeconds(2), deadline, cancellationToken, delay);
-                continue;
-            }
-
-            if (!IsTransient(response.StatusCode))
-                return response;
-
-            var retryDelay = response.StatusCode == HttpStatusCode.TooManyRequests
-                ? InfrastructureResultDelivery.GetRetryDelay(response, DateTimeOffset.UtcNow)
-                : TimeSpan.FromSeconds(2);
-            var statusCode = response.StatusCode;
-            response.Dispose();
-            Serilog.Log.Warning(
-                "Host-container API returned HTTP {StatusCode}; retrying the existing operation in {RetryDelay}.",
-                (int)statusCode, retryDelay);
-            await DelayBeforeDeadlineAsync(retryDelay, deadline, cancellationToken, delay);
-        }
-
-        throw new TimeoutException("The host-container API operation did not complete before its deadline.");
+            if (time.GetUtcNow().UtcDateTime >= deadline)
+                throw new TimeoutException("The host-container API operation did not complete before its deadline.");
+            return await send(token);
+        }, cancellationToken);
     }
 
     private static async Task DelayBeforeDeadlineAsync(

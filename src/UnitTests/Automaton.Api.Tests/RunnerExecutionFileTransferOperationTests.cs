@@ -28,8 +28,10 @@ public sealed class RunnerExecutionFileTransferOperationTests
             Is.EqualTo(new RunnerExecutionRequestedEvent(uploadId, runnerId, Management: false)));
         await operations.QueueFileTransferAsync(uploadId, runnerId, ownerId, upload, CancellationToken.None);
         Assert.That(await db.RunnerExecutionOperations.CountAsync(), Is.EqualTo(1));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => operations.QueueFileTransferAsync(
+        Assert.ThrowsAsync<OperationIdentityConflictException>(() => operations.QueueFileTransferAsync(
             uploadId, runnerId, ownerId, upload with { FileName = "different.txt" }, CancellationToken.None));
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() => operations.QueueFileTransferAsync(
+            uploadId, runnerId, Guid.NewGuid(), upload, CancellationToken.None));
 
         var metadataId = Guid.NewGuid();
         var metadata = new RunnerFileTransferCommand(RunnerFileTransferKinds.ReadMediaMetadata,
