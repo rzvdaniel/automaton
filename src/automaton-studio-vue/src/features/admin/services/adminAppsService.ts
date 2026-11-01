@@ -5,9 +5,38 @@ import type { AdminAppDetails, AdminAppModerationRequest } from '../types/admin.
 
 export interface AdminAppPermissionStatus { permission: string; approved: boolean; status: string }
 
+export interface AdminAppListItem {
+  id: string
+  name: string
+  publicUrl?: string | null
+  isPublished: boolean
+  accessStatus: string
+  updated: string
+  ownerUserId?: string | null
+  ownerName: string
+  ownerEmail: string
+  waitingPermissions: string[]
+}
+
+export interface AdminAppListResponse { items: AdminAppListItem[]; total: number; waitingForApprovalTotal: number }
+
+export interface AdminAppListQuery { search?: string; waiting?: boolean; page?: number; pageSize?: number }
+
 class AdminAppsService {
   private encodePath(path: string): string {
     return path.split('/').map(encodeURIComponent).join('/')
+  }
+
+  async listApps(query: AdminAppListQuery = {}): Promise<AdminAppListResponse> {
+    const { data } = await apiClient.get<AdminAppListResponse>('/api/admin/apps', {
+      params: {
+        search: query.search || undefined,
+        waiting: query.waiting || undefined,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 25,
+      },
+    })
+    return data
   }
 
   async getApp(appId: string): Promise<AdminAppDetails> {

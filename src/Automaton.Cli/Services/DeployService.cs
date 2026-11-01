@@ -32,6 +32,8 @@ public sealed class DeployService
     private readonly Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployRuntimeResult Deploy)>> deployPackageAsync;
     private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> createSnapshotAsync;
     private readonly Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync;
+    // Status checks (secrets, permissions) only run against a real server; tests that replace the upload skip them.
+    private readonly bool checksServerStatus;
 
     public DeployService(
         ConfigService config,
@@ -63,6 +65,7 @@ public sealed class DeployService
         this.progress = progress;
         this.checkReported = checkReported;
         this.deployPackageAsync = deployPackageAsync ?? DeployPackageAsync;
+        checksServerStatus = deployPackageAsync is null;
         this.createSnapshotAsync = createSnapshotAsync ?? CreateSnapshotAsync;
         this.ensureManagedRuntimeReadyAsync = ensureManagedRuntimeReadyAsync
             ?? (deployPackageAsync == null ? EnsureManagedRuntimeReadyAsync : null);
@@ -71,13 +74,23 @@ public sealed class DeployService
     private async Task WarnAboutMissingSecretsAsync(List<DeployCheckResult> checks, string server, string apiKey,
         string appId, Models.AutomatonConfig projectConfig, CancellationToken cancellationToken)
     {
-        // Only against a real server; tests that replace the upload also skip this call.
-        if (deployPackageAsync != DeployPackageAsync) return;
+        if (!checksServerStatus) return;
         var missing = await SecretStatusCheck.FindMissingAsync(server, apiKey, appId, projectConfig.Application.Secrets, cancellationToken);
         if (missing is null) return;
         // The app still deploys; it starts without those variables until they are set.
         AddCheck(checks, new DeployCheckResult(SecretStatusCheck.CheckName, false, missing, IsWarning: true));
         ReportProgress($"Secrets warning: {missing}");
+    }
+
+    private async Task WarnAboutWaitingPermissionsAsync(List<DeployCheckResult> checks, string server, string apiKey,
+        string appId, Models.AutomatonConfig projectConfig, CancellationToken cancellationToken)
+    {
+        if (!checksServerStatus) return;
+        var outcome = await PermissionStatusCheck.FindWaitingAsync(server, apiKey, appId, projectConfig.Application.Permissions, cancellationToken);
+        if (outcome is null) return;
+        // The app is already deployed; either way this is only a warning.
+        AddCheck(checks, new DeployCheckResult(PermissionStatusCheck.CheckName, false, outcome.Message, IsWarning: true));
+        ReportProgress($"Permissions: {outcome.Message}");
     }
 
     public async Task<DeployResult> DeployAsync(
@@ -170,6 +183,8 @@ public sealed class DeployService
 
         AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, runtimeResult.Message ?? $"deploy package applied to {runtimeResult.RunnerCount} runner(s)"));
         ReportProgress(runtimeResult.Message ?? $"Deploy package applied to {runtimeResult.RunnerCount} runner(s).");
+        // After the deploy, which is what sends new permission requests to the server.
+        await WarnAboutWaitingPermissionsAsync(checks, server!, apiKey!, appId!, projectConfig, cancellationToken);
 
         return CreateResult(
             true, checks, nextSteps, projectConfig, appId, server, clean,

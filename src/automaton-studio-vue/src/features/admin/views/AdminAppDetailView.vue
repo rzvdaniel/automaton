@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -38,6 +39,14 @@ const savingPermission = ref<string | null>(null)
 const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
 const ownerUserName = computed(() => String(route.query.ownerUserName || details.value?.ownerName || 'User'))
+// Opened from Admin → Apps (or an approval link): breadcrumbs and Back return there.
+// Decided from the link alone, so the breadcrumb does not change once the details load.
+const fromAppsList = computed(() => route.query.from === 'apps' || !route.query.ownerUserId)
+// Tab order: Overview, Permissions, Source Code. `?tab=permissions` opens the approval tab directly.
+// Only system administrators approve permissions (the endpoint is SysAdmin-only), so only they get the tab.
+const authStore = useAuthStore()
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const activeTab = ref(isSystemAdministrator.value && route.query.tab === 'permissions' ? 1 : 0)
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')
 
 const reviewOptions = [
@@ -71,7 +80,7 @@ async function loadApp() {
 
     details.value = appDetails
     fileTree.value = files
-    void loadPermissions()
+    if (isSystemAdministrator.value) void loadPermissions()
 
     const firstReadableFile = findFirstFile(files)
     if (firstReadableFile) {
@@ -151,6 +160,10 @@ function canPreviewPath(path: string): boolean {
 }
 
 function goBack() {
+  if (fromAppsList.value) {
+    void router.push({ name: 'admin-apps' })
+    return
+  }
   if (ownerUserId.value) {
     void router.push({
       name: 'admin-user-apps',
@@ -259,10 +272,16 @@ onMounted(() => {
     <div class="page-header">
       <div>
         <div class="breadcrumb-row">
-          <Button label="Users" link class="breadcrumb-link" @click="router.push({ name: 'admin-users' })" />
-          <span class="breadcrumb-separator">/</span>
-          <Button v-if="ownerUserId" label="User Apps" link class="breadcrumb-link" @click="goBack" />
-          <span v-if="ownerUserId" class="breadcrumb-separator">/</span>
+          <template v-if="fromAppsList">
+            <Button label="Apps" link class="breadcrumb-link" @click="router.push({ name: 'admin-apps' })" />
+            <span class="breadcrumb-separator">/</span>
+          </template>
+          <template v-else>
+            <Button label="Users" link class="breadcrumb-link" @click="router.push({ name: 'admin-users' })" />
+            <span class="breadcrumb-separator">/</span>
+            <Button label="User Apps" link class="breadcrumb-link" @click="goBack" />
+            <span class="breadcrumb-separator">/</span>
+          </template>
           <span class="breadcrumb-current">{{ details?.app.name || 'App details' }}</span>
         </div>
         <h2 class="page-title">{{ details?.app.name || 'Admin App Details' }}</h2>
@@ -277,7 +296,7 @@ onMounted(() => {
     </div>
 
     <template v-else-if="details">
-      <TabView class="admin-app-tabs">
+      <TabView v-model:active-index="activeTab" class="admin-app-tabs">
         <TabPanel header="Overview" value="overview">
           <div class="summary-grid">
             <Card class="detail-card">
@@ -380,7 +399,7 @@ onMounted(() => {
           </div>
         </TabPanel>
 
-        <TabPanel header="Permissions" value="permissions">
+        <TabPanel v-if="isSystemAdministrator" header="Permissions" value="permissions">
           <Card class="detail-card">
             <template #title>App permissions</template>
             <template #content>

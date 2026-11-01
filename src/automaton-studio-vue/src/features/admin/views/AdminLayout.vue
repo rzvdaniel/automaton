@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Badge from 'primevue/badge'
+import { adminAppsService } from '../services/adminAppsService'
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -14,6 +16,23 @@ interface AdminNavItem {
   icon: string
   to: string
   routePrefix: string
+  badge?: () => number
+}
+
+// Permission requests waiting for a system administrator, shown on the Apps entry.
+// Only system administrators can approve, so only they see (and pay for) the count.
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const waitingForApproval = ref(0)
+async function refreshWaiting() {
+  if (!isSystemAdministrator.value) {
+    waitingForApproval.value = 0
+    return
+  }
+  try {
+    waitingForApproval.value = (await adminAppsService.listApps({ waiting: true, pageSize: 1 })).waitingForApprovalTotal
+  } catch {
+    waitingForApproval.value = 0
+  }
 }
 
 const navItems: AdminNavItem[] = [
@@ -34,6 +53,13 @@ const navItems: AdminNavItem[] = [
     icon: 'pi pi-users',
     to: '/admin/users',
     routePrefix: '/admin/users',
+  },
+  {
+    label: 'Apps',
+    icon: 'pi pi-th-large',
+    to: '/admin/apps',
+    badge: () => waitingForApproval.value,
+    routePrefix: '/admin/apps',
   },
   {
     label: 'AI Providers',
@@ -85,7 +111,7 @@ const navItems: AdminNavItem[] = [
   },
 ]
 
-const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || authStore.user?.roles?.includes('SysAdmin')))
+const visibleNavItems = computed(() => navItems.filter(item => item.to !== '/admin/installation' || isSystemAdministrator.value))
 
 const isActive = (item: AdminNavItem) => {
   return route.path.startsWith(item.routePrefix)
@@ -94,6 +120,15 @@ const isActive = (item: AdminNavItem) => {
 const navigate = (to: string) => {
   router.push(to)
 }
+
+onMounted(() => {
+  void refreshWaiting()
+})
+// Approving or rejecting on an app page changes the count; refresh when moving to another admin page,
+// not on query changes such as search keystrokes.
+watch(() => route.path, () => {
+  void refreshWaiting()
+})
 
 </script>
 
@@ -108,13 +143,16 @@ const navigate = (to: string) => {
             <Button
               v-for="item in visibleNavItems"
               :key="item.to"
-              :label="item.label"
-              :icon="item.icon"
               text
               :class="{ 'surface-hover': isActive(item) }"
               class="w-full justify-content-start"
+              :aria-label="item.badge?.() ? `${item.label}, ${item.badge()} waiting for approval` : item.label"
               @click="navigate(item.to)"
-            />
+            >
+              <i :class="[item.icon, 'p-button-icon', 'p-button-icon-left']" aria-hidden="true" />
+              <span class="nav-label">{{ item.label }}</span>
+              <Badge v-if="item.badge?.()" :value="item.badge()" severity="warn" class="nav-badge" />
+            </Button>
           </div>
         </template>
       </Card>
@@ -128,6 +166,15 @@ const navigate = (to: string) => {
 </template>
 
 <style scoped>
+.nav-label {
+  flex: 1;
+  text-align: left;
+}
+
+.nav-badge {
+  margin-left: 0.5rem;
+}
+
 .admin-layout {
   display: flex;
   gap: 1.5rem;

@@ -103,8 +103,18 @@ public sealed class AppPermissionService(
         return RequestedPermissions(json);
     }
 
+    /// <summary>
+    /// Requested permissions that no administrator has decided yet (not approved, rejected or revoked).
+    /// </summary>
+    public static IReadOnlyList<string> Waiting(IReadOnlyList<AppPermissionStatus> statuses)
+        => statuses.Where(item => item.Status == AppPermissionStatuses.Pending).Select(item => item.Permission).ToArray();
+
+    /// <summary>The Studio page where a system administrator approves an app's permissions.</summary>
+    public static string? ApprovalUrl(string? studioUrl, Guid appId)
+        => string.IsNullOrWhiteSpace(studioUrl) ? null : $"{studioUrl.TrimEnd('/')}/admin/apps/{appId}?tab=permissions";
+
     // A stored contract that no longer reads requests nothing; the next deployment stores a new one.
-    private static string[] RequestedPermissions(string json)
+    internal static string[] RequestedPermissions(string json)
     {
         try { return ApplicationContractSerialization.Deserialize(json).Permissions.ToArray(); }
         catch (InvalidOperationException) { return []; }

@@ -437,6 +437,19 @@ export function getFileIcon(filePath: string): string {
   }
 }
 
+/** One requested platform permission of an app and its administrator decision. */
+export interface AppPermissionStatus {
+  permission: string
+  approved: boolean
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Revoked' | string
+}
+
+export interface AppPermissionsResponse {
+  permissions: AppPermissionStatus[]
+  waiting: string[]
+  approvalUrl?: string | null
+}
+
 export interface AppSecretSummary {
   name: string
   version: number

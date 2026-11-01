@@ -254,6 +254,14 @@ public class AutomatonApiClient : IDisposable
         return true;
     }
 
+    /// <summary>The app's requested permissions, their approval state and the administrator approval link.</summary>
+    public async Task<JsonElement> GetPermissionsAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/permissions", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<JsonElement> GetSecretStatusAsync(string appId, IReadOnlyList<ApplicationSecretDeclaration> secrets, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { secrets }, JsonOptions);
