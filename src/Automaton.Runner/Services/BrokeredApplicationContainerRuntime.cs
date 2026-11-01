@@ -47,7 +47,10 @@ public sealed class BrokeredApplicationContainerRuntime : IApplicationContainerR
         var scope = await ScopeAsync(request.AppId, request.DeploymentTargetId, Guid.Empty);
         var result = await execute(new()
         {
-            OperationId = request.CandidateId,
+            // A fresh operation per call (the API client assigns it). The candidate ID is reused when a
+            // missing container is recreated after a Runner restart, with current secrets, so it cannot be
+            // the operation identity. Creation stays idempotent on the host through the candidate's name.
+            OperationId = Guid.Empty,
             Scope = scope, Operation = HostContainerOperationKinds.CreateApplicationContainer,
             CandidateId = request.CandidateId, RequestedImage = request.Image, ContainerPort = request.ContainerPort,
             Command = request.Command, Storage = request.Storage, User = request.User,

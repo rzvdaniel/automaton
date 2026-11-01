@@ -61,7 +61,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         Assert.Multiple(() =>
         {
             Assert.That(request.Operation, Is.EqualTo(HostContainerOperationKinds.CreateApplicationContainer));
-            Assert.That(request.OperationId, Is.EqualTo(candidateId));
+            Assert.That(request.OperationId, Is.EqualTo(Guid.Empty), "the API client assigns a fresh operation per call");
             Assert.That(request.Scope.AppId, Is.EqualTo(appId));
             Assert.That(request.Scope.DeploymentTargetId, Is.EqualTo(targetId));
             Assert.That(request.CandidateId, Is.EqualTo(candidateId));
