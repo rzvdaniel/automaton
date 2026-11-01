@@ -21,6 +21,9 @@ public sealed class ApplicationContract
     /// </summary>
     public List<ApplicationSecretDeclaration> Secrets { get; set; } = [];
 
+    /// <summary>Platform capabilities the app requests for administrator approval.</summary>
+    public List<string> Permissions { get; set; } = [];
+
     public bool IsStaticSite => Runtime.Command is null
         && Compose is null
         && Build.Command is not null
@@ -225,8 +228,21 @@ public static class ApplicationContractValidator
         ValidateStorage(contract.Storage, errors);
         ValidateCompose(contract, errors);
         ValidateSecrets(contract.Secrets, errors);
+        ValidatePermissions(contract.Permissions, errors);
 
         return errors;
+    }
+
+    private static void ValidatePermissions(List<string>? permissions, ICollection<string> errors)
+    {
+        if (permissions is null) return;
+        if (permissions.Count > 10) errors.Add("permissions can contain at most 10 names");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var permission in permissions)
+        {
+            if (permission != "backups:read") errors.Add($"permissions contains unsupported permission '{permission}'");
+            if (!seen.Add(permission)) errors.Add($"permissions declares '{permission}' more than once");
+        }
     }
 
     private static void ValidateSecrets(List<ApplicationSecretDeclaration>? secrets, ICollection<string> errors)

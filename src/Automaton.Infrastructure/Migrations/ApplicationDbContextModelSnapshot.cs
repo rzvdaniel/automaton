@@ -3654,6 +3654,21 @@ namespace Automaton.Api.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppPermissionApproval", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("char(36)");
+                    b.Property<Guid>("AppId").HasColumnType("char(36)");
+                    b.Property<string>("ProtectedKey").HasColumnType("longtext");
+                    b.Property<string>("TokenHash").HasMaxLength(64).HasColumnType("varchar(64)");
+                    b.Property<string>("Permission").IsRequired().HasMaxLength(100).HasColumnType("varchar(100)");
+                    b.Property<string>("Status").IsRequired().ValueGeneratedOnAdd().HasMaxLength(20).HasColumnType("varchar(20)").HasDefaultValue("Pending");
+                    b.Property<DateTime>("UpdatedAtUtc").HasColumnType("datetime(6)");
+                    b.HasKey("Id");
+                    b.HasIndex("AppId", "Permission").IsUnique();
+                    b.HasIndex("TokenHash").IsUnique();
+                    b.ToTable("AppPermissionApprovals");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.SecretDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3732,6 +3747,15 @@ namespace Automaton.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("SecretVersions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppPermissionApproval", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.SelfHostedRunnerEnrollment", b =>

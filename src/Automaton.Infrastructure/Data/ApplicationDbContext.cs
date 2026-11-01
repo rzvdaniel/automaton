@@ -35,6 +35,12 @@ namespace Automaton.Api.Data
             IdentityAiModelConfiguration.Apply(modelBuilder);
             ProjectModelConfiguration.Apply(modelBuilder);
             ChatOrganizationModelConfiguration.Apply(modelBuilder);
+            modelBuilder.Entity<AppPermissionApproval>()
+                .HasIndex(approval => new { approval.AppId, approval.Permission }).IsUnique();
+            modelBuilder.Entity<AppPermissionApproval>()
+                .HasOne<WebApp>().WithMany().HasForeignKey(approval => approval.AppId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AppPermissionApproval>()
+                .Property(approval => approval.Status).HasDefaultValue("Pending");
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)

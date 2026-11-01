@@ -45,4 +45,15 @@ public sealed class ApplicationContractRuntimeUserTests
 
         Assert.That(errors, Does.Contain("runtime.user must be a numeric UID or UID:GID"));
     }
+
+    [Test]
+    public void RequestedAppPermissionSurvivesSerializationAndUnknownPermissionsAreRejected()
+    {
+        var restored = ApplicationContractSerialization.Deserialize(ApplicationContractSerialization.Serialize(
+            new ApplicationContract { Permissions = ["backups:read"] }));
+        Assert.That(restored.Permissions, Is.EqualTo(new[] { "backups:read" }));
+
+        var errors = ApplicationContractValidator.Validate(new ApplicationContract { Permissions = ["admin:all"] });
+        Assert.That(errors, Has.Some.Contains("unsupported permission"));
+    }
 }

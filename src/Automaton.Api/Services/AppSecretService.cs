@@ -129,8 +129,6 @@ public sealed class AppSecretService(
         var values = await CurrentValuesAsync(vaults.App, null, token);
         var declarations = await DeclarationsAsync(appId, token);
         var wanted = declarations.Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
-        if (wanted.Count == 0) return values;
-
         var available = await CurrentNamesAsync(vaults, token);
         var sources = new List<(string Name, SecretOwner Owner, string SourceName)>();
         foreach (var declaration in wanted)
@@ -143,6 +141,11 @@ public sealed class AppSecretService(
                 if (groupValues.TryGetValue(source.SourceName, out var value))
                     values[source.Name] = value;
         }
+        var permissionCredentials = await db.AppPermissionApprovals
+            .Where(approval => approval.AppId == appId && approval.Permission == "backups:read" && approval.ProtectedKey != null)
+            .Select(approval => approval.ProtectedKey).ToListAsync(token);
+        if (permissionCredentials.Count > 0)
+            values["APP_AUTOMATON_API_KEY"] = protector.Unprotect(permissionCredentials[0]!);
         return values;
     }
 

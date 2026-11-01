@@ -3,6 +3,8 @@ import type { FileNode } from '@/features/apps/types/apps.types'
 import { appsService } from '@/features/apps/services/apps.service'
 import type { AdminAppDetails, AdminAppModerationRequest } from '../types/admin.types'
 
+export interface AdminAppPermissionStatus { permission: string; requested: boolean; approved: boolean; status: string }
+
 class AdminAppsService {
   private encodePath(path: string): string {
     return path.split('/').map(encodeURIComponent).join('/')
@@ -30,6 +32,17 @@ class AdminAppsService {
 
   async updateModeration(appId: string, request: AdminAppModerationRequest): Promise<void> {
     await apiClient.put(`/api/admin/apps/${appId}/moderation`, request)
+  }
+
+  async getPermissions(appId: string): Promise<AdminAppPermissionStatus[]> {
+    const { data } = await apiClient.get<AdminAppPermissionStatus[]>(`/api/admin/apps/${appId}/permissions`)
+    return data
+  }
+
+  async setPermission(appId: string, permission: string, approved: boolean): Promise<AdminAppPermissionStatus[]> {
+    const { data } = await apiClient.put<AdminAppPermissionStatus[]>(
+      `/api/admin/apps/${appId}/permissions/${encodeURIComponent(permission)}`, { approved })
+    return data
   }
 }
 
