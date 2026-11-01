@@ -18,6 +18,13 @@ and no environment. Renaming the workflow file or moving the repository needs a
 matching policy change. The workflow rejects publishing from another branch;
 package builds and artifact downloads need no NuGet access.
 
+A server release publishes the CLI too. **Publish Automaton Server**
+(`server-release.yml`) has a `cli` input: `auto` (default) starts this workflow
+with the next free `1.0.YYYYMMDD.N` version when `src/Automaton.Cli` or
+`src/Automaton.Core` (which holds the `automaton.json` contract) changed since the
+previous server release; `always` publishes regardless; `never` skips it. Run this
+workflow by hand only for a CLI-only release.
+
 Runners are distributed as container images only; see
 [deploying the Runner](deploying-runner.md).
 
