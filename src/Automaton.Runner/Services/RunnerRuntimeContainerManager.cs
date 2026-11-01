@@ -1,3 +1,5 @@
+using Polly;
+using Polly.Retry;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -743,15 +745,30 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
 
     private async Task RetryPendingReconciliationUntilCompleteAsync(CancellationToken cancellationToken)
     {
+        // Retries on the stepped schedule (2s, 5s, 15s, 30s, 1m, 2m, then every 5m) until every pending
+        // runtime is reconciled or the Runner stops, so a persistent failure does not hammer the server.
+        var pipeline = new ResiliencePipelineBuilder<bool>()
+            .AddRetry(new RetryStrategyOptions<bool>
+            {
+                MaxRetryAttempts = int.MaxValue,
+                ShouldHandle = args => ValueTask.FromResult(args.Outcome.Result is false),
+                DelayGenerator = args => ValueTask.FromResult<TimeSpan?>(
+                    RetrySchedule.Delay(args.AttemptNumber, RetrySchedule.BackgroundCeiling, Random.Shared.NextDouble())),
+                OnRetry = args =>
+                {
+                    logger.LogInformation("Managed application reconciliation is still pending; retrying in {RetryDelay}.",
+                        args.RetryDelay);
+                    return default;
+                }
+            })
+            .Build();
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            await pipeline.ExecuteAsync(async token =>
             {
-                await RetryPendingReconciliationAsync(cancellationToken);
-                lock (gate)
-                    if (pendingReconciliation.Count == 0) return;
-                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-            }
+                await RetryPendingReconciliationAsync(token);
+                lock (gate) return pendingReconciliation.Count == 0;
+            }, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

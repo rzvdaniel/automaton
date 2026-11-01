@@ -96,8 +96,10 @@ public sealed class RunnerExecutionOperationService(
         var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
         if (operation is null) return false;
         var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
-        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId || pinned?.FileTransfer != request)
-            throw new UnauthorizedAccessException("Runner file-transfer operation identity is already assigned to another request.");
+        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId)
+            throw new UnauthorizedAccessException("Runner file-transfer operation identity belongs to another Runner or user.");
+        if (pinned?.FileTransfer != request)
+            throw new OperationIdentityConflictException("Runner file-transfer operation identity is already assigned to another request.");
         return true;
     }
 
@@ -120,13 +122,13 @@ public sealed class RunnerExecutionOperationService(
         var operation = await db.RunnerExecutionOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, token);
         if (operation is null) return false;
         var pinned = JsonSerializer.Deserialize<RunnerExecutionRequest>(protector.Unprotect(operation.ProtectedRequest), JsonOptions);
-        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId
-            || pinned?.HostContainer is null
-            || !string.Equals(
+        if (operation.RunnerId != runnerId || operation.RequestedByUserId != ownerId || pinned?.HostContainer is null)
+            throw new UnauthorizedAccessException("Typed container operation identity belongs to another Runner, user or operation kind.");
+        if (!string.Equals(
                 JsonSerializer.Serialize(pinned.HostContainer, JsonOptions),
                 JsonSerializer.Serialize(request, JsonOptions),
                 StringComparison.Ordinal))
-            throw new UnauthorizedAccessException("Typed container operation identity is already assigned to another request.");
+            throw new OperationIdentityConflictException("Typed container operation identity is already assigned to another request.");
         return true;
     }
 
