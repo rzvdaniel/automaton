@@ -82,6 +82,35 @@ separate action and requires explicit approval.
 
 Keep credentials out of `automaton.json` and source files. Set them as app secrets in Studio under **App → Settings → Secrets**: a name such as `S3_SECRET_KEY` (capital letters, digits and underscores) and its value. Values are stored encrypted, are never shown again after saving, and are passed as environment variables to each **Action** run and to the **running app** (API or server-rendered site) whenever it starts, including after a server restart. Action logs and results have them replaced by `[REDACTED]`. Saving an existing name replaces its value; a running app picks up the change on its next start, so redeploy it with `automaton deploy`. Read secrets from the environment in code (for example `process.env.STRIPE_KEY` or `os.environ["STRIPE_KEY"]`); never write them into source or build output. Static sites cannot use secrets, because their files are sent to the browser. Compose apps do not receive app secrets yet.
 
+### Declared secrets and shared vaults
+
+Declare the secrets an app needs in `application.secrets`:
+
+```json
+"secrets": [
+  { "name": "STRIPE_KEY", "description": "Stripe secret key for payments" },
+  { "name": "PAYMENTS_KEY", "from": "project:STRIPE_LIVE_KEY" }
+]
+```
+
+An app receives every app secret, and for each declared name it does not have itself, a value from a shared vault:
+
+1. The **project vault**, when the app belongs to exactly one project. Project administrators and developers set its secrets; every app of the project that declares the name receives it.
+2. The **user vault** of the app's owner, only for personal apps (in no project, with one owner), so nobody else who can change an app's code can read a person's own secrets.
+
+`from` takes the value from a vault under another name (`project:NAME` or `user:NAME`). Vault secrets an app does not declare never reach it. A changed vault secret applies to every app using it at its next Action run or start.
+
+From the app's folder:
+
+| Command | Does |
+|---|---|
+| `automaton secrets status` | Lists declared secrets: present or missing, and which scope provides each. |
+| `automaton secrets set NAME [--project\|--user] [--description TEXT]` | Saves a value read from standard input, or prompts without echo. Without a flag, it is an app secret. |
+| `automaton secrets list [--project\|--user]` | Lists names, versions and descriptions, never values. |
+| `automaton secrets delete NAME [--project\|--user]` | Deletes a secret. |
+
+`automaton validate` and `automaton deploy` warn about declared secrets without a value (`validate --strict` fails).
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`

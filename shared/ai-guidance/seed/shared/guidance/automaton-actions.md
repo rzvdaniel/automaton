@@ -16,10 +16,19 @@ An Action receives one UTF-8 JSON value on standard input, writes one UTF-8
 JSON result to standard output, writes operational logs to standard error, and
 uses a zero exit code for success. It must not write secrets to output or logs.
 
-Read credentials such as API keys from environment variables named in the
-Action's documentation, never from source files. The app owner sets them as app
-secrets in Studio (**App → Settings → Secrets**); each Action run receives them
-as environment variables, and their values are removed from logs and results.
+Read credentials such as API keys from environment variables, never from
+source files. Declare each one the app needs in `automaton.json` under
+`application.secrets`, for example
+`"secrets": [{ "name": "STRIPE_KEY", "description": "Stripe secret key" }]`.
+Each Action run and the running app receive them as environment variables, and
+their values are removed from Action logs and results.
+
+Run `automaton secrets status` to see which declared secrets are missing. Never
+ask for a secret value in chat and never put one in a command argument. Ask the
+user to run `automaton secrets set NAME` themselves (it prompts without echo),
+or pipe a value that is already in an environment variable:
+`printf '%s' "$VALUE" | automaton secrets set NAME`. Add `--project` to share it
+with every app in the project, or `--user` for all of the user's personal apps.
 
 Deploy Actions with `automaton deploy`. Validate with
 `automaton action validate <action-key>`. Invoke a deployed Action with

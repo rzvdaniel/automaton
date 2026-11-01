@@ -15,6 +15,10 @@ public sealed class SecretDefinition
     [Required, MaxLength(160)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Optional one-line explanation for people and AI agents.</summary>
+    [MaxLength(200)]
+    public string? Description { get; set; }
+
     public int CurrentVersion { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;

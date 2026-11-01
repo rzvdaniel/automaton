@@ -26,6 +26,7 @@ internal static class CliCommandCatalog
         root.AddCommand(CurrentRunnerCommand.Build(config));
         root.AddCommand(ValidateCommand.Build(config));
         root.AddCommand(ActionCommand.Build(config));
+        root.AddCommand(SecretsCommand.Build(config));
         root.AddCommand(InitCommand.Build(config));
         root.AddCommand(LinkCommand.Build(config));
         root.AddCommand(DeployCommand.Build(config));

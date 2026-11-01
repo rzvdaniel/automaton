@@ -68,6 +68,18 @@ public sealed class DeployService
             ?? (deployPackageAsync == null ? EnsureManagedRuntimeReadyAsync : null);
     }
 
+    private async Task WarnAboutMissingSecretsAsync(List<DeployCheckResult> checks, string server, string apiKey,
+        string appId, Models.AutomatonConfig projectConfig, CancellationToken cancellationToken)
+    {
+        // Only against a real server; tests that replace the upload also skip this call.
+        if (deployPackageAsync != DeployPackageAsync) return;
+        var missing = await SecretStatusCheck.FindMissingAsync(server, apiKey, appId, projectConfig.Application.Secrets, cancellationToken);
+        if (missing is null) return;
+        // The app still deploys; it starts without those variables until they are set.
+        AddCheck(checks, new DeployCheckResult(SecretStatusCheck.CheckName, false, missing, IsWarning: true));
+        ReportProgress($"Secrets warning: {missing}");
+    }
+
     public async Task<DeployResult> DeployAsync(
         string directory,
         bool clean,
@@ -112,6 +124,8 @@ public sealed class DeployService
             AddCheck(checks, new DeployCheckResult("restore_point", false, ex.Message, IsWarning: true));
             ReportProgress($"Restore point warning: {ex.Message}");
         }
+
+        await WarnAboutMissingSecretsAsync(checks, server!, apiKey!, appId!, projectConfig, cancellationToken);
 
         var readinessFailure = await CheckManagedRuntimeReadinessAsync(
             preflight, clean, target, uploadResult, cancellationToken);

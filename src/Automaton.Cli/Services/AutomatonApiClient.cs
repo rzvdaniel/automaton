@@ -1,3 +1,4 @@
+using Automaton.Core.Models;
 using System.Net.Http.Headers;
 using System.Security.Authentication;
 using System.Net.Sockets;
@@ -224,6 +225,39 @@ public class AutomatonApiClient : IDisposable
     public async Task<JsonElement> DeleteAppActionVersionAsync(string appId, string actionKey, string version, CancellationToken ct = default)
     {
         using var resp = await _http.DeleteAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/versions/{Uri.EscapeDataString(version)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> ListSecretsAsync(string appId, string scope, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/secrets?scope={Uri.EscapeDataString(scope)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> SetSecretAsync(string appId, string scope, string name, string value, string? description, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { value, description }, JsonOptions);
+        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync($"api/apps/{appId}/secrets/{Uri.EscapeDataString(name)}?scope={Uri.EscapeDataString(scope)}", content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    /// <summary>Deletes a secret; false when it did not exist.</summary>
+    public async Task<bool> DeleteSecretAsync(string appId, string scope, string name, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{appId}/secrets/{Uri.EscapeDataString(name)}?scope={Uri.EscapeDataString(scope)}", ct);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+        await EnsureSuccessAsync(resp);
+        return true;
+    }
+
+    public async Task<JsonElement> GetSecretStatusAsync(string appId, IReadOnlyList<ApplicationSecretDeclaration> secrets, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { secrets }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/secrets/status", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }
