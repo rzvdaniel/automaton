@@ -33,7 +33,7 @@ const reviewStatus = ref('approved')
 const accessStatus = ref('active')
 const moderationReason = ref('')
 const permissions = ref<AdminAppPermissionStatus[]>([])
-const savingPermission = ref(false)
+const savingPermission = ref<string | null>(null)
 
 const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
@@ -71,7 +71,7 @@ async function loadApp() {
 
     details.value = appDetails
     fileTree.value = files
-    permissions.value = await adminAppsService.getPermissions(appId.value)
+    void loadPermissions()
 
     const firstReadableFile = findFirstFile(files)
     if (firstReadableFile) {
@@ -89,15 +89,24 @@ async function loadApp() {
   }
 }
 
-async function setPermission(permission: string, approved: boolean) {
-  savingPermission.value = true
+async function loadPermissions() {
   try {
-    permissions.value = await adminAppsService.setPermission(appId.value, permission, approved)
-    toast.add({ severity: 'success', summary: approved ? 'Permission approved' : 'Permission revoked', life: 2500 })
+    permissions.value = await adminAppsService.getPermissions(appId.value)
+  } catch {
+    toast.add({ severity: 'error', summary: 'Failed to load app permissions', life: 3000 })
+  }
+}
+
+async function setPermission(item: AdminAppPermissionStatus, approved: boolean) {
+  savingPermission.value = item.permission
+  const summary = approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected'
+  try {
+    permissions.value = await adminAppsService.setPermission(appId.value, item.permission, approved)
+    toast.add({ severity: 'success', summary, life: 2500 })
   } catch {
     toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
   } finally {
-    savingPermission.value = false
+    savingPermission.value = null
   }
 }
 
@@ -379,10 +388,10 @@ onMounted(() => {
               <div v-if="permissions.length === 0" class="empty-state">This app has not requested any permissions.</div>
               <div v-for="item in permissions" :key="item.permission" class="detail-item">
                 <div><strong>{{ item.permission }}</strong> <Tag :value="item.status" /></div>
-                <Button v-if="item.approved" label="Revoke" severity="danger" outlined :loading="savingPermission" @click="setPermission(item.permission, false)" />
+                <Button v-if="item.approved" label="Revoke" severity="danger" outlined :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
                 <template v-else>
-                  <Button label="Approve" :loading="savingPermission" @click="setPermission(item.permission, true)" />
-                  <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined :loading="savingPermission" @click="setPermission(item.permission, false)" />
+                  <Button label="Approve" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
+                  <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined :disabled="savingPermission !== null" @click="setPermission(item, false)" />
                 </template>
               </div>
             </template>

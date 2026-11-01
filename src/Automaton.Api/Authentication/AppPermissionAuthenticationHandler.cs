@@ -8,6 +8,7 @@ namespace Automaton.Api.Authentication;
 public sealed class AppPermissionAuthenticationOptions : AuthenticationSchemeOptions
 {
     public const string Scheme = "AppPermission";
+    public const string BackupsReadPolicy = "AppPermission:backups:read";
 }
 
 public sealed class AppPermissionAuthenticationHandler(

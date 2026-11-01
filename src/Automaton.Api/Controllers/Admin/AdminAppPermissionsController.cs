@@ -24,7 +24,7 @@ public sealed class AdminAppPermissionsController(AppPermissionService permissio
         try { return Ok(await permissions.SetApprovalAsync(appId, permission, request.Approved, token)); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (ArgumentException error) { return BadRequest(new { message = error.Message }); }
-        catch (InvalidOperationException error) { return Conflict(new { message = error.Message }); }
+        catch (Exception error) when (error is InvalidOperationException or AppPermissionConflictException) { return Conflict(new { message = error.Message }); }
     }
 }
 

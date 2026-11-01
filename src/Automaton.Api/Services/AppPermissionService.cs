@@ -1,3 +1,4 @@
+using Automaton.Api.Enums;
 using System.Security.Cryptography;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-public sealed record AppPermissionStatus(string Permission, bool Requested, bool Approved, string Status);
+public sealed record AppPermissionStatus(string Permission, bool Approved, string Status);
 
 /// <summary>System administrator approval and scoped credentials for app capabilities.</summary>
 public sealed class AppPermissionService(
@@ -23,15 +24,15 @@ public sealed class AppPermissionService(
         return requested.Select(permission =>
         {
             var found = approvals.TryGetValue(permission, out var approval);
-            var status = found ? approval!.Status : "Pending";
-            return new AppPermissionStatus(permission, true, found && approval!.ProtectedKey is not null, status);
+            var status = found ? approval!.Status : AppPermissionStatuses.Pending;
+            return new AppPermissionStatus(permission, found && approval!.ProtectedKey is not null, status);
         }).ToArray();
     }
 
     public async Task<IReadOnlyList<AppPermissionStatus>> SetApprovalAsync(Guid appId, string permission, bool approved,
         CancellationToken token)
     {
-        if (permission != "backups:read") throw new ArgumentException("Unsupported app permission.", nameof(permission));
+        if (permission != AppPermissionApproval.BackupsRead) throw new ArgumentException("Unsupported app permission.", nameof(permission));
         var requested = await RequestedAsync(appId, token);
         if (approved && !requested.Contains(permission, StringComparer.Ordinal))
             throw new InvalidOperationException("The app has not requested this permission.");
@@ -45,7 +46,7 @@ public sealed class AppPermissionService(
 
         if (!approved)
         {
-            row.Status = row.ProtectedKey is null ? "Rejected" : "Revoked";
+            row.Status = row.ProtectedKey is null ? AppPermissionStatuses.Rejected : AppPermissionStatuses.Revoked;
             row.ProtectedKey = null;
             row.TokenHash = null;
         }
@@ -56,9 +57,10 @@ public sealed class AppPermissionService(
             row.ProtectedKey = protector.Protect(credential);
             row.TokenHash = Convert.ToHexString(SHA256.HashData(keyBytes));
         }
-        if (approved) row.Status = "Approved";
+        if (approved) row.Status = AppPermissionStatuses.Approved;
         row.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(token);
+        try { await db.SaveChangesAsync(token); }
+        catch (DbUpdateException) { throw new AppPermissionConflictException(); }
         return await GetStatusAsync(appId, token);
     }
 
@@ -69,7 +71,11 @@ public sealed class AppPermissionService(
         catch (FormatException) { return null; }
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
         var row = await db.AppPermissionApprovals.SingleOrDefaultAsync(x => x.TokenHash == hash, token);
-        if (row is null || !(await RequestedAsync(row.AppId, token)).Contains(row.Permission, StringComparer.Ordinal)) return null;
+        if (row is null) return null;
+        var app = await db.WebApps.Where(item => item.Id == row.AppId)
+            .Select(item => new { item.AccessStatus, item.ApplicationContractJson }).SingleOrDefaultAsync(token);
+        if (app is null || app.AccessStatus != AppAccessStatuses.Active
+            || !RequestedPermissions(app.ApplicationContractJson).Contains(row.Permission, StringComparer.Ordinal)) return null;
         return (row.AppId, row.Permission);
     }
 
@@ -77,6 +83,18 @@ public sealed class AppPermissionService(
     {
         var json = await db.WebApps.Where(app => app.Id == appId).Select(app => app.ApplicationContractJson).SingleOrDefaultAsync(token);
         if (json is null) throw new KeyNotFoundException("App not found.");
-        return ApplicationContractSerialization.Deserialize(json).Permissions.ToArray();
+        return RequestedPermissions(json);
+    }
+
+    // A stored contract that no longer reads requests nothing; the next deployment stores a new one.
+    private static string[] RequestedPermissions(string json)
+    {
+        try { return ApplicationContractSerialization.Deserialize(json).Permissions.ToArray(); }
+        catch (InvalidOperationException) { return []; }
+        catch (System.Text.Json.JsonException) { return []; }
     }
 }
+
+/// <summary>Another administrator changed the same permission at the same time.</summary>
+public sealed class AppPermissionConflictException()
+    : Exception("The permission was changed at the same time. Reload and try again.");

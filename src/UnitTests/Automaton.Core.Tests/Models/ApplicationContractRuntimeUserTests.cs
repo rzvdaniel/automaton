@@ -55,5 +55,6 @@ public sealed class ApplicationContractRuntimeUserTests
 
         var errors = ApplicationContractValidator.Validate(new ApplicationContract { Permissions = ["admin:all"] });
         Assert.That(errors, Has.Some.Contains("unsupported permission"));
+        Assert.That(ApplicationSecretNames.IsValidName("APP_AUTOMATON_API_KEY"), Is.False, "the platform delivers the app permission credential under this name");
     }
 }

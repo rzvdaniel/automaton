@@ -265,11 +265,11 @@ internal static class ApiAuthorizationRegistration
             options.AddPolicy("Administrators", policy =>
                 policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
 
-            options.AddPolicy("AppPermission:backups:read", policy => policy
+            options.AddPolicy(AppPermissionAuthenticationOptions.BackupsReadPolicy, policy => policy
                 .AddAuthenticationSchemes(AppPermissionAuthenticationOptions.Scheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context => context.User.IsInRole(UserRole.SystemAdministrator)
-                    || context.User.HasClaim("app_permission", "backups:read")));
+                    || context.User.HasClaim("app_permission", AppPermissionApproval.BackupsRead)));
 
             // Project-based authorization policies
             options.AddPolicy("ProjectAdmin", policy =>

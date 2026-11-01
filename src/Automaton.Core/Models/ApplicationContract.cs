@@ -55,7 +55,8 @@ public static class ApplicationSecretNames
         => name is { Length: > 0 and <= 100 }
             && (name[0] is '_' or (>= 'A' and <= 'Z'))
             && name.All(c => c is '_' or (>= 'A' and <= 'Z') or (>= '0' and <= '9'))
-            && !name.StartsWith("AUTOMATON_", StringComparison.Ordinal);
+            && !name.StartsWith("AUTOMATON_", StringComparison.Ordinal)
+            && name != "APP_AUTOMATON_API_KEY";
 
     /// <summary>Parses <c>project:NAME</c> or <c>user:NAME</c>.</summary>
     public static bool TryParseFrom(string? from, out string scope, out string name)
@@ -233,6 +234,9 @@ public static class ApplicationContractValidator
         return errors;
     }
 
+    /// <summary>The only app permission currently supported.</summary>
+    public const string SupportedPermission = "backups:read";
+
     private static void ValidatePermissions(List<string>? permissions, ICollection<string> errors)
     {
         if (permissions is null) return;
@@ -240,7 +244,7 @@ public static class ApplicationContractValidator
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var permission in permissions)
         {
-            if (permission != "backups:read") errors.Add($"permissions contains unsupported permission '{permission}'");
+            if (permission != SupportedPermission) errors.Add($"permissions contains unsupported permission '{permission}'");
             if (!seen.Add(permission)) errors.Add($"permissions declares '{permission}' more than once");
         }
     }
@@ -254,7 +258,7 @@ public static class ApplicationContractValidator
         {
             if (secret is null || !ApplicationSecretNames.IsValidName(secret.Name))
             {
-                errors.Add("secrets[].name must be capital letters, digits and underscores, not starting with a digit or AUTOMATON_");
+                errors.Add("secrets[].name must be capital letters, digits and underscores, not starting with a digit or AUTOMATON_, and not the reserved APP_AUTOMATON_API_KEY");
                 continue;
             }
             if (!names.Add(secret.Name))

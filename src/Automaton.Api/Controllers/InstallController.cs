@@ -36,7 +36,7 @@ public class InstallController(InstallService installService, IConfiguration con
     }
 
     [HttpGet("backups")]
-    [Authorize(Policy = "AppPermission:backups:read")]
+    [Authorize(Policy = Automaton.Api.Authentication.AppPermissionAuthenticationOptions.BackupsReadPolicy)]
     public async Task<IActionResult> GetBackups(CancellationToken token)
         => Ok(await InstallationBackups.ReadAsync(configuration, token));
 

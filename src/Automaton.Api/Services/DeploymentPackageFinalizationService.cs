@@ -92,6 +92,8 @@ public sealed class DeploymentPackageFinalizationService(
             .ToListAsync(cancellationToken);
         foreach (var approval in removedApprovals)
         {
+            if (approval.ProtectedKey is not null || approval.Status == AppPermissionStatuses.Approved)
+                approval.Status = AppPermissionStatuses.Revoked;
             approval.ProtectedKey = null;
             approval.TokenHash = null;
             approval.UpdatedAtUtc = DateTime.UtcNow;

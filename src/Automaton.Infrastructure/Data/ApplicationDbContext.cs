@@ -38,9 +38,11 @@ namespace Automaton.Api.Data
             modelBuilder.Entity<AppPermissionApproval>()
                 .HasIndex(approval => new { approval.AppId, approval.Permission }).IsUnique();
             modelBuilder.Entity<AppPermissionApproval>()
+                .HasIndex(approval => approval.TokenHash).IsUnique();
+            modelBuilder.Entity<AppPermissionApproval>()
                 .HasOne<WebApp>().WithMany().HasForeignKey(approval => approval.AppId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<AppPermissionApproval>()
-                .Property(approval => approval.Status).HasDefaultValue("Pending");
+                .Property(approval => approval.Status).HasDefaultValue(AppPermissionStatuses.Pending);
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
