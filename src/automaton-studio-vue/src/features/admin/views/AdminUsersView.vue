@@ -19,6 +19,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import type { DataTableRowClickEvent } from 'primevue/datatable'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminUsersService } from '../services/adminUsersService'
+import AdminAddUserDialog from '../components/AdminAddUserDialog.vue'
 import type { AdminUser, AdminUserSummary } from '../types/admin.types'
 
 const toast = useToast()
@@ -66,6 +67,8 @@ const lockStatusOptions = [
   { label: 'Active', value: false },
   { label: 'Locked', value: true },
 ]
+
+const addUserVisible = ref(false)
 
 const isCurrentUserSystemAdministrator = computed(() => {
   const roles = authStore.user?.roles ?? []
@@ -431,6 +434,8 @@ onMounted(async () => {
         </p>
       </div>
 
+      <Button label="Add user" icon="pi pi-user-plus" @click="addUserVisible = true" />
+
       <div class="users-stats-strip">
         <span
           v-for="stat in headerStats"
@@ -441,6 +446,12 @@ onMounted(async () => {
         </span>
       </div>
     </div>
+
+    <AdminAddUserDialog
+      v-model:visible="addUserVisible"
+      :can-grant-administrator="isCurrentUserSystemAdministrator"
+      @added="loadUsers"
+    />
 
     <DataTable
       :value="users"

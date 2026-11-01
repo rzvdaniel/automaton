@@ -27,6 +27,18 @@ Password login, GitHub login for existing accounts, refresh, email confirmation 
 
 To reopen, set the same property to `true` and apply it through the normal API deployment workflow. No invitation system or data migration is required.
 
+## Adding users while signup is paused
+
+Administrators add people from **Admin → Users → Add user**:
+
+- **Invite by email** creates the account without a password and emails a link to **Set your password** (template `AutomatonUserInvitation`). The link works once and expires after 24 hours; inviting the same address again sends a new link while the account has no password. Setting the password from the link confirms the email address. Configure **Admin → Installation → Outgoing email** first; if sending fails, the account is kept and Studio says so.
+- **Create with password** creates the account with a password the administrator types or generates. A generated password is shown once and never stored in readable form; no email is sent. Use it for test accounts and people without email.
+- Only system administrators can make the new user an administrator. Both actions are administrator-only, require a browser or JWT login (API keys are refused) and appear in **Admin → Audit Events** (`UserInvited`, `UserCreatedByAdministrator`) without passwords.
+
+Project admins can add only people who already have an account. Adding an unknown email to a project is refused with a message to ask a server administrator for an invitation first; project invites never create accounts.
+
+Admins add people while signup is paused; you can use plus addresses such as `you+test1@example.com` for separate test accounts that still reach your inbox.
+
 ## Existing-account execution review
 
 Signup is not an execution safeguard. Review each account in Administration > Users for roles and assigned/effective plan, then inspect its runners, apps and pending execution operations. Unassigned accounts may inherit the default active plan. Plan assignment does not create a Hosted Runner or determine Machine Management Runner access.

@@ -630,4 +630,80 @@
   <data name="AutomatonResetPasswordConfirmation.Subject" xml:space="preserve">
     <value>Password reset confirmation for Automaton account</value>
   </data>
+  <data name="AutomatonUserInvitation.Subject" xml:space="preserve">
+    <value>You are invited to Automaton</value>
+  </data>
+  <data name="AutomatonUserInvitation.Body" xml:space="preserve">
+    <value>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
+  &lt;title&gt;You are invited to Automaton&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .security-notice { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .security-notice p { margin: 0; color: #92400e; font-size: 14px; font-weight: 500; }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #4F46E5; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #4F46E5; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+      .button { display: block; text-align: center; }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;You are invited to Automaton&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;Hi {{Name}},&lt;/h2&gt;
+              &lt;p&gt;{{InvitedByName}} created an Automaton account for you at &lt;a href="{{WebsiteUrl}}" style="color: #4F46E5; text-decoration: none;"&gt;{{WebsiteUrl}}&lt;/a&gt;.&lt;/p&gt;
+              &lt;p&gt;Choose your password to finish setting it up, then sign in with this email address:&lt;/p&gt;
+              &lt;center&gt;
+                &lt;a href="{{SetupPasswordUrl}}" class="button"&gt;Set your password&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;div class="security-notice"&gt;
+                &lt;p&gt;⏱️ This link works once and is valid for 24 hours. If it expires, ask the administrator to invite you again.&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;&lt;strong&gt;Not expecting this?&lt;/strong&gt; You can ignore this email; the account stays unusable until a password is set.&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you're having trouble with the button above, copy and paste this URL into your browser: &lt;a href="{{SetupPasswordUrl}}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{SetupPasswordUrl}}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;Need help? Contact us at &lt;a href="mailto:{{SupportEmail}}" style="color: #4F46E5; text-decoration: none;"&gt;{{SupportEmail}}&lt;/a&gt;&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
+&lt;/body&gt;
+&lt;/html&gt;</value>
+  </data>
 </root>
