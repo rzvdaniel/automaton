@@ -29,17 +29,41 @@ public class AdminUsersController : BaseController
     private readonly UsersService usersService;
     private readonly ConfigurationService configurationService;
     private readonly IEmailService emailService;
+    private readonly AdminUserProvisioningService provisioning;
 
     public AdminUsersController(
         AdminAppsService adminAppsService,
         UsersService usersService,
         ConfigurationService configurationService,
-        IEmailService emailService)
+        IEmailService emailService,
+        AdminUserProvisioningService provisioning)
     {
         this.adminAppsService = adminAppsService;
         this.usersService = usersService;
         this.configurationService = configurationService;
         this.emailService = emailService;
+        this.provisioning = provisioning;
+    }
+
+    /// <summary>Creates the account without a password and emails a one-time link to set it; resends for pending accounts.</summary>
+    [HttpPost("invite")]
+    public async Task<ActionResult<AdminProvisionedUser>> Invite([FromBody] AdminInviteUserRequest request, CancellationToken cancellationToken)
+        => await Provision(() => provisioning.InviteAsync(request, User.Identity?.Name,
+            User.IsInRole(UserRole.SystemAdministrator), cancellationToken));
+
+    /// <summary>Creates the account with a password set by the administrator or generated and returned once; no email.</summary>
+    [HttpPost]
+    public async Task<ActionResult<AdminProvisionedUser>> Create([FromBody] AdminCreateUserRequest request, CancellationToken cancellationToken)
+        => await Provision(() => provisioning.CreateAsync(request, User.IsInRole(UserRole.SystemAdministrator), cancellationToken));
+
+    private async Task<ActionResult<AdminProvisionedUser>> Provision(Func<Task<AdminProvisionedUser>> action)
+    {
+        try { return Ok(await action()); }
+        catch (AdminUserConflictException exception) { return Conflict(new { message = exception.Message }); }
+        catch (UnauthorizedAccessException exception) { return StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message }); }
+        catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
+        // Identity rejected the password (policy) or a duplicate slipped past the check.
+        catch (InvalidOperationException exception) { return BadRequest(new { message = exception.Message }); }
     }
 
     [HttpGet]

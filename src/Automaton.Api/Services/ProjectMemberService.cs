@@ -233,13 +233,9 @@ public class ProjectMemberService
         }
     }
 
-    private async Task<string> CreatePasswordSetupUrlAsync(ApplicationUser user)
-    {
-        var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-        var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-        var email = user.Email ?? throw new InvalidOperationException("A user email is required to create a password setup link.");
-        return $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(email)}&code={encodedResetToken}";
-    }
+    // Studio's /reset-password page sets the password; /account/createpassword never existed.
+    private Task<string> CreatePasswordSetupUrlAsync(ApplicationUser user)
+        => AdminUserProvisioningService.CreatePasswordSetupUrlAsync(userManager, user, configurationService.WebsiteUrl);
 
     private EmailData CreateInvitationEmail(
         Project project,
