@@ -30,6 +30,13 @@ or pipe a value that is already in an environment variable:
 `printf '%s' "$VALUE" | automaton secrets set NAME`. Add `--project` to share it
 with every app in the project, or `--user` for all of the user's personal apps.
 
+Platform access such as reading server backups is requested in
+`application.permissions` (for example `["backups:read"]`) and needs a system
+administrator's approval in Studio; no agent or API key can approve it. After
+deploying, run `automaton permissions status` and give the user the approval
+link it prints. The app receives its key as `APP_AUTOMATON_API_KEY` on its next
+start after approval.
+
 Deploy Actions with `automaton deploy`. Validate with
 `automaton action validate <action-key>`. Invoke a deployed Action with
 `automaton action run <action-key> --input '{...}'`.

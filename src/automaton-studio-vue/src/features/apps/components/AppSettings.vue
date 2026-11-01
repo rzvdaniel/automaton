@@ -17,6 +17,7 @@ import Button from 'primevue/button'
 import CopyCommand from './CopyCommand.vue'
 import AppDeploymentTargets from './AppDeploymentTargets.vue'
 import AppSecrets from './AppSecrets.vue'
+import AppPermissions from './AppPermissions.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -44,12 +45,13 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'targets' | 'secrets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'targets' | 'secrets' | 'permissions' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
   (section) => {
     if (section === 'targets') activeSection.value = 'targets'
+    if (section === 'permissions') activeSection.value = 'permissions'
   },
   { immediate: true },
 )
@@ -548,6 +550,14 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'secrets'"
               />
               <Button
+                label="Permissions"
+                icon="pi pi-shield"
+                text
+                :class="{ 'surface-hover': activeSection === 'permissions' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'permissions'"
+              />
+              <Button
                 label="Appearance"
                 icon="pi pi-image"
                 text
@@ -721,6 +731,13 @@ async function handleSaveTemplateStatus() {
           <template #title>Secrets</template>
           <template #content>
             <AppSecrets v-if="app" :app-id="app.id" />
+          </template>
+        </Card>
+
+        <Card v-if="activeSection === 'permissions'">
+          <template #title>Permissions</template>
+          <template #content>
+            <AppPermissions v-if="app" :app-id="app.id" />
           </template>
         </Card>
 

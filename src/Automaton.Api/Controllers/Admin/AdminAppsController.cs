@@ -11,11 +11,19 @@ namespace Automaton.Api.Controllers.Admin;
 public class AdminAppsController : ControllerBase
 {
     private readonly AdminAppsService adminAppsService;
+    private readonly AdminAppDirectoryService directory;
 
-    public AdminAppsController(AdminAppsService adminAppsService)
+    public AdminAppsController(AdminAppsService adminAppsService, AdminAppDirectoryService directory)
     {
         this.adminAppsService = adminAppsService;
+        this.directory = directory;
     }
+
+    /// <summary>Every app with its owner; <c>waiting=true</c> keeps apps with permission requests to decide.</summary>
+    [HttpGet]
+    public async Task<ActionResult<AdminAppListResponse>> List([FromQuery] string? search, [FromQuery] bool waiting = false,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default)
+        => Ok(await directory.ListAsync(search, waiting, page, pageSize, cancellationToken));
 
     [HttpGet("{appId:guid}")]
     public async Task<ActionResult<AdminAppDetails>> Get(Guid appId, CancellationToken cancellationToken)

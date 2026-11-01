@@ -38,6 +38,10 @@ const savingPermission = ref<string | null>(null)
 const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
 const ownerUserName = computed(() => String(route.query.ownerUserName || details.value?.ownerName || 'User'))
+// Opened from Admin → Apps (or an approval link): breadcrumbs and Back return there.
+const fromAppsList = computed(() => route.query.from === 'apps' || !ownerUserId.value)
+// Tab order: Overview, Permissions, Source Code. `?tab=permissions` opens the approval tab directly.
+const activeTab = ref(route.query.tab === 'permissions' ? 1 : 0)
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')
 
 const reviewOptions = [
@@ -151,6 +155,10 @@ function canPreviewPath(path: string): boolean {
 }
 
 function goBack() {
+  if (fromAppsList.value) {
+    void router.push({ name: 'admin-apps' })
+    return
+  }
   if (ownerUserId.value) {
     void router.push({
       name: 'admin-user-apps',
@@ -259,10 +267,16 @@ onMounted(() => {
     <div class="page-header">
       <div>
         <div class="breadcrumb-row">
-          <Button label="Users" link class="breadcrumb-link" @click="router.push({ name: 'admin-users' })" />
-          <span class="breadcrumb-separator">/</span>
-          <Button v-if="ownerUserId" label="User Apps" link class="breadcrumb-link" @click="goBack" />
-          <span v-if="ownerUserId" class="breadcrumb-separator">/</span>
+          <template v-if="fromAppsList">
+            <Button label="Apps" link class="breadcrumb-link" @click="router.push({ name: 'admin-apps' })" />
+            <span class="breadcrumb-separator">/</span>
+          </template>
+          <template v-else>
+            <Button label="Users" link class="breadcrumb-link" @click="router.push({ name: 'admin-users' })" />
+            <span class="breadcrumb-separator">/</span>
+            <Button label="User Apps" link class="breadcrumb-link" @click="goBack" />
+            <span class="breadcrumb-separator">/</span>
+          </template>
           <span class="breadcrumb-current">{{ details?.app.name || 'App details' }}</span>
         </div>
         <h2 class="page-title">{{ details?.app.name || 'Admin App Details' }}</h2>
@@ -277,7 +291,7 @@ onMounted(() => {
     </div>
 
     <template v-else-if="details">
-      <TabView class="admin-app-tabs">
+      <TabView v-model:active-index="activeTab" class="admin-app-tabs">
         <TabPanel header="Overview" value="overview">
           <div class="summary-grid">
             <Card class="detail-card">

@@ -80,6 +80,16 @@ public sealed class DeployService
         ReportProgress($"Secrets warning: {missing}");
     }
 
+    private async Task WarnAboutWaitingPermissionsAsync(List<DeployCheckResult> checks, string server, string apiKey,
+        string appId, Models.AutomatonConfig projectConfig, CancellationToken cancellationToken)
+    {
+        if (deployPackageAsync != DeployPackageAsync) return;
+        var waiting = await PermissionStatusCheck.FindWaitingAsync(server, apiKey, appId, projectConfig.Application.Permissions, cancellationToken);
+        if (waiting is null) return;
+        AddCheck(checks, new DeployCheckResult(PermissionStatusCheck.CheckName, false, waiting, IsWarning: true));
+        ReportProgress($"Permissions: {waiting}");
+    }
+
     public async Task<DeployResult> DeployAsync(
         string directory,
         bool clean,
@@ -170,6 +180,8 @@ public sealed class DeployService
 
         AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, runtimeResult.Message ?? $"deploy package applied to {runtimeResult.RunnerCount} runner(s)"));
         ReportProgress(runtimeResult.Message ?? $"Deploy package applied to {runtimeResult.RunnerCount} runner(s).");
+        // After the deploy, which is what sends new permission requests to the server.
+        await WarnAboutWaitingPermissionsAsync(checks, server!, apiKey!, appId!, projectConfig, cancellationToken);
 
         return CreateResult(
             true, checks, nextSteps, projectConfig, appId, server, clean,

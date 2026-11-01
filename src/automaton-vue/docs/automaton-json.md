@@ -111,6 +111,10 @@ From the app's folder:
 
 `automaton validate` and `automaton deploy` warn about declared secrets without a value (`validate --strict` fails).
 
+### Platform permissions
+
+`application.permissions` requests platform access for the app, for example `"permissions": ["backups:read"]` (the only supported permission today). A system administrator of the server approves each request in Studio; the app then receives a scoped key as `APP_AUTOMATON_API_KEY` at its next Action run or start. `automaton permissions status` shows each request (waiting, approved, rejected or revoked) and the approval link to send to an administrator, and `automaton validate` and `automaton deploy` warn while a request waits. An app cannot approve its own requests, and neither can an API key.
+
 ## Create or link
 
 Use `automaton new "<name>"` for a new remote app. Use `automaton link <app-id>`
