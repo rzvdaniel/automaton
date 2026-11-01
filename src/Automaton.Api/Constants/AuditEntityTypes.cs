@@ -18,4 +18,8 @@ public static class AuditEntityTypes
     public const string AiGuidance = "AiGuidance";
     public const string AppModuleExecution = "AppModuleExecution";
     public const string ExecutionSecretGrant = "ExecutionSecretGrant";
+    public const string AppSecretVault = "AppSecretVault";
+    public const string ProjectSecretVault = "ProjectSecretVault";
+    public const string UserSecretVault = "UserSecretVault";
+    public const string AppPermission = "AppPermission";
 }

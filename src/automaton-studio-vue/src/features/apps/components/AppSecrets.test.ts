@@ -7,7 +7,7 @@ import AppSecrets from './AppSecrets.vue'
 import { appsService } from '../services/apps.service'
 
 vi.mock('../services/apps.service', () => ({
-  appsService: { listSecrets: vi.fn(), setSecret: vi.fn(), deleteSecret: vi.fn() },
+  appsService: { listSecrets: vi.fn(), setSecret: vi.fn(), deleteSecret: vi.fn(), listSecretHistory: vi.fn() },
 }))
 
 const mountSecrets = () => mount(AppSecrets, {
@@ -50,5 +50,22 @@ describe('AppSecrets', () => {
 
     expect(appsService.setSecret).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('not starting with a digit or AUTOMATON_')
+  })
+  it('shows the audit history of changes and deliveries on demand', async () => {
+    vi.mocked(appsService.listSecrets).mockResolvedValue([])
+    vi.mocked(appsService.listSecretHistory).mockResolvedValue([
+      {
+        createdAtUtc: '2026-11-01T03:00:00Z', eventType: 'SecretsDelivered', message: '1 secret(s) delivered to a runtime start',
+        runnerId: 'runner-1', delivered: [{ name: 'PAYMENTS_KEY', scope: 'project', version: 2, from: 'STRIPE_KEY' }],
+      },
+    ])
+    const wrapper = mountSecrets()
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text().includes('Show history'))!.trigger('click')
+    await flushPromises()
+
+    expect(appsService.listSecretHistory).toHaveBeenCalledWith('app-1')
+    expect(wrapper.text()).toContain('PAYMENTS_KEY v2 (project:STRIPE_KEY)')
+    expect(wrapper.text()).toContain('Runner')
   })
 })

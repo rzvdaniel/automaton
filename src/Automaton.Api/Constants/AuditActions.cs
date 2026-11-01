@@ -25,4 +25,8 @@ public static class AuditActions
     public const string Forked = "Forked";
     public const string Assigned = "Assigned";
     public const string Unassigned = "Unassigned";
+    public const string Delivered = "Delivered";
+    public const string Approved = "Approved";
+    public const string Rejected = "Rejected";
+    public const string Revoked = "Revoked";
 }

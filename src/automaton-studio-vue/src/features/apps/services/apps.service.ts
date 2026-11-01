@@ -5,6 +5,7 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   AppSecretSummary,
+  SecretAuditEntry,
   AppDeploymentTarget,
   App,
   AppListItem,
@@ -105,6 +106,11 @@ class AppsService {
   async getTagSuggestions(projectId?: string): Promise<string[]> {
     const params = projectId ? { projectId } : {}
     const { data } = await apiClient.get<string[]>('/api/apps/tags', { params })
+    return data
+  }
+
+  async listSecretHistory(appId: string): Promise<SecretAuditEntry[]> {
+    const { data } = await apiClient.get<SecretAuditEntry[]>(`/api/apps/${appId}/secrets/history`)
     return data
   }
 

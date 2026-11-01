@@ -4,6 +4,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
@@ -150,7 +151,9 @@ public sealed class AppSecretVaultTests
             var authorization = new ResourceAuthorizationService(db, AppAuthorizationTestData.CreateUserContextService(developer));
             return new Fixture
             {
-                Db = db, Service = new AppSecretService(db, new SecretStore(db, protector), protector, authorization),
+                Db = db,
+                Service = new AppSecretService(db, new SecretStore(db, protector), protector, authorization,
+                    new SecretAuditLog(new AuditEventService(db, AppAuthorizationTestData.CreateUserContextService(developer), new HttpContextAccessor()), db)),
                 ProjectId = projectId, Developer = developer
             };
         }

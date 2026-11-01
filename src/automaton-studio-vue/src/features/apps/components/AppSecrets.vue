@@ -9,7 +9,7 @@ import Message from 'primevue/message'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import { appsService } from '../services/apps.service'
-import type { AppSecretSummary } from '../types/apps.types'
+import type { AppSecretSummary, SecretAuditEntry } from '../types/apps.types'
 
 const props = defineProps<{ appId: string }>()
 const confirm = useConfirm()
@@ -18,6 +18,8 @@ const name = ref('')
 const value = ref('')
 const saving = ref(false)
 const error = ref<string | null>(null)
+const history = ref<SecretAuditEntry[] | null>(null)
+const historyLoading = ref(false)
 const namePattern = /^[A-Z_][A-Z0-9_]{0,99}$/
 
 onMounted(load)
@@ -79,6 +81,33 @@ function remove(secretName: string) {
   })
 }
 
+async function toggleHistory() {
+  if (history.value) {
+    history.value = null
+    return
+  }
+  historyLoading.value = true
+  try {
+    history.value = await appsService.listSecretHistory(props.appId)
+  } catch (failure) {
+    error.value = message(failure, 'Secret history could not be loaded.')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function describe(entry: SecretAuditEntry) {
+  if (entry.delivered.length === 0) return entry.version ? `${entry.name} v${entry.version}` : entry.name ?? ''
+  return entry.delivered
+    .map((item) => `${item.name}${item.version ? ` v${item.version}` : ''} (${item.from ? `${item.scope}:${item.from}` : item.scope})`)
+    .join(', ')
+}
+
+function actor(entry: SecretAuditEntry) {
+  if (entry.runnerId) return 'Runner'
+  return entry.userName || (entry.userId ? 'User' : 'Platform')
+}
+
 function message(failure: unknown, fallback: string) {
   return isAxiosError(failure) ? failure.response?.data?.message ?? fallback : fallback
 }
@@ -122,5 +151,31 @@ function message(failure: unknown, fallback: string) {
     </div>
     <small class="text-color-secondary">Saving an existing name replaces its value.</small>
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+    <div>
+      <Button
+        :label="history ? 'Hide history' : 'Show history'"
+        icon="pi pi-history"
+        text
+        size="small"
+        :loading="historyLoading"
+        @click="toggleHistory"
+      />
+    </div>
+    <DataTable v-if="history" :value="history" size="small">
+      <template #empty>No history yet.</template>
+      <Column header="When">
+        <template #body="{ data }">{{ new Date(data.createdAtUtc).toLocaleString() }}</template>
+      </Column>
+      <Column field="message" header="Event" />
+      <Column header="Secrets">
+        <template #body="{ data }">{{ describe(data) }}</template>
+      </Column>
+      <Column header="By">
+        <template #body="{ data }">{{ actor(data) }}</template>
+      </Column>
+    </DataTable>
+    <small v-if="history" class="text-color-secondary">
+      Changes and deliveries to Action runs and runtime starts, newest first, kept for 180 days. Values are never recorded.
+    </small>
   </div>
 </template>

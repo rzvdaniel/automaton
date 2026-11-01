@@ -33,6 +33,11 @@ public sealed class AppSecretsController(AppSecretService secrets, UserContextSe
         CancellationToken token = default)
         => await Run(async () => await secrets.DeleteAsync(appId, users.GetUserId(), scope, name, token) ? NoContent() : NotFound());
 
+    /// <summary>Audit history of the vault: changes and, for the app scope, deliveries. Names and versions only.</summary>
+    [HttpGet("history")]
+    public async Task<IActionResult> History(Guid appId, [FromQuery] string scope = AppSecretScopes.App, CancellationToken token = default)
+        => await Run(async () => Ok(await secrets.HistoryAsync(appId, users.GetUserId(), scope, token)));
+
     /// <summary>Whether each declared secret is available to the app, and from which scope.</summary>
     [HttpPost("status")]
     public async Task<IActionResult> Status(Guid appId, [FromBody] AppSecretStatusRequest request, CancellationToken token)

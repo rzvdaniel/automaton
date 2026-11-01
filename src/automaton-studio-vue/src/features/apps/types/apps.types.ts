@@ -442,3 +442,24 @@ export interface AppSecretSummary {
   version: number
   updatedAtUtc: string
 }
+
+export interface SecretDelivery {
+  name: string
+  scope: string
+  version?: number | null
+  from?: string | null
+}
+
+/** One audit entry about a vault: a change or a delivery. Never carries a value. */
+export interface SecretAuditEntry {
+  createdAtUtc: string
+  eventType: string
+  message: string
+  userId?: string | null
+  userName?: string | null
+  name?: string | null
+  version?: number | null
+  appId?: string | null
+  runnerId?: string | null
+  delivered: SecretDelivery[]
+}
