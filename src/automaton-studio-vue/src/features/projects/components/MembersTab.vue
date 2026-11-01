@@ -42,6 +42,9 @@
             />
           </div>
         </div>
+        <p class="text-sm mt-2 mb-0" style="color: var(--p-text-muted-color)">
+          The person needs an Automaton account on this server. If they don't have one, ask a server administrator to invite them first.
+        </p>
       </template>
     </Card>
 
@@ -191,13 +194,14 @@ async function handleInvite() {
     await store.addMember(props.projectId, {
       email: inviteForm.value.email,
       role: inviteForm.value.role,
-      createAccountIfNotExists: true,
     });
 
     inviteForm.value.email = '';
     inviteForm.value.role = ProjectRole.Viewer;
   } catch (error) {
-    // Error handled by service
+    // Most often: the person has no account yet and a server administrator has to invite them first.
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    toast.add({ severity: 'error', summary: 'Could not add member', detail: message ?? 'The member could not be added.', life: 8000 })
   }
 }
 

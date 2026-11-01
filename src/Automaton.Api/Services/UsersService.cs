@@ -422,6 +422,13 @@ public class UsersService
         {
             throw new InvalidOperationException($"Error in resetting password");
         }
+
+        // The token arrived by email, so using it proves the address (invited users start unconfirmed).
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+        }
     }
 
     public async Task SetDisabledAsync(Guid userId, bool disabled, CancellationToken cancellationToken = default)

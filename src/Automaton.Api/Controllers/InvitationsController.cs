@@ -149,8 +149,14 @@ public class InvitationsController : ControllerBase
         AcceptInvitationRequest request)
     {
         var user = await userManager.FindByEmailAsync(invite.Email);
-        if (user is null)
-            return await CreateInvitedUserAsync(invite, request);
+        // Invitations never create accounts: only server administrators do (sign-up is disabled on purpose).
+        if (user is null || user.IsDeleted)
+        {
+            return new InviteePreparationResult(null, BadRequest(new
+            {
+                message = "No account exists for this invitation. Ask a server administrator to invite you first."
+            }));
+        }
 
         if (await userManager.HasPasswordAsync(user))
         {
@@ -168,37 +174,6 @@ public class InvitationsController : ControllerBase
                 message = "Failed to set password",
                 errors = result.Errors.Select(error => error.Description)
             }));
-    }
-
-    private async Task<InviteePreparationResult> CreateInvitedUserAsync(
-        InvitationToken invite,
-        AcceptInvitationRequest request)
-    {
-        var displayName = string.IsNullOrWhiteSpace(request.Name) ? invite.Email : request.Name;
-        var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(displayName);
-        var user = new ApplicationUser
-        {
-            UserName = invite.Email,
-            Email = invite.Email,
-            Name = displayName,
-            PublicUsername = publicUsername,
-            EmailConfirmed = true,
-            IsEnterpriseEnabled = true,
-            RegisteredAtUtc = DateTime.UtcNow,
-            RegistrationProvider = RegistrationProviders.Invitation
-        };
-
-        var result = await userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-        {
-            return new InviteePreparationResult(null, BadRequest(new
-            {
-                message = "Failed to create user",
-                errors = result.Errors.Select(error => error.Description)
-            }));
-        }
-
-        return new InviteePreparationResult(await userManager.FindByEmailAsync(invite.Email), null);
     }
 
     private async Task EnsureProjectMembershipAsync(InvitationToken invite, ApplicationUser user)

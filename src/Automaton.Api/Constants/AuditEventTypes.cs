@@ -51,6 +51,8 @@ public static class AuditEventTypes
     public const string HostedRunnerDeleted = "HostedRunnerDeleted";
     public const string HostedRunnerDeleteFailed = "HostedRunnerDeleteFailed";
     public const string UserRegistered = "UserRegistered";
+    public const string UserInvited = "UserInvited";
+    public const string UserCreatedByAdministrator = "UserCreatedByAdministrator";
     public const string UserDisabled = "UserDisabled";
     public const string UserEnabled = "UserEnabled";
     public const string UserDeleted = "UserDeleted";

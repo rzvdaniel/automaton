@@ -17,6 +17,18 @@ interface AdminUsersQuery {
   pageSize?: number
 }
 
+export interface AdminInviteUserRequest { email: string; name?: string; administrator?: boolean }
+export interface AdminCreateUserRequest { email: string; name?: string; password?: string; administrator?: boolean }
+export interface AdminProvisionedUser {
+  userId: string
+  email: string
+  name: string
+  invitationSent: boolean
+  resent: boolean
+  generatedPassword?: string | null
+  warning?: string | null
+}
+
 class AdminUsersService {
   async getUsers(query: AdminUsersQuery = {}): Promise<AdminUserPage> {
     const { data } = await apiClient.get<AdminUserPage>('/api/admin/users', {
@@ -61,6 +73,18 @@ class AdminUsersService {
 
   async resendConfirmation(userId: string): Promise<void> {
     await apiClient.post(`/api/admin/users/${userId}/resend-confirmation`)
+  }
+
+  /** Creates the account without a password and emails a one-time link to set it (resends for pending accounts). */
+  async inviteUser(request: AdminInviteUserRequest): Promise<AdminProvisionedUser> {
+    const { data } = await apiClient.post<AdminProvisionedUser>('/api/admin/users/invite', request)
+    return data
+  }
+
+  /** Creates the account with a password; a generated password is returned once. No email is sent. */
+  async createUser(request: AdminCreateUserRequest): Promise<AdminProvisionedUser> {
+    const { data } = await apiClient.post<AdminProvisionedUser>('/api/admin/users', request)
+    return data
   }
 
   async hardDeleteUser(userId: string, confirmationText: string): Promise<void> {

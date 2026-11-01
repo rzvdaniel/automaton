@@ -115,6 +115,7 @@ export interface UpdateProjectRequest {
 export interface AddProjectMemberRequest {
   email: string;
   role: ProjectRoleType;
+  /** @deprecated Ignored by the server; project invites never create accounts. */
   createAccountIfNotExists?: boolean;
 }
 
