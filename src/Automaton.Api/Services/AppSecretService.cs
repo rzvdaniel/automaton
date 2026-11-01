@@ -30,7 +30,8 @@ public sealed class AppSecretService(
     ApplicationDbContext db,
     ISecretStore store,
     ISecretProtector protector,
-    ResourceAuthorizationService authorization)
+    ResourceAuthorizationService authorization,
+    SecretAuditLog? auditLog = null)
 {
     public const int MaxSecretsPerApp = 50;
     public const int MaxSecretsPerVault = 200;
@@ -73,6 +74,7 @@ public sealed class AppSecretService(
             definition.Description = description;
         }
         await db.SaveChangesAsync(token);
+        if (auditLog is not null) await auditLog.ChangedAsync(owner, appId, userId, name, created.Version, token);
         return new(name, created.Version, DateTime.UtcNow, scope, description);
     }
 
@@ -99,6 +101,7 @@ public sealed class AppSecretService(
         db.SecretVersions.RemoveRange(definition.Versions);
         db.SecretDefinitions.Remove(definition);
         await db.SaveChangesAsync(token);
+        if (auditLog is not null) await auditLog.ChangedAsync(owner, appId, userId, name, null, token);
         return true;
     }
 
@@ -119,35 +122,21 @@ public sealed class AppSecretService(
         }).ToList();
     }
 
+    /// <summary>Who or what a delivery of secrets is recorded for in the audit log.</summary>
+    public sealed record DeliveryActor(Guid? UserId, Guid? RunnerId);
+
     /// <summary>
     /// Current secret values for an Action run or runtime start: every app secret, plus vault secrets for
-    /// declared names the app does not have itself. Called only by the platform when dispatching.
+    /// declared names the app does not have itself. Called only by the platform when dispatching, and
+    /// recorded in the audit log as one entry listing the names, scopes and versions delivered.
     /// </summary>
-    public async Task<Dictionary<string, string>> ResolveForExecutionAsync(Guid appId, CancellationToken token)
-    {
-        var vaults = await VaultsAsync(appId, token);
-        var values = await CurrentValuesAsync(vaults.App, null, token);
-        var declarations = await DeclarationsAsync(appId, token);
-        var permissionKey = await db.AppPermissionApprovals
-            .Where(approval => approval.AppId == appId && approval.Permission == AppPermissionApproval.BackupsRead && approval.ProtectedKey != null)
-            .Select(approval => approval.ProtectedKey).FirstOrDefaultAsync(token);
-        if (permissionKey is not null)
-            values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(permissionKey);
-        var wanted = declarations.Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
-        if (wanted.Count == 0) return values;
+    public Task<Dictionary<string, string>> ResolveForExecutionAsync(Guid appId, CancellationToken token)
+        => ResolveForExecutionAsync(appId, new DeliveryActor(null, null), token);
 
-        var available = await CurrentNamesAsync(vaults, token);
-        var sources = new List<(string Name, SecretOwner Owner, string SourceName)>();
-        foreach (var declaration in wanted)
-            if (Source(declaration, vaults, available) is { } source)
-                sources.Add((declaration.Name, source.Owner, source.Name));
-        foreach (var group in sources.GroupBy(source => source.Owner))
-        {
-            var groupValues = await CurrentValuesAsync(group.Key, group.Select(source => source.SourceName).ToHashSet(StringComparer.Ordinal), token);
-            foreach (var source in group)
-                if (groupValues.TryGetValue(source.SourceName, out var value))
-                    values[source.Name] = value;
-        }
+    public async Task<Dictionary<string, string>> ResolveForExecutionAsync(Guid appId, DeliveryActor actor, CancellationToken token)
+    {
+        var (values, delivered) = await ResolveAsync(appId, token);
+        if (auditLog is not null) await auditLog.DeliveredAsync(appId, delivered, actor.UserId, actor.RunnerId, token);
         return values;
     }
 
@@ -159,7 +148,56 @@ public sealed class AppSecretService(
             target.Id == deploymentTargetId && target.WebAppId == appId && target.ExecutionRunnerId == runnerId, token);
         if (!assigned)
             throw new UnauthorizedAccessException("The deployment target is not assigned to this Runner.");
-        return await ResolveForExecutionAsync(appId, token);
+        return await ResolveForExecutionAsync(appId, new DeliveryActor(null, runnerId), token);
+    }
+
+    /// <summary>Audit history of one vault, addressed like <see cref="ListAsync(Guid, Guid, string, CancellationToken)"/>.</summary>
+    public async Task<IReadOnlyList<SecretAuditEntry>> HistoryAsync(Guid appId, Guid userId, string scope, CancellationToken token)
+    {
+        var owner = await OwnerForManagementAsync(appId, userId, scope, write: false, token);
+        return auditLog is null ? [] : await auditLog.HistoryAsync(owner, token);
+    }
+
+    private async Task<(Dictionary<string, string> Values, List<SecretDelivery> Delivered)> ResolveAsync(Guid appId, CancellationToken token)
+    {
+        var vaults = await VaultsAsync(appId, token);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var delivered = new List<SecretDelivery>();
+        foreach (var secret in await CurrentAsync(vaults.App, null, token))
+        {
+            values[secret.Name] = protector.Unprotect(secret.ProtectedValue);
+            delivered.Add(new(secret.Name, AppSecretScopes.App, secret.Version));
+        }
+        var permissionKey = await db.AppPermissionApprovals
+            .Where(approval => approval.AppId == appId && approval.Permission == AppPermissionApproval.BackupsRead && approval.ProtectedKey != null)
+            .Select(approval => approval.ProtectedKey).FirstOrDefaultAsync(token);
+        if (permissionKey is not null)
+        {
+            values[AppPermissionApproval.CredentialVariable] = protector.Unprotect(permissionKey);
+            delivered.Add(new(AppPermissionApproval.CredentialVariable, "permission", null, AppPermissionApproval.BackupsRead));
+        }
+        var declarations = await DeclarationsAsync(appId, token);
+        var wanted = declarations.Where(declaration => !values.ContainsKey(declaration.Name)).ToList();
+        if (wanted.Count == 0) return (values, delivered);
+
+        var available = await CurrentNamesAsync(vaults, token);
+        var sources = new List<(string Name, SecretOwner Owner, string SourceName)>();
+        foreach (var declaration in wanted)
+            if (Source(declaration, vaults, available) is { } source)
+                sources.Add((declaration.Name, source.Owner, source.Name));
+        foreach (var group in sources.GroupBy(source => source.Owner))
+        {
+            var current = (await CurrentAsync(group.Key, group.Select(source => source.SourceName).ToHashSet(StringComparer.Ordinal), token))
+                .ToDictionary(secret => secret.Name, StringComparer.Ordinal);
+            var scope = group.Key.OwnerType == SecretOwnerTypes.Project ? AppSecretScopes.Project : AppSecretScopes.User;
+            foreach (var source in group)
+                if (current.TryGetValue(source.SourceName, out var secret))
+                {
+                    values[source.Name] = protector.Unprotect(secret.ProtectedValue);
+                    delivered.Add(new(source.Name, scope, secret.Version, source.SourceName == source.Name ? null : source.SourceName));
+                }
+        }
+        return (values, delivered);
     }
 
     /// <summary>Stages removal of every secret of an app; the caller saves with the app deletion.</summary>
@@ -253,11 +291,7 @@ public sealed class AppSecretService(
         return result;
     }
 
-    private async Task<Dictionary<string, string>> CurrentValuesAsync(SecretOwner owner, HashSet<string>? names, CancellationToken token)
-        => (await CurrentAsync(owner, names, token))
-            .ToDictionary(secret => secret.Name, secret => protector.Unprotect(secret.ProtectedValue), StringComparer.Ordinal);
-
-    private sealed record CurrentSecret(string Name, string ProtectedValue);
+    private sealed record CurrentSecret(string Name, string ProtectedValue, int Version);
 
     /// <summary>The current, unrevoked, unexpired version of each secret of an owner, optionally by name.</summary>
     private async Task<List<CurrentSecret>> CurrentAsync(SecretOwner owner, HashSet<string>? names, CancellationToken token)
@@ -268,9 +302,9 @@ public sealed class AppSecretService(
         var current = await definitions.SelectMany(secret => secret.Versions
                 .Where(version => version.Version == secret.CurrentVersion && version.RevokedAtUtc == null
                     && (version.ExpiresAtUtc == null || version.ExpiresAtUtc > now))
-                .Select(version => new { secret.Name, version.ProtectedValue }))
+                .Select(version => new { secret.Name, version.ProtectedValue, version.Version }))
             .ToListAsync(token);
-        return current.Select(secret => new CurrentSecret(secret.Name, secret.ProtectedValue)).ToList();
+        return current.Select(secret => new CurrentSecret(secret.Name, secret.ProtectedValue, secret.Version)).ToList();
     }
 
     private async Task<IReadOnlyList<ApplicationSecretDeclaration>> DeclarationsAsync(Guid appId, CancellationToken token)

@@ -306,6 +306,7 @@ internal static class ApiMessagingRegistration
         services.AddTransient<DeploymentPackageRequestedCapSubscriber>();
         services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<ISecretStore, SecretStore>();
+        services.AddScoped<SecretAuditLog>();
         services.AddScoped<AppSecretService>();
         services.AddScoped<AppPermissionService>();
         services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();

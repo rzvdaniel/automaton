@@ -151,7 +151,7 @@ public sealed class AppActionExecutionService
         // The request is stored encrypted and fetched by the Runner over HTTPS; the Runner passes
         // secrets to the Action container as environment variables and redacts them from logs.
         if (appSecrets is not null)
-            request.Secrets = await appSecrets.ResolveForExecutionAsync(appId, cancellationToken);
+            request.Secrets = await appSecrets.ResolveForExecutionAsync(appId, new AppSecretService.DeliveryActor(userId, null), cancellationToken);
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {
             if (machineResources?.IsValid() != true)

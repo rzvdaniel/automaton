@@ -27,6 +27,9 @@ public sealed class SecretGrantCleanupService(
         var now = DateTime.UtcNow;
         var grantCount = await RevokeExpiredGrantsAsync(db, now, cancellationToken);
         var versionCount = await RevokeExpiredVersionsAsync(db, now, cancellationToken);
+        var auditCount = await SecretAuditLog.RemoveExpiredAsync(db, now, cancellationToken);
+        if (auditCount > 0)
+            logger.LogDebug("Removed {AuditCount} secret audit entries past retention", auditCount);
         if (grantCount > 0 || versionCount > 0)
         {
             logger.LogDebug(

@@ -1,3 +1,4 @@
+using Automaton.Api.Constants;
 using Automaton.Api.Enums;
 using System.Security.Cryptography;
 using Automaton.Api.Data;
@@ -14,7 +15,8 @@ public sealed record AppPermissionStatus(string Permission, bool Approved, strin
 /// <summary>System administrator approval and scoped credentials for app capabilities.</summary>
 public sealed class AppPermissionService(
     ApplicationDbContext db,
-    ISecretProtector protector)
+    ISecretProtector protector,
+    IAuditEventService? audit = null)
 {
     public async Task<IReadOnlyList<AppPermissionStatus>> GetStatusAsync(Guid appId, CancellationToken token)
     {
@@ -61,6 +63,21 @@ public sealed class AppPermissionService(
         row.UpdatedAtUtc = DateTime.UtcNow;
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException) { throw new AppPermissionConflictException(); }
+        if (audit is not null)
+        {
+            var (action, eventType) = row.Status switch
+            {
+                AppPermissionStatuses.Approved => (AuditActions.Approved, AuditEventTypes.AppPermissionApproved),
+                AppPermissionStatuses.Revoked => (AuditActions.Revoked, AuditEventTypes.AppPermissionRevoked),
+                _ => (AuditActions.Rejected, AuditEventTypes.AppPermissionRejected)
+            };
+            await audit.WriteAsync(new AuditEventWriteRequest
+            {
+                Action = action, EntityType = AuditEntityTypes.AppPermission, EntityId = appId, EventType = eventType,
+                Message = $"App permission {permission} was {row.Status.ToLowerInvariant()}",
+                Metadata = new { permission, appId }
+            }, token);
+        }
         return await GetStatusAsync(appId, token);
     }
 

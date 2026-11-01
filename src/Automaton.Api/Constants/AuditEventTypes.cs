@@ -3,6 +3,12 @@ namespace Automaton.Api.Constants;
 public static class AuditEventTypes
 {
     public const string ApiKeyCreated = "ApiKeyCreated";
+    public const string SecretSet = "SecretSet";
+    public const string SecretDeleted = "SecretDeleted";
+    public const string SecretsDelivered = "SecretsDelivered";
+    public const string AppPermissionApproved = "AppPermissionApproved";
+    public const string AppPermissionRejected = "AppPermissionRejected";
+    public const string AppPermissionRevoked = "AppPermissionRevoked";
     public const string ApiKeyDeleted = "ApiKeyDeleted";
     public const string ApiKeyAssignedToProject = "ApiKeyAssignedToProject";
     public const string ApiKeyUnassignedFromProject = "ApiKeyUnassignedFromProject";
