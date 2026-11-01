@@ -150,8 +150,14 @@ public sealed class AppActionExecutionService
         };
         // The request is stored encrypted and fetched by the Runner over HTTPS; the Runner passes
         // secrets to the Action container as environment variables and redacts them from logs.
+        // The delivery is audited after the execution is queued: the audit write saves the shared DbContext,
+        // which must not commit the pending execution before dispatch succeeds.
+        AppSecretService.ResolvedSecrets? resolved = null;
         if (appSecrets is not null)
-            request.Secrets = await appSecrets.ResolveForExecutionAsync(appId, new AppSecretService.DeliveryActor(userId, null), cancellationToken);
+        {
+            resolved = await appSecrets.ResolveForDispatchAsync(appId, cancellationToken);
+            request.Secrets = resolved.Values;
+        }
         if (RunnerApplicationProfiles.Normalize(runner.ApplicationProfile) == RunnerApplicationProfiles.MachineManagement)
         {
             if (machineResources?.IsValid() != true)
@@ -159,6 +165,8 @@ public sealed class AppActionExecutionService
             request.ContainerPolicy = machineResources.ToActionContainerPolicy();
         }
         await runnerGateway.QueueExecutionAsync(runner.Id, userId ?? Guid.Empty, execution.Id, request, cancellationToken);
+        if (resolved is not null)
+            await appSecrets!.RecordDeliveryAsync(appId, resolved, new AppSecretService.DeliveryActor(userId, null), cancellationToken);
         return execution;
     }
 

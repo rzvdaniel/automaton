@@ -135,10 +135,27 @@ public sealed class AppSecretService(
 
     public async Task<Dictionary<string, string>> ResolveForExecutionAsync(Guid appId, DeliveryActor actor, CancellationToken token)
     {
-        var (values, delivered) = await ResolveAsync(appId, token);
-        if (auditLog is not null) await auditLog.DeliveredAsync(appId, delivered, actor.UserId, actor.RunnerId, token);
-        return values;
+        var resolved = await ResolveForDispatchAsync(appId, token);
+        await RecordDeliveryAsync(appId, resolved, actor, token);
+        return resolved.Values;
     }
+
+    /// <summary>Secret values and what was delivered, for a caller that records the delivery after its own save.</summary>
+    public sealed record ResolvedSecrets(Dictionary<string, string> Values, IReadOnlyList<SecretDelivery> Delivered);
+
+    /// <summary>
+    /// Resolves secrets without writing the audit log. The audit write saves the shared DbContext, so callers
+    /// with pending changes call <see cref="RecordDeliveryAsync"/> after their own save.
+    /// </summary>
+    public async Task<ResolvedSecrets> ResolveForDispatchAsync(Guid appId, CancellationToken token)
+    {
+        var (values, delivered) = await ResolveAsync(appId, token);
+        return new(values, delivered);
+    }
+
+    public Task RecordDeliveryAsync(Guid appId, ResolvedSecrets resolved, DeliveryActor actor, CancellationToken token)
+        => auditLog is null ? Task.CompletedTask
+            : auditLog.DeliveredAsync(appId, resolved.Delivered, actor.UserId, actor.RunnerId, token);
 
     /// <summary>Current secret values for a runtime start, only for a target assigned to the requesting Runner.</summary>
     public async Task<Dictionary<string, string>> ResolveForRuntimeAsync(

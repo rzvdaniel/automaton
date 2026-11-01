@@ -58,6 +58,26 @@ public sealed class SecretAuditLogTests
     }
 
     [Test]
+    public async Task DispatchResolutionDoesNotSavePendingChangesUntilRecorded()
+    {
+        var (db, service, developer, appId) = Create();
+        await service.SetAsync(appId, developer, AppSecretScopes.Project, "STRIPE_KEY", Value1, null, None);
+        var pending = new AuditEvent
+        {
+            Id = Guid.NewGuid(), Category = "Audit", Action = "Created", EntityType = AuditEntityTypes.ApiKey, EventType = "ApiKeyCreated",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.AuditEvents.Add(pending);
+
+        var resolved = await service.ResolveForDispatchAsync(appId, None);
+
+        Assert.That(resolved.Values["STRIPE_KEY"], Is.EqualTo(Value1));
+        Assert.That(db.Entry(pending).State, Is.EqualTo(EntityState.Added), "resolving must not save the caller's pending changes");
+        await service.RecordDeliveryAsync(appId, resolved, new AppSecretService.DeliveryActor(developer, null), None);
+        Assert.That(await service.HistoryAsync(appId, developer, AppSecretScopes.App, None), Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task ReadingHistoryNeedsAccessToTheVault()
     {
         var (_, service, developer, appId) = Create();
