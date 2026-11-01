@@ -18,7 +18,7 @@ Each plan is a numbered file. The number is a permanent ID, not a priority: new 
 
 - **These files** hold the design: why, architecture, security rules and decisions. Change them in reviewed PRs.
 - **GitHub issues** hold the work. Each plan in progress has a parent issue; each step is a sub-issue with full context and acceptance criteria. Native *blocked by* links give the order: an issue without open blockers can start. Labels `agent:ready`, `agent:blocked`, `agent:in-progress` and `agent:human-review` show who can pick it up.
-- **Status** is the issue state (and the project board). A PR closes its issue and updates the step's one-line status in the plan file; do not keep detailed progress notes in these files.
+- **Status** is the issue state and the [Automaton roadmap board](https://github.com/users/rzvdaniel/projects/1) (Status, Priority, Plan). A PR closes its issue and updates the step's one-line status in the plan file; do not keep detailed progress notes in these files.
 - New work found while implementing becomes a new sub-issue of the plan's parent issue, not a paragraph here.
 
 | # | Plan | Status |
