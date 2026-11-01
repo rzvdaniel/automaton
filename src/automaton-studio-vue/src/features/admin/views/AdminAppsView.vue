@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Button from 'primevue/button'
@@ -94,13 +94,8 @@ watch(search, () => {
   searchTimer = setTimeout(reload, 300)
 })
 watch(waitingOnly, reload)
-// Back/forward or a link changes the query without touching the inputs; follow it.
-watch(() => route.query, (query) => {
-  const nextSearch = String(query.search || '')
-  const nextWaiting = query.waiting === 'true'
-  if (nextSearch !== search.value.trim()) search.value = nextSearch
-  if (nextWaiting !== waitingOnly.value) waitingOnly.value = nextWaiting
-})
+// Leaving within the debounce must not rewrite the next page's query.
+onBeforeUnmount(() => clearTimeout(searchTimer))
 
 onMounted(() => {
   void loadApps()

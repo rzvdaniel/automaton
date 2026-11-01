@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -42,7 +43,10 @@ const ownerUserName = computed(() => String(route.query.ownerUserName || details
 // Decided from the link alone, so the breadcrumb does not change once the details load.
 const fromAppsList = computed(() => route.query.from === 'apps' || !route.query.ownerUserId)
 // Tab order: Overview, Permissions, Source Code. `?tab=permissions` opens the approval tab directly.
-const activeTab = ref(route.query.tab === 'permissions' ? 1 : 0)
+// Only system administrators approve permissions (the endpoint is SysAdmin-only), so only they get the tab.
+const authStore = useAuthStore()
+const isSystemAdministrator = computed(() => authStore.user?.roles?.includes('SysAdmin') ?? false)
+const activeTab = ref(isSystemAdministrator.value && route.query.tab === 'permissions' ? 1 : 0)
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')
 
 const reviewOptions = [
@@ -76,7 +80,7 @@ async function loadApp() {
 
     details.value = appDetails
     fileTree.value = files
-    void loadPermissions()
+    if (isSystemAdministrator.value) void loadPermissions()
 
     const firstReadableFile = findFirstFile(files)
     if (firstReadableFile) {
@@ -395,7 +399,7 @@ onMounted(() => {
           </div>
         </TabPanel>
 
-        <TabPanel header="Permissions" value="permissions">
+        <TabPanel v-if="isSystemAdministrator" header="Permissions" value="permissions">
           <Card class="detail-card">
             <template #title>App permissions</template>
             <template #content>

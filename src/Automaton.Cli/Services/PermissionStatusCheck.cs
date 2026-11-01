@@ -2,12 +2,13 @@ using System.Text.Json;
 
 namespace Automaton.Cli.Services;
 
+/// <summary>What to tell the user. <c>Waiting</c> is false when the status could not be checked.</summary>
+public sealed record PermissionStatusOutcome(string Message, bool Waiting);
+
 /// <summary>
 /// Asks the server which requested permissions still wait for a system administrator. Used by validate and
 /// deploy, so an agent can hand the owner the approval link instead of debugging a refused API call.
 /// </summary>
-/// <summary>What to tell the user. <c>Waiting</c> is false when the status could not be checked.</summary>
-public sealed record PermissionStatusOutcome(string Message, bool Waiting);
 
 public static class PermissionStatusCheck
 {
@@ -21,11 +22,11 @@ public static class PermissionStatusCheck
         IReadOnlyList<string>? requested, CancellationToken cancellationToken)
     {
         if (requested is not { Count: > 0 }) return null;
-        JsonElement status;
         try
         {
             using var client = new AutomatonApiClient(server, apiKey);
-            status = await client.GetPermissionsAsync(appId, cancellationToken);
+            var status = await client.GetPermissionsAsync(appId, cancellationToken);
+            return Describe(status) is { } message ? new PermissionStatusOutcome(message, true) : null;
         }
         catch (HttpRequestException exception)
         {
@@ -35,11 +36,11 @@ public static class PermissionStatusCheck
         {
             return new PermissionStatusOutcome("could not check requested permissions: the server did not answer in time", false);
         }
-        catch (JsonException)
+        // The client wraps unreadable JSON in InvalidOperationException; Describe throws it for an unexpected shape.
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
             return new PermissionStatusOutcome("could not check requested permissions: the server sent an unexpected answer", false);
         }
-        return Describe(status) is { } message ? new PermissionStatusOutcome(message, true) : null;
     }
 
     public static string? Describe(JsonElement status)

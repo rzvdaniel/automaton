@@ -44,4 +44,12 @@ public sealed class PermissionStatusCheckTests
         Assert.That(outcome!.Waiting, Is.False);
         Assert.That(outcome.Message, Does.StartWith("could not check requested permissions"));
     }
+
+    [Test]
+    public void AnUnexpectedShapeIsReportedByTheCaller()
+    {
+        // Describe throws for a non-object answer; FindWaitingAsync turns that into "could not check".
+        using var status = JsonDocument.Parse("[1,2]");
+        Assert.Throws<InvalidOperationException>(() => PermissionStatusCheck.Describe(status.RootElement));
+    }
 }
