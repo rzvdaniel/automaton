@@ -35,6 +35,7 @@ const accessStatus = ref('active')
 const moderationReason = ref('')
 const permissions = ref<AdminAppPermissionStatus[]>([])
 const savingPermission = ref<string | null>(null)
+const savingApproval = ref<boolean | null>(null)
 
 const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
@@ -118,6 +119,7 @@ function permissionSeverity(status: string) {
 
 async function setPermission(item: AdminAppPermissionStatus, approved: boolean) {
   savingPermission.value = item.permission
+  savingApproval.value = approved
   const summary = approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected'
   try {
     permissions.value = await adminAppsService.setPermission(appId.value, item.permission, approved)
@@ -126,6 +128,7 @@ async function setPermission(item: AdminAppPermissionStatus, approved: boolean) 
     toast.add({ severity: 'error', summary: 'Permission update failed', life: 3000 })
   } finally {
     savingPermission.value = null
+    savingApproval.value = null
   }
 }
 
@@ -418,10 +421,10 @@ onMounted(() => {
               <div v-for="item in permissions" :key="item.permission" class="permission-row">
                 <div class="permission-name"><code>{{ item.permission }}</code> <Tag :value="item.status" :severity="permissionSeverity(item.status)" /></div>
                 <div class="permission-actions">
-                  <Button v-if="item.approved" label="Revoke" severity="danger" outlined size="small" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                  <Button v-if="item.approved" label="Revoke" :aria-label="`Revoke ${item.permission}`" severity="danger" outlined size="small" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
                   <template v-else>
-                    <Button label="Approve" size="small" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
-                    <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined size="small" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                    <Button label="Approve" :aria-label="`Approve ${item.permission}`" size="small" :loading="savingPermission === item.permission && savingApproval === true" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
+                    <Button v-if="item.status === 'Pending'" label="Reject" :aria-label="`Reject ${item.permission}`" severity="secondary" outlined size="small" :loading="savingPermission === item.permission && savingApproval === false" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
                   </template>
                 </div>
               </div>
