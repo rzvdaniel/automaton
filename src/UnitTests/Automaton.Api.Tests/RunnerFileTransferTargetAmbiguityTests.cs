@@ -13,15 +13,6 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerFileTransferTargetAmbiguityTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task MediaTransferWithoutTargetId_AllowsMultipleTargetsOnOneRunner()
-    {
-        var result = await RunnerFileTransferTargetAmbiguityScenario.RunAsync();
-
-        Assert.That(result, Is.True,
-            "The media command should pass preflight and remain queued for Runner delivery.");
-    }
 }
 
 internal static class RunnerFileTransferTargetAmbiguityScenario

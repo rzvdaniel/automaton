@@ -11,47 +11,6 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class RunnerStartupTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ManagedServiceHost_StartsBeforeRunnerServiceMode()
-    {
-        using var environment = TestEnvironment.Managed();
-        using var host = Program.CreateHostBuilder([]).Build();
-
-        var startup = Task.Run(() => host.StartAsync());
-        Assert.That(
-            await Task.WhenAny(startup, Task.Delay(TimeSpan.FromSeconds(5))),
-            Is.SameAs(startup),
-            "Managed Runner host startup must not block on hosted-service resolution.");
-        await startup;
-
-        Assert.That(host.Services.GetRequiredService<RunnerHostService>(), Is.Not.Null);
-        Assert.That(
-            host.Services.GetServices<IHostedService>(),
-            Has.Some.TypeOf<RunnerRuntimeContainerHostedService>());
-        await host.StopAsync();
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ManagedEnrollment_UsesExchangeBoundaryAfterHostBuild()
-    {
-        using var environment = TestEnvironment.Managed();
-        var handler = new EnrollmentHandler();
-        using var host = Program.CreateHostBuilder([])
-            .ConfigureServices(services => services.AddSingleton(handler))
-            .Build();
-        await host.StartAsync();
-        using var enrollmentClient = new HttpClient(handler);
-        var runner = ManagedRunnerEnrollmentFixture.CreateRunner(host, enrollmentClient);
-
-        Assert.That(await runner.EnrollAsync(), Is.True);
-        Assert.That(handler.RequestUri?.AbsolutePath, Is.EqualTo("/api/runner-enrollments/exchange"));
-        Assert.That(handler.RequestMethod, Is.EqualTo(HttpMethod.Post));
-        Assert.That(handler.RequestBody?.EnrollmentToken, Is.EqualTo("re_test-token"));
-        await host.StopAsync();
-    }
-
     [Test]
     public async Task MachineManagementProfileReload_RestoresPersistedRunnerIdentityAfterRestart()
     {

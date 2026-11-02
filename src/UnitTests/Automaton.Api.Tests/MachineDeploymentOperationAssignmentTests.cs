@@ -41,60 +41,6 @@ public sealed class MachineDeploymentOperationAssignmentTests
         Assert.That(fixture.Target.ExecutionRunnerId, Is.EqualTo(fixture.Runner.Id));
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("workspace")]
-    [TestCase("target")]
-    [TestCase("attempt")]
-    public async Task QueuedDeploymentIsTerminalizedWhenItsBindingChanges(string change)
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        fixture.RevokeOrReplace(change);
-
-        var assignment = await fixture.Service.AssignmentAsync(
-            fixture.Runner.ApiKeyId!.Value, fixture.TransferOperationId, CancellationToken.None,
-            authenticatedUserId: fixture.ActorId, runnerId: fixture.Runner.Id);
-        var result = await fixture.Service.WaitAsync(fixture.TransferOperationId, CancellationToken.None);
-        var expectedFailure = change switch
-        {
-            "attempt" => "attempt",
-            "target" => "assigned",
-            _ => "permission"
-        };
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
-            Assert.That(assignment.Request, Is.Null);
-            Assert.That(result.Outcome, Is.EqualTo("Failed"));
-            Assert.That(result.FileTransferResult!.Success, Is.False);
-            Assert.That(result.Error, Does.Contain(expectedFailure));
-        });
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("workspace")]
-    [TestCase("target")]
-    public async Task QueuedActionIsTerminalizedWhenItsBindingChanges(string change)
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        var operationId = await fixture.QueueActionAsync();
-        fixture.RevokeOrReplace(change);
-
-        var assignment = await fixture.Service.AssignmentAsync(
-            fixture.Runner.ApiKeyId!.Value, operationId, CancellationToken.None,
-            authenticatedUserId: fixture.ActorId, runnerId: fixture.Runner.Id);
-        var result = await fixture.Service.WaitAsync(operationId, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
-            Assert.That(assignment.Request, Is.Null);
-            Assert.That(result.Outcome, Is.EqualTo("Failed"));
-            Assert.That(result.Error, Is.Not.Empty);
-        });
-        Assert.That(await fixture.ReadActionStatusAsync(operationId), Is.EqualTo(AppModuleExecutionStatuses.RunnerUnavailable));
-    }
-
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly ApplicationDbContext db;

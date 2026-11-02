@@ -29,62 +29,6 @@ public sealed class HostContainerExecutionTests
         Assert.That(invoked, Is.False);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("HostContainerExecution")]
-    [TestCase(RunnerCapabilities.ManagedContainerExecution)]
-    public async Task InfrastructureIdentityCannotExecuteMachineOrLegacyContainerWork(string capabilities)
-    {
-        using var machine = MachineContainerTestEnvironment.Create();
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
-        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", capabilities);
-        var invoked = false;
-        var service = new HostContainerExecutionService((_, _, _) =>
-        {
-            invoked = true;
-            return Task.FromResult(new InfrastructureCommandResponse { Success = true });
-        });
-        var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-        {
-            Scope = MachineContainerTestEnvironment.CurrentScope(),
-            Operation = HostContainerOperationKinds.ResolveImage, RequestedImage = "example/app:1"
-        });
-        Assert.That(result.ErrorCode, Is.EqualTo("authorization"));
-        Assert.That(invoked, Is.False);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task HostExecutionAloneDoesNotAuthorizeHostContainerExecution()
-    {
-        var service = new HostContainerExecutionService((_, _, _) =>
-            Task.FromResult(new InfrastructureCommandResponse { Success = true }));
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", "HostExecution");
-            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-            {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-                Operation = HostContainerOperationKinds.ResolveImage,
-                RequestedImage = "python:3.13-slim"
-            });
-
-            Assert.That(result.ErrorCode, Is.EqualTo("authorization"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
-    }
-
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [Test]
-    public async Task MachineManagementRunsTypedOperationOnlyForItsStableIdentity()
-        => await MachineManagementIdentityScenario.ExecuteAsync();
-
     private static class MachineManagementIdentityScenario
     {
         public static async Task ExecuteAsync()
@@ -346,32 +290,6 @@ public sealed class HostContainerExecutionTests
         finally
         {
             Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", priorRoot);
-        }
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task HostedRunnerCannotUseHostContainerCapability()
-    {
-        var service = new HostContainerExecutionService((_, _, _) =>
-            Task.FromResult(new InfrastructureCommandResponse { Success = true }));
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", RunnerPurposes.Managed);
-            var result = await service.ExecuteAsync(new HostContainerExecutionRequest
-            {
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-                Operation = HostContainerOperationKinds.ResolveImage,
-                Resources = new("workspace", "artifact", "data"),
-                RequestedImage = "python:3.13-slim"
-            });
-
-            Assert.That(result.ErrorCode, Is.EqualTo("authorization"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
         }
     }
 

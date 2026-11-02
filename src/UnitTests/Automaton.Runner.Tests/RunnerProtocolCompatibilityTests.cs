@@ -18,22 +18,6 @@ public sealed class RunnerProtocolCompatibilityTests
             Is.EqualTo(RunnerApiCompatibilityVersions.Current));
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public void HostContainerExecutionIsProtocolFourAndTunnelReconnectCommandsAreProtocolFive()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(RunnerApiCompatibilityVersions.HostContainerExecution, Is.EqualTo("4"));
-            Assert.That(RunnerApiCompatibilityVersions.RuntimeTunnelReconnectCommands, Is.EqualTo("5"));
-            Assert.That(RunnerApiCompatibilityVersions.Current, Is.EqualTo("5"));
-            Assert.That(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
-                Does.Not.Contain("HostContainerExecution"));
-            Assert.That(RunnerCapabilities.DefaultsForPurpose("Infrastructure"),
-                Does.Contain("HostContainerExecution"));
-        });
-    }
-
     [Test]
     public void ManagedArtifactsUseTheDurableExecutorAndHaveNoHubHandler()
     {

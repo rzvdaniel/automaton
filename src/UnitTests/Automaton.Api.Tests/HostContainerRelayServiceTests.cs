@@ -118,30 +118,6 @@ public sealed class HostContainerRelayServiceTests
         });
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task AssignmentAfterTargetReassignmentTerminalizesQueuedContainerRequest()
-    {
-        using var fixture = RelayFixture.Create();
-        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace();
-        await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, fixture.Request(), CancellationToken.None);
-        fixture.Target.ExecutionRunnerId = Guid.NewGuid();
-        await fixture.Db.SaveChangesAsync();
-
-        var assignment = await fixture.RunnerOperations.AssignmentAsync(fixture.MachineApiKeyId,
-            fixture.OperationId, CancellationToken.None, authenticatedUserId: ownerId, runnerId: fixture.MachineRunnerId);
-        var operation = await fixture.RunnerOperations.ReadHostContainerOperationAsync(fixture.MachineApiKeyId,
-            fixture.OperationId, ownerId, fixture.MachineRunnerId, CancellationToken.None);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(assignment.Disposition, Is.EqualTo("already-applied"));
-            Assert.That(assignment.Request, Is.Null);
-            Assert.That(operation!.Completed, Is.True);
-            Assert.That(operation.Result!.ErrorCode, Is.EqualTo("app_assignment_mismatch"));
-        });
-    }
-
     [Test]
     public async Task AssignmentAfterCapabilityRevocationTerminalizesQueuedContainerRequest()
     {

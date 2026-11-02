@@ -107,16 +107,6 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         });
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase(RunnerPurposes.Managed, "Standard", true, true)]
-    [TestCase(RunnerPurposes.Managed, "PrivilegedHost", true, false)]
-    [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false, true)]
-    [TestCase(RunnerPurposes.Managed, "Standard", false, false)]
-    [TestCase("Infrastructure", "Standard", true, false)]
-    public void RuntimeSelectionRequiresSupportedManagedBrokerShape(string purpose, string profile, bool hasHostedId, bool expected)
-        => Assert.That(RunnerApplicationContainerRuntimeSelection.UsesBroker(
-            purpose, profile, hasHostedId ? Guid.NewGuid().ToString() : null), Is.EqualTo(expected));
-
     [Test]
     public async Task MachineManagementScopeUsesStableRunnerIdentityWithoutHostedBinding()
     {

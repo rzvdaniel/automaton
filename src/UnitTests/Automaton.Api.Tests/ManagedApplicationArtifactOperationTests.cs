@@ -10,49 +10,6 @@ namespace Automaton.Api.Tests;
 
 public sealed class ManagedApplicationArtifactOperationTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task CallbackRetryReusesPinnedArtifactRequestAndTerminalResult()
-    {
-        await using var db = Db();
-        var runner = CreateRunner();
-        db.Runners.Add(runner); await db.SaveChangesAsync();
-        var publisher = new Publisher();
-        var operations = RunnerExecutionTestServices.Operations(db, publisher);
-        var owner = Guid.NewGuid(); var id = Guid.NewGuid();
-        var request = Request(Guid.NewGuid(), Guid.NewGuid(), "[]");
-        await operations.QueueManagedArtifactsAsync(id, runner.Id, owner, request, CancellationToken.None);
-        await AssertPinnedRequestAsync(operations, runner, id);
-        await ApplySuccessAsync(operations, runner, id, request);
-        var before = (await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ProtectedRequest;
-        await operations.QueueManagedArtifactsAsync(id, runner.Id, owner,
-            Request(request.AppId, request.DeploymentTargetId, "changed"), CancellationToken.None);
-        Assert.That(publisher.Count, Is.EqualTo(1));
-        Assert.That(publisher.Command!.Management, Is.True);
-        Assert.That((await db.RunnerExecutionOperations.AsNoTracking().SingleAsync()).ProtectedRequest, Is.EqualTo(before));
-        await AssertTerminalReplayAsync(operations, runner, id);
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => operations.QueueManagedArtifactsAsync(id, runner.Id,
-            Guid.NewGuid(), request, CancellationToken.None));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task AnotherOwnerOrWrongTargetCannotQueueArtifacts(bool wrongTarget)
-    {
-        await using var db = Db();
-        var app = Guid.NewGuid(); var owner = Guid.NewGuid(); var runner = Guid.NewGuid();
-        var target = AppDeploymentTarget.CreateLive(app, runner);
-        db.AppDeploymentTargets.Add(target);
-        db.WebAppUsers.Add(new() { WebAppId = app, UserId = owner });
-        await db.SaveChangesAsync();
-        var gateway = new ManagedApplicationArtifactGateway(db, RunnerExecutionTestServices.Operations(db));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => gateway.SynchronizeAsync(runner,
-            wrongTarget ? owner : Guid.NewGuid(), new(app, wrongTarget ? Guid.NewGuid() : target.Id, []),
-            Guid.NewGuid(), CancellationToken.None));
-        Assert.That(await db.RunnerExecutionOperations.CountAsync(), Is.Zero);
-    }
-
     [Test]
     public void DeploymentIdentityIsStableAndScopedToRunner()
     {

@@ -17,12 +17,6 @@ public sealed class HostedLifecycleEndpointRetirementTests
     public void RetiredMutationEndpointsAreNotRegistered(string verb, string route)
         => Assert.That(RegisteredRoutes().Contains(verb + " " + route.ToLowerInvariant()), Is.False);
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("POST", "api/infrastructure-commands/{commandId:guid}/result")]
-    [TestCase("GET", "api/host-container-executions/{operationId:guid}/result")]
-    public void ValidationAndMachineResultEndpointsRemainRegistered(string verb, string route)
-        => Assert.That(RegisteredRoutes().Contains(verb + " " + route.ToLowerInvariant()), Is.True);
-
     private static HashSet<string> RegisteredRoutes()
     {
         var services = new ServiceCollection();

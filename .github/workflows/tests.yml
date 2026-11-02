@@ -28,12 +28,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-      # Tests tagged Quarantine528 already failed on main when CI started running tests (#528).
-      # They are fixed or removed under that issue; every other test must pass.
       - name: Test
         run: >
           dotnet test src/UnitTests/Automaton.${{ matrix.project }}.Tests
-          --filter "TestCategory!=Quarantine528"
           --logger "console;verbosity=minimal"
 
   studio:

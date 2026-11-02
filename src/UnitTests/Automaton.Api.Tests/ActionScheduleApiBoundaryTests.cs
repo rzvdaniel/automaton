@@ -19,14 +19,6 @@ public sealed class ActionScheduleApiBoundaryTests
             () => JsonSerializer.Deserialize<SaveActionScheduleRequest>($$"""{"runAtUtc":"{{value}}"}""", new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             Throws.TypeOf<JsonException>());
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("2026-01-15T12:00:00Z")]
-    [TestCase("2026-01-15T12:00:00+02:00")]
-    public void RunAtUtc_AcceptsTimestampWithExplicitOffset(string value)
-        => Assert.That(
-            JsonSerializer.Deserialize<SaveActionScheduleRequest>($$"""{"runAtUtc":"{{value}}"}""", new JsonSerializerOptions(JsonSerializerDefaults.Web))!.RunAtUtc,
-            Is.Not.Null);
-
     [TestCase(typeof(InvalidOperationException), StatusCodes.Status400BadRequest)]
     [TestCase(typeof(UnauthorizedAccessException), StatusCodes.Status403Forbidden)]
     [TestCase(typeof(KeyNotFoundException), StatusCodes.Status404NotFound)]

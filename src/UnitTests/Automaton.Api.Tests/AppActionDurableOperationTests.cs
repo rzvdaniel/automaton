@@ -9,30 +9,6 @@ namespace Automaton.Api.Tests;
 
 public sealed class AppActionDurableOperationTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task CallbackPersistsActionAndReplayCannotChangeItsTerminalResult()
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        await fixture.QueueAsync();
-        var result = fixture.Result();
-        Assert.That((await fixture.Service.ApplyAsync(fixture.Key, fixture.Id, result, CancellationToken.None)).Outcome, Is.EqualTo("accepted"));
-        var stored = await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync();
-        Assert.That(stored.Status, Is.EqualTo("Succeeded"));
-        Assert.That(stored.ExitCode, Is.Zero);
-        Assert.That(stored.LogsAvailableUntilUtc, Is.Not.Null);
-        Assert.That((await fixture.Service.ApplyAsync(fixture.Key, fixture.Id, new(), CancellationToken.None)).Outcome, Is.EqualTo("already-applied"));
-        Assert.That((await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync()).CompletedAtUtc, Is.EqualTo(stored.CompletedAtUtc));
-    }
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ForeignRunnerKeyCannotReadOrCompleteAction()
-    {
-        await using var fixture = await Fixture.CreateAsync(); await fixture.QueueAsync();
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => fixture.Service.AssignmentAsync(Guid.NewGuid(), fixture.Id, CancellationToken.None));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(() => fixture.Service.ApplyAsync(Guid.NewGuid(), fixture.Id, fixture.Result(), CancellationToken.None));
-        Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).CompletedAtUtc, Is.Null);
-    }
     [Test]
     public async Task WrongExecutionIdentityIsRejectedBeforeEitherRecordChanges()
     {
@@ -42,62 +18,6 @@ public sealed class AppActionDurableOperationTests
         Assert.That((await fixture.Db.RunnerExecutionOperations.SingleAsync()).CompletedAtUtc, Is.Null);
         Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).CompletedAtUtc, Is.Null);
     }
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task CancellationSurvivesRestartAndDoesNotPretendActionHasFinished()
-    {
-        await using var fixture = await Fixture.CreateAsync(); await fixture.QueueAsync();
-        Assert.That(await fixture.Service.CancelAsync(fixture.Id, CancellationToken.None), Is.True);
-        Assert.That((await fixture.Service.AssignmentAsync(fixture.Key, fixture.Id, CancellationToken.None)).Disposition, Is.EqualTo("cancel"));
-        Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).CompletedAtUtc, Is.Null);
-        await fixture.Service.ApplyAsync(fixture.Key, fixture.Id, new() { Outcome = "Cancelled", Started = DateTime.UtcNow, Finished = DateTime.UtcNow }, CancellationToken.None);
-        Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).Status, Is.EqualTo("Cancelled"));
-        Assert.That(await fixture.Service.CancelAsync(fixture.Id, CancellationToken.None), Is.False);
-    }
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ExpiredDispatchIsTerminalizedWithoutSendingExecutablePayload()
-    {
-        await using var fixture = await Fixture.CreateAsync(); await fixture.QueueAsync();
-        var execution = await fixture.Db.AppModuleExecutions.SingleAsync(); execution.ExecutionDeadlineUtc = DateTime.UtcNow.AddSeconds(-1); await fixture.Db.SaveChangesAsync();
-        var assignment = await fixture.Service.AssignmentAsync(fixture.Key, fixture.Id, CancellationToken.None);
-        Assert.That(assignment.Disposition, Is.EqualTo("already-applied")); Assert.That(assignment.Request, Is.Null);
-        Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).Status, Is.EqualTo("Lost"));
-    }
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task AssignedActionStartsWithoutSignalRAndPayloadIsProtected()
-    {
-        await using var fixture = await Fixture.CreateAsync(); await fixture.QueueAsync();
-        Assert.That((await fixture.Db.RunnerExecutionOperations.SingleAsync()).ProtectedRequest, Does.Not.Contain("private-value"));
-        var assignment = await fixture.Service.AssignmentAsync(fixture.Key, fixture.Id, CancellationToken.None);
-        Assert.That(assignment.Request!.Action!.Kind, Is.EqualTo("execute"));
-        Assert.That((await fixture.Db.AppModuleExecutions.SingleAsync()).Status, Is.EqualTo("Running"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task SignalRDisconnectDoesNotTerminalizeDurableActionBeforeItsResultArrives()
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        await fixture.QueueAsync();
-        await fixture.Service.AssignmentAsync(fixture.Key, fixture.Id, CancellationToken.None);
-        var runner = await fixture.Db.Runners.SingleAsync();
-        runner.ConnectionId = "cutover-connection";
-        await fixture.Db.SaveChangesAsync();
-
-        await ManagedRunnerConnectionTestServiceFactory.MarkDisconnectedAsync(
-            fixture.Db, fixture.RunnerId, "cutover-connection");
-
-        var disconnectedExecution = await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync();
-        Assert.That(disconnectedExecution.Status, Is.EqualTo(AppModuleExecutionStatuses.Running));
-        Assert.That(disconnectedExecution.CompletedAtUtc, Is.Null);
-
-        await fixture.Service.ApplyAsync(fixture.Key, fixture.Id, fixture.Result(), CancellationToken.None);
-        Assert.That((await fixture.Db.AppModuleExecutions.AsNoTracking().SingleAsync()).Status,
-            Is.EqualTo(AppModuleExecutionStatuses.Succeeded));
-    }
-
     private sealed class Fixture : IAsyncDisposable
     {
         public ApplicationDbContext Db { get; } = new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

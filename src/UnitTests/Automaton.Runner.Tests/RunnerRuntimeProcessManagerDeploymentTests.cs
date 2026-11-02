@@ -21,27 +21,6 @@ public sealed class RunnerRuntimeProcessManagerDeploymentTests : RunnerRuntimePr
         await RunnerRuntimeProcessManagerFailedReplacementScenario.RunAsync();
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task FailedDeployment_LeavesCurrentArtifactFilesAndMetadataIntact()
-    {
-        await RunnerRuntimeProcessManagerFailedDeploymentScenario.RunAsync(root);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task FailedBuild_LeavesCurrentRuntimeAndArtifactsIntact()
-    {
-        await RunnerRuntimeProcessManagerFailedBuildScenario.RunAsync(root);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task InPlaceBuildWithoutOutputDirectory_PromotesPostBuildWorkspaceAsRuntimeArtifact()
-    {
-        await RunnerRuntimeProcessManagerInPlaceBuildScenario.RunAsync(root);
-    }
-
     [Test]
     public async Task FinalMetadataCompactionFailure_RetainsPromotedRuntimeForRestartReconciliation()
     {

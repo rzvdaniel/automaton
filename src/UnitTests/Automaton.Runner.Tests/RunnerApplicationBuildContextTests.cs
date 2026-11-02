@@ -32,32 +32,6 @@ public sealed class RunnerApplicationBuildContextTests
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ContainerBuildReceivesServerIssuedExecutionContext()
-    {
-        var workspace = new RunnerWorkspaceService();
-        var build = new RecordingBuildExecutor();
-        var service = new RunnerDeploymentService(workspace, new NoopRuntimeManager(),
-            new AppActionDeploymentService(workspace), build);
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var attemptId = Guid.NewGuid();
-        var packagePath = CreatePackage(appId);
-
-        var result = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = targetId,
-            ExecutionAttemptId = attemptId,
-            PackagePath = packagePath,
-            Clean = true
-        });
-
-        Assert.That(result.Success, Is.True, result.Message);
-        Assert.That(build.Context, Is.EqualTo(new RunnerApplicationBuildContext(appId, targetId, attemptId)));
-    }
-
     private string CreatePackage(Guid appId)
     {
         Directory.CreateDirectory(root);

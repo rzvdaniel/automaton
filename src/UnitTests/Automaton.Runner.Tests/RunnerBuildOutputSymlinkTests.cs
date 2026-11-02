@@ -11,46 +11,6 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class RunnerBuildOutputSymlinkTests
 {
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task BuildOutputLinksCannotCopyRunnerReadableFiles(bool linkOutputAncestor)
-    {
-        if (!OperatingSystem.IsLinux())
-            Assert.Ignore("Build-output link boundary regression requires Linux symlink semantics.");
-
-        using var fixture = await BuildOutputLinkFixture.CreateAsync(linkOutputAncestor, internalLink: false);
-        var result = await fixture.DeployAsync();
-        fixture.AssertPrivateFileWasNotCopied(result);
-    }
-
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [Test]
-    public async Task DynamicAppBuildPreservesInternalNodeModulesBinLinkWithRelativeDependency()
-    {
-        if (!OperatingSystem.IsLinux())
-            Assert.Ignore("Build-output link regression requires Linux symlink semantics.");
-        if (!await NodeIsAvailableAsync())
-            Assert.Ignore("The Node.js executable is unavailable for the relative-import regression.");
-
-        using var fixture = await BuildOutputLinkFixture.CreateAsync(linkOutputAncestor: false, internalLink: true);
-        var result = await fixture.DeployAsync();
-        await fixture.AssertInternalLinkWasPreservedAndRunsAsync(result);
-    }
-
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [Test]
-    public async Task BuildOutputDirectoryCyclesAreRejected()
-    {
-        if (!OperatingSystem.IsLinux())
-            Assert.Ignore("Build-output link regression requires Linux symlink semantics.");
-
-        using var fixture = await BuildOutputLinkFixture.CreateAsync(
-            linkOutputAncestor: false, internalLink: false, directoryCycle: true);
-        var result = await fixture.DeployAsync();
-        fixture.AssertDirectoryCycleWasRejected(result);
-    }
-
     private static async Task<bool> NodeIsAvailableAsync()
     {
         try

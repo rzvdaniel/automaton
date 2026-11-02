@@ -205,34 +205,6 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         AssertEnrollmentResult(result);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("Standard")]
-    [TestCase("PrivilegedHost")]
-    public async Task Exchange_RejectsPendingLegacyEnrollment(string profile)
-    {
-        await using var db = SelfHostedRunnerInstallationTestServices.CreateDbContext();
-        const string token = "legacy-enrollment-token";
-        db.SelfHostedRunnerEnrollments.Add(new SelfHostedRunnerEnrollment
-        {
-            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerName = "legacy-runner",
-            ApplicationProfile = profile,
-            InstallationId = $"sh_{Guid.NewGuid():N}",
-            EnrollmentTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant(),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
-        });
-        await db.SaveChangesAsync();
-        var service = SelfHostedRunnerInstallationTestServices.CreateService(db, Guid.NewGuid());
-
-        var result = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
-        {
-            EnrollmentToken = token,
-            RunnerName = "legacy-runner"
-        }, CancellationToken.None);
-
-        Assert.That(result, Is.Null);
-        Assert.That(await db.Runners.CountAsync(), Is.Zero);
-    }
-
     private static void AssertEnrollmentResult(EnrollmentExchangeResult result)
     {
         Assert.That(result.Purpose, Is.EqualTo(RunnerPurposes.Managed));

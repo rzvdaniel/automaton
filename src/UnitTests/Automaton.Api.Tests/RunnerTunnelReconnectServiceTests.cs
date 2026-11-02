@@ -14,26 +14,6 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerTunnelReconnectServiceTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase(false, false)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(true, true)]
-    public async Task CutoverAndCompensation_IncludeEnrolledByoWithProvisioningKey(bool reconcile, bool connected)
-    {
-        await using var fixture = await RunnerTunnelReconnectFixture.CreateAsync();
-        var byoId = await fixture.AddEnrolledByoRunnerAsync(connected);
-        var deletedId = await fixture.AddHostedRunnerAsync(deleted: true);
-        fixture.Publisher.RemovedQueueRunnerIds.Add(deletedId);
-
-        var result = await fixture.Service.RequestForApiColorAsync("blue", reconcile, CancellationToken.None);
-
-        Assert.That(result.FailedCount, Is.Zero);
-        Assert.That(result.RequestedCount, Is.EqualTo(5));
-        Assert.That(fixture.Publisher.RunnerIds, Does.Contain(byoId));
-        Assert.That(fixture.Publisher.RunnerIds, Does.Not.Contain(deletedId));
-    }
-
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

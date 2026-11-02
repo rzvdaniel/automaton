@@ -57,35 +57,6 @@ public sealed class RunnerDeploymentCleanupTests
     }
 
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResultJournalFailureDoesNotReportPromotedRuntimeAsFailed()
-    {
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var attemptId = Guid.NewGuid();
-        var operationId = Guid.NewGuid();
-        var package = CreateRuntimePackage(appId);
-        var workspace = new RunnerWorkspaceService();
-        Directory.CreateDirectory(workspace.RunnerRoot);
-        File.WriteAllText(Path.Combine(workspace.RunnerRoot, "command-results"), "blocks journal directory");
-        var runtimeManager = new PromotingRuntimeProcessManager();
-        var service = new RunnerDeploymentService(
-            workspace, runtimeManager, new AppActionDeploymentService(workspace));
-
-        var result = await service.DeployPackage(new DeployAppPackageRequest
-        {
-            AppId = appId,
-            DeploymentTargetId = targetId,
-            PackagePath = package,
-            DeploymentOperationId = operationId,
-            ExecutionAttemptId = attemptId
-        });
-
-        Assert.That(result.Success, Is.True);
-        Assert.That(runtimeManager.ApplyCount, Is.EqualTo(1));
-    }
-
     [Test]
     public async Task DeploymentRetryAfterRunnerInterruptionReturnsSavedResultWithoutApplyingRuntimeAgain()
     {

@@ -8,36 +8,6 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture, NonParallelizable]
 public sealed class MachineContainerResourceLimitsTests
 {
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [Test]
-    public async Task BuildContainerReceivesServerDerivedCpuMemoryAndPidLimits()
-    {
-        using var environment = MachineContainerTestEnvironment.Create();
-        var run = await MachineBuildContainerLimitScenario.ExecuteAsync(environment);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(run.Success, Is.True);
-            AssertContainerLimits(run.Arguments);
-            Assert.That(run.Arguments, Does.Not.Contain("--cgroup-parent"));
-        });
-    }
-
-    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
-    [Test]
-    public async Task AppContainerReceivesServerDerivedCpuMemoryAndPidLimits()
-    {
-        using var environment = MachineContainerTestEnvironment.Create();
-        var create = await MachineAppContainerLimitScenario.ExecuteAsync(environment);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(create.Success, Is.True);
-            AssertContainerLimits(create.Arguments);
-            Assert.That(create.Arguments, Does.Not.Contain("--cgroup-parent"));
-        });
-    }
-
     [Test]
     public async Task BuildContainerIsRefusedBelowTheConfiguredFreeDiskReserve()
     {

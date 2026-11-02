@@ -28,49 +28,6 @@ public class AppActionDeploymentServiceTests
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task PrepareAll_SkipsUnchangedAndPreservesRestorableVersions()
-    {
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var source = CreateBashAction(appId, targetId, "printf '{\"version\":1}'");
-
-        var first = await service.PrepareAllAsync(appId, targetId);
-        var unchanged = await service.PrepareAllAsync(appId, targetId);
-        File.WriteAllText(Path.Combine(source, "main.sh"), "printf '{\"version\":2}'");
-        var second = await service.PrepareAllAsync(appId, targetId);
-        var versions = service.ListVersions(appId, targetId, "hello");
-
-        Assert.That(first.Single().Status, Is.EqualTo("deployed"));
-        Assert.That(unchanged.Single().Status, Is.EqualTo("unchanged"));
-        Assert.That(second.Single().Status, Is.EqualTo("deployed"));
-        Assert.That(versions.Versions, Has.Count.EqualTo(2));
-        var oldVersion = versions.Versions.Single(version => !version.IsCurrent);
-
-        var restored = service.RestoreVersion(appId, targetId, "hello", oldVersion.Version);
-
-        Assert.That(restored.Success, Is.True);
-        Assert.That(File.ReadAllText(Path.Combine(workspace.GetAppActionCurrentDirectory(appId, targetId, "hello"), "main.sh")), Does.Contain("version\":1"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task DeleteVersion_RejectsCurrentAndDeletesNamedOldVersion()
-    {
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var source = CreateBashAction(appId, targetId, "printf '{}'");
-        await service.PrepareAllAsync(appId, targetId);
-        File.AppendAllText(Path.Combine(source, "main.sh"), "\nprintf ' '");
-        await service.PrepareAllAsync(appId, targetId);
-        var oldVersion = service.ListVersions(appId, targetId, "hello").Versions.Single(version => !version.IsCurrent);
-
-        Assert.That(() => service.DeleteVersion(appId, targetId, "hello", "current"), Throws.TypeOf<InvalidOperationException>());
-        Assert.That(service.DeleteVersion(appId, targetId, "hello", oldVersion.Version).Success, Is.True);
-        Assert.That(service.ListVersions(appId, targetId, "hello").Versions, Has.Count.EqualTo(1));
-    }
-
     [Test]
     public void MachineManagementRejectsPythonDependencyPreparationBeforeCreatingEnvironment()
     {

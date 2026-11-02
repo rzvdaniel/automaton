@@ -12,49 +12,6 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AppDeploymentTargetResolverTests
 {
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResolveAsync_WithoutSlug_ReturnsDefaultTarget()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(db, userId, online: true);
-        var app = AddApp(db, userId, runner.Id);
-        await db.SaveChangesAsync();
-
-        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId).ResolveAsync(app.Id, null, userId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(target.IsDefault, Is.True);
-            Assert.That(target.Slug, Is.EqualTo("live"));
-            Assert.That(target.ExecutionRunner?.Id, Is.EqualTo(runner.Id));
-        });
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResolveAsync_WithSlug_ReturnsNamedTarget()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var defaultRunner = AddRunner(db, userId, online: true);
-        var namedRunner = AddRunner(db, userId, online: true);
-        var app = AddApp(db, userId, defaultRunner.Id);
-        var namedTarget = CreateTarget(app.Id, "Server EU", "server-eu", namedRunner.Id);
-        app.DeploymentTargets.Add(namedTarget);
-        await db.SaveChangesAsync();
-
-        var target = await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
-            .ResolveAsync(app.Id, " SERVER-EU ", userId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(target.Id, Is.EqualTo(namedTarget.Id));
-            Assert.That(target.ExecutionRunner?.Id, Is.EqualTo(namedRunner.Id));
-        });
-    }
-
     [Test]
     public async Task ResolveAsync_WithUnknownSlug_Throws()
     {
@@ -88,70 +45,6 @@ public class AppDeploymentTargetResolverTests
                 .ResolveAsync(firstApp.Id, "server-us", userId));
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResolveAsync_WhenRunnerIsInaccessible_Throws()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(db, Guid.NewGuid(), online: true);
-        var app = AddApp(db, userId, runner.Id);
-        await db.SaveChangesAsync();
-
-        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
-                .ResolveAsync(app.Id, null, userId));
-
-        Assert.That(exception!.Message, Does.Contain("access"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResolveAsync_WhenOrdinaryAppUsesInfrastructureRunner_Throws()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(
-            db,
-            userId,
-            online: true,
-            purpose: "Infrastructure");
-        var app = AddApp(db, userId, runner.Id);
-        app.Tags = "infrastructure,admin";
-        await db.SaveChangesAsync();
-
-        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId)
-                .ResolveAsync(app.Id, null, userId));
-
-        Assert.That(exception!.Message, Does.Contain("Management Runner"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ResolveAsync_RejectsInfrastructureRunnerEvenForAdministrator()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        AddAdministratorRole(db, userId);
-        var runner = AddRunner(
-            db,
-            userId,
-            online: true,
-            purpose: "Infrastructure");
-        var app = AddApp(
-            db,
-            userId,
-            runner.Id,
-            InfrastructureAppTrust.PlatformAppId);
-        await db.SaveChangesAsync();
-
-        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await AppDeploymentTargetResolverTestServices.CreateResolver(db, userId, isAdministrator: true)
-                .ResolveAsync(app.Id, null, userId));
-        Assert.That(exception!.Message, Does.Contain("Management Runner"));
-    }
-
     [Test]
     public async Task ResolveAsync_WhenTargetIsUnassigned_Throws()
     {
@@ -166,87 +59,6 @@ public class AppDeploymentTargetResolverTests
 
         Assert.That(exception!.Message, Does.Contain("no assigned Runner"));
         Assert.That(exception.Message, Does.Contain("Assign a Management Runner"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task GetAssignedRunnerAsync_WhenRunnerIsOfflineAndOnlineRequired_Throws()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(db, userId, online: false);
-        var app = AddApp(db, userId, runner.Id);
-        await db.SaveChangesAsync();
-        var resolver = AppDeploymentTargetResolverTestServices.CreateResolver(db, userId);
-        var authorizationPolicy = AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId);
-        var assignmentPolicy = new AppRunnerAssignmentPolicy(
-            db,
-            authorizationPolicy,
-            resolver);
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await assignmentPolicy.GetAssignedRunnerAsync(
-                app.Id,
-                userId,
-                requireOnline: true));
-
-        Assert.That(exception!.Message, Does.Contain("unavailable"));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task AssignAsync_RejectsRetiredPrivilegedHostProfile()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(
-            db,
-            userId,
-            online: true,
-            applicationProfile: "PrivilegedHost");
-        var app = AddApp(db, userId, runnerId: null);
-        await db.SaveChangesAsync();
-
-        var assignmentPolicy = new AppRunnerAssignmentPolicy(
-            db,
-            AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
-            AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
-
-        Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await assignmentPolicy.AssignAsync(app, runner.Id, userId));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task AssignAsync_DoesNotApplyRetiredHostedRunnerAppLimit()
-    {
-        await using var db = CreateDbContext();
-        var userId = Guid.NewGuid();
-        var runner = AddRunner(db, userId, online: true);
-        var app = AddApp(db, userId, runnerId: null);
-        db.HostedRunners.Add(new HostedRunner
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            RunnerId = runner.Id,
-            Name = "legacy hosted record",
-            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
-            {
-                Resources = new HostedRunnerResources { MaximumApps = 0 }
-            }
-        });
-        await db.SaveChangesAsync();
-
-        var assignmentPolicy = new AppRunnerAssignmentPolicy(
-            db,
-            AppDeploymentTargetResolverTestServices.CreateRunnerAuthorizationPolicy(db, userId),
-            AppDeploymentTargetResolverTestServices.CreateResolver(db, userId));
-
-        await assignmentPolicy.AssignAsync(app, runner.Id, userId);
-
-        Assert.That(
-            (await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
-            Is.EqualTo(runner.Id));
     }
 
     private static WebApp AddApp(

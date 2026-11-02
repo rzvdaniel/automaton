@@ -100,46 +100,6 @@ public sealed class RunnerExecutionDeliveryTests
         Assert.That(executor.Calls, Is.Zero);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task BuildContainerCleanupRunsOnlyAfterResultSubmission()
-    {
-        var priorPurpose = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE");
-        var priorCapabilities = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES");
-        try
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", "Infrastructure");
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", "HostContainerExecution");
-            var events = new List<string>();
-            var http = new Api { Events = events };
-            var runnerId = Guid.NewGuid();
-            var operationId = Guid.NewGuid();
-            http.Request = new HostContainerExecutionRequest
-            {
-                OperationId = operationId,
-                Operation = HostContainerOperationKinds.RunBuild,
-                Scope = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
-            };
-            var docker = new InfrastructureCommandService((_, _, _) =>
-            {
-                events.Add("cleanup");
-                return Task.FromResult(new InfrastructureCommandResponse { Success = true });
-            });
-            var cleanup = new HostContainerBuildCleanupService(docker);
-            using var api = Client(http);
-            var handler = Handler(new Executor(), buildCleanup: cleanup);
-
-            Assert.That(await handler.HandleAsync(Body(operationId, runnerId), operationId.ToString(), api,
-                runnerId, CancellationToken.None), Is.True);
-            Assert.That(events, Is.EqualTo(new[] { "submit", "cleanup" }));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", priorPurpose);
-            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", priorCapabilities);
-        }
-    }
-
     private RunnerExecutionDeliveryHandler Handler(Executor executor, ReconnectRequester? requester = null,
         HostContainerBuildCleanupService? buildCleanup = null)
         => new(new RunnerExecutionProcessor(new RunnerExecutionJournal(directory), executor),

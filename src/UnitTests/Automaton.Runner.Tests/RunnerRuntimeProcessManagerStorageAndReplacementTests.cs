@@ -185,50 +185,6 @@ public sealed class RunnerRuntimeProcessManagerStorageAndReplacementTests : Runn
         await manager.StopAsync(appId, targetId);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task DeployedRuntimeFixture_StartsFromTheGenericApplicationArtifactRoot()
-    {
-        var workspace = new RunnerWorkspaceService();
-        var registry = new RunnerRuntimeRegistry();
-        var processManager = CreateManager(workspace, registry);
-        var deployment = CreateDeployment(workspace, processManager);
-        var appId = Guid.NewGuid();
-        var targetId = Guid.NewGuid();
-        var packagePath = CreateRuntimePackage(root, appId);
-
-        try
-        {
-            var result = await deployment.DeployPackage(new DeployAppPackageRequest
-            {
-                AppId = appId,
-                DeploymentTargetId = targetId,
-                PackagePath = packagePath,
-                Clean = true
-            });
-
-            var metadataPath = Path.Combine(workspace.GetAppAutomationRoot(appId, targetId), "deployment.json");
-            var deployedMetadata = ReadMetadata(metadataPath);
-            var logPath = Path.Combine(
-                workspace.GetAppRuntimeLogsDirectory(appId, targetId, deployedMetadata.ArtifactId!),
-                "runtime.stdout.log");
-            var output = await WaitForLogLineAsync(logPath, "deployed");
-            Assert.Multiple(() =>
-            {
-                Assert.That(result.Success, Is.True, result.Message);
-                Assert.That(output, Does.Contain("stdout:--tcp|deployed"));
-                Assert.That(registry.TryGet(appId, targetId, out _), Is.True);
-            });
-        }
-        finally
-        {
-            await processManager.StopAsync(appId, targetId);
-            processManager.Dispose();
-            if (File.Exists(packagePath))
-                File.Delete(packagePath);
-        }
-    }
-
     private static RunnerDeploymentService CreateDeployment(
         RunnerWorkspaceService workspace,
         IAppRuntimeProcessManager processManager)

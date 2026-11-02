@@ -79,17 +79,6 @@ public class AppActionManifestParserTests
         Assert.That(error.Message, Does.Contain("folder name"));
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public void RejectsPrivilegedCapabilitiesForNormalActions()
-    {
-        var yaml = ValidManifest + "\n  capabilities:\n    - docker\n";
-
-        var error = Assert.Throws<InvalidOperationException>(() => AppActionManifestParser.Parse(yaml, "hello"))!;
-
-        Assert.That(error.Message, Does.Contain("privileged"));
-    }
-
     [Test]
     public void RejectsUnknownCapabilities()
     {

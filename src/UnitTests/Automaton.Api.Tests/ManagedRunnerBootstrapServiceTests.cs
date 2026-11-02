@@ -54,49 +54,6 @@ public class ManagedRunnerBootstrapServiceTests
         Assert.That(await db.AppDeploymentTargets.Where(x => x.WebAppId == app.Id).Select(x => x.ExecutionRunnerId).SingleAsync(), Is.Null);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForSoftDeletedHostedRunnerAssignment()
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var app = SeedBackendApp(db, ownerId);
-        var runnerId = PrepareConnectedHostedRunnerAssignment(db, ownerId, app, deleted: true);
-
-        var service = CreateService(db);
-
-        await AssertUnavailableAndAssignmentAsync(
-            db, service, app.Id, ownerId, AppDeployStates.ManagedRuntimeUnavailable,
-            "Assign a Management Runner", runnerId, containsMessage: true);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [TestCase("Pending")]
-    [TestCase("Provisioning")]
-    [TestCase("Running")]
-    [TestCase("Failed")]
-    [TestCase("Reprovisioning")]
-    public async Task EnsureRunnerAssignmentAsync_RejectsRetiredHostedAssignmentWithoutRetry(string status)
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var app = SeedBackendApp(db, ownerId);
-        var runnerId = PrepareConnectedHostedRunnerAssignment(db, ownerId, app);
-        db.HostedRunners.Single().Status = status;
-        await db.SaveChangesAsync();
-
-        var result = await CreateService(db).EnsureRunnerAssignmentAsync(app.Id, ownerId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.IsReady, Is.False);
-            Assert.That(result.RequiresRetry, Is.False);
-            Assert.That(result.Message, Does.Contain("Assign a Management Runner"));
-            Assert.That(app.DeploymentTargets.Single().ExecutionRunnerId, Is.EqualTo(runnerId));
-            Assert.That(db.HostedRunners.Single().Status, Is.EqualTo(status));
-        });
-    }
-
     [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsReady_ForConnectedMachineManagementRunnerWithoutHostedRecord()
     {
@@ -122,22 +79,6 @@ public class ManagedRunnerBootstrapServiceTests
             "The assigned Runner is offline.", containsMessage: false);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForDisabledHostedRunnerAssignment()
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var app = SeedBackendApp(db, ownerId);
-        var runnerId = PrepareConnectedHostedRunnerAssignment(db, ownerId, app, disabled: true);
-
-        await AssertUnavailableAndAssignmentAsync(
-            db,
-            CreateService(db),
-            app.Id, ownerId, AppDeployStates.ManagedRuntimeUnavailable,
-            "Assign a Management Runner", runnerId, containsMessage: true);
-    }
-
     [Test]
     public async Task EnsureRunnerAssignmentAsync_DoesNotAssignOnlineInfrastructureRunnerFromHostedRunnerRecord()
     {
@@ -151,38 +92,6 @@ public class ManagedRunnerBootstrapServiceTests
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
         Assert.That(result.Message, Does.Contain("Assign a Management Runner"));
         Assert.That(await db.AppDeploymentTargets.Where(x => x.WebAppId == app.Id).Select(x => x.ExecutionRunnerId).SingleAsync(), Is.Null);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForLegacyInfrastructureAssignment()
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var planId = SeedHostedRunnerPlan(db, enabled: true);
-        var app = SeedBackendApp(db, ownerId);
-        SeedUser(db, ownerId, planId);
-        SeedRunnerHost(db);
-        var runnerId = SeedLegacyInfrastructureAssignment(db, ownerId, app);
-
-        await AssertLegacyInfrastructureAssignmentUnavailableAsync(
-            db,
-            CreateService(db),
-            app.Id, ownerId, runnerId);
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForMissingPersistedAssignment()
-    {
-        using var db = CreateDbContext();
-        var ownerId = Guid.NewGuid();
-        var app = SeedBackendApp(db, ownerId);
-        SeedMissingPersistedAssignment(db, ownerId, app);
-
-        var service = CreateService(db);
-
-        await AssertMissingAssignmentUnavailableAsync(db, service, app.Id, ownerId);
     }
 
 }

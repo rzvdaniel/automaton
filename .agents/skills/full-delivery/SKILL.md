@@ -68,7 +68,7 @@ and `"administrator": true`, store its email and generated password in the crede
    the owner, then review again until nothing above low severity is left.
 6. **Merge.** Only with the owner's go-ahead. Asking for a delivery to the test server includes releasing and
    upgrading the test server; a production update needs its own request. Wait for the checks of the final commit, including a conflict-resolution
-   commit, before merging. Squash-merge and delete the branch.
+   commit, before merging. The `Tests` workflow (all unit tests) must pass; never skip or quarantine a failing test to get green. Squash-merge and delete the branch.
 7. **Release.** After the merge, wait for the `Runner image` and `Build production images` workflows on `main` to
    succeed; a release pins the Runner image that exists at that moment. Then run
    `gh workflow run server-release.yml -f version=<next>` and wait for it and for `Pack CLI and Runner` to succeed.

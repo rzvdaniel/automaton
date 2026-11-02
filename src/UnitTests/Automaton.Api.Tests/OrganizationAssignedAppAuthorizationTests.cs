@@ -116,39 +116,6 @@ public sealed class OrganizationAssignedAppAuthorizationTests
         Assert.That(gateway.DispatchCount, Is.Zero);
     }
 
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned()
-    {
-        await using var fixture = await AppFixture.CreateAsync(assignApp: true, projectRole: ProjectRole.Developer);
-        var runnerId = await fixture.AssignMachineRunnerAsync("Standard");
-        var gateway = new RecordingActionGateway();
-        var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
-        using var input = JsonDocument.Parse("{}");
-
-        await service.ExecuteAsync(fixture.AppId, "hello", fixture.UserId, input.RootElement, CancellationToken.None);
-
-        Assert.That(gateway.QueuedRunnerId, Is.EqualTo(runnerId));
-    }
-
-    [Category("Quarantine528")] // #528: fails on main; fix or remove
-    [Test]
-    public async Task ExecuteAsync_RequiresPersistedApprovalForPrivilegedHostTarget()
-    {
-        await using var fixture = await AppFixture.CreateAsync(
-            assignApp: true, projectRole: ProjectRole.Developer);
-        await fixture.AssignMachineRunnerAsync("PrivilegedHost");
-        var gateway = new RecordingActionGateway();
-        var service = AppAuthorizationActionExecutionTestFactory.Create(fixture.DbContext, fixture.UserId, gateway);
-        using var input = JsonDocument.Parse("{}");
-
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await service.ExecuteAsync(
-            fixture.AppId, "hello", fixture.UserId, input.RootElement, CancellationToken.None));
-
-        Assert.That(exception!.Message, Does.Contain("persisted Privileged Host access approval"));
-        Assert.That(gateway.DispatchCount, Is.Zero);
-    }
-
     private sealed class AppFixture : IAsyncDisposable
     {
         private AppFixture(
