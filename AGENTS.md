@@ -38,7 +38,7 @@ Core workflow:
 
 ## Agent orchestration
 
-Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`.
+Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`. The [Full delivery](.agents/skills/full-delivery/SKILL.md) skill is a checklist for one agent, not orchestration machinery.
 
 ## Git workflow
 
@@ -121,4 +121,4 @@ git diff --check
 
 For production shell changes, run `bash -n` on every touched script. For Studio UI, follow the studio-design visual checklist in addition to type-check.
 
-For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request.
+For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request. When production work is requested, agents also do the administrator settings themselves and keep people informed, as the [Full delivery](.agents/skills/full-delivery/SKILL.md) skill describes.
