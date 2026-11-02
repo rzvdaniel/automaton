@@ -59,7 +59,7 @@ public sealed class AdminUserProvisioningServiceTests
         Assert.That(user.MustChangePassword, Is.True, "on by default for real people");
         Assert.That(PasswordChangeRequirement.ClaimsFor(user), Does.ContainKey(PasswordChangeRequirement.ClaimType));
 
-        Assert.ThrowsAsync<ArgumentException>(() => fixture.UsersService.UpdatePassword(user.Id, "Given-Pass-123", "Given-Pass-123"));
+        Assert.ThrowsAsync<PasswordChangeRejectedException>(() => fixture.UsersService.UpdatePassword(user.Id, "Given-Pass-123", "Given-Pass-123"));
         await fixture.UsersService.UpdatePassword(user.Id, "Given-Pass-123", "Own-Pass-456");
 
         user = (await fixture.Users.FindByIdAsync(created.UserId.ToString()))!;

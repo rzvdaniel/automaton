@@ -60,7 +60,7 @@ public class AccountController : BaseController
         {
             await userManagerService.UpdatePassword(userId, passwordUpdateCommand.OldPassword, passwordUpdateCommand.NewPassword);
         }
-        catch (ArgumentException error)
+        catch (PasswordChangeRejectedException error)
         {
             return BadRequest(new { message = error.Message });
         }

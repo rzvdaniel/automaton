@@ -96,7 +96,7 @@ public class UsersService
     {
         var user = await GetUserById(userId);
         if (user.MustChangePassword && string.Equals(oldPassword, newPassword, StringComparison.Ordinal))
-            throw new ArgumentException("Choose a password different from the one you were given.");
+            throw new PasswordChangeRejectedException("Choose a password different from the one you were given.");
 
         // Cleared in the same save as the new password, so a failure leaves both unchanged.
         var required = user.MustChangePassword;
@@ -106,7 +106,7 @@ public class UsersService
         if (!result.Succeeded)
         {
             user.MustChangePassword = required;
-            throw new ArgumentException(string.Join(" ", result.Errors.Select(error => error.Description)));
+            throw new PasswordChangeRejectedException(string.Join(" ", result.Errors.Select(error => error.Description)));
         }
 
         if (!required) return;
@@ -849,3 +849,6 @@ public class UsersService
         }
     }
 }
+
+/// <summary>The new password was not accepted (wrong current password, policy, or unchanged); the message is safe to show.</summary>
+public sealed class PasswordChangeRejectedException(string message) : Exception(message);
