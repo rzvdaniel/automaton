@@ -52,6 +52,13 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertGreater(edge['http']['routers']['studio-api']['priority'], edge['http']['routers']['studio']['priority'])
         self.assertIn('Path(`/auth/github/login`)', edge['http']['routers']['studio-api']['rule'])
         self.assertNotIn('PathPrefix(`/auth/github`)', edge['http']['routers']['studio-api']['rule'])
+        # Studio pages such as /apikeys must not match the API route.
+        self.assertIn('PathPrefix(`/api/`)', edge['http']['routers']['studio-api']['rule'])
+        self.assertNotIn('PathPrefix(`/api`)', edge['http']['routers']['studio-api']['rule'])
+        pages = json.loads((self.root / 'dynamic/studio-paths.yml').read_text())['http']
+        self.assertEqual(pages['routers']['studio-pages']['rule'], 'Host(`studio.example.com`) && PathRegexp(`^/api[^/]`)')
+        self.assertGreater(pages['routers']['studio-pages']['priority'], edge['http']['routers']['studio-api']['priority'])
+        self.assertEqual(pages['services']['studio-pages']['loadBalancer']['servers'], [{'url': 'http://studio:80'}])
         self.assertNotEqual(password, (self.root / 'secrets/mysql-root-password').read_text())
         self.assertIn('https://api.example.com', (self.root / 'studio-runtime-config.js').read_text())
         self.assertIn('https://apps.example.com', (self.root / 'studio-runtime-config.js').read_text())
@@ -107,6 +114,22 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual(secrets_before, {p.name: p.read_bytes() for p in (self.root / 'secrets').iterdir()})
         before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         module.ensure_store(self.root)
+        self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
+
+    def test_ensure_studio_paths_migrates_existing_installation_once(self):
+        module.configure(self.root, 'example.com', 'owner@example.com', 'cloudflare')
+        # An installation from before this router, with a hand-written YAML installation.yml that must stay untouched.
+        installation_path = self.root / 'dynamic/installation.yml'
+        installation_path.write_text('http:\n  routers: {}\n')
+        (self.root / 'dynamic/studio-paths.yml').unlink()
+
+        module.ensure_studio_paths(self.root)
+
+        pages = json.loads((self.root / 'dynamic/studio-paths.yml').read_text())['http']['routers']['studio-pages']
+        self.assertEqual(pages['tls'], {'certResolver': 'cloudflare'})
+        self.assertEqual(installation_path.read_text(), 'http:\n  routers: {}\n')
+        before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        module.ensure_studio_paths(self.root)
         self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
 
     def test_domain_change_does_not_rewrite_existing_installation(self):

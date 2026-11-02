@@ -217,6 +217,12 @@ if [[ " ${application_services[*]} " == *' store '* ]]; then
         exit 1
     fi
 fi
+[[ -f "$bundle/configure.py" ]] || { echo 'The release bundle is incomplete: configure.py is missing.' >&2; exit 1; }
+echo 'Routing Studio pages such as /apikeys to Studio if missing.'
+if ! python3 "$bundle/configure.py" --config-dir "$config_dir" --ensure-studio-paths; then
+    echo "Studio route configuration failed; services were not changed. Fix the reported configuration file, or restore it from $backup/config.tar.gz, then rerun the update." >&2
+    exit 1
+fi
 old_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$install_dir/release.env" | cut -d= -f2-)
 new_runner_image=$(grep -m1 '^RUNNER_IMAGE=' "$bundle/release.env" | cut -d= -f2-)
 recreate=()

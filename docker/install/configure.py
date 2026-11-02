@@ -52,6 +52,26 @@ def store_router(domain, resolver):
                 tls={'certResolver': resolver}, priority=100)
 
 
+def studio_paths_router(domain, resolver):
+    # Studio pages whose path starts with "api" (e.g. /apikeys) belong to Studio, not the API. The studio-api router
+    # matches PathPrefix(`/api`) as plain text on installations configured before this router existed.
+    return dict(entryPoints=['websecure'], rule=f'Host(`studio.{domain}`) && PathRegexp(`^/api[^/]`)',
+                service='studio-pages', tls={'certResolver': resolver}, priority=300)
+
+
+def ensure_studio_paths(root):
+    """Route Studio pages such as /apikeys to Studio; idempotent and safe for existing installations."""
+    state = json.loads((root / 'installation.json').read_text())
+    resolver = 'cloudflare' if state.get('tls_mode') == 'cloudflare' else 'letsencrypt'
+    (root / 'dynamic').mkdir(exist_ok=True, mode=0o700)
+    # A separate dynamic file with its own service: adopted installations keep a hand-written installation.yml
+    # whose Studio service may have another name.
+    write_new(root / 'dynamic' / 'studio-paths.yml', json.dumps({'http': {
+        'routers': {'studio-pages': studio_paths_router(state['domain'], resolver)},
+        'services': {'studio-pages': {'loadBalancer': {'servers': [{'url': 'http://studio:80'}]}}},
+    }}))
+
+
 def ensure_store(root):
     """Add the public app store to an installation; idempotent and safe for existing installations."""
     state = json.loads((root / 'installation.json').read_text())
@@ -201,7 +221,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
                        'domain': {'main': f'apps.{domain}', 'sans': [f'*.apps.{domain}']}}}}}}
     for name, rule, service in [('api', f'Host(`api.{domain}`)', 'api'),
                                 ('studio', f'Host(`studio.{domain}`)', 'studio'),
-                                ('studio-api', f'Host(`studio.{domain}`) && (PathPrefix(`/api`) || Path(`/auth/github/login`) || PathPrefix(`/signin-github`))', 'api'),
+                                ('studio-api', f'Host(`studio.{domain}`) && (Path(`/api`) || PathPrefix(`/api/`) || Path(`/auth/github/login`) || PathPrefix(`/signin-github`))', 'api'),
                                 ('apps', f'Host(`apps.{domain}`)', 'api')]:
         edge['http']['routers'][name] = dict(entryPoints=['websecure'], rule=rule, service=service,
                                              tls={'certResolver': resolver}, priority=200 if name == 'studio-api' else 1 if name == 'apps' else 100)
@@ -209,6 +229,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         edge.pop('tls')
     write_new(root / 'dynamic' / 'installation.yml', json.dumps(edge))
     ensure_store(root)
+    ensure_studio_paths(root)
 
 
 if __name__ == '__main__':
@@ -218,6 +239,8 @@ if __name__ == '__main__':
     parser.add_argument('--email')
     parser.add_argument('--ensure-store', action='store_true',
                         help='Add the app store to an existing installation without changing credentials.')
+    parser.add_argument('--ensure-studio-paths', action='store_true',
+                        help='Route Studio pages whose path starts with "api" to Studio on an existing installation.')
     parser.add_argument('--tls-mode', choices=['http', 'cloudflare'], default='http')
     parser.add_argument('--runner-image', default='ghcr.io/rzvdaniel/automaton-runner:latest')
     parser.add_argument('--update-runner-image', nargs=2, metavar=('PREVIOUS', 'CURRENT'),
@@ -231,6 +254,10 @@ if __name__ == '__main__':
                 print('New Runners will use the Runner image from this release.')
             else:
                 print('Keeping the custom Runner image configured in HostedRunners.DockerImage.')
+        elif args.ensure_studio_paths:
+            if not (args.config_dir / 'installation.json').is_file():
+                raise ValueError('No existing installation configuration was found.')
+            ensure_studio_paths(args.config_dir)
         elif args.ensure_store:
             if not (args.config_dir / 'installation.json').is_file():
                 raise ValueError('No existing installation configuration was found.')
