@@ -9,7 +9,7 @@
         </div>
       </template>
       <template #content>
-        <div class="flex gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
           <div class="flex-1">
             <label for="member-email" class="block text-sm font-medium mb-2">
               Email Address
@@ -33,7 +33,7 @@
               class="w-full"
             />
           </div>
-          <div class="flex items-end">
+          <div class="flex sm:items-end">
             <Button
               label="Invite"
               icon="pi pi-send"

@@ -164,7 +164,7 @@ public class ProjectMemberService
         {
             ProjectId = projectId,
             UserId = user.Id,
-            UserName = user.UserName ?? string.Empty,
+            UserName = DisplayNameOf(user),
             Email = user.Email ?? string.Empty,
             Role = request.Role,
             JoinedAt = DateTime.UtcNow,
@@ -397,6 +397,10 @@ public class ProjectMemberService
         return MapMemberToDto(membership, project?.OwnerId);
     }
 
+    // Members are shown by name; accounts without one fall back to the sign-in name (usually the email).
+    private static string DisplayNameOf(ApplicationUser user) =>
+        string.IsNullOrWhiteSpace(user.DisplayName) ? user.UserName ?? string.Empty : user.DisplayName;
+
     private static ProjectMemberDto MapMemberToDto(ProjectMember membership, Guid? projectOwnerId)
     {
         var user = membership.User
@@ -405,12 +409,12 @@ public class ProjectMemberService
         {
             ProjectId = membership.ProjectId,
             UserId = membership.UserId,
-            UserName = user.UserName ?? string.Empty,
+            UserName = DisplayNameOf(user),
             Email = user.Email ?? string.Empty,
             Role = membership.Role,
             JoinedAt = membership.JoinedAt,
             InvitedBy = membership.InvitedBy,
-            InvitedByName = membership.Inviter?.UserName,
+            InvitedByName = membership.Inviter is null ? null : DisplayNameOf(membership.Inviter),
             IsActive = membership.IsActive,
             IsOwner = projectOwnerId == membership.UserId
         };
