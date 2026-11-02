@@ -19,7 +19,8 @@ loop around them.
   `POST api/admin/users`.
 - On the test server, agents operate fully as the test system administrator: approve and revoke app permissions,
   add users and change settings themselves, then report what they did (what, for which app or user, and why).
-  On production, permission approvals stay with the owner.
+  On production, agents may do the same administrator work when the task calls for it: say beforehand what will
+  change, take a backup before anything disruptive, and report afterwards what was done.
 - Test only on the test server. Production changes follow the production skills, with a backup and a check of the
   public URLs afterwards.
 - Never print, commit or post credentials, tokens or API keys. Keep them in files only the current user can read.
