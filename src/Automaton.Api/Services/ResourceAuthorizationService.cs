@@ -482,31 +482,13 @@ public class ResourceAuthorizationService
         return await CanUpdateRunnerAsync(runnerId, UserId, cancellationToken);
     }
 
-    public async Task<bool> CanUpdateRunnerAsync(Guid runnerId, Guid userId, CancellationToken cancellationToken = default)
-    {
-        // Check personal ownership
-        var hasPersonalAccess = await dbContext.RunnerUsers
-            .AnyAsync(u => u.RunnerId == runnerId && u.UserId == userId, cancellationToken);
-
-        if (hasPersonalAccess)
-        {
-            return true;
-        }
-
-        // Check project membership with appropriate role
-        var hasProjectAccess = await dbContext.ProjectRunners
-            .Where(pr => pr.RunnerId == runnerId)
-            .Join(
-                dbContext.ProjectMembers,
-                pr => pr.ProjectId,
-                pm => pm.ProjectId,
-                (pr, pm) => new { pr, pm })
-            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive &&
-                          (x.pm.Role == ProjectRole.ProjectAdmin || x.pm.Role == ProjectRole.Developer),
-                      cancellationToken);
-
-        return hasProjectAccess;
-    }
+    /// <remarks>
+    /// Only the Runner's owner may change it. A Runner can serve several projects, so letting a
+    /// project's Developers or Project Admins change it would affect projects they are not part of.
+    /// Projects use a Runner; they decide only whether it is attached.
+    /// </remarks>
+    public async Task<bool> CanUpdateRunnerAsync(Guid runnerId, Guid userId, CancellationToken cancellationToken = default) =>
+        await dbContext.RunnerUsers.AnyAsync(u => u.RunnerId == runnerId && u.UserId == userId, cancellationToken);
 
     /// <summary>
     /// Check if user can delete a runner

@@ -34,6 +34,7 @@ Good to know:
 - Every member of a project can see the project's apps.
 - One Runner can be attached to several projects and serves all of them.
 - People outside the project cannot see the Runner or the project's apps, and cannot change either.
+- Only the Runner's owner can rename it or change its settings. Project members, including Project Admins, use it for deploys; Project Admins decide whether it is attached to their project.
 - Removing someone from the project stops their deploys to its Runner straight away. Apps they created stay theirs, but cannot deploy until they are assigned a Runner they can use.
 - A project for one person to experiment in, or one everyone can deploy to, is just another project you can create. Automaton doesn't create these for you.
 
