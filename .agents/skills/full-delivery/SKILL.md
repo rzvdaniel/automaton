@@ -70,9 +70,12 @@ and `"administrator": true`, store its email and generated password in the crede
 6. **Merge.** The agent merges without waiting for the owner when all of these hold: the checks of the final commit
    pass (including a conflict-resolution commit; the `Tests` workflow with all unit tests must pass, and a failing
    test is never skipped or quarantined to get green), the latest subagent review found nothing above low severity,
-   and the agent is satisfied with the change. Ask the owner first when the change drops or rewrites stored data in
-   a migration, changes authentication or authorization rules in a way the issue did not ask for, or the owner said
-   so in the task. Squash-merge, delete the branch, and continue with the release and the test-server check below:
+   and the agent is satisfied with the change. Ask the owner first for changes that are hard to undo:
+   - database migrations that drop or rewrite data;
+   - changes to authentication or authorization;
+   - anything that touches production;
+   - anything the owner said to hold in the task.
+   Otherwise squash-merge, delete the branch, and continue with the release and the test-server check below:
    merging includes delivering to the test server. A production update still needs its own request.
    **Batching.** When several issues or PRs are lined up, the agent may merge a few before one release when that saves
    work: small, independent changes, usually two to four. Release on its own anything with a higher risk of breaking
