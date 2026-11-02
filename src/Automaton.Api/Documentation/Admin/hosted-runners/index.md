@@ -40,7 +40,7 @@ Good to know:
 
 ## Remove a Machine Management Runner
 
-The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (links of deleted projects do not count, and deleting a project removes its links), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
+The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (deleted projects do not count; a deleted project also stops giving its members access to the Runner, and gets it back if the project is reactivated), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
 
 Preparation persists a removal intent that blocks new assignments and Runner operations. Studio displays an installation-specific shell command. Run it on the Runner's server with Docker access. It verifies the management container's installation ID and persisted Runner ID, including when the container is stopped. Installation identity is issued during enrollment and cannot be replaced through the Runner update API.
 

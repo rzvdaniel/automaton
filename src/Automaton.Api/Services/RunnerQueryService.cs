@@ -128,7 +128,7 @@ public sealed class RunnerQueryService(
             .Where(x => ids.Contains(x.RunnerId));
         query = projectId.HasValue
             ? query.Where(x => x.ProjectId == projectId.Value)
-            : query.Where(x => x.Project != null && x.Project.Members.Any(member => member.UserId == userId && member.IsActive));
+            : query.Where(x => x.Project != null && x.Project.IsActive && x.Project.Members.Any(member => member.UserId == userId && member.IsActive));
 
         var links = await query.ToListAsync(cancellationToken);
         return links

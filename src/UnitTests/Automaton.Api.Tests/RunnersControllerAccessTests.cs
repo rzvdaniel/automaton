@@ -84,19 +84,32 @@ public sealed class RunnersControllerAccessTests
     }
 
     [Test]
-    public async Task DeletingAProjectRemovesItsRunnerLinks()
+    public async Task ADeletedProjectStopsSharingItsRunnerUntilItIsReactivated()
     {
         var (db, runner, project, owner) = await SharedRunnerAsync(projectActive: true);
-        var users = AppAuthorizationTestData.CreateUserContextService(owner);
-        var authorization = new ResourceAuthorizationService(db, users);
+        var member = Guid.NewGuid();
+        db.ProjectMembers.Add(new Automaton.Api.Entities.ProjectMember
+        {
+            ProjectId = project, UserId = member, Role = Automaton.Api.Enums.ProjectRole.Developer, JoinedAt = DateTime.UtcNow, IsActive = true
+        });
+        await db.SaveChangesAsync();
+        var ownerContext = AppAuthorizationTestData.CreateUserContextService(owner);
+        var projects = new ProjectService(db, ownerContext, new ResourceAuthorizationService(db, ownerContext), new NoAudit());
+        var access = new ResourceAuthorizationService(db, ownerContext);
+        Assert.That(await access.CanAccessRunnerAsync(runner, member), Is.True);
 
-        Assert.That(await new ProjectService(db, users, authorization, new NoAudit()).DeleteProjectAsync(project), Is.True);
-
+        Assert.That(await projects.DeleteProjectAsync(project), Is.True);
+        var memberAccess = access;
         Assert.Multiple(async () =>
         {
-            Assert.That(await db.ProjectRunners.AnyAsync(link => link.RunnerId == runner), Is.False);
-            Assert.That(await authorization.CanDeleteRunnerAsync(runner, owner), Is.True);
+            Assert.That(await memberAccess.CanAccessRunnerAsync(runner, member), Is.False, "a deleted project shares nothing");
+            Assert.That(await memberAccess.GetAccessibleRunnersQuery(member).AnyAsync(item => item.Id == runner), Is.False);
+            Assert.That(await new ResourceAuthorizationService(db, ownerContext).CanDeleteRunnerAsync(runner, owner), Is.True);
         });
+
+        (await db.Projects.SingleAsync(item => item.Id == project)).IsActive = true;
+        await db.SaveChangesAsync();
+        Assert.That(await memberAccess.CanAccessRunnerAsync(runner, member), Is.True, "reactivation brings the Runner back");
     }
 
     private static async Task<(Automaton.Api.Data.ApplicationDbContext Db, Guid Runner, Guid Project, Guid Owner)> SharedRunnerAsync(bool projectActive)
