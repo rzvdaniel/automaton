@@ -281,21 +281,23 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
     {
         var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
-        if (metadata is not { State: RuntimeReadinessState.Ready, Candidate: null } || string.IsNullOrWhiteSpace(metadata.ContainerId)
+        if (metadata is not { State: RuntimeReadinessState.Ready }
+            || metadata.Candidate is not (null or { State: RuntimeReadinessState.Failed }) || string.IsNullOrWhiteSpace(metadata.ContainerId)
             || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
         var candidateId = Guid.NewGuid();
         var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
-        RunnerWorkspaceService.CopyRuntimeArtifact(metadata.ArtifactRoot!, artifact);
         try
         {
+            RunnerWorkspaceService.CopyRuntimeArtifact(metadata.ArtifactRoot!, artifact);
             await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
                 cancellationToken, artifact, candidateId);
         }
         catch
         {
             var warnings = new List<string>();
-            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(artifact, warnings);
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(
+                workspace.GetAppRuntimeCandidateDirectory(appId, deploymentTargetId, candidateId), warnings);
             throw;
         }
         return true;
