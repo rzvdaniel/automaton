@@ -46,7 +46,9 @@ a step when you reach it.
    independent changes may share one release; risky ones (Runner, migrations, install or update scripts) go alone.
 8. **Close out.** The PR's `Closes #N` closes the issue on merge. Comment the end-to-end results (pass or fail per
    check) and every administrator action on the PR, link that comment from the issue, set the board Status to Done,
-   open issues for gaps you found (`issue.md`), and tell the owner what is left for them, with links.
+   open issues for gaps you found (`issue.md`), and tell the owner what is left for them, with links. If testing
+   showed the docs are wrong, or the issue completes a roadmap step, fix the docs or the status in
+   `docs/roadmap/README.md` in a small follow-up PR.
 
 ## Handoff
 
