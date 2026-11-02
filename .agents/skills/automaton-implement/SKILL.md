@@ -16,6 +16,8 @@ a step when you reach it.
   Status, Priority and Plan fields.
 - Ask the owner only for product decisions and for the changes listed under step 6. Decide everything else yourself
   and report it.
+- Before asking the owner, check whether running something would answer it (behaviour, output, timing, layout). If
+  so, run it and decide from the result. Ask only real product or preference questions.
 - Self sign-up is disabled on purpose. Never re-enable it, insert users into the database or bypass the invite flow.
 - Test only on the test server. Production is changed only when the owner asked for it in the task; then follow
   `verify.md` → Production.
@@ -25,8 +27,9 @@ a step when you reach it.
 
 1. **Issue.** Find the issue. If there is none, create it first (`issue.md`). Read its parent and blockers, restate
    the done criteria, and set the board Status to In Progress.
-2. **Build.** Branch from `main`. Follow `AGENTS.md` (keep it simple, maintainability guardrails) and the area
-   skills. Add tests for new behaviour, including who gets 200, 403 and 404.
+2. **Build.** Branch from `main`. For a bug, reproduce it first on the surface where it shows (API, CLI or Studio),
+   then commit a failing test before the fix; afterwards the original reproduction must pass.
+   Follow `AGENTS.md` (keep it simple, maintainability guardrails) and the area skills. Add tests for new behaviour, including who gets 200, 403 and 404.
 3. **Test locally.** Run the affected test projects and, for Studio changes, `npx vue-tsc --noEmit -p tsconfig.app.json`
    in `src/automaton-studio-vue`. `main` is green, so every failure is yours to fix. Never skip or delete a failing
    test to get green unless the test itself is wrong, and say so in the PR.
@@ -41,9 +44,9 @@ a step when you reach it.
    - anything the owner said to hold.
 7. **Deliver and verify.** Release, upgrade the test server and verify as real users (`verify.md`). Several small,
    independent changes may share one release; risky ones (Runner, migrations, install or update scripts) go alone.
-8. **Close out.** The PR's `Closes #N` closes the issue on merge. Comment the end-to-end results and every
-   administrator action on the issue, set the board Status to Done, open issues for gaps you found (`issue.md`), and
-   tell the owner what is left for them, with links.
+8. **Close out.** The PR's `Closes #N` closes the issue on merge. Comment the end-to-end results (pass or fail per
+   check) and every administrator action on the PR, link that comment from the issue, set the board Status to Done,
+   open issues for gaps you found (`issue.md`), and tell the owner what is left for them, with links.
 
 ## Handoff
 
