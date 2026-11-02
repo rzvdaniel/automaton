@@ -55,9 +55,9 @@ Found during the clean-server installation review on 31 October 2026 (PRs #463�
 
 - **Release artifacts and resource guidance.** Measure server-update downtime and publish CPU, memory and disk guidance from observed workloads (the updater replaces application containers in place; no zero-downtime updates). Publish portable CLI downloads as release assets if NuGet-only installation proves limiting.
 
-- **Linux test job in CI** (#489). CI builds images and runs CodeQL but no C# test suite. Add a Linux job for the API, CLI and Runner tests. Prerequisite: [repair tests that fail on main](03-enhancements.md#repair-tests-that-fail-on-main). On Windows, a filtered API run also fails dozens of pre-existing tests that may pass on Linux; establish the Linux baseline first.
+- **Linux test job in CI** (#489): **done**. The `Tests` workflow (#531, #532) runs all .NET test projects and the Studio tests on Linux, and the repository ruleset "Required tests" makes those checks required on `main` (repository admins can bypass).
 - **Remove the 0.1.18-and-earlier update note** from [the install guide](../prod/install-automaton.md#update-an-installed-server) ("run update.sh a second time"). No external installation predates 0.1.19; both known servers are updated.
-- **Studio Upgrade runner dialog.** The generated command is verified on two servers; the Studio dialog itself has not been opened by an administrator yet.
+- **Studio Upgrade runner dialog:** **done**. On 2 November 2026 the owner upgraded a test-server Runner from the dialog (after #542 let owners upgrade shared Runners).
 - **Docker Hub Runner repository** `rzvdaniel/automaton-runner`: no code, CI or running container uses it. Mark it deprecated or delete it (owner action on Docker Hub).
 - **Production host housekeeping.** The operator home directory holds rollout leftovers from September–October (checkout/env backups, `rollout-backups`, `runner-image-rollback-*`, `stage4a-config-*`, logs); some may contain old secrets. Production also keeps `automaton-retained-*` images from its adoption and the unused `0f69…` Runner image. Review and remove when no longer needed.
 - **"Hola Automaton"** on production has no Runner assignment since its retired Runners were removed. Redeploy it (`automaton deploy`) or delete it.

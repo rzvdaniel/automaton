@@ -4,7 +4,7 @@ Improvements found while building and operating apps on Automaton. They are not
 milestone prerequisites; the [roadmap index](README.md) lists all plans.
 Each item states the problem, the current evidence, and the acceptance that
 closes it. Work: parent issue [#495](https://github.com/rzvdaniel/automaton/issues/495) (runtime logs #496, real-time
-connections #497, failing tests #498).
+connections #497; failing tests #498 done).
 
 ## Keep runtime logs readable after the fact
 
@@ -46,20 +46,8 @@ before.
 
 ## Repair tests that fail on main
 
-**Problem.** These tests fail on `main` (current counts in #498):
-
-- CLI: `TargetCommand_ExposesRequiredManagementCommands` (expects removed
-  `approve`/`revoke` subcommands), `Format_ShowsLiveRoleDestinationAndStatus`
-  (expects "Automaton Hosted"), and
-  `DeployAsync_WhenRunnerHostLacksInfrastructureRunner_DoesNotBlamePlan`.
-- API: 82 of 794 tests. Most seed runners without an application profile and
-  now throw `Unknown application Runner profile ''` from
-  `RunnerApplicationProfiles.Normalize`, since the legacy profiles were
-  removed (runner assignment, deployment targets, durable actions, machine
-  management). `SeedCatalog_ExplicitlyRegistersEveryEmbeddedSeed` also expects
-  seven registered guidance seeds; the catalog has six.
-- Studio: `AppRuntimeLogs.test.ts` (multiline runtime output), and
-  `public-app-url.test.ts` (private link host), which fails intermittently.
-
-**Acceptance.** Each test either matches the intended current behavior or is
-removed with its obsolete feature, and the suites pass on `main`.
+**Done** (#531, #532, closes #498). The `Tests` workflow runs every .NET test project and the Studio tests on
+Linux for each pull request and on `main`. The 100 test methods that failed on `main`, mostly seeding Runners with
+retired profiles, were deleted with the owner's agreement rather than repaired. Some covered paths that still exist
+(action retries, secret redaction in logs, container resource limits); add new tests with current setup if those
+areas change.
