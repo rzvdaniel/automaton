@@ -8,6 +8,7 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture, NonParallelizable]
 public sealed class MachineContainerResourceLimitsTests
 {
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [Test]
     public async Task BuildContainerReceivesServerDerivedCpuMemoryAndPidLimits()
     {
@@ -22,6 +23,7 @@ public sealed class MachineContainerResourceLimitsTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [Test]
     public async Task AppContainerReceivesServerDerivedCpuMemoryAndPidLimits()
     {

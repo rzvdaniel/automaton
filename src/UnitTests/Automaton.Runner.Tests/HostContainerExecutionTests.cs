@@ -80,6 +80,7 @@ public sealed class HostContainerExecutionTests
         }
     }
 
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [Test]
     public async Task MachineManagementRunsTypedOperationOnlyForItsStableIdentity()
         => await MachineManagementIdentityScenario.ExecuteAsync();

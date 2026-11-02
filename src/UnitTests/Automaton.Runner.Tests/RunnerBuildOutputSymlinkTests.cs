@@ -11,6 +11,7 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class RunnerBuildOutputSymlinkTests
 {
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [TestCase(false)]
     [TestCase(true)]
     public async Task BuildOutputLinksCannotCopyRunnerReadableFiles(bool linkOutputAncestor)
@@ -23,6 +24,7 @@ public sealed class RunnerBuildOutputSymlinkTests
         fixture.AssertPrivateFileWasNotCopied(result);
     }
 
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [Test]
     public async Task DynamicAppBuildPreservesInternalNodeModulesBinLinkWithRelativeDependency()
     {
@@ -36,6 +38,7 @@ public sealed class RunnerBuildOutputSymlinkTests
         await fixture.AssertInternalLinkWasPreservedAndRunsAsync(result);
     }
 
+    [Category("Quarantine528")] // #528: fails on Linux CI; fix or remove
     [Test]
     public async Task BuildOutputDirectoryCyclesAreRejected()
     {

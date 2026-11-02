@@ -40,6 +40,9 @@ jobs:
     name: Studio tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # The runtime log tests expect a 24-hour clock, as on the developers' machines.
+      LANG: en_GB.UTF-8
     defaults:
       run:
         working-directory: src/automaton-studio-vue
@@ -49,6 +52,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: src/automaton-studio-vue/package-lock.json
+          cache-dependency-path: |
+            src/automaton-studio-vue/package-lock.json
+            src/automaton-vue/package-lock.json
+      # Studio tests import shared config from the website project, which needs its own packages.
+      - run: npm ci
+        working-directory: src/automaton-vue
       - run: npm ci
       - run: npm test
