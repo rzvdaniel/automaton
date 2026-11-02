@@ -57,6 +57,11 @@ Check pages in a browser with `agent-browser` (see `AGENTS.md`; on the test serv
 `ab-shot.sh` log in and take screenshots), or Claude in Chrome on the owner's PC, following the studio-design visual
 checklist. Record what passed and what you could not check.
 
+After every test-server upgrade, also run the Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`:
+`npm run smoke` with `AUTOMATON_TEST_STUDIO_URL` set to the server's real Studio domain). They are read-only,
+sign in as the administrator and a regular user, and leave a screenshot of each page in `smoke-results/`; attach the
+ones your change affects to the PR. A failure is a finding to fix or report, not something to skip.
+
 Name everything you create `e2e-...` (apps, projects, API keys). Remove it when done:
 `python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test accounts stay. A nightly timer
 removes `e2e-` items older than a day.

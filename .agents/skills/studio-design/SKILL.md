@@ -711,3 +711,12 @@ Do not:
 When uncertain:
 
 > Find an existing Automaton Studio surface that already solves the same visual problem and follow it.
+
+---
+
+# Browser check before a Studio PR is ready
+
+Look at every page the change touches in a real browser before asking for review: light and dark themes and phone
+width (390 px, no horizontal scroll). Use `agent-browser` on the test server (`AGENTS.md`), or build this branch
+against the test API when the change is not deployed yet. Attach the screenshots to the PR. After the release, the
+Studio smoke checks (`src/automaton-studio-vue/smoke/README.md`) cover the main pages.
