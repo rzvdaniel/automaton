@@ -34,6 +34,8 @@ export interface User {
   name: string
   email: string
   emailConfirmed: boolean
+  /** The user must choose a new password before using Studio. */
+  mustChangePassword?: boolean
   publicUsername: string
   roles: string[]
 }

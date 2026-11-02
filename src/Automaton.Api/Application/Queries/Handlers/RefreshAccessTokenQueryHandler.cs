@@ -53,7 +53,7 @@ namespace Automaton.Api.Application.Queries.Handlers
 
             await ReplaceRefreshTokenAsync(refreshToken, newRefreshToken, user.Id, cancellationToken);
 
-            var claims = GetCustomClaimsForUser();
+            var claims = PasswordChangeRequirement.ClaimsFor(user);
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
             var userName = user.UserName
                 ?? throw new InvalidOperationException($"User {user.Id} has no username for token issuance.");
@@ -63,12 +63,6 @@ namespace Automaton.Api.Application.Queries.Handlers
             logger.Log(LogLevel.Debug, "AccessTokenRefreshed Event Published.");
 
             return jwt;
-        }
-
-        static Dictionary<string, string> GetCustomClaimsForUser()
-        {
-            //Get Custom Claims for User
-            return new Dictionary<string, string>();
         }
 
         private async Task ReplaceRefreshTokenAsync(

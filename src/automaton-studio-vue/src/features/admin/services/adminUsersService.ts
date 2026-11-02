@@ -18,7 +18,7 @@ interface AdminUsersQuery {
 }
 
 export interface AdminInviteUserRequest { email: string; name?: string; administrator?: boolean }
-export interface AdminCreateUserRequest { email: string; name?: string; password?: string; administrator?: boolean }
+export interface AdminCreateUserRequest { email: string; name?: string; password?: string; administrator?: boolean; mustChangePassword?: boolean }
 export interface AdminProvisionedUser {
   userId: string
   email: string

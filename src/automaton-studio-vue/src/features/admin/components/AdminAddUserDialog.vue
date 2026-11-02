@@ -24,6 +24,8 @@ const email = ref('')
 const name = ref('')
 const password = ref('')
 const generatePassword = ref(true)
+// On for real people: the administrator knows this password. Turn off for shared test accounts.
+const mustChangePassword = ref(true)
 const administrator = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
@@ -39,6 +41,7 @@ function reset() {
   name.value = ''
   password.value = ''
   generatePassword.value = true
+  mustChangePassword.value = true
   administrator.value = false
   error.value = null
   result.value = null
@@ -61,7 +64,11 @@ async function submit() {
     }
     result.value = mode.value === 'invite'
       ? await adminUsersService.inviteUser(request)
-      : await adminUsersService.createUser({ ...request, password: generatePassword.value ? undefined : password.value })
+      : await adminUsersService.createUser({
+          ...request,
+          password: generatePassword.value ? undefined : password.value,
+          mustChangePassword: mustChangePassword.value,
+        })
     emit('added', result.value)
   } catch (err) {
     const response = (err as { response?: { data?: { message?: string } } }).response
@@ -114,6 +121,10 @@ async function copyPassword() {
           <label v-if="!generatePassword" class="field">
             <span>Password</span>
             <Password v-model="password" toggle-mask :feedback="false" autocomplete="new-password" input-class="w-full" />
+          </label>
+          <label class="checkbox">
+            <Checkbox v-model="mustChangePassword" binary input-id="must-change-password" />
+            <span>Must choose a new password at first sign-in</span>
           </label>
         </template>
 

@@ -13,7 +13,9 @@ namespace Automaton.Api.Services;
 
 public sealed record AdminInviteUserRequest(string Email, string? Name = null, bool Administrator = false);
 
-public sealed record AdminCreateUserRequest(string Email, string? Name = null, string? Password = null, bool Administrator = false);
+/// <summary><c>MustChangePassword</c>: the user sets their own password at first sign-in (default), since the administrator knows this one.</summary>
+public sealed record AdminCreateUserRequest(string Email, string? Name = null, string? Password = null, bool Administrator = false,
+    bool MustChangePassword = true);
 
 /// <summary>The outcome of an invite or create. <c>GeneratedPassword</c> is returned once and never stored.</summary>
 public sealed record AdminProvisionedUser(
@@ -118,6 +120,7 @@ public sealed class AdminUserProvisioningService(
         var user = await NewUserAsync(address, request.Name, RegistrationProviders.AdminCreated);
         // The administrator vouches for the address; no confirmation email is sent.
         user.EmailConfirmed = true;
+        user.MustChangePassword = request.MustChangePassword;
         await users.CreateUser(user, password);
         if (request.Administrator) await AddAdministratorAsync(user, address, AuditEventTypes.UserCreatedByAdministrator);
 
@@ -130,7 +133,7 @@ public sealed class AdminUserProvisioningService(
             EventType = AuditEventTypes.UserCreatedByAdministrator,
             Outcome = AuditOutcomes.Success,
             Message = "User created by an administrator.",
-            Metadata = new { Email = address, request.Administrator, PasswordGenerated = generated }
+            Metadata = new { Email = address, request.Administrator, PasswordGenerated = generated, ChangeAtFirstSignIn = request.MustChangePassword }
         }, CancellationToken.None); // the account exists now; record it even if the caller has gone
         return new AdminProvisionedUser(user.Id, address, user.Name, false, false, generated ? password : null, null);
     }

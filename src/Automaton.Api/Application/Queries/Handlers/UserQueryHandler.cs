@@ -139,6 +139,7 @@ namespace Automaton.Api.Application.Queries.Handlers
                 Email = user.Email
                     ?? throw new InvalidOperationException($"User {user.Id} has no email address."),
                 EmailConfirmed = user.EmailConfirmed,
+                MustChangePassword = user.MustChangePassword,
                 PublicUsername = user.PublicUsername,
                 RegisteredAtUtc = user.RegisteredAtUtc,
                 LastLoginAtUtc = user.LastLoginAtUtc,

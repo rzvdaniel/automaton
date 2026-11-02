@@ -10,6 +10,9 @@ public class UserDetails
 
     public bool EmailConfirmed { get; set; }
 
+    /// <summary>The user must set a new password before using anything else.</summary>
+    public bool MustChangePassword { get; set; }
+
     public string? PublicUsername { get; set; }
 
     public DateTime? RegisteredAtUtc { get; set; }

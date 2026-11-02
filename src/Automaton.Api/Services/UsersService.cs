@@ -95,6 +95,8 @@ public class UsersService
     public async Task UpdatePassword(Guid userId, string oldPassword, string newPassword)
     {
         var user = await GetUserById(userId);
+        if (user.MustChangePassword && string.Equals(oldPassword, newPassword, StringComparison.Ordinal))
+            throw new ArgumentException("Choose a password different from the one you were given.");
 
         var result = await _userManager.ChangePasswordAsync(user, oldPassword, newPassword);
 
@@ -102,6 +104,22 @@ public class UsersService
         {
             throw new InvalidOperationException("Error in updating password!");
         }
+
+        if (!user.MustChangePassword) return;
+        user.MustChangePassword = false;
+        var cleared = await _userManager.UpdateAsync(user);
+        if (!cleared.Succeeded) throw new InvalidOperationException("Error in updating password!");
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Changed,
+            EntityType = AuditEntityTypes.User,
+            EntityId = userId,
+            EventType = AuditEventTypes.UserRequiredPasswordChanged,
+            Message = "User chose a new password at first sign-in.",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = userId,
+            TargetUserId = userId
+        }, CancellationToken.None);
     }
 
     public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default)

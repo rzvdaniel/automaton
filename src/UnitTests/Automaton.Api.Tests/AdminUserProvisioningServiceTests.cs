@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using Automaton.Api.Authentication;
 using Automaton.Api.Constants;
 using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
@@ -47,6 +48,41 @@ public sealed class AdminUserProvisioningServiceTests
             Assert.That(audit.EventType, Is.EqualTo(AuditEventTypes.UserCreatedByAdministrator));
             Assert.That(audit.MetadataJson, Does.Not.Contain(created.GeneratedPassword!));
         });
+    }
+
+    [Test]
+    public async Task CreatedUserMustChooseANewPasswordBeforeTheClaimIsDropped()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(new AdminCreateUserRequest("first@example.com", Password: "Given-Pass-123"), false, default);
+        var user = (await fixture.Users.FindByIdAsync(created.UserId.ToString()))!;
+        Assert.That(user.MustChangePassword, Is.True, "on by default for real people");
+        Assert.That(PasswordChangeRequirement.ClaimsFor(user), Does.ContainKey(PasswordChangeRequirement.ClaimType));
+
+        Assert.ThrowsAsync<ArgumentException>(() => fixture.UsersService.UpdatePassword(user.Id, "Given-Pass-123", "Given-Pass-123"));
+        await fixture.UsersService.UpdatePassword(user.Id, "Given-Pass-123", "Own-Pass-456");
+
+        user = (await fixture.Users.FindByIdAsync(created.UserId.ToString()))!;
+        Assert.Multiple(async () =>
+        {
+            Assert.That(user.MustChangePassword, Is.False);
+            Assert.That(PasswordChangeRequirement.ClaimsFor(user), Is.Empty);
+            Assert.That(await fixture.Users.CheckPasswordAsync(user, "Own-Pass-456"), Is.True);
+            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.UserRequiredPasswordChanged), Is.EqualTo(1));
+            Assert.That((await fixture.Db.AuditEvents.SingleAsync(e => e.EventType == AuditEventTypes.UserCreatedByAdministrator)).MetadataJson,
+                Does.Contain("\"changeAtFirstSignIn\":true"));
+        });
+    }
+
+    [Test]
+    public async Task TestAccountsCanSkipThePasswordChange()
+    {
+        var fixture = await Fixture.CreateAsync();
+        var created = await fixture.Service.CreateAsync(
+            new AdminCreateUserRequest("e2e@example.com", Password: "Given-Pass-123", MustChangePassword: false), false, default);
+        var user = (await fixture.Users.FindByIdAsync(created.UserId.ToString()))!;
+        Assert.That(user.MustChangePassword, Is.False);
+        Assert.That(PasswordChangeRequirement.ClaimsFor(user), Is.Empty);
     }
 
     [Test]

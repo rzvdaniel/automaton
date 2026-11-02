@@ -25,7 +25,7 @@ public class AuthTokenService
     {
         var refreshToken = new RefreshToken(user.Id, refreshTokenLifetimeDays);
         var roles = (await _usersService.GetRoles(user.Id)).ToImmutableList();
-        var jwt = _jwtService.GenerateToken(user.Id.ToString(), user.Email!, roles, GetCustomClaimsForUser());
+        var jwt = _jwtService.GenerateToken(user.Id.ToString(), user.Email!, roles, PasswordChangeRequirement.ClaimsFor(user));
 
         jwt.RefreshToken = refreshToken.Token;
 
@@ -33,10 +33,5 @@ public class AuthTokenService
         await _dataContext.SaveChangesAsync(cancellationToken);
 
         return jwt;
-    }
-
-    private static IDictionary<string, string> GetCustomClaimsForUser()
-    {
-        return new Dictionary<string, string>();
     }
 }

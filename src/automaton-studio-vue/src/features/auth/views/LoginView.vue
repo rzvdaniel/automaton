@@ -45,6 +45,8 @@ onMounted(async () => {
   // Check for success message from registration
   if (route.query.setup === 'complete') {
     successMessage.value = 'Administrator created. Sign in to continue.'
+  } else if (route.query.passwordChanged === 'true') {
+    successMessage.value = 'Password changed. Sign in with your new password.'
   } else if (route.query.registered === 'true') {
     successMessage.value = 'Registration successful! Please sign in with your credentials.'
   } else if (route.query.emailConfirmation === 'success') {

@@ -1,3 +1,4 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Data;
 using Automaton.Api.Hubs;
 using Automaton.Api.Logging;
@@ -31,6 +32,7 @@ internal static class ApiApplicationPipelineExtensions
 
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
         app.MapControllers();

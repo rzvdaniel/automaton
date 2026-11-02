@@ -56,12 +56,14 @@ public class AccountController : BaseController
 
         var userId = GetUserId();
 
-        await userManagerService.UpdatePassword
-        (
-            userId,
-            passwordUpdateCommand.OldPassword,
-            passwordUpdateCommand.NewPassword
-        );
+        try
+        {
+            await userManagerService.UpdatePassword(userId, passwordUpdateCommand.OldPassword, passwordUpdateCommand.NewPassword);
+        }
+        catch (ArgumentException error)
+        {
+            return BadRequest(new { message = error.Message });
+        }
 
         await userManagerService.RevokeAllRefreshTokensAsync(userId, cancellationToken);
         RefreshTokenCookieService.ClearRefreshToken(HttpContext);

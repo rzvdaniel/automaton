@@ -13,6 +13,13 @@ export const authRoutes: RouteRecordRaw[] = [
     meta: { layout: 'auth', requiresAuth: false },
   },
   {
+    // Signed-in users whose administrator set their password land here before anything else.
+    path: '/change-password',
+    name: 'change-password',
+    component: () => import('./views/ChangePasswordView.vue'),
+    meta: { layout: 'auth', requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('./views/LoginView.vue'),

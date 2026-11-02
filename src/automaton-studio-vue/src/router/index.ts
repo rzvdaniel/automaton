@@ -62,7 +62,7 @@ const router = createRouter({
 // Navigation guard for authentication and authorization
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
-  const requiresAuth = to.meta.requiresAuth !== false && to.meta.layout !== 'auth'
+  const requiresAuth = to.meta.requiresAuth === true || (to.meta.requiresAuth !== false && to.meta.layout !== 'auth')
 
   // Public routes must not force auth initialization because a stale token can
   // turn an otherwise anonymous page load into a login redirect.
@@ -87,8 +87,19 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
+  // A user whose administrator set their password must choose a new one first; the API refuses everything else.
+  const mustChangePassword = authStore.isAuthenticated && authStore.user?.mustChangePassword === true
+  if (mustChangePassword && to.name !== 'change-password') {
+    next({ name: 'change-password' })
+    return
+  }
+  if (!mustChangePassword && to.name === 'change-password') {
+    next({ path: '/' })
+    return
+  }
+
   // If user is authenticated and tries to access auth pages (login/register)
-  if (authStore.isAuthenticated && to.meta.layout === 'auth') {
+  if (authStore.isAuthenticated && to.meta.layout === 'auth' && to.name !== 'change-password') {
     // Redirect to dashboard
     next({ path: '/' })
     return

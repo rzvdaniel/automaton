@@ -77,6 +77,11 @@ namespace Automaton.Api.Entities
         public DateTime? LastLoginAtUtc { get; set; }
 
         /// <summary>
+        /// The user must choose a new password before doing anything else, e.g. after an administrator set one.
+        /// </summary>
+        public bool MustChangePassword { get; set; }
+
+        /// <summary>
         /// Source used to create the account (password, github, invitation, adminCreated).
         /// </summary>
         public string RegistrationProvider { get; set; }

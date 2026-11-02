@@ -1237,6 +1237,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");

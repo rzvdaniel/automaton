@@ -16,7 +16,8 @@ loop around them.
   `agent:blocked` (say why in a comment), `agent:human-review` (needs the owner).
 - Self sign-up is disabled on purpose. Never re-enable it, insert users into the database or bypass the invite
   flow. Test accounts are created by an administrator in **Admin → Users → Add user**, or through
-  `POST api/admin/users`.
+  `POST api/admin/users`, with **Must choose a new password at first sign-in** turned off (`"mustChangePassword": false`)
+  so agents can use them.
 - On the test server, agents operate fully as the test system administrator: approve and revoke app permissions,
   add users and change settings themselves, then report what they did (what, for which app or user, and why).
 - Production is changed only when the owner asked for it in the task. Then agents do the administrator work
