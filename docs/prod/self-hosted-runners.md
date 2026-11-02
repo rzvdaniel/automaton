@@ -135,8 +135,8 @@ a separate operator decision.
 
 ## Machine Management Runner updates
 
-Upgrade a Machine Management Runner from **Studio -> Runners -> Upgrade runner**. Studio
-shows a command to run on the Runner's server. It verifies the container's installation
+The Runner's owner upgrades a Machine Management Runner from **Studio -> Runners -> Upgrade runner**,
+also while projects use it. Studio shows a command to run on the Runner's server. It verifies the container's installation
 and Runner identity, pulls the server's configured Runner image
 (`HostedRunners.DockerImage`, updated by each server release), and recreates the Runner
 container with the same identity, configuration, workspace volume and network. Deployed

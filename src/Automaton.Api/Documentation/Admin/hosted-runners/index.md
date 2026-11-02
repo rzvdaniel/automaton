@@ -34,13 +34,13 @@ Good to know:
 - Every member of a project can see the project's apps.
 - One Runner can be attached to several projects and serves all of them.
 - People outside the project cannot see the Runner or the project's apps, and cannot change either.
-- Only the Runner's owner can rename it or change its settings. Project members, including Project Admins, use it for deploys; Project Admins decide whether it is attached to their project.
+- Only the Runner's owner can rename it, change its settings or upgrade it; the owner can upgrade it while projects use it, since an upgrade does not change who may use it. Project members, including Project Admins, use it for deploys; Project Admins decide whether it is attached to their project.
 - Removing someone from the project stops their deploys to its Runner straight away. Apps they created stay theirs, but cannot deploy until they are assigned a Runner they can use.
 - A project for one person to experiment in, or one everyone can deploy to, is just another project you can create. Automaton doesn't create these for you.
 
 ## Remove a Machine Management Runner
 
-The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove project links, and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
+The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove it from active projects (links of deleted projects do not count, and deleting a project removes its links), and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
 
 Preparation persists a removal intent that blocks new assignments and Runner operations. Studio displays an installation-specific shell command. Run it on the Runner's server with Docker access. It verifies the management container's installation ID and persisted Runner ID, including when the container is stopped. Installation identity is issued during enrollment and cannot be replaced through the Runner update API.
 

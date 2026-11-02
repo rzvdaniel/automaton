@@ -16,7 +16,7 @@ public sealed class RunnerDeletionPolicy(
         if (!await authorizationService.CanDeleteRunnerAsync(runnerId, cancellationToken))
         {
             var isPartOfProject = await dbContext.ProjectRunners
-                .AnyAsync(pr => pr.RunnerId == runnerId, cancellationToken);
+                .AnyAsync(pr => pr.RunnerId == runnerId && pr.Project != null && pr.Project.IsActive, cancellationToken);
 
             if (isPartOfProject)
                 throw new InvalidOperationException($"Cannot delete runner {runnerId} because it is part of one or more projects. Remove it from all projects first.");

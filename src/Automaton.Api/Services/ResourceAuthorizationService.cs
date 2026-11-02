@@ -509,9 +509,9 @@ public class ResourceAuthorizationService
             return false;
         }
 
-        // Check if runner is part of any project
+        // Check if runner is part of any active project; links of deleted projects do not count.
         var isPartOfProject = await dbContext.ProjectRunners
-            .AnyAsync(pr => pr.RunnerId == runnerId, cancellationToken);
+            .AnyAsync(pr => pr.RunnerId == runnerId && pr.Project != null && pr.Project.IsActive, cancellationToken);
 
         return !isPartOfProject;
     }

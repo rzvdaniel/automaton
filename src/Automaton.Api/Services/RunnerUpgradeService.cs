@@ -14,7 +14,9 @@ public sealed class RunnerUpgradeService(
 {
     public async Task<RunnerUpgradeInstructions> PrepareAsync(Guid id, CancellationToken token)
     {
-        if (!await authorization.CanDeleteRunnerAsync(id, token))
+        // Upgrading replaces the Runner's software without changing who may use it, so the owner may
+        // upgrade a Runner that projects share; deleting it still requires removing it from them first.
+        if (!await authorization.CanUpdateRunnerAsync(id, token))
             throw new UnauthorizedAccessException($"You do not have permission to manage runner {id}");
         var runner = await db.Runners.AsNoTracking().SingleAsync(runner => runner.Id == id, token);
         var image = hostedRunnerOptions.Value.DockerImage;

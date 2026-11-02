@@ -297,6 +297,9 @@ public class ProjectService
 
         project.IsActive = false;
         project.Updated = DateTime.UtcNow;
+        // A deleted project no longer shares Runners; its links would otherwise keep them "shared" forever.
+        dbContext.ProjectRunners.RemoveRange(
+            await dbContext.ProjectRunners.Where(link => link.ProjectId == projectId).ToListAsync(cancellationToken));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
