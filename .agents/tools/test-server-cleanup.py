@@ -98,7 +98,8 @@ def remove_app(api, app):
 
 
 def clean(api, who, cutoff, apply):
-    projects = [p for p in items(api, "/api/projects") if p.get("role") == "ProjectAdmin" or who == "ADMIN"]
+    projects = [p for p in items(api, "/api/projects")  # deleted projects stay listed as inactive
+                if p.get("isActive", True) and (p.get("role") == "ProjectAdmin" or who == "ADMIN")]
     apps = {a["id"]: dict(a, links=[]) for a in items(api, "/api/apps")}
     for project in projects:  # project apps don't always appear in /api/apps
         for app in items(api, f"/api/projects/{project['id']}/apps"):
