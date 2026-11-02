@@ -435,7 +435,8 @@ public class ProjectResourceService
     public async Task<IEnumerable<ProjectRunnerDto>> ListProjectRunnersAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
         var hasAccess = await dbContext.ProjectMembers
-            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive
+                && pm.Project != null && pm.Project.IsActive, cancellationToken);
 
         if (!hasAccess)
         {

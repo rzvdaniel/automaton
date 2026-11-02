@@ -99,17 +99,16 @@ public sealed class RunnersControllerAccessTests
         Assert.That(await access.CanAccessRunnerAsync(runner, member), Is.True);
 
         Assert.That(await projects.DeleteProjectAsync(project), Is.True);
-        var memberAccess = access;
         Assert.Multiple(async () =>
         {
-            Assert.That(await memberAccess.CanAccessRunnerAsync(runner, member), Is.False, "a deleted project shares nothing");
-            Assert.That(await memberAccess.GetAccessibleRunnersQuery(member).AnyAsync(item => item.Id == runner), Is.False);
+            Assert.That(await access.CanAccessRunnerAsync(runner, member), Is.False, "a deleted project shares nothing");
+            Assert.That(await access.GetAccessibleRunnersQuery(member).AnyAsync(item => item.Id == runner), Is.False);
             Assert.That(await new ResourceAuthorizationService(db, ownerContext).CanDeleteRunnerAsync(runner, owner), Is.True);
         });
 
         (await db.Projects.SingleAsync(item => item.Id == project)).IsActive = true;
         await db.SaveChangesAsync();
-        Assert.That(await memberAccess.CanAccessRunnerAsync(runner, member), Is.True, "reactivation brings the Runner back");
+        Assert.That(await access.CanAccessRunnerAsync(runner, member), Is.True, "reactivation brings the Runner back");
     }
 
     private static async Task<(Automaton.Api.Data.ApplicationDbContext Db, Guid Runner, Guid Project, Guid Owner)> SharedRunnerAsync(bool projectActive)
