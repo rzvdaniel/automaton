@@ -21,7 +21,7 @@ Read the matching skill before changing the related area:
 | Administrator-visible Studio or API behavior and its documentation | [Admin docs](.agents/skills/admin-docs/SKILL.md) |
 | Roadmaps, architecture guides, or other repository documentation | [Documentation maintenance](.agents/skills/documentation-maintenance/SKILL.md) |
 | User-facing Studio UI, theme tokens, or visual verification | [Studio design](.agents/skills/studio-design/SKILL.md) |
-| Delivering an issue or PR end to end: review, merge, release, test-server upgrade, and verification as real users | [Full delivery](.agents/skills/full-delivery/SKILL.md) |
+| Implementing a feature or bug fix end to end: issue, PR, review, merge, release, test-server upgrade, and verification as real users (`/automaton-implement` in Claude Code) | [Automaton implement](.agents/skills/automaton-implement/SKILL.md) |
 
 The skills listed above are the repository contract. Other folders under `.agents/skills/` are developer-local. Do not add, expand, or commit local skills unless the task names that work.
 
@@ -38,7 +38,7 @@ Core workflow:
 
 ## Agent orchestration
 
-Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`. The [Full delivery](.agents/skills/full-delivery/SKILL.md) skill is a checklist for one agent, not orchestration machinery.
+Repository coding agents follow this file and the matching repository skills directly. No separate local orchestrator is required. Do not add manager/developer/reviewer role prompts, agent loops, orchestration state, metrics harnesses, or equivalent machinery under `.agents/` or `AgentRuns/`. The [Automaton implement](.agents/skills/automaton-implement/SKILL.md) skill is a checklist for one agent, not orchestration machinery.
 
 ## Git workflow
 
@@ -121,4 +121,4 @@ git diff --check
 
 For production shell changes, run `bash -n` on every touched script. For Studio UI, follow the studio-design visual checklist in addition to type-check.
 
-For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request. When production work is requested, agents also do the administrator settings themselves and keep people informed, as the [Full delivery](.agents/skills/full-delivery/SKILL.md) skill describes.
+For production operations, follow the preflight, release, update, and verification workflow in the production deployment skill. Do not deploy or change production data without an explicit request. When production work is requested, agents also do the administrator settings themselves and keep people informed, as the [Automaton implement](.agents/skills/automaton-implement/SKILL.md) skill describes.

@@ -90,8 +90,9 @@ appsettings*.json
 
 .vscode/
 
-# Ignore files created by Claude AI
-.claude
+# Ignore files created by Claude AI, except the shared slash-command skills
+.claude/*
+!.claude/skills/
 # App file storage
 AppData/
 # Runner data
