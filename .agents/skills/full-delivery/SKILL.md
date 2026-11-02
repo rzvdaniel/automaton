@@ -17,8 +17,9 @@ loop around them.
 - Self sign-up is disabled on purpose. Never re-enable it, insert users into the database or bypass the invite
   flow. Test accounts are created by an administrator in **Admin → Users → Add user**, or through
   `POST api/admin/users`.
-- Permission approval is a system administrator decision. An agent may prepare it and hand over the approval link,
-  but does not approve on the owner's behalf unless the owner asks for that specific approval.
+- On the test server, agents operate fully as the test system administrator: approve and revoke app permissions,
+  add users and change settings themselves, then report what they did (what, for which app or user, and why).
+  On production, permission approvals stay with the owner.
 - Test only on the test server. Production changes follow the production skills, with a backup and a check of the
   public URLs afterwards.
 - Never print, commit or post credentials, tokens or API keys. Keep them in files only the current user can read.
@@ -69,7 +70,8 @@ deploy as the administrator and use the regular user for the access checks.
    - each role boundary (a regular user and a stranger are refused, a plain Admin versus a SysAdmin);
    - error messages a person will see.
    Use the browser for pages. Record what passed and what you could not check.
-10. **Close out.** Comment the results on the issue or PR, open issues for gaps found while testing, update the board,
+10. **Close out.** Comment the results on the issue or PR, including every administrator action you took on the test
+    server, open issues for gaps found while testing, update the board,
     and tell the owner what is left for them, with direct links.
 
 ## Handoff
