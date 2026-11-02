@@ -210,7 +210,9 @@ watch(() => route.path, () => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  /* Pages taller than the window scroll here; full-height workspaces still fit and scroll inside. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 @media (max-width: 768px) {

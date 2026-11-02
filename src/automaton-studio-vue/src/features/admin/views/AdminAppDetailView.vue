@@ -106,6 +106,16 @@ async function loadPermissions() {
   }
 }
 
+function permissionSeverity(status: string) {
+  switch (status) {
+    case 'Approved': return 'success'
+    case 'Pending': return 'warn'
+    case 'Rejected':
+    case 'Revoked': return 'danger'
+    default: return 'secondary'
+  }
+}
+
 async function setPermission(item: AdminAppPermissionStatus, approved: boolean) {
   savingPermission.value = item.permission
   const summary = approved ? 'Permission approved' : item.approved ? 'Permission revoked' : 'Permission rejected'
@@ -405,13 +415,15 @@ onMounted(() => {
             <template #content>
               <p>Apps receive access only after a system administrator approves a requested permission.</p>
               <div v-if="permissions.length === 0" class="empty-state">This app has not requested any permissions.</div>
-              <div v-for="item in permissions" :key="item.permission" class="detail-item">
-                <div><strong>{{ item.permission }}</strong> <Tag :value="item.status" /></div>
-                <Button v-if="item.approved" label="Revoke" severity="danger" outlined :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
-                <template v-else>
-                  <Button label="Approve" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
-                  <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined :disabled="savingPermission !== null" @click="setPermission(item, false)" />
-                </template>
+              <div v-for="item in permissions" :key="item.permission" class="permission-row">
+                <div class="permission-name"><code>{{ item.permission }}</code> <Tag :value="item.status" :severity="permissionSeverity(item.status)" /></div>
+                <div class="permission-actions">
+                  <Button v-if="item.approved" label="Revoke" severity="danger" outlined size="small" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                  <template v-else>
+                    <Button label="Approve" size="small" :loading="savingPermission === item.permission" :disabled="savingPermission !== null" @click="setPermission(item, true)" />
+                    <Button v-if="item.status === 'Pending'" label="Reject" severity="secondary" outlined size="small" :disabled="savingPermission !== null" @click="setPermission(item, false)" />
+                  </template>
+                </div>
               </div>
             </template>
           </Card>
@@ -538,6 +550,29 @@ onMounted(() => {
   grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
   align-items: start;
   column-gap: 1rem;
+}
+
+.permission-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+.permission-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.permission-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .detail-item dt {
