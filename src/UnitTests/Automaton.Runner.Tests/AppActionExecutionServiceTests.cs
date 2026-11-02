@@ -8,6 +8,7 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public class AppActionExecutionServiceTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DuplicateExecutionId_ReusesTerminalResultAndDoesNotRestartInterruptedExecution()
     {

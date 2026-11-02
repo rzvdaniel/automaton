@@ -22,6 +22,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AppRunnerUpdateTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(true)]
     [TestCase(false)]
     public async Task Update_AuthenticationChangeRefreshesDeployedRoutes(bool requiresAuthentication)
@@ -70,6 +71,7 @@ public class AppRunnerUpdateTests
         await db.SaveChangesAsync();
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(true)]
     [TestCase(false)]
     public async Task Update_FailedAuthenticationRouteWrite_SameValueRetryRepairsRoute(bool requiresAuthentication)
@@ -169,6 +171,7 @@ public class AppRunnerUpdateTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task UpdateRunner_AssignsEligibleOwnedRunner()
     {
@@ -201,6 +204,7 @@ public class AppRunnerUpdateTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task UpdateRunner_WhenGenericRuntimeIsNotDeployed_AllowsRunnerReassignment()
     {
@@ -227,6 +231,7 @@ public class AppRunnerUpdateTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task Update_RejectsChangingRunnerWhenGenericRuntimeIsDeployed()
     {

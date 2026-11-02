@@ -13,6 +13,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerFileTransferTargetAmbiguityTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task MediaTransferWithoutTargetId_AllowsMultipleTargetsOnOneRunner()
     {

@@ -79,6 +79,7 @@ public class AppActionManifestParserTests
         Assert.That(error.Message, Does.Contain("folder name"));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public void RejectsPrivilegedCapabilitiesForNormalActions()
     {

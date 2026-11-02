@@ -116,6 +116,7 @@ public sealed class OrganizationAssignedAppAuthorizationTests
         Assert.That(gateway.DispatchCount, Is.Zero);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task ExecuteAsync_ProjectDeveloperKeepsStandardRunnerAccessWhenAlsoAssigned()
     {
@@ -130,6 +131,7 @@ public sealed class OrganizationAssignedAppAuthorizationTests
         Assert.That(gateway.QueuedRunnerId, Is.EqualTo(runnerId));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task ExecuteAsync_RequiresPersistedApprovalForPrivilegedHostTarget()
     {

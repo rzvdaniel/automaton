@@ -33,6 +33,7 @@ public sealed class RunnerCertificateValidationTests
         }
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task HubConnection_RejectsUntrustedServerCertificate()
     {

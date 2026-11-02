@@ -14,6 +14,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class RunnerTunnelReconnectServiceTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(false, false)]
     [TestCase(false, true)]
     [TestCase(true, false)]

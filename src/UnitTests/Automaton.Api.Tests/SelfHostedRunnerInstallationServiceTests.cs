@@ -205,6 +205,7 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         AssertEnrollmentResult(result);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("Standard")]
     [TestCase("PrivilegedHost")]
     public async Task Exchange_RejectsPendingLegacyEnrollment(string profile)

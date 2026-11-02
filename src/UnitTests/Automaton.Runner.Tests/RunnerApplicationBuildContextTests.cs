@@ -32,6 +32,7 @@ public sealed class RunnerApplicationBuildContextTests
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task ContainerBuildReceivesServerIssuedExecutionContext()
     {

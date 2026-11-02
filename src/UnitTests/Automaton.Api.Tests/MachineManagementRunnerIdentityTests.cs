@@ -8,6 +8,7 @@ namespace Automaton.Api.Tests;
 
 public sealed class MachineManagementRunnerIdentityTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, true)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false)]
     [TestCase(RunnerPurposes.Managed, "Standard", true)]

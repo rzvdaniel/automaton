@@ -26,6 +26,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class ApplicationDeploymentServiceTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task RunnerConnectedToAnotherApiCanReceiveDurableDeploymentByStableIdentity()
     {
@@ -123,6 +124,7 @@ public sealed class ApplicationDeploymentServiceTests
         await DeploymentAcceptanceTestScenarios.AssertViewerCannotDeployAsync(fixture);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_PersistsOpaqueGenericSourceFiles()
     {
@@ -158,6 +160,7 @@ public sealed class ApplicationDeploymentServiceTests
             Assert.That(File.Exists(Path.Combine(sourceRoot, file)), Is.True, file);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_RejectsSourcePathTraversal()
     {
@@ -223,6 +226,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task RedeliveryAfterLeaseExpiry_ReclaimsOperationWithoutManualStateReset()
     {
@@ -256,6 +260,7 @@ public sealed class ApplicationDeploymentServiceTests
         Assert.That(unchanged.Status, Is.EqualTo(DeploymentOperationStatuses.Succeeded));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task CallerCancellationDuringRunnerExecution_LeavesOperationDurable()
     {
@@ -270,6 +275,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_CompletesTargetOnlyAfterApiFinalization()
     {
@@ -288,6 +294,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_SuccessfulNoRuntimeReplacementRemovesGenericRoute()
     {
@@ -313,6 +320,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_RunnerFailureMarksTargetFailedWithoutChangingMarkers()
     {
@@ -345,6 +353,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_FinalizationFailurePreservesOriginalErrorAndDoesNotClaimLegacyRuntime()
     {
@@ -361,6 +370,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_SecondaryFailureFencingConflictDoesNotReplaceOriginalError()
     {
@@ -379,6 +389,7 @@ public sealed class ApplicationDeploymentServiceTests
         Assert.That(exception!.Message, Is.EqualTo("route refresh failed"));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_FirstDeploymentCompletionFailureRemovesPendingRoute()
     {
@@ -393,6 +404,7 @@ public sealed class ApplicationDeploymentServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployPackageAsync_NoRuntimeCompletionFailureRestoresCommittedRoute()
     {

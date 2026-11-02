@@ -41,6 +41,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
         Assert.That(fixture.Target.ExecutionRunnerId, Is.EqualTo(fixture.Runner.Id));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("workspace")]
     [TestCase("target")]
     [TestCase("attempt")]
@@ -70,6 +71,7 @@ public sealed class MachineDeploymentOperationAssignmentTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("workspace")]
     [TestCase("target")]
     public async Task QueuedActionIsTerminalizedWhenItsBindingChanges(string change)

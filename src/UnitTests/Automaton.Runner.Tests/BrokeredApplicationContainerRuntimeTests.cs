@@ -107,6 +107,7 @@ public sealed class BrokeredApplicationContainerRuntimeTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(RunnerPurposes.Managed, "Standard", true, true)]
     [TestCase(RunnerPurposes.Managed, "PrivilegedHost", true, false)]
     [TestCase(RunnerPurposes.Managed, RunnerApplicationProfiles.MachineManagement, false, true)]

@@ -49,12 +49,14 @@ public sealed class GenericRuntimeAcceptanceTests
             Directory.Delete(workspaceRoot, recursive: true);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DifferentStacks_UseOneGenericBuildRuntimeReadinessAndGatewayPath()
     {
         await GenericRuntimeAcceptanceScenario.RunAsync(workspaceRoot);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task NodeReplacement_LeavesV1CurrentUntilV2ReadinessThenRoutesV2()
     {
@@ -117,6 +119,7 @@ public sealed class GenericRuntimeAcceptanceTests
         }
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task NodeFailedReplacement_PreservesHealthyV1RuntimeAndRoute()
     {

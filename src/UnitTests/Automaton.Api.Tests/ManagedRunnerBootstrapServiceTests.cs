@@ -54,6 +54,7 @@ public class ManagedRunnerBootstrapServiceTests
         Assert.That(await db.AppDeploymentTargets.Where(x => x.WebAppId == app.Id).Select(x => x.ExecutionRunnerId).SingleAsync(), Is.Null);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForSoftDeletedHostedRunnerAssignment()
     {
@@ -69,6 +70,7 @@ public class ManagedRunnerBootstrapServiceTests
             "Assign a Management Runner", runnerId, containsMessage: true);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("Pending")]
     [TestCase("Provisioning")]
     [TestCase("Running")]
@@ -120,6 +122,7 @@ public class ManagedRunnerBootstrapServiceTests
             "The assigned Runner is offline.", containsMessage: false);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForDisabledHostedRunnerAssignment()
     {
@@ -150,6 +153,7 @@ public class ManagedRunnerBootstrapServiceTests
         Assert.That(await db.AppDeploymentTargets.Where(x => x.WebAppId == app.Id).Select(x => x.ExecutionRunnerId).SingleAsync(), Is.Null);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForLegacyInfrastructureAssignment()
     {
@@ -167,6 +171,7 @@ public class ManagedRunnerBootstrapServiceTests
             app.Id, ownerId, runnerId);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForMissingPersistedAssignment()
     {

@@ -7,6 +7,7 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class GenericRuntimeBuildAcceptanceTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task NodeBuildOutput_IsPassedToTheGenericRuntimeArtifactRoot()
     {

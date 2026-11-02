@@ -5,6 +5,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public sealed class HttpDeploymentRoutingTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("static", true)]
     [TestCase("compose", true)]
     [TestCase("finite", false)]

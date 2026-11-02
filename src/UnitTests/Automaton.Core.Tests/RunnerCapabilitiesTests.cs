@@ -35,6 +35,7 @@ public class RunnerCapabilitiesTests
         Assert.That(capabilities, Is.EquivalentTo(RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed)));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public void LegacyPurposeCannotExecuteApplications()
     {

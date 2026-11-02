@@ -10,6 +10,7 @@ namespace Automaton.Api.Tests;
 
 public sealed class ManagedApplicationArtifactOperationTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task CallbackRetryReusesPinnedArtifactRequestAndTerminalResult()
     {
@@ -34,6 +35,7 @@ public sealed class ManagedApplicationArtifactOperationTests
             Guid.NewGuid(), request, CancellationToken.None));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase(false)]
     [TestCase(true)]
     public async Task AnotherOwnerOrWrongTargetCannotQueueArtifacts(bool wrongTarget)

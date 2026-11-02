@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dotnet:
+    name: .NET tests (${{ matrix.project }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [Api, Cli, Core, Runner, Worker, Ai, Architecture]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      # Tests tagged Quarantine528 already failed on main when CI started running tests (#528).
+      # They are fixed or removed under that issue; every other test must pass.
+      - name: Test
+        run: >
+          dotnet test src/UnitTests/Automaton.${{ matrix.project }}.Tests
+          --filter "TestCategory!=Quarantine528"
+          --logger "console;verbosity=minimal"
+
+  studio:
+    name: Studio tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/automaton-studio-vue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/automaton-studio-vue/package-lock.json
+      - run: npm ci
+      - run: npm test

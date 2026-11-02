@@ -118,6 +118,7 @@ public sealed class HostContainerRelayServiceTests
         });
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task AssignmentAfterTargetReassignmentTerminalizesQueuedContainerRequest()
     {

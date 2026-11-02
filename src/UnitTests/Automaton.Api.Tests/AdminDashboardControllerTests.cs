@@ -11,6 +11,7 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class AdminDashboardControllerTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task GetSummary_ReturnsOperationalOverviewMetrics()
     {

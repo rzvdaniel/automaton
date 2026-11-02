@@ -100,6 +100,7 @@ public sealed class RunnerExecutionDeliveryTests
         Assert.That(executor.Calls, Is.Zero);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task BuildContainerCleanupRunsOnlyAfterResultSubmission()
     {

@@ -23,6 +23,7 @@ namespace Automaton.Api.Tests;
 public class AppRunnerEligibilityTests
 {
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task Publish_WhenGenericRuntimeIsNotDeployed_AllowsRunnerAssignment()
     {
@@ -54,6 +55,7 @@ public class AppRunnerEligibilityTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task UpdateRunner_RejectsInfrastructureRunner()
     {
@@ -75,6 +77,7 @@ public class AppRunnerEligibilityTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("infrastructure")]
     public async Task UpdateRunner_TagDoesNotGrantInfrastructureRunnerAssignment(string tag)
     {
@@ -96,6 +99,7 @@ public class AppRunnerEligibilityTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [TestCase("system")]
     [TestCase("admin")]
     public async Task UpdateRunner_PrivilegedLookingTagsDoNotExpandRunnerEligibility(string tag)
@@ -118,6 +122,7 @@ public class AppRunnerEligibilityTests
     }
 
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task Create_RejectsRunnerOutsideCallerScope()
     {

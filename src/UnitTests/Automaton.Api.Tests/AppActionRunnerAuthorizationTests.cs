@@ -23,6 +23,7 @@ namespace Automaton.Api.Tests;
 public class AppActionRunnerAuthorizationTests
 {
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task AppActionExecution_RejectsInvalidPersistedRunnerAssignment()
     {

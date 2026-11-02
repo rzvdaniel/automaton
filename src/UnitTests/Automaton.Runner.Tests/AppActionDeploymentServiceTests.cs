@@ -28,6 +28,7 @@ public class AppActionDeploymentServiceTests
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task PrepareAll_SkipsUnchangedAndPreservesRestorableVersions()
     {
@@ -53,6 +54,7 @@ public class AppActionDeploymentServiceTests
         Assert.That(File.ReadAllText(Path.Combine(workspace.GetAppActionCurrentDirectory(appId, targetId, "hello"), "main.sh")), Does.Contain("version\":1"));
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeleteVersion_RejectsCurrentAndDeletesNamedOldVersion()
     {

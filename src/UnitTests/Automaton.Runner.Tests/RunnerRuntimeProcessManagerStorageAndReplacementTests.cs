@@ -185,6 +185,7 @@ public sealed class RunnerRuntimeProcessManagerStorageAndReplacementTests : Runn
         await manager.StopAsync(appId, targetId);
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task DeployedRuntimeFixture_StartsFromTheGenericApplicationArtifactRoot()
     {

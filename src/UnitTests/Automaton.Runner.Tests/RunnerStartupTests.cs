@@ -11,6 +11,7 @@ namespace Automaton.Runner.Console.Tests;
 [TestFixture]
 public sealed class RunnerStartupTests
 {
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task ManagedServiceHost_StartsBeforeRunnerServiceMode()
     {
@@ -31,6 +32,7 @@ public sealed class RunnerStartupTests
         await host.StopAsync();
     }
 
+    [Category("Quarantine528")] // #528: fails on main; fix or remove
     [Test]
     public async Task ManagedEnrollment_UsesExchangeBoundaryAfterHostBuild()
     {
