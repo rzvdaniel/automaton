@@ -1,7 +1,7 @@
 # Studio smoke checks
 
-Read-only browser checks of a deployed Studio, run against the test server after each update (full-delivery
-skill, step 9). They sign in once as the system administrator and once as a regular user, open the main pages,
+Read-only browser checks of a deployed Studio, run against the test server after each update (`automaton-implement`
+skill, `verify.md`). They sign in once as the system administrator and once as a regular user, open the main pages,
 and save a screenshot of each page in `smoke-results/`. They never create or change anything.
 
 What they cover: dashboard; Admin → Users and the Add user dialog; Admin → Apps and, when an app exists, its
@@ -28,3 +28,5 @@ npm run smoke
 - `PLAYWRIGHT_CHROMIUM_EXECUTABLE` reuses agent-browser's Chromium; without it, Playwright needs its own browser
   (`npx playwright install chromium`).
 - Run one browser at a time; the test server has little memory.
+- A failed sign-in leaves a screenshot that can show the test account's email address; do not attach that one to a PR.
+- Branches that need data the server lacks (an app, a project) are reported as `skipped` annotations, not passed.
