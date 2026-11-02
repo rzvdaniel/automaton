@@ -66,7 +66,6 @@ public sealed class AppPermissionService(
         row.UpdatedAtUtc = DateTime.UtcNow;
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException) { throw new AppPermissionConflictException(); }
-        var restarted = credentialChanged && runtimes is not null ? await runtimes.RestartRunningAsync(appId, token) : 0;
         if (audit is not null)
         {
             var (action, eventType) = row.Status switch
@@ -79,9 +78,10 @@ public sealed class AppPermissionService(
             {
                 Action = action, EntityType = AuditEntityTypes.AppPermission, EntityId = appId, EventType = eventType,
                 Message = $"App permission {permission} was {row.Status.ToLowerInvariant()}",
-                Metadata = new { permission, appId, restartedRuntimes = restarted }
+                Metadata = new { permission, appId }
             }, token);
         }
+        if (credentialChanged && runtimes is not null) await runtimes.RestartRunningAsync(appId, CancellationToken.None);
         return await GetStatusAsync(appId, token);
     }
 

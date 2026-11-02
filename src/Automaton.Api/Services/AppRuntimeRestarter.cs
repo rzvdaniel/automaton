@@ -16,7 +16,8 @@ public interface IAppRuntimeRestarter
 /// <summary>
 /// Queues a durable <c>restart-runtime</c> command for every running deployment target of an app. The Runner
 /// starts a new container from the deployed files, which loads current secrets, and replaces the old one once
-/// the new one is ready. Targets being deployed are skipped: the deployment loads current secrets itself.
+/// the new one is ready. A target being deployed is included too: its deployment may have loaded the old
+/// credential, and the Runner runs the restart after the deployment finishes.
 /// </summary>
 public sealed class AppRuntimeRestarter(
     ApplicationDbContext db,
@@ -38,9 +39,9 @@ public sealed class AppRuntimeRestarter(
                     AppActionCommand.Create(CommandKind, new RestartAppRuntimeRequest(appId, target.Id))), token);
                 queued++;
             }
-            catch (InvalidOperationException error)
+            catch (Exception error) when (error is not OperationCanceledException)
             {
-                // A Runner being removed accepts no work; its runtime goes away with it.
+                // The permission change is already saved; a copy that misses the restart gets it at its next start.
                 logger.LogWarning(error, "Could not queue a runtime restart for app {AppId} target {TargetId}.", appId, target.Id);
             }
         }
@@ -50,7 +51,7 @@ public sealed class AppRuntimeRestarter(
     internal static IQueryable<RunningTarget> RunningTargets(ApplicationDbContext db, Guid appId)
         => db.AppDeploymentTargets
             .Where(target => target.WebAppId == appId && target.ExecutionRunnerId != null && target.GenericRuntimeDeployed
-                && target.Status == DeploymentTargetStatus.Running && target.ActiveDeploymentOperationId == null && !target.CleanupPending)
+                && (target.Status == DeploymentTargetStatus.Running || target.Status == DeploymentTargetStatus.Deploying) && !target.CleanupPending)
             .Select(target => new RunningTarget(target.Id, target.ExecutionRunnerId!.Value));
 
     internal sealed record RunningTarget(Guid Id, Guid RunnerId);

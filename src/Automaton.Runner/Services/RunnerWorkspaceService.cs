@@ -77,6 +77,23 @@ public class RunnerWorkspaceService
     internal static string GetDeploymentStagingVolumeSubpath(Guid appId, Guid deploymentTargetId, Guid operationId)
         => $"workspace/{GetDeploymentStagingRelativePath(appId, deploymentTargetId, operationId)}";
 
+    /// <summary>Copies deployed runtime files, keeping symbolic links (for example in virtual environments) as links.</summary>
+    internal static void CopyRuntimeArtifact(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var entry in new DirectoryInfo(source).EnumerateFileSystemInfos())
+        {
+            var target = Path.Combine(destination, entry.Name);
+            if (entry.LinkTarget is { } link)
+            {
+                if (entry is DirectoryInfo) Directory.CreateSymbolicLink(target, link);
+                else File.CreateSymbolicLink(target, link);
+            }
+            else if (entry is DirectoryInfo directory) CopyRuntimeArtifact(directory.FullName, target);
+            else File.Copy(entry.FullName, target);
+        }
+    }
+
     internal static string GetRuntimeCandidateVolumeSubpath(Guid appId, Guid targetId, Guid candidateId)
         => $"workspace/apps/{appId:D}/targets/{targetId:D}/artifacts/candidates/{candidateId:D}/application";
 

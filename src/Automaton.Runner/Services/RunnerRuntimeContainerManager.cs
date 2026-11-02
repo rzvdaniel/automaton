@@ -273,8 +273,9 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
     }
 
     /// <summary>
-    /// Replaces the running container with a new one from the same deployed files, using the normal
+    /// Replaces the running container with a new one from a copy of the deployed files, using the normal
     /// start, readiness and promotion path; the old container keeps serving until the new one is ready.
+    /// The copy gets a fresh candidate identity because brokered hosts name (and reuse) containers by it.
     /// Compose runtimes receive no app secrets, so they are left alone.
     /// </summary>
     public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
@@ -283,8 +284,20 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         if (metadata is not { State: RuntimeReadinessState.Ready, Candidate: null } || string.IsNullOrWhiteSpace(metadata.ContainerId)
             || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
             return false;
-        await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
-            cancellationToken, metadata.ArtifactRoot, metadata.CandidateId);
+        var candidateId = Guid.NewGuid();
+        var artifact = workspace.GetAppRuntimeCandidateApplicationDirectory(appId, deploymentTargetId, candidateId);
+        RunnerWorkspaceService.CopyRuntimeArtifact(metadata.ArtifactRoot!, artifact);
+        try
+        {
+            await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
+                cancellationToken, artifact, candidateId);
+        }
+        catch
+        {
+            var warnings = new List<string>();
+            RunnerWorkspaceService.TryDeletePreviousRuntimeArtifact(artifact, warnings);
+            throw;
+        }
         return true;
     }
 

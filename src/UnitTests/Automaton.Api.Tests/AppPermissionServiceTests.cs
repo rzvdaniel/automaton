@@ -87,7 +87,7 @@ public sealed class AppPermissionServiceTests
     }
 
     [Test]
-    public async Task OnlyRunningAssignedTargetsThatAreNotBeingDeployedAreRestarted()
+    public async Task RunningAndDeployingAssignedTargetsAreRestarted()
     {
         var (db, appId, _, _) = await CreateAsync();
         var runnerId = Guid.NewGuid();
@@ -105,7 +105,11 @@ public sealed class AppPermissionServiceTests
         }
         var running = Target(_ => { });
         Target(target => target.Status = DeploymentTargetStatus.Failed);
-        Target(target => target.ActiveDeploymentOperationId = Guid.NewGuid());
+        var deploying = Target(target =>
+        {
+            target.Status = DeploymentTargetStatus.Deploying;
+            target.ActiveDeploymentOperationId = Guid.NewGuid();
+        });
         Target(target => target.CleanupPending = true);
         Target(target => target.GenericRuntimeDeployed = false);
         Target(target => { target.ExecutionRunnerId = null; });
@@ -117,7 +121,10 @@ public sealed class AppPermissionServiceTests
 
         var selected = await AppRuntimeRestarter.RunningTargets(db, appId).ToListAsync();
 
-        Assert.That(selected, Is.EqualTo(new[] { new AppRuntimeRestarter.RunningTarget(running.Id, runnerId) }));
+        Assert.That(selected, Is.EquivalentTo(new[]
+        {
+            new AppRuntimeRestarter.RunningTarget(running.Id, runnerId), new AppRuntimeRestarter.RunningTarget(deploying.Id, runnerId)
+        }));
     }
 
     private sealed class RecordingRestarter : IAppRuntimeRestarter

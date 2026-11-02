@@ -65,6 +65,9 @@ public sealed class RunnerRuntimeContainerManagerTests
         Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
 
         await manager.ApplyAsync(appId, targetId, Contract(19021));
+        var first = await ReadMetadataAsync(workspace, appId, targetId);
+        Directory.CreateDirectory(Path.Combine(first.ArtifactRoot!, "lib"));
+        await File.WriteAllTextAsync(Path.Combine(first.ArtifactRoot!, "lib", "app.txt"), "deployed");
         secrets.Value = "v2";
         var restarted = await manager.RestartAsync(appId, targetId, CancellationToken.None);
 
@@ -76,7 +79,11 @@ public sealed class RunnerRuntimeContainerManagerTests
             Assert.That(metadata.ContainerId, Is.EqualTo("container-2"));
             Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
             Assert.That(fake.StoppedContainers, Does.Contain("container-1"));
-            Assert.That(workspace.RuntimeArtifactExists(metadata.ArtifactRoot), Is.True, "The shared deployed files stay.");
+            // Brokered hosts name and reuse containers by candidate, so a restart must not reuse the running one's.
+            Assert.That(fake.LastRequest.CandidateId, Is.Not.EqualTo(first.CandidateId));
+            Assert.That(metadata.ArtifactRoot, Is.Not.EqualTo(first.ArtifactRoot));
+            Assert.That(File.ReadAllText(Path.Combine(metadata.ArtifactRoot!, "lib", "app.txt")), Is.EqualTo("deployed"));
+            Assert.That(Directory.Exists(first.ArtifactRoot), Is.False, "The old copy is removed with the old container.");
         });
         await manager.StopAsync(CancellationToken.None);
     }
