@@ -34,6 +34,7 @@ public class RunnersController : BaseController
     public async Task<IActionResult> Put(Guid id, Automaton.Api.Models.UpdateRunnerRequest runner, CancellationToken cancellationToken)
     {
         try { await runnersService.Update(id, runner, cancellationToken); }
+        catch (UnauthorizedAccessException) { return Forbid(); }
         catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
 
         return NoContent();
@@ -47,6 +48,10 @@ public class RunnersController : BaseController
         try
         {
             await runnersService.Delete(id, cancellationToken, hostCleanupConfirmed);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
         }
         catch (InvalidOperationException exception)
         {
@@ -62,6 +67,7 @@ public class RunnersController : BaseController
         CancellationToken cancellationToken)
     {
         try { return Ok(await removal.PrepareAsync(id, cancellationToken)); }
+        catch (UnauthorizedAccessException) { return Forbid(); }
         catch (InvalidOperationException exception) { return Conflict(new { message = exception.Message }); }
     }
 
@@ -114,7 +120,8 @@ public class RunnersController : BaseController
     public async Task<IActionResult> UpdateScriptSettings(Guid id, [FromBody] RunnerScriptEngineSettings settings, CancellationToken cancellationToken)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(settings);
-        await runnersService.UpdateScriptEngineSettings(id, json, cancellationToken);
+        try { await runnersService.UpdateScriptEngineSettings(id, json, cancellationToken); }
+        catch (UnauthorizedAccessException) { return Forbid(); }
         return NoContent();
     }
 

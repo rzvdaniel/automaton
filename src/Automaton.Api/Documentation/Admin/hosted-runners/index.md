@@ -15,6 +15,28 @@ The former Admin Runner screens, Infrastructure Runner installer, and Hosted Run
 
 The former bundled System Application page and its privileged schedules are retired. Create an ordinary App with administrator access for future system tasks. Existing schedule records are retained but do not dispatch.
 
+## Sharing Runners
+
+A Runner belongs to the person who installed it. Other people use it only through a project; there are no server-wide Runners, and a Runner cannot be handed to another user as their personal Runner.
+
+**One person on their own servers.** Install one or more Runners as yourself. With one Runner, deploys use it automatically. With several, choose one per app with `automaton deploy --runner <name>` or `automaton set-runner <name>`.
+
+**An organization.** A server administrator (or anyone who owns a Runner):
+
+1. creates a project and attaches the Runner on the project's **Runners** tab;
+2. adds the people who build apps as **Developer** on the **Members** tab (they need an account first; see [Pause public registration](./public-registration.md));
+3. each developer creates an app and links it to the project. Deploys of project apps can then use the project's Runner.
+
+People who only use apps need no Runner and no project role beyond what the app requires.
+
+Good to know:
+
+- Every member of a project can see the project's apps.
+- One Runner can be attached to several projects and serves all of them.
+- People outside the project cannot see the Runner or the project's apps, and cannot change either.
+- Removing someone from the project stops their deploys to its Runner straight away. Apps they created stay theirs, but cannot deploy until they are assigned a Runner they can use.
+- A project for one person to experiment in, or one everyone can deploy to, is just another project you can create. Automaton doesn't create these for you.
+
 ## Remove a Machine Management Runner
 
 The personal owner uses **Runners → Delete runner → Prepare removal**. First move or delete every assigned app environment, including stopped or undeployed environments, remove project links, and wait for pending Runner operations to finish. The API rejects removal and names the blocking environments; it never silently unassigns them.
