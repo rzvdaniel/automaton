@@ -154,10 +154,11 @@ public sealed class RunnerExecutionOperationService(
         => request.ManagedArtifacts is not null
             || request.FileTransfer?.Kind is RunnerFileTransferKinds.ReadMediaStats or RunnerFileTransferKinds.ReadMediaMetadata
             || request.HostContainer is not null
-            // Cleanup waits for typed Docker work on the management queue. It must
-            // leave that queue's single consumer free to run its nested operations.
+            // Cleanup and runtime restarts wait for typed Docker work on the management queue.
+            // They must leave that queue's single consumer free to run its nested operations.
             || request.Action is not null && request.Action.Kind is not
-                ("execute" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target");
+                ("execute" or "cleanup-app-resources" or "cleanup-target-resources" or "cleanup-app" or "cleanup-target"
+                or AppRuntimeRestarter.CommandKind);
 
     public async Task<RunnerExecutionResult> WaitAsync(Guid operationId, CancellationToken token)
     {

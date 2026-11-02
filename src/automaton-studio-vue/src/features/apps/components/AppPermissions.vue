@@ -51,8 +51,8 @@ onMounted(() => {
   <div class="app-permissions">
     <p class="intro">
       An app asks for platform access in <code>automaton.json</code> under <code>application.permissions</code>.
-      It gets that access only after a system administrator approves it; the app then receives its key
-      as <code>APP_AUTOMATON_API_KEY</code> on its next start.
+      It gets that access only after a system administrator approves it; the app's running copies then
+      restart within moments and receive the key as <code>APP_AUTOMATON_API_KEY</code>, without a deploy.
     </p>
 
     <Message v-if="failed" severity="error" :closable="false">Could not load the app's permissions.</Message>

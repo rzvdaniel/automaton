@@ -308,6 +308,7 @@ internal static class ApiMessagingRegistration
         services.AddScoped<ISecretStore, SecretStore>();
         services.AddScoped<SecretAuditLog>();
         services.AddScoped<AppSecretService>();
+        services.AddScoped<IAppRuntimeRestarter, AppRuntimeRestarter>();
         services.AddScoped<AppPermissionService>();
         services.AddScoped<AdminAppDirectoryService>();
         services.AddScoped<AdminUserProvisioningService>();

@@ -53,6 +53,42 @@ public sealed class RunnerRuntimeContainerManagerTests
     }
 
     [Test]
+    public async Task RestartReplacesTheRunningContainerWithOneThatLoadsCurrentSecrets()
+    {
+        var fake = new FakeContainerRuntime();
+        var secrets = new ChangingSecretSource { Value = "v1" };
+        var workspace = new RunnerWorkspaceService();
+        var (appId, targetId) = (Guid.NewGuid(), Guid.NewGuid());
+        var manager = new RunnerRuntimeContainerManager(workspace, new RunnerRuntimeRegistry(), fake,
+            NullLogger<RunnerRuntimeContainerManager>.Instance, secrets);
+        await manager.StartAsync(CancellationToken.None);
+        Assert.That(await manager.RestartAsync(appId, targetId, CancellationToken.None), Is.False, "Nothing runs yet.");
+
+        await manager.ApplyAsync(appId, targetId, Contract(19021));
+        secrets.Value = "v2";
+        var restarted = await manager.RestartAsync(appId, targetId, CancellationToken.None);
+
+        var metadata = await ReadMetadataAsync(workspace, appId, targetId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(restarted, Is.True);
+            Assert.That(fake.LastRequest!.Secrets!["KEY"], Is.EqualTo("v2"));
+            Assert.That(metadata.ContainerId, Is.EqualTo("container-2"));
+            Assert.That(metadata.State, Is.EqualTo(RuntimeReadinessState.Ready));
+            Assert.That(fake.StoppedContainers, Does.Contain("container-1"));
+            Assert.That(workspace.RuntimeArtifactExists(metadata.ArtifactRoot), Is.True, "The shared deployed files stay.");
+        });
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    private sealed class ChangingSecretSource : IRuntimeSecretSource
+    {
+        public string Value { get; set; } = string.Empty;
+        public Task<IReadOnlyDictionary<string, string>> GetAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string> { ["KEY"] = Value });
+    }
+
+    [Test]
     public async Task FailedCandidatePreservesPreviousCurrent()
     {
         var fake = new FakeContainerRuntime();

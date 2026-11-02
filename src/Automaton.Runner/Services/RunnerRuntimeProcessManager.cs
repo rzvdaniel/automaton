@@ -18,6 +18,13 @@ public interface IAppRuntimeProcessManager
         Guid? deploymentAttemptId = null);
 
     Task StopAsync(Guid appId, Guid deploymentTargetId);
+
+    /// <summary>
+    /// Starts a running runtime again from its deployed files so it loads the app's current secrets.
+    /// Returns false when there is nothing to restart; only container runtimes receive secrets.
+    /// </summary>
+    Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+        => Task.FromResult(false);
 }
 
 public sealed class RuntimeApplyResult

@@ -16,7 +16,8 @@ public sealed record AppPermissionStatus(string Permission, bool Approved, strin
 public sealed class AppPermissionService(
     ApplicationDbContext db,
     ISecretProtector protector,
-    IAuditEventService? audit = null)
+    IAuditEventService? audit = null,
+    IAppRuntimeRestarter? runtimes = null)
 {
     public async Task<IReadOnlyList<AppPermissionStatus>> GetStatusAsync(Guid appId, CancellationToken token)
     {
@@ -46,6 +47,8 @@ public sealed class AppPermissionService(
             db.AppPermissionApprovals.Add(row);
         }
 
+        // Approving issues a new credential and revoking withdraws one; either way running copies restart to pick it up.
+        var credentialChanged = approved == (row.ProtectedKey is null);
         if (!approved)
         {
             row.Status = row.ProtectedKey is null ? AppPermissionStatuses.Rejected : AppPermissionStatuses.Revoked;
@@ -63,6 +66,7 @@ public sealed class AppPermissionService(
         row.UpdatedAtUtc = DateTime.UtcNow;
         try { await db.SaveChangesAsync(token); }
         catch (DbUpdateException) { throw new AppPermissionConflictException(); }
+        var restarted = credentialChanged && runtimes is not null ? await runtimes.RestartRunningAsync(appId, token) : 0;
         if (audit is not null)
         {
             var (action, eventType) = row.Status switch
@@ -75,7 +79,7 @@ public sealed class AppPermissionService(
             {
                 Action = action, EntityType = AuditEntityTypes.AppPermission, EntityId = appId, EventType = eventType,
                 Message = $"App permission {permission} was {row.Status.ToLowerInvariant()}",
-                Metadata = new { permission, appId }
+                Metadata = new { permission, appId, restartedRuntimes = restarted }
             }, token);
         }
         return await GetStatusAsync(appId, token);

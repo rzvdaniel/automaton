@@ -272,6 +272,22 @@ public sealed class RunnerRuntimeContainerManager : IAppRuntimeProcessManager
         return await StartAndPromoteCandidateAsync(attempt, previous, cancellationToken);
     }
 
+    /// <summary>
+    /// Replaces the running container with a new one from the same deployed files, using the normal
+    /// start, readiness and promotion path; the old container keeps serving until the new one is ready.
+    /// Compose runtimes receive no app secrets, so they are left alone.
+    /// </summary>
+    public async Task<bool> RestartAsync(Guid appId, Guid deploymentTargetId, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadExistingMetadataAsync(metadataStore.GetPath(appId, deploymentTargetId), cancellationToken);
+        if (metadata is not { State: RuntimeReadinessState.Ready, Candidate: null } || string.IsNullOrWhiteSpace(metadata.ContainerId)
+            || metadata.ComposeCandidateId is not null || !workspace.RuntimeArtifactExists(metadata.ArtifactRoot))
+            return false;
+        await ApplyAsync(appId, deploymentTargetId, RunnerRuntimeMetadataPolicy.CreateApplicationContract(metadata),
+            cancellationToken, metadata.ArtifactRoot, metadata.CandidateId);
+        return true;
+    }
+
     private async Task<RunnerRuntimeDeploymentMetadata?> ReadExistingMetadataAsync(
         string metadataPath,
         CancellationToken cancellationToken)

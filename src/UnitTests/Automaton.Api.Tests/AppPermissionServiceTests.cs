@@ -1,6 +1,7 @@
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -67,6 +68,66 @@ public sealed class AppPermissionServiceTests
         await db.SaveChangesAsync();
         Assert.That(await service.ValidateCredentialAsync(token, default), Is.Null);
         Assert.That(await service.GetStatusAsync(appId, default), Is.Empty);
+    }
+
+    [Test]
+    public async Task RunningCopiesRestartWhenTheCredentialIsIssuedOrWithdrawn()
+    {
+        var (db, appId, _, protector) = await CreateAsync();
+        var restarter = new RecordingRestarter();
+        var service = new AppPermissionService(db, protector, runtimes: restarter);
+
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, false, default);
+        Assert.That(restarter.Apps, Is.Empty, "Rejecting a pending request changes no credential.");
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, true, default);
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, true, default);
+        Assert.That(restarter.Apps, Is.EqualTo(new[] { appId }), "Approving again keeps the same credential.");
+        await service.SetApprovalAsync(appId, AppPermissionApproval.BackupsRead, false, default);
+        Assert.That(restarter.Apps, Is.EqualTo(new[] { appId, appId }));
+    }
+
+    [Test]
+    public async Task OnlyRunningAssignedTargetsThatAreNotBeingDeployedAreRestarted()
+    {
+        var (db, appId, _, _) = await CreateAsync();
+        var runnerId = Guid.NewGuid();
+        db.Runners.Add(new Runner { Id = runnerId, Name = "runner", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", Status = "online" });
+        AppDeploymentTarget Target(Action<AppDeploymentTarget> change)
+        {
+            var target = AppDeploymentTarget.CreateLive(appId, runnerId);
+            target.IsDefault = false;
+            target.SynchronizeDefaultConstraint();
+            target.GenericRuntimeDeployed = true;
+            target.Status = DeploymentTargetStatus.Running;
+            change(target);
+            db.AppDeploymentTargets.Add(target);
+            return target;
+        }
+        var running = Target(_ => { });
+        Target(target => target.Status = DeploymentTargetStatus.Failed);
+        Target(target => target.ActiveDeploymentOperationId = Guid.NewGuid());
+        Target(target => target.CleanupPending = true);
+        Target(target => target.GenericRuntimeDeployed = false);
+        Target(target => { target.ExecutionRunnerId = null; });
+        var otherApp = AppDeploymentTarget.CreateLive(Guid.NewGuid(), runnerId);
+        otherApp.Status = DeploymentTargetStatus.Running;
+        otherApp.GenericRuntimeDeployed = true;
+        db.AppDeploymentTargets.Add(otherApp);
+        await db.SaveChangesAsync();
+
+        var selected = await AppRuntimeRestarter.RunningTargets(db, appId).ToListAsync();
+
+        Assert.That(selected, Is.EqualTo(new[] { new AppRuntimeRestarter.RunningTarget(running.Id, runnerId) }));
+    }
+
+    private sealed class RecordingRestarter : IAppRuntimeRestarter
+    {
+        public List<Guid> Apps { get; } = [];
+        public Task<int> RestartRunningAsync(Guid appId, CancellationToken token)
+        {
+            Apps.Add(appId);
+            return Task.FromResult(1);
+        }
     }
 
     private static async Task<(Automaton.Api.Data.ApplicationDbContext Db, Guid AppId, AppPermissionService Service, DataProtectionSecretProtector Protector)> CreateAsync()

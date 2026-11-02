@@ -51,6 +51,12 @@ public sealed record CleanupAppDeploymentTargetResult(
     bool Success,
     string? Error = null);
 
+/// <summary>Starts an app's running runtime again from its deployed files, so it loads current secrets.</summary>
+public sealed record RestartAppRuntimeRequest(Guid AppId, Guid DeploymentTargetId);
+
+/// <summary><c>Restarted</c> is false when the target had no running runtime that takes secrets.</summary>
+public sealed record RestartAppRuntimeResult(Guid AppId, Guid DeploymentTargetId, bool Restarted);
+
 public sealed record ApplicationManagedArtifactFile(
     string RelativePath,
     byte[] Content);
