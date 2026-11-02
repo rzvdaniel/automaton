@@ -64,11 +64,20 @@ and `"administrator": true`, store its email and generated password in the crede
    `main`, compare the names of the failing tests, and report any new failure.
 4. **Open the PR.** Close the issue from the PR body. Wait for CI. A check list that is still empty means the run has
    not started yet; it is not a pass.
-5. **Review.** Get an independent read-only review (a fresh agent session with no stake in the change). Fix confirmed findings, take product questions to
-   the owner, then review again until nothing above low severity is left.
-6. **Merge.** Only with the owner's go-ahead. Asking for a delivery to the test server includes releasing and
-   upgrading the test server; a production update needs its own request. Wait for the checks of the final commit, including a conflict-resolution
-   commit, before merging. The `Tests` workflow (all unit tests) must pass; never skip or quarantine a failing test to get green. Squash-merge and delete the branch.
+5. **Review.** Get an independent read-only review from a subagent (a fresh agent session with no stake in the
+   change). Fix confirmed findings, take product questions to the owner, then review again until nothing above low
+   severity is left.
+6. **Merge.** The agent merges without waiting for the owner when all of these hold: the checks of the final commit
+   pass (including a conflict-resolution commit; the `Tests` workflow with all unit tests must pass, and a failing
+   test is never skipped or quarantined to get green), the latest subagent review found nothing above low severity,
+   and the agent is satisfied with the change. Ask the owner first when the change drops or rewrites stored data in
+   a migration, changes authentication or authorization rules in a way the issue did not ask for, or the owner said
+   so in the task. Squash-merge, delete the branch, and continue with the release and the test-server check below:
+   merging includes delivering to the test server. A production update still needs its own request.
+   **Batching.** When several issues or PRs are lined up, the agent may merge a few before one release when that saves
+   work: small, independent changes, usually two to four. Release on its own anything with a higher risk of breaking
+   a running system (Runner changes, database migrations, install or update scripts), so a failure points to one
+   change. Verify every item of a batch end to end in step 9, and list them all in the release notes and handoff.
 7. **Release.** After the merge, wait for the `Runner image` and `Build production images` workflows on `main` to
    succeed; a release pins the Runner image that exists at that moment. Then run
    `gh workflow run server-release.yml -f version=<next>` and wait for it and for `Pack CLI and Runner` to succeed.
