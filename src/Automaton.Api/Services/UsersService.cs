@@ -98,17 +98,18 @@ public class UsersService
         if (user.MustChangePassword && string.Equals(oldPassword, newPassword, StringComparison.Ordinal))
             throw new ArgumentException("Choose a password different from the one you were given.");
 
+        // Cleared in the same save as the new password, so a failure leaves both unchanged.
+        var required = user.MustChangePassword;
+        user.MustChangePassword = false;
         var result = await _userManager.ChangePasswordAsync(user, oldPassword, newPassword);
 
         if (!result.Succeeded)
         {
-            throw new InvalidOperationException("Error in updating password!");
+            user.MustChangePassword = required;
+            throw new ArgumentException(string.Join(" ", result.Errors.Select(error => error.Description)));
         }
 
-        if (!user.MustChangePassword) return;
-        user.MustChangePassword = false;
-        var cleared = await _userManager.UpdateAsync(user);
-        if (!cleared.Succeeded) throw new InvalidOperationException("Error in updating password!");
+        if (!required) return;
         await _auditEventService.WriteAsync(new AuditEventWriteRequest
         {
             Action = AuditActions.Changed,

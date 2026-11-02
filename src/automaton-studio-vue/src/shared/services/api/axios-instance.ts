@@ -74,6 +74,14 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
+    // The API holds a user whose administrator set their password to the password change.
+    const code = (error.response?.data as { code?: string } | undefined)?.code
+    if (error.response?.status === 403 && code === 'password_change_required') {
+      const target = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/change-password`
+      if (window.location.pathname !== target) window.location.assign(target)
+      return Promise.reject(error)
+    }
+
     // If error is 401 and we haven't already tried to refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Don't try to refresh if we're on auth routes

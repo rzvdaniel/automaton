@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Automaton.Api.Authentication;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NUnit.Framework;
 
 namespace Automaton.Api.Tests;
@@ -20,6 +22,7 @@ public sealed class PasswordChangeRequirementTests
     [TestCase("/api/Token/RefreshAccessToken", false)]
     [TestCase("/api/TokenThief", true)]
     [TestCase("/healthz", false)]
+    [TestCase("/_Host", true)]
     public void OnlyThePasswordChangePageIsReachable(string path, bool blocked)
         => Assert.That(PasswordChangeRequirement.IsBlocked(new PathString(path)), Is.EqualTo(blocked));
 
@@ -28,14 +31,16 @@ public sealed class PasswordChangeRequirementTests
     {
         var reached = 0;
         var middleware = new PasswordChangeRequirement(_ => { reached++; return Task.CompletedTask; });
+        using var db = AppAuthorizationTestData.CreateDbContext();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
 
         var flagged = Context("/api/ApiKeys", new Claim(PasswordChangeRequirement.ClaimType, "true"));
-        await middleware.InvokeAsync(flagged);
+        await middleware.InvokeAsync(flagged, db, cache);
         flagged.Response.Body.Position = 0;
         var body = await new StreamReader(flagged.Response.Body).ReadToEndAsync();
 
-        await middleware.InvokeAsync(Context("/api/ApiKeys"));
-        await middleware.InvokeAsync(Context("/api/Account/UpdateUserPassword", new Claim(PasswordChangeRequirement.ClaimType, "true")));
+        await middleware.InvokeAsync(Context("/api/ApiKeys"), db, cache);
+        await middleware.InvokeAsync(Context("/api/Account/UpdateUserPassword", new Claim(PasswordChangeRequirement.ClaimType, "true")), db, cache);
 
         Assert.Multiple(() =>
         {
@@ -43,6 +48,31 @@ public sealed class PasswordChangeRequirementTests
             Assert.That(body, Does.Contain(PasswordChangeRequirement.ErrorCode));
             Assert.That(reached, Is.EqualTo(2));
         });
+    }
+
+    [Test]
+    public async Task APrincipalWithoutTheClaimIsCheckedAgainstTheDatabase()
+    {
+        // An Identity cookie (GitHub sign-in) or an API key carries no claim; the stored flag still applies.
+        var reached = 0;
+        var middleware = new PasswordChangeRequirement(_ => { reached++; return Task.CompletedTask; });
+        using var db = AppAuthorizationTestData.CreateDbContext();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var userId = Guid.NewGuid();
+        db.Users.Add(new Automaton.Api.Entities.ApplicationUser
+        {
+            Id = userId, PublicUsername = "flagged", UserName = "flagged@example.com", Email = "flagged@example.com", MustChangePassword = true
+        });
+        await db.SaveChangesAsync();
+        var cookie = Context("/api/ApiKeys", new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
+
+        await middleware.InvokeAsync(cookie, db, cache);
+        Assert.That(cookie.Response.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
+
+        (await db.Users.SingleAsync(user => user.Id == userId)).MustChangePassword = false;
+        await db.SaveChangesAsync();
+        await middleware.InvokeAsync(Context("/api/ApiKeys", new Claim(ClaimTypes.NameIdentifier, userId.ToString())), db, cache);
+        Assert.That(reached, Is.EqualTo(1), "a cleared flag takes effect at once");
     }
 
     private static DefaultHttpContext Context(string path, params Claim[] claims)
