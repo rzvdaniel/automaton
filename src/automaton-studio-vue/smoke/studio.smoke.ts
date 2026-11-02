@@ -30,7 +30,8 @@ test.describe('as the system administrator', () => {
   test('Admin → Users lists users and opens Add user', async () => {
     await goTo(page, '/admin/users')
     await expect(heading(page, 'Users')).toBeVisible()
-    await expect(page.getByRole('row').nth(1)).toBeVisible() // at least one user below the header row
+    // At least one user row below the header; the table's "No users found" placeholder is also a row.
+    await expect(page.getByRole('row').filter({ hasNot: page.getByText(/No users found/) }).nth(1)).toBeVisible()
     await page.getByRole('button', { name: 'Add user' }).click()
     await page.getByText('Create with password').click()
     await expect(page.getByText('Must choose a new password at first sign-in')).toBeVisible()
