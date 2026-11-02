@@ -115,7 +115,7 @@ public class UsersService
             Action = AuditActions.Changed,
             EntityType = AuditEntityTypes.User,
             EntityId = userId,
-            EventType = AuditEventTypes.UserRequiredPasswordChanged,
+            EventType = AuditEventTypes.UserFirstSignInCompleted,
             Message = "User chose a new password at first sign-in.",
             Outcome = AuditOutcomes.Success,
             ActorUserId = userId,

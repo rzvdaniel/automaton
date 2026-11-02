@@ -68,7 +68,7 @@ public sealed class AdminUserProvisioningServiceTests
             Assert.That(user.MustChangePassword, Is.False);
             Assert.That(PasswordChangeRequirement.ClaimsFor(user), Is.Empty);
             Assert.That(await fixture.Users.CheckPasswordAsync(user, "Own-Pass-456"), Is.True);
-            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.UserRequiredPasswordChanged), Is.EqualTo(1));
+            Assert.That(await fixture.Db.AuditEvents.CountAsync(e => e.EventType == AuditEventTypes.UserFirstSignInCompleted), Is.EqualTo(1));
             Assert.That((await fixture.Db.AuditEvents.SingleAsync(e => e.EventType == AuditEventTypes.UserCreatedByAdministrator)).MetadataJson,
                 Does.Contain("\"changeAtFirstSignIn\":true"));
         });
