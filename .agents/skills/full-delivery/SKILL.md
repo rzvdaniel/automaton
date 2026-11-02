@@ -85,6 +85,9 @@ and `"administrator": true`, store its email and generated password in the crede
    - error messages a person will see.
    Check pages in a browser: `agent-browser` (see `AGENTS.md`) on a server without a screen, or Claude in Chrome on
    the owner's PC, following the studio-design visual checklist. Record what passed and what you could not check.
+   Name everything you create on the test server `e2e-…` (apps, projects, API keys), so it can be cleaned up.
+   Then remove it: `python .agents/tools/test-server-cleanup.py` lists it, `--apply` removes it. Test accounts stay.
+   A nightly timer on the test server removes `e2e-` items older than a day, in case a run stops early.
 10. **Close out.** Comment the results on the issue or PR, including every administrator action you took, open issues for gaps found while testing, update the board,
     and tell the owner what is left for them, with direct links.
 
