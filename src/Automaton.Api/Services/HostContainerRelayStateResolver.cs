@@ -59,7 +59,10 @@ public sealed class HostContainerRelayStateResolver(
             return HostContainerRelayResolution.Rejected(
                 Failure("deployment_attempt_mismatch", "The build attempt is not the active deployment attempt."));
 
-        var actorId = await ResolveMachineWorkspaceActorAsync(caller, target, cancellationToken);
+        var actorId = await ResolveMachineWorkspaceActorAsync(caller, target, cancellationToken)
+            ?? (IsRuntimeRemoval(request.Operation)
+                ? await ResolveAppOwnerAsync(target.WebAppId, cancellationToken)
+                : null);
         if (!actorId.HasValue)
             return HostContainerRelayResolution.Rejected(
                 Failure("workspace_assignment_missing", "The app workspace is not assigned to this machine Runner."));
@@ -106,6 +109,20 @@ public sealed class HostContainerRelayStateResolver(
             .Select(user => (Guid?)user.UserId)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    // Removing a runtime from the Runner that already hosts the target only releases resources, so it stays
+    // allowed after the workspace loses its Runner assignment (member removed, project deleted).
+    private static bool IsRuntimeRemoval(string operation) => operation is
+        HostContainerOperationKinds.RemoveTargetContainers
+        or HostContainerOperationKinds.RemoveComposeProject
+        or HostContainerOperationKinds.RemoveContainer
+        or HostContainerOperationKinds.RemoveActionContainer;
+
+    private Task<Guid?> ResolveAppOwnerAsync(Guid appId, CancellationToken cancellationToken) =>
+        db.WebAppUsers.Where(user => user.WebAppId == appId)
+            .OrderBy(user => user.UserId)
+            .Select(user => (Guid?)user.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     private static bool IsMachineManagementProfile(string? applicationProfile) =>
         RunnerApplicationProfiles.TryNormalize(applicationProfile, out var profile)

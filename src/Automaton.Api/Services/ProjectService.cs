@@ -117,12 +117,16 @@ public class ProjectService
     public async Task<ProjectDto> CreateProjectAsync(CreateProjectRequest request, CancellationToken cancellationToken = default)
     {
         // Validate unique name (URL-safe slug)
-        var nameExists = await dbContext.Projects
-            .AnyAsync(p => p.Name.ToLower() == request.Name.ToLower(), cancellationToken);
+        var existing = await dbContext.Projects
+            .Where(p => p.Name.ToLower() == request.Name.ToLower())
+            .Select(p => new { p.IsActive })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (nameExists)
+        if (existing is not null)
         {
-            throw new InvalidOperationException($"Project with name '{request.Name}' already exists");
+            throw new InvalidOperationException(existing.IsActive
+                ? $"Project with name '{request.Name}' already exists"
+                : $"Project name '{request.Name}' belongs to a deleted project. Reactivate it or choose another name.");
         }
         
         // If organizationId is provided, verify user is a member

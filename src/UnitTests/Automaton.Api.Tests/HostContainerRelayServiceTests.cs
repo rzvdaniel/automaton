@@ -96,6 +96,23 @@ public sealed class HostContainerRelayServiceTests
     }
 
     [Test]
+    public async Task Submit_MachineRunnerAllowsRuntimeRemovalAfterWorkspaceLosesRunnerAssignment()
+    {
+        using var fixture = RelayFixture.Create();
+        var ownerId = fixture.AssignMachineRunnerToPersonalWorkspace(assignRunnerToUser: false);
+        var request = fixture.Request() with { Operation = HostContainerOperationKinds.RemoveTargetContainers, RequestedImage = null };
+
+        var result = await fixture.Service.SubmitAsync(fixture.MachineApiKeyId, request, CancellationToken.None);
+        var operation = await fixture.Db.RunnerExecutionOperations.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Result?.ErrorCode, Is.Null);
+            Assert.That(operation.RequestedByUserId, Is.EqualTo(ownerId));
+        });
+    }
+
+    [Test]
     public async Task AssignmentAfterWorkspaceRevocationTerminalizesQueuedContainerRequest()
     {
         using var fixture = RelayFixture.Create();

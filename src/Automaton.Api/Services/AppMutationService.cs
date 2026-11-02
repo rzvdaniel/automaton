@@ -201,7 +201,7 @@ public sealed class AppMutationService(
         {
             // Check if it's because the app is part of a project
             var isPartOfProject = await dataContext.ProjectApps
-                .AnyAsync(pa => pa.WebAppId == id);
+                .AnyAsync(pa => pa.WebAppId == id && pa.Project!.IsActive);
 
             if (isPartOfProject)
             {

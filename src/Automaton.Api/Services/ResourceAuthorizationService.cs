@@ -137,9 +137,9 @@ public class ResourceAuthorizationService
             return false;
         }
 
-        // Check if app is part of any project
+        // Check if app is part of any active project; links left by a deleted project do not block.
         var isPartOfProject = await dbContext.ProjectApps
-            .AnyAsync(pa => pa.WebAppId == appId, cancellationToken);
+            .AnyAsync(pa => pa.WebAppId == appId && pa.Project!.IsActive, cancellationToken);
 
         return !isPartOfProject;
     }
