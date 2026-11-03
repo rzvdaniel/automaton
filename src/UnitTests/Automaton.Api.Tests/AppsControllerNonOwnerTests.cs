@@ -36,8 +36,8 @@ public sealed class AppsControllerNonOwnerTests
             await controller.UpdateRunner(AppId, new Automaton.Api.Controllers.UpdateRunnerRequest())
         };
 
-        Assert.That(results.Select(result => (result as ObjectResult)?.StatusCode ?? (result as StatusCodeResult)?.StatusCode),
-            Has.All.EqualTo(StatusCodes.Status403Forbidden));
+        Assert.That(results.Select(result => (result as ObjectResult)?.StatusCode), Has.All.EqualTo(StatusCodes.Status403Forbidden));
+        Assert.That(results.Select(result => ((ObjectResult)result).Value?.ToString()), Has.All.Contain("permission"));
     }
 
     [Test]
@@ -54,7 +54,7 @@ public sealed class AppsControllerNonOwnerTests
 
         var result = await controller.UpdateRunner(AppId, new Automaton.Api.Controllers.UpdateRunnerRequest());
 
-        Assert.That((result as ObjectResult)?.StatusCode, Is.Not.EqualTo(StatusCodes.Status403Forbidden));
+        Assert.That(result, Is.InstanceOf<NoContentResult>());
     }
 
     private sealed class ConfirmedGuard : ConfirmedEmailGuardService
