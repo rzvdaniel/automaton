@@ -66,7 +66,17 @@ elif args[0]=='compose':
     if 'config' in args and '--format' in args: print(open(args[args.index('-f')+1]).read())
     elif 'config' in args and '--services' in args: print(*json.load(open(args[args.index('-f')+1]))['services'], sep=chr(10))
     elif 'ps' in args: print('container-'+args[-1])
-    elif 'exec' in args: print('-- Dump completed on 2026-01-01')
+    elif 'exec' in args:
+        # The updater runs pg_dump (custom format) and pg_restore --list in the postgres service.
+        if args[args.index('exec')+1:][:2]!=['-T','postgres']: sys.exit(2)
+        command=args[args.index('postgres')+1:]
+        if command[0]=='pg_dump':
+            if '--format=custom' not in command or command[command.index('-d')+1]!='automaton': sys.exit(2)
+            sys.stdout.buffer.write(b'PGDMP-fake-custom-archive')
+        elif command[:2]==['pg_restore','--list']:
+            if sys.stdin.buffer.read()!=b'PGDMP-fake-custom-archive': sys.exit(1)
+            print('; Archive created by fake pg_dump')
+        else: sys.exit(2)
     elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
 ''')
         (self.bin / 'curl').write_text('#!/bin/sh\necho \'{"installationComplete":true}\'\n')

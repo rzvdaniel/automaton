@@ -39,7 +39,7 @@ Every Automaton installation ships a public app store at `store.<domain>`. It is
 
 ### 5. Update — `update-automaton.sh`
 
-Implemented in #460: the updater compares the effective Compose configuration and allows added or changed application services while MySQL, RabbitMQ, Traefik, volumes, secrets and networks stay identical and no service is removed. It pulls and starts only release-owned application services (not override additions), runs `configure.py --ensure-store` after the verified backup, and only warns when the store does not answer. The manifest may gain `STORE_IMAGE`. Updaters installed by earlier releases still refuse the first store release, so that one update uses the downloaded `update-automaton.sh` (documented in the install guide). The store image's GHCR package starts private and must be made public before the first store release passes the anonymous pull check.
+Implemented in #460: the updater compares the effective Compose configuration and allows added or changed application services while PostgreSQL, RabbitMQ, Traefik, volumes, secrets and networks stay identical and no service is removed. It pulls and starts only release-owned application services (not override additions), runs `configure.py --ensure-store` after the verified backup, and only warns when the store does not answer. The manifest may gain `STORE_IMAGE`. Updaters installed by earlier releases still refuse the first store release, so that one update uses the downloaded `update-automaton.sh` (documented in the install guide). The store image's GHCR package starts private and must be made public before the first store release passes the anonymous pull check.
 
 ### 6. Store setting — API and Studio
 

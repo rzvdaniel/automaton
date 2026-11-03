@@ -16,7 +16,7 @@ For a new standalone server, use [the public installation guide](../../../docs/p
 
 Do not use a live server's untracked settings file as the setup template. Read the tracked examples and current consumers:
 
-- `.env.prod.example` and `docker-compose.prod.yml` for production services, domains, DNS/TLS, MySQL, RabbitMQ, runtime proxy authentication, image/network settings and retention.
+- `.env.prod.example` and `docker-compose.prod.yml` for production services, domains, DNS/TLS, the database (MySQL on the existing host), RabbitMQ, runtime proxy authentication, image/network settings and retention.
 - `src/Automaton.Api/appsettings.Production.example.json` for shared API/Worker application settings and optional integrations.
 - `.env.runner.example`, `docker-compose.runner.yml` and `docs/prod/deploying-runner.md` for independently installed Runners.
 - `docs/prod/production-docker-cheat-sheet.md` and `docs/prod/self-hosted-runners.md` for host prerequisites, persistent data and recovery notes.

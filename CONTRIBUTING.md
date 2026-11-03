@@ -34,7 +34,7 @@ Run the tests for the projects you changed. Add a test for new behaviour and, fo
 - `docker-compose.runtime-local.yml`: local stack with Traefik and a Runner, set up by `scripts/setup-local-development.ps1`.
 - `docker-compose.managed-local.yml`: local Traefik for managed-runtime host development (`scripts/start-managed-runtime-host-dev.ps1`).
 - `docker-compose.runner.yml`: a Runner on its own host, configured from `.env`.
-- `docker-compose.prod.yml`: the production stack (Traefik, MySQL, RabbitMQ, blue/green API, Worker, Studio, website); see the [production install guide](docs/prod/install-automaton.md).
+- `docker-compose.prod.yml`: the production stack (Traefik, MySQL (the existing production host; installed servers use PostgreSQL), RabbitMQ, blue/green API, Worker, Studio, website); see the [production install guide](docs/prod/install-automaton.md).
 
 ## Propose a change
 
