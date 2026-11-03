@@ -7,7 +7,7 @@ This page covers the standard installation made by `install.sh`. A server with a
 ## Before you start
 
 - A release that includes the migration (its bundle contains `migrate-to-postgresql.sh`, `mysql_to_postgres.py` and `migration_app_check.py`). The script downloads and verifies it for you.
-- At least 10 GiB free on the installation's filesystem and on Docker's data directory, outbound internet access (it pulls the release images and a `python:3.12-slim` container used for the copy), and a server that is running normally.
+- At least 10 GiB free on the installation's filesystem, on Docker's data directory and where the backups go (`--backup-dir`), outbound internet access (it pulls the release images and a `python:3.12-slim` container used for the copy), and a server that is running normally.
 - An administrator account, and ideally a regular user's, in the environment: `AUTOMATON_CHECK_EMAIL` / `AUTOMATON_CHECK_PASSWORD` and optionally `AUTOMATON_CHECK_USER_EMAIL` / `AUTOMATON_CHECK_USER_PASSWORD`. The script signs in as them before and after and requires the API to list the same items (`--skip-app-check` skips this; do not on a real server).
 - A quiet moment, and `tmux` or `screen`: API and Worker are down while the data is copied (about a minute for a small server; it grows with the data). Apps run on their Runners and are not restarted by the migration; Runners and Studio reconnect when the API is back.
 - A hosting-provider snapshot or other off-server copy of the server, taken just before.
@@ -30,7 +30,7 @@ sudo -E bash migrate-to-postgresql.sh --version server-vX.Y.Z --run --confirm yo
 
 What happens, in order:
 
-1. The checks, and an API snapshot of what the administrator and the regular user see now.
+1. The checks (pending work is refused here, before anything stops), the release images and the copy tool are pulled, and an API snapshot is taken of what the administrator and the regular user see now. From this point a rollback is possible whatever happens.
 2. API and Worker stop (the downtime starts), and the pending work is checked again.
 3. A verified recovery backup in `/opt/automaton-server/backups/mysql-to-postgresql-<time>`: the configuration, the API and Worker keys, app data, a MySQL dump, the old release files, with checksums.
 4. A `postgres-password` secret is created if there is none and the connection string in `appsettings.Production.json` is switched (other settings are kept). PostgreSQL starts and the new API creates the schema in a one-off container that receives no traffic.
@@ -45,8 +45,8 @@ A column that exists only in MySQL is ignored only if every row holds its defaul
 ### If it stops
 
 - **Before step 6:** the script starts the MySQL services again with the saved configuration and release files, removes the files it added to the configuration directory and the PostgreSQL volume it created, and exits non-zero. If that return itself fails it says so and keeps the recovery data; fix the reported problem and run `--rollback`, which is safe to repeat.
-- **After step 6:** the PostgreSQL stack is running and the installation files are still the MySQL ones. Fix what the message reports and run `--finish` (it repeats the API comparison and the public checks, then does step 7). Running `--run` again is refused, so the old MySQL data cannot overwrite the PostgreSQL data. Or run `--rollback`.
-- **If your connection drops** or the machine restarts during the downtime: API and Worker may be stopped. Run `sudo bash /opt/automaton-server/migrate-to-postgresql.sh --rollback` (or `--finish` if the state is `switched`; the recovery directory's `STATE` file says which).
+- **After step 6:** the PostgreSQL stack is running and the installation files are still the MySQL ones. The message prints the exact commands. Fix what it reports and run `sudo -E bash /opt/automaton-server/migrate-to-postgresql.sh --finish --version server-vX.Y.Z` with the `AUTOMATON_CHECK_*` variables set and the same release as before (it repeats the API comparison and the public checks, then does step 7, and can be repeated if it stops again). Running `--run` again is refused, so the old MySQL data cannot overwrite the PostgreSQL data. Or run `--rollback`; the PostgreSQL data is first saved to `postgresql-before-rollback.dump` in the recovery directory.
+- **If your connection drops**, the machine restarts or the script is killed during the downtime: API and Worker may be stopped. Run `sudo bash /opt/automaton-server/migrate-to-postgresql.sh --rollback --confirm your-domain.example` (or `--finish` if the recovery directory's `STATE` file says `switched`). This works from the moment step 1 has finished.
 
 ## Check it yourself
 
@@ -61,7 +61,7 @@ Developers can decrypt every protected value of the migrated database with the k
 sudo bash /opt/automaton-server/migrate-to-postgresql.sh --rollback --confirm your-domain.example
 ```
 
-(Add `--install-dir` / `--config-dir` if you changed them.) It stops PostgreSQL, removes the PostgreSQL volume it created, restores the configuration and the previous release files from the recovery backup, and starts the MySQL services. If the MySQL volume is gone it is recreated from the dump. Everything written to PostgreSQL after the switch is lost. With nothing in progress it says so and does nothing.
+(Add `--install-dir` / `--config-dir` if you changed them.) It saves the PostgreSQL data to a dump if the switch already happened, stops PostgreSQL, removes the PostgreSQL volume it created, restores the configuration and the previous release files from the recovery backup and removes the files the migration added, then restarts the MySQL services (services that exist only in the new release are removed). If the MySQL volume is gone it is recreated from the dump. Everything written to PostgreSQL after the switch is lost. With nothing in progress it says so and does nothing.
 
 ## Clean up
 
@@ -69,10 +69,10 @@ When you are sure (a few days), remove the old database and its recovery data:
 
 ```bash
 docker rm <the mysql container>; docker volume rm <project>_mysql-data
-sudo rm -r /etc/automaton/pre-postgresql /opt/automaton-server/backups/mysql-to-postgresql-*
+sudo rm -r /etc/automaton/pre-postgresql /opt/automaton-server/backups/mysql-to-postgresql-* /opt/automaton-server/.postgresql-migration
 ```
 
-The script prints the exact names at the end.
+The script prints the exact names at the end. Python packages for the copy are cached in the Docker volume `automaton-migration-pip`, which the script removes when it ends.
 
 ## Trying it on a copy
 
