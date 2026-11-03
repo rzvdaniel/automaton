@@ -37,11 +37,13 @@ public sealed class FlowStepDeleteStatusTests
 
         var refused = await Controller(stranger).Delete(flow);
         var blocked = await Controller(owner).Delete(flow);
+        var unknown = await Controller(stranger).Delete(Guid.NewGuid());
 
         Assert.Multiple(() =>
         {
             Assert.That((refused as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden));
             Assert.That(Message(refused), Does.Not.Contain("project"));
+            Assert.That((unknown as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status403Forbidden), "an unknown id looks the same");
             Assert.That((blocked as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
             Assert.That(Message(blocked), Does.Contain("part of one or more projects"));
         });
