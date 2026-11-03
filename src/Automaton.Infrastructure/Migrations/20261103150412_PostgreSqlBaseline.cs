@@ -1024,7 +1024,7 @@ namespace Automaton.Infrastructure.Migrations
                     RegisteredAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LastLoginAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     MustChangePassword = table.Column<bool>(type: "boolean", nullable: false),
-                    RegistrationProvider = table.Column<string>(type: "text", nullable: true),
+                    RegistrationProvider = table.Column<string>(type: "citext", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     DeletedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     DeletedByUserId = table.Column<Guid>(type: "uuid", nullable: true),

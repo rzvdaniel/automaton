@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Automaton.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261103143728_PostgreSqlBaseline")]
+    [Migration("20261103150412_PostgreSqlBaseline")]
     partial class PostgreSqlBaseline
     {
         /// <inheritdoc />
@@ -1306,7 +1306,7 @@ namespace Automaton.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RegistrationProvider")
-                        .HasColumnType("text");
+                        .HasColumnType("citext");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");

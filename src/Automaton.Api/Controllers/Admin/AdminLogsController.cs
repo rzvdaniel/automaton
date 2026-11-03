@@ -133,7 +133,7 @@ public class AdminLogsController : ControllerBase
         {
             var search = searchText.Trim();
             dbQuery = dbQuery.Where(x =>
-                x.Message.Contains(search) ||
+                x.Message.ToLower().Contains(search.ToLower()) ||
                 x.EventType.Contains(search) ||
                 x.EntityType.Contains(search) ||
                 (x.UserName != null && x.UserName.Contains(search)) ||

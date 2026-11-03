@@ -15,7 +15,7 @@ internal static class PostgreSqlModelConfiguration
     private const int MaxCaseInsensitiveLength = 512;
 
     private static readonly HashSet<string> UnboundedLookupNames =
-        ["Name", "DisplayName", "PublicUsername", "GitHubUsername", "Category"];
+        ["Name", "DisplayName", "PublicUsername", "GitHubUsername", "Category", "RegistrationProvider"];
 
     internal static void Apply(ModelBuilder modelBuilder)
     {
