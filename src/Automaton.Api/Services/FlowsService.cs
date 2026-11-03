@@ -241,7 +241,7 @@ public class FlowsService
         var flow = Get(id);
         if (flow is null)
         {
-            throw new InvalidOperationException($"Flow {id} not found or not accessible.");
+            throw new KeyNotFoundException($"Flow {id} not found or not accessible.");
         }
 
         var settings = new FlowSettings

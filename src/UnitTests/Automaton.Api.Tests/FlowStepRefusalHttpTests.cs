@@ -56,6 +56,13 @@ public sealed class FlowStepRefusalHttpTests
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
     }
 
+    [Test]
+    public async Task ReadingTheSettingsOfAFlowThatDoesNotExist_Answers404()
+    {
+        using var response = await SendAsync(false, HttpMethod.Get, _ => $"/api/flows/settings/{Guid.NewGuid()}", _ => null);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
+
     [TestCase(false, HttpStatusCode.Forbidden)]
     [TestCase(true, HttpStatusCode.BadRequest)]
     public async Task DeletingAProjectFlow_Answers403ForANonOwnerAnd400WithTheReasonForTheOwner(bool owner, HttpStatusCode expected)
