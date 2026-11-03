@@ -1,4 +1,4 @@
-﻿using Automaton.Api.Authentication;
+using Automaton.Api.Authentication;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;

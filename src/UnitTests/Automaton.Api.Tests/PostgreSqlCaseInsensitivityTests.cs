@@ -241,6 +241,24 @@ public sealed class PostgreSqlCaseInsensitivityTests
     }
 
     [Test]
+    public async Task AuditSearch_FindsMetadataWithAnyCase()
+    {
+        var marker = Guid.NewGuid().ToString("N")[..10];
+        await using var db = database.Open();
+        db.AuditEvents.Add(new AuditEvent
+        {
+            Id = Guid.NewGuid(), Category = "test", Action = "test", EntityType = "Test", EventType = "test.event",
+            Message = "Search", MetadataJson = $"{{\"reason\":\"Failed-{marker}\"}}", CreatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        await using var read = database.Open();
+        var search = $"FAILED-{marker}".ToUpperInvariant();
+        // AdminLogsController search over the unbounded metadata column.
+        Assert.That(await read.AuditEvents.AnyAsync(x => x.MetadataJson != null
+            && x.MetadataJson.ToLower().Contains(search.ToLower())), Is.True);
+    }
+
+    [Test]
     public async Task Timestamps_KeepUtcAndMicroseconds()
     {
         var moment = new DateTime(2026, 11, 3, 10, 20, 30, DateTimeKind.Utc).AddTicks(1234560);

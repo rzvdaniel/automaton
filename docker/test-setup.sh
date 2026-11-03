@@ -112,11 +112,8 @@ fi
 # Step 7: Verify initialization script ran or database is ready
 echo ""
 echo "Step 7: Verifying database initialization..."
-# Check if initialization ran in current session or database already exists with data
-if docker logs automaton-postgres-dev 2>&1 | grep -q "Automaton PostgreSQL database initialized successfully"; then
-    print_success "Initialization script ran in this session"
-elif docker exec automaton-postgres-dev psql -U automaton_user -d automaton -c "SELECT 1" 2>/dev/null > /dev/null; then
-    print_success "Database is ready (may have been initialized previously)"
+if docker exec automaton-postgres-dev psql -U automaton_user -d automaton -c "SELECT 1" 2>/dev/null > /dev/null; then
+    print_success "Database is ready"
 else
     print_error "Database initialization verification failed"
     exit 1

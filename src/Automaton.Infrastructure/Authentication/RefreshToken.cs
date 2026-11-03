@@ -11,7 +11,7 @@ namespace Automaton.Api.Authentication
         public DateTime CreatedAt { get; private set; }
         public DateTime? RevokedAt { get; private set; }
         public bool Revoked => RevokedAt.HasValue;
-        public bool IsAlive => DateTime.Now <= Expires;
+        public bool IsAlive => DateTime.UtcNow <= Expires;
 
         public DateTime Expires { get; private set; }
 
@@ -23,9 +23,9 @@ namespace Automaton.Api.Authentication
         {
             Id = Guid.NewGuid();
             UserId = userId;
-            CreatedAt = DateTime.Now;
+            CreatedAt = DateTime.UtcNow;
             Token = GenerateToken();
-            Expires = DateTime.Now.AddDays(dayToExpire);
+            Expires = DateTime.UtcNow.AddDays(dayToExpire);
         }
 
         public void ValidateRefreshToken()
@@ -57,7 +57,7 @@ namespace Automaton.Api.Authentication
                 throw new Exception($"Refresh token: '{Id}' was already revoked at '{RevokedAt}'.");
             }
 
-            RevokedAt = DateTime.Now;
+            RevokedAt = DateTime.UtcNow;
         }
     }
 }
