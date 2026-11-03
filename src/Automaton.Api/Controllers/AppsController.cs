@@ -232,6 +232,10 @@ public class AppsController : BaseController
         {
             await appsService.Update(id, request.ToAppModel());
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Forbidden(exception);
+        }
         catch (InvalidOperationException exception)
         {
             return BadRequest(new { message = exception.Message });
@@ -281,6 +285,10 @@ public class AppsController : BaseController
                 request.MarketplacePreviewMode,
                 cancellationToken);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbidden(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
@@ -312,6 +320,10 @@ public class AppsController : BaseController
         {
             await appsService.Unpublish(id, cancellationToken);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbidden(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
@@ -340,6 +352,7 @@ public class AppsController : BaseController
         }
 
         try { await appsService.UpdateRunner(id, request.ExecutionRunnerId); }
+        catch (UnauthorizedAccessException ex) { return Forbidden(ex); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
@@ -373,6 +386,9 @@ public class AppsController : BaseController
         var result = await appImageManagementService.DeleteScreenshotAsync(id, screenshotId, User.Identity?.Name);
         return ToImageOperationResult(result, "Failed to delete screenshot");
     }
+
+    private ObjectResult Forbidden(UnauthorizedAccessException exception)
+        => StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message });
 
     private bool HasAppWriteKeyScope() => AppChangeKeyScope.IsAllowed(User);
 
