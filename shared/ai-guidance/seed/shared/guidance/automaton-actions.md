@@ -29,6 +29,8 @@ user to run `automaton secrets set NAME` themselves (it prompts without echo),
 or pipe a value that is already in an environment variable:
 `printf '%s' "$VALUE" | automaton secrets set NAME`. Add `--project` to share it
 with every app in the project, or `--user` for all of the user's personal apps.
+An app joins a project with `automaton project add-app [PROJECT]`; create a project
+with `automaton project create NAME` and list yours with `automaton project list`.
 
 Platform access such as reading server backups is requested in
 `application.permissions` (for example `["backups:read"]`) and needs a system

@@ -28,6 +28,7 @@ public class ProjectsController : BaseController
     /// Returns basic project information with member/resource counts.
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<ProjectListItem>>> ListProjects()
     {
         try
@@ -48,6 +49,7 @@ public class ProjectsController : BaseController
     /// </summary>
     [HttpGet("{id}")]
     [Authorize(Policy = "ProjectMember")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectDto>> GetProject(Guid id)
     {
         try
@@ -77,6 +79,7 @@ public class ProjectsController : BaseController
     /// The creator automatically becomes the owner with ProjectAdmin role.
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectDto>> CreateProject([FromBody] CreateProjectRequest request)
     {
         try
@@ -107,6 +110,7 @@ public class ProjectsController : BaseController
     /// </summary>
     [HttpPut("{id}")]
     [Authorize(Policy = "ProjectAdmin")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectDto>> UpdateProject(Guid id, [FromBody] UpdateProjectRequest request)
     {
         try

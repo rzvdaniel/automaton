@@ -33,6 +33,7 @@ public class ProjectMembersController : BaseController
     /// </summary>
     [HttpGet]
     [Authorize(Policy = "ProjectMember")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<ProjectMemberDto>>> ListMembers(Guid projectId)
     {
         try

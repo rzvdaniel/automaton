@@ -108,6 +108,9 @@ From the app's folder:
 | `automaton secrets set NAME [--project\|--user] [--description TEXT]` | Saves a value read from standard input, or prompts without echo. Without a flag, it is an app secret. |
 | `automaton secrets list [--project\|--user]` | Lists names, versions and descriptions, never values. |
 | `automaton secrets delete NAME [--project\|--user]` | Deletes a secret. |
+| `automaton project create NAME` | Creates a project; you become its administrator. |
+| `automaton project list` | Lists the projects you belong to. |
+| `automaton project add-app [PROJECT]` | Adds the current app to a project (name or id; optional when you are in one project). Needed before `secrets set --project`. |
 
 `automaton validate` and `automaton deploy` warn about declared secrets without a value (`validate --strict` fails).
 

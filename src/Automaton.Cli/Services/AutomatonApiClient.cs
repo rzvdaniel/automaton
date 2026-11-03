@@ -533,6 +533,29 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    // ── Projects ──────────────────────────────────────────────────────────────
+
+    public async Task<JsonElement> ListProjectsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/projects", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> CreateProjectAsync(string name, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { name, displayName = name }, JsonOptions);
+        using var resp = await PostJsonAsync("api/projects", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task AddAppToProjectAsync(string projectId, string appId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/projects/{Uri.EscapeDataString(projectId)}/apps/{Uri.EscapeDataString(appId)}", "{}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     // ── Runners ───────────────────────────────────────────────────────────────
 
     public Task<JsonElement> ListRunnersAsync(CancellationToken ct = default)

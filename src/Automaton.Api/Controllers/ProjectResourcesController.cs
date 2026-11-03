@@ -32,6 +32,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpGet("apps")]
     [Authorize(Policy = "ProjectMember")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<ProjectAppDto>>> ListProjectApps(Guid projectId)
     {
         try
@@ -57,6 +58,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpPost("apps/{appId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectAppDto>> AddAppToProject(Guid projectId, Guid appId)
     {
         try
@@ -88,6 +90,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpDelete("apps/{appId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult> RemoveAppFromProject(Guid projectId, Guid appId)
     {
         try
