@@ -1,6 +1,6 @@
 # Self-hosted core
 
-Status: done (M1–M4). The two-user isolation pass on the test server on 3 November 2026 found no cross-user access and two non-leaking defects ([#571](https://github.com/rzvdaniel/automaton/issues/571), [#572](https://github.com/rzvdaniel/automaton/issues/572); results below). Still open before team use: the combined restart/replay acceptance, so #521 stays open. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
+Status: done (M1–M4). The two-user isolation pass on the test server on 3 November 2026 found no cross-user access and two non-leaking defects ([#571](https://github.com/rzvdaniel/automaton/issues/571), [#572](https://github.com/rzvdaniel/automaton/issues/572); results below). The restart/replay pass the same day (below) found the platform recovers, with two gaps filed ([#576](https://github.com/rzvdaniel/automaton/issues/576), [#577](https://github.com/rzvdaniel/automaton/issues/577)). This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
 
 Updated: 27 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; a single-account CLI/static/API/Action flow is now demonstrated. Multi-user and combined restart/replay acceptance remain deferred before team use.
 
@@ -44,8 +44,11 @@ Run on 3 November 2026 on the test server (server 0.1.32) with the administrator
 | CLI | Linking to another user's app with the other user's key | 404 |
 | Studio | A user opens another user's app address | Redirected to their own app list, no data shown |
 | Running apps | Two sites deployed through two projects on one Runner; each user opens only their own | Both ran; cross-access denied |
+| Action logs and results | Each user runs an Action in their app and reads its logs and result; each tries the other's executions, logs, results, cancel, run, rollback and version delete | Own logs and results readable (no other user's output in them); every cross-user call 403/404. Logs and results appear when the execution finishes |
+| Restart and replay | With both users' sites running and an Action in flight for each, restart the API, Worker and both Runners | The API was back in about 25 s; both sites kept running; each in-flight execution was marked `Lost` (`AmbiguousDispatch`) and not re-run, as designed; the jobs' containers ran to the end and were removed ([#577](https://github.com/rzvdaniel/automaton/issues/577)). New executions then succeeded once each, with no duplicates, and the cross-user denials above still held |
+| Runner offline | Start an Action while the Runners are stopped | The request hangs and creates no execution; nothing is queued or replayed ([#576](https://github.com/rzvdaniel/automaton/issues/576)) |
 
-**Not checked:** log and result access for Action executions (no Action was deployed); combined restart and replay (restarting the Runners and server with both users' apps and an execution in flight), which disrupts the shared test server and needs a coordinated window.
+**Not checked:** replay of queued work (there is no queue while a Runner is offline, see #576); restarting the database, message broker or proxy; more than two users or more than one Runner machine.
 
 ## Starting point and baseline
 
