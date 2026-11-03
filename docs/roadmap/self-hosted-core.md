@@ -1,6 +1,6 @@
 # Self-hosted core
 
-Status: done (M1–M4). Open before team use: two-user isolation and the combined restart/replay and small-team acceptance. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
+Status: done (M1–M4). Two-user isolation passed on the test server on 3 November 2026 (below). Still open before team use: the combined restart/replay acceptance. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
 
 Updated: 27 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; a single-account CLI/static/API/Action flow is now demonstrated. Multi-user and combined restart/replay acceptance remain deferred before team use.
 
@@ -25,6 +25,27 @@ The self-hosted positioning is now the intended onboarding story. Remaining rele
 - Clean-host acceptance: done on 31 October 2026 on a rebuilt Ubuntu 26.04 host (installation, administrator setup, Runner enrollment, fresh NuGet CLI, app create/deploy/publish, moving an app between Runners, Runner upgrade and rename, updates 0.1.15–0.1.19, nightly backup and a database/key restore round trip). Fixes are in PRs #463–#468. Off-host restore on a different server remains unverified; see [self-maintenance](self-maintenance.md).
 - Measure server-update downtime and publish resource guidance from observed workloads. The updater replaces application containers in place; it does not provide zero-downtime control-plane updates or remote backups.
 - Keep public DNS/HTTPS and x86_64 Ubuntu requirements explicit. Private-only/offline and ARM installation are not the supported quickstart. Managed hosting remains a possible service, not an announced plan or SLA.
+
+## Two-user isolation acceptance
+
+Run on 3 November 2026 on the test server (server 0.1.32) with the administrator and two regular users, through the API, the CLI and Studio (#521). Data was named `e2e-521-*` and removed afterwards. Rerun after changes to authorization, projects or Runners.
+
+| Area | Checked | Result |
+| --- | --- | --- |
+| Personal apps | Each user reads, edits, deletes, publishes, duplicates, launches and exports the other's app; reads its secrets, secret history, files, deployment targets, actions and permissions | Denied (403/404) everywhere. Edit, publish and Runner re-assignment answer **500** instead of 403 ([#571](https://github.com/rzvdaniel/automaton/issues/571)); deleting an app that is in a project answers 400 and reveals that ([#572](https://github.com/rzvdaniel/automaton/issues/572)). Nothing was changed or deleted |
+| Lists | App, API key and recent-activity lists | Show only the caller's own items |
+| API keys | Using the other user's keys on an app; deleting the other's key | Denied |
+| Runners | A regular user lists, edits, deletes, upgrades or reads the settings of the administrator's Runner | Denied; the Runner is absent from the list |
+| Admin area | A regular user calls the admin settings, logs, users, apps, dashboard, SMTP, AI and backup endpoints | 403 |
+| Projects | A non-member reads the project, its apps, members, Runners and vault | Denied; the project is absent from the list |
+| Project roles | Viewer, AppUser and Developer: read project and shared app; edit project, add members, delete project, link apps; read and write the shared vault | Viewer and AppUser read only; Developer also links apps and uses the shared vault; only ProjectAdmin edits the project and its members |
+| Member removed | The same calls after removal | Denied again |
+| Project Runners | A member lists the project's Runner; a non-member does not | As expected |
+| CLI | Linking to another user's app with the other user's key | 404 |
+| Studio | A user opens another user's app address | Redirected to their own app list, no data shown |
+| Running apps | Two sites deployed through two projects on one Runner; each user opens only their own | Both ran; cross-access denied |
+
+**Not checked:** log and result access for Action executions (no Action was deployed); combined restart and replay (restarting the Runners and server with both users' apps and an execution in flight), which disrupts the shared test server and needs a coordinated window.
 
 ## Starting point and baseline
 
