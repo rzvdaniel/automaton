@@ -8,7 +8,7 @@
 # =============================================================================
 # Stage 1: Build the .NET application
 # =============================================================================
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
@@ -45,11 +45,11 @@ RUN dotnet publish Automaton.Runner/Automaton.Runner.csproj \
     -p:PublishSingleFile=false
 
 # =============================================================================
-# Stage 2: Runtime image with Python 3.13 + .NET 9
+# Stage 2: Runtime image with Python 3.13 + .NET 10
 # =============================================================================
 FROM python:3.13-slim AS final
 
-# Install .NET 9 runtime dependencies. Docker CLI only. The Runner controls the
+# Install .NET 10 runtime dependencies. Docker CLI only. The Runner controls the
 # host Docker daemon through the mounted /var/run/docker.sock; it does not run
 # Docker-in-Docker.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -68,11 +68,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pandoc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the .NET 9 ASP.NET Core runtime. The runner hosts the HTTP runtime gateway.
+# Install the .NET 10 ASP.NET Core runtime. The runner hosts the HTTP runtime gateway.
 ENV DOTNET_ROOT=/usr/share/dotnet
 RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
     && chmod +x dotnet-install.sh \
-    && ./dotnet-install.sh --runtime aspnetcore --version 9.0.6 --install-dir $DOTNET_ROOT \
+    && ./dotnet-install.sh --runtime aspnetcore --channel 10.0 --install-dir $DOTNET_ROOT \
     && rm dotnet-install.sh \
     && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 

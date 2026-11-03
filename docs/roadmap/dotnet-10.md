@@ -1,10 +1,10 @@
 # .NET 10 LTS
 
-Updated: 31 October 2026. Status: waits for [PostgreSQL](postgresql.md) step 1, then retargets with Npgsql 10 (decided 3 November 2026: Pomelo has no EF Core 10 release and Oracle's provider breaks CAP; earlier postponed on 31 October in favor of [self-maintenance](self-maintenance.md)). Deadline: .NET 9 support ends on 10 November 2026 ([support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)); after that date it receives no security fixes. Work: parent issue [#492](https://github.com/rzvdaniel/automaton/issues/492) (retarget #493, rollout #494).
+Updated: 3 November 2026. Status: retarget (#493) done: all 22 projects target `net10.0` on Npgsql.EntityFrameworkCore.PostgreSQL 10 and EF Core 10 (no new migration needed); Dockerfiles and CI use .NET 10. Rollout (#494) is open: release, test server, production. Deadline: .NET 9 support ends on 10 November 2026 ([support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)); after that date it receives no security fixes. Work: parent issue [#492](https://github.com/rzvdaniel/automaton/issues/492) (retarget #493, rollout #494).
 
 ## Scope
 
-- All 22 projects target `net9.0`: retarget to `net10.0` (API, Worker, Runner, CLI, shared libraries, tests and fixtures).
+- All 22 projects targeted `net9.0`: retargeted (done) to `net10.0` (API, Worker, Runner, CLI, shared libraries, tests and fixtures).
 - Docker images use `mcr.microsoft.com/dotnet/sdk:9.0` and `aspnet:9.0`: move to the 10.0 images (server, Worker, Runner).
 - CI and release workflows: install the .NET 10 SDK.
 - NuGet dependencies: update packages pinned to 9.x (EF Core, ASP.NET Core, Microsoft.Extensions.*) and Npgsql, `DotNetCore.CAP.PostgreSql` and `Hangfire.PostgreSql` to versions that support .NET 10.

@@ -155,7 +155,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <li class="step">
               <h3>Build and deploy</h3>
               <p>
-                Install the CLI (needs the .NET 9 SDK or later), connect it to your server, and let
+                Install the CLI (needs the .NET 10 SDK or later), connect it to your server, and let
                 your coding agent build the app.
               </p>
               <span class="where">on your computer</span>
@@ -187,7 +187,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
             <li><span>Free disk space</span><span>10 GiB or more</span></li>
             <li><span>DNS records</span><span>api, studio, store, apps, *.apps</span></li>
             <li><span>Open ports</span><span>TCP 80, 443, 5671</span></li>
-            <li><span>On your computer</span><span>.NET 9 SDK or later</span></li>
+            <li><span>On your computer</span><span>.NET 10 SDK or later</span></li>
           </ul>
         </div>
       </section>

@@ -2,7 +2,7 @@
 # Usage (PowerShell):
 #   irm https://your-server/install.ps1 | iex
 #
-# Requires the .NET 9 SDK or later. Install from https://dot.net if not already present.
+# Requires the .NET 10 SDK or later. Install from https://dot.net if not already present.
 
 $ErrorActionPreference = "Stop"
 

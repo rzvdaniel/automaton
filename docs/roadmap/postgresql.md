@@ -31,7 +31,7 @@ Each step depends on the previous one.
 
 What the next steps rely on:
 
-- Packages: Npgsql.EntityFrameworkCore.PostgreSQL 9.0.4, `DotNetCore.CAP.PostgreSql` 10.0.1, `Hangfire.PostgreSql`. The connection string is `ConnectionStrings:PostgreSqlConnection` (API and Worker); the `AppConfig:DatabaseType` setting is gone.
+- Packages: Npgsql.EntityFrameworkCore.PostgreSQL 9.0.4 (10.0.3 after the .NET 10 retarget), `DotNetCore.CAP.PostgreSql` 10.0.1, `Hangfire.PostgreSql`. The connection string is `ConnectionStrings:PostgreSqlConnection` (API and Worker); the `AppConfig:DatabaseType` setting is gone.
 - One baseline migration, `PostgreSqlBaseline`. The first migration run needs `CREATE EXTENSION citext`: the database owner may do it (the extension is trusted since PostgreSQL 13).
 - Case-insensitive text: MySQL compared without case, so every identifier-like text column (bounded up to 512 characters, indexed or key columns, and the unbounded `Name`, `DisplayName`, `PublicUsername`, `GitHubUsername`, `Category` and `RegistrationProvider` columns) is `citext`. Longer text (messages, logs, JSON, tokens) is plain `text`. `PostgreSqlModelConfiguration` applies this to the model. Unlike MySQL's `utf8mb4_0900_ai_ci`, `citext` still tells accented letters apart. Data migration: values that differ only by case cannot exist in MySQL unique indexes, so they copy without conflicts.
 - Dates: `timestamptz`; the model converts every `DateTime` to UTC on write and reads it back as UTC. JSON columns are `jsonb`, long text is `text`.

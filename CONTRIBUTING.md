@@ -11,7 +11,7 @@ Thanks for your interest. Automaton is in early access and maintained by a small
 
 ## Build and test
 
-Set up a local development environment with [repository development](docs/development.md) (.NET 9 SDK, Node.js 22+, Docker). Before opening a pull request, run from the repository root (CI runs the `dotnet test` projects and Studio `npm test`):
+Set up a local development environment with [repository development](docs/development.md) (.NET 10 SDK, Node.js 22+, Docker). Before opening a pull request, run from the repository root (CI runs the `dotnet test` projects and Studio `npm test`):
 
 ```bash
 dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal

@@ -3,7 +3,7 @@
     <h1>Automaton CLI</h1>
     <p class="text-color-secondary">
       Install the CLI on your development computer, then build, deploy and publish apps to this server.
-      It requires the .NET 9 SDK or later.
+      It requires the .NET 10 SDK or later.
     </p>
 
     <Card v-for="step in steps" :key="step.title" class="mb-3">

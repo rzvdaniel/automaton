@@ -10,7 +10,7 @@ Automaton. Read `automaton.json` and the generated local guidance before editing
 
 ## Install and authenticate
 
-Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 9 SDK or later.
+Use the API URL from [your server installation](./install-server) or your team administrator. The NuGet CLI requires the .NET 10 SDK or later.
 
 ```bash
 dotnet tool install -g Automaton.Cli

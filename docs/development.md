@@ -26,7 +26,7 @@ Public app serving must never expose source files, secrets, logs, runner state, 
 
 ## Requirements
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Node.js 22+ and npm/pnpm
 - PostgreSQL 16 (the local Compose default)
 - Docker, for local database/runner workflows

@@ -284,7 +284,7 @@ public sealed class ApplicationBuildExecutorTests
         => Path.GetFullPath(Path.Combine(
             TestContext.CurrentContext.TestDirectory,
             "..", "..", "..", "..",
-            "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
+            "RunnerRuntimeFixture", "bin", "Debug", "net10.0", "RunnerRuntimeFixture.dll"));
 
     private static int ParseChildPid(IEnumerable<string> output)
     {

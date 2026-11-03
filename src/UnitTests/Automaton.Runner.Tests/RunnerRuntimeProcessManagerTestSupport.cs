@@ -255,7 +255,7 @@ internal static class RunnerRuntimeProcessManagerTestSupport
         => Path.GetFullPath(Path.Combine(
             TestContext.CurrentContext.TestDirectory,
             "..", "..", "..", "..",
-            "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
+            "RunnerRuntimeFixture", "bin", "Debug", "net10.0", "RunnerRuntimeFixture.dll"));
 
     internal static async Task<string> ReadSharedTextAsync(string path)
     {

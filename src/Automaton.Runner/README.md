@@ -126,7 +126,7 @@ The runner normally starts and manages the local FastAPI backend for app control
 If you launch `fastapi_server/main.py` manually, you must point it at the same workspace directories the runner uses:
 
 ```powershell
-$env:AUTOMATON_WORKSPACE_ROOT="C:\path\to\Automaton.Runner\bin\Debug\net9.0\workspace"
+$env:AUTOMATON_WORKSPACE_ROOT="C:\path\to\Automaton.Runner\bin\Debug\net10.0\workspace"
 $env:RUNNER_SCRIPTS_DIR="$env:AUTOMATON_WORKSPACE_ROOT\apps"
 python fastapi_server/main.py
 ```

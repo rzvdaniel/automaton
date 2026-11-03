@@ -213,7 +213,7 @@ Use this when you want to run the runner directly on a Windows or Linux machine 
 
 ### Prerequisites
 
-- .NET 9.0 Runtime
+- .NET 10.0 Runtime
 - Python 3.x with `pip` (for app controller execution via FastAPI)
 - The runner binary (`automaton-runner` / `automaton-runner.exe`)
 

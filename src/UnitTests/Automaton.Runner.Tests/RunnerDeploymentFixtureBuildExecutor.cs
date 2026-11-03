@@ -14,7 +14,7 @@ internal sealed class RunnerDeploymentFixtureBuildExecutor : IRunnerApplicationB
 
     public static string FixturePath() => Path.GetFullPath(Path.Combine(
         NUnit.Framework.TestContext.CurrentContext.TestDirectory, "..", "..", "..", "..",
-        "RunnerRuntimeFixture", "bin", "Debug", "net9.0", "RunnerRuntimeFixture.dll"));
+        "RunnerRuntimeFixture", "bin", "Debug", "net10.0", "RunnerRuntimeFixture.dll"));
 
     public Task<ApplicationBuildExecutionResult> ExecuteAsync(ApplicationBuildSpec build,
         ApplicationRuntimeSpec runtime, string workspaceRoot, RunnerApplicationBuildContext? context = null,

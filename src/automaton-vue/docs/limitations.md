@@ -32,6 +32,6 @@ Automaton is early. These are the specific things to know before you rely on it.
 
 ## Tooling
 
-- **The CLI needs the .NET 9 SDK or later** to install from NuGet. The server installer does not need .NET.
+- **The CLI needs the .NET 10 SDK or later** to install from NuGet. The server installer does not need .NET.
 
 We update this page as these are fixed. See the [roadmap](https://github.com/rzvdaniel/automaton/blob/main/docs/roadmap/README.md) for what is planned.

@@ -4,7 +4,7 @@
 #   curl -fsSL https://your-server/install.sh | bash
 #   curl -fsSL https://your-server/install.sh | bash -s latest
 #
-# Requires the .NET 9 SDK or later. Install from https://dot.net if not already present.
+# Requires the .NET 10 SDK or later. Install from https://dot.net if not already present.
 
 set -e
 
