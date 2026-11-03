@@ -12,7 +12,7 @@ Manage plans in Studio under **Admin → Subscription Plans** (administrators on
 | Subscription Price (USD/month) | `0` means free. A price above zero marks the plan as paid in the user-facing pricing page. |
 | Stripe Product ID, Stripe Price ID | Optional. Only needed if you charge your users through your own Stripe account. |
 | Default plan for new users | The plan assigned automatically to users created after you set it. Only one plan is the default, and only an active plan can be. |
-| Active | Inactive plans stay in the list but are hidden from user-facing pricing and checkout and cannot be picked when assigning. |
+| Active | Inactive plans stay in the list but are hidden from user-facing pricing and checkout and are not offered in the Studio assignment picker. |
 | Sort Order | Order of plans. |
 | Capabilities | The limits below. |
 
@@ -36,7 +36,7 @@ The capability settings are stored with the plan and are read by the API when a 
 
 - The **User Plans** table on the same page lists users and their plan. **Assign** sets a user's plan, or clears it (None).
 - A user with no plan gets the limits of the built-in free plan record if your database has one, otherwise the defaults above.
-- Plan creation, changes and assignments are audit logged.
+- Plan creation and assignments are audit logged.
 
 ## Not available
 
