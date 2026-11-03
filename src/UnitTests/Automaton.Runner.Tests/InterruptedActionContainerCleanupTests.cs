@@ -61,4 +61,49 @@ public sealed class InterruptedActionContainerCleanupTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
+
+    [Test]
+    public async Task AnExecutionStartedByThisRunnerIsNeverTreatedAsInterrupted()
+    {
+        using var environment = MachineContainerTestEnvironment.Create();
+        var root = Path.Combine(Path.GetTempPath(), "automaton-interrupted-action", Guid.NewGuid().ToString("N"));
+        var priorRoot = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", root);
+        try
+        {
+            var workspace = new RunnerWorkspaceService();
+            var docker = new MachineContainerDockerExecutor(environment.InstallationId);
+            var service = new AppActionExecutionService(workspace, null,
+                new MachineActionExecutionHandler(new HostContainerExecutionService(docker.ExecuteAsync)));
+            await Task.Delay(50);
+            // A state written after the service started: a running execution of this very process.
+            Guid app = Guid.NewGuid(), target = Guid.NewGuid(), execution = Guid.NewGuid();
+            var statePath = Path.Combine(workspace.GetAppActionExecutionsDirectory(app, target, "work"),
+                execution.ToString("N"), ".automaton-execution.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
+            File.WriteAllText(statePath, JsonSerializer.Serialize(new
+            {
+                Terminal = false,
+                Result = new AppActionExecutionResult
+                {
+                    ExecutionId = execution, Status = AppModuleExecutionStatuses.Running, StartedAtUtc = DateTime.UtcNow
+                },
+                AppId = app, DeploymentTargetId = target, ActionKey = "work"
+            }));
+
+            var complete = await service.CleanupInterruptedActionContainersAsync(CancellationToken.None);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(complete, Is.True);
+                Assert.That(docker.Commands.Any(command => command.Contains("rm")), Is.False, "no container is removed");
+                Assert.That(File.ReadAllText(statePath), Does.Contain("\"Terminal\":false"));
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", priorRoot);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
 }

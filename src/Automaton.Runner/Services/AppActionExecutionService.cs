@@ -13,6 +13,8 @@ public sealed class AppActionExecutionService
     private readonly AppActionExecutionCoordinator coordinator;
     private readonly MachineActionExecutionHandler? machineActionExecution;
     private readonly ConcurrentDictionary<Guid, ActiveExecution> active = new();
+    // Executions recorded before this process started were interrupted by the restart; later ones belong to this run.
+    private readonly DateTime startedAtUtc = DateTime.UtcNow;
     internal const ushort MaximumConcurrentExecutions = 4;
     private readonly SemaphoreSlim concurrencyGate = new(MaximumConcurrentExecutions, MaximumConcurrentExecutions);
     private bool IsMachineManagement => RunnerApplicationProfiles.Normalize(
@@ -83,7 +85,8 @@ public sealed class AppActionExecutionService
         AppActionExecutionResult result)
     {
         if (!machineManagement || result.Status != AppModuleExecutionStatuses.Lost) return;
-        await machineActionExecution!.RemoveAsync(request);
+        // Keep the execution pending when its container could not be removed, so the startup cleanup can retry.
+        if (!await machineActionExecution!.RemoveAsync(request)) return;
         WriteExecutionState(statePath, CreateTerminalState(request, result));
     }
 
@@ -205,31 +208,37 @@ public sealed class AppActionExecutionService
             var state = ReadExecutionState(statePath);
             if (state is null || state.Terminal || state.Result.ExecutionId == Guid.Empty
                 || state.AppId == Guid.Empty || state.DeploymentTargetId == Guid.Empty
-                || string.IsNullOrWhiteSpace(state.ActionKey))
+                || string.IsNullOrWhiteSpace(state.ActionKey)
+                || File.GetLastWriteTimeUtc(statePath) >= startedAtUtc)
                 continue;
-            var removed = await machineActionExecution.RemoveAsync(new ExecuteAppActionModuleRequest
+            try
             {
-                ExecutionId = state.Result.ExecutionId,
-                AppId = state.AppId,
-                DeploymentTargetId = state.DeploymentTargetId,
-                ActionKey = state.ActionKey
-            });
-            if (!removed)
-            {
-                complete = false;
-                continue;
+                complete &= await RemoveInterruptedAsync(state, statePath);
             }
-            var lost = AppActionExecutionResultFactory.Create(state.Result.ExecutionId,
-                AppModuleExecutionStatuses.Lost, null, AppModuleExecutionErrorCodes.AmbiguousDispatch,
-                "Runner restarted before completion was confirmed; the Action was not replayed.",
-                state.Result.DeploymentHash, state.Result.StartedAtUtc, logs: false, result: false);
-            WriteExecutionState(statePath, CreateTerminalState(new ExecuteAppActionModuleRequest
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                ExecutionId = state.Result.ExecutionId, AppId = state.AppId,
-                DeploymentTargetId = state.DeploymentTargetId, ActionKey = state.ActionKey
-            }, lost));
+                Serilog.Log.Warning("Could not finish cleaning up the interrupted Action {ExecutionId}: {Error}",
+                    state.Result.ExecutionId, exception.Message);
+                complete = false;
+            }
         }
         return complete;
+    }
+
+    private async Task<bool> RemoveInterruptedAsync(RunnerActionExecutionState state, string statePath)
+    {
+        var request = new ExecuteAppActionModuleRequest
+        {
+            ExecutionId = state.Result.ExecutionId, AppId = state.AppId,
+            DeploymentTargetId = state.DeploymentTargetId, ActionKey = state.ActionKey
+        };
+        if (!await machineActionExecution!.RemoveAsync(request)) return false;
+        var lost = AppActionExecutionResultFactory.Create(state.Result.ExecutionId,
+            AppModuleExecutionStatuses.Lost, null, AppModuleExecutionErrorCodes.AmbiguousDispatch,
+            "Runner restarted before completion was confirmed; the Action was not replayed.",
+            state.Result.DeploymentHash, state.Result.StartedAtUtc, logs: false, result: false);
+        WriteExecutionState(statePath, CreateTerminalState(request, lost));
+        return true;
     }
 
     public AppModuleExecutionArtifactResponse ReadLogs(ReadAppModuleExecutionArtifactRequest request)

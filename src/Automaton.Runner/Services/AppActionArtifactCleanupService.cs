@@ -15,10 +15,15 @@ public sealed class AppActionArtifactCleanupService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        for (var attempt = 1;
-             !await executions.CleanupInterruptedActionContainersAsync(stoppingToken) && attempt < InterruptedCleanupMaxAttempts;
-             attempt++)
-            await Task.Delay(InterruptedCleanupRetryDelay, stoppingToken);
+        var cleaned = false;
+        for (var attempt = 1; !cleaned && attempt <= InterruptedCleanupMaxAttempts; attempt++)
+        {
+            cleaned = await executions.CleanupInterruptedActionContainersAsync(stoppingToken);
+            if (!cleaned && attempt < InterruptedCleanupMaxAttempts)
+                await Task.Delay(InterruptedCleanupRetryDelay, stoppingToken);
+        }
+        if (!cleaned)
+            Serilog.Log.Warning("Gave up removing the containers of Actions interrupted by the last restart; they stay marked pending");
         Cleanup();
         using var timer = new PeriodicTimer(Interval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
