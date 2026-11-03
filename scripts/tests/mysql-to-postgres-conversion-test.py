@@ -121,6 +121,23 @@ class ComparisonTests(unittest.TestCase):
         self.assertNotEqual(module.canonical(None, 'text'), module.canonical('', 'text'))
 
 
+class FingerprintTests(unittest.TestCase):
+    types = ['uuid', 'timestamp with time zone', 'boolean', 'text']
+
+    def test_the_same_rows_give_the_same_fingerprint_in_any_order_and_representation(self):
+        mysql_rows = [('3f2504e0-4f89-11d3-9a0c-0305e82c3301', datetime.datetime(2026, 1, 2, 3, 4, 5), 1, 'a'),
+                      ('11111111-1111-1111-1111-111111111111', datetime.datetime(2026, 2, 3, 4, 5, 6), 0, 'b')]
+        postgres_rows = [(uuid.UUID('11111111-1111-1111-1111-111111111111'), datetime.datetime(2026, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc), False, 'b'),
+                         (uuid.UUID('3f2504e0-4f89-11d3-9a0c-0305e82c3301'), datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc), True, 'a')]
+        self.assertEqual(module.table_fingerprint(mysql_rows, self.types), module.table_fingerprint(postgres_rows, self.types))
+
+    def test_a_changed_or_missing_row_changes_the_fingerprint(self):
+        rows = [('3f2504e0-4f89-11d3-9a0c-0305e82c3301', datetime.datetime(2026, 1, 2, 3, 4, 5), 1, 'a')]
+        changed = [('3f2504e0-4f89-11d3-9a0c-0305e82c3301', datetime.datetime(2026, 1, 2, 3, 4, 5), 1, 'A')]
+        self.assertNotEqual(module.table_fingerprint(rows, self.types), module.table_fingerprint(changed, self.types))
+        self.assertNotEqual(module.table_fingerprint(rows, self.types), module.table_fingerprint([], self.types))
+
+
 class SnapshotComparisonTests(unittest.TestCase):
     def snapshot(self, apps=('a', 'b'), health=200, sign_in='ok', status=200):
         return {'health': health, 'administrator': {'signIn': sign_in, 'apps': {'status': status, 'ids': sorted(apps)}}}

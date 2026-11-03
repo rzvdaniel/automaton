@@ -189,7 +189,7 @@ def canonical(value, pg_type):
 
 def row_digest(values, pg_types):
     row = '\x1f'.join(canonical(value, pg_type) for value, pg_type in zip(values, pg_types))
-    return int.from_bytes(hashlib.md5(row.encode('utf-8')).digest()[:8], 'big')
+    return int.from_bytes(hashlib.sha256(row.encode('utf-8')).digest()[:8], 'big')
 
 
 # ---- database access --------------------------------------------------------------------------------------------
@@ -355,7 +355,7 @@ def source_fingerprint(my, table, columns, pg_types):
 
 def target_fingerprint(pg, table, columns, pg_types):
     select = ', '.join((quote_pg(c) + '::text') if t in JSON_TYPES else quote_pg(c) for c, t in zip(columns, pg_types))
-    with pg.cursor(name='verify_' + hashlib.md5(table.encode()).hexdigest()[:12]) as cursor:
+    with pg.cursor(name='verify_' + hashlib.sha256(table.encode()).hexdigest()[:12]) as cursor:
         cursor.execute(f'SELECT {select} FROM {quote_pg(table)}')
         return table_fingerprint(cursor, pg_types)
 
