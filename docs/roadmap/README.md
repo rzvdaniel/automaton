@@ -30,7 +30,7 @@ Each plan is a file named after the plan (for example `self-maintenance.md`), wi
 | [Self-maintenance](self-maintenance.md) | **In progress** ([#490](https://github.com/rzvdaniel/automaton/issues/490)): app secrets, shared vault, app permissions and the secret audit log done; next encrypted backup download (#484) and our nightly maintenance apps (#556) |
 | [App install and shared stores](app-install-and-stores.md) | Planned ([#551](https://github.com/rzvdaniel/automaton/issues/551)): install any store app from Studio, from this or another server; deploy from stored source (#552) can start now |
 | [Enhancements](enhancements.md) | Ongoing ([#495](https://github.com/rzvdaniel/automaton/issues/495)): independent improvements and bugs not part of another plan |
-| [Self-hosted core](self-hosted-core.md) | Done (M1–M4). Two-user isolation and restart/replay checked on the test server: no cross-user access; fixes for #571, #572, #576 and #581 verified in 0.1.33; #588 and #577 keep #521 open |
+| [Self-hosted core](self-hosted-core.md) | Done (M1–M4). Two-user isolation and restart/replay checked on the test server: no cross-user access; fixes for #571, #572, #576 and #581 verified in 0.1.33; #588 (flow and custom-step deletes answer 500) and #577 keep #521 open |
 | [App store](app-store.md) | Done (server 0.1.12). Follow-up ideas only |
 
 ## Working rules
