@@ -1,6 +1,6 @@
 # 05 Self-maintenance
 
-Updated: 1 November 2026. Status: in progress (steps 1, 1a, 1b and 2 delivered in PR closing #483; next: step 3 encrypted backup download). Work and status: parent issue [#490](https://github.com/rzvdaniel/automaton/issues/490) and its sub-issues; this file holds the design. Local nightly backups are shipped (server 0.1.19).
+Updated: 3 November 2026. Status: in progress (steps 1, 1a, 1b and 2 delivered in PR closing #483; next: step 3 encrypted backup download and step 7 nightly maintenance apps). Work and status: parent issue [#490](https://github.com/rzvdaniel/automaton/issues/490) and its sub-issues; this file holds the design. Local nightly backups are shipped (server 0.1.19).
 
 Automaton should maintain its own server with its own building blocks: apps, Actions and schedules. Maintenance logic lives in ordinary, premade apps instead of growing platform code for each task. The platform adds only small, generic capabilities those apps need. This also demonstrates the product: an Automaton server managing itself the same way users manage their apps.
 
@@ -20,14 +20,14 @@ Maintenance apps get **only the permissions an administrator approves**: no hidd
 
 ### What a maintenance app is
 
-A source folder in this repository (for example `maintenance-apps/offsite-backup/`) with `automaton.json` and one or more Actions, written in Python, with unit tests that run in CI. It is premade, reviewed code: AI may help write it during development, but installation never generates code. Each server release builds its templates into the API image, so a server only installs templates matching its version and never downloads app code at runtime.
+A source folder in this repository (for example `maintenance-apps/offsite-backup/`) with `automaton.json` and one or more Actions, written in Python, with unit tests that run in CI. It is premade, reviewed code: AI may help write it during development, but installation never generates code. Generic maintenance apps are published in automaton.monster's store and installed with [plan 06](06-app-install-and-stores.md); apps specific to our own servers are deployed with the CLI and stay unpublished.
 
 ### Delivery
 
-- **Admin → Maintenance** in Studio lists the templates of the server's release: purpose, requested permissions, installed version and settings.
-- **Install** (system administrators): the API creates an ordinary app owned by the administrator, deploys the template package through the existing durable deployment pipeline (as `automaton deploy` does), assigns the Runner by the existing rule (the only online Machine Management Runner, or the administrator's choice), asks for the template's settings and secrets, shows the requested permissions for approval, and creates the template's default schedules with the existing Action schedules.
+Maintenance apps are installed like any store app ([plan 06](06-app-install-and-stores.md)): an administrator explicitly installs a pinned version, fills its settings and secrets, approves its permissions and gets its default schedules. Nothing installs or updates on its own; updates from origin are applied when the administrator chooses. This replaces the earlier rule that templates are built into the API image and servers never download app code (decided 3 November 2026).
+
+- **Admin → Maintenance** in Studio is the store filtered to the `maintenance` category, with installed version and "Update available" for installed ones.
 - **Not installed by the server installer**: a fresh server has no Runner yet and no destination credentials. Studio suggests the relevant maintenance apps once a Runner is online, for example "Set up off-site backups".
-- **Updates**: a server update brings newer templates. Proposed default: unmodified maintenance apps update automatically with the server; once an administrator edits an app's source, Studio shows "Update available" and the administrator decides. Settings, secrets, approvals and schedules are kept across updates.
 
 ## Plan
 
@@ -44,10 +44,11 @@ Each step is generic platform work or one maintenance app, delivered and verifie
     - Follow-ups: Studio vault pages (#478), audit log (#479, done), projects API for API keys (#480), older CLIs dropping fields (#481), stale secrets in stopped containers (#482).
 2. **App permissions** (#483). An app declares requested permissions in `automaton.json` (for example `"permissions": ["backups:read"]`). Installing or changing them requires administrator approval in Studio; the platform then issues a scoped, revocable key and stores it as an app secret. Unapproved or revoked permissions are rejected by the API. *Acceptance:* a scoped key can call only its approved endpoints; revoking the approval stops the next call.
 3. **Encrypted backup download (`backups:read`)** (#484). `backup.sh` additionally writes an encrypted archive of each nightly backup with a per-installation backup key; the API serves it read-only to `backups:read` keys. The backup key is shown once in **Admin → Installation → Backups** for the administrator to keep in a password manager; restoring off-site copies on a new server needs it. *Acceptance:* the archive decrypts only with the backup key and restores on another server.
-4. **Template install and Admin → Maintenance** (#485). The catalog, install, settings, permission approval, default schedules and update behavior described above.
+4. **Admin → Maintenance** (#485). The store view described above. Depends on plan 06 steps 2–3 (#553, #554).
 5. **Off-site backup** (first maintenance app, #486). Scheduled after the nightly backup: download the newest encrypted backup and upload it to S3-compatible storage (Hetzner Object Storage, Backblaze B2, AWS S3, MinIO) with retention. Studio shows its runs and logs. *Acceptance:* a server lost entirely is restored on a new server from the off-site copy plus the backup key.
 6. **App data backup** (Action template for any app, #487). Back up an app's own data directory (uploads, SQLite and similar files, which the platform database does not contain) on a schedule, to the same destinations, with a matching restore Action. *Acceptance:* deleted app data is restored for one app without affecting others.
-7. **Further maintenance apps** (#488), each only after its platform capability exists: disk-space and backup-age alerts by email, cleanup of unused Docker images and build cache within retention rules, certificate expiry checks.
+7. **Our nightly maintenance apps** (#556). Unpublished apps for our own servers, deployed with the CLI and scheduled in Studio; no dependency on step 4 or plan 06. Each checks and reports: it opens or updates a deduplicated GitHub issue labelled `maintenance` and closes it when the problem is gone; fixes go through `/automaton-implement-issue`. First `site-links` (broken links in website, store, Studio and docs), then `user-flows` (sign-in and main Studio flows as real users on the test server), `code-health` (dead code, duplication, complexity), `deps-security`, `server-health`. Exercises Actions, schedules and secrets end to end. Later: an agent Action on the development server that picks the top `maintenance` issue.
+8. **Further maintenance apps** (#488), each only after its platform capability exists: disk-space and backup-age alerts by email, cleanup of unused Docker images and build cache within retention rules, certificate expiry checks.
 
 ## Other open work
 

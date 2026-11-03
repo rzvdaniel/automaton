@@ -1,6 +1,6 @@
 # Automaton roadmap
 
-Updated: 1 November 2026.
+Updated: 3 November 2026.
 
 ## Product
 
@@ -8,7 +8,7 @@ Automaton is a self-hosted workspace where individuals and small teams deploy, s
 
 Each machine runs **one management Runner**, responsible for machine management and application orchestration. User applications, builds and Actions run in separate containers. The Runner is a trusted management service, not a shared process in which users execute arbitrary code.
 
-Automaton maintains its own server with its own building blocks where possible: premade maintenance apps with Actions and schedules, rather than task-specific platform code. See [self-maintenance](05-self-maintenance.md).
+Automaton maintains its own server with its own building blocks where possible: premade maintenance apps with Actions and schedules, rather than task-specific platform code. See [self-maintenance](05-self-maintenance.md); they are installed like any store app ([plan 06](06-app-install-and-stores.md)).
 
 ## Plans
 
@@ -24,6 +24,7 @@ Each plan is a numbered file. The number is a permanent ID, not a priority: new 
 | # | Plan | Status |
 | --- | --- | --- |
 | 05 | [Self-maintenance](05-self-maintenance.md) | **In progress** ([#490](https://github.com/rzvdaniel/automaton/issues/490)): app secrets, shared vault, app permissions (#483) and the secret audit log (#479, this PR); next encrypted backup download (#484) |
+| 06 | [App install and shared stores](06-app-install-and-stores.md) | Planned ([#551](https://github.com/rzvdaniel/automaton/issues/551)): install any store app from Studio, from this or another server; step 1 (deploy from stored source) can start now |
 | 04 | [.NET 10 LTS](04-dotnet-10.md) | ([#492](https://github.com/rzvdaniel/automaton/issues/492)) Postponed (decided 31 October 2026). .NET 9 support ends 10 November 2026; after that it gets no security fixes |
 | 03 | [Enhancements](03-enhancements.md) | ([#495](https://github.com/rzvdaniel/automaton/issues/495)) Ongoing list: persisted runtime logs, real-time connections (failing tests on main: done) |
 | 01 | [Self-hosted core](01-self-hosted-core.md) | Done (M1–M4). Open before team use: two-user isolation and combined restart/replay acceptance |
