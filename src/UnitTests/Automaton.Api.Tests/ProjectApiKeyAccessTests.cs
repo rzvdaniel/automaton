@@ -1,6 +1,10 @@
 using Automaton.Api.Controllers;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using System.Security.Claims;
 
 namespace Automaton.Api.Tests;
 
@@ -36,5 +40,25 @@ public class ProjectApiKeyAccessTests
             Assert.That(method.GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>()
                 .Select(attribute => attribute.Policy), Does.Not.Contain("AllowApiKey"), method.Name);
         }
+    }
+
+    [Test]
+    public async Task ReadOnlyKeysCannotChangeProjects()
+    {
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim("api_key_scope", "ReadOnly")], "ApiKey"));
+        var context = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
+        var projects = new ProjectsController(null!, NullLogger<ProjectsController>.Instance) { ControllerContext = context };
+        var resources = new ProjectResourcesController(null!, NullLogger<ProjectResourcesController>.Instance) { ControllerContext = context };
+
+        var results = new[]
+        {
+            (await projects.CreateProject(new())).Result,
+            (await projects.UpdateProject(Guid.NewGuid(), new())).Result,
+            (await resources.AddAppToProject(Guid.NewGuid(), Guid.NewGuid())).Result,
+            await resources.RemoveAppFromProject(Guid.NewGuid(), Guid.NewGuid()) as IActionResult,
+        };
+
+        Assert.That(results.Select(result => (result as ObjectResult)?.StatusCode), Has.All.EqualTo(StatusCodes.Status403Forbidden));
     }
 }

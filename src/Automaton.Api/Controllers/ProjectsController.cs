@@ -1,3 +1,4 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -82,6 +83,7 @@ public class ProjectsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectDto>> CreateProject([FromBody] CreateProjectRequest request)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             if (!ModelState.IsValid)
@@ -113,6 +115,7 @@ public class ProjectsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectDto>> UpdateProject(Guid id, [FromBody] UpdateProjectRequest request)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             if (!ModelState.IsValid)
@@ -237,4 +240,7 @@ public class ProjectsController : BaseController
             return StatusCode(500, new { message = "Error checking membership" });
         }
     }
+
+    private ObjectResult KeyScopeDenied()
+        => StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot change projects. Use a key with the Developer scope." });
 }
