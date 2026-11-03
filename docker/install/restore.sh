@@ -32,6 +32,7 @@ fi
 [[ "$name" =~ ^automaton-[0-9]{8}T[0-9]{6}Z$ ]] || { echo "Not a backup name: $name" >&2; exit 2; }
 backup="$backup_root/$name"
 [[ -d "$backup" ]] || { echo "Backup not found: $backup" >&2; exit 1; }
+[[ -f "$backup/database.dump" ]] || { echo 'This is not a PostgreSQL backup (no database.dump); nothing was restored.' >&2; exit 1; }
 (cd "$backup" && sha256sum -c --quiet SHA256SUMS) || { echo 'The backup failed its checksum verification; it was not restored.' >&2; exit 1; }
 
 config_dir=$(grep -m1 '^CONFIG_DIR=' "$install_dir/.env" | cut -d= -f2-)

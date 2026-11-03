@@ -37,5 +37,5 @@ What the next steps rely on:
 - Dates: `timestamptz`; the model converts every `DateTime` to UTC on write and reads it back as UTC. JSON columns are `jsonb`, long text is `text`.
 - Locks: app deletion and first-administrator setup use session-level advisory locks (`pg_try_advisory_lock`); scheduled-action admission uses `SELECT ... FOR UPDATE` on the user row.
 - CAP keeps separate storage per host: schemas `cap_api` and `cap_worker`; Hangfire uses schema `hangfire` (both created at startup).
-- Tests: PostgreSQL integration tests read `AUTOMATON_TEST_POSTGRES_CONNECTION_STRING` (a server connection whose user can create databases) and skip without it; CI provides a PostgreSQL 16 service. The production Compose files, install, update and backup scripts still use MySQL until step 2.
+- Tests: PostgreSQL integration tests read `AUTOMATON_TEST_POSTGRES_CONNECTION_STRING` (a server connection whose user can create databases) and skip without it; CI provides a PostgreSQL 16 service..
 
