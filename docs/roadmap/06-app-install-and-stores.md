@@ -36,9 +36,10 @@ A central templates service, catalog federation or syncing between stores, searc
 
 ## Plan
 
-Each step depends on the previous one.
+Each step depends on the previous one; step 5 depends on steps 2–3.
 
 1. **Deploy from stored source** (#552). Move package creation from the CLI's `ZipService` into a library shared by CLI and API; add `POST api/apps/{id}/deploy` that packages the app's stored source and hands it to `DeploymentOperationService` (same authorization as `deploy-package`); add a Deploy button to the app page. *Acceptance:* an app forked on the same server is deployed and runs without the CLI.
 2. **Install manifest** (#553). `automaton.json` declares settings, secrets (`application.secrets`), permissions and default schedules for installers; fork on the same server runs the set-up flow above and deploys. *Acceptance:* a user installs a published app with secrets, permissions and a schedule from Studio alone and its scheduled Action runs.
 3. **Remote stores** (#554). Public store listing and version package download for forkable apps; Admin → Stores to add a store by URL (automaton.monster preset); install from a remote store with origin recorded. *Acceptance:* an app published on one server is installed and runs on another.
 4. **Update from origin** (#555). Studio shows "Update available" for installed apps whose origin has a newer version, with a source diff; applying it keeps settings, secrets, approvals and schedules. *Acceptance:* an update is applied on request, and an edited app's changes are shown before they are replaced.
+5. **Admin → Maintenance** (#485). The store view of maintenance apps from [plan 05](05-self-maintenance.md#delivery): the store filtered to the `maintenance` category, with installed version and "Update available"; Studio suggests relevant ones once a Runner is online. *Acceptance:* an administrator installs a maintenance app from Admin → Maintenance, fills its secrets, approves its permissions, and its scheduled Action runs.
