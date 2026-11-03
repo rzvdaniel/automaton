@@ -1,3 +1,4 @@
+using Automaton.Api.Authentication;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -32,6 +33,7 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpGet("apps")]
     [Authorize(Policy = "ProjectMember")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<ProjectAppDto>>> ListProjectApps(Guid projectId)
     {
         try
@@ -57,13 +59,15 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpPost("apps/{appId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<ProjectAppDto>> AddAppToProject(Guid projectId, Guid appId)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             var projectApp = await resourceService.AddAppToProjectAsync(projectId, appId);
             
-            return Ok(projectApp);
+            return projectApp is null ? Forbid() : Ok(projectApp);
         }
         catch (UnauthorizedAccessException)
         {
@@ -88,8 +92,10 @@ public class ProjectResourcesController : BaseController
     /// </summary>
     [HttpDelete("apps/{appId}")]
     [Authorize(Policy = "ProjectResourceManager")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult> RemoveAppFromProject(Guid projectId, Guid appId)
     {
+        if (!AppChangeKeyScope.IsAllowed(User)) return KeyScopeDenied();
         try
         {
             var success = await resourceService.RemoveAppFromProjectAsync(projectId, appId);
@@ -559,4 +565,7 @@ public class ProjectResourcesController : BaseController
     }
 
     #endregion
+
+    private ObjectResult KeyScopeDenied()
+        => StatusCode(StatusCodes.Status403Forbidden, new { message = "This API key cannot change projects. Use a key with the Developer scope." });
 }
