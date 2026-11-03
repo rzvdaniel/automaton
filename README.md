@@ -90,4 +90,4 @@ The software is free under [Apache 2.0](LICENSE). You pay for your servers, doma
 
 Report security problems privately as described in [SECURITY.md](SECURITY.md); see also the [security overview](docs/security/overview.md).
 
-See [repository development](docs/development.md), the [roadmap](docs/roadmap/README.md), and [GitHub issues](https://github.com/rzvdaniel/automaton/issues). Coding agents should start with [AGENTS.md](AGENTS.md).
+Ask questions in [Discussions](https://github.com/rzvdaniel/automaton/discussions), report bugs or request features with an [issue template](https://github.com/rzvdaniel/automaton/issues/new/choose), and read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. See also [repository development](docs/development.md) and the [roadmap](docs/roadmap/README.md). Coding agents should start with [AGENTS.md](AGENTS.md).

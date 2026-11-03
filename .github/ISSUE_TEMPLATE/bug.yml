@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in Automaton does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems: do not open an issue. Report them privately as described in [SECURITY.md](https://github.com/rzvdaniel/automaton/blob/main/SECURITY.md).
+        Never paste passwords, tokens, API keys or setup tokens.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Server release (for example server-v0.1.32), CLI version (`automaton --version`) and Runner, if relevant.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Install or update, Studio, API, CLI, Runner, App store, Website or docs, Other]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets and private hostnames first.

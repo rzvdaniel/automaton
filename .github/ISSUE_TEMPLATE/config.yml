@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/rzvdaniel/automaton/discussions
+    about: Ask and discuss in GitHub Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/rzvdaniel/automaton/security/advisories/new
+    about: Report security problems privately, never in a public issue.

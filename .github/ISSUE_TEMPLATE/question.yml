@@ -1,0 +1,20 @@
+name: Question
+description: Ask how to do something. For open-ended questions, prefer Discussions.
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions and ideas fit best in [Discussions](https://github.com/rzvdaniel/automaton/discussions). Never paste secrets.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What you want to do, what you tried and which docs you read.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Server release and CLI version, if relevant.
