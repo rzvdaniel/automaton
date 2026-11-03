@@ -1,4 +1,4 @@
-using Automaton.Api.Authentication;
+﻿using Automaton.Api.Authentication;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
@@ -24,6 +24,12 @@ namespace Automaton.Api.Data
             // No-op, configuration is handled by DI
         }
 
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            base.ConfigureConventions(configurationBuilder);
+            if (Database.IsNpgsql()) PostgreSqlModelConfiguration.ConfigureConventions(configurationBuilder);
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -43,6 +49,7 @@ namespace Automaton.Api.Data
                 .HasOne<WebApp>().WithMany().HasForeignKey(approval => approval.AppId).OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<AppPermissionApproval>()
                 .Property(approval => approval.Status).HasDefaultValue(AppPermissionStatuses.Pending);
+            if (Database.IsNpgsql()) PostgreSqlModelConfiguration.Apply(modelBuilder);
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)

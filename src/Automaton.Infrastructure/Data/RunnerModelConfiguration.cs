@@ -128,8 +128,8 @@ internal static class RunnerModelConfiguration
                 entity.Property(e => e.ReservedMemoryMb).IsRequired();
                 entity.Property(e => e.TotalDiskMb).IsRequired();
                 entity.Property(e => e.ReservedDiskMb).IsRequired();
-                entity.Property(e => e.MetadataJson).HasColumnType("json");
-                entity.Property(e => e.HealthJson).HasColumnType("json");
+                entity.Property(e => e.MetadataJson).HasColumnType("jsonb");
+                entity.Property(e => e.HealthJson).HasColumnType("jsonb");
                 entity.Property(e => e.StorageState).IsRequired().HasMaxLength(32).HasDefaultValue(RunnerHostStorageStates.Unknown);
                 entity.Property(e => e.StorageMeasurementStatus).IsRequired().HasMaxLength(32).HasDefaultValue(StorageMeasurementStatuses.NeverMeasured);
                 entity.Property(e => e.StorageMeasurementError).HasMaxLength(2000);
@@ -178,7 +178,7 @@ internal static class RunnerModelConfiguration
                 entity.Property(e => e.TargetImageDigest).HasMaxLength(256);
                 entity.Property(e => e.PreviousImageDigest).HasMaxLength(256);
                 entity.Property(e => e.Error).HasMaxLength(2000);
-                entity.Property(e => e.Diagnostics).HasColumnType("longtext");
+                entity.Property(e => e.Diagnostics).HasColumnType("text");
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
             });
@@ -238,7 +238,7 @@ internal static class RunnerModelConfiguration
             modelBuilder.Entity<SecretVersion>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.ProtectedValue).IsRequired().HasColumnType("longtext");
+                entity.Property(e => e.ProtectedValue).IsRequired().HasColumnType("text");
                 entity.HasIndex(e => new { e.SecretDefinitionId, e.Version }).IsUnique();
                 entity.HasIndex(e => new { e.ExpiresAtUtc, e.RevokedAtUtc });
                 entity.HasOne(e => e.SecretDefinition)

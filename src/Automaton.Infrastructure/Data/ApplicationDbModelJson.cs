@@ -10,7 +10,7 @@ internal static class ApplicationDbModelJson
     public static void ConfigureJson<T>(PropertyBuilder<T> property)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        property.HasColumnType("json").HasConversion(
+        property.HasColumnType("jsonb").HasConversion(
             value => JsonSerializer.Serialize(value, options),
             json => JsonSerializer.Deserialize<T>(json, options)!);
         property.Metadata.SetValueComparer(new ValueComparer<T>(

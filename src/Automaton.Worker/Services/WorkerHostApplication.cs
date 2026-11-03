@@ -92,8 +92,8 @@ internal static class WorkerHostApplication
     {
         builder.Services.AddCap(options =>
         {
-            var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
-                ?? throw new InvalidOperationException("ConnectionStrings:MySqlConnection is required.");
+            var connectionString = builder.Configuration.GetConnectionString("PostgreSqlConnection")
+                ?? throw new InvalidOperationException("ConnectionStrings:PostgreSqlConnection is required.");
             var rabbitMqHost = builder.Configuration["RabbitMq:Host"]
                 ?? throw new InvalidOperationException("RabbitMq:Host is required.");
             var rabbitMqUsername = builder.Configuration["RabbitMq:Username"]

@@ -11,10 +11,6 @@ public class ConfigurationService
     private readonly UserPasswordConfig userPasswordConfig = new();
     private readonly UserLockoutConfig userLockoutConfig = new();
 
-    public const string MsSqlDatabaseType = "MsSql";
-    public const string MySqlDatabaseType = "MySql";
-
-    public string DatabaseType => AppConfig.DatabaseType;
     public int RefreshTokenLifetime => AppConfig.RefreshTokenLifetime;
     public string WebsiteUrl => AppConfig.WebsiteUrl;
     public const string RegistrationPausedMessage = "Public registration is temporarily paused while we prepare Automaton for wider access.";
@@ -39,15 +35,5 @@ public class ConfigurationService
         configuration.GetSection(nameof(UserLockoutConfig)).Bind(userLockoutConfig);
         configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
         configuration.GetSection(CloudflareTurnstileOptions.SectionName).Bind(CloudflareTurnstileOptions);
-    }
-
-    public bool IsDatabaseTypeMsSql()
-    {
-        return DatabaseType == MsSqlDatabaseType;
-    }
-
-    public bool IsDatabaseTypeMySql()
-    {
-        return DatabaseType == MySqlDatabaseType;
     }
 }

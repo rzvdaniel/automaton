@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Automaton.Api.Data;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Automaton.Api.Services;
 
@@ -9,17 +9,17 @@ namespace Automaton.Api.Services;
 public sealed class AppDeletionExecutionLock : IAsyncDisposable
 {
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> TestLocks = new();
-    private readonly MySqlConnection? connection;
+    private readonly NpgsqlConnection? connection;
     private readonly SemaphoreSlim? testLock;
-    private readonly string name;
+    private readonly long key;
     private int disposed;
 
-    private AppDeletionExecutionLock(Guid appId, MySqlConnection? connection, SemaphoreSlim? testLock)
+    private AppDeletionExecutionLock(Guid appId, NpgsqlConnection? connection, SemaphoreSlim? testLock)
     {
         AppId = appId;
         this.connection = connection;
         this.testLock = testLock;
-        name = $"automaton:app-delete:{appId:N}";
+        key = PostgresAdvisoryLockKey.From($"automaton:app-delete:{appId:N}");
     }
 
     public Guid AppId { get; }
@@ -34,23 +34,23 @@ public sealed class AppDeletionExecutionLock : IAsyncDisposable
             if (!await semaphore.WaitAsync(0, token)) throw ActiveDeletion();
             return new(appId, null, semaphore);
         }
-        if (db.Database.ProviderName?.Contains("MySql", StringComparison.Ordinal) != true)
-            throw new NotSupportedException("Deletion executor recovery requires the MySQL platform store.");
+        if (!db.Database.IsNpgsql())
+            throw new NotSupportedException("Deletion executor recovery requires the PostgreSQL platform store.");
 
-        var options = new MySqlConnectionStringBuilder(db.Database.GetConnectionString()
-            ?? throw new InvalidOperationException("The MySQL connection is not configured."))
+        var options = new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("The PostgreSQL connection is not configured."))
         {
             // Returning a session with an advisory lock to a pool must never preserve ownership.
             Pooling = false
         };
-        var connection = new MySqlConnection(options.ConnectionString);
+        var connection = new NpgsqlConnection(options.ConnectionString);
         var owner = new AppDeletionExecutionLock(appId, connection, null);
         try
         {
             await connection.OpenAsync(token);
-            await using var command = new MySqlCommand("SELECT GET_LOCK(@name, 0)", connection);
-            command.Parameters.AddWithValue("@name", owner.name);
-            if (Convert.ToInt32(await command.ExecuteScalarAsync(token)) != 1) throw ActiveDeletion();
+            await using var command = new NpgsqlCommand("SELECT pg_try_advisory_lock(@key)", connection);
+            command.Parameters.AddWithValue("key", owner.key);
+            if (await command.ExecuteScalarAsync(token) is not true) throw ActiveDeletion();
             return owner;
         }
         catch
@@ -68,11 +68,13 @@ public sealed class AppDeletionExecutionLock : IAsyncDisposable
         if (connection?.State != System.Data.ConnectionState.Open) throw ActiveDeletion();
         try
         {
-            await using var command = new MySqlCommand("SELECT IS_USED_LOCK(@name) = CONNECTION_ID()", connection);
-            command.Parameters.AddWithValue("@name", name);
-            if (Convert.ToInt32(await command.ExecuteScalarAsync(token)) != 1) throw ActiveDeletion();
+            await using var command = new NpgsqlCommand(PostgresAdvisoryLockKey.HeldBySessionSql, connection);
+            command.Parameters.AddWithValue("classid", PostgresAdvisoryLockKey.ClassId(key));
+            command.Parameters.AddWithValue("objid", PostgresAdvisoryLockKey.ObjectId(key));
+            if (await command.ExecuteScalarAsync(token) is not true) throw ActiveDeletion();
         }
-        catch (MySqlException) { throw ActiveDeletion(); }
+        catch (NpgsqlException) { throw ActiveDeletion(); }
+        catch (System.IO.IOException) { throw ActiveDeletion(); }
     }
 
     public async ValueTask DisposeAsync()

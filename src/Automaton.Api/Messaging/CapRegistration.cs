@@ -9,6 +9,6 @@ internal static class CapRegistration
     internal static void ConfigureStorage(CapOptions options)
     {
         options.UseEntityFramework<ApplicationDbContext>(capOptions =>
-            capOptions.TableNamePrefix = CapStorageTablePrefixes.Api);
+            capOptions.Schema = CapStorageTablePrefixes.Api);
     }
 }

@@ -175,7 +175,7 @@ internal static class IdentityAiModelConfiguration
                 entity.Property(e => e.StripePriceId).HasMaxLength(100);
                 entity.Property(e => e.IsDefault).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-                entity.Property(e => e.CapabilitiesJson).IsRequired().HasColumnType("longtext");
+                entity.Property(e => e.CapabilitiesJson).IsRequired().HasColumnType("text");
                 entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
                 entity.Property(e => e.CreatedAt).IsRequired();
 

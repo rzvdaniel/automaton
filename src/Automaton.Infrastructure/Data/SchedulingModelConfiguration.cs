@@ -155,7 +155,7 @@ internal static class SchedulingModelConfiguration
                 entity.Property(e => e.TargetSlug).HasMaxLength(120);
                 entity.Property(e => e.ExecutorInstanceId).HasMaxLength(120);
                 entity.Property(e => e.ErrorMessage).HasMaxLength(4000);
-                entity.Property(e => e.ResultJson).HasColumnType("longtext");
+                entity.Property(e => e.ResultJson).HasColumnType("text");
                 entity.Property(e => e.CreatedAtUtc).IsRequired();
                 entity.HasIndex(e => new { e.WebAppId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.WebAppId, e.Id }).IsUnique();

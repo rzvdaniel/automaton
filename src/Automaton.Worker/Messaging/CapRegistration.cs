@@ -7,10 +7,10 @@ internal static class CapRegistration
 {
     internal static void ConfigureStorage(CapOptions options, string connectionString)
     {
-        options.UseMySql(mysqlOptions =>
+        options.UsePostgreSql(postgresOptions =>
         {
-            mysqlOptions.ConnectionString = connectionString;
-            mysqlOptions.TableNamePrefix = CapStorageTablePrefixes.Worker;
+            postgresOptions.ConnectionString = connectionString;
+            postgresOptions.Schema = CapStorageTablePrefixes.Worker;
         });
     }
 }

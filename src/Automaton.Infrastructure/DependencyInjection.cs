@@ -17,10 +17,9 @@ public static class DependencyInjection
         services.Configure<EmailConfig>(configuration.GetSection("EmailConfig"));
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseMySql(
-                configuration.GetConnectionString("MySqlConnection"),
-                new MySqlServerVersion(new Version(8, 0, 36)),
-                mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(DependencyInjection).Assembly.GetName().Name)));
+            options.UseNpgsql(
+                configuration.GetConnectionString("PostgreSqlConnection"),
+                npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(DependencyInjection).Assembly.GetName().Name)));
 
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<SmtpSettingsService>();

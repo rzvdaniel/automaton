@@ -14,13 +14,13 @@
     <PackageReference Include="Destructurama.Attributed" Version="4.0.0" />
     <PackageReference Include="Destructurama.JsonNet" Version="3.0.0" />
     <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
-    <PackageReference Include="DotNetCore.CAP.MySql" Version="10.0.1" />
+    <PackageReference Include="DotNetCore.CAP.PostgreSql" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.RabbitMQ" Version="10.0.1" />
     <PackageReference Include="Cronos" Version="0.13.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="Fluid.Core" Version="2.31.0" />
     <PackageReference Include="Hangfire" Version="1.8.16" />
-    <PackageReference Include="Hangfire.MySqlStorage" Version="2.0.3" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageReference Include="MailKit" Version="4.16.0" />
     <PackageReference Include="MediatR" Version="12.4.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.11" />
@@ -40,7 +40,7 @@
     <PackageReference Include="MimeKit" Version="4.16.0" />
     <PackageReference Include="murmurhash" Version="1.0.3" />
     <PackageReference Include="Octokit" Version="13.0.1" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="OpenAI" Version="2.5.0" />
     <PackageReference Include="Serilog" Version="4.1.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />

@@ -20,11 +20,11 @@ public sealed class CapStorageConfigurationTests
         services.AddCap(CapRegistration.ConfigureStorage);
 
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<MySqlOptions>>().Value;
+        var options = provider.GetRequiredService<IOptions<PostgreSqlOptions>>().Value;
 
         Assert.Multiple(() =>
         {
-            Assert.That(options.TableNamePrefix, Is.EqualTo(CapStorageTablePrefixes.Api));
+            Assert.That(options.Schema, Is.EqualTo(CapStorageTablePrefixes.Api));
             Assert.That(CapStorageTablePrefixes.Api, Is.Not.EqualTo(CapStorageTablePrefixes.Worker));
         });
     }

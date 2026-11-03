@@ -6,7 +6,7 @@ using Destructurama;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
-using Hangfire.MySql;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -82,7 +82,7 @@ internal static class ApiHostingServiceRegistration
         services.AddApiControllers();
         Serilog.Debugging.SelfLog.Enable(Console.Out);
         services.ConfigureApiLogging(applicationBuilder);
-        services.AddApiHangfire(applicationBuilder, configurationService);
+        services.AddApiHangfire(applicationBuilder);
         return services;
     }
 }
@@ -471,31 +471,21 @@ internal static class ApiLoggerSinks
 
 internal static class ApiHangfireRegistration
 {
-    internal static IServiceCollection AddApiHangfire(this IServiceCollection services, WebApplicationBuilder applicationBuilder, ConfigurationService configurationService)
+    internal static IServiceCollection AddApiHangfire(this IServiceCollection services, WebApplicationBuilder applicationBuilder)
     {
         var configurationManager = applicationBuilder.Configuration;
-        services.AddHangfire(x =>
-        {
-            switch (configurationService.DatabaseType)
+        var connectionString = configurationManager.GetConnectionString("PostgreSqlConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:PostgreSqlConnection is required.");
+        services.AddHangfire(x => x.UsePostgreSqlStorage(
+            options => options.UseNpgsqlConnection(connectionString),
+            new PostgreSqlStorageOptions
             {
-                case ConfigurationService.MySqlDatabaseType:
-                    x.UseStorage(new MySqlStorage(configurationManager.GetConnectionString("MySqlConnection"),
-                        new MySqlStorageOptions
-                        {
-                            TransactionIsolationLevel = IsolationLevel.ReadCommitted,
-                            QueuePollInterval = TimeSpan.FromSeconds(15),
-                            JobExpirationCheckInterval = TimeSpan.FromHours(1),
-                            CountersAggregateInterval = TimeSpan.FromMinutes(5),
-                            PrepareSchemaIfNecessary = true,
-                            DashboardJobListLimit = 50000,
-                            TransactionTimeout = TimeSpan.FromMinutes(1),
-                            TablesPrefix = "hangfire."
-                        }));
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unsupported hangfire provider: {configurationService.DatabaseType}");
-            }
-        });
+                QueuePollInterval = TimeSpan.FromSeconds(15),
+                InvisibilityTimeout = TimeSpan.FromMinutes(30),
+                DistributedLockTimeout = TimeSpan.FromMinutes(1),
+                PrepareSchemaIfNecessary = true,
+                SchemaName = "hangfire"
+            }));
 
         services.AddHangfireServer();
         return services;

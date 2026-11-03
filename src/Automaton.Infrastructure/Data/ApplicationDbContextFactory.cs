@@ -22,15 +22,13 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("MySqlConnection")
-            ?? throw new InvalidOperationException("Connection string 'MySqlConnection' not found.");
-        var serverVersionValue = configuration["DatabaseServerVersion"] ?? "8.0.36-mysql";
+        var connectionString = configuration.GetConnectionString("PostgreSqlConnection")
+            ?? throw new InvalidOperationException("Connection string 'PostgreSqlConnection' not found.");
 
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseMySql(
+        optionsBuilder.UseNpgsql(
             connectionString,
-            ServerVersion.Parse(serverVersionValue),
-            mySqlOptions => mySqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name));
+            npgsqlOptions => npgsqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name));
 
         return new ApplicationDbContext(optionsBuilder.Options);
     }

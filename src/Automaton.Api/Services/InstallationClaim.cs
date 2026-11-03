@@ -7,18 +7,19 @@ namespace Automaton.Api.Services;
 /// <summary>Keep the first-administrator claim on the same session as its transaction.</summary>
 internal sealed class InstallationClaim(ApplicationDbContext db) : IAsyncDisposable
 {
+    private static readonly long LockKey = PostgresAdvisoryLockKey.From("automaton:first-administrator");
     private bool ownsLock;
 
     public static async Task<InstallationClaim> AcquireAsync(ApplicationDbContext db, CancellationToken token)
     {
         var claim = new InstallationClaim(db);
-        if (db.Database.ProviderName?.Contains("MySql", StringComparison.Ordinal) != true) return claim;
+        if (!db.Database.IsNpgsql()) return claim;
         await db.Database.OpenConnectionAsync(token);
         try
         {
             await using var command = db.Database.GetDbConnection().CreateCommand();
-            command.CommandText = "SELECT GET_LOCK('automaton:first-administrator', 0)";
-            if (Convert.ToInt32(await command.ExecuteScalarAsync(token)) != 1)
+            command.CommandText = $"SELECT pg_try_advisory_lock({LockKey})";
+            if (await command.ExecuteScalarAsync(token) is not true)
                 throw new InstallationSetupException("Setup is already running. Retry after it completes.");
             claim.ownsLock = true;
             return claim;
@@ -36,7 +37,7 @@ internal sealed class InstallationClaim(ApplicationDbContext db) : IAsyncDisposa
         try
         {
             await using DbCommand command = db.Database.GetDbConnection().CreateCommand();
-            command.CommandText = "SELECT RELEASE_LOCK('automaton:first-administrator')";
+            command.CommandText = $"SELECT pg_advisory_unlock({LockKey})";
             await command.ExecuteScalarAsync();
         }
         finally

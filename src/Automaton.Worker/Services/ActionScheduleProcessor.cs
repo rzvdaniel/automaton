@@ -298,14 +298,14 @@ public sealed class ActionScheduleProcessor(
 
     private Task LockAccountAdmissionAsync(Guid? ownerId, CancellationToken ct)
     {
-        if (!ownerId.HasValue || db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) != true)
+        if (!ownerId.HasValue || !db.Database.IsNpgsql())
             return Task.CompletedTask;
         if (db.Database.CurrentTransaction == null)
             throw new InvalidOperationException("Scheduled account admission requires a database transaction.");
         // This is the first database read inside the transaction: subsequent consistent reads
         // must see the previous owner's committed reservations after waiting for this lock.
         return db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT Id FROM AspNetUsers WHERE Id = {ownerId.Value} FOR UPDATE", ct);
+            $"""SELECT "Id" FROM "AspNetUsers" WHERE "Id" = {ownerId.Value} FOR UPDATE""", ct);
     }
 
     private Task<bool> HasActiveExecutionAsync(Guid scheduleId, CancellationToken ct)

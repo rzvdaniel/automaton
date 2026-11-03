@@ -57,7 +57,7 @@ internal static class RunnerStorageModelConfiguration
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.Error).HasMaxLength(2000);
                 entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
-                entity.Property(e => e.ResultJson).HasColumnType("longtext");
+                entity.Property(e => e.ResultJson).HasColumnType("text");
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => new { e.TargetRunnerHostId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.TargetRunnerId, e.CreatedAtUtc });
@@ -70,7 +70,7 @@ internal static class RunnerStorageModelConfiguration
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Stream).IsRequired().HasMaxLength(16);
-                entity.Property(e => e.Message).IsRequired().HasColumnType("longtext");
+                entity.Property(e => e.Message).IsRequired().HasColumnType("text");
                 entity.HasIndex(e => new { e.ExecutionId, e.Sequence }).IsUnique();
                 entity.HasOne(e => e.Execution)
                     .WithMany(e => e.Logs)
@@ -146,7 +146,7 @@ internal static class RunnerStorageModelConfiguration
                 entity.Property(e => e.StorageFilesystemUuid).HasMaxLength(80);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_AccountStorageAllocations_StorageProjectId_Positive",
-                    "StorageProjectId > 0"));
+                    "\"StorageProjectId\" > 0"));
                 entity.HasIndex(e => e.StorageProjectId).IsUnique();
                 entity.HasOne(e => e.Account)
                     .WithMany()
@@ -190,7 +190,7 @@ internal static class RunnerStorageModelConfiguration
             entity.HasKey(operation => operation.Id);
             entity.Property(operation => operation.Status).IsRequired().HasMaxLength(32);
             entity.Property(operation => operation.RequestHash).IsRequired().HasMaxLength(64);
-            entity.Property(operation => operation.ResultJson).HasColumnType("longtext");
+            entity.Property(operation => operation.ResultJson).HasColumnType("text");
             entity.HasIndex(operation => new { operation.InfrastructureRunnerId, operation.CreatedAtUtc });
             entity.HasIndex(operation => new { operation.HostedRunnerId, operation.CreatedAtUtc });
         });
@@ -244,9 +244,9 @@ internal static class RunnerStorageModelConfiguration
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Action).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
-                entity.Property(e => e.CommandPreview).HasColumnType("longtext");
-                entity.Property(e => e.Logs).HasColumnType("longtext");
-                entity.Property(e => e.Error).HasColumnType("longtext");
+                entity.Property(e => e.CommandPreview).HasColumnType("text");
+                entity.Property(e => e.Logs).HasColumnType("text");
+                entity.Property(e => e.Error).HasColumnType("text");
                 entity.Property(e => e.PreviousConnectionId).HasMaxLength(120);
                 entity.Property(e => e.StartedAt).IsRequired();
 

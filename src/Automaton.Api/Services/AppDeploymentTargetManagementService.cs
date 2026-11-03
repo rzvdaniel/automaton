@@ -374,16 +374,13 @@ public sealed partial class AppDeploymentTargetManagementService(
         var now = DateTimeOffset.UtcNow;
         if (dbContext.Database.IsRelational())
         {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                UPDATE AppDeploymentTargets
-                SET IsDefault = FALSE,
-                    DefaultConstraintKey = NULL,
-                    UpdatedAt = {now}
-                WHERE WebAppId = {appId}
-                  AND IsDefault = TRUE
-                """,
-                cancellationToken);
+            await dbContext.AppDeploymentTargets
+                .Where(target => target.WebAppId == appId && target.IsDefault)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(target => target.IsDefault, false)
+                    .SetProperty(target => target.DefaultConstraintKey, (byte?)null)
+                    .SetProperty(target => target.UpdatedAt, now),
+                    cancellationToken);
             return;
         }
 

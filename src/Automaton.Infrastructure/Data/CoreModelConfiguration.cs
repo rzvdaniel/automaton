@@ -70,7 +70,7 @@ internal static class CoreModelConfiguration
                 entity.Property(e => e.TimeZone).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.ConcurrencyPolicy).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.MisfirePolicy).IsRequired().HasMaxLength(32);
-                entity.Property(e => e.InputJson).IsRequired().HasColumnType("longtext");
+                entity.Property(e => e.InputJson).IsRequired().HasColumnType("text");
                 entity.Property(e => e.LeaseOwner).HasMaxLength(128);
                 entity.HasIndex(e => new { e.OwnerType, e.OwnerUserId, e.ApplicationId });
                 entity.HasIndex(e => new { e.Enabled, e.NextRunAtUtc });
@@ -78,7 +78,7 @@ internal static class CoreModelConfiguration
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_ActionSchedules_Owner",
-                    "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)"));
+                    """("OwnerType" = 'User' AND "OwnerUserId" IS NOT NULL) OR ("OwnerType" = 'System' AND "OwnerUserId" IS NULL)"""));
             });
     }
 
@@ -135,7 +135,7 @@ internal static class CoreModelConfiguration
                 entity.Property(e => e.Outcome).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.EventType).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
-                entity.Property(e => e.MetadataJson).HasColumnType("longtext");
+                entity.Property(e => e.MetadataJson).HasColumnType("text");
                 entity.Property(e => e.IpAddress).HasMaxLength(128);
                 entity.Property(e => e.CreatedAtUtc).IsRequired();
 
@@ -157,7 +157,7 @@ internal static class CoreModelConfiguration
                 entity.Property(e => e.Category).IsRequired().HasMaxLength(80);
                 entity.Property(e => e.EventType).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
-                entity.Property(e => e.MetadataJson).HasColumnType("longtext");
+                entity.Property(e => e.MetadataJson).HasColumnType("text");
                 entity.Property(e => e.CreatedAtUtc).IsRequired();
 
                 entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });

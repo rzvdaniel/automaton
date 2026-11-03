@@ -17,8 +17,8 @@ public sealed class CapStorageConfigurationTests
         services.AddCap(options => CapRegistration.ConfigureStorage(options, "Server=localhost;Database=automaton;"));
 
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<MySqlOptions>>().Value;
+        var options = provider.GetRequiredService<IOptions<PostgreSqlOptions>>().Value;
 
-        Assert.That(options.TableNamePrefix, Is.EqualTo(CapStorageTablePrefixes.Worker));
+        Assert.That(options.Schema, Is.EqualTo(CapStorageTablePrefixes.Worker));
     }
 }

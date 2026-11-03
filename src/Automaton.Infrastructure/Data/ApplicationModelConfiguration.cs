@@ -120,7 +120,7 @@ internal static class ApplicationModelConfiguration
                 entity.Property(e => e.CreatedBy).IsRequired();
                 entity.Property(e => e.AiModel).HasMaxLength(200);
                 entity.Property(e => e.SnapshotPath).IsRequired().HasMaxLength(500);
-                entity.Property(e => e.FilesChangeSummary).HasColumnType("json");
+                entity.Property(e => e.FilesChangeSummary).HasColumnType("jsonb");
 
                 entity.HasIndex(e => e.AppId);
                 entity.HasIndex(e => new { e.AppId, e.VersionNumber }).IsUnique();
@@ -150,7 +150,7 @@ internal static class ApplicationModelConfiguration
                 entity.Property(e => e.Action).IsRequired();
                 entity.Property(e => e.Description).HasMaxLength(2000);
                 entity.Property(e => e.CodeSnapshot).IsRequired();
-                entity.Property(e => e.VariablesSnapshot).IsRequired().HasColumnType("json");
+                entity.Property(e => e.VariablesSnapshot).IsRequired().HasColumnType("jsonb");
 
                 entity.HasIndex(e => e.AppVersionId);
                 entity.HasIndex(e => e.StepId);
@@ -177,7 +177,7 @@ internal static class ApplicationModelConfiguration
                 entity.Property(s => s.CreatedAt)
                     .IsRequired()
                     .ValueGeneratedOnAdd()
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(s => s.Expires).IsRequired();
             });
     }

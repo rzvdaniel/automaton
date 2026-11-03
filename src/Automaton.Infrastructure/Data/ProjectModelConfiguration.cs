@@ -165,7 +165,7 @@ internal static class ProjectModelConfiguration
                 entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Content).IsRequired();
                 entity.Property(e => e.MessageType).IsRequired();
-                entity.Property(e => e.Metadata).HasColumnType("json");
+                entity.Property(e => e.Metadata).HasColumnType("jsonb");
                 entity.Property(e => e.CreatedAt).IsRequired();
 
                 // Configure relationship
