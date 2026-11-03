@@ -185,12 +185,18 @@ public sealed class AppActionExecutionService
         return removed;
     }
 
-    public async Task CleanupInterruptedActionContainersAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Removes the containers of Actions that were running when the Runner stopped and marks them lost.
+    /// Returns false when some could not be removed yet (for example before the Runner knows its identity),
+    /// leaving them pending so a later call can finish the job.
+    /// </summary>
+    public async Task<bool> CleanupInterruptedActionContainersAsync(CancellationToken cancellationToken)
     {
         if (RunnerApplicationProfiles.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_APPLICATION_PROFILE"))
             != RunnerApplicationProfiles.MachineManagement || machineActionExecution is null || !Directory.Exists(workspace.AppsRoot))
-            return;
+            return true;
 
+        var complete = true;
         foreach (var executionsDirectory in Directory.GetDirectories(workspace.AppsRoot, "executions", SearchOption.AllDirectories))
         foreach (var executionDirectory in Directory.GetDirectories(executionsDirectory))
         {
@@ -201,13 +207,18 @@ public sealed class AppActionExecutionService
                 || state.AppId == Guid.Empty || state.DeploymentTargetId == Guid.Empty
                 || string.IsNullOrWhiteSpace(state.ActionKey))
                 continue;
-            await machineActionExecution.RemoveAsync(new ExecuteAppActionModuleRequest
+            var removed = await machineActionExecution.RemoveAsync(new ExecuteAppActionModuleRequest
             {
                 ExecutionId = state.Result.ExecutionId,
                 AppId = state.AppId,
                 DeploymentTargetId = state.DeploymentTargetId,
                 ActionKey = state.ActionKey
             });
+            if (!removed)
+            {
+                complete = false;
+                continue;
+            }
             var lost = AppActionExecutionResultFactory.Create(state.Result.ExecutionId,
                 AppModuleExecutionStatuses.Lost, null, AppModuleExecutionErrorCodes.AmbiguousDispatch,
                 "Runner restarted before completion was confirmed; the Action was not replayed.",
@@ -218,6 +229,7 @@ public sealed class AppActionExecutionService
                 DeploymentTargetId = state.DeploymentTargetId, ActionKey = state.ActionKey
             }, lost));
         }
+        return complete;
     }
 
     public AppModuleExecutionArtifactResponse ReadLogs(ReadAppModuleExecutionArtifactRequest request)

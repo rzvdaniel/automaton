@@ -45,11 +45,12 @@ public sealed class MachineActionExecutionHandler(HostContainerExecutionService 
             response.ExitCode ?? (response.Success ? 0 : 1), logsPath, resultPath, deploymentHash, startedAt);
     }
 
-    public async Task RemoveAsync(ExecuteAppActionModuleRequest request)
+    /// <summary>Removes the Action's container; returns whether it was removed, so callers can retry.</summary>
+    public async Task<bool> RemoveAsync(ExecuteAppActionModuleRequest request)
     {
         try
         {
-            await execution.ExecuteAsync(new HostContainerExecutionRequest
+            var response = await execution.ExecuteAsync(new HostContainerExecutionRequest
             {
                 OperationId = Guid.NewGuid(),
                 Scope = MachineActionExecutionPolicy.CreateScope(request.AppId, request.DeploymentTargetId),
@@ -57,11 +58,16 @@ public sealed class MachineActionExecutionHandler(HostContainerExecutionService 
                 ActionKey = request.ActionKey,
                 ActionExecutionId = request.ExecutionId
             }, CancellationToken.None);
+            if (response.Success) return true;
+            Serilog.Log.Warning("Could not remove an interrupted Action container for {ExecutionId}: {Error}",
+                request.ExecutionId, response.Error);
         }
         catch (Exception exception) when (exception is InvalidOperationException or UnauthorizedAccessException)
         {
-            Serilog.Log.Warning(exception, "Could not remove an interrupted Action container for {ExecutionId}", request.ExecutionId);
+            Serilog.Log.Warning("Could not remove an interrupted Action container for {ExecutionId}: {Error}",
+                request.ExecutionId, exception.Message);
         }
+        return false;
     }
 
     private static HostContainerExecutionRequest CreateRequest(
