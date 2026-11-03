@@ -41,9 +41,9 @@ Choose Automaton when control and data location matter more to you than managed 
 
 | Setup | Monthly cost | Install time |
 | --- | --- | --- |
-| _To be measured in the fresh-server pass ([#561](https://github.com/rzvdaniel/automaton/issues/561))_ | _TBD_ | _TBD_ |
+| Server and Runner on one Hetzner CPX22 (2 vCPU, 4 GB RAM, 80 GB disk, Helsinki) | €24.19 (server €23.58 + IPv4 €0.61, incl. 21% VAT), plus your domain | 90 seconds for the server installer; about 10 minutes from a new server to a first public app |
 
-These figures are placeholders until that pass is done. Nothing on this page quotes a cost that has not been measured.
+Measured on 3 November 2026 with release 0.2.0 ([#561](https://github.com/rzvdaniel/automaton/issues/561)). At idle the server and Runner used about 1.2 GB of memory with one small app. Larger apps, builds and more users need more; Hetzner bills by the hour, so you can resize later. Prices are Hetzner's list prices on that date and change over time.
 
 ## Next
 

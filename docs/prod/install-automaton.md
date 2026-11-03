@@ -16,6 +16,14 @@ Have a domain you can configure, a certificate notification email, sudo access, 
 | `apps.example.com` | Published app routing |
 | `*.apps.example.com` | Your deployed apps, one hostname each |
 
+Measured on 3 November 2026 (release 0.2.0): a Hetzner CPX22 (2 vCPU, 4 GB RAM, 80 GB disk) runs the server and a Runner for small apps, at €24.19 a month including VAT. The installer finished in 90 seconds, and a first public app was live about 10 minutes after the server was created. At idle with one small app, everything used about 1.2 GB of memory.
+
+Before you start, check three things that cost time in that run:
+
+- **SSH key.** Select the key you will actually connect with when you create the server, then check it with `ssh root@SERVER_IP true`. Key-created Ubuntu servers refuse root password logins, and provider web consoles often mistype symbols, so fixing a wrong key later is slow.
+- **DNS only.** If your DNS is at Cloudflare, set these records to *DNS only* (grey cloud). Proxied records break certificate issuance and the Runner broker.
+- **Ubuntu 24.04.** It is the tested release; newer releases are not yet tested. Run `apt update && apt upgrade -y` first, because a new image can have many pending security updates.
+
 Use records that reach the server directly for setup. Keep the API hostname directly reachable afterward because Runners use its TLS broker port 5671. Allow inbound TCP 80 and 443 for HTTPS and 5671 for the TLS Runner broker. PostgreSQL, plaintext RabbitMQ and RabbitMQ administration are not exposed on host ports. Your server must have outgoing internet access to download images and request certificates.
 
 The default HTTPS mode issues certificates through HTTP validation, including individual application hostnames when they are deployed. Port 80 must remain publicly reachable for issuance/renewal. For many application hostnames, `--tls-mode cloudflare` enables a wildcard certificate instead: provide a Cloudflare API token with Zone Read and DNS Edit restricted to the domain's zone. The token prompt is hidden. A local evaluation mode without a public domain is not yet supported.

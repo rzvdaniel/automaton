@@ -6,7 +6,7 @@ Automaton is an open-source platform for deploying web apps, APIs and Actions on
 
 [Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps)
 
-> **Early access.** The app lifecycle runs on our own production server. Not yet proven: a restore onto a different clean server, isolation between several users of one server, and a timed install on a fresh server. There is no high availability, and apps cannot use WebSockets. Updates briefly interrupt the services, and backups stay on the same server unless you copy them. See [current limitations](https://automaton.monster/docs/limitations).
+> **Early access.** The app lifecycle runs on our own production server. Not yet proven: a restore onto a different clean server. A fresh server installs in 90 seconds (measured on a Hetzner CPX22). There is no high availability, and apps cannot use WebSockets. Updates briefly interrupt the services, and backups stay on the same server unless you copy them. See [current limitations](https://automaton.monster/docs/limitations).
 
 ## Is Automaton for you?
 
@@ -30,8 +30,10 @@ Use an **x86_64 Ubuntu 24.04+ server**, a domain, and at least **10 GiB free dis
 ```bash
 curl -fL https://raw.githubusercontent.com/rzvdaniel/automaton/main/scripts/install-automaton.sh -o install-automaton.sh
 less install-automaton.sh
-sudo bash install-automaton.sh
+sudo bash install-automaton.sh --domain your-domain.com --email you@your-domain.com
 ```
+
+Without `--domain` and `--email` the installer asks for them; pass both when an AI agent runs the install.
 
 The installer selects the latest stable release, verifies the bundle, installs Docker if needed, and starts the server. No source build or GitHub account is required.
 
