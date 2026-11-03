@@ -205,20 +205,21 @@ public sealed class AppActionExecutionService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var statePath = Path.Combine(executionDirectory, ".automaton-execution.json");
-            var state = ReadExecutionState(statePath);
-            if (state is null || state.Terminal || state.Result.ExecutionId == Guid.Empty
-                || state.AppId == Guid.Empty || state.DeploymentTargetId == Guid.Empty
-                || string.IsNullOrWhiteSpace(state.ActionKey)
-                || File.GetLastWriteTimeUtc(statePath) >= startedAtUtc)
-                continue;
+            // Executions recorded by this process are running now, not interrupted.
+            if (File.GetLastWriteTimeUtc(statePath) >= startedAtUtc) continue;
             try
             {
+                var state = ReadExecutionState(statePath);
+                if (state is null || state.Terminal || state.Result.ExecutionId == Guid.Empty
+                    || state.AppId == Guid.Empty || state.DeploymentTargetId == Guid.Empty
+                    || string.IsNullOrWhiteSpace(state.ActionKey))
+                    continue;
                 complete &= await RemoveInterruptedAsync(state, statePath);
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                Serilog.Log.Warning("Could not finish cleaning up the interrupted Action {ExecutionId}: {Error}",
-                    state.Result.ExecutionId, exception.Message);
+                Serilog.Log.Warning("Could not finish cleaning up an interrupted Action in {Directory}: {Error}",
+                    executionDirectory, exception.Message);
                 complete = false;
             }
         }

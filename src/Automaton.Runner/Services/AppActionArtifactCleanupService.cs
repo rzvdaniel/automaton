@@ -18,7 +18,15 @@ public sealed class AppActionArtifactCleanupService : BackgroundService
         var cleaned = false;
         for (var attempt = 1; !cleaned && attempt <= InterruptedCleanupMaxAttempts; attempt++)
         {
-            cleaned = await executions.CleanupInterruptedActionContainersAsync(stoppingToken);
+            try
+            {
+                cleaned = await executions.CleanupInterruptedActionContainersAsync(stoppingToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // Never let a failed cleanup stop the Runner; it is retried below.
+                Serilog.Log.Warning("Cleaning up interrupted Actions failed: {Error}", exception.Message);
+            }
             if (!cleaned && attempt < InterruptedCleanupMaxAttempts)
                 await Task.Delay(InterruptedCleanupRetryDelay, stoppingToken);
         }

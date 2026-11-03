@@ -75,7 +75,6 @@ public sealed class InterruptedActionContainerCleanupTests
             var docker = new MachineContainerDockerExecutor(environment.InstallationId);
             var service = new AppActionExecutionService(workspace, null,
                 new MachineActionExecutionHandler(new HostContainerExecutionService(docker.ExecuteAsync)));
-            await Task.Delay(50);
             // A state written after the service started: a running execution of this very process.
             Guid app = Guid.NewGuid(), target = Guid.NewGuid(), execution = Guid.NewGuid();
             var statePath = Path.Combine(workspace.GetAppActionExecutionsDirectory(app, target, "work"),
@@ -90,13 +89,15 @@ public sealed class InterruptedActionContainerCleanupTests
                 },
                 AppId = app, DeploymentTargetId = target, ActionKey = "work"
             }));
+            // Do not depend on the file system's timestamp granularity.
+            File.SetLastWriteTimeUtc(statePath, DateTime.UtcNow.AddMinutes(1));
 
             var complete = await service.CleanupInterruptedActionContainersAsync(CancellationToken.None);
 
             Assert.Multiple(() =>
             {
                 Assert.That(complete, Is.True);
-                Assert.That(docker.Commands.Any(command => command.Contains("rm")), Is.False, "no container is removed");
+                Assert.That(docker.Commands, Is.Empty, "no container is touched");
                 Assert.That(File.ReadAllText(statePath), Does.Contain("\"Terminal\":false"));
             });
         }

@@ -62,7 +62,7 @@ public sealed class MachineActionExecutionHandler(HostContainerExecutionService 
             Serilog.Log.Warning("Could not remove an interrupted Action container for {ExecutionId}: {Error}",
                 request.ExecutionId, response.Error);
         }
-        catch (Exception exception) when (exception is InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             Serilog.Log.Warning("Could not remove an interrupted Action container for {ExecutionId}: {Error}",
                 request.ExecutionId, exception.Message);
