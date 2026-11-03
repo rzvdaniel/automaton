@@ -22,6 +22,7 @@ public sealed class PasswordChangeRequirementTests
     [TestCase("/api/Token/RefreshAccessToken", false)]
     [TestCase("/api/TokenThief", true)]
     [TestCase("/healthz", false)]
+    [TestCase("/health", false)]
     [TestCase("/_Host", true)]
     public void OnlyThePasswordChangePageIsReachable(string path, bool blocked)
         => Assert.That(PasswordChangeRequirement.IsBlocked(new PathString(path)), Is.EqualTo(blocked));

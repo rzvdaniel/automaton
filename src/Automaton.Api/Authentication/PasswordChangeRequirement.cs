@@ -67,6 +67,7 @@ public sealed class PasswordChangeRequirement(RequestDelegate next)
 
     internal static bool IsBlocked(PathString path)
         => !path.Equals("/healthz", StringComparison.OrdinalIgnoreCase)
+            && !path.Equals("/health", StringComparison.OrdinalIgnoreCase)
             && !AllowedPaths.Any(allowed => allowed.EndsWith('/')
                 ? path.StartsWithSegments(allowed.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
                 : path.Equals(allowed, StringComparison.OrdinalIgnoreCase));

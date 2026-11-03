@@ -79,7 +79,13 @@ elif args[0]=='compose':
         else: sys.exit(2)
     elif 'up' in args and os.environ.get('FAKE_UP_FAIL')=='1': sys.exit(1)
 ''')
-        (self.bin / 'curl').write_text('#!/bin/sh\necho \'{"installationComplete":true}\'\n')
+        (self.bin / 'curl').write_text("""#!/bin/sh
+case "$*" in
+  *api.example.invalid/health) echo "${FAKE_API_HEALTH-ok}" ;;
+  *store.example.invalid*) [ "${FAKE_STORE_DNS_MISSING:-}" != 1 ] || exit 6 ;;
+  *) echo '{"installationComplete":true}' ;;
+esac
+""")
         (self.bin / 'df').write_text('#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 30000000 1000000 29000000 4%% /\\n"\n')
         for tool in self.bin.iterdir():
             tool.chmod(0o755)
@@ -153,11 +159,16 @@ elif args[0]=='compose':
         self.assertNotIn(f'{self.config.name}/store-runtime-config.js', names)
 
     def test_missing_store_dns_warns_without_failing(self):
-        (self.bin / 'curl').write_text('#!/bin/sh\ncase "$*" in\n  *store.example.invalid*) exit 6 ;;\n  *) echo \'{"installationComplete":true}\' ;;\nesac\n')
-        result = self.update(*self.bundle())
+        result = self.update(*self.bundle(), extra={'FAKE_STORE_DNS_MISSING': '1'})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('Point a DNS record for store.example.invalid', result.stderr)
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
+
+    def test_unhealthy_public_api_prevents_update_completion(self):
+        result = self.update(*self.bundle(), extra={'FAKE_API_HEALTH': 'unexpected response'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Public route validation failed', result.stderr)
+        self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.1')
 
     def test_override_sidecar_is_not_pulled_or_required(self):
         override = self.install / 'compose.override.yaml'

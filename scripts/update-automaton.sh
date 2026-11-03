@@ -250,6 +250,7 @@ if ! "${new_compose[@]}" up -d --wait --wait-timeout 600 "${recreate[@]}" "${app
     exit 1
 fi
 if ! curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; assert json.load(sys.stdin)["installationComplete"]' \
+    || [[ $(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://api.$domain/health") != ok ]] \
     || ! curl --fail --silent --show-error "https://studio.$domain/" >/dev/null; then
     echo "Public route validation failed. Previous manifest and recovery backup remain at $backup. Assess the services before recovery." >&2
     exit 1

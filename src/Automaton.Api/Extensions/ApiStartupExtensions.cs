@@ -35,6 +35,7 @@ internal static class ApiApplicationPipelineExtensions
         app.UseMiddleware<PasswordChangeRequirement>();
         app.UseMiddleware<MultipartUploadAdmissionMiddleware>();
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+        app.MapGet("/health", () => Results.Text("ok")).AllowAnonymous();
         app.MapControllers();
         app.MapBlazorHub();
         app.MapHub<AutomatonHub>("/api/workflow/hub");

@@ -196,6 +196,7 @@ fi
 "${compose[@]}" up -d --wait --wait-timeout 600
 # Validate actual public HTTPS/API routing as well as container health.
 echo 'Waiting for HTTPS certificates. Certificate errors printed while they are issued are expected and retried.'
+[[ $(curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://api.$domain/health") == ok ]]
 curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://studio.$domain/api/install/status" | python3 -c 'import json,sys; response=json.load(sys.stdin); assert "installationComplete" in response'
 curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://studio.$domain/" >/dev/null
 curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors "https://store.$domain/" >/dev/null \
