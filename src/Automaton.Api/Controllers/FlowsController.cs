@@ -60,7 +60,18 @@ public class FlowsController : BaseController
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        await flowsService.Remove(id);
+        try
+        {
+            await flowsService.Remove(id);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
 
         return NoContent();
     }
