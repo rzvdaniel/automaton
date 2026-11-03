@@ -12,6 +12,10 @@ spec = importlib.util.spec_from_file_location('mysql_to_postgres', source)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
+check_spec = importlib.util.spec_from_file_location('migration_app_check', source.parent / 'migration_app_check.py')
+check = importlib.util.module_from_spec(check_spec)
+check_spec.loader.exec_module(check)
+
 Error = module.MigrationError
 
 
@@ -109,6 +113,32 @@ class ComparisonTests(unittest.TestCase):
         self.assertNotEqual(module.canonical('Abc', 'text'), module.canonical('abc', 'text'))
         self.assertNotEqual(module.canonical(0, 'boolean'), module.canonical(1, 'boolean'))
         self.assertNotEqual(module.canonical(None, 'text'), module.canonical('', 'text'))
+
+
+class SnapshotComparisonTests(unittest.TestCase):
+    def snapshot(self, apps=('a', 'b'), health=200, sign_in='ok', status=200):
+        return {'health': health, 'administrator': {'signIn': sign_in, 'apps': {'status': status, 'ids': sorted(apps)}}}
+
+    def test_identical_snapshots_have_no_differences(self):
+        self.assertEqual(check.diff_snapshots(self.snapshot(), self.snapshot(apps=('b', 'a'))), [])
+
+    def test_a_missing_item_is_reported_with_counts(self):
+        problems = check.diff_snapshots(self.snapshot(), self.snapshot(apps=('a',)))
+        self.assertEqual(len(problems), 1)
+        self.assertIn('administrator apps', problems[0])
+        self.assertIn('2 -> 1', problems[0])
+        self.assertIn('missing 1', problems[0])
+
+    def test_a_failed_sign_in_or_health_check_is_reported(self):
+        self.assertTrue(any('sign-in' in p for p in check.diff_snapshots(self.snapshot(), self.snapshot(sign_in='failed (401)'))))
+        self.assertTrue(any('health' in p for p in check.diff_snapshots(self.snapshot(), self.snapshot(health=503))))
+
+    def test_a_changed_status_is_reported(self):
+        self.assertTrue(check.diff_snapshots(self.snapshot(), self.snapshot(status=500)))
+
+    def test_item_ids_come_from_the_id_property(self):
+        self.assertEqual(check.identify({'id': '5', 'name': 'x'}), '5')
+        self.assertEqual(check.identify({'name': 'x'}), 'x')
 
 
 if __name__ == '__main__':

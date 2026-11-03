@@ -234,6 +234,33 @@ def target_columns(pg, table):
     return {name: (pg_type, nullable, has_default) for name, pg_type, nullable, has_default in rows}
 
 
+def unused_source_column(my, table, column):
+    """True when every row holds the column's default or NULL, so leaving the column out loses nothing."""
+    with my.cursor() as cursor:
+        cursor.execute('SELECT column_default, extra FROM information_schema.columns WHERE table_schema = DATABASE() '
+                       'AND table_name = %s AND column_name = %s', (table, column))
+        default, extra = cursor.fetchone()
+        if default is None or 'DEFAULT_GENERATED' in (extra or ''):
+            cursor.execute(f'SELECT COUNT(*) FROM {quote_my(table)} WHERE {quote_my(column)} IS NOT NULL')
+        else:
+            cursor.execute(f'SELECT COUNT(*) FROM {quote_my(table)} WHERE {quote_my(column)} IS NOT NULL AND {quote_my(column)} <> %s', (default,))
+        return cursor.fetchone()[0] == 0
+
+
+def mapped_columns(my, pg, table):
+    """(columns to copy, target column types, ignored obsolete columns). Stops if a column with data has no target."""
+    source = source_columns(my, table)
+    target = target_columns(pg, table)
+    ignored = []
+    for column in source:
+        if column not in target:
+            if not unused_source_column(my, table, column):
+                raise MigrationError(f'{table}.{column} exists in MySQL and holds data but the PostgreSQL schema has no such column; its data would be lost')
+            ignored.append(column)
+    columns = plan_columns(table, [c for c in source if c not in ignored], target)
+    return columns, target, ignored
+
+
 def quote_my(name):
     return '`' + name.replace('`', '``') + '`'
 
@@ -265,9 +292,9 @@ def reset_sequences(pg):
 
 
 def copy_table(my, pg, table, log):
-    source = source_columns(my, table)
-    target = target_columns(pg, table)
-    columns = plan_columns(table, source, target)
+    columns, target, ignored = mapped_columns(my, pg, table)
+    if ignored:
+        log(f'  {table}: ignoring obsolete MySQL column(s) {", ".join(ignored)} (every row holds the default)')
     select = f'SELECT {", ".join(quote_my(c) for c in columns)} FROM {quote_my(table)}'
     statement = f'COPY {quote_pg(table)} ({", ".join(quote_pg(c) for c in columns)}) FROM STDIN'
     types = [target[c][0] for c in columns]
@@ -376,8 +403,8 @@ def run_verify(log=print):
         log(f'{"table":42} {"rows":>8}  result')
         total = 0
         for table in tables:
-            columns = plan_columns(table, source_columns(my, table), target_columns(pg, table))
-            types = [target_columns(pg, table)[c][0] for c in columns]
+            columns, target, _ignored = mapped_columns(my, pg, table)
+            types = [target[c][0] for c in columns]
             left = source_fingerprint(my, table, columns, types)
             right = target_fingerprint(pg, table, columns, types)
             total += right[0]
