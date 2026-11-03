@@ -1,6 +1,6 @@
 # Self-hosted core
 
-Status: done (M1–M4). Two-user isolation passed on the test server on 3 November 2026 (below). Still open before team use: the combined restart/replay acceptance. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
+Status: done (M1–M4). The two-user isolation pass on the test server on 3 November 2026 found no cross-user access and two non-leaking defects ([#571](https://github.com/rzvdaniel/automaton/issues/571), [#572](https://github.com/rzvdaniel/automaton/issues/572); results below). Still open before team use: the combined restart/replay acceptance, so #521 stays open. This was the main roadmap until 31 October 2026; the [roadmap index](README.md) now lists all plans. Its .NET item moved to [04](dotnet-10.md); backups, Runner upgrades and the remaining operations items moved to [05](self-maintenance.md).
 
 Updated: 27 October 2026. Status: M3 and M4 are complete. The single-machine install/deploy/persistence flow is demonstrated, source cleanup/audit is merged through #416, and the demonstrated routing/CLI corrections are merged in #417 (`a442dda3`). M1/M2 implementation is merged; a single-account CLI/static/API/Action flow is now demonstrated. Multi-user and combined restart/replay acceptance remain deferred before team use.
 
@@ -32,13 +32,13 @@ Run on 3 November 2026 on the test server (server 0.1.32) with the administrator
 
 | Area | Checked | Result |
 | --- | --- | --- |
-| Personal apps | Each user reads, edits, deletes, publishes, duplicates, launches and exports the other's app; reads its secrets, secret history, files, deployment targets, actions and permissions | Denied (403/404) everywhere. Edit, publish and Runner re-assignment answer **500** instead of 403 ([#571](https://github.com/rzvdaniel/automaton/issues/571)); deleting an app that is in a project answers 400 and reveals that ([#572](https://github.com/rzvdaniel/automaton/issues/572)). Nothing was changed or deleted |
+| Personal apps | Each user reads, edits, deletes, publishes, duplicates, launches and exports the other's app; reads its secrets, secret history, files, deployment targets, actions and permissions | Denied everywhere, but with the wrong status in two cases: edit, publish and Runner re-assignment answer **500** instead of 403 ([#571](https://github.com/rzvdaniel/automaton/issues/571)); deleting an app that is in a project answers 400 and reveals that ([#572](https://github.com/rzvdaniel/automaton/issues/572)). Nothing was changed or deleted |
 | Lists | App, API key and recent-activity lists | Show only the caller's own items |
 | API keys | Using the other user's keys on an app; deleting the other's key | Denied |
 | Runners | A regular user lists, edits, deletes, upgrades or reads the settings of the administrator's Runner | Denied; the Runner is absent from the list |
 | Admin area | A regular user calls the admin settings, logs, users, apps, dashboard, SMTP, AI and backup endpoints | 403 |
 | Projects | A non-member reads the project, its apps, members, Runners and vault | Denied; the project is absent from the list |
-| Project roles | Viewer, AppUser and Developer: read project and shared app; edit project, add members, delete project, link apps; read and write the shared vault | Viewer and AppUser read only; Developer also links apps and uses the shared vault; only ProjectAdmin edits the project and its members |
+| Project roles | Viewer, AppUser and Developer: read project and shared app; edit project, add members, delete project, link apps; read and write the shared vault | Viewer and AppUser read the project and the shared app but were refused the app's secrets and the shared vault (list and write) and linking apps; Developer also links apps and lists and writes the shared vault; only ProjectAdmin edits the project and its members. Covered one project and one shared app |
 | Member removed | The same calls after removal | Denied again |
 | Project Runners | A member lists the project's Runner; a non-member does not | As expected |
 | CLI | Linking to another user's app with the other user's key | 404 |
@@ -133,7 +133,7 @@ The implementation PRs are merged on the reconciled source baseline from PR #391
 
 Acceptance: on a disposable Linux machine, two users deploy apps and run jobs through one management Runner. Cross-user files, secrets, logs and operations are denied. There is no placeholder Hosted Runner record or per-user management container required for new workloads. Restart/lost-response checks demonstrate safe result recovery and no automatic replay of uncertain Actions. Source/artifacts and persistent data survive the applicable restart/update scenarios.
 
-M1 implementation PRs are merged. Combined integration acceptance remains deferred. The 27 October normal-user exercise below adds real Action execution and cancellation evidence; two-user isolation and combined restart/replay behavior remain unverified.
+M1 implementation PRs are merged. Combined integration acceptance remains deferred. The 27 October normal-user exercise below adds real Action execution and cancellation evidence; combined restart/replay behavior remains unverified; two-user isolation was later checked (see [Two-user isolation acceptance](#two-user-isolation-acceptance)).
 
 ### 2. Make personal and shared apps useful with low overhead
 
