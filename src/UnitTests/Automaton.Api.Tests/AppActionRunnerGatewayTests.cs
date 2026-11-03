@@ -33,7 +33,7 @@ public sealed class AppActionRunnerGatewayTests
         var finished = await Task.WhenAny(send, Task.Delay(TimeSpan.FromSeconds(8)));
 
         Assert.That(finished, Is.SameAs(send), "the call is still waiting for the Runner after 8 seconds");
-        Assert.ThrowsAsync<TimeoutException>(async () => await send);
+        Assert.ThrowsAsync<RunnerNotRespondingException>(async () => await send);
         // The queued command is withdrawn, so the Runner does not run it later.
         Assert.That((await db.RunnerExecutionOperations.SingleAsync()).CancellationRequested, Is.True);
     }
@@ -44,7 +44,7 @@ public sealed class AppActionRunnerGatewayTests
         var context = new ExceptionContext(
             new ActionContext(new DefaultHttpContext(), new RouteData(), new ActionDescriptor()), [])
         {
-            Exception = new TimeoutException("The Runner assigned to this app did not answer.")
+            Exception = new RunnerNotRespondingException("The Runner assigned to this app did not answer.")
         };
 
         new AppActionExceptionFilter().OnException(context);

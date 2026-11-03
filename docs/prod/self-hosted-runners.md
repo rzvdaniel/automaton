@@ -148,6 +148,10 @@ that cannot clean up, move or delete deployed apps. The install command is for e
 a new installation; do not rerun it as an upgrade. Automatic Runner self-update is not
 provided.
 
+## When a Runner does not answer
+
+Starting an Action, listing Actions or versions and reading Action logs ask the app's Runner first. If it does not answer within 60 seconds (`HostedRunners:ActionCommandTimeoutSeconds`), for example because the machine is off or restarting, the API answers **503** "did not answer … It may be offline" and withdraws the request; start the Runner and try again. Studio shows a Runner as offline only after about ten minutes without a heartbeat, so the 503 can come first. A scheduled run that cannot reach its Runner is recorded as failed.
+
 ## Manual testing
 
 Use an authenticated API key with the installation endpoint, save the returned

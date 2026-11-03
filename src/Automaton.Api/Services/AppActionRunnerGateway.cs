@@ -14,8 +14,9 @@ public sealed class AppActionRunnerGateway(
     public Task<T> SendAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         => SendAsync<T>(runnerId, kind, payload, limit: null, token);
 
-    // A Runner that stopped recently still looks online for a while, so quick commands wait only a bounded time
-    // instead of holding the caller's request open.
+    // A Runner that stopped recently still looks online for a while, so read commands wait only a bounded time
+    // instead of holding the caller's request open. Commands that change something (restore, delete, cleanup) keep
+    // waiting: a timeout would report a failure for work the Runner may still complete.
     private Task<T> SendQuickAsync<T>(Guid runnerId, string kind, object payload, CancellationToken token)
         => SendAsync<T>(runnerId, kind, payload, TimeSpan.FromSeconds(Math.Max(1, options.Value.ActionCommandTimeoutSeconds)), token);
 
@@ -32,7 +33,7 @@ public sealed class AppActionRunnerGateway(
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested && limit is not null)
         {
-            throw new TimeoutException(
+            throw new RunnerNotRespondingException(
                 $"The Runner assigned to this app did not answer within {limit.Value.TotalSeconds:0} seconds. It may be offline; try again when it is back.");
         }
         if (result.Outcome != "Succeeded" || result.ActionResult is null)
@@ -51,9 +52,9 @@ public sealed class AppActionRunnerGateway(
     public Task<AppActionVersionsResponse> ListVersionsAsync(Guid runnerId, Guid appId, Guid targetId, string key, CancellationToken token)
         => SendQuickAsync<AppActionVersionsResponse>(runnerId, "list-versions", new AppActionModuleRequest(appId, targetId, key), token);
     public Task<AppActionVersionOperationResponse> RestoreVersionAsync(Guid runnerId, Guid appId, Guid targetId, string key, string version, CancellationToken token)
-        => SendQuickAsync<AppActionVersionOperationResponse>(runnerId, "restore-version", new AppActionVersionRequest(appId, targetId, key, version), token);
+        => SendAsync<AppActionVersionOperationResponse>(runnerId, "restore-version", new AppActionVersionRequest(appId, targetId, key, version), token);
     public Task<AppActionVersionOperationResponse> DeleteVersionAsync(Guid runnerId, Guid appId, Guid targetId, string key, string version, CancellationToken token)
-        => SendQuickAsync<AppActionVersionOperationResponse>(runnerId, "delete-version", new AppActionVersionRequest(appId, targetId, key, version), token);
+        => SendAsync<AppActionVersionOperationResponse>(runnerId, "delete-version", new AppActionVersionRequest(appId, targetId, key, version), token);
     public async Task<bool> CancelExecutionAsync(Guid runnerId, Guid executionId, CancellationToken token)
     {
         return await operations.CancelAsync(executionId, token);
