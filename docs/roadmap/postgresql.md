@@ -24,7 +24,7 @@ Each step depends on the previous one.
 
 1. **Application on PostgreSQL** (#585, done 3 November 2026) (on .NET 9): providers, baseline migration, raw SQL, case-insensitive lookups, test fixtures. *Acceptance:* all tests pass on PostgreSQL; a fresh database works end to end locally.
 2. **Server installation on PostgreSQL** (#586): Compose, install, update, backup and restore scripts, install guide. *Acceptance:* a clean install, update, backup and restore work on PostgreSQL.
-3. **Data migration of existing servers** (#587): procedure, verification, test server, then production. *Acceptance:* both servers run on PostgreSQL with all data, users can sign in, apps run, secrets decrypt.
+3. **Data migration of existing servers** (#587): procedure, verification, test server, then production. *Acceptance:* both servers run on PostgreSQL with all data, users can sign in, apps run, secrets decrypt. *Status:* the procedure ([runbook](../prod/migrate-to-postgresql.md), `docker/install/migrate-to-postgresql.sh`) is built and was rehearsed on a throwaway copy of the test server's database on 3 November 2026: copy and verification (1,126 rows in 86 tables by count and content hash, 96 foreign keys, sequences), identical API answers for an administrator and a user before and after, all protected values decrypt with the original key ring, a deliberate failure returns to MySQL by itself, and `--rollback` restores the old state; API and Worker were down 44 s. The test server itself and production are not switched yet.
 4. **.NET 10** (#493, #494): retarget with Npgsql 10 after step 1.
 
 ## Step 1 result

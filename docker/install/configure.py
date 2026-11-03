@@ -145,7 +145,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         required = ['postgres-password', 'rabbitmq-password', 'setup-token',
                     'signing-key.json', 'hmac-key', 'ai-encryption-key', 'runtime-proxy-key', 'cloudflare-token']
         if (root / 'secrets' / 'mysql-password').is_file():
-            raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first (issue #587).')
+            raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first with migrate-to-postgresql.sh (docs/prod/migrate-to-postgresql.md, issue #587).')
         if not (root / 'installation.json').exists() or any(not (root / 'secrets' / name).is_file() for name in required):
             raise ValueError('Existing installation credentials are incomplete. Restore the configuration backup; keys will not be regenerated.')
     root.mkdir(parents=True, exist_ok=True, mode=0o700)

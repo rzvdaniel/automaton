@@ -99,7 +99,7 @@ Preserve generated encryption/signing keys and Data Protection volumes. Back up 
 
 ## Update an installed server
 
-**Servers installed before PostgreSQL (MySQL-based).** Releases that use PostgreSQL are not applied to a MySQL server. `update.sh` and the installer stop with a message and change nothing; the data migration to PostgreSQL is tracked in issue #587. Stay on your current release until it is available.
+**Servers installed before PostgreSQL (MySQL-based).** Releases that use PostgreSQL are not applied to a MySQL server. `update.sh` and the installer stop with a message and change nothing; move the data first with `migrate-to-postgresql.sh`, which copies and verifies it and can roll back; see [Migrate a server from MySQL to PostgreSQL](migrate-to-postgresql.md) (issue #587). Stay on your current release until you have.
 
 Run the updater that the installer placed beside the Compose file. Without a version, it selects the newest stable server distribution available publicly on GHCR:
 

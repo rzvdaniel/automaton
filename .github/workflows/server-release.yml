@@ -104,7 +104,7 @@ jobs:
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]
           mkdir automaton-server
-          cp docker/install/{compose.yaml,configure.py,backup.sh,restore.sh} automaton-server/
+          cp docker/install/{compose.yaml,configure.py,backup.sh,restore.sh,migrate-to-postgresql.sh,mysql_to_postgres.py,migration_app_check.py} automaton-server/
           cp scripts/install-automaton.sh automaton-server/install.sh
           cp scripts/update-automaton.sh automaton-server/update.sh
           cp docs/prod/install-automaton.md automaton-server/README.md
@@ -127,7 +127,13 @@ jobs:
             }
             if [[ -n "$previous" ]]; then
               # Infrastructure stays pinned across releases; changing it needs a reviewed migration.
-              grep -E '^(POSTGRES|RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
+              grep -E '^(RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
+              if grep -q '^POSTGRES_IMAGE=' previous-release/automaton-server/release.env; then
+                grep '^POSTGRES_IMAGE=' previous-release/automaton-server/release.env
+              else
+                # The first PostgreSQL release follows a MySQL release, whose manifest has no PostgreSQL image.
+                resolve POSTGRES_IMAGE postgres:16
+              fi
             else
               resolve POSTGRES_IMAGE postgres:16
               resolve RABBITMQ_IMAGE rabbitmq:4-management
@@ -155,6 +161,8 @@ jobs:
           sudo apt-get install -y python3-cryptography
           sudo python3 scripts/tests/server-installer-config-test.py
           sudo python3 scripts/tests/server-updater-test.py
+          python3 scripts/tests/mysql-to-postgres-conversion-test.py
+          bash -n automaton-server/migrate-to-postgresql.sh
           sudo env AUTOMATON_RUN_INSTALL_SMOKE=1 bash scripts/tests/server-install-smoke.sh "$PWD/automaton-server"
       - name: Package release
         run: |
