@@ -55,7 +55,7 @@ Inspect all relevant filesystems, including Docker/containerd, persistent volume
 - Preserve active images, configured Runner artifacts and explicitly retained rollback references. Image maintenance uses a protected allow-list and fails closed if a reference is missing. Historical blue/green state may still protect images but is not the active deployment state.
 - Configure the actual builder's native GC with a 2 GB cache target. After confirming no build is active, bounded one-time cleanup can use `docker builder prune -af --keep-storage 2GB`.
 - Container stdout, application file logs and audit records have separate retention. Do not delete live application data or audit records as log cleanup.
-- The installer defaults to seven-day MySQL binlog expiry. Verify actual settings and backup/replica dependencies. Purge only authorized history using MySQL commands; never unlink database files.
+- Installer-managed servers run PostgreSQL 16 in the `postgres-data` volume; there is no binary log to purge. Use `pg_dump`/`pg_restore` through the installed `backup.sh` and `restore.sh`.
 - Compare exact resolved backup/staging paths with container mounts before removal. Do not follow backup symlinks into live settings or certificate stores.
 - Never use blanket volume pruning, `docker system prune -a`, or automatic `docker image prune -a`.
 

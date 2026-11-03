@@ -26,6 +26,14 @@ class InstallationConfigurationTests(unittest.TestCase):
     def configure(self):
         module.configure(self.root, 'example.com', 'owner@example.com')
 
+    def test_mysql_installation_is_refused_unchanged(self):
+        self.configure()
+        (self.root / 'secrets/mysql-password').write_text('legacy')
+        (self.root / 'secrets/postgres-password').unlink()
+        with self.assertRaisesRegex(ValueError, 'runs on MySQL'):
+            self.configure()
+        self.assertFalse((self.root / 'secrets/postgres-password').exists())
+
     def test_rerun_preserves_all_secrets_and_modified_operator_settings(self):
         self.configure()
         path = self.root / 'appsettings.Production.json'
@@ -40,8 +48,8 @@ class InstallationConfigurationTests(unittest.TestCase):
     def test_generated_credentials_are_private_unique_and_connected(self):
         self.configure()
         settings = json.loads((self.root / 'appsettings.Production.json').read_text())
-        password = (self.root / 'secrets/mysql-password').read_text()
-        self.assertIn(password, settings['ConnectionStrings']['MySqlConnection'])
+        password = (self.root / 'secrets/postgres-password').read_text()
+        self.assertIn(password, settings['ConnectionStrings']['PostgreSqlConnection'])
         self.assertEqual(len(settings['AppConfig']['AiApiEncryptionKey']), 32)
         self.assertFalse(settings['AppConfig']['UserSignUp'])
         self.assertEqual(settings['AppConfig']['ApiUrl'], 'https://api.example.com')
@@ -59,7 +67,7 @@ class InstallationConfigurationTests(unittest.TestCase):
         self.assertEqual(pages['routers']['studio-pages']['rule'], 'Host(`studio.example.com`) && PathRegexp(`^/api[^/]`)')
         self.assertGreater(pages['routers']['studio-pages']['priority'], edge['http']['routers']['studio-api']['priority'])
         self.assertEqual(pages['services']['studio-pages']['loadBalancer']['servers'], [{'url': 'http://studio:80'}])
-        self.assertNotEqual(password, (self.root / 'secrets/mysql-root-password').read_text())
+        self.assertNotEqual(password, (self.root / 'secrets/rabbitmq-password').read_text())
         self.assertIn('https://api.example.com', (self.root / 'studio-runtime-config.js').read_text())
         self.assertIn('https://apps.example.com', (self.root / 'studio-runtime-config.js').read_text())
         for path in self.root.rglob('*'):

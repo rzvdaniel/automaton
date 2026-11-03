@@ -117,15 +117,14 @@ take_backup() {
     api=$("${compose[@]}" ps -q api)
     worker=$("${compose[@]}" ps -q worker)
     [[ -n "$api" && -n "$worker" ]] || { echo 'API and Worker containers must exist to back up their Data Protection keys.' >&2; return 1; }
-    "${compose[@]}" exec -T mysql sh -ec 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password); export MYSQL_PWD; exec mysqldump --single-transaction --quick --routines --triggers --events --no-tablespaces -u root automaton' \
-        < /dev/null | gzip -6 > "$working/database.sql.gz"
-    gzip -t "$working/database.sql.gz"
-    zcat "$working/database.sql.gz" | tail -n 1 | grep -q 'Dump completed' || { echo 'The database dump did not complete.' >&2; return 1; }
+    "${compose[@]}" exec -T postgres pg_dump -U automaton -d automaton --format=custom --compress=6 < /dev/null > "$working/database.dump"
+    # pg_restore --list fails on a truncated or corrupt custom-format archive.
+    "${compose[@]}" exec -T postgres pg_restore --list < "$working/database.dump" > /dev/null || { echo 'The database dump did not complete.' >&2; return 1; }
     docker cp "$api:/app/data-protection-keys/." - | gzip > "$working/api-keys.tar.gz"
     docker cp "$worker:/app/data-protection-keys/." - | gzip > "$working/worker-keys.tar.gz"
     for archive in api-keys worker-keys; do tar -tzf "$working/$archive.tar.gz" >/dev/null; done
     cp "$install_dir/version" "$working/version" 2>/dev/null || true
-    (cd "$working" && sha256sum database.sql.gz api-keys.tar.gz worker-keys.tar.gz > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
+    (cd "$working" && sha256sum database.dump api-keys.tar.gz worker-keys.tar.gz > SHA256SUMS && sha256sum -c --quiet SHA256SUMS)
     mv -- "$working" "$backup_root/$name"
     echo "Backup saved: $backup_root/$name ($(du -sh "$backup_root/$name" | cut -f1))"
     # Rotate only backups this script created.

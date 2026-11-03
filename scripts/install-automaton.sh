@@ -35,7 +35,7 @@ for dir in "$install_dir" "$config_dir"; do
 done
 exec 9>/run/lock/automaton-install.lock
 flock -n 9 || { echo 'Another installer is running.' >&2; exit 1; }
-unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE STORE_IMAGE MYSQL_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
+unset API_IMAGE WORKER_IMAGE STUDIO_IMAGE STORE_IMAGE POSTGRES_IMAGE RABBITMQ_IMAGE TRAEFIK_IMAGE RUNNER_IMAGE
 if $status_only; then
     compose=(docker compose --project-directory "$install_dir" --env-file "$install_dir/release.env" --env-file "$install_dir/.env" -f "$install_dir/compose.yaml")
     if [[ -e "$install_dir/compose.override.yaml" || -L "$install_dir/compose.override.yaml" ]]; then
@@ -163,7 +163,7 @@ fi
 # The release contains immutable references for application and infrastructure images.
 runner_image=$(python3 - "$bundle_dir/release.env" <<'PY'
 import re, sys
-required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','MYSQL_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
+required={'API_IMAGE','STUDIO_IMAGE','STORE_IMAGE','WORKER_IMAGE','POSTGRES_IMAGE','RABBITMQ_IMAGE','TRAEFIK_IMAGE','RUNNER_IMAGE'}
 entries=dict(line.strip().split('=',1) for line in open(sys.argv[1]) if line.strip() and not line.startswith('#'))
 if set(entries) != required or any(not re.fullmatch(r'[a-zA-Z0-9_./:@-]+',v) for v in entries.values()):
     raise SystemExit('Invalid release image manifest.')

@@ -27,7 +27,7 @@ less install-automaton.sh
 sudo bash install-automaton.sh
 ```
 
-It asks for your domain and certificate email, downloads the latest stable release, verifies its checksum, and starts Studio, API, the app store, Worker, MySQL, RabbitMQ and Traefik. Add `--version server-vX.Y.Z` to select a release. Use `--tls-mode cloudflare` for optional Cloudflare wildcard certificates; provide the scoped DNS token only at the hidden terminal prompt.
+It asks for your domain and certificate email, downloads the latest stable release, verifies its checksum, and starts Studio, API, the app store, Worker, PostgreSQL, RabbitMQ and Traefik. Add `--version server-vX.Y.Z` to select a release. Use `--tls-mode cloudflare` for optional Cloudflare wildcard certificates; provide the scoped DNS token only at the hidden terminal prompt.
 
 ## Create the administrator and connect a Runner
 

@@ -5,7 +5,7 @@ order: 1
 
 # Server installation and setup
 
-A server release installs the API, Studio, the public app store, Worker, MySQL, RabbitMQ and Traefik. The installer supports Ubuntu 24.04 or newer on x86_64 with public DNS. It installs a missing Docker Compose plugin automatically. It requires a published server release; it does not change an existing blue/green production installation.
+A server release installs the API, Studio, the public app store, Worker, PostgreSQL, RabbitMQ and Traefik. The installer supports Ubuntu 24.04 or newer on x86_64 with public DNS. It installs a missing Docker Compose plugin automatically. It requires a published server release; it does not change an existing blue/green production installation.
 
 After the installer finishes, open `/install`, enter the server setup token read locally on the host, and select **Check installation**. Studio never displays the saved token. Resolve any failing service checks, then create the first system administrator. Email delivery is optional at this stage. The setup token stops working when administrator creation commits. Sign in afterward.
 

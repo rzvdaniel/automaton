@@ -142,8 +142,10 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
     if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
         raise ValueError('A valid certificate notification email is required.')
     if (root / 'appsettings.Production.json').exists() or (root / 'installation.json').exists():
-        required = ['mysql-password', 'mysql-root-password', 'rabbitmq-password', 'setup-token',
+        required = ['postgres-password', 'rabbitmq-password', 'setup-token',
                     'signing-key.json', 'hmac-key', 'ai-encryption-key', 'runtime-proxy-key', 'cloudflare-token']
+        if (root / 'secrets' / 'mysql-password').is_file():
+            raise ValueError('This installation runs on MySQL; this release uses PostgreSQL. Nothing was changed. Migrate the data first (issue #587).')
         if not (root / 'installation.json').exists() or any(not (root / 'secrets' / name).is_file() for name in required):
             raise ValueError('Existing installation credentials are incomplete. Restore the configuration backup; keys will not be regenerated.')
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -161,15 +163,14 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         if not re.fullmatch(r'[A-Za-z0-9_-]{20,200}', token):
             raise ValueError('A Cloudflare DNS token is required for wildcard application certificates.')
         write_new(cloudflare, token)
-    password = secret(root, 'mysql-password')
-    secret(root, 'mysql-root-password')
+    password = secret(root, 'postgres-password')
     broker_password = secret(root, 'rabbitmq-password')
     setup_token = secret(root, 'setup-token')
     urls = public_urls(domain)
     api, studio, apps, store = urls['api'], urls['studio'], urls['apps'], urls['store']
     resolver = 'cloudflare' if tls_mode == 'cloudflare' else 'letsencrypt'
     settings = {
-        'ConnectionStrings': {'MySqlConnection': f'Server=mysql;Database=automaton;User=automaton;Password={password};'},
+        'ConnectionStrings': {'PostgreSqlConnection': f'Host=postgres;Database=automaton;Username=automaton;Password={password}'},
         'RabbitMq': dict(Host='rabbitmq', Port=5672, Username='automaton', Password=broker_password,
                          VirtualHost='/', ManagementUrl='http://rabbitmq:15672/'),
         'HostedRunnerRabbitMq': dict(Host=f'api.{domain}', Port=5671, TlsEnabled=True, TlsServerName=f'api.{domain}'),
@@ -178,7 +179,7 @@ def configure(root, domain, email, tls_mode="http", runner_image="ghcr.io/rzvdan
         'Cors': {'AllowedOrigins': [studio, api, store]},
         'JwtOptions': dict(ValidateIssuer=True, Issuer=api, ValidateAudience=False, Audience='Automaton.Studio'),
         'AuthenticationSettings': {'RsaSettings': rsa_settings(root), 'HMacSettings': {'SecretKey': secret(root, 'hmac-key')}},
-        'AppConfig': dict(DatabaseType='MySql', ApiUrl=api, WebsiteUrl=studio, UserSignUp=False,
+        'AppConfig': dict(ApiUrl=api, WebsiteUrl=studio, UserSignUp=False,
                           AiApiEncryptionKey=secret(root, 'ai-encryption-key', 16)),
         'UserPasswordConfig': dict(RequiredLength=12, RequireDigit=True, RequireUppercase=True,
                                    RequireLowercase=True, RequireNonAlphanumeric=True),

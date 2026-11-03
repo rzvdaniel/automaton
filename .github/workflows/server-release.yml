@@ -127,9 +127,9 @@ jobs:
             }
             if [[ -n "$previous" ]]; then
               # Infrastructure stays pinned across releases; changing it needs a reviewed migration.
-              grep -E '^(MYSQL|RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
+              grep -E '^(POSTGRES|RABBITMQ|TRAEFIK)_IMAGE=' previous-release/automaton-server/release.env
             else
-              resolve MYSQL_IMAGE mysql:8.4
+              resolve POSTGRES_IMAGE postgres:16
               resolve RABBITMQ_IMAGE rabbitmq:4-management
               resolve TRAEFIK_IMAGE traefik:v3
             fi

@@ -11,7 +11,7 @@ docker() {
         'context inspect --format {{.Endpoints.docker.Host}}') echo unix:///var/run/docker.sock ;;
         'info --format {{.DockerRootDir}}') echo /workloads/docker ;;
         'ps -aq') echo container ;;
-        'inspect container --format {{range .Mounts}}{{println .Source}}{{end}}') echo /database/mysql ;;
+        'inspect container --format {{range .Mounts}}{{println .Source}}{{end}}') echo /database/postgres ;;
         *) return 1 ;;
     esac
 }

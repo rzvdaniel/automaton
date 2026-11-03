@@ -65,12 +65,11 @@ echo "Stopping ${services[*]}..."
 "${compose[@]}" stop "${services[@]}"
 
 echo 'Restoring the database...'
-# Recreate the database with its existing character set and collation, so tables added after the
-# backup do not survive and the restored schema matches the backup exactly.
-"${compose[@]}" exec -T mysql sh -ec 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password); export MYSQL_PWD
-set -- $(mysql -N -u root -e "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '"'"'automaton'"'"'")
-mysql -u root -e "DROP DATABASE IF EXISTS automaton; CREATE DATABASE automaton CHARACTER SET ${1:-utf8mb4} COLLATE ${2:-utf8mb4_0900_ai_ci};"' < /dev/null
-zcat "$backup/database.sql.gz" | "${compose[@]}" exec -T mysql sh -ec 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password); export MYSQL_PWD; exec mysql -u root automaton'
+# Recreate the database, so tables added after the backup do not survive and the restored schema
+# matches the backup exactly. The dump recreates the citext extension and the application schemas.
+"${compose[@]}" exec -T postgres psql -U automaton -d postgres -v ON_ERROR_STOP=1 \
+    -c 'DROP DATABASE IF EXISTS automaton WITH (FORCE)' -c 'CREATE DATABASE automaton' < /dev/null
+"${compose[@]}" exec -T postgres pg_restore -U automaton -d automaton --exit-on-error --no-owner < "$backup/database.dump"
 
 echo 'Restoring Data Protection keys...'
 restore_keys() {

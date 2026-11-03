@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 REPO = Path(__file__).resolve().parents[2]
-IMAGES = ('API', 'WORKER', 'STUDIO', 'MYSQL', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
+IMAGES = ('API', 'WORKER', 'STUDIO', 'POSTGRES', 'RABBITMQ', 'TRAEFIK', 'RUNNER')
 APPLICATION_IMAGES = ('API', 'WORKER', 'STUDIO', 'STORE')
 
 
@@ -21,13 +21,13 @@ def manifest(app_digit, infrastructure_digit='0', store=True):
                    for name in names)
 
 
-def compose(store=True, mysql_image='mysql'):
+def compose(store=True, postgres_image='postgres'):
     # JSON is valid YAML; the fake docker prints it for `compose config --format json`.
-    services = {name: {'image': name} for name in ('mysql', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
-    services['mysql']['image'] = mysql_image
+    services = {name: {'image': name} for name in ('postgres', 'rabbitmq', 'api', 'worker', 'studio', 'traefik')}
+    services['postgres']['image'] = postgres_image
     if store:
         services['store'] = {'image': 'store'}
-    return json.dumps({'services': services, 'volumes': {'mysql-data': {}}})
+    return json.dumps({'services': services, 'volumes': {'postgres-data': {}}})
 
 
 @unittest.skipUnless(hasattr(os, 'geteuid') and os.geteuid() == 0, 'Requires root on Ubuntu; does not touch a live installation.')
@@ -103,10 +103,21 @@ elif args[0]=='compose':
         self.assertEqual((self.install / 'version').read_text().strip(), 'server-v0.1.2')
         self.assertEqual((self.install / 'release.env').read_text(), manifest('2'))
         backup, = (self.install / 'backups').iterdir()
-        for name in ('database.sql', 'config.tar.gz', 'api-keys.tar.gz', 'worker-keys.tar.gz', 'api-data.tar.gz', 'release.env', 'SHA256SUMS'):
+        for name in ('database.dump', 'config.tar.gz', 'api-keys.tar.gz', 'worker-keys.tar.gz', 'api-data.tar.gz', 'release.env', 'SHA256SUMS'):
             self.assertTrue((backup / name).is_file(), name)
         self.assertEqual((backup / 'release.env').read_text(), manifest('1', store=False))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
+
+    def test_stops_on_mysql_installation_without_changes(self):
+        legacy = manifest('1', store=False).replace('POSTGRES_IMAGE', 'MYSQL_IMAGE')
+        (self.install / 'release.env').write_text(legacy)
+        result = self.update(*self.bundle())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('still runs on MySQL', result.stderr)
+        self.assertIn('#587', result.stderr)
+        self.assertEqual((self.install / 'release.env').read_text(), legacy)
+        self.assertFalse((self.install / 'backups').exists())
+        self.assertFalse((self.install / 'backup.sh').exists())
 
     def test_adds_app_store_to_installation_without_it(self):
         log = self.root / 'docker.log'
@@ -118,7 +129,7 @@ elif args[0]=='compose':
         pull, = [args for args in calls if args[0] == 'compose' and 'pull' in args]
         self.assertEqual(sorted(up[up.index('600') + 1:]), ['api', 'store', 'studio', 'worker'])
         self.assertEqual(sorted(pull[pull.index('pull') + 1:]), ['api', 'store', 'studio', 'worker'])
-        self.assertNotIn('mysql', up)
+        self.assertNotIn('postgres', up)
         settings = json.loads((self.config / 'appsettings.Production.json').read_text())
         self.assertIn('https://store.example.invalid', settings['Cors']['AllowedOrigins'])
         edge = json.loads((self.config / 'dynamic/store.yml').read_text())
@@ -153,7 +164,7 @@ elif args[0]=='compose':
         without_worker = json.loads(compose())
         del without_worker['services']['worker']
         changed_volumes = json.loads(compose())
-        changed_volumes['volumes'] = {'mysql-data': {'external': True}}
+        changed_volumes['volumes'] = {'postgres-data': {'external': True}}
         for candidate, message in ((without_worker, 'removes a service'), (changed_volumes, 'changes Compose volumes')):
             result = self.update(*self.bundle(compose_file=json.dumps(candidate)))
             self.assertNotEqual(result.returncode, 0)
@@ -171,9 +182,9 @@ elif args[0]=='compose':
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
 
     def test_compose_infrastructure_change_preserves_installation(self):
-        result = self.update(*self.bundle(compose_file=compose(mysql_image='mysql-next')))
+        result = self.update(*self.bundle(compose_file=compose(postgres_image='postgres-next')))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('changes mysql', result.stderr)
+        self.assertIn('changes postgres', result.stderr)
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
         self.assertFalse((self.install / 'backups').exists())
 
@@ -241,11 +252,11 @@ elif args[0]=='compose':
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.install / 'release.env').read_text(), manifest('1', store=False))
         backup, = (self.install / 'backups').iterdir()
-        self.assertTrue((backup / 'database.sql').is_file())
+        self.assertTrue((backup / 'database.dump').is_file())
 
     def test_preserves_and_uses_reviewed_override_for_both_manifests(self):
         override = self.install / 'compose.override.yaml'
-        content = 'services:\n  mysql:\n    image: example.invalid/retained-mysql@sha256:' + '9' * 64 + '\n'
+        content = 'services:\n  postgres:\n    image: example.invalid/retained-postgres@sha256:' + '9' * 64 + '\n'
         override.write_text(content)
         log = self.root / 'docker.log'
         result = self.update(*self.bundle(), extra={'FAKE_DOCKER_LOG': str(log)})

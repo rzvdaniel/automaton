@@ -112,6 +112,13 @@ ensure_backups() {
     fi
     echo "Warning: nightly backups could not be enabled. Run: sudo bash $install_dir/backup.sh --install-timer" >&2
 }
+# Releases run on PostgreSQL. An installation that still runs MySQL must not be switched silently:
+# its data has to be migrated first, and the old backup and restore scripts stay in place until then.
+if grep -q '^MYSQL_IMAGE=' "$install_dir/release.env"; then
+    echo 'This installation still runs on MySQL; this release uses PostgreSQL.' >&2
+    echo 'Nothing was changed. Migrate the data to PostgreSQL first (issue #587 in the Automaton repository), then update.' >&2
+    exit 1
+fi
 if cmp -s "$bundle/release.env" "$install_dir/release.env"; then
     echo 'This release is already installed.'
     ensure_backups
@@ -126,7 +133,7 @@ python3 - "$install_dir/release.env" "$bundle/release.env" <<'PY'
 import re, sys
 def read(path):
     entries = dict(line.strip().split('=', 1) for line in open(path) if line.strip())
-    required = {'API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'}
+    required = {'API_IMAGE', 'WORKER_IMAGE', 'STUDIO_IMAGE', 'POSTGRES_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE', 'RUNNER_IMAGE'}
     # STORE_IMAGE was added after the first releases; older installed manifests do not have it.
     if set(entries) not in (required, required | {'STORE_IMAGE'}) or any(not re.fullmatch(r'[a-zA-Z0-9_./:-]+@sha256:[a-f0-9]{64}', value) for value in entries.values()):
         raise SystemExit('Invalid release image manifest.')
@@ -134,7 +141,7 @@ def read(path):
 old, new = read(sys.argv[1]), read(sys.argv[2])
 if not set(old) <= set(new):
     raise SystemExit('This release removes an image. A reviewed migration is required.')
-for name in ('MYSQL_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE'):
+for name in ('POSTGRES_IMAGE', 'RABBITMQ_IMAGE', 'TRAEFIK_IMAGE'):
     if old[name] != new[name]:
         raise SystemExit(f'{name} changed. A reviewed infrastructure migration is required.')
 PY
@@ -157,7 +164,7 @@ fi
 python3 - "$working/old-compose.json" "$working/new-compose.json" <<'PY'
 import json, sys
 old, new = (json.load(open(path)) for path in sys.argv[1:3])
-infrastructure = ('mysql', 'rabbitmq', 'traefik')
+infrastructure = ('postgres', 'rabbitmq', 'traefik')
 old_services, new_services = old.get('services', {}), new.get('services', {})
 if not set(old_services) <= set(new_services):
     raise SystemExit('This release removes a service. A reviewed migration is required.')
@@ -170,7 +177,7 @@ for section in ('volumes', 'secrets', 'networks'):
 PY
 application_services=()
 for service in $new_release_services; do
-    [[ " mysql rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
+    [[ " postgres rabbitmq traefik " == *" $service "* ]] || application_services+=("$service")
 done
 for service in $old_release_services; do
     container=$("${old_compose[@]}" ps -q "$service")
@@ -202,10 +209,10 @@ worker_container=$("${old_compose[@]}" ps -q worker)
 docker cp "$api_container:/app/data-protection-keys/." - | gzip > "$backup/api-keys.tar.gz"
 docker cp "$worker_container:/app/data-protection-keys/." - | gzip > "$backup/worker-keys.tar.gz"
 docker cp "$api_container:/app/AppData/." - | gzip > "$backup/api-data.tar.gz"
-"${old_compose[@]}" exec -T mysql sh -ec 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password); export MYSQL_PWD; exec mysqldump --single-transaction --quick --routines --triggers --events --no-tablespaces -u root automaton' > "$backup/database.sql"
-[[ -s "$backup/database.sql" ]] && tail -n 1 "$backup/database.sql" | grep -q 'Dump completed' || { echo 'Database backup did not complete.' >&2; exit 1; }
+"${old_compose[@]}" exec -T postgres pg_dump -U automaton -d automaton --format=custom --compress=6 < /dev/null > "$backup/database.dump"
+"${old_compose[@]}" exec -T postgres pg_restore --list < "$backup/database.dump" > /dev/null || { echo 'Database backup did not complete.' >&2; exit 1; }
 for archive in config api-keys worker-keys api-data; do tar -tzf "$backup/$archive.tar.gz" >/dev/null; done
-(cd "$backup" && sha256sum release.env compose.yaml .env config.tar.gz api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz database.sql > SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
+(cd "$backup" && sha256sum release.env compose.yaml .env config.tar.gz api-keys.tar.gz worker-keys.tar.gz api-data.tar.gz database.dump > SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
 if [[ -f "$override" ]]; then
     (cd "$backup" && sha256sum compose.override.yaml >> SHA256SUMS && sha256sum -c SHA256SUMS >/dev/null)
 fi

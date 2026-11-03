@@ -34,7 +34,7 @@ YAML
 compose=(docker compose -p "$project" --env-file "$bundle/release.env" -f "$bundle/compose.yaml" -f "$fixture/override.yaml")
 cleanup() { local status=$?; if (( status != 0 )); then "${compose[@]}" logs --tail 60 api worker traefik >&2; fi; "${compose[@]}" down -v --remove-orphans >/dev/null; rm -rf -- "$fixture"; }
 trap cleanup EXIT
-"${compose[@]}" up -d --wait --wait-timeout 600 mysql rabbitmq api worker studio store traefik
+"${compose[@]}" up -d --wait --wait-timeout 600 postgres rabbitmq api worker studio store traefik
 address="http://$("${compose[@]}" port api 8080)"
 https_address="$("${compose[@]}" port traefik 443)"
 curl -kfSs -H 'Host: studio.example.invalid' "https://$https_address/" | grep -q '<!doctype html>'
@@ -93,8 +93,8 @@ assert sys.argv[2] in response['installationCommand']
 assert response['requiresHostAccessAcknowledgement']
 PYRUNNER
 # The persistent completion marker prevents setup reopening after later account changes.
-"${compose[@]}" exec -T mysql sh -c 'MYSQL_PWD=$(cat /run/secrets/mysql_root_password) exec mysql -u root -N' > "$fixture/marker" <<'SQL'
-SELECT COUNT(*) FROM automaton.Settings WHERE `Key` = 'Installation.Complete';
+"${compose[@]}" exec -T postgres psql -U automaton -d automaton -At > "$fixture/marker" <<'SQL'
+SELECT COUNT(*) FROM "Settings" WHERE "Key" = 'Installation.Complete';
 SQL
 [[ "$(cat "$fixture/marker")" == 1 ]]
 echo 'Isolated installation, readiness and concurrent administrator claim passed.'
