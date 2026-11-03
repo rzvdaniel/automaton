@@ -41,11 +41,11 @@ docker compose -f docker-compose.dev.yml up -d mysql
 docker compose -f docker-compose.rabbitmq.yml up -d
 ```
 
-Configure the backend connection string:
+Configure the backend connection string. Replace `<your-MYSQL_PASSWORD>` with the `MYSQL_PASSWORD` the MySQL container starts with: set it in a local, untracked `.env` in the repo root (start from `.env.example`) before the first `docker compose up`. If you set nothing, the compose files fall back to a local-only default (see `docker-compose.mysql.yml`); never use that default on a machine reachable from a network.
 
 ```bash
 cd src/Automaton.Api
-dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=<your-MYSQL_PASSWORD>;"
 ```
 
 Apply migrations:

@@ -1,37 +1,43 @@
-# Subscription Plans — Production Setup
+# Subscription Plans (instance owners)
 
-Create these plans via **Admin → Subscription Plans** after deploying to production.
+Subscription plans let the owner of a self-hosted Automaton server set limits and capabilities for the people they open the server to: their team, their customers or their own users. If you run Automaton only for yourself, you do not need plans. Automaton does not ship preset plans or prices; you define your own.
 
-## Plans
+Manage plans in Studio under **Admin → Subscription Plans** (administrators only; API: `api/admin/subscription-plans`).
 
-| Field | Free | Starter | Pro | Business |
-|---|---|---|---|---|
-| **Name** | Free | Starter | Pro | Business |
-| **Description** | Get started for free | For indie developers | For power users & small teams | For companies |
-| **AI Budget (USD/month)** | 2.00 | 10.00 | 30.00 | 100.00 |
-| **Can Create Projects** | ❌ | ✅ | ✅ | ✅ |
-| **Can Create Organizations** | ❌ | ❌ | ✅ | ✅ |
-| **Is Default** | ✅ | ❌ | ❌ | ❌ |
-| **Sort Order** | 0 | 1 | 2 | 3 |
+## What a plan holds
 
-## Notes
-
-- **Free is the default plan** — automatically assigned to new users on registration (once user plan auto-assignment is wired up).
-- **AI budget** is enforced today: when a user exceeds their monthly limit, AI calls are downgraded to the cheapest available model.
-- **Projects / Organizations** gating is planned but not yet enforced — see `docs/plans/feature-gating.md`.
-- All plans allow unlimited self-hosted runners (no restriction).
-
-## Rationale
-
-- **$2 Free**: ~500–800 AI interactions/month with Gemini Flash Lite. Enough to evaluate and build something real, not enough to abuse.
-- **$10 Starter**: Daily use for a solo developer. Adds Projects for structured work.
-- **$30 Pro**: Heavy usage + team collaboration via Organizations.
-- **$100 Business**: High-volume teams and companies.
-
-## Future dimensions (not implemented yet)
-
-| Dimension | Notes |
+| Field | Meaning |
 |---|---|
-| Managed runner (Hetzner) | One provisioned runner per paying user — future add-on or plan perk |
-| Storage limit | Runner container data, files, databases — add `StorageLimitGb` to plan when needed |
-| Bandwidth | Not a concern — Cloudflare caches published app frontends |
+| Name, Description | Shown in the plan list and in the assignment picker. |
+| Subscription Price (USD/month) | `0` means free. A price above zero marks the plan as paid in the user-facing pricing page. |
+| Stripe Product ID, Stripe Price ID | Optional. Only needed if you charge your users through your own Stripe account. |
+| Default plan for new users | The plan assigned automatically to users created after you set it. Only one plan is the default, and only an active plan can be. |
+| Active | Inactive plans stay in the list but are hidden from user-facing pricing and checkout and cannot be picked when assigning. |
+| Sort Order | Order of plans. |
+| Capabilities | The limits below. |
+
+## Capabilities that are enforced today
+
+Scheduled actions, per user:
+
+| Setting | Default |
+|---|---|
+| Enabled | on |
+| Maximum schedules | 10 |
+| Minimum interval (seconds) | 300 |
+| Maximum concurrent executions | 1 |
+| Monthly execution limit | 5000 |
+
+Values that are zero or missing are replaced by these defaults. Administrators are not limited by plans.
+
+The capability settings are stored with the plan and are read by the API when a user creates or runs a schedule. The current Studio plan dialog does not show these fields; the API accepts them in the plan's `capabilities` object.
+
+## Assigning plans
+
+- The **User Plans** table on the same page lists users and their plan. **Assign** sets a user's plan, or clears it (None).
+- A user with no plan gets the limits of the built-in free plan record if your database has one, otherwise the defaults above.
+- Plan creation, changes and assignments are audit logged.
+
+## Not available
+
+Plans do not currently limit projects, organizations, AI spend, storage or Runners. Do not describe them to your users as if they do.

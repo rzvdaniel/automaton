@@ -16,12 +16,25 @@ Set up a local development environment with [repository development](docs/develo
 ```bash
 dotnet build Automaton.All.sln -c Debug --no-incremental -v minimal
 dotnet test src/UnitTests/Automaton.Api.Tests        # also Cli, Core, Runner, Worker, Ai, Architecture
-cd src/automaton-vue && npm ci                         # Studio tests import website config
-cd ../automaton-studio-vue && npm ci && npm test && npx vue-tsc --noEmit -p tsconfig.app.json
+npm ci --prefix src/automaton-vue                       # Studio tests import website config
+npm ci --prefix src/automaton-studio-vue
+npm test --prefix src/automaton-studio-vue
+npm exec --prefix src/automaton-studio-vue -- vue-tsc --noEmit -p src/automaton-studio-vue/tsconfig.app.json
 git diff --check
 ```
 
 Run the tests for the projects you changed. Add a test for new behaviour and, for a bug, a test that fails before the fix.
+
+## Compose files in the repository root
+
+- `docker-compose.dev.yml`: local MySQL for development (API, Worker and Studio services are included but commented out).
+- `docker-compose.mysql.yml`: standalone MySQL when you run the API on the host.
+- `docker-compose.rabbitmq.yml`: standalone RabbitMQ when you run the API and Worker on the host.
+- `docker-compose.local.yml`: the whole stack in containers for a local test, with an optional Runner.
+- `docker-compose.runtime-local.yml`: local stack with Traefik and a Runner, set up by `scripts/setup-local-development.ps1`.
+- `docker-compose.managed-local.yml`: local Traefik for managed-runtime host development (`scripts/start-managed-runtime-host-dev.ps1`).
+- `docker-compose.runner.yml`: a Runner on its own host, configured from `.env`.
+- `docker-compose.prod.yml`: the production stack (Traefik, MySQL, API, Studio, website); see the [production install guide](docs/prod/install-automaton.md).
 
 ## Propose a change
 

@@ -30,7 +30,7 @@ The self-hosted positioning is now the intended onboarding story. Remaining rele
 
 Existing Automaton already deploys and serves apps, runs Actions, routes traffic and groups account containers with resource controls. Infrastructure and Hosted Runners use the same executable, but differ in permissions, assignment, provisioning, storage and execution paths. Combining their names or registrations would leave that duplication and its security implications intact.
 
-The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes from `649761f6`, reconciled with current main by PR #391. Its reviewed head was `489a4004d5f79a72f78e5982634a7cedb3fe25e3`; it merged as `bb12bf68f36b1b271f4ebfe6986add1ad190e125`. It removed the abandoned Node implementation and retained the roadmap, repository guidance, approved Symphony cleanup and shared DbContext cleanup. It added no Runner behavior. The [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) is based on that merged source.
+The source baseline is `57941d99` plus the registration-blocking and existing-user GitHub login/account-creation fixes from `649761f6`, reconciled with current main by PR #391. Its reviewed head was `489a4004d5f79a72f78e5982634a7cedb3fe25e3`; it merged as `bb12bf68f36b1b271f4ebfe6986add1ad190e125`. It removed the abandoned Node implementation and retained the roadmap, repository guidance, approved Symphony cleanup and shared DbContext cleanup. It added no Runner behavior. The [milestone 1 implementation guide](../archive/implementation/self-hosted-milestone-1.md) is based on that merged source.
 
 The source model and EF snapshot returned to the pre-Node shape, but source changes do not reverse applied SQL. The removed migrations were `20261012183817_AddNodeEnrollmentAuthentication` and `20261013095351_AddNodeActivationPersistence`. Fresh installation does not require converting an old database. Reusing an existing database would require a separate review of its `__EFMigrationsHistory` and an explicit reuse/reset/compatibility decision; this roadmap does not provide an automatic upgrade path or authorize database changes.
 
@@ -103,7 +103,7 @@ M1/M2 implementation is merged; their broader integration acceptance remains def
 
 ### 1. One machine Runner can deploy apps and run isolated jobs
 
-The implementation PRs are merged on the reconciled source baseline from PR #391 and retain the existing control plane and durable Runner operation mechanisms. Reusing or changing an existing installation/database is separate from fresh-install development and requires an explicit operational decision. See the [milestone 1 implementation guide](../implementation/self-hosted-milestone-1.md) for source details and acceptance cases to revisit before relying on the assembled flow for other users or replacing the active Runner.
+The implementation PRs are merged on the reconciled source baseline from PR #391 and retain the existing control plane and durable Runner operation mechanisms. Reusing or changing an existing installation/database is separate from fresh-install development and requires an explicit operational decision. See the [milestone 1 implementation guide](../archive/implementation/self-hosted-milestone-1.md) for source details and acceptance cases to revisit before relying on the assembled flow for other users or replacing the active Runner.
 
 - Establish machine/workspace/app assignment and capacity ownership without allocating a per-user Hosted Runner. Preserve existing API authorization and durable operation semantics.
 - Implement a complete API-to-Runner web deployment on ext4: build or pull, create/start, health/readiness, routing, logs, stop/update and explicit persistent data.
@@ -206,7 +206,7 @@ These are later improvements, not prerequisites for M3's single-server target or
 - Smaller developer-experience improvements found while building apps, such as persisted runtime logs and real-time connections, are tracked in [enhancements](enhancements.md).
 - Self-maintenance through premade maintenance apps (off-site backups, app-data backups, alerts and cleanup) and the remaining items from the clean-server review are planned in [self-maintenance](self-maintenance.md).
 
-The broader M1/M2 acceptance remains recorded in the [M1 guide](../implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
+The broader M1/M2 acceptance remains recorded in the [M1 guide](../archive/implementation/self-hosted-milestone-1.md) and milestone summaries above. It is still needed before claiming those guarantees for broader use; it must not be expanded into an unrelated feature program or a gate on every isolated cleanup PR.
 
 ## Verification and working rules
 
