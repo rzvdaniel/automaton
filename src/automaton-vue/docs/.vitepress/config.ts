@@ -34,6 +34,7 @@ export default defineConfig({
       {
         text: 'Start Here',
         items: [
+          { text: 'Is Automaton for you?', link: '/is-automaton-for-you' },
           { text: 'Install Your Server', link: '/install-server' },
           { text: 'Build an Automaton App', link: '/build-an-automaton-app' },
           { text: 'Getting Started', link: '/getting-started' },
@@ -43,6 +44,8 @@ export default defineConfig({
           { text: 'Deploy a Runner', link: '/deploy-runner' },
           { text: 'Deploy', link: '/deploy' },
           { text: 'Publish', link: '/publish' },
+          { text: 'Current limitations', link: '/limitations' },
+          { text: 'FAQ', link: '/faq' },
         ],
       },
       {

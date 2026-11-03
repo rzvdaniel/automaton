@@ -6,7 +6,24 @@ Automaton is an open-source platform for deploying web apps, APIs and Actions on
 
 [Website](https://automaton.monster) · [Install guide](docs/prod/install-automaton.md) · [Releases](https://github.com/rzvdaniel/automaton/releases) · [App documentation](https://automaton.monster/docs/) · [Example apps](https://github.com/rzvdaniel/automaton-apps)
 
-> **Early access.** The core app lifecycle has been exercised on our production server. Clean-server acceptance and recovery testing remain limited. Plan backups and a brief interruption during server updates.
+> **Early access.** The app lifecycle runs on our own production server. Not yet proven: a restore onto a different clean server, isolation between several users of one server, and a timed install on a fresh server. There is no high availability, and apps cannot use WebSockets. Updates briefly interrupt the services, and backups stay on the same server unless you copy them. See [current limitations](https://automaton.monster/docs/limitations).
+
+## Is Automaton for you?
+
+**It fits** if you or your small team build many small apps, tools or automations with an AI coding agent and want them on servers you control, at a cost set by the servers you rent, and you are comfortable owning a Linux server.
+
+**It does not fit** if you need autoscaling, multi-region failover, live streaming connections, a hosted service to sign up for, or hosting for untrusted users.
+
+Compared with a cloud provider you gain control, data location and flat costs; you take on updates, backups and being on call, and you get no global scale. The full comparison, with pros and cons, is on [Is Automaton for you?](https://automaton.monster/docs/is-automaton-for-you). Questions: [FAQ](https://automaton.monster/docs/faq).
+
+## Quickstart
+
+1. Install the server on an Ubuntu 24.04+ host (below) and create your administrator in Studio.
+2. Add a Runner from Studio.
+3. Install the CLI, `automaton login` against your server, then `automaton new "My App"`.
+4. Ask your coding agent to build the app, then `automaton validate` and `automaton deploy`.
+
+Details follow.
 
 ## Install
 

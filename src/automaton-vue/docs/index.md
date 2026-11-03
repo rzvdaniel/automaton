@@ -9,6 +9,7 @@ Automaton is open source and self-hosted. Install your own Studio and API, or us
 
 ## Start here
 
+- [Is Automaton for you?](/is-automaton-for-you)
 - [Install your server](/install-server)
 - [Build an Automaton App](/build-an-automaton-app)
 - [Getting Started](/getting-started)
@@ -52,3 +53,5 @@ If you searched for one of these, you are in the right place:
 - [automaton.json Reference](/automaton-json)
 - [Full-Stack Todo Example](/example-todo-fullstack)
 - [Automaton CLI Reference](/automaton-cli)
+- [Current limitations](/limitations)
+- [FAQ](/faq)
