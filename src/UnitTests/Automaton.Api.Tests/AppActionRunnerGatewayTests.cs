@@ -1,7 +1,15 @@
+using Automaton.Api.Config;
+using Automaton.Api.Controllers;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
 namespace Automaton.Api.Tests;
@@ -18,12 +26,30 @@ public sealed class AppActionRunnerGatewayTests
         db.Runners.Add(new Runner { Id = runnerId, ApiKeyId = Guid.NewGuid(), Name = "offline", RunnerUsers = [] });
         await db.SaveChangesAsync();
         var gateway = new AppActionRunnerGateway(RunnerExecutionTestServices.Operations(db),
-            AppAuthorizationTestData.CreateUserContextService(Guid.NewGuid()));
+            AppAuthorizationTestData.CreateUserContextService(Guid.NewGuid()),
+            Options.Create(new HostedRunnerOptions { ActionCommandTimeoutSeconds = 1 }));
 
         var send = gateway.ListModulesAsync(runnerId, Guid.NewGuid(), Guid.NewGuid(), "work", CancellationToken.None);
         var finished = await Task.WhenAny(send, Task.Delay(TimeSpan.FromSeconds(8)));
 
         Assert.That(finished, Is.SameAs(send), "the call is still waiting for the Runner after 8 seconds");
         Assert.ThrowsAsync<TimeoutException>(async () => await send);
+        // The queued command is withdrawn, so the Runner does not run it later.
+        Assert.That((await db.RunnerExecutionOperations.SingleAsync()).CancellationRequested, Is.True);
+    }
+
+    [Test]
+    public void ATimeoutIsReportedAsServiceUnavailable()
+    {
+        var context = new ExceptionContext(
+            new ActionContext(new DefaultHttpContext(), new RouteData(), new ActionDescriptor()), [])
+        {
+            Exception = new TimeoutException("The Runner assigned to this app did not answer.")
+        };
+
+        new AppActionExceptionFilter().OnException(context);
+
+        Assert.That((context.Result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+        Assert.That(context.ExceptionHandled, Is.True);
     }
 }
